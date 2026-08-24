@@ -1,8 +1,23 @@
 {
   "name": "church-platform",
-  "private": true,
   "version": "0.1.0",
+  "private": true,
+  "description": "Backend-first foundation for the global church digital operating system.",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "foundation:check": "node scripts/check-foundation.mjs"
+    "foundation:check": "node scripts/check-foundation.mjs",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:lint": "supabase db lint --level warning",
+    "db:test": "supabase test db",
+    "db:verify": "npm run foundation:check && npm run db:reset && npm run db:lint && npm run db:test",
+    "db:types": "supabase gen types typescript --local --schema public"
+  },
+  "devDependencies": {
+    "@pgsql/parser": "1.5.0",
+    "supabase": "2.115.0"
   }
 }
