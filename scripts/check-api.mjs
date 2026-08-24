@@ -1,0 +1,78 @@
+import { access, readFile } from 'node:fs/promises';
+
+const requiredFiles = [
+  'supabase/functions/_shared/config.ts',
+  'supabase/functions/_shared/context.ts',
+  'supabase/functions/_shared/cors.ts',
+  'supabase/functions/_shared/errors.ts',
+  'supabase/functions/_shared/handler.ts',
+  'supabase/functions/_shared/logging.ts',
+  'supabase/functions/_shared/request.ts',
+  'supabase/functions/_shared/response.ts',
+  'supabase/functions/_shared/supabase.ts',
+  'supabase/functions/_shared/validation.ts',
+  'supabase/functions/login/index.ts',
+  'supabase/functions/password-recovery/index.ts',
+  'supabase/functions/profile/index.ts',
+  'supabase/functions/verify-otp/index.ts',
+  'supabase/functions/organizations/index.ts',
+  'supabase/functions/branches/index.ts',
+  'supabase/functions/memberships/index.ts',
+  'supabase/functions/roles/index.ts',
+  'supabase/functions/role-assignments/index.ts',
+  'supabase/functions/permissions/index.ts',
+  'supabase/functions/events/index.ts',
+  'supabase/functions/event-registrations/index.ts',
+  'supabase/functions/attendance/index.ts',
+  'supabase/functions/audit-log/index.ts',
+  'supabase/functions/organization-units/index.ts',
+  'supabase/functions/groups/index.ts',
+  'supabase/functions/prayer-requests/index.ts',
+  'supabase/functions/volunteers/index.ts',
+  'supabase/functions/announcements/index.ts',
+  'supabase/functions/notification-settings/index.ts',
+  'supabase/functions/conversations/index.ts',
+  'supabase/functions/notifications/index.ts',
+  'supabase/functions/notification-dispatch/index.ts',
+  'supabase/functions/membership-invitations/index.ts',
+  'supabase/functions/_shared/rate-limit.ts',
+];
+
+await Promise.all(requiredFiles.map((file) => access(file)));
+
+const handler = await readFile('supabase/functions/_shared/handler.ts', 'utf8');
+const response = await readFile('supabase/functions/_shared/response.ts', 'utf8');
+const signup = await readFile('supabase/functions/signup/index.ts', 'utf8');
+const organizationContext = await readFile('supabase/functions/organization-context/index.ts', 'utf8');
+const login = await readFile('supabase/functions/login/index.ts', 'utf8');
+const organizations = await readFile('supabase/functions/organizations/index.ts', 'utf8');
+const memberships = await readFile('supabase/functions/memberships/index.ts', 'utf8');
+const roles = await readFile('supabase/functions/roles/index.ts', 'utf8');
+const events = await readFile('supabase/functions/events/index.ts', 'utf8');
+const signupRateLimited = await readFile('supabase/functions/signup/index.ts', 'utf8');
+
+const invariants = [
+  [handler, /request\.method === "OPTIONS"/, 'CORS preflight handling'],
+  [handler, /authenticate\(request/, 'central authentication'],
+  [handler, /authorize\(auth/, 'central authorization'],
+  [handler, /api_request_failed/, 'structured failure logging'],
+  [response, /requestId/, 'request IDs in response envelopes'],
+  [response, /Cache-Control.*no-store/, 'no-store response caching'],
+  [signup, /client\.auth\.signUp/, 'Supabase Auth signup'],
+  [signup, /assertNoUnknownFields/, 'strict signup validation'],
+  [organizationContext, /effectivePermissions/, 'effective permission resolution'],
+  [login, /signInWithPassword/, 'password login workflow'],
+  [organizations, /create_organization/, 'transactional organization provisioning'],
+  [memberships, /update_membership_status/, 'protected membership lifecycle'],
+  [roles, /create_custom_role/, 'custom role administration'],
+  [events, /events\.create/, 'event authorization'],
+  [signupRateLimited, /enforceRateLimit/, 'signup rate limiting'],
+];
+
+const missing = invariants.filter(([source, pattern]) => !pattern.test(source));
+if (missing.length) {
+  console.error(`API check failed: ${missing.map(([, , label]) => label).join(', ')}`);
+  process.exitCode = 1;
+} else {
+  console.log(`API check passed (${requiredFiles.length} shared modules, ${invariants.length} invariants).`);
+}

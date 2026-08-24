@@ -7,6 +7,8 @@
     "node": ">=22"
   },
   "scripts": {
+    "api:check": "node scripts/check-api.mjs",
+    "check": "npm run foundation:check && npm run api:check",
     "foundation:check": "node scripts/check-foundation.mjs",
     "supabase:start": "supabase start",
     "supabase:stop": "supabase stop",
