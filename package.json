@@ -1,0 +1,8 @@
+{
+  "name": "church-platform",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "foundation:check": "node scripts/check-foundation.mjs"
+  }
+}
