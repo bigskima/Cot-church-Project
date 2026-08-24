@@ -1,0 +1,2 @@
+-- Core tenancy migration
+-- Source foundation migration from church-platform-foundation package.
