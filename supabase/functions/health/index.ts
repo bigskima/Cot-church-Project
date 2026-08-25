@@ -1,10 +1,14 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { json } from "../_shared/response.ts";
+import { createHandler } from "../_shared/handler.ts";
 
-Deno.serve(() => {
-  return json({
-    service: "church-platform-api",
-    status: "healthy",
-    timestamp: new Date().toISOString(),
-  });
-});
+Deno.serve(createHandler(
+  { methods: ["GET"], authentication: "none", organization: "none" },
+  () => ({
+    data: {
+      service: "church-platform-api",
+      status: "healthy",
+      version: "v1",
+      timestamp: new Date().toISOString(),
+    },
+  }),
+));
