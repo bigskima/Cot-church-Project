@@ -36,6 +36,30 @@ const requiredFiles = [
   'supabase/functions/notification-dispatch/index.ts',
   'supabase/functions/membership-invitations/index.ts',
   'supabase/functions/_shared/rate-limit.ts',
+<<<<<<< ours
+<<<<<<< ours
+=======
+=======
+>>>>>>> theirs
+  'supabase/functions/giving/index.ts',
+  'supabase/functions/finance/index.ts',
+  'supabase/functions/payment-events/index.ts',
+  'supabase/functions/live-streams/index.ts',
+  'supabase/functions/social-feed/index.ts',
+  'supabase/functions/public-content/index.ts',
+  'supabase/functions/reports/index.ts',
+  'supabase/functions/integrations/index.ts',
+  'supabase/functions/workflow-dispatch/index.ts',
+  'supabase/functions/streaming-broadcasts/index.ts',
+  'supabase/functions/streaming-webhook/index.ts',
+  'supabase/functions/streaming-recordings/index.ts',
+  'supabase/functions/stream-access/index.ts',
+  'supabase/functions/ai-gateway/index.ts',
+  'supabase/functions/ai-review/index.ts',
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
 ];
 
 await Promise.all(requiredFiles.map((file) => access(file)));
@@ -50,6 +74,16 @@ const memberships = await readFile('supabase/functions/memberships/index.ts', 'u
 const roles = await readFile('supabase/functions/roles/index.ts', 'utf8');
 const events = await readFile('supabase/functions/events/index.ts', 'utf8');
 const signupRateLimited = await readFile('supabase/functions/signup/index.ts', 'utf8');
+<<<<<<< ours
+<<<<<<< ours
+=======
+const paymentEvents = await readFile('supabase/functions/payment-events/index.ts', 'utf8');
+const publicContent = await readFile('supabase/functions/public-content/index.ts', 'utf8');
+>>>>>>> theirs
+=======
+const paymentEvents = await readFile('supabase/functions/payment-events/index.ts', 'utf8');
+const publicContent = await readFile('supabase/functions/public-content/index.ts', 'utf8');
+>>>>>>> theirs
 
 const invariants = [
   [handler, /request\.method === "OPTIONS"/, 'CORS preflight handling'],
@@ -67,6 +101,16 @@ const invariants = [
   [roles, /create_custom_role/, 'custom role administration'],
   [events, /events\.create/, 'event authorization'],
   [signupRateLimited, /enforceRateLimit/, 'signup rate limiting'],
+<<<<<<< ours
+<<<<<<< ours
+=======
+  [paymentEvents, /HMAC/, 'payment event signature validation'],
+  [publicContent, /visibility.*public/, 'public content visibility enforcement'],
+>>>>>>> theirs
+=======
+  [paymentEvents, /HMAC/, 'payment event signature validation'],
+  [publicContent, /visibility.*public/, 'public content visibility enforcement'],
+>>>>>>> theirs
 ];
 
 const missing = invariants.filter(([source, pattern]) => !pattern.test(source));

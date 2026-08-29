@@ -74,6 +74,37 @@ Authenticated endpoints require `Authorization: Bearer <access-token>`. Tenant e
 | `membership-invitations` | GET, POST, DELETE | `members.invite` | List, create, deliver, and revoke membership invitations. |
 | `membership-invitations` | PUT | Authenticated identity | Accept an invitation after verified contact matching. |
 
+<<<<<<< ours
+<<<<<<< ours
+=======
+=======
+>>>>>>> theirs
+## Giving and finance
+
+| Function | Method | Authorization | Purpose |
+| --- | --- | --- | --- |
+| `giving` | GET | Member / owner | List active campaigns, personal donations, and personal receipts. |
+| `giving` | POST | Member / `giving.campaigns.manage` | Create idempotent donation intents or campaigns. |
+| `giving` | PATCH | `giving.campaigns.manage` | Manage campaign lifecycle and targets. |
+| `finance` | GET | `giving.finance.read` | Retrieve bounded, currency-separated giving summaries. |
+| `finance` | POST | `giving.refunds.manage` | Request a concurrency-safe full or partial refund. |
+| `payment-events` | POST | Verified internal payment adapter | Idempotently normalize signed provider events, finalize donations, and issue receipts. |
+
+## Digital platform, automation, and intelligence
+
+| Function | Method | Authorization | Purpose |
+| --- | --- | --- | --- |
+| `live-streams` | GET, POST, PATCH | Member / `streams.manage` | Discover, schedule, operate, end, and archive live or recorded services. |
+| `public-content` | GET | Public | Retrieve explicitly public streams, recordings, and social posts. |
+| `social-feed` | GET, POST | Scoped member / `feed.post` | Read public, organization, branch, group, or private feeds and publish posts, comments, and reactions. |
+| `reports` | GET | `reports.read` | Retrieve bounded organization dashboards across membership, events, attendance, giving, and engagement. |
+| `integrations` | GET, POST, PATCH | `integrations.manage` | Configure external adapters using secret references rather than raw credentials. |
+| `workflow-dispatch` | POST | Worker secret | Claim, complete, retry, and dead-letter durable workflow runs. |
+
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
 ## Runtime configuration
 
 - `SUPABASE_URL`
@@ -83,5 +114,15 @@ Authenticated endpoints require `Authorization: Bearer <access-token>`. Tenant e
 - `PASSWORD_RECOVERY_REDIRECT_URL`
 - `NOTIFICATION_WORKER_SECRET`
 - `RATE_LIMIT_PEPPER`
+<<<<<<< ours
+<<<<<<< ours
+=======
+- `PAYMENT_WEBHOOK_SECRET`
+- `WORKFLOW_WORKER_SECRET`
+>>>>>>> theirs
+=======
+- `PAYMENT_WEBHOOK_SECRET`
+- `WORKFLOW_WORKER_SECRET`
+>>>>>>> theirs
 
 Secrets must be supplied by the deployment environment and must never be committed.

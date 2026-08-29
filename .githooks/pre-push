@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+node scripts/check-secrets.mjs
+rc=$?
+if [ $rc -ne 0 ]; then
+  echo "Pre-push secret check failed. Aborting push." >&2
+  exit $rc
+fi
+
+echo "Pre-push checks passed." 

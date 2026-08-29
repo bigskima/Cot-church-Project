@@ -25,3 +25,13 @@ A phase is complete only when its database constraints, RLS, transactional funct
 ### Current status
 
 Phase 1 backend scope is implemented, including verified-contact invitations, endpoint rate limiting, idempotency storage, tenant security, RBAC, audit, API contracts, and database security tests. Full execution of container-backed database tests remains a required deployment gate.
+<<<<<<< ours
+<<<<<<< ours
+=======
+
+Phase 3 backend scope now includes provider-neutral finance, receipts, refunds, reconciliation, durable domain workflows, analytics dashboards, external integration connections, live and recorded services, and a public/organization/branch/group/private social platform. Provider-specific adapters and user-facing experiences remain deployment and Phase 4 work.
+>>>>>>> theirs
+=======
+
+Phase 3 backend scope now includes provider-neutral finance, receipts, refunds, reconciliation, durable domain workflows, analytics dashboards, external integration connections, live and recorded services, and a public/organization/branch/group/private social platform. Provider-specific adapters and user-facing experiences remain deployment and Phase 4 work.
+>>>>>>> theirs

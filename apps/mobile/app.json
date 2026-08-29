@@ -1,0 +1,1 @@
+{"expo":{"name":"Church OS","slug":"church-os","scheme":"churchos","version":"1.0.0","orientation":"portrait","userInterfaceStyle":"automatic","plugins":["expo-router","expo-secure-store"],"experiments":{"typedRoutes":true},"ios":{"supportsTablet":true,"bundleIdentifier":"com.churchos.mobile"},"android":{"package":"com.churchos.mobile"}}}

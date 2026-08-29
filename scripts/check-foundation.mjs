@@ -10,6 +10,16 @@ const migrationPaths = [
   'supabase/migrations/20260824143321_volunteers_communications.sql',
   'supabase/migrations/20260824143322_messaging_notification_delivery.sql',
   'supabase/migrations/20260824143323_phase1_hardening.sql',
+<<<<<<< ours
+<<<<<<< ours
+=======
+  'supabase/migrations/20260825100000_giving_finance.sql',
+  'supabase/migrations/20260825110000_phase3_platform_intelligence.sql',
+>>>>>>> theirs
+=======
+  'supabase/migrations/20260825100000_giving_finance.sql',
+  'supabase/migrations/20260825110000_phase3_platform_intelligence.sql',
+>>>>>>> theirs
 ];
 
 const requiredPatterns = [
@@ -35,6 +45,23 @@ const requiredPatterns = [
   /create table public\.membership_invitations/i,
   /create function public\.consume_rate_limit/i,
   /create table public\.api_idempotency_keys/i,
+<<<<<<< ours
+<<<<<<< ours
+=======
+=======
+>>>>>>> theirs
+  /create table public\.payment_provider_events/i,
+  /create function public\.process_payment_result/i,
+  /create table public\.receipts/i,
+  /create table public\.live_streams/i,
+  /create table public\.social_posts/i,
+  /create function public\.claim_workflow_runs/i,
+  /create function public\.claim_integration_deliveries/i,
+  /create function public\.organization_dashboard/i,
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
 ];
 
 const source = (await Promise.all(migrationPaths.map((path) => readFile(path, 'utf8')))).join('\n');

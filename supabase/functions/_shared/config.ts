@@ -35,3 +35,20 @@ export function getNotificationWorkerSecret() {
 export function getRateLimitPepper() {
   return required("RATE_LIMIT_PEPPER");
 }
+<<<<<<< ours
+<<<<<<< ours
+=======
+=======
+>>>>>>> theirs
+
+export function getPaymentWebhookSecret() {
+  return required("PAYMENT_WEBHOOK_SECRET");
+}
+
+export function getWorkflowWorkerSecret() {
+  return required("WORKFLOW_WORKER_SECRET");
+}
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs

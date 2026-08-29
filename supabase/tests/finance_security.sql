@@ -1,0 +1,18 @@
+begin;
+select plan(14);
+select has_table('public','giving_campaigns','campaigns table exists');
+select has_table('public','donations','donations table exists');
+select has_table('public','payment_attempts','payment attempts table exists');
+select has_table('public','payment_provider_events','provider events table exists');
+select has_table('public','refunds','refunds table exists');
+select has_table('public','receipts','receipts table exists');
+select has_table('public','reconciliation_entries','reconciliation table exists');
+select ok((select relrowsecurity from pg_class where oid='public.donations'::regclass),'donation RLS enabled');
+select ok((select relrowsecurity from pg_class where oid='public.receipts'::regclass),'receipt RLS enabled');
+select has_function('public','create_donation_intent',array['uuid','uuid','uuid','bigint','text','text','text','boolean','text'],'donation intent exists');
+select has_function('public','process_payment_result',array['text','text','text','uuid','text','payment_attempt_status','jsonb','text'],'payment result processor exists');
+select has_function('public','request_donation_refund',array['uuid','bigint','text'],'refund request exists');
+select has_function('public','giving_summary',array['uuid','timestamptz','timestamptz','uuid'],'giving report exists');
+select ok(not has_function_privilege('authenticated','public.process_payment_result(text,text,text,uuid,text,public.payment_attempt_status,jsonb,text)','execute'),'clients cannot finalize payments');
+select * from finish();
+rollback;
