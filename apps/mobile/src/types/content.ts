@@ -5,6 +5,7 @@ export type MediaAssetType = 'video' | 'audio' | 'image';
 export type MediaProcessingState = 'uploading' | 'uploaded' | 'processing' | 'ready' | 'failed';
 export type MediaRenditionKind = 'video_stream' | 'video_download' | 'audio_stream' | 'audio_download' | 'thumbnail' | 'waveform';
 export type VideoCategory = 'documentary' | 'conference' | 'worship' | 'interview' | 'testimony' | 'teaching' | 'programme' | 'highlights' | 'podcast' | 'general';
+export type CollectionType = 'playlist' | 'series' | 'conference' | 'teaching' | 'worship' | 'featured';
 
 export type MediaRendition = {
   id: string;
@@ -76,6 +77,7 @@ export type SocialPost = {
   organization_id?: string;
   author_membership_id?: string;
   branch_id?: string | null;
+  expression_id?: string | null;
   group_id?: string | null;
   body: string;
   visibility: ContentVisibility;
@@ -88,6 +90,7 @@ export type SocialPost = {
 export type Reel = {
   id: string;
   organization_id: string;
+  expression_id?: string | null;
   media_asset_id: string;
   caption: string;
   audio_title?: string | null;
@@ -104,6 +107,7 @@ export type Reel = {
 export type Video = {
   id: string;
   organization_id: string;
+  expression_id?: string | null;
   media_asset_id: string;
   series_id?: string | null;
   title: string;
@@ -119,6 +123,29 @@ export type Video = {
   created_at: string;
   content_items?: ContentItem;
   media_assets?: MediaAsset;
+};
+
+export type ContentCollectionItem = {
+  content_item_id: string;
+  item_type: ContentItemType;
+  title: string;
+  display_order: number;
+};
+
+export type ContentCollection = {
+  id: string;
+  organization_id: string;
+  expression_id?: string | null;
+  title: string;
+  slug: string;
+  description: string;
+  artwork_url?: string | null;
+  collection_type: CollectionType;
+  visibility: ContentVisibility;
+  status: PublicationStatus;
+  items_count?: number;
+  items?: ContentCollectionItem[];
+  created_at: string;
 };
 
 export type Leader = {
@@ -170,6 +197,7 @@ export type LiveStream = {
   id: string;
   organization_id?: string;
   expression_id?: string | null;
+  branch_id?: string | null;
   title: string;
   description: string;
   status: 'provisioning' | 'ready' | 'scheduled' | 'live' | 'ended' | 'cancelled' | 'failed';
@@ -223,11 +251,16 @@ export type Sermon = {
   topics?: string[];
   description: string;
   transcript?: string | null;
-  audio_url?: string | null;
-  video_url?: string | null;
+  
+  // Authoritative Asset References
   audio_asset_id?: string | null;
   video_asset_id?: string | null;
+  
+  // Derived/Read-only Playback URLs
+  audio_url?: string | null;
+  video_url?: string | null;
   thumbnail_url?: string | null;
+  
   duration_seconds?: number | null;
   chapters?: { title: string; timestamp_seconds: number }[];
   status: PublicationStatus;
@@ -236,7 +269,11 @@ export type Sermon = {
   play_count?: number;
   published_at?: string;
   ai_summary?: string | null;
-  ai_study?: { summary?: string; takeaways?: string[] } | null;
+  ai_study?: {
+    summary?: string;
+    takeaways?: string[];
+    review_status?: 'draft' | 'reviewed' | 'approved' | 'rejected';
+  } | null;
 };
 
 export type GivingCampaign = {

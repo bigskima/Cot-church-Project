@@ -57,3 +57,23 @@ export interface CreateBranchRequest {
   parentBranchId?: string;
   address?: Record<string, unknown>;
 }
+
+/**
+ * Public Ministry Leadership Entity (Decoupled from Login Credentials)
+ * Note: Public leadership titles do NOT equate to security roles or RBAC capabilities.
+ */
+export interface Leader {
+  id: string;
+  organization_id: string;
+  expression_id?: string | null;
+  profile_id?: string | null;
+  name: string;
+  role_title: string;
+  biography: string;
+  avatar_url?: string | null;
+  is_founder: boolean;
+  is_historic: boolean;
+  display_order: number;
+  created_at?: string;
+  updated_at?: string;
+}

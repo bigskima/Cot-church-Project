@@ -128,7 +128,7 @@ export function LiveCard({
 }
 
 // -------------------------------------------------------------
-// SERMON CARD (With Preacher, Scripture, & Media Type)
+// SERMON CARD (With Preacher, Scripture, & Dynamic Media Formats)
 // -------------------------------------------------------------
 export function SermonCard({
   sermon,
@@ -137,6 +137,10 @@ export function SermonCard({
   sermon: Sermon;
   onPress: () => void;
 }) {
+  const hasVideo = !!sermon.video_url || !!sermon.video_asset_id;
+  const hasAudio = !!sermon.audio_url || !!sermon.audio_asset_id;
+  const formatLabel = hasVideo && hasAudio ? 'AUDIO & VIDEO' : hasVideo ? 'VIDEO' : 'AUDIO';
+
   return (
     <Pressable
       onPress={onPress}
@@ -156,7 +160,7 @@ export function SermonCard({
         )}
         <View style={styles.mediaTypePill}>
           <Text style={styles.mediaTypeText}>
-            {sermon.video_url ? 'VIDEO' : 'AUDIO'}
+            {formatLabel}
           </Text>
         </View>
       </View>
@@ -224,20 +228,26 @@ export function EventCard({
 }
 
 // -------------------------------------------------------------
-// SOCIAL POST CARD (Rich Community Feed)
+// SOCIAL POST CARD (Rich Community Feed with Media & Reactions)
 // -------------------------------------------------------------
 export function PostCard({
   post,
   onReact,
+  onOpenComments,
+  onShare,
 }: {
   post: SocialPost;
   onReact?: (reaction: string) => void;
+  onOpenComments?: () => void;
+  onShare?: () => void;
 }) {
-  const image = post.media?.find((item) => item.type === 'image');
+  const image = post.media?.find((item: any) => item.type === 'image' || item.mime_type?.startsWith('image/'));
 
   return (
     <View style={[styles.postCardContainer, shadows.sm] as any}>
-      {image && <Image source={{ uri: image.url }} style={styles.postImage} />}
+      {image && (image as any).url && (
+        <Image source={{ uri: (image as any).url }} style={styles.postImage} />
+      )}
       <View style={styles.postContent}>
         <Text style={styles.postBody}>{post.body}</Text>
         <View style={styles.postMetaRow}>
@@ -264,6 +274,15 @@ export function PostCard({
               <Text style={styles.reactionLabel}>{label}</Text>
             </Pressable>
           ))}
+          {onOpenComments && (
+            <Pressable
+              onPress={onOpenComments}
+              style={({ pressed }) => [styles.reactionButton, pressed ? styles.pressed : null] as any}
+            >
+              <Text style={styles.reactionIcon}>💬</Text>
+              <Text style={styles.reactionLabel}>Reply</Text>
+            </Pressable>
+          )}
         </View>
       </View>
     </View>

@@ -14,11 +14,12 @@ import {
   ReelCard,
   ResourceError,
   SectionHeader,
+  SermonCard,
   Skeleton,
   VideoCard,
 } from '@/components';
 import { palette, radius, shadows, spacing } from '@/design-system/tokens';
-import type { Event, LiveStream, Reel, SocialPost, Video } from '@/types/content';
+import type { Event, LiveStream, Reel, Sermon, SocialPost, Video } from '@/types/content';
 
 const publicOrganization = process.env.EXPO_PUBLIC_ORGANIZATION_ID;
 
@@ -45,6 +46,10 @@ export default function HomeScreen() {
     api.request<Video[]>(`${publicBase}${publicBase.includes('?') ? '&' : '?'}type=videos`, { signal })
   );
 
+  const sermons = useResource<Sermon[]>('home:sermons', (signal) =>
+    api.request<Sermon[]>(`${publicBase}${publicBase.includes('?') ? '&' : '?'}type=sermons`, { signal })
+  );
+
   const posts = useResource<SocialPost[]>('home:posts', (signal) =>
     api.request<SocialPost[]>(
       mode === 'authenticated' ? 'social-feed' : `${publicBase}${publicBase.includes('?') ? '&' : '?'}type=feed`,
@@ -63,6 +68,7 @@ export default function HomeScreen() {
   const activeStream = streams.data?.find((s) => s.status === 'live') ?? streams.data?.[0];
   const reelsList = reels.data ?? [];
   const videosList = videos.data ?? [];
+  const sermonsList = sermons.data ?? [];
 
   return (
     <>
@@ -224,6 +230,25 @@ export default function HomeScreen() {
                   video={item}
                   onPress={() => router.push(`/watch/${item.id}` as any)}
                   dark={isDark}
+                />
+              ))}
+            </View>
+          ) : null}
+
+          {/* Latest Sermons Teaching Section */}
+          {sermonsList.length > 0 ? (
+            <View style={styles.sectionWrapper as any}>
+              <SectionHeader
+                title="Latest Ministry Sermons"
+                actionLabel="All Sermons"
+                onAction={() => router.push('/(tabs)/discover')}
+                dark={isDark}
+              />
+              {sermonsList.slice(0, 2).map((sermon) => (
+                <SermonCard
+                  key={sermon.id}
+                  sermon={sermon}
+                  onPress={() => router.push(`/(tabs)/discover/sermon/${sermon.id}` as any)}
                 />
               ))}
             </View>

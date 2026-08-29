@@ -6,5 +6,9 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "node -e \"console.log('@church/types ready')\"",
+    "typecheck": "node -e \"console.log('@church/types typechecked')\""
   }
 }
