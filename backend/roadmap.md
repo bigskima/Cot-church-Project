@@ -4,7 +4,7 @@ This is the single delivery structure for the Global Church Digital Operating Sy
 
 ## Phase 1 — Platform and Security Core
 
-Architecture, PostgreSQL tenancy, Edge API runtime, validation, authentication, identity, organizations, branches, membership, invitations, dynamic RBAC, audit, shared contracts, security controls, and foundational tests.
+Architecture, PostgreSQL tenancy, Edge API runtime, validation, authentication, identity, organizations, branches/expressions, membership, invitations, dynamic RBAC, audit, shared contracts, security controls, and foundational tests.
 
 ## Phase 2 — Church Operations and Engagement
 
@@ -16,7 +16,7 @@ Giving campaigns, donations, provider-neutral payments, webhooks, refunds, recei
 
 ## Phase 4 — Applications and Production
 
-Expo mobile application, administration web platform, offline synchronization, device push experience, accessibility, end-to-end testing, observability, CI/CD, infrastructure, performance, retention, backup/restore, disaster recovery, and production hardening.
+Expo mobile application with role-aware Leadership Hub, Platform Governance Administration web platform, offline synchronization, device push experience, accessibility, end-to-end testing, observability, CI/CD, infrastructure, performance, retention, backup/restore, disaster recovery, and production hardening.
 
 ## Completion rule
 
@@ -24,14 +24,4 @@ A phase is complete only when its database constraints, RLS, transactional funct
 
 ### Current status
 
-Phase 1 backend scope is implemented, including verified-contact invitations, endpoint rate limiting, idempotency storage, tenant security, RBAC, audit, API contracts, and database security tests. Full execution of container-backed database tests remains a required deployment gate.
-<<<<<<< ours
-<<<<<<< ours
-=======
-
-Phase 3 backend scope now includes provider-neutral finance, receipts, refunds, reconciliation, durable domain workflows, analytics dashboards, external integration connections, live and recorded services, and a public/organization/branch/group/private social platform. Provider-specific adapters and user-facing experiences remain deployment and Phase 4 work.
->>>>>>> theirs
-=======
-
-Phase 3 backend scope now includes provider-neutral finance, receipts, refunds, reconciliation, durable domain workflows, analytics dashboards, external integration connections, live and recorded services, and a public/organization/branch/group/private social platform. Provider-specific adapters and user-facing experiences remain deployment and Phase 4 work.
->>>>>>> theirs
+Phase 1-3 backend scopes are implemented, including verified-contact invitations, endpoint rate limiting, idempotency storage, tenant security, RBAC, audit, API contracts, provider-neutral finance, receipts, refunds, reconciliation, durable domain workflows, analytics dashboards, external integration connections, live and recorded services, provider adapters for streaming (Mux) and AI (OpenAI, Gemini, Anthropic), and public/organization/expression social platform. Applications are undergoing full production role-aware and governance alignment.

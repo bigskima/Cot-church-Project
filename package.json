@@ -8,37 +8,27 @@
   ],
   "description": "Backend-first foundation for the global church digital operating system.",
   "engines": {
-    {
-      "name": "church-platform",
-      "version": "0.1.0",
-      "private": true,
-      "workspaces": [
-        "apps/*",
-        "packages/*"
-      ],
-      "description": "Backend-first foundation for the global church digital operating system.",
-      "engines": {
-        "node": ">=22"
-      },
-      "scripts": {
-        "api:check": "node scripts/check-api.mjs",
-        "admin:build": "npm --workspace @church/admin run build",
-        "admin:typecheck": "npm --workspace @church/admin run typecheck",
-        "mobile:typecheck": "npm --workspace @church/mobile run typecheck",
-        "apps:check": "node scripts/check-apps.mjs",
-        "check": "npm run foundation:check && npm run api:check && npm run apps:check && npm run services:check",
-        "foundation:check": "node scripts/check-foundation.mjs",
-        "supabase:start": "supabase start",
-        "supabase:stop": "supabase stop",
-        "db:reset": "supabase db reset",
-        "db:lint": "supabase db lint --level warning",
-        "db:test": "supabase test db",
-        "db:verify": "npm run foundation:check && npm run db:reset && npm run db:lint && npm run db:test",
-        "db:types": "supabase gen types typescript --local --schema public",
-        "services:check": "node scripts/check-production-services.mjs"
-      },
-      "devDependencies": {
-        "@pgsql/parser": "1.5.0",
-        "supabase": "2.115.0"
-      }
-    }
+    "node": ">=20"
+  },
+  "scripts": {
+    "api:check": "node scripts/check-api.mjs",
+    "admin:build": "npm --workspace @church/admin run build",
+    "admin:typecheck": "npm --workspace @church/admin run typecheck",
+    "mobile:typecheck": "npm --workspace @church/mobile run typecheck",
+    "apps:check": "node scripts/check-apps.mjs",
+    "check": "npm run foundation:check && npm run api:check && npm run apps:check && npm run services:check",
+    "foundation:check": "node scripts/check-foundation.mjs",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:lint": "supabase db lint --level warning",
+    "db:test": "supabase test db",
+    "db:verify": "npm run foundation:check && npm run db:reset && npm run db:lint && npm run db:test",
+    "db:types": "supabase gen types typescript --local --schema public",
+    "services:check": "node scripts/check-production-services.mjs"
+  },
+  "devDependencies": {
+    "@pgsql/parser": "1.5.0",
+    "supabase": "2.115.0"
+  }
+}

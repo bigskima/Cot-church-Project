@@ -30,9 +30,9 @@ Authenticated endpoints require `Authorization: Bearer <access-token>`. Tenant e
 | `organizations` | GET | Required | List available organizations or read selected organization. |
 | `organizations` | POST | Required | Transactionally provision an organization and owner access. |
 | `organizations` | PATCH | Required + `organizations.update` | Update selected organization configuration. |
-| `branches` | GET | Required membership | List branches in the selected organization. |
-| `branches` | POST | Required + `branches.create` | Create a tenant-safe branch. |
-| `branches` | PATCH | Required + `branches.update` | Update the branch selected by the `id` query parameter. |
+| `branches` | GET | Required membership | List branches/expressions in the selected organization. |
+| `branches` | POST | Required + `branches.create` | Create a tenant-safe branch/expression. |
+| `branches` | PATCH | Required + `branches.update` | Update the branch/expression selected by the `id` query parameter. |
 
 ## Membership and permissions
 
@@ -74,11 +74,6 @@ Authenticated endpoints require `Authorization: Bearer <access-token>`. Tenant e
 | `membership-invitations` | GET, POST, DELETE | `members.invite` | List, create, deliver, and revoke membership invitations. |
 | `membership-invitations` | PUT | Authenticated identity | Accept an invitation after verified contact matching. |
 
-<<<<<<< ours
-<<<<<<< ours
-=======
-=======
->>>>>>> theirs
 ## Giving and finance
 
 | Function | Method | Authorization | Purpose |
@@ -100,11 +95,13 @@ Authenticated endpoints require `Authorization: Bearer <access-token>`. Tenant e
 | `reports` | GET | `reports.read` | Retrieve bounded organization dashboards across membership, events, attendance, giving, and engagement. |
 | `integrations` | GET, POST, PATCH | `integrations.manage` | Configure external adapters using secret references rather than raw credentials. |
 | `workflow-dispatch` | POST | Worker secret | Claim, complete, retry, and dead-letter durable workflow runs. |
+| `streaming-broadcasts` | POST, PATCH | `streams.broadcast` | Provision ingest endpoints via configured provider adapter and control live broadcasts. |
+| `streaming-webhook` | POST | Public webhook (signed) | Normalize and ingest provider webhooks idempotently. |
+| `streaming-recordings` | GET, POST | `streams.recordings.manage` | Manage replay assets, create clips, and persist metadata. |
+| `stream-access` | POST | Active membership / Permitted | Request signed playback grants and establish viewer sessions. |
+| `ai-gateway` | POST | `ai.use` | Execute capability-routed prompts with fallback and budget enforcement. |
+| `ai-review` | GET, POST | `ai.review` | Review, approve, or reject human-in-the-loop AI drafts. |
 
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
 ## Runtime configuration
 
 - `SUPABASE_URL`
@@ -114,15 +111,7 @@ Authenticated endpoints require `Authorization: Bearer <access-token>`. Tenant e
 - `PASSWORD_RECOVERY_REDIRECT_URL`
 - `NOTIFICATION_WORKER_SECRET`
 - `RATE_LIMIT_PEPPER`
-<<<<<<< ours
-<<<<<<< ours
-=======
 - `PAYMENT_WEBHOOK_SECRET`
 - `WORKFLOW_WORKER_SECRET`
->>>>>>> theirs
-=======
-- `PAYMENT_WEBHOOK_SECRET`
-- `WORKFLOW_WORKER_SECRET`
->>>>>>> theirs
 
 Secrets must be supplied by the deployment environment and must never be committed.

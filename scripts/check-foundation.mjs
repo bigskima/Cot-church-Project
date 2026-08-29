@@ -10,16 +10,12 @@ const migrationPaths = [
   'supabase/migrations/20260824143321_volunteers_communications.sql',
   'supabase/migrations/20260824143322_messaging_notification_delivery.sql',
   'supabase/migrations/20260824143323_phase1_hardening.sql',
-<<<<<<< ours
-<<<<<<< ours
-=======
   'supabase/migrations/20260825100000_giving_finance.sql',
   'supabase/migrations/20260825110000_phase3_platform_intelligence.sql',
->>>>>>> theirs
-=======
-  'supabase/migrations/20260825100000_giving_finance.sql',
-  'supabase/migrations/20260825110000_phase3_platform_intelligence.sql',
->>>>>>> theirs
+  'supabase/migrations/20260825120000_live_community_experience.sql',
+  'supabase/migrations/20260826100000_production_streaming.sql',
+  'supabase/migrations/20260826110000_ai_gateway.sql',
+  'supabase/migrations/20260827100000_sermons_media.sql',
 ];
 
 const requiredPatterns = [
@@ -45,11 +41,6 @@ const requiredPatterns = [
   /create table public\.membership_invitations/i,
   /create function public\.consume_rate_limit/i,
   /create table public\.api_idempotency_keys/i,
-<<<<<<< ours
-<<<<<<< ours
-=======
-=======
->>>>>>> theirs
   /create table public\.payment_provider_events/i,
   /create function public\.process_payment_result/i,
   /create table public\.receipts/i,
@@ -58,10 +49,8 @@ const requiredPatterns = [
   /create function public\.claim_workflow_runs/i,
   /create function public\.claim_integration_deliveries/i,
   /create function public\.organization_dashboard/i,
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
+  /create table public\.sermons/i,
+  /create function public\.convert_recording_to_sermon/i,
 ];
 
 const source = (await Promise.all(migrationPaths.map((path) => readFile(path, 'utf8')))).join('\n');
