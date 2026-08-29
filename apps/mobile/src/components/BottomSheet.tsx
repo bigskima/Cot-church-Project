@@ -32,8 +32,8 @@ export function BottomSheet({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <Pressable style={styles.backdrop} onPress={onClose} />
-        <View style={[styles.sheetContainer, shadows.lg]}>
+        <Pressable style={styles.backdrop as any} onPress={onClose} />
+        <View style={[styles.sheetContainer, shadows.lg] as any}>
           <View style={styles.handleBar} />
           {title && (
             <View style={styles.header}>
@@ -53,11 +53,11 @@ export function BottomSheet({
   );
 }
 
-const styles = StyleSheet.create({
+const styles: Record<string, any> = StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: '#00000088',
+    backgroundColor: 'rgba(20, 12, 7, 0.75)',
   },
   backdrop: {
     flex: 1,
@@ -66,34 +66,36 @@ const styles = StyleSheet.create({
     backgroundColor: palette.surface,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
-    paddingTop: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: 40,
     maxHeight: '85%',
+    paddingBottom: spacing.xl,
   },
   handleBar: {
-    width: 44,
+    width: 42,
     height: 5,
+    backgroundColor: '#E8D5C4',
     borderRadius: radius.pill,
-    backgroundColor: palette.line,
     alignSelf: 'center',
-    marginBottom: spacing.md,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
   },
   header: {
-    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8D5C4',
   },
   title: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '900',
-    color: palette.ink,
+    color: '#26140A',
     letterSpacing: -0.3,
   },
   subtitle: {
-    fontSize: 14,
-    color: palette.muted,
+    fontSize: 12,
+    color: '#8C6549',
     marginTop: 2,
   },
   contentContainer: {
-    paddingBottom: spacing.lg,
+    padding: spacing.lg,
   },
 });

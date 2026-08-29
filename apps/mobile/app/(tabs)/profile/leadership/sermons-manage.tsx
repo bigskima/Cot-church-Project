@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSession } from '@/state/session';
+import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import {
   Badge,
@@ -17,6 +18,7 @@ import type { Sermon } from '@/types/content';
 
 export default function SermonsManageScreen() {
   const { api } = useSession();
+  const { colors, isDark } = useTheme();
   const [title, setTitle] = useState('');
   const [preacher, setPreacher] = useState('');
   const [scripture, setScripture] = useState('');
@@ -61,23 +63,36 @@ export default function SermonsManageScreen() {
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={[styles.screen, { backgroundColor: colors.bg }]}
+      contentContainerStyle={styles.content}
+    >
       <ScreenHeader
         title="Sermons & Media Publishing"
         subtitle="Review recorded message drafts, assign scripture topics, and publish sermons to members."
         showBack
+        dark={isDark}
       />
 
       <View style={styles.body}>
         {/* Publish Sermon Card */}
-        <View style={[styles.card, shadows.md]}>
-          <Text style={styles.cardHeaderTitle}>PUBLISH NEW SERMON MESSAGE</Text>
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: colors.card, borderColor: colors.border },
+            shadows.md,
+          ] as any}
+        >
+          <Text style={[styles.cardHeaderTitle, { color: colors.textMuted }] as any}>
+            PUBLISH NEW SERMON MESSAGE
+          </Text>
 
           <InputField
             label="Sermon Title"
             value={title}
             onChangeText={setTitle}
             placeholder="e.g. Walking in Divine Alignment"
+            dark={isDark}
           />
 
           <InputField
@@ -85,6 +100,7 @@ export default function SermonsManageScreen() {
             value={preacher}
             onChangeText={setPreacher}
             placeholder="e.g. Pastor David"
+            dark={isDark}
           />
 
           <InputField
@@ -92,6 +108,7 @@ export default function SermonsManageScreen() {
             value={scripture}
             onChangeText={setScripture}
             placeholder="e.g. Proverbs 3:5-6, Romans 8:28"
+            dark={isDark}
           />
 
           <InputField
@@ -101,6 +118,7 @@ export default function SermonsManageScreen() {
             placeholder="Key sermon outline and spiritual summary..."
             multiline
             numberOfLines={3}
+            dark={isDark}
           />
 
           {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
@@ -111,33 +129,47 @@ export default function SermonsManageScreen() {
             variant="gold"
             size="lg"
             loading={creating}
-            style={{ marginTop: spacing.md }}
+            style={{ marginTop: spacing.md } as any}
           />
         </View>
 
         {/* Existing Sermons List */}
-        <SectionHeader title="Published Sermons Library" badge={sermons.data?.length ?? 0} />
+        <SectionHeader
+          title="Published Sermons Library"
+          badge={sermons.data?.length ?? 0}
+          dark={isDark}
+        />
         {sermons.loading ? (
-          <Skeleton height={100} count={2} />
+          <Skeleton height={100} count={2} dark={isDark} />
         ) : sermons.error && !sermons.data ? (
           <ResourceError
             offline={sermons.offline}
             message={sermons.error}
             retry={sermons.refresh}
+            dark={isDark}
           />
         ) : sermons.data && sermons.data.length > 0 ? (
           sermons.data.map((sermon) => (
-            <View key={sermon.id} style={[styles.sermonCard, shadows.sm]}>
+            <View
+              key={sermon.id}
+              style={[
+                styles.sermonCard,
+                { backgroundColor: colors.card, borderColor: colors.border },
+                shadows.sm,
+              ] as any}
+            >
               <View style={styles.sermonHeader}>
                 <Badge label={sermon.status.toUpperCase()} variant="success" />
-                <Text style={styles.sermonDate}>
+                <Text style={[styles.sermonDate, { color: colors.textMuted }] as any}>
                   {new Date(sermon.sermon_date || Date.now()).toLocaleDateString()}
                 </Text>
               </View>
-              <Text style={styles.sermonTitle}>{sermon.title}</Text>
-              <Text style={styles.sermonPreacher}>Speaker: {sermon.preacher}</Text>
+              <Text style={[styles.sermonTitle, { color: colors.text }] as any}>{sermon.title}</Text>
+              <Text style={[styles.sermonPreacher, { color: colors.primaryDark }] as any}>
+                Speaker: {sermon.preacher}
+              </Text>
               {sermon.scripture_references && sermon.scripture_references.length > 0 && (
-                <Text style={styles.sermonScripture}>
+                <Text style={[styles.sermonScripture, { color: colors.textMuted }] as any}>
                   📖 {sermon.scripture_references.join(', ')}
                 </Text>
               )}
@@ -148,6 +180,7 @@ export default function SermonsManageScreen() {
             title="No Sermons Published"
             message="Publish sermons above or convert recorded broadcasts into messages."
             icon="📖"
+            dark={isDark}
           />
         )}
       </View>
@@ -155,10 +188,9 @@ export default function SermonsManageScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles: Record<string, any> = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: palette.cream,
   },
   content: {
     paddingBottom: 120,
@@ -167,15 +199,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   card: {
-    backgroundColor: palette.surface,
     borderRadius: radius.xl,
     padding: spacing.lg,
     marginTop: spacing.sm,
+    borderWidth: 1,
   },
   cardHeaderTitle: {
     fontSize: 11,
     fontWeight: '900',
-    color: palette.muted,
     letterSpacing: 0.8,
     marginBottom: spacing.md,
   },
@@ -186,10 +217,10 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   sermonCard: {
-    backgroundColor: palette.surface,
     padding: spacing.md,
     borderRadius: radius.lg,
     marginBottom: spacing.sm,
+    borderWidth: 1,
   },
   sermonHeader: {
     flexDirection: 'row',
@@ -199,22 +230,18 @@ const styles = StyleSheet.create({
   },
   sermonDate: {
     fontSize: 11,
-    color: palette.muted,
   },
   sermonTitle: {
     fontSize: 16,
     fontWeight: '900',
-    color: palette.ink,
   },
   sermonPreacher: {
     fontSize: 12,
-    color: palette.navy,
     fontWeight: '700',
     marginTop: 2,
   },
   sermonScripture: {
     fontSize: 12,
-    color: palette.muted,
     marginTop: 4,
   },
 });

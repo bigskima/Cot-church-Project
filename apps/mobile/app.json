@@ -1,1 +1,42 @@
-{"expo":{"name":"Church OS","slug":"church-os","scheme":"churchos","version":"1.0.0","orientation":"portrait","userInterfaceStyle":"automatic","plugins":["expo-router","expo-secure-store"],"experiments":{"typedRoutes":true},"ios":{"supportsTablet":true,"bundleIdentifier":"com.churchos.mobile"},"android":{"package":"com.churchos.mobile"}}}
+{
+  "expo": {
+    "name": "Church Digital Platform",
+    "slug": "church-platform",
+    "scheme": "churchos",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#091733"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#091733",
+          "image": "./assets/splash.png",
+          "imageWidth": 240
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.churchos.mobile"
+    },
+    "android": {
+      "package": "com.churchos.mobile",
+      "splash": {
+        "backgroundColor": "#091733",
+        "resizeMode": "contain",
+        "image": "./assets/splash.png"
+      }
+    }
+  }
+}

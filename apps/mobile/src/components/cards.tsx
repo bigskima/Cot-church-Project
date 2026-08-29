@@ -30,15 +30,15 @@ export function HeroLiveCard({
       style={({ pressed }) => [
         styles.heroCardContainer,
         shadows.lg,
-        pressed && styles.pressed,
-      ]}
+        pressed ? styles.pressed : null,
+      ] as any}
     >
       <ImageBackground
         source={stream.thumbnail_url ? { uri: stream.thumbnail_url } : undefined}
         style={styles.heroBackground}
       >
         <LinearGradient
-          colors={['#0713291A', '#071329B3', '#071329F5']}
+          colors={['#140C071A', '#140C07B3', '#140C07F5']}
           style={styles.heroGradient}
         >
           <View style={styles.heroTopRow}>
@@ -97,15 +97,15 @@ export function LiveCard({
       style={({ pressed }) => [
         styles.liveCardContainer,
         shadows.md,
-        pressed && styles.pressed,
-      ]}
+        pressed ? styles.pressed : null,
+      ] as any}
     >
       <ImageBackground
         source={stream.thumbnail_url ? { uri: stream.thumbnail_url } : undefined}
         style={styles.cardBackground}
       >
         <LinearGradient
-          colors={['#07132910', '#071329CC']}
+          colors={['#140C0710', '#140C07CC']}
           style={styles.cardGradient}
         >
           <Badge
@@ -143,8 +143,8 @@ export function SermonCard({
       style={({ pressed }) => [
         styles.sermonCardContainer,
         shadows.sm,
-        pressed && styles.pressed,
-      ]}
+        pressed ? styles.pressed : null,
+      ] as any}
     >
       <View style={styles.sermonMediaPreview}>
         {sermon.thumbnail_url ? (
@@ -196,8 +196,8 @@ export function EventCard({
       style={({ pressed }) => [
         styles.eventCardContainer,
         shadows.sm,
-        pressed && styles.pressed,
-      ]}
+        pressed ? styles.pressed : null,
+      ] as any}
     >
       <View style={styles.dateTile}>
         <Text style={styles.dateMonth}>
@@ -236,7 +236,7 @@ export function PostCard({
   const image = post.media?.find((item) => item.type === 'image');
 
   return (
-    <View style={[styles.postCardContainer, shadows.sm]}>
+    <View style={[styles.postCardContainer, shadows.sm] as any}>
       {image && <Image source={{ uri: image.url }} style={styles.postImage} />}
       <View style={styles.postContent}>
         <Text style={styles.postBody}>{post.body}</Text>
@@ -258,7 +258,7 @@ export function PostCard({
             <Pressable
               key={value}
               onPress={() => onReact?.(value)}
-              style={({ pressed }) => [styles.reactionButton, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.reactionButton, pressed ? styles.pressed : null] as any}
             >
               <Text style={styles.reactionIcon}>{icon}</Text>
               <Text style={styles.reactionLabel}>{label}</Text>
@@ -281,7 +281,7 @@ export function PrayerCard({
   onPray?: () => void;
 }) {
   return (
-    <View style={[styles.prayerCardContainer, shadows.sm]}>
+    <View style={[styles.prayerCardContainer, shadows.sm] as any}>
       <View style={styles.prayerTopRow}>
         <Badge
           label={prayer.status.toUpperCase()}
@@ -304,7 +304,7 @@ export function PrayerCard({
         {onPray && (
           <Pressable
             onPress={onPray}
-            style={({ pressed }) => [styles.prayNowButton, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.prayNowButton, pressed ? styles.pressed : null] as any}
           >
             <Text style={styles.prayNowText}>🙏 Stand in Agreement</Text>
           </Pressable>
@@ -336,8 +336,8 @@ export function LeadershipModuleCard({
       style={({ pressed }) => [
         styles.leadModuleContainer,
         shadows.sm,
-        pressed && styles.pressed,
-      ]}
+        pressed ? styles.pressed : null,
+      ] as any}
     >
       <View style={styles.leadIconTile}>
         <Text style={styles.leadIcon}>{icon}</Text>
@@ -372,11 +372,11 @@ export function AIButton({ onPress }: { onPress: () => void }) {
       style={({ pressed }) => [
         styles.aiButton,
         shadows.glowGold,
-        pressed && styles.pressed,
-      ]}
+        pressed ? styles.pressed : null,
+      ] as any}
     >
       <LinearGradient
-        colors={['#F3D27E', '#E7BB4D', '#C79A2B']}
+        colors={['#FDE047', '#F59E0B', '#B45309']}
         style={styles.aiButtonGradient}
       >
         <Text style={styles.aiButtonIcon}>✦</Text>
@@ -385,7 +385,7 @@ export function AIButton({ onPress }: { onPress: () => void }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles: Record<string, any> = StyleSheet.create({
   pressed: {
     opacity: 0.88,
     transform: [{ scale: 0.98 }],
@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
     overflow: 'hidden',
     marginBottom: spacing.lg,
-    backgroundColor: palette.midnight,
+    backgroundColor: '#140C07',
   },
   heroBackground: {
     flex: 1,
@@ -412,13 +412,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   visibilityBadge: {
-    backgroundColor: '#FFFFFF26',
+    backgroundColor: 'rgba(255, 253, 249, 0.2)',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: radius.pill,
   },
   visibilityText: {
-    color: palette.white,
+    color: '#FFFDF9',
     fontSize: 11,
     fontWeight: '800',
   },
@@ -428,11 +428,11 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 24,
     fontWeight: '900',
-    color: palette.white,
+    color: '#FFFDF9',
     letterSpacing: -0.5,
   },
   heroDescription: {
-    color: '#D4DBE8',
+    color: '#E6CCB2',
     fontSize: 13,
     marginTop: 4,
     lineHeight: 18,
@@ -441,14 +441,14 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   heroCtaButton: {
-    backgroundColor: palette.gold,
+    backgroundColor: palette.yellow,
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: radius.pill,
     alignSelf: 'flex-start',
   },
   heroCtaText: {
-    color: palette.midnight,
+    color: '#140C07',
     fontWeight: '900',
     fontSize: 13,
   },
@@ -458,7 +458,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     overflow: 'hidden',
     marginRight: spacing.md,
-    backgroundColor: palette.navy,
+    backgroundColor: '#22140C',
   },
   cardBackground: {
     flex: 1,
@@ -471,10 +471,10 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 18,
     fontWeight: '900',
-    color: palette.white,
+    color: '#FFFDF9',
   },
   cardSubtitle: {
-    color: '#B6C0D0',
+    color: '#E6CCB2',
     fontSize: 12,
     marginTop: 4,
   },
@@ -491,7 +491,7 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: radius.md,
     overflow: 'hidden',
-    backgroundColor: palette.navy,
+    backgroundColor: '#22140C',
     position: 'relative',
   },
   sermonThumbnail: {
@@ -502,17 +502,17 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: palette.navy,
+    backgroundColor: '#2E1C11',
   },
   sermonIcon: {
     fontSize: 24,
-    color: palette.gold,
+    color: palette.yellow,
   },
   mediaTypePill: {
     position: 'absolute',
     bottom: 4,
     right: 4,
-    backgroundColor: '#000000B3',
+    backgroundColor: 'rgba(20, 12, 7, 0.75)',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: radius.xs,
@@ -520,7 +520,7 @@ const styles = StyleSheet.create({
   mediaTypeText: {
     fontSize: 9,
     fontWeight: '900',
-    color: palette.white,
+    color: '#FFFDF9',
   },
   sermonContent: {
     flex: 1,
@@ -530,17 +530,17 @@ const styles = StyleSheet.create({
   sermonSeries: {
     fontSize: 11,
     fontWeight: '800',
-    color: palette.goldDark,
+    color: palette.yellowDark,
     marginBottom: 2,
   },
   sermonTitle: {
     fontSize: 16,
     fontWeight: '900',
-    color: palette.ink,
+    color: '#26140A',
   },
   sermonPreacher: {
     fontSize: 12,
-    color: palette.muted,
+    color: '#8C6549',
     marginTop: 4,
   },
   eventCardContainer: {
@@ -556,18 +556,18 @@ const styles = StyleSheet.create({
     height: 60,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F8EDCE',
+    backgroundColor: '#FEF3C7',
     borderRadius: radius.md,
   },
   dateMonth: {
-    color: palette.navy,
+    color: '#78350F',
     fontSize: 10,
     fontWeight: '900',
   },
   dateDay: {
     fontSize: 24,
     fontWeight: '900',
-    color: palette.navy,
+    color: '#78350F',
     lineHeight: 28,
   },
   eventDetails: {
@@ -577,15 +577,15 @@ const styles = StyleSheet.create({
   eventTitle: {
     fontSize: 16,
     fontWeight: '900',
-    color: palette.ink,
+    color: '#26140A',
   },
   eventMeta: {
-    color: palette.muted,
+    color: '#8C6549',
     fontSize: 12,
     marginTop: 4,
   },
   onlineBadge: {
-    backgroundColor: '#EBF3FE',
+    backgroundColor: '#FEF3C7',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: radius.pill,
@@ -595,7 +595,7 @@ const styles = StyleSheet.create({
   onlineBadgeText: {
     fontSize: 10,
     fontWeight: '800',
-    color: palette.blue,
+    color: '#B45309',
   },
   postCardContainer: {
     backgroundColor: palette.surface,
@@ -613,7 +613,7 @@ const styles = StyleSheet.create({
   postBody: {
     fontSize: 15,
     lineHeight: 23,
-    color: palette.ink,
+    color: '#26140A',
   },
   postMetaRow: {
     flexDirection: 'row',
@@ -621,15 +621,15 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     paddingBottom: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: palette.line,
+    borderBottomColor: '#E8D5C4',
   },
   postDate: {
     fontSize: 12,
-    color: palette.muted,
+    color: '#8C6549',
   },
   postReactionsCount: {
     fontSize: 12,
-    color: palette.muted,
+    color: '#8C6549',
     fontWeight: '600',
   },
   reactionBar: {
@@ -650,7 +650,7 @@ const styles = StyleSheet.create({
   reactionLabel: {
     fontSize: 13,
     fontWeight: '800',
-    color: palette.inkSecondary,
+    color: '#5C3D28',
   },
   prayerCardContainer: {
     backgroundColor: palette.surface,
@@ -672,11 +672,11 @@ const styles = StyleSheet.create({
   prayerTitle: {
     fontSize: 17,
     fontWeight: '900',
-    color: palette.ink,
+    color: '#26140A',
   },
   prayerDescription: {
     fontSize: 14,
-    color: palette.inkSecondary,
+    color: '#5C3D28',
     lineHeight: 20,
     marginTop: 4,
   },
@@ -687,14 +687,14 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     paddingTop: spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: palette.line,
+    borderTopColor: '#E8D5C4',
   },
   prayerAuthor: {
     fontSize: 12,
-    color: palette.muted,
+    color: '#8C6549',
   },
   prayNowButton: {
-    backgroundColor: '#F2EFFB',
+    backgroundColor: '#F3E8FF',
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: radius.pill,
@@ -716,7 +716,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: radius.md,
-    backgroundColor: palette.surfaceSubtle,
+    backgroundColor: '#F1E3D3',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -734,10 +734,10 @@ const styles = StyleSheet.create({
   leadTitle: {
     fontSize: 16,
     fontWeight: '900',
-    color: palette.ink,
+    color: '#26140A',
   },
   leadBadge: {
-    backgroundColor: palette.gold,
+    backgroundColor: palette.yellow,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: radius.pill,
@@ -746,17 +746,17 @@ const styles = StyleSheet.create({
   leadBadgeText: {
     fontSize: 10,
     fontWeight: '900',
-    color: palette.midnight,
+    color: '#140C07',
   },
   leadDescription: {
     fontSize: 13,
-    color: palette.muted,
+    color: '#8C6549',
     marginTop: 2,
   },
   leadChevron: {
     fontSize: 22,
     fontWeight: '700',
-    color: palette.mutedLight,
+    color: '#A68A75',
     marginLeft: spacing.sm,
   },
   aiButton: {
@@ -775,7 +775,195 @@ const styles = StyleSheet.create({
   },
   aiButtonIcon: {
     fontSize: 26,
-    color: palette.midnight,
+    color: '#140C07',
     fontWeight: '900',
   },
+  leaderCard: {
+    borderWidth: 1,
+    marginBottom: spacing.md,
+  },
+  leaderHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  avatarFallback: {
+    backgroundColor: palette.yellow,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarFallbackText: {
+    fontWeight: '900',
+    color: '#140C07',
+  },
+  leaderName: {
+    fontWeight: '900',
+  },
+  founderBadge: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  founderBadgeText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#92400E',
+  },
+  leaderRoleText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: palette.yellowDark,
+    marginTop: 2,
+  },
+  leaderMinistryText: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  leaderBioText: {
+    fontSize: 13,
+    marginTop: 12,
+    lineHeight: 18,
+  },
 });
+
+// -------------------------------------------------------------
+// LEADER CARD (Reusable domain component for Church & Expression leadership)
+// -------------------------------------------------------------
+export function LeaderCard({
+  leader,
+  name,
+  roleTitle,
+  biography,
+  variant = 'standard',
+  dark = false,
+  onPress,
+}: {
+  leader?: {
+    id?: string;
+    display_name?: string;
+    role_title?: string;
+    ministry?: string | null;
+    short_bio?: string | null;
+    portrait_url?: string | null;
+    is_founder?: boolean;
+    is_featured_public?: boolean;
+  };
+  name?: string;
+  roleTitle?: string;
+  biography?: string;
+  variant?: 'standard' | 'featured' | 'compact' | 'founder';
+  dark?: boolean;
+  onPress?: () => void;
+}) {
+  const isCompact = variant === 'compact';
+  const isFeatured = variant === 'featured' || variant === 'founder';
+  const avatarSize = isCompact ? 46 : isFeatured ? 68 : 58;
+
+  const displayName = leader?.display_name ?? name ?? 'Leader';
+  const role = leader?.role_title ?? roleTitle ?? 'Pastor';
+  const bio = leader?.short_bio ?? biography ?? null;
+  const isFounder = variant === 'founder' || leader?.is_founder;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      style={[
+        styles.leaderCard,
+        {
+          backgroundColor: dark ? '#22140C' : '#FFFDF9',
+          borderColor: dark ? '#452A1A' : '#E8D5C4',
+          borderRadius: isCompact ? radius.md : radius.xl,
+          padding: isCompact ? spacing.md : spacing.lg,
+        },
+      ] as any}
+    >
+      <View style={styles.leaderHeaderRow}>
+        {leader?.portrait_url ? (
+          <Image
+            source={{ uri: leader.portrait_url }}
+            style={{
+              width: avatarSize,
+              height: avatarSize,
+              borderRadius: avatarSize / 2,
+            }}
+          />
+        ) : (
+          <View
+            style={[
+              styles.avatarFallback,
+              {
+                width: avatarSize,
+                height: avatarSize,
+                borderRadius: avatarSize / 2,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.avatarFallbackText,
+                { fontSize: isCompact ? 18 : 24 },
+              ]}
+            >
+              {displayName ? displayName[0] : 'L'}
+            </Text>
+          </View>
+        )}
+
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <Text
+              style={[
+                styles.leaderName,
+                {
+                  fontSize: isCompact ? 15 : 17,
+                  color: dark ? '#FFFDF9' : '#26140A',
+                },
+              ]}
+            >
+              {displayName}
+            </Text>
+            {isFounder ? (
+              <View style={styles.founderBadge}>
+                <Text style={styles.founderBadgeText}>FOUNDER</Text>
+              </View>
+            ) : null}
+          </View>
+
+          <Text
+            style={[
+              styles.leaderRole,
+              { color: dark ? palette.yellow : '#8C430B' },
+            ]}
+          >
+            {role}
+          </Text>
+
+          {leader?.ministry ? (
+            <Text
+              style={[
+                styles.leaderMinistry,
+                { color: dark ? '#C9B5A3' : '#6B4226' },
+              ]}
+            >
+              ✦ {leader.ministry}
+            </Text>
+          ) : null}
+        </View>
+      </View>
+
+      {bio ? (
+        <Text
+          style={[
+            styles.leaderBio,
+            { color: dark ? '#E6D7CB' : '#422415' },
+          ]}
+          numberOfLines={isCompact ? 2 : 4}
+        >
+          {bio}
+        </Text>
+      ) : null}
+    </Pressable>
+  );
+}

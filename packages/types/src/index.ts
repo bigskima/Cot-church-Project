@@ -13,3 +13,4 @@ export * from "./organizations";
 export * from "./permissions";
 export * from "./platform";
 export * from "./media";
+export * from "./branding";

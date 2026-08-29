@@ -1,32 +1,34 @@
 import React, { useEffect, useState } from 'react';
 import type { ApiClient, AuthState } from '../api';
+import { Badge } from './ui';
 import { PlatformOverview } from '../pages/PlatformOverview';
 import { OrganizationsGovernance } from '../pages/OrganizationsGovernance';
 import { ExpressionsGovernance } from '../pages/ExpressionsGovernance';
 import { UserGovernance } from '../pages/UserGovernance';
+import { BrandingAppearance } from '../pages/BrandingAppearance';
 import { StreamingInfrastructure } from '../pages/StreamingInfrastructure';
 import { AiInfrastructure } from '../pages/AiInfrastructure';
 import { PaymentInfrastructure } from '../pages/PaymentInfrastructure';
 import { FeatureFlags } from '../pages/FeatureFlags';
 import { IntegrationsJobs } from '../pages/IntegrationsJobs';
 import { AuditSecurity } from '../pages/AuditSecurity';
-import { Badge, Button } from './ui';
 
 const navSections = [
   {
-    group: 'Ecosystem Governance',
+    group: 'Platform Ecosystem',
     items: [
-      { key: 'overview', label: 'Platform Overview', icon: '⌂' },
-      { key: 'organizations', label: 'Organisations', icon: '🏛' },
-      { key: 'expressions', label: 'Expressions', icon: '🌐' },
-      { key: 'users', label: 'User Governance', icon: '👥' },
-      { key: 'features', label: 'Feature Flags', icon: '⚑' },
+      { key: 'overview', label: 'Platform Telemetry', icon: '📊' },
+      { key: 'organizations', label: 'Church Organizations', icon: '🏛' },
+      { key: 'expressions', label: 'Expression Campuses', icon: '🌿' },
+      { key: 'users', label: 'Global Identities', icon: '👥' },
+      { key: 'branding', label: 'Branding & Identity', icon: '🎨' },
+      { key: 'features', label: 'Tenant Feature Flags', icon: '⚑' },
     ],
   },
   {
-    group: 'Infrastructure & Safety',
+    group: 'Provider Infrastructure',
     items: [
-      { key: 'streaming', label: 'Streaming Infrastructure', icon: '📡' },
+      { key: 'streaming', label: 'Video Broadcast Adapter', icon: '📡' },
       { key: 'ai', label: 'AI Gateway & Models', icon: '✦' },
       { key: 'payments', label: 'Payment Gateways', icon: '💳' },
       { key: 'integrations', label: 'Jobs & Webhooks', icon: '⚡' },
@@ -46,6 +48,15 @@ export function Shell({
 }) {
   const [page, setPage] = useState<string>('overview');
   const [loading, setLoading] = useState(!auth.organizationId);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
 
   useEffect(() => {
     if (auth.organizationId) return;
@@ -76,6 +87,8 @@ export function Shell({
         return <ExpressionsGovernance api={api} />;
       case 'users':
         return <UserGovernance api={api} />;
+      case 'branding':
+        return <BrandingAppearance api={api} />;
       case 'streaming':
         return <StreamingInfrastructure api={api} />;
       case 'ai':
@@ -162,6 +175,18 @@ export function Shell({
           </div>
 
           <div className="admin-topbar-right">
+            {/* Theme Toggle Button */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="admin-btn-secondary admin-btn-sm"
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+              title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}
+            >
+              <span>{theme === 'dark' ? '☀️' : '🌙'}</span>
+              <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+            </button>
+
             <div className="admin-system-health-pill">
               <span className="pulse-live-dot" />
               <span>All Systems Operational</span>

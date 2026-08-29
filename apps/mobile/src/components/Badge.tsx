@@ -53,20 +53,27 @@ export function Badge({ label, variant = 'neutral', pulse = false, icon }: Badge
   };
 
   return (
-    <View style={[styles.base, getContainerStyle()]}>
-      {pulse && <View style={[styles.pulseDot, { backgroundColor: variant === 'live' ? palette.white : palette.gold }]} />}
+    <View style={[styles.base, getContainerStyle()] as any}>
+      {pulse && (
+        <View
+          style={[
+            styles.pulseDot,
+            { backgroundColor: variant === 'live' ? '#FFFFFF' : '#F59E0B' },
+          ]}
+        />
+      )}
       {icon && <View style={styles.iconContainer}>{icon}</View>}
-      <Text style={[styles.text, getTextStyle()]}>{label}</Text>
+      <Text style={[styles.text, getTextStyle()] as any}>{label}</Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const styles: Record<string, any> = StyleSheet.create({
   base: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: radius.pill,
     alignSelf: 'flex-start',
   },
@@ -74,61 +81,71 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    marginRight: 6,
+    marginRight: 5,
   },
   iconContainer: {
     marginRight: 4,
   },
   text: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '900',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
     textTransform: 'uppercase',
   },
   live: {
-    backgroundColor: palette.live,
+    backgroundColor: 'rgba(239, 68, 68, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.4)',
   },
   liveText: {
-    color: palette.white,
+    color: '#EF4444',
   },
   gold: {
-    backgroundColor: '#FBF2DA',
+    backgroundColor: '#FEF3C7',
     borderWidth: 1,
-    borderColor: '#F3D27E',
+    borderColor: '#F59E0B',
   },
   goldText: {
-    color: palette.goldDark,
+    color: '#B45309',
   },
   success: {
-    backgroundColor: '#E8F5EE',
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.35)',
   },
   successText: {
-    color: palette.success,
+    color: '#10B981',
   },
   prayer: {
-    backgroundColor: '#F2EFFB',
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.35)',
   },
   prayerText: {
-    color: palette.prayer,
+    color: '#8B5CF6',
   },
   giving: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
   },
   givingText: {
-    color: palette.giving,
+    color: '#92400E',
+  },
+  neutral: {
+    backgroundColor: '#F1E3D3',
+    borderWidth: 1,
+    borderColor: '#E8D5C4',
+  },
+  neutralText: {
+    color: '#5C3D28',
   },
   outline: {
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: palette.glassBorderDark,
+    borderColor: '#E8D5C4',
   },
   outlineText: {
-    color: palette.mutedLight,
-  },
-  neutral: {
-    backgroundColor: palette.surfaceSubtle,
-  },
-  neutralText: {
-    color: palette.inkSecondary,
+    color: '#78350F',
   },
 });

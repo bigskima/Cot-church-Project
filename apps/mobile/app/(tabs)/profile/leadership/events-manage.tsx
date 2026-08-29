@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSession } from '@/state/session';
+import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import {
   Badge,
@@ -17,6 +18,7 @@ import type { Event } from '@/types/content';
 
 export default function EventsManageScreen() {
   const { api } = useSession();
+  const { colors, isDark } = useTheme();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [locationName, setLocationName] = useState('Main Sanctuary & Online');
@@ -59,23 +61,36 @@ export default function EventsManageScreen() {
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={[styles.screen, { backgroundColor: colors.bg }]}
+      contentContainerStyle={styles.content}
+    >
       <ScreenHeader
         title="Events & Gatherings Coordinator"
         subtitle="Schedule sanctuary worship services, configure attendance limits, and track registrations."
         showBack
+        dark={isDark}
       />
 
       <View style={styles.body}>
         {/* Create Event Card */}
-        <View style={[styles.card, shadows.md]}>
-          <Text style={styles.cardHeaderTitle}>SCHEDULE NEW GATHERING</Text>
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: colors.card, borderColor: colors.border },
+            shadows.md,
+          ] as any}
+        >
+          <Text style={[styles.cardHeaderTitle, { color: colors.textMuted }] as any}>
+            SCHEDULE NEW GATHERING
+          </Text>
 
           <InputField
             label="Gathering Title"
             value={title}
             onChangeText={setTitle}
             placeholder="e.g. Midweek Revival Service, Leaders Encounter..."
+            dark={isDark}
           />
 
           <InputField
@@ -83,6 +98,7 @@ export default function EventsManageScreen() {
             value={locationName}
             onChangeText={setLocationName}
             placeholder="e.g. Main Auditorium / Hybrid Online"
+            dark={isDark}
           />
 
           <InputField
@@ -91,6 +107,7 @@ export default function EventsManageScreen() {
             onChangeText={setCapacity}
             keyboardType="numeric"
             placeholder="e.g. 250"
+            dark={isDark}
           />
 
           <InputField
@@ -100,6 +117,7 @@ export default function EventsManageScreen() {
             placeholder="Keynote speakers, worship team, notes..."
             multiline
             numberOfLines={3}
+            dark={isDark}
           />
 
           {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
@@ -110,34 +128,53 @@ export default function EventsManageScreen() {
             variant="gold"
             size="lg"
             loading={creating}
-            style={{ marginTop: spacing.md }}
+            style={{ marginTop: spacing.md } as any}
           />
         </View>
 
         {/* Existing Events List */}
-        <SectionHeader title="Active Church Gatherings" badge={events.data?.length ?? 0} />
+        <SectionHeader
+          title="Active Church Gatherings"
+          badge={events.data?.length ?? 0}
+          dark={isDark}
+        />
         {events.loading ? (
-          <Skeleton height={100} count={2} />
+          <Skeleton height={100} count={2} dark={isDark} />
         ) : events.error && !events.data ? (
           <ResourceError
             offline={events.offline}
             message={events.error}
             retry={events.refresh}
+            dark={isDark}
           />
         ) : events.data && events.data.length > 0 ? (
           events.data.map((event) => {
             const date = new Date(event.starts_at);
             return (
-              <View key={event.id} style={[styles.eventCard, shadows.sm]}>
-                <View style={styles.dateBlock}>
-                  <Text style={styles.dateMonth}>
+              <View
+                key={event.id}
+                style={[
+                  styles.eventCard,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                  shadows.sm,
+                ] as any}
+              >
+                <View
+                  style={[
+                    styles.dateBlock,
+                    { backgroundColor: isDark ? '#2E1C11' : '#F1E3D3' },
+                  ] as any}
+                >
+                  <Text style={[styles.dateMonth, { color: colors.primaryDark }] as any}>
                     {date.toLocaleString(undefined, { month: 'short' }).toUpperCase()}
                   </Text>
-                  <Text style={styles.dateDay}>{date.getDate()}</Text>
+                  <Text style={[styles.dateDay, { color: colors.primaryDark }] as any}>
+                    {date.getDate()}
+                  </Text>
                 </View>
                 <View style={styles.eventInfo}>
-                  <Text style={styles.eventTitle}>{event.title}</Text>
-                  <Text style={styles.eventMeta}>
+                  <Text style={[styles.eventTitle, { color: colors.text }] as any}>{event.title}</Text>
+                  <Text style={[styles.eventMeta, { color: colors.textMuted }] as any}>
                     {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {event.location?.name ?? 'Main Sanctuary'}
                   </Text>
                   <View style={styles.badgeRow}>
@@ -152,6 +189,7 @@ export default function EventsManageScreen() {
             title="No Gatherings Scheduled"
             message="Schedule upcoming worship services and conferences above."
             icon="🗓️"
+            dark={isDark}
           />
         )}
       </View>
@@ -159,10 +197,9 @@ export default function EventsManageScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles: Record<string, any> = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: palette.cream,
   },
   content: {
     paddingBottom: 120,
@@ -171,15 +208,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   card: {
-    backgroundColor: palette.surface,
     borderRadius: radius.xl,
     padding: spacing.lg,
     marginTop: spacing.sm,
+    borderWidth: 1,
   },
   cardHeaderTitle: {
     fontSize: 11,
     fontWeight: '900',
-    color: palette.muted,
     letterSpacing: 0.8,
     marginBottom: spacing.md,
   },
@@ -192,15 +228,14 @@ const styles = StyleSheet.create({
   eventCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: palette.surface,
     padding: spacing.md,
     borderRadius: radius.lg,
     marginBottom: spacing.sm,
+    borderWidth: 1,
   },
   dateBlock: {
     width: 54,
     height: 54,
-    backgroundColor: '#F8EDCE',
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
@@ -208,12 +243,10 @@ const styles = StyleSheet.create({
   dateMonth: {
     fontSize: 10,
     fontWeight: '900',
-    color: palette.navy,
   },
   dateDay: {
     fontSize: 20,
     fontWeight: '900',
-    color: palette.navy,
   },
   eventInfo: {
     flex: 1,
@@ -222,11 +255,9 @@ const styles = StyleSheet.create({
   eventTitle: {
     fontSize: 15,
     fontWeight: '900',
-    color: palette.ink,
   },
   eventMeta: {
     fontSize: 12,
-    color: palette.muted,
     marginTop: 2,
   },
   badgeRow: {

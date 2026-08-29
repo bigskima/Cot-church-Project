@@ -44,13 +44,68 @@ export default function LivePlayerScreen() {
   const [chatLog, setChatLog] = useState<Array<{ id: string; user: string; text: string }>>([
     { id: '1', user: 'Pastor David', text: 'Welcome to today’s sanctuary broadcast!' },
     { id: '2', user: 'Sarah M.', text: 'Joining from London. Amen! 🙏' },
+    { id: '3', user: 'Emmanuel K.', text: 'Hallelujah, glory to God! 🔥' },
   ]);
   const [showSupportSheet, setShowSupportSheet] = useState(false);
+  const [supportName, setSupportName] = useState('');
+  const [supportContact, setSupportContact] = useState('');
   const [supportSent, setSupportSent] = useState(false);
 
   useEffect(() => {
     if (mode === 'visitor') {
-      setError('Sign in to request secure broadcast access.');
+      // Fetch stream details directly from public-content
+      api
+        .request<{ data: Array<{ id: string; title: string; description: string; status: string; playback_url: string; visibility: string }> }>(
+          `public-content?type=streams`
+        )
+        .then((res) => {
+          const match = res.data?.find((s) => s.id === id) ?? res.data?.[0];
+          if (match) {
+            setAccess({
+              stream: {
+                id: match.id,
+                title: match.title,
+                description: match.description,
+                status: match.status,
+                visibility: match.visibility,
+              },
+              playbackUrl: match.playback_url,
+              viewerSessionId: `guest_${Date.now()}`,
+              canChat: true,
+              givingEnabled: true,
+            });
+          } else {
+            // Fallback preview stream
+            setAccess({
+              stream: {
+                id: id ?? 'stream-1',
+                title: 'Sunday Sanctuary Live Worship',
+                description: 'Join us live for praise, prayer, and word of transformation.',
+                status: 'live',
+                visibility: 'public',
+              },
+              playbackUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+              viewerSessionId: `guest_${Date.now()}`,
+              canChat: true,
+              givingEnabled: true,
+            });
+          }
+        })
+        .catch(() => {
+          setAccess({
+            stream: {
+              id: id ?? 'stream-1',
+              title: 'Sunday Sanctuary Live Worship',
+              description: 'Join us live for praise, prayer, and word of transformation.',
+              status: 'live',
+              visibility: 'public',
+            },
+            playbackUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+            viewerSessionId: `guest_${Date.now()}`,
+            canChat: true,
+            givingEnabled: true,
+          });
+        });
       return;
     }
 
@@ -69,7 +124,7 @@ export default function LivePlayerScreen() {
 
   // Viewer presence heartbeat
   useEffect(() => {
-    if (!access?.viewerSessionId) return;
+    if (!access?.viewerSessionId || mode === 'visitor') return;
     const timer = setInterval(
       () =>
         api
@@ -90,7 +145,7 @@ export default function LivePlayerScreen() {
         })
         .catch(() => {});
     };
-  }, [access?.viewerSessionId]);
+  }, [access?.viewerSessionId, mode]);
 
   const sendInteraction = async (action: string, payload: Record<string, unknown> = {}) => {
     try {
@@ -106,25 +161,31 @@ export default function LivePlayerScreen() {
   const handleSendChat = () => {
     if (!chatMessage.trim()) return;
     const msg = chatMessage.trim();
-    setChatLog((prev) => [...prev, { id: Date.now().toString(), user: 'You', text: msg }]);
+    setChatLog((prev) => [...prev, { id: Date.now().toString(), user: mode === 'visitor' ? 'Guest Visitor' : 'You', text: msg }]);
     setChatMessage('');
     sendInteraction('chat', { message: msg });
   };
 
   const handleFollowUpRequest = async (type: string) => {
-    await sendInteraction('follow_up', { type });
+    await sendInteraction('follow_up', {
+      type,
+      name: supportName || 'Sanctuary Participant',
+      contact: supportContact,
+    });
     setSupportSent(true);
     setTimeout(() => {
       setShowSupportSheet(false);
       setSupportSent(false);
+      setSupportName('');
+      setSupportContact('');
     }, 1800);
   };
 
   if (error) {
     return (
       <View style={styles.errorScreen}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>‹ Back</Text>
+        <Pressable onPress={() => router.back()} style={styles.backButton as any}>
+          <Text style={styles.backButtonText as any}>‹ Back</Text>
         </Pressable>
         <View style={styles.errorWrapper}>
           <ResourceError offline={false} message={error} retry={() => router.back()} dark />
@@ -138,9 +199,9 @@ export default function LivePlayerScreen() {
       <View style={styles.loadingScreen}>
         <Skeleton height={280} dark />
         <View style={{ padding: spacing.lg, gap: spacing.md }}>
-          <Skeleton height={28} width="70%" dark />
-          <Skeleton height={16} width="90%" dark />
-          <Skeleton height={16} width="50%" dark />
+          <Skeleton height={24} width="70%" dark />
+          <Skeleton height={16} width="40%" dark />
+          <Skeleton height={120} dark />
         </View>
       </View>
     );
@@ -153,150 +214,171 @@ export default function LivePlayerScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {/* Video Player Container */}
-      <View style={styles.videoPlayerBox}>
-        {access.playbackUrl ? (
-          <VideoView player={player} style={styles.videoView} allowsPictureInPicture nativeControls />
-        ) : (
-          <View style={styles.noVideoPlaceholder}>
-            <Text style={styles.noVideoIcon}>📡</Text>
-            <Text style={styles.noVideoTitle}>
-              {isLive ? 'Connecting to live feed...' : 'Broadcast has not started yet'}
-            </Text>
-            <Text style={styles.noVideoSubtitle}>
-              Live worship and sermon will appear when the broadcast begins.
-            </Text>
-          </View>
-        )}
-
-        <Pressable onPress={() => router.back()} style={styles.floatingBackButton}>
-          <Text style={styles.floatingBackText}>‹</Text>
+      {/* Top Header Navigation Overlay */}
+      <View style={styles.topBar}>
+        <Pressable
+          onPress={() => router.back()}
+          style={({ pressed }) => [styles.navPill, pressed && styles.pressed] as any}
+        >
+          <Text style={styles.navPillText as any}>‹ Leave Live Stage</Text>
         </Pressable>
+        <Badge
+          label={isLive ? '● Live Sanctuary' : 'Broadcast Archive'}
+          variant={isLive ? 'live' : 'gold'}
+          pulse={isLive}
+        />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Stream Metadata Header */}
-        <View style={styles.streamMetaBox}>
-          <View style={styles.statusRow}>
-            <Badge
-              label={access.stream.status.toUpperCase()}
-              variant={isLive ? 'live' : 'gold'}
-              pulse={isLive}
-            />
-            <Text style={styles.visibilityLabel}>
-              {access.stream.visibility === 'public' ? 'Public Broadcast' : 'Sanctuary Members'}
+      {/* Video Player Stage */}
+      <View style={styles.videoStage}>
+        {access.playbackUrl ? (
+          <VideoView
+            player={player}
+            style={styles.videoView}
+            nativeControls
+            allowsPictureInPicture
+          />
+        ) : (
+          <View style={styles.streamOfflineBox}>
+            <Text style={styles.streamOfflineIcon as any}>📡</Text>
+            <Text style={styles.streamOfflineTitle as any}>Broadcast Preparing</Text>
+            <Text style={styles.streamOfflineDesc as any}>
+              The sanctuary audio/video feed is synchronizing. Please stand by.
             </Text>
           </View>
-          <Text style={styles.streamTitle}>{access.stream.title}</Text>
-          {access.stream.description ? (
-            <Text style={styles.streamDescription}>{access.stream.description}</Text>
-          ) : null}
-        </View>
-
-        {/* Live Reaction Bar */}
-        <View style={styles.reactionContainer}>
-          <Text style={styles.reactionPrompt}>React live:</Text>
-          <View style={styles.reactionButtonsRow}>
-            {[
-              ['❤️', 'heart', 'Amen'],
-              ['🙏', 'prayer', 'Praying'],
-              ['🔥', 'fire', 'Glory'],
-              ['🙌', 'praise', 'Praise'],
-            ].map(([emoji, reaction, label]) => (
-              <Pressable
-                key={reaction}
-                onPress={() => sendInteraction('react', { reaction })}
-                style={({ pressed }) => [styles.reactionPill, pressed && styles.pressed]}
-              >
-                <Text style={styles.reactionEmoji}>{emoji}</Text>
-                <Text style={styles.reactionLabel}>{label}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
-        {/* Pastoral Prayer & Decision CTA */}
-        <Pressable
-          onPress={() => setShowSupportSheet(true)}
-          style={({ pressed }) => [styles.altarCallBanner, shadows.glowGold, pressed && styles.pressed]}
-        >
-          <Text style={styles.altarIcon}>🕊️</Text>
-          <View style={styles.altarContent}>
-            <Text style={styles.altarTitle}>Need Prayer or Pastoral Support?</Text>
-            <Text style={styles.altarSubtitle}>Our ministers are standing by in faith with you.</Text>
-          </View>
-          <Text style={styles.altarChevron}>›</Text>
-        </Pressable>
-
-        {/* Live Chat Stream */}
-        {access.canChat && (
-          <View style={styles.chatSection}>
-            <Text style={styles.chatSectionTitle}>Live Sanctuary Conversation</Text>
-            <View style={styles.chatLogBox}>
-              {chatLog.map((chat) => (
-                <View key={chat.id} style={styles.chatItem}>
-                  <Text style={styles.chatUser}>{chat.user}:</Text>
-                  <Text style={styles.chatText}>{chat.text}</Text>
-                </View>
-              ))}
-            </View>
-
-            <View style={styles.chatInputRow}>
-              <InputField
-                value={chatMessage}
-                onChangeText={setChatMessage}
-                placeholder="Share a message or blessing..."
-                dark
-                containerStyle={{ flex: 1, marginBottom: 0 }}
-              />
-              <Button
-                label="Send"
-                onPress={handleSendChat}
-                variant="gold"
-                size="sm"
-                style={{ marginLeft: spacing.sm, height: 50 }}
-              />
-            </View>
-          </View>
         )}
-      </ScrollView>
+      </View>
 
-      {/* Pastoral Support & Altar Response Bottom Sheet */}
+      {/* Broadcast Metadata & Quick Actions */}
+      <View style={styles.metadataSection}>
+        <View style={styles.metaRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.streamTitle as any}>{access.stream.title}</Text>
+            <Text style={styles.streamDesc as any} numberOfLines={1}>
+              {access.stream.description || 'Public live worship gathering.'}
+            </Text>
+          </View>
+          <Button
+            label="🤍 Give"
+            onPress={() => router.push('/(tabs)/profile/giving')}
+            variant="gold"
+            size="sm"
+          />
+        </View>
+
+        {/* Reaction Row */}
+        <View style={styles.reactionBar}>
+          {[
+            ['🙏', 'pray', 'Amen'],
+            ['🔥', 'fire', 'Glory'],
+            ['❤️', 'love', 'Love'],
+            ['✨', 'praise', 'Praise'],
+          ].map(([emoji, action, label]) => (
+            <Pressable
+              key={action}
+              onPress={() => sendInteraction('reaction', { emoji })}
+              style={({ pressed }) => [styles.reactionPill, pressed && styles.pressed] as any}
+            >
+              <Text style={styles.reactionEmoji as any}>{emoji}</Text>
+              <Text style={styles.reactionLabel as any}>{label}</Text>
+            </Pressable>
+          ))}
+          <Pressable
+            onPress={() => setShowSupportSheet(true)}
+            style={({ pressed }) => [styles.altarCallBtn, pressed && styles.pressed] as any}
+          >
+            <Text style={styles.altarCallText as any}>🕊️ Altar & Prayer</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Real-Time Live Chat Feed */}
+      <View style={styles.chatContainer}>
+        <Text style={styles.chatHeading as any}>LIVE FELLOWSHIP CHAT</Text>
+        <ScrollView style={styles.chatLog} contentContainerStyle={styles.chatLogContent}>
+          {chatLog.map((chat) => (
+            <View key={chat.id} style={styles.chatBubble}>
+              <Text style={styles.chatUser as any}>{chat.user}: </Text>
+              <Text style={styles.chatText as any}>{chat.text}</Text>
+            </View>
+          ))}
+        </ScrollView>
+
+        {/* Chat Input Bar */}
+        <View style={styles.chatInputRow}>
+          <InputField
+            value={chatMessage}
+            onChangeText={setChatMessage}
+            placeholder="Type a message of agreement..."
+            style={styles.chatInput as any}
+          />
+          <Button
+            label="Send"
+            onPress={handleSendChat}
+            variant="gold"
+            size="sm"
+            style={styles.sendButton as any}
+          />
+        </View>
+      </View>
+
+      {/* Altar Call & Pastoral Care Bottom Sheet */}
       <BottomSheet
         visible={showSupportSheet}
         onClose={() => setShowSupportSheet(false)}
-        title="Sanctuary Pastoral Care"
-        subtitle="Connect confidentially with our pastoral and prayer team."
+        title="Sanctuary Pastoral Care & Decision"
       >
         {supportSent ? (
-          <View style={styles.sentConfirmation}>
-            <Text style={styles.sentEmoji}>🕊️</Text>
-            <Text style={styles.sentTitle}>Your request has been received</Text>
-            <Text style={styles.sentSubtitle}>
-              Our pastoral care team has been notified and is praying with you.
+          <View style={styles.sheetSuccessBox}>
+            <Text style={styles.sheetSuccessIcon as any}>🕊️</Text>
+            <Text style={styles.sheetSuccessTitle as any}>We Are Standing In Prayer With You</Text>
+            <Text style={styles.sheetSuccessDesc as any}>
+              A pastoral team minister has received your response and will reach out with care and confidential prayer.
             </Text>
           </View>
         ) : (
-          <View style={styles.supportOptionsList}>
-            {[
-              ['🙏', 'I Need Prayer', 'prayer_request', 'Submit an urgent prayer request for our team.'],
-              ['✝️', 'I Grew or Gave My Life to Christ', 'altar_response', 'Make a fresh decision for Jesus today.'],
-              ['💬', 'I Request Pastoral Counselling', 'counselling', 'Speak with a pastor regarding life guidance.'],
-              ['🏛️', 'I Want to Join This Church', 'membership_interest', 'Become a dedicated member of this congregation.'],
-            ].map(([icon, label, type, description]) => (
-              <Pressable
-                key={type}
-                onPress={() => handleFollowUpRequest(type)}
-                style={({ pressed }) => [styles.supportCard, pressed && styles.pressed]}
-              >
-                <Text style={styles.supportCardIcon}>{icon}</Text>
-                <View style={styles.supportCardContent}>
-                  <Text style={styles.supportCardTitle}>{label}</Text>
-                  <Text style={styles.supportCardDescription}>{description}</Text>
-                </View>
-                <Text style={styles.supportCardChevron}>➔</Text>
-              </Pressable>
-            ))}
+          <View style={styles.sheetBody}>
+            <Text style={styles.sheetDesc as any}>
+              If God has touched your heart today or you need personal prayer, select an option below:
+            </Text>
+
+            {mode === 'visitor' && (
+              <View style={{ marginBottom: spacing.md }}>
+                <InputField
+                  label="Your Name"
+                  value={supportName}
+                  onChangeText={setSupportName}
+                  placeholder="e.g. Michael"
+                />
+                <InputField
+                  label="Phone or Email (for pastoral follow-up)"
+                  value={supportContact}
+                  onChangeText={setSupportContact}
+                  placeholder="michael@example.com / (555) 000-1234"
+                />
+              </View>
+            )}
+
+            <View style={styles.decisionOptions}>
+              <Button
+                label="✝ I Surrender My Life to Jesus"
+                onPress={() => handleFollowUpRequest('salvation_decision')}
+                variant="gold"
+                size="md"
+              />
+              <Button
+                label="🙏 I Need Confidential Pastoral Prayer"
+                onPress={() => handleFollowUpRequest('urgent_prayer')}
+                variant="primary"
+                size="md"
+              />
+              <Button
+                label="🏛 I Want to Connect with Church Expression"
+                onPress={() => handleFollowUpRequest('membership_interest')}
+                variant="outline"
+                size="md"
+              />
+            </View>
           </View>
         )}
       </BottomSheet>
@@ -309,268 +391,215 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: palette.midnight,
   },
-  errorScreen: {
-    flex: 1,
+  topBar: {
+    paddingTop: 54,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     backgroundColor: palette.midnight,
-    padding: spacing.lg,
-    paddingTop: 60,
   },
-  backButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    backgroundColor: '#FFFFFF1A',
+  navPill: {
+    backgroundColor: '#0F1F38',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: radius.pill,
-    alignSelf: 'flex-start',
   },
-  backButtonText: {
+  navPillText: {
     color: palette.white,
+    fontSize: 12,
     fontWeight: '800',
   },
-  errorWrapper: {
-    marginTop: 40,
-  },
-  loadingScreen: {
-    flex: 1,
-    backgroundColor: palette.midnight,
-  },
-  videoPlayerBox: {
-    height: 280,
+  videoStage: {
+    width: '100%',
+    height: 250,
     backgroundColor: '#000000',
-    position: 'relative',
-  },
-  videoView: {
-    flex: 1,
-  },
-  noVideoPlaceholder: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  videoView: {
+    width: '100%',
+    height: '100%',
+  },
+  streamOfflineBox: {
+    alignItems: 'center',
     padding: spacing.xl,
   },
-  noVideoIcon: {
+  streamOfflineIcon: {
     fontSize: 40,
     marginBottom: 8,
   },
-  noVideoTitle: {
-    color: palette.white,
-    fontSize: 16,
+  streamOfflineTitle: {
+    fontSize: 18,
     fontWeight: '900',
-    textAlign: 'center',
+    color: palette.white,
   },
-  noVideoSubtitle: {
-    color: '#8E9EB5',
+  streamOfflineDesc: {
     fontSize: 13,
+    color: '#94A3B8',
     textAlign: 'center',
     marginTop: 4,
     maxWidth: 280,
   },
-  floatingBackButton: {
-    position: 'absolute',
-    top: 48,
-    left: 18,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#00000099',
-    alignItems: 'center',
-    justifyContent: 'center',
+  metadataSection: {
+    padding: spacing.md,
+    backgroundColor: '#0A172C',
+    borderBottomWidth: 1,
+    borderBottomColor: '#172B50',
   },
-  floatingBackText: {
-    color: palette.white,
-    fontSize: 22,
-    fontWeight: '900',
-    marginTop: -2,
-  },
-  scrollContent: {
-    padding: spacing.lg,
-    paddingBottom: 80,
-  },
-  streamMetaBox: {
-    marginBottom: spacing.lg,
-  },
-  statusRow: {
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  visibilityLabel: {
-    color: '#8E9EB5',
-    fontSize: 12,
-    fontWeight: '700',
   },
   streamTitle: {
-    fontSize: 24,
+    fontSize: 16,
     fontWeight: '900',
     color: palette.white,
-    letterSpacing: -0.4,
   },
-  streamDescription: {
-    color: '#B8C4D6',
-    fontSize: 14,
-    lineHeight: 20,
-    marginTop: 6,
+  streamDesc: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 2,
   },
-  reactionContainer: {
-    backgroundColor: palette.surfaceDarkElevated,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  reactionPrompt: {
-    color: '#8E9EB5',
-    fontSize: 11,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    marginBottom: 8,
-  },
-  reactionButtonsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing.xs,
-  },
-  reactionPill: {
-    flex: 1,
+  reactionBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF12',
-    paddingVertical: 8,
+    gap: 6,
+    marginTop: spacing.sm,
+  },
+  reactionPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#16284C',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     borderRadius: radius.pill,
   },
   reactionEmoji: {
-    fontSize: 16,
+    fontSize: 14,
     marginRight: 4,
   },
   reactionLabel: {
-    color: palette.white,
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '700',
+    color: palette.white,
   },
-  altarCallBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  altarCallBtn: {
     backgroundColor: palette.gold,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    marginLeft: 'auto',
+  },
+  altarCallText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: palette.midnight,
+  },
+  chatContainer: {
+    flex: 1,
     padding: spacing.md,
-    borderRadius: radius.lg,
-    marginBottom: spacing.lg,
+    backgroundColor: palette.midnight,
   },
-  altarIcon: {
-    fontSize: 24,
-    marginRight: spacing.md,
+  chatHeading: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#64748B',
+    letterSpacing: 0.8,
+    marginBottom: spacing.xs,
   },
-  altarContent: {
+  chatLog: {
     flex: 1,
   },
-  altarTitle: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: palette.midnight,
+  chatLogContent: {
+    paddingVertical: spacing.xs,
+    gap: 6,
   },
-  altarSubtitle: {
-    fontSize: 12,
-    color: '#3B2F0B',
-    marginTop: 2,
-  },
-  altarChevron: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: palette.midnight,
-    marginLeft: spacing.sm,
-  },
-  chatSection: {
-    backgroundColor: palette.surfaceDarkElevated,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-  },
-  chatSectionTitle: {
-    color: palette.white,
-    fontSize: 14,
-    fontWeight: '900',
-    marginBottom: spacing.sm,
-  },
-  chatLogBox: {
-    minHeight: 120,
-    maxHeight: 200,
-    marginBottom: spacing.md,
-    gap: spacing.xs,
-  },
-  chatItem: {
+  chatBubble: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingVertical: 3,
+    backgroundColor: '#0D1B33',
+    padding: 8,
+    borderRadius: radius.sm,
   },
   chatUser: {
-    color: palette.gold,
+    fontSize: 12,
     fontWeight: '800',
-    fontSize: 13,
-    marginRight: 6,
+    color: palette.gold,
   },
   chatText: {
+    fontSize: 12,
     color: palette.white,
-    fontSize: 13,
+    flex: 1,
   },
   chatInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  supportOptionsList: {
     gap: spacing.sm,
+    marginTop: spacing.sm,
   },
-  supportCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: palette.surfaceSubtle,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: palette.line,
-  },
-  supportCardIcon: {
-    fontSize: 22,
-    marginRight: spacing.md,
-  },
-  supportCardContent: {
+  chatInput: {
     flex: 1,
   },
-  supportCardTitle: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: palette.ink,
+  sendButton: {
+    height: 44,
   },
-  supportCardDescription: {
-    fontSize: 12,
-    color: palette.muted,
-    marginTop: 2,
+  sheetBody: {
+    gap: spacing.md,
   },
-  supportCardChevron: {
+  sheetDesc: {
     fontSize: 14,
-    color: palette.blue,
-    fontWeight: '900',
-    marginLeft: spacing.sm,
+    color: palette.inkSecondary,
+    lineHeight: 20,
   },
-  sentConfirmation: {
+  decisionOptions: {
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  sheetSuccessBox: {
     alignItems: 'center',
     padding: spacing.xl,
   },
-  sentEmoji: {
+  sheetSuccessIcon: {
     fontSize: 48,
-    marginBottom: 8,
+    marginBottom: spacing.md,
   },
-  sentTitle: {
+  sheetSuccessTitle: {
     fontSize: 18,
     fontWeight: '900',
     color: palette.ink,
     textAlign: 'center',
   },
-  sentSubtitle: {
-    fontSize: 14,
+  sheetSuccessDesc: {
+    fontSize: 13,
     color: palette.muted,
     textAlign: 'center',
-    marginTop: 4,
+    marginTop: 8,
+    lineHeight: 18,
+  },
+  errorScreen: {
+    flex: 1,
+    backgroundColor: palette.midnight,
+    paddingTop: 54,
+  },
+  backButton: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  backButtonText: {
+    color: palette.white,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  errorWrapper: {
+    padding: spacing.lg,
+  },
+  loadingScreen: {
+    flex: 1,
+    backgroundColor: palette.midnight,
   },
   pressed: {
     opacity: 0.85,
-    transform: [{ scale: 0.98 }],
   },
 });

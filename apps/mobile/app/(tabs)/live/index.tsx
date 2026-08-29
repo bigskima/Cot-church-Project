@@ -2,6 +2,7 @@ import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSession } from '@/state/session';
+import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import {
   EmptyState,
@@ -19,11 +20,15 @@ const organization = process.env.EXPO_PUBLIC_ORGANIZATION_ID;
 
 export default function LiveDiscoveryScreen() {
   const { api, mode } = useSession();
+  const { colors, isDark } = useTheme();
+
+  const publicBase = organization
+    ? `public-content?organizationId=${organization}&type=streams`
+    : 'public-content?type=streams';
+
   const resource = useResource<LiveStream[]>('live:discovery', (signal) =>
-    api.request(
-      mode === 'visitor'
-        ? `public-content?organizationId=${organization}&type=streams`
-        : 'live-streams',
+    api.request<LiveStream[]>(
+      mode === 'visitor' ? publicBase : 'live-streams',
       { signal }
     )
   );
@@ -36,32 +41,35 @@ export default function LiveDiscoveryScreen() {
   const replays = resource.data?.filter((item) => item.status === 'ended') ?? [];
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={[styles.screen, { backgroundColor: colors.bg }]}
+      contentContainerStyle={styles.content}
+    >
       <ScreenHeader
         title="Sanctuary Live"
         subtitle="Global broadcasts, interactive services, and replay archives."
-        dark
+        dark={isDark}
       />
 
       <View style={styles.body}>
         {resource.loading ? (
           <View style={styles.loadingWrapper}>
-            <Skeleton height={260} dark />
-            <Skeleton height={180} dark />
+            <Skeleton height={260} dark={isDark} />
+            <Skeleton height={180} dark={isDark} />
           </View>
         ) : resource.error && !resource.data ? (
           <ResourceError
             offline={resource.offline}
             message={resource.error}
             retry={resource.refresh}
-            dark
+            dark={isDark}
           />
         ) : (
           <>
-            {/* Active Live Broadcast */}
+            {/* Featured Active Broadcast */}
             {liveStreams.length > 0 ? (
               <>
-                <SectionHeader title="Broadcasting Now" dark badge="LIVE" />
+                <SectionHeader title="Broadcasting Now" dark={isDark} />
                 <HeroLiveCard
                   stream={liveStreams[0]}
                   onPress={() => openStream(liveStreams[0].id)}
@@ -69,10 +77,18 @@ export default function LiveDiscoveryScreen() {
               </>
             ) : null}
 
-            {/* Scheduled Broadcasts */}
-            <SectionHeader title="Upcoming Gatherings" dark />
+            {/* Upcoming Broadcasts Carousel */}
+            <SectionHeader
+              title="Upcoming Sanctuary Broadcasts"
+              badge={scheduledStreams.length}
+              dark={isDark}
+            />
             {scheduledStreams.length > 0 ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.carousel}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.carouselContainer}
+              >
                 {scheduledStreams.map((stream) => (
                   <LiveCard
                     key={stream.id}
@@ -83,27 +99,40 @@ export default function LiveDiscoveryScreen() {
               </ScrollView>
             ) : (
               <EmptyState
-                title="No Live Streams Right Now"
-                message="Check back for scheduled services or watch recorded replays below."
+                title="No Upcoming Broadcasts"
+                message="Weekly Sunday services stream live at 9:00 AM & 11:30 AM."
                 icon="📡"
-                dark
+                dark={isDark}
               />
             )}
 
-            {/* Replays and Archives */}
-            {replays.length > 0 && (
-              <>
-                <SectionHeader title="Recent Broadcast Replays" dark />
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.carousel}>
-                  {replays.map((stream) => (
-                    <LiveCard
-                      key={stream.id}
-                      stream={stream}
-                      onPress={() => openStream(stream.id)}
-                    />
-                  ))}
-                </ScrollView>
-              </>
+            {/* Broadcast Archives & Replays */}
+            <SectionHeader
+              title="Service Replays & Archives"
+              badge={replays.length}
+              dark={isDark}
+            />
+            {replays.length > 0 ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.carouselContainer}
+              >
+                {replays.map((stream) => (
+                  <LiveCard
+                    key={stream.id}
+                    stream={stream}
+                    onPress={() => openStream(stream.id)}
+                  />
+                ))}
+              </ScrollView>
+            ) : (
+              <EmptyState
+                title="No Replays Available"
+                message="Live stream replays will be archived here following the service."
+                icon="📼"
+                dark={isDark}
+              />
             )}
           </>
         )}
@@ -115,7 +144,6 @@ export default function LiveDiscoveryScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: palette.midnight,
   },
   content: {
     paddingBottom: 120,
@@ -125,9 +153,10 @@ const styles = StyleSheet.create({
   },
   loadingWrapper: {
     gap: spacing.lg,
-    marginTop: spacing.md,
+    paddingTop: spacing.md,
   },
-  carousel: {
-    marginBottom: spacing.lg,
+  carouselContainer: {
+    paddingVertical: spacing.sm,
+    gap: spacing.md,
   },
 });

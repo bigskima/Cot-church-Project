@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSession } from '@/state/session';
+import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import {
   Badge,
@@ -18,6 +19,7 @@ import type { PrayerRequest } from '@/types/content';
 
 export default function PrayerScreen() {
   const { api, mode } = useSession();
+  const { colors, isDark } = useTheme();
   const [title, setTitle] = useState('');
   const [request, setRequest] = useState('');
   const [privacy, setPrivacy] = useState<'pastoral_only' | 'prayer_team' | 'public_approved'>('pastoral_only');
@@ -60,123 +62,146 @@ export default function PrayerScreen() {
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={[styles.screen, { backgroundColor: colors.bg }]}
+      contentContainerStyle={styles.content}
+    >
       <ScreenHeader
         title="Sanctuary Prayer Wall"
-        subtitle="Submit confidential prayer requests, altar petitions, and stand in agreement."
+        subtitle="Bring your burdens before the altar in faith and unity."
         showBack
+        dark={isDark}
       />
 
       <View style={styles.body}>
-        {/* Prayer Request Form Card */}
-        <View style={[styles.formCard, shadows.md]}>
-          <Text style={styles.formTitle}>SUBMIT A PRAYER PETITION</Text>
+        {/* Submit Prayer Request Form Card */}
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: colors.card, borderColor: colors.border },
+            shadows.md,
+          ] as any}
+        >
+          <Text style={[styles.cardHeaderTitle, { color: colors.textMuted }] as any}>
+            SUBMIT A PRAYER PETITION
+          </Text>
 
           <InputField
-            label="Prayer Subject / Title"
+            label="Prayer Focus / Title"
             value={title}
             onChangeText={setTitle}
-            placeholder="e.g. Healing, Career breakthrough, Family peace..."
+            placeholder="e.g. Healing for mother, Career breakthrough..."
+            dark={isDark}
           />
 
           <InputField
-            label="Details of your request"
+            label="Petition Details"
             value={request}
             onChangeText={setRequest}
-            placeholder="Describe your situation so ministers can agree in faith..."
+            placeholder="Describe your request. Our pastoral team and intercessors will stand with you in faith..."
             multiline
             numberOfLines={4}
-            style={{ height: 90, textAlignVertical: 'top' }}
+            dark={isDark}
           />
 
           {/* Privacy Level Selector */}
-          <Text style={styles.privacyLabel}>CONFIDENTIALITY LEVEL</Text>
-          <View style={styles.privacySelector}>
+          <Text style={[styles.privacyLabel, { color: colors.text }] as any}>CONFIDENTIALITY SCOPE</Text>
+          <View style={styles.privacyRow}>
             {[
-              ['pastoral_only', '🔒 Pastoral Team Only', 'Senior ministers and pastoral counselors'],
-              ['prayer_team', '🕊️ Dedicated Prayer Team', 'Authorized intercessors team'],
-              ['public_approved', '🌐 Congregation Wall', 'Visible to members after pastoral review'],
-            ].map(([key, label, desc]) => {
+              ['pastoral_only', '🔒 Pastoral Care Only'],
+              ['prayer_team', '🕊️ Prayer Team'],
+              ['public_approved', '✦ Sanctuary Wall'],
+            ].map(([key, label]) => {
               const isSelected = privacy === key;
               return (
                 <Pressable
                   key={key}
                   onPress={() => setPrivacy(key as any)}
-                  style={({ pressed }) => [
-                    styles.privacyOption,
-                    isSelected && styles.privacyOptionActive,
-                    pressed && styles.pressed,
-                  ]}
+                  style={[
+                    styles.privacyChip,
+                    {
+                      backgroundColor: isSelected
+                        ? colors.primary
+                        : isDark
+                        ? '#2E1C11'
+                        : '#F1E3D3',
+                      borderColor: isSelected ? colors.primaryDark : colors.border,
+                    },
+                  ] as any}
                 >
-                  <Text style={[styles.privacyOptionTitle, isSelected && styles.privacyOptionTitleActive]}>
+                  <Text
+                    style={[
+                      styles.privacyText,
+                      {
+                        color: isSelected
+                          ? '#140C07'
+                          : isDark
+                          ? '#FFFDF9'
+                          : '#26140A',
+                        fontWeight: isSelected ? '900' : '700',
+                      },
+                    ] as any}
+                  >
                     {label}
                   </Text>
-                  <Text style={styles.privacyOptionDesc}>{desc}</Text>
                 </Pressable>
               );
             })}
           </View>
 
-          {/* Feedback messages */}
           {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
-          {successMsg ? (
-            <View style={styles.successBox}>
-              <Text style={styles.successEmoji}>🕊️</Text>
-              <Text style={styles.successText}>{successMsg}</Text>
-            </View>
-          ) : null}
+          {successMsg ? <Text style={styles.successText}>{successMsg}</Text> : null}
 
           <Button
-            label="Submit Prayer Request ➔"
+            label="Submit Prayer Petition ➔"
             onPress={handleSubmitPrayer}
-            variant="primary"
+            variant="gold"
             size="lg"
             loading={submitting}
-            style={{ marginTop: spacing.md }}
+            style={{ marginTop: spacing.md } as any}
           />
         </View>
 
-        {/* Previous Prayer Requests */}
-        <SectionHeader title="Your Submitted Petitions" />
-        {myRequests.loading ? (
-          <Skeleton height={120} count={2} />
-        ) : myRequests.error && !myRequests.data ? (
-          <ResourceError
-            offline={myRequests.offline}
-            message={myRequests.error}
-            retry={myRequests.refresh}
-          />
-        ) : myRequests.data && myRequests.data.length > 0 ? (
-          myRequests.data.map((p) => (
-            <PrayerCard
-              key={p.id}
-              prayer={p}
-              onPray={() =>
-                api
-                  .request('prayer-requests', {
-                    method: 'POST',
-                    body: JSON.stringify({ action: 'pray', id: p.id }),
-                  })
-                  .then(() => myRequests.refresh())
-              }
+        {/* My Petitions List */}
+        {mode === 'authenticated' && (
+          <>
+            <SectionHeader
+              title="My Submitted Petitions"
+              badge={myRequests.data?.length ?? 0}
+              dark={isDark}
             />
-          ))
-        ) : (
-          <EmptyState
-            title="No Petitions Submitted Yet"
-            message="Cast all your anxiety on Him, because He cares for you (1 Peter 5:7)."
-            icon="🙏"
-          />
+
+            {myRequests.loading ? (
+              <Skeleton height={120} count={2} dark={isDark} />
+            ) : myRequests.error && !myRequests.data ? (
+              <ResourceError
+                offline={myRequests.offline}
+                message={myRequests.error}
+                retry={myRequests.refresh}
+                dark={isDark}
+              />
+            ) : myRequests.data && myRequests.data.length > 0 ? (
+              myRequests.data.map((item) => (
+                <PrayerCard key={item.id} prayer={item} />
+              ))
+            ) : (
+              <EmptyState
+                title="No Petitions Recorded"
+                message="Your submitted prayer petitions and pastoral updates will appear here."
+                icon="🙏"
+                dark={isDark}
+              />
+            )}
+          </>
         )}
       </View>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
+const styles: Record<string, any> = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: palette.cream,
   },
   content: {
     paddingBottom: 120,
@@ -184,81 +209,50 @@ const styles = StyleSheet.create({
   body: {
     paddingHorizontal: spacing.lg,
   },
-  formCard: {
-    backgroundColor: palette.surface,
+  card: {
     borderRadius: radius.xl,
     padding: spacing.lg,
-    marginTop: spacing.sm,
+    borderWidth: 1,
+    marginBottom: spacing.lg,
   },
-  formTitle: {
+  cardHeaderTitle: {
     fontSize: 11,
     fontWeight: '900',
-    color: palette.muted,
     letterSpacing: 0.8,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   privacyLabel: {
     fontSize: 11,
     fontWeight: '900',
-    color: palette.muted,
     letterSpacing: 0.8,
-    marginTop: spacing.sm,
-    marginBottom: spacing.xs,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs + 2,
   },
-  privacySelector: {
+  privacyRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.xs,
     marginBottom: spacing.md,
   },
-  privacyOption: {
-    padding: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: palette.surfaceSubtle,
+  privacyChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: palette.line,
   },
-  privacyOptionActive: {
-    backgroundColor: '#F3EFFC',
-    borderColor: palette.prayer,
-  },
-  privacyOptionTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: palette.ink,
-  },
-  privacyOptionTitleActive: {
-    color: palette.prayer,
-    fontWeight: '900',
-  },
-  privacyOptionDesc: {
-    fontSize: 11,
-    color: palette.muted,
-    marginTop: 2,
+  privacyText: {
+    fontSize: 12,
   },
   errorText: {
     color: palette.live,
     fontSize: 13,
     fontWeight: '800',
-    marginVertical: 4,
-  },
-  successBox: {
-    backgroundColor: '#ECFDF5',
-    padding: spacing.md,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    marginVertical: spacing.sm,
-  },
-  successEmoji: {
-    fontSize: 24,
-    marginBottom: 4,
+    marginBottom: spacing.sm,
   },
   successText: {
     color: palette.success,
     fontSize: 13,
     fontWeight: '800',
-    textAlign: 'center',
-  },
-  pressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.98 }],
+    marginBottom: spacing.sm,
   },
 });

@@ -85,12 +85,12 @@ export function Button({
   const getTextSizeStyle = () => {
     switch (size) {
       case 'sm':
-        return styles.textSizeSm;
+        return styles.textSm;
       case 'lg':
-        return styles.textSizeLg;
+        return styles.textLg;
       case 'md':
       default:
-        return styles.textSizeMd;
+        return styles.textMd;
     }
   };
 
@@ -100,148 +100,150 @@ export function Button({
       disabled={disabled || loading}
       style={({ pressed }) => [
         styles.base,
-        getSizeStyle(),
         getContainerStyle(),
-        disabled && styles.disabled,
-        pressed && !disabled && styles.pressed,
+        getSizeStyle(),
+        (disabled || loading) ? styles.disabled : null,
+        (pressed && !disabled && !loading) ? styles.pressed : null,
         style,
-      ]}
+      ] as any}
     >
       {loading ? (
         <ActivityIndicator
           size="small"
-          color={variant === 'gold' || variant === 'ghost' ? palette.midnight : palette.white}
+          color={variant === 'gold' ? '#140C07' : '#FFFFFF'}
         />
       ) : (
         <View style={styles.contentRow}>
-          {icon && <View style={styles.iconLeft}>{icon}</View>}
-          <Text style={[styles.textBase, getTextSizeStyle(), getTextStyle()]}>{label}</Text>
+          {icon && <View style={styles.iconSlotLeft}>{icon}</View>}
+          <Text style={[styles.baseText, getTextStyle(), getTextSizeStyle()] as any}>
+            {label}
+          </Text>
           {badge !== undefined && (
-            <View style={styles.badgeContainer}>
+            <View style={styles.badgeWrapper}>
               <Text style={styles.badgeText}>{badge}</Text>
             </View>
           )}
-          {iconRight && <View style={styles.iconRight}>{iconRight}</View>}
+          {iconRight && <View style={styles.iconSlotRight}>{iconRight}</View>}
         </View>
       )}
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const styles: Record<string, any> = StyleSheet.create({
   base: {
-    borderRadius: radius.pill,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    flexDirection: 'row',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   contentRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconLeft: {
-    marginRight: spacing.sm,
+  baseText: {
+    fontWeight: '900',
+    letterSpacing: -0.2,
+    textAlign: 'center',
   },
-  iconRight: {
-    marginLeft: spacing.sm,
-  },
-  textBase: {
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  pressed: {
-    opacity: 0.88,
-    transform: [{ scale: 0.98 }],
-  },
-  disabled: {
-    opacity: 0.45,
-  },
-  // Sizes
   sizeSm: {
-    paddingVertical: spacing.xs + 2,
+    paddingVertical: 8,
     paddingHorizontal: spacing.md,
     minHeight: 36,
   },
   sizeMd: {
-    paddingVertical: spacing.sm + 4,
+    paddingVertical: 12,
     paddingHorizontal: spacing.lg,
     minHeight: 48,
   },
   sizeLg: {
-    paddingVertical: spacing.md + 2,
+    paddingVertical: 16,
     paddingHorizontal: spacing.xl,
     minHeight: 56,
   },
-  textSizeSm: {
+  textSm: {
     fontSize: 13,
   },
-  textSizeMd: {
+  textMd: {
     fontSize: 15,
   },
-  textSizeLg: {
+  textLg: {
     fontSize: 17,
   },
-  // Variants
-  primary: {
-    backgroundColor: palette.navy,
-  },
-  primaryText: {
-    color: palette.white,
-  },
   gold: {
-    backgroundColor: palette.gold,
+    backgroundColor: palette.yellow,
+    borderColor: '#D97706',
   },
   goldText: {
-    color: palette.midnight,
-    fontWeight: '900',
+    color: '#140C07',
   },
-  live: {
-    backgroundColor: palette.live,
+  primary: {
+    backgroundColor: '#2E1C11',
+    borderColor: '#452A1A',
   },
-  liveText: {
-    color: palette.white,
-    fontWeight: '900',
+  primaryText: {
+    color: '#FFFDF9',
   },
   secondary: {
-    backgroundColor: palette.surfaceDarkElevated,
+    backgroundColor: '#F1E3D3',
+    borderColor: '#E8D5C4',
   },
   secondaryText: {
-    color: palette.white,
+    color: '#26140A',
   },
   outline: {
     backgroundColor: 'transparent',
-    borderWidth: 1.5,
-    borderColor: palette.line,
+    borderColor: '#E8D5C4',
   },
   outlineText: {
-    color: palette.ink,
+    color: '#78350F',
+  },
+  live: {
+    backgroundColor: palette.live,
+    borderColor: '#B91C1C',
+  },
+  liveText: {
+    color: '#FFFFFF',
   },
   glass: {
-    backgroundColor: '#FFFFFF1F',
-    borderWidth: 1,
-    borderColor: palette.glassBorder,
+    backgroundColor: 'rgba(255, 253, 249, 0.15)',
+    borderColor: 'rgba(245, 158, 11, 0.4)',
   },
   glassText: {
-    color: palette.white,
+    color: '#FFFDF9',
   },
   ghost: {
     backgroundColor: 'transparent',
   },
   ghostText: {
-    color: palette.blue,
+    color: '#8C6549',
   },
-  // Badge
-  badgeContainer: {
-    backgroundColor: '#00000026',
+  disabled: {
+    opacity: 0.45,
+  },
+  pressed: {
+    opacity: 0.88,
+    transform: [{ scale: 0.98 }],
+  },
+  iconSlotLeft: {
+    marginRight: spacing.xs + 2,
+  },
+  iconSlotRight: {
+    marginLeft: spacing.xs + 2,
+  },
+  badgeWrapper: {
+    backgroundColor: 'rgba(20, 12, 7, 0.15)',
+    borderRadius: radius.pill,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: radius.pill,
-    marginLeft: spacing.xs + 2,
+    marginLeft: spacing.xs,
   },
   badgeText: {
     fontSize: 11,
     fontWeight: '900',
-    color: palette.white,
+    color: 'inherit' as any,
   },
 });

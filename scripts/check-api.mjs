@@ -52,6 +52,8 @@ const requiredFiles = [
   'supabase/functions/ai-gateway/index.ts',
   'supabase/functions/ai-review/index.ts',
   'supabase/functions/sermons/index.ts',
+  'supabase/functions/branding/index.ts',
+  'supabase/functions/church-story/index.ts',
 ];
 
 await Promise.all(requiredFiles.map((file) => access(file)));
@@ -69,6 +71,8 @@ const signupRateLimited = await readFile('supabase/functions/signup/index.ts', '
 const paymentEvents = await readFile('supabase/functions/payment-events/index.ts', 'utf8');
 const publicContent = await readFile('supabase/functions/public-content/index.ts', 'utf8');
 const sermons = await readFile('supabase/functions/sermons/index.ts', 'utf8');
+const branding = await readFile('supabase/functions/branding/index.ts', 'utf8');
+const churchStory = await readFile('supabase/functions/church-story/index.ts', 'utf8');
 
 const invariants = [
   [handler, /request\.method === "OPTIONS"/, 'CORS preflight handling'],
@@ -89,6 +93,8 @@ const invariants = [
   [paymentEvents, /HMAC/, 'payment event signature validation'],
   [publicContent, /visibility.*public/, 'public content visibility enforcement'],
   [sermons, /sermons\.create/, 'sermon authorization'],
+  [branding, /platform\.branding\.manage/, 'branding authorization'],
+  [churchStory, /leadership_profiles/, 'leadership profile management'],
 ];
 
 const missing = invariants.filter(([source, pattern]) => !pattern.test(source));

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSession } from '@/state/session';
+import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import {
   Badge,
   Button,
   EmptyState,
-  InputField,
   ResourceError,
   ScreenHeader,
   SectionHeader,
@@ -17,8 +17,8 @@ import type { LiveFollowUp, PrayerRequest } from '@/types/content';
 
 export default function PastoralTriageScreen() {
   const { api } = useSession();
+  const { colors, isDark } = useTheme();
   const [activeQueue, setActiveQueue] = useState<'prayer' | 'altar'>('prayer');
-  const [noteInput, setNoteInput] = useState<{ [id: string]: string }>({});
 
   const prayers = useResource<PrayerRequest[]>('pastoral:prayers', (signal) =>
     api.request<PrayerRequest[]>('prayer-requests', { signal })
@@ -41,16 +41,25 @@ export default function PastoralTriageScreen() {
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={[styles.screen, { backgroundColor: colors.bg }]}
+      contentContainerStyle={styles.content}
+    >
       <ScreenHeader
         title="Pastoral Triage & Care"
         subtitle="Confidential prayer petitions, altar call decisions, and ministerial follow-ups."
         showBack
+        dark={isDark}
       />
 
       <View style={styles.body}>
         {/* Queue Switcher */}
-        <View style={styles.queueSelector}>
+        <View
+          style={[
+            styles.queueSelector,
+            { backgroundColor: isDark ? '#22140C' : '#E8D5C4' },
+          ]}
+        >
           {[
             ['prayer', `Prayer Queue (${prayers.data?.length ?? 0})`],
             ['altar', `Altar & Care (${followups.data?.length ?? 0})`],
@@ -60,13 +69,21 @@ export default function PastoralTriageScreen() {
               <Pressable
                 key={q}
                 onPress={() => setActiveQueue(q as any)}
-                style={({ pressed }) => [
+                style={[
                   styles.queuePill,
-                  isSelected && styles.queuePillActive,
-                  pressed && styles.pressed,
-                ]}
+                  isSelected ? {
+                    backgroundColor: isDark ? '#2E1C11' : '#FFFDF9',
+                    ...shadows.sm,
+                  } : null,
+                ] as any}
               >
-                <Text style={[styles.queuePillText, isSelected && styles.queuePillTextActive]}>
+                <Text
+                  style={[
+                    styles.queuePillText,
+                    { color: isSelected ? colors.text : colors.textMuted },
+                    isSelected ? styles.queuePillTextActive : null,
+                  ] as any}
+                >
                   {label}
                 </Text>
               </Pressable>
@@ -77,32 +94,42 @@ export default function PastoralTriageScreen() {
         {/* Prayer Queue */}
         {activeQueue === 'prayer' && (
           <>
-            <SectionHeader title="Active Prayer Petitions" />
+            <SectionHeader title="Active Prayer Petitions" dark={isDark} />
             {prayers.loading ? (
-              <Skeleton height={140} count={2} />
+              <Skeleton height={140} count={2} dark={isDark} />
             ) : prayers.error && !prayers.data ? (
               <ResourceError
                 offline={prayers.offline}
                 message={prayers.error}
                 retry={prayers.refresh}
+                dark={isDark}
               />
             ) : prayers.data && prayers.data.length > 0 ? (
               prayers.data.map((prayer) => (
-                <View key={prayer.id} style={[styles.card, shadows.sm]}>
+                <View
+                  key={prayer.id}
+                  style={[
+                    styles.card,
+                    { backgroundColor: colors.card, borderColor: colors.border },
+                    shadows.sm,
+                  ] as any}
+                >
                   <View style={styles.cardHeader}>
                     <Badge
                       label={prayer.status.toUpperCase()}
                       variant={prayer.status === 'answered' ? 'success' : 'prayer'}
                     />
-                    <Text style={styles.confidentialityTag}>
+                    <Text style={styles.confidentialityTag as any}>
                       {prayer.is_confidential ? '🔒 Confidential' : 'Public Wall'}
                     </Text>
                   </View>
 
-                  <Text style={styles.cardTitle}>{prayer.title}</Text>
-                  <Text style={styles.cardDescription}>{prayer.description}</Text>
+                  <Text style={[styles.cardTitle, { color: colors.text }] as any}>{prayer.title}</Text>
+                  <Text style={[styles.cardDescription, { color: colors.textSecondary }] as any}>
+                    {prayer.description}
+                  </Text>
 
-                  <View style={styles.actionRow}>
+                  <View style={[styles.actionRow, { borderTopColor: colors.border }] as any}>
                     <Button
                       label="Mark Praying"
                       onPress={() => updatePrayerStatus(prayer.id, 'praying')}
@@ -120,9 +147,10 @@ export default function PastoralTriageScreen() {
               ))
             ) : (
               <EmptyState
-                title="Prayer Queue Cleared"
-                message="No pending prayer requests awaiting pastoral attention."
+                title="No Open Prayer Requests"
+                message="All submitted prayer requests have been triaged and prayed over."
                 icon="🕊️"
+                dark={isDark}
               />
             )}
           </>
@@ -131,30 +159,39 @@ export default function PastoralTriageScreen() {
         {/* Altar & Follow-ups Queue */}
         {activeQueue === 'altar' && (
           <>
-            <SectionHeader title="Live Stream Altar & Discipleship Queue" />
+            <SectionHeader title="Live Stream Altar & Discipleship Queue" dark={isDark} />
             {followups.loading ? (
-              <Skeleton height={140} count={2} />
+              <Skeleton height={140} count={2} dark={isDark} />
             ) : followups.data && followups.data.length > 0 ? (
               followups.data.map((item) => (
-                <View key={item.id} style={[styles.card, shadows.sm]}>
+                <View
+                  key={item.id}
+                  style={[
+                    styles.card,
+                    { backgroundColor: colors.card, borderColor: colors.border },
+                    shadows.sm,
+                  ] as any}
+                >
                   <View style={styles.cardHeader}>
                     <Badge label={item.type.replace('_', ' ').toUpperCase()} variant="gold" />
-                    <Text style={styles.cardDate}>
+                    <Text style={[styles.cardDate, { color: colors.textMuted }] as any}>
                       {new Date(item.created_at).toLocaleTimeString([], {
                         hour: '2-digit',
                         minute: '2-digit',
                       })}
                     </Text>
                   </View>
-                  <Text style={styles.cardTitle}>{item.user_name || 'Anonymous Visitor'}</Text>
-                  <Text style={styles.cardDescription}>
+                  <Text style={[styles.cardTitle, { color: colors.text }] as any}>
+                    {item.user_name || 'Anonymous Visitor'}
+                  </Text>
+                  <Text style={[styles.cardDescription, { color: colors.textSecondary }] as any}>
                     Contact: {item.user_email || 'No email on record'} · Status: {item.status}
                   </Text>
-                  <View style={styles.actionRow}>
+                  <View style={[styles.actionRow, { borderTopColor: colors.border }] as any}>
                     <Button
                       label="Assign Pastoral Counselor"
                       onPress={() => alert('Assigned to pastoral care.')}
-                      variant="primary"
+                      variant="gold"
                       size="sm"
                     />
                   </View>
@@ -165,6 +202,7 @@ export default function PastoralTriageScreen() {
                 title="No Pending Follow-ups"
                 message="Decisions for Christ, counselling requests, and membership interests appear here."
                 icon="✝️"
+                dark={isDark}
               />
             )}
           </>
@@ -174,10 +212,9 @@ export default function PastoralTriageScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles: Record<string, any> = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: palette.cream,
   },
   content: {
     paddingBottom: 120,
@@ -187,7 +224,6 @@ const styles = StyleSheet.create({
   },
   queueSelector: {
     flexDirection: 'row',
-    backgroundColor: '#E5E2D8',
     padding: 4,
     borderRadius: radius.pill,
     marginTop: spacing.sm,
@@ -200,24 +236,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  queuePillActive: {
-    backgroundColor: palette.navy,
-    ...shadows.sm,
-  },
   queuePillText: {
     fontSize: 13,
     fontWeight: '800',
-    color: palette.inkSecondary,
   },
   queuePillTextActive: {
-    color: palette.white,
     fontWeight: '900',
   },
   card: {
-    backgroundColor: palette.surface,
     padding: spacing.lg,
     borderRadius: radius.lg,
     marginBottom: spacing.md,
+    borderWidth: 1,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -232,16 +262,13 @@ const styles = StyleSheet.create({
   },
   cardDate: {
     fontSize: 11,
-    color: palette.muted,
   },
   cardTitle: {
     fontSize: 17,
     fontWeight: '900',
-    color: palette.ink,
   },
   cardDescription: {
     fontSize: 13,
-    color: palette.inkSecondary,
     marginTop: 4,
     lineHeight: 18,
   },
@@ -252,10 +279,5 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     paddingTop: spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: palette.line,
-  },
-  pressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.98 }],
   },
 });

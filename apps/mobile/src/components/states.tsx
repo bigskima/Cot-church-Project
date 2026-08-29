@@ -28,7 +28,7 @@ export function Skeleton({
                 height: height as any,
                 width: width as any,
                 borderRadius,
-                backgroundColor: dark ? palette.surfaceDarkElevated : '#E5E9F0',
+                backgroundColor: dark ? '#2E1C11' : '#EAD9C8',
               },
             ]}
           />
@@ -45,7 +45,7 @@ export function Skeleton({
           height: height as any,
           width: width as any,
           borderRadius,
-          backgroundColor: dark ? palette.surfaceDarkElevated : '#E5E9F0',
+          backgroundColor: dark ? '#2E1C11' : '#EAD9C8',
         },
       ]}
     />
@@ -60,7 +60,10 @@ export function SkeletonCardList({ count = 3, dark = false }: { count?: number; 
           key={idx}
           style={[
             styles.skeletonCard,
-            { backgroundColor: dark ? palette.surfaceDark : palette.surface },
+            {
+              backgroundColor: dark ? '#22140C' : palette.surface,
+              borderColor: dark ? '#452A1A' : '#E8D5C4',
+            },
           ]}
         >
           <Skeleton height={20} width="60%" dark={dark} />
@@ -75,44 +78,40 @@ export function SkeletonCardList({ count = 3, dark = false }: { count?: number; 
 export function EmptyState({
   title,
   message,
+  icon = '🕊️',
   actionLabel,
   onAction,
-  icon = '✦',
   dark = false,
 }: {
   title: string;
   message: string;
+  icon?: string;
   actionLabel?: string;
   onAction?: () => void;
-  icon?: string;
   dark?: boolean;
 }) {
   return (
     <View
       style={[
         styles.emptyContainer,
-        { backgroundColor: dark ? palette.surfaceDark : palette.surface },
+        {
+          backgroundColor: dark ? '#22140C' : palette.surface,
+          borderColor: dark ? '#452A1A' : '#E8D5C4',
+        },
       ]}
     >
-      <View
-        style={[
-          styles.emptyIconCircle,
-          { backgroundColor: dark ? palette.surfaceDarkElevated : palette.surfaceSubtle },
-        ]}
-      >
-        <Text style={styles.emptyIconText}>{icon}</Text>
-      </View>
-      <Text style={[styles.emptyTitle, { color: dark ? palette.white : palette.ink }]}>
-        {title}
-      </Text>
-      <Text style={[styles.emptyMessage, { color: dark ? palette.mutedLight : palette.muted }]}>
-        {message}
-      </Text>
-      {actionLabel && onAction && (
-        <View style={styles.emptyActionWrapper}>
-          <Button label={actionLabel} onPress={onAction} variant={dark ? 'gold' : 'primary'} size="sm" />
-        </View>
-      )}
+      <Text style={styles.emptyIcon}>{icon}</Text>
+      <Text style={[styles.emptyTitle, { color: dark ? '#FFFDF9' : '#26140A' }]}>{title}</Text>
+      <Text style={[styles.emptyMessage, { color: dark ? '#A68A75' : '#8C6549' }]}>{message}</Text>
+      {actionLabel && onAction ? (
+        <Button
+          label={actionLabel}
+          onPress={onAction}
+          variant="outline"
+          size="sm"
+          style={{ marginTop: spacing.md } as any}
+        />
+      ) : null}
     </View>
   );
 }
@@ -123,7 +122,7 @@ export function ResourceError({
   offline = false,
   dark = false,
 }: {
-  message: string;
+  message?: string;
   retry?: () => void;
   offline?: boolean;
   dark?: boolean;
@@ -132,116 +131,113 @@ export function ResourceError({
     <View
       style={[
         styles.errorContainer,
-        { backgroundColor: dark ? '#2A1215' : '#FFF1F2', borderColor: dark ? '#5C1D24' : '#FECDD3' },
+        {
+          backgroundColor: dark ? '#22140C' : palette.surface,
+          borderColor: dark ? '#452A1A' : '#E8D5C4',
+        },
       ]}
     >
-      <Text style={styles.errorIcon}>{offline ? '📡' : '⚠️'}</Text>
-      <Text style={[styles.errorTitle, { color: dark ? '#FECDD3' : '#9F1239' }]}>
-        {offline ? 'Connection Unavailable' : 'Unable to Load Data'}
+      <Text style={styles.errorIcon}>{offline ? '📶' : '⚠️'}</Text>
+      <Text style={[styles.errorTitle, { color: dark ? '#FFFDF9' : '#26140A' }]}>
+        {offline ? 'You are currently offline' : 'Unable to load content'}
       </Text>
-      <Text style={[styles.errorMessage, { color: dark ? '#F43F5E' : '#BE123C' }]}>
-        {message}
+      <Text style={[styles.errorMessage, { color: dark ? '#A68A75' : '#8C6549' }]}>
+        {message || 'Please check your connection and tap retry.'}
       </Text>
-      {retry && (
-        <View style={styles.retryWrapper}>
-          <Button label="Try Again" onPress={retry} variant="outline" size="sm" />
-        </View>
-      )}
+      {retry ? (
+        <Button
+          label="Retry ↺"
+          onPress={retry}
+          variant="gold"
+          size="sm"
+          style={{ marginTop: spacing.md } as any}
+        />
+      ) : null}
     </View>
   );
 }
 
 export function LoadingSpinner({
-  message = 'Loading...',
+  label = 'Loading sanctuary stream...',
   dark = false,
 }: {
-  message?: string;
+  label?: string;
   dark?: boolean;
 }) {
   return (
     <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color={palette.gold} />
-      <Text style={[styles.loadingText, { color: dark ? palette.mutedLight : palette.muted }]}>
-        {message}
-      </Text>
+      <ActivityIndicator size="large" color="#F59E0B" />
+      <Text style={[styles.loadingLabel, { color: dark ? '#A68A75' : '#8C6549' }]}>{label}</Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const styles: Record<string, any> = StyleSheet.create({
   skeleton: {
-    marginBottom: spacing.xs,
+    overflow: 'hidden',
   },
   skeletonCard: {
     padding: spacing.lg,
     borderRadius: radius.lg,
+    borderWidth: 1,
     gap: spacing.sm,
   },
   emptyContainer: {
     padding: spacing.xl,
     borderRadius: radius.xl,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
     marginVertical: spacing.md,
   },
-  emptyIconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
-  },
-  emptyIconText: {
-    fontSize: 28,
+  emptyIcon: {
+    fontSize: 40,
+    marginBottom: spacing.sm,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '900',
     textAlign: 'center',
-    letterSpacing: -0.2,
+    letterSpacing: -0.3,
   },
   emptyMessage: {
-    fontSize: 14,
+    fontSize: 13,
     textAlign: 'center',
-    marginTop: 6,
-    lineHeight: 20,
+    marginTop: 4,
+    lineHeight: 18,
     maxWidth: 280,
   },
-  emptyActionWrapper: {
-    marginTop: spacing.lg,
-  },
   errorContainer: {
-    padding: spacing.lg,
-    borderRadius: radius.lg,
+    padding: spacing.xl,
+    borderRadius: radius.xl,
     borderWidth: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     marginVertical: spacing.md,
   },
   errorIcon: {
-    fontSize: 26,
-    marginBottom: 6,
+    fontSize: 36,
+    marginBottom: spacing.sm,
   },
   errorTitle: {
     fontSize: 16,
     fontWeight: '900',
+    textAlign: 'center',
   },
   errorMessage: {
     fontSize: 13,
     textAlign: 'center',
     marginTop: 4,
     lineHeight: 18,
-  },
-  retryWrapper: {
-    marginTop: spacing.md,
+    maxWidth: 280,
   },
   loadingContainer: {
     padding: spacing.xxl,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  loadingText: {
-    fontSize: 14,
+  loadingLabel: {
+    fontSize: 13,
     fontWeight: '700',
     marginTop: spacing.md,
   },

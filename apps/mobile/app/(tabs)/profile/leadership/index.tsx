@@ -17,19 +17,42 @@ export default function LeadershipHubScreen() {
     hasCapability('streams.broadcast') ||
     hasCapability('streams.manage') ||
     hasCapability('livestream.operate') ||
-    hasCapability('livestream.create');
+    hasCapability('livestream.create') ||
+    hasCapability('*');
+
   const canPastoralTriage =
     hasCapability('prayer.manage') ||
     hasCapability('prayer.moderate') ||
-    hasCapability('prayer.pastoral_notes.manage');
+    hasCapability('prayer.pastoral_notes.manage') ||
+    hasCapability('*');
+
   const canManageSermons =
     hasCapability('sermons.create') ||
     hasCapability('sermons.manage') ||
-    hasCapability('sermons.publish');
+    hasCapability('sermons.publish') ||
+    hasCapability('*');
+
   const canManageEvents =
     hasCapability('events.create') ||
     hasCapability('events.update') ||
-    hasCapability('events.manage');
+    hasCapability('events.manage') ||
+    hasCapability('*');
+
+  const canManageGiving =
+    hasCapability('giving.campaigns.manage') ||
+    hasCapability('giving.finance.read') ||
+    hasCapability('*');
+
+  const canManageLeadership =
+    hasCapability('expression.leadership.manage') ||
+    hasCapability('organization.leadership.manage') ||
+    hasCapability('*');
+
+  const canManageExpressions =
+    hasCapability('organizations.manage') ||
+    hasCapability('branches.create') ||
+    hasCapability('expression.create') ||
+    hasCapability('*');
 
   const tools = [
     {
@@ -42,7 +65,7 @@ export default function LeadershipHubScreen() {
       enabled: canManageMedia,
     },
     {
-      title: 'Pastoral Triage & Care',
+      title: 'Pastoral Triage & Care Queue',
       description:
         'Manage confidential prayer petitions, respond to altar call decisions, and assign pastoral follow-ups.',
       icon: '🕊️',
@@ -51,42 +74,69 @@ export default function LeadershipHubScreen() {
       enabled: canPastoralTriage,
     },
     {
+      title: 'Expression Leadership Directory',
+      description:
+        'Add, update, and manage local pastors, directors, coordinators, and public featured profiles for this campus.',
+      icon: '👥',
+      badge: 'DIRECTORY',
+      route: '/(tabs)/profile/leadership/expression-leadership',
+      enabled: canManageLeadership,
+    },
+    {
+      title: 'Giving & Church Bank Details',
+      description:
+        'Administer church giving campaigns, building projects, and configure manual bank transfer instructions.',
+      icon: '🤍',
+      badge: 'FINANCE',
+      route: '/(tabs)/profile/leadership/giving-manage',
+      enabled: canManageGiving,
+    },
+    {
       title: 'Sermons & Media Publishing',
       description:
-        'Review recorded message drafts, generate AI scripture & summaries, and publish sermons to the global app.',
+        'Review recorded message drafts, generate AI scripture & summaries, and publish sermons to the church.',
       icon: '📖',
-      badge: 'PUBLISHING',
+      badge: 'MEDIA',
       route: '/(tabs)/profile/leadership/sermons-manage',
       enabled: canManageSermons,
     },
     {
-      title: 'Gatherings & Events Coordinator',
+      title: 'Events & Gatherings Coordinator',
       description:
-        'Create church services, manage registration capacities, and oversee real-time attendance check-in counters.',
+        'Schedule sanctuary worship gatherings, configure attendance caps, and manage member RSVPs.',
       icon: '🗓️',
-      badge: 'GATHERINGS',
+      badge: 'SCHEDULE',
       route: '/(tabs)/profile/leadership/events-manage',
       enabled: canManageEvents,
     },
-  ].filter((t) => t.enabled);
+    {
+      title: 'Expressions & Campus Bootstrap',
+      description:
+        'Bootstrap new church campuses, daughter expressions, and establish responsible authority.',
+      icon: '🏛️',
+      badge: 'CAMPUS',
+      route: '/(tabs)/profile/leadership/expressions-manage',
+      enabled: canManageExpressions,
+    },
+  ];
+
+  const availableTools = tools.filter((t) => t.enabled);
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <ScreenHeader
-        title="Leadership Studio"
-        subtitle={`Operational tools scoped to ${
-          context?.expression?.name ?? context?.organizations?.[0]?.name ?? 'your local church expression'
-        }.`}
+        title="Sanctuary Leadership Hub"
+        subtitle="Role-scoped tools for pastors, media operators, finance stewards, and campus coordinators."
         showBack
       />
 
       <View style={styles.body}>
-        <SectionHeader title="Active Ministry Workspaces" badge={tools.length} />
+        <SectionHeader title="Your Ministerial Capabilities" badge={availableTools.length} />
 
-        {tools.length > 0 ? (
-          tools.map((tool, idx) => (
+        {availableTools.length > 0 ? (
+          availableTools.map((tool) => (
             <LeadershipModuleCard
-              key={idx}
+              key={tool.title}
               title={tool.title}
               description={tool.description}
               icon={tool.icon}
@@ -96,8 +146,10 @@ export default function LeadershipHubScreen() {
           ))
         ) : (
           <EmptyState
-            title="No Scoped Permissions"
-            message="Your account currently does not have active ministerial or operational roles assigned for this church."
+            title="No Leadership Delegations"
+            message={`You are an active member of ${
+              context?.organizations?.[0]?.name ?? 'your local church expression'
+            }. Leadership modules will appear here when authorized by your pastoral leadership.`}
             icon="🔒"
           />
         )}

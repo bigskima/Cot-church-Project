@@ -16,6 +16,7 @@ const migrationPaths = [
   'supabase/migrations/20260826100000_production_streaming.sql',
   'supabase/migrations/20260826110000_ai_gateway.sql',
   'supabase/migrations/20260827100000_sermons_media.sql',
+  'supabase/migrations/20260828100000_leadership_and_church_story.sql',
 ];
 
 const requiredPatterns = [
@@ -51,6 +52,8 @@ const requiredPatterns = [
   /create function public\.organization_dashboard/i,
   /create table public\.sermons/i,
   /create function public\.convert_recording_to_sermon/i,
+  /create table public\.platform_branding/i,
+  /create table public\.leadership_profiles/i,
 ];
 
 const source = (await Promise.all(migrationPaths.map((path) => readFile(path, 'utf8')))).join('\n');

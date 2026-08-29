@@ -11,9 +11,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@church/types": "*",
     "expo": "latest",
     "expo-router": "latest",
     "expo-linear-gradient": "latest",
+    "expo-splash-screen": "latest",
     "expo-video": "latest",
     "expo-secure-store": "latest",
     "expo-status-bar": "latest",
@@ -23,6 +25,7 @@
   },
   "devDependencies": {
     "@types/react": "latest",
+    "@types/react-native": "latest",
     "typescript": "latest"
   }
 }

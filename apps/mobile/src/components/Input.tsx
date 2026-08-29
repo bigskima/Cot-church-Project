@@ -18,7 +18,7 @@ interface InputFieldProps extends TextInputProps {
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
   dark?: boolean;
-  containerStyle?: StyleProp<ViewStyle>;
+  containerStyle?: any;
 }
 
 export function InputField({
@@ -33,21 +33,21 @@ export function InputField({
   ...props
 }: InputFieldProps) {
   return (
-    <View style={[styles.container, containerStyle]}>
+    <View style={[styles.container, containerStyle] as any}>
       {label && (
-        <Text style={[styles.label, dark ? styles.labelDark : styles.labelLight]}>{label}</Text>
+        <Text style={[styles.label, dark ? styles.labelDark : styles.labelLight] as any}>{label}</Text>
       )}
       <View
         style={[
           styles.inputWrapper,
           dark ? styles.inputWrapperDark : styles.inputWrapperLight,
           error ? styles.inputError : undefined,
-        ]}
+        ] as any}
       >
         {leftIcon && <View style={styles.iconLeft}>{leftIcon}</View>}
         <TextInput
-          placeholderTextColor={dark ? palette.mutedLight : palette.muted}
-          style={[styles.input, dark ? styles.textDark : styles.textLight, style]}
+          placeholderTextColor={dark ? '#A68A75' : '#8C6549'}
+          style={[styles.input, dark ? styles.textDark : styles.textLight, style] as any}
           {...props}
         />
         {rightIcon && <View style={styles.iconRight}>{rightIcon}</View>}
@@ -55,7 +55,7 @@ export function InputField({
       {error ? (
         <Text style={styles.errorText}>{error}</Text>
       ) : helperText ? (
-        <Text style={[styles.helperText, dark ? styles.helperDark : styles.helperLight]}>
+        <Text style={[styles.helperText, dark ? styles.helperDark : styles.helperLight] as any}>
           {helperText}
         </Text>
       ) : null}
@@ -74,30 +74,32 @@ interface SearchBarProps {
 export function SearchBar({
   value,
   onChangeText,
-  placeholder = 'Search sermons, scriptures, events...',
+  placeholder = 'Search...',
   onClear,
   dark = false,
 }: SearchBarProps) {
+  const handleClear = () => {
+    onChangeText('');
+    onClear?.();
+  };
+
   return (
-    <View style={[styles.searchContainer, dark ? styles.searchDark : styles.searchLight]}>
-      <Text style={[styles.searchIcon, { color: dark ? palette.mutedLight : palette.muted }]}>
-        🔍
-      </Text>
+    <View
+      style={[
+        styles.searchContainer,
+        dark ? styles.searchContainerDark : styles.searchContainerLight,
+      ] as any}
+    >
+      <Text style={styles.searchIcon}>⌕</Text>
       <TextInput
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={dark ? palette.mutedLight : palette.muted}
-        style={[styles.searchInput, dark ? styles.textDark : styles.textLight]}
+        placeholderTextColor={dark ? '#A68A75' : '#8C6549'}
+        style={[styles.searchInput, dark ? styles.textDark : styles.textLight] as any}
       />
       {value.length > 0 && (
-        <Pressable
-          onPress={() => {
-            onChangeText('');
-            onClear?.();
-          }}
-          style={styles.clearButton}
-        >
+        <Pressable onPress={handleClear} style={styles.clearButton as any}>
           <Text style={styles.clearIcon}>✕</Text>
         </Pressable>
       )}
@@ -105,51 +107,52 @@ export function SearchBar({
   );
 }
 
-const styles = StyleSheet.create({
+const styles: Record<string, any> = StyleSheet.create({
   container: {
     marginBottom: spacing.md,
   },
   label: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
     marginBottom: 6,
     letterSpacing: 0.2,
   },
   labelLight: {
-    color: palette.inkSecondary,
+    color: '#26140A',
   },
   labelDark: {
-    color: palette.creamDark,
+    color: '#E6CCB2',
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: radius.md,
     borderWidth: 1.5,
-    minHeight: 50,
     paddingHorizontal: spacing.md,
+    minHeight: 48,
   },
   inputWrapperLight: {
-    backgroundColor: palette.surface,
-    borderColor: palette.line,
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E8D5C4',
   },
   inputWrapperDark: {
-    backgroundColor: palette.surfaceDarkElevated,
-    borderColor: palette.glassBorderDark,
+    backgroundColor: '#1C1009',
+    borderColor: '#452A1A',
   },
   inputError: {
     borderColor: palette.live,
   },
   input: {
     flex: 1,
-    fontSize: 15,
-    paddingVertical: spacing.sm,
+    fontSize: 14,
+    fontWeight: '600',
+    paddingVertical: 10,
   },
   textLight: {
-    color: palette.ink,
+    color: '#26140A',
   },
   textDark: {
-    color: palette.white,
+    color: '#FFFDF9',
   },
   iconLeft: {
     marginRight: spacing.sm,
@@ -159,39 +162,41 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 12,
+    fontWeight: '700',
     color: palette.live,
     marginTop: 4,
-    fontWeight: '700',
   },
   helperText: {
     fontSize: 12,
     marginTop: 4,
   },
   helperLight: {
-    color: palette.muted,
+    color: '#8C6549',
   },
   helperDark: {
-    color: palette.mutedLight,
+    color: '#A68A75',
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: radius.pill,
     paddingHorizontal: spacing.md,
-    height: 48,
+    height: 44,
     borderWidth: 1,
   },
-  searchLight: {
-    backgroundColor: palette.surface,
-    borderColor: palette.line,
+  searchContainerLight: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E8D5C4',
   },
-  searchDark: {
-    backgroundColor: palette.surfaceDarkElevated,
-    borderColor: palette.glassBorderDark,
+  searchContainerDark: {
+    backgroundColor: '#22140C',
+    borderColor: '#452A1A',
   },
   searchIcon: {
-    fontSize: 15,
+    fontSize: 18,
+    color: '#F59E0B',
     marginRight: spacing.sm,
+    fontWeight: '900',
   },
   searchInput: {
     flex: 1,
@@ -200,12 +205,10 @@ const styles = StyleSheet.create({
   },
   clearButton: {
     padding: 4,
-    borderRadius: radius.pill,
-    backgroundColor: '#0000001A',
   },
   clearIcon: {
-    fontSize: 11,
+    fontSize: 12,
+    color: '#8C6549',
     fontWeight: '900',
-    color: palette.muted,
   },
 });

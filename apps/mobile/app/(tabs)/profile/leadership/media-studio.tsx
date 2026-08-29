@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSession } from '@/state/session';
+import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import {
   Badge,
@@ -17,6 +18,7 @@ import type { LiveStream } from '@/types/content';
 
 export default function MediaStudioScreen() {
   const { api } = useSession();
+  const { colors, isDark } = useTheme();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [latencyMode, setLatencyMode] = useState<'standard' | 'reduced' | 'low'>('reduced');
@@ -77,18 +79,30 @@ export default function MediaStudioScreen() {
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={[styles.screen, { backgroundColor: colors.bg }]}
+      contentContainerStyle={styles.content}
+    >
       <ScreenHeader
         title="Expression Media Studio"
         subtitle="Manage live encoders, RTMP broadcast keys, and convert recordings to sermon drafts."
         showBack
+        dark={isDark}
       />
 
       <View style={styles.body}>
         {/* Create Broadcast Stage */}
-        <View style={[styles.createCard, shadows.md]}>
+        <View
+          style={[
+            styles.createCard,
+            { backgroundColor: colors.card, borderColor: colors.border },
+            shadows.md,
+          ]}
+        >
           <View style={styles.cardHeaderRow}>
-            <Text style={styles.cardHeaderTitle}>CREATE NEW LIVESTREAM</Text>
+            <Text style={[styles.cardHeaderTitle, { color: colors.textMuted }]}>
+              CREATE NEW LIVESTREAM
+            </Text>
             <Badge label="ENCODER OPS" variant="gold" />
           </View>
 
@@ -97,6 +111,7 @@ export default function MediaStudioScreen() {
             value={title}
             onChangeText={setTitle}
             placeholder="e.g. Sunday Celebration Service - 10:00 AM"
+            dark={isDark}
           />
 
           <InputField
@@ -106,10 +121,11 @@ export default function MediaStudioScreen() {
             placeholder="Message theme or order of service..."
             multiline
             numberOfLines={2}
+            dark={isDark}
           />
 
           {/* Latency Selection */}
-          <Text style={styles.latencyLabel}>STREAM LATENCY TARGET</Text>
+          <Text style={[styles.latencyLabel, { color: colors.text }] as any}>STREAM LATENCY TARGET</Text>
           <View style={styles.latencySelector}>
             {[
               ['reduced', 'Reduced (~4s)', 'Best for real-time interaction & prayer'],
@@ -120,16 +136,41 @@ export default function MediaStudioScreen() {
                 <Pressable
                   key={key}
                   onPress={() => setLatencyMode(key as any)}
-                  style={({ pressed }) => [
+                  style={[
                     styles.latencyPill,
-                    isSelected && styles.latencyPillActive,
-                    pressed && styles.pressed,
-                  ]}
+                    {
+                      backgroundColor: isSelected
+                        ? colors.primary
+                        : isDark
+                        ? '#2E1C11'
+                        : '#F1E3D3',
+                      borderColor: isSelected ? colors.primaryDark : colors.border,
+                    },
+                  ] as any}
                 >
-                  <Text style={[styles.latencyPillTitle, isSelected && styles.latencyPillTitleActive]}>
+                  <Text
+                    style={[
+                      styles.latencyPillTitle,
+                      {
+                        color: isSelected
+                          ? '#140C07'
+                          : isDark
+                          ? '#FFFDF9'
+                          : '#26140A',
+                        fontWeight: isSelected ? '900' : '700',
+                      },
+                    ] as any}
+                  >
                     {label}
                   </Text>
-                  <Text style={styles.latencyPillDesc}>{desc}</Text>
+                  <Text
+                    style={[
+                      styles.latencyPillDesc,
+                      { color: isSelected ? '#362215' : colors.textMuted },
+                    ] as any}
+                  >
+                    {desc}
+                  </Text>
                 </Pressable>
               );
             })}
@@ -137,7 +178,12 @@ export default function MediaStudioScreen() {
 
           {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
           {actionMsg ? (
-            <View style={styles.successBox}>
+            <View
+              style={[
+                styles.successBox,
+                { backgroundColor: isDark ? '#1C3A27' : '#ECFDF5' },
+              ] as any}
+            >
               <Text style={styles.successText}>{actionMsg}</Text>
             </View>
           ) : null}
@@ -148,13 +194,13 @@ export default function MediaStudioScreen() {
             variant="gold"
             size="lg"
             loading={creating}
-            style={{ marginTop: spacing.md }}
+            style={{ marginTop: spacing.md } as any}
           />
         </View>
 
         {/* RTMP Encoder Ingest Credentials Card */}
         {createdIngest && (
-          <View style={[styles.ingestCard, shadows.lg]}>
+          <View style={[styles.ingestCard, shadows.lg] as any}>
             <View style={styles.ingestHeader}>
               <Text style={styles.ingestTitle}>OBS / vMix Ingest Credentials</Text>
               <Badge label="CONFIDENTIAL" variant="live" />
@@ -178,7 +224,7 @@ export default function MediaStudioScreen() {
                 </Text>
                 <Pressable
                   onPress={() => setShowKey(!showKey)}
-                  style={styles.showKeyButton}
+                  style={styles.showKeyButton as any}
                 >
                   <Text style={styles.showKeyText}>{showKey ? 'Hide' : 'Reveal'}</Text>
                 </Pressable>
@@ -188,34 +234,48 @@ export default function MediaStudioScreen() {
         )}
 
         {/* Active & Scheduled Streams List */}
-        <SectionHeader title="Expression Streams" badge={streams.data?.length ?? 0} />
+        <SectionHeader
+          title="Expression Streams"
+          badge={streams.data?.length ?? 0}
+          dark={isDark}
+        />
         {streams.loading ? (
-          <Skeleton height={140} count={2} />
+          <Skeleton height={140} count={2} dark={isDark} />
         ) : streams.error && !streams.data ? (
           <ResourceError
             offline={streams.offline}
             message={streams.error}
             retry={streams.refresh}
+            dark={isDark}
           />
         ) : streams.data && streams.data.length > 0 ? (
           streams.data.map((stream) => {
             const isLive = stream.status === 'live';
             return (
-              <View key={stream.id} style={[styles.streamCard, shadows.sm]}>
+              <View
+                key={stream.id}
+                style={[
+                  styles.streamCard,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                  shadows.sm,
+                ] as any}
+              >
                 <View style={styles.streamCardHeader}>
                   <Badge
                     label={stream.status.toUpperCase()}
                     variant={isLive ? 'live' : stream.status === 'scheduled' ? 'gold' : 'neutral'}
                     pulse={isLive}
                   />
-                  <Text style={styles.streamCreated}>
+                  <Text style={[styles.streamCreated, { color: colors.textMuted }] as any}>
                     {new Date(stream.created_at || Date.now()).toLocaleDateString()}
                   </Text>
                 </View>
 
-                <Text style={styles.streamCardTitle}>{stream.title}</Text>
+                <Text style={[styles.streamCardTitle, { color: colors.text }] as any}>{stream.title}</Text>
                 {stream.description ? (
-                  <Text style={styles.streamCardDescription}>{stream.description}</Text>
+                  <Text style={[styles.streamCardDescription, { color: colors.textSecondary }] as any}>
+                    {stream.description}
+                  </Text>
                 ) : null}
 
                 <View style={styles.streamCardFooter}>
@@ -239,6 +299,7 @@ export default function MediaStudioScreen() {
             title="No Expression Streams Found"
             message="Provision a livestream above to start broadcasting to your congregation."
             icon="📡"
+            dark={isDark}
           />
         )}
       </View>
@@ -246,10 +307,9 @@ export default function MediaStudioScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles: Record<string, any> = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: palette.cream,
   },
   content: {
     paddingBottom: 120,
@@ -258,10 +318,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   createCard: {
-    backgroundColor: palette.surface,
     borderRadius: radius.xl,
     padding: spacing.lg,
     marginTop: spacing.sm,
+    borderWidth: 1,
   },
   cardHeaderRow: {
     flexDirection: 'row',
@@ -272,13 +332,11 @@ const styles = StyleSheet.create({
   cardHeaderTitle: {
     fontSize: 11,
     fontWeight: '900',
-    color: palette.muted,
     letterSpacing: 0.8,
   },
   latencyLabel: {
     fontSize: 11,
     fontWeight: '900',
-    color: palette.muted,
     letterSpacing: 0.8,
     marginTop: spacing.sm,
     marginBottom: spacing.xs,
@@ -290,26 +348,13 @@ const styles = StyleSheet.create({
   latencyPill: {
     padding: spacing.md,
     borderRadius: radius.md,
-    backgroundColor: palette.surfaceSubtle,
     borderWidth: 1,
-    borderColor: palette.line,
-  },
-  latencyPillActive: {
-    backgroundColor: '#F8EDCE',
-    borderColor: palette.gold,
   },
   latencyPillTitle: {
     fontSize: 13,
-    fontWeight: '800',
-    color: palette.ink,
-  },
-  latencyPillTitleActive: {
-    color: palette.navy,
-    fontWeight: '900',
   },
   latencyPillDesc: {
     fontSize: 11,
-    color: palette.muted,
     marginTop: 2,
   },
   errorText: {
@@ -319,7 +364,6 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   successBox: {
-    backgroundColor: '#ECFDF5',
     padding: spacing.md,
     borderRadius: radius.md,
     marginVertical: spacing.sm,
@@ -330,12 +374,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   ingestCard: {
-    backgroundColor: palette.midnight,
+    backgroundColor: '#140C07',
     borderRadius: radius.xl,
     padding: spacing.lg,
     marginTop: spacing.lg,
     borderWidth: 1.5,
-    borderColor: palette.gold,
+    borderColor: palette.yellow,
   },
   ingestHeader: {
     flexDirection: 'row',
@@ -345,27 +389,27 @@ const styles = StyleSheet.create({
   ingestTitle: {
     fontSize: 16,
     fontWeight: '900',
-    color: palette.white,
+    color: '#FFFDF9',
   },
   ingestWarning: {
     fontSize: 12,
-    color: '#8E9EB5',
+    color: '#E6CCB2',
     marginVertical: spacing.sm,
   },
   credentialField: {
     marginTop: spacing.sm,
-    backgroundColor: palette.surfaceDarkElevated,
+    backgroundColor: '#2E1C11',
     padding: spacing.md,
     borderRadius: radius.md,
   },
   credentialLabel: {
     fontSize: 10,
     fontWeight: '900',
-    color: palette.gold,
+    color: palette.yellow,
     letterSpacing: 0.5,
   },
   credentialValue: {
-    color: palette.white,
+    color: '#FFFDF9',
     fontFamily: 'monospace',
     fontSize: 13,
     marginTop: 4,
@@ -382,15 +426,15 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   showKeyText: {
-    color: palette.white,
+    color: '#FFFDF9',
     fontSize: 11,
     fontWeight: '800',
   },
   streamCard: {
-    backgroundColor: palette.surface,
     borderRadius: radius.lg,
     padding: spacing.lg,
     marginBottom: spacing.md,
+    borderWidth: 1,
   },
   streamCardHeader: {
     flexDirection: 'row',
@@ -400,25 +444,18 @@ const styles = StyleSheet.create({
   },
   streamCreated: {
     fontSize: 12,
-    color: palette.muted,
   },
   streamCardTitle: {
     fontSize: 17,
     fontWeight: '900',
-    color: palette.ink,
   },
   streamCardDescription: {
     fontSize: 13,
-    color: palette.inkSecondary,
     marginTop: 4,
   },
   streamCardFooter: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     marginTop: spacing.md,
-  },
-  pressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.98 }],
   },
 });

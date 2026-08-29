@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
 import { useSession } from '@/state/session';
+import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import { EmptyState, PostCard, ResourceError, ScreenHeader, Skeleton } from '@/components';
 import { palette, radius, shadows, spacing } from '@/design-system/tokens';
@@ -11,17 +13,22 @@ type Scope = 'global' | 'expression';
 
 export default function CommunityScreen() {
   const { api, mode, context } = useSession();
+  const { colors, isDark } = useTheme();
   const [scope, setScope] = useState<Scope>('global');
 
   const feed = useResource<SocialPost[]>(`feed:${scope}`, (signal) =>
     mode === 'visitor'
-      ? api.request<SocialPost[]>(`public-content?organizationId=${organization}&type=feed`, { signal })
+      ? api.request<SocialPost[]>(
+          `public-content?type=feed${organization ? `&organizationId=${organization}` : ''}`,
+          { signal }
+        )
       : api.request<SocialPost[]>('social-feed', { signal })
   );
 
-  const posts = feed.data?.filter((post) =>
-    scope === 'global' ? post.visibility === 'public' : post.visibility !== 'public'
-  ) ?? [];
+  const posts =
+    feed.data?.filter((post) =>
+      scope === 'global' ? post.visibility === 'public' : post.visibility !== 'public'
+    ) ?? [];
 
   const handleReact = async (postId: string, reaction: string) => {
     if (mode === 'visitor') return;
@@ -32,24 +39,33 @@ export default function CommunityScreen() {
       });
       feed.refresh();
     } catch {
-      // Ignore reaction failure
+      // Ignored
     }
   };
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ScreenHeader
         title="Sanctuary Community"
         subtitle="Encouragement, testimonies, and updates from your spiritual family."
+        dark={isDark}
       />
 
       {/* Scope Selector Tabs */}
       <View style={styles.tabContainer}>
-        <View style={styles.tabPillContainer}>
+        <View
+          style={[
+            styles.tabPillContainer,
+            { backgroundColor: isDark ? '#22140C' : '#E8D5C4' },
+          ]}
+        >
           {(['global', 'expression'] as Scope[]).map((val) => {
             const isSelected = scope === val;
             const isDisabled = mode === 'visitor' && val === 'expression';
-            const label = val === 'global' ? 'Global Church' : (context?.expression?.name ?? 'My Expression');
+            const label =
+              val === 'global'
+                ? 'Global Church'
+                : 'My Expression';
 
             return (
               <Pressable
@@ -58,17 +74,20 @@ export default function CommunityScreen() {
                 onPress={() => setScope(val)}
                 style={({ pressed }) => [
                   styles.tabPill,
-                  isSelected && styles.tabPillActive,
-                  isDisabled && styles.tabPillDisabled,
-                  pressed && styles.pressed,
-                ]}
+                  isSelected ? {
+                    backgroundColor: isDark ? '#2E1C11' : '#FFFDF9',
+                    ...shadows.sm,
+                  } : null,
+                  isDisabled ? styles.disabledPill : null,
+                  pressed ? styles.pressed : null,
+                ] as any}
               >
                 <Text
                   style={[
                     styles.tabPillText,
-                    isSelected && styles.tabPillTextActive,
-                    isDisabled && styles.tabPillTextDisabled,
-                  ]}
+                    { color: isSelected ? colors.text : colors.textMuted },
+                    isSelected ? styles.tabPillTextActive : null,
+                  ] as any}
                 >
                   {label}
                 </Text>
@@ -76,49 +95,88 @@ export default function CommunityScreen() {
             );
           })}
         </View>
+
+        {/* Expression Leadership Quick Button */}
+        {scope === 'expression' && mode === 'authenticated' && (
+          <Pressable
+            onPress={() => router.push('/(tabs)/community/leadership' as any)}
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              backgroundColor: isDark ? '#1C1008' : '#FFFDF9',
+              padding: 12,
+              borderRadius: radius.md,
+              marginTop: 10,
+              borderWidth: 1,
+              borderColor: isDark ? '#3D2415' : palette.line,
+            } as any}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={{ fontSize: 18 } as any}>👥</Text>
+              <Text style={{ fontWeight: '800', color: colors.text, fontSize: 13 } as any}>
+                View Campus Pastoral & Ministry Leadership
+              </Text>
+            </View>
+            <Text style={{ color: palette.gold, fontSize: 14, fontWeight: '900' } as any}>›</Text>
+          </Pressable>
+        )}
       </View>
 
       {/* Feed List */}
       {feed.loading ? (
-        <View style={styles.loadingWrapper}>
-          <Skeleton height={200} />
-          <Skeleton height={200} />
+        <View style={styles.loadingWrapper as any}>
+          <Skeleton height={200} count={2} dark={isDark} />
         </View>
       ) : feed.error && !feed.data ? (
-        <View style={styles.errorWrapper}>
+        <View style={styles.errorWrapper as any}>
           <ResourceError
             offline={feed.offline}
             message={feed.error}
             retry={feed.refresh}
+            dark={isDark}
           />
         </View>
-      ) : (
+      ) : posts.length > 0 ? (
         <FlatList
           data={posts}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          onRefresh={feed.refresh}
-          refreshing={feed.refreshing}
           renderItem={({ item }) => (
-            <PostCard post={item} onReact={(reaction) => handleReact(item.id, reaction)} />
+            <PostCard
+              post={item}
+              onReact={(reaction) => handleReact(item.id, reaction)}
+            />
           )}
-          ListEmptyComponent={
-            <EmptyState
-              title="No Community Updates Yet"
-              message="New testimonies, pastoral messages, and ministry fellowship updates will appear here."
-              icon="🕊️"
+          contentContainerStyle={styles.listContent as any}
+          refreshControl={
+            <RefreshControl
+              refreshing={feed.loading}
+              onRefresh={feed.refresh}
+              tintColor={colors.primary}
             />
           }
         />
+      ) : (
+        <View style={styles.emptyWrapper as any}>
+          <EmptyState
+            title="No Community Posts Yet"
+            message={
+              scope === 'expression'
+                ? 'Your church expression feed is quiet right now. Check back soon for announcements and fellowship.'
+                : 'Global church feed has no published updates.'
+            }
+            icon="✦"
+            dark={isDark}
+          />
+        </View>
       )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const styles: Record<string, any> = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: palette.cream,
   },
   tabContainer: {
     paddingHorizontal: spacing.lg,
@@ -126,49 +184,40 @@ const styles = StyleSheet.create({
   },
   tabPillContainer: {
     flexDirection: 'row',
-    backgroundColor: '#E5E2D8',
-    padding: 4,
     borderRadius: radius.pill,
+    padding: 4,
   },
   tabPill: {
     flex: 1,
     paddingVertical: 10,
-    borderRadius: radius.pill,
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabPillActive: {
-    backgroundColor: palette.surface,
-    ...shadows.sm,
-  },
-  tabPillDisabled: {
-    opacity: 0.4,
+    borderRadius: radius.pill,
   },
   tabPillText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
-    color: palette.inkSecondary,
   },
   tabPillTextActive: {
-    color: palette.navy,
     fontWeight: '900',
   },
-  tabPillTextDisabled: {
-    color: palette.muted,
+  disabledPill: {
+    opacity: 0.45,
+  },
+  pressed: {
+    opacity: 0.85,
   },
   listContent: {
     paddingHorizontal: spacing.lg,
     paddingBottom: 120,
   },
   loadingWrapper: {
-    padding: spacing.lg,
-    gap: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.md,
   },
   errorWrapper: {
-    padding: spacing.lg,
+    paddingHorizontal: spacing.lg,
   },
-  pressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.98 }],
+  emptyWrapper: {
+    paddingHorizontal: spacing.lg,
   },
 });

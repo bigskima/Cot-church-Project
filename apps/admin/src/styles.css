@@ -1,30 +1,30 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap');
 
 :root {
-  --bg-main: #040914;
-  --bg-sidebar: #070F20;
-  --bg-card: #0D1930;
-  --bg-card-hover: #132445;
-  --bg-elevated: #16284C;
-  --bg-input: #091326;
+  --bg-main: #140C07;
+  --bg-sidebar: #1C1009;
+  --bg-card: #22140C;
+  --bg-card-hover: #2E1C11;
+  --bg-elevated: #362215;
+  --bg-input: #1C1009;
   
-  --border-subtle: #172B50;
-  --border-strong: #233F73;
-  --border-glow: #E7BB4D40;
+  --border-subtle: #452A1A;
+  --border-strong: #613C25;
+  --border-glow: #F59E0B55;
 
-  --text-primary: #FFFFFF;
-  --text-secondary: #94A3B8;
-  --text-muted: #64748B;
+  --text-primary: #FFFDF9;
+  --text-secondary: #E6CCB2;
+  --text-muted: #A68A75;
 
-  --gold: #E7BB4D;
-  --gold-light: #F3D27E;
-  --gold-dark: #C79A2B;
-  --gold-glow: 0 0 20px #E7BB4D33;
+  --gold: #F59E0B;
+  --gold-light: #FDE047;
+  --gold-dark: #B45309;
+  --gold-glow: 0 0 20px rgba(245, 158, 11, 0.35);
 
   --blue: #3B82F6;
-  --blue-glow: 0 0 20px #3B82F633;
+  --blue-glow: 0 0 20px rgba(59, 130, 246, 0.35);
   --live: #EF4444;
-  --live-glow: 0 0 20px #EF44444D;
+  --live-glow: 0 0 20px rgba(239, 68, 68, 0.45);
   --success: #10B981;
   --warning: #F59E0B;
   --purple: #8B5CF6;
@@ -37,6 +37,27 @@
 
   --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
+}
+
+[data-theme="light"] {
+  --bg-main: #F8EDE2;
+  --bg-sidebar: #F1E3D3;
+  --bg-card: #FFFDF9;
+  --bg-card-hover: #F8EDE2;
+  --bg-elevated: #FFFFFF;
+  --bg-input: #FFFFFF;
+  
+  --border-subtle: #E8D5C4;
+  --border-strong: #D4BEAB;
+  --border-glow: #F59E0B40;
+
+  --text-primary: #26140A;
+  --text-secondary: #5C3D28;
+  --text-muted: #8C6549;
+
+  --gold: #D97706;
+  --gold-light: #F59E0B;
+  --gold-dark: #92400E;
 }
 
 * {
@@ -60,7 +81,7 @@ body {
 .admin-shell {
   display: flex;
   min-height: 100vh;
-  background: radial-gradient(circle at 10% 0%, #0d1f3d 0%, var(--bg-main) 60%);
+  background: radial-gradient(circle at 10% 0%, #2A170C 0%, var(--bg-main) 60%);
 }
 
 .admin-sidebar {
