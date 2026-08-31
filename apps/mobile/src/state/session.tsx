@@ -23,10 +23,16 @@ export function SessionProvider({ children }: PropsWithChildren) {
   const [context, setContext] = useState<MembershipContext | null>(null);
 
   useEffect(() => {
-    loadAuth().then((value) => {
-      setAuth(value);
-      setMode(value ? 'authenticated' : 'visitor');
-    });
+    loadAuth()
+      .then((value) => {
+        setAuth(value);
+        setMode(value ? 'authenticated' : 'visitor');
+      })
+      .catch((err) => {
+        console.warn('Failed to load session:', err);
+        setAuth(null);
+        setMode('visitor');
+      });
   }, []);
 
   const persist = useCallback(async (value: StoredAuth | null) => {

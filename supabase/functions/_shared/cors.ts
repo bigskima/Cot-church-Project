@@ -7,7 +7,15 @@ export function corsHeaders(request: Request) {
   const origin = request.headers.get("origin");
   if (!origin) return {};
   const allowed = getAllowedOrigins();
-  if (!allowed.includes(origin)) throw new ApiError("ORIGIN_NOT_ALLOWED", "Origin not allowed", 403);
+  const isPermitted =
+    allowed.length === 0 ||
+    allowed.includes("*") ||
+    allowed.includes(origin) ||
+    origin.endsWith(".vercel.app") ||
+    origin.startsWith("http://localhost:") ||
+    origin.startsWith("http://127.0.0.1:");
+
+  if (!isPermitted) throw new ApiError("ORIGIN_NOT_ALLOWED", "Origin not allowed", 403);
   return {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Headers": allowedHeaders,
