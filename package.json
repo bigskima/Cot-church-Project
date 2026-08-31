@@ -14,6 +14,8 @@
     "api:check": "node scripts/check-api.mjs",
     "admin:build": "npm --workspace @church/admin run build",
     "admin:typecheck": "npm --workspace @church/admin run typecheck",
+    "mobile:build": "npm --workspace @church/mobile run build",
+    "mobile:build:web": "npm --workspace @church/mobile run build:web",
     "mobile:typecheck": "npm --workspace @church/mobile run typecheck",
     "apps:check": "node scripts/check-apps.mjs",
     "check": "npm run foundation:check && npm run api:check && npm run apps:check && npm run services:check",
@@ -30,5 +32,9 @@
   "devDependencies": {
     "@pgsql/parser": "1.5.0",
     "supabase": "2.115.0"
+  },
+  "dependencies": {
+    "react-native": "^0.86.3",
+    "react-native-web": "^0.21.2"
   }
 }

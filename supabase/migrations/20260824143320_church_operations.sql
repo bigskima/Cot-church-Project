@@ -4,6 +4,9 @@ create type public.group_membership_status as enum ('requested', 'active', 'decl
 create type public.prayer_request_status as enum ('submitted', 'in_review', 'praying', 'answered', 'closed');
 create type public.prayer_visibility as enum ('private', 'prayer_team', 'organization');
 
+alter table public.permissions drop constraint if exists permissions_code_check;
+alter table public.permissions add constraint permissions_code_check check (code ~ '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$');
+
 insert into public.permissions (code, name, description, category) values
   ('units.read', 'View ministries and departments', 'View organization units.', 'operations'),
   ('units.manage', 'Manage ministries and departments', 'Create and update organization units.', 'operations'),

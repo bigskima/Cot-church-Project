@@ -1,7 +1,7 @@
 -- Database-driven, organization-scoped role-based access control.
 
 create table public.permissions (
-  code text primary key check (code ~ '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$'),
+  code text primary key check (code ~ '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$'),
   name text not null,
   description text not null,
   category text not null,

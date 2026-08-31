@@ -1,3 +1,4 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import{ApiError}from"../_shared/errors.ts";import{createHandler}from"../_shared/handler.ts";
+import { ApiError } from "../_shared/errors.ts";
+import { createHandler } from "../_shared/handler.ts";
 Deno.serve(createHandler({methods:["GET"],authentication:"required",organization:"required",permission:"reports.read"},async({request,auth})=>{if(!auth?.organizationId)throw new ApiError("ORGANIZATION_REQUIRED","Organization context is required",400);const url=new URL(request.url),start=url.searchParams.get("start")??new Date(Date.now()-30*86400000).toISOString(),end=url.searchParams.get("end")??new Date().toISOString();if(Number.isNaN(Date.parse(start))||Number.isNaN(Date.parse(end)))throw new ApiError("VALIDATION_FAILED","Invalid report period",422);const{data,error}=await auth.client.rpc("organization_dashboard",{target_organization_id:auth.organizationId,period_start:start,period_end:end});if(error)throw new ApiError("REPORT_BUILD_FAILED","Unable to build organization dashboard",500,undefined,false);return{data,meta:{start,end}};}));

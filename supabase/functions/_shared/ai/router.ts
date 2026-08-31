@@ -1,4 +1,7 @@
-import{ApiError}from'../errors.ts';import{adminClient}from'../supabase.ts';import{aiProvider}from'./registry.ts';import type{AiCapability,AiRequest,AiResult}from'./types.ts';
+import { ApiError } from '../errors.ts';
+import { adminClient } from '../supabase.ts';
+import { aiProvider } from './registry.ts';
+import type{AiCapability,AiRequest,AiResult } from './types.ts';
 type Model={id:string;model_key:string;input_cost_per_million:number;output_cost_per_million:number;ai_providers:{code:string;secret_reference:string;status:string}};type Route={id:string;primary_model_id:string;fallback_model_ids:string[];timeout_ms:number;max_retries:number};
 const methodFor:Record<string,AiCapability>={'assistant.answer':'generateText','sermon.summarize':'generateStructuredData','sermon.transcribe':'transcribeAudio','live.caption':'transcribeAudio','translate.text':'translateText','search.embed':'createEmbeddings','content.moderate':'moderateContent','pastoral.triage':'generateStructuredData','admin.insight':'generateStructuredData'};
 async function digest(value:string){const result=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value));return[...new Uint8Array(result)].map(x=>x.toString(16).padStart(2,'0')).join('')}

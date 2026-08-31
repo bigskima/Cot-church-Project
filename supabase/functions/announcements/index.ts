@@ -1,5 +1,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { ApiError } from "../_shared/errors.ts";import{authorize}from"../_shared/context.ts";import{createHandler}from"../_shared/handler.ts";import{jsonBody}from"../_shared/request.ts";import{assertNoUnknownFields,assertObject,optionalString,requiredString,uuid}from"../_shared/validation.ts";
+import { ApiError } from "../_shared/errors.ts";
+import { authorize } from "../_shared/context.ts";
+import { createHandler } from "../_shared/handler.ts";
+import { jsonBody } from "../_shared/request.ts";
+import { assertNoUnknownFields,assertObject,optionalString,requiredString,uuid } from "../_shared/validation.ts";
 const channels=new Set(["in_app","email","sms","push"]);
 Deno.serve(createHandler({methods:["GET","POST","PATCH"],authentication:"required",organization:"required"},async({request,auth})=>{if(!auth?.organizationId)throw new ApiError("ORGANIZATION_REQUIRED","Organization context is required",400);if(request.method==="GET"){const{data,error}=await auth.client.from("announcements").select("id,branch_id,title,body,status,audience,channels,scheduled_for,published_at,created_at,updated_at").eq("organization_id",auth.organizationId).order("created_at",{ascending:false}).limit(100);if(error)throw new ApiError("ANNOUNCEMENT_LIST_FAILED","Unable to retrieve announcements",500,undefined,false);return{data:data??[]};}
  const body=assertObject(await jsonBody(request));if(body.action==="publish"){assertNoUnknownFields(body,["action","id"]);const{data,error}=await auth.client.rpc("publish_announcement",{target_announcement_id:uuid(requiredString(body.id,"id",36),"id",true)}).single();if(error?.code==="42501")throw new ApiError("PERMISSION_DENIED","Permission denied",403);if(error)throw new ApiError("ANNOUNCEMENT_PUBLISH_FAILED","Unable to publish announcement",500,undefined,false);return{data};}

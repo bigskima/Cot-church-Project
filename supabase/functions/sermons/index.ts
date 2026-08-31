@@ -158,4 +158,4 @@ Deno.serve(createHandler({ methods: ["GET", "POST", "PATCH"], authentication: "o
   const { data, error } = await auth.client.from("sermons").update(updates).eq("id", id).eq("organization_id", auth.organizationId).select().single();
   if (error) throw new ApiError("SERMON_UPDATE_FAILED", "Unable to update sermon", 500, undefined, false);
   return { data };
-});
+}));

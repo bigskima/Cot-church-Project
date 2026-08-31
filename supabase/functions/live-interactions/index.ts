@@ -1,2 +1,6 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";import{ApiError}from"../_shared/errors.ts";import{createHandler}from"../_shared/handler.ts";import{jsonBody}from"../_shared/request.ts";import{assertNoUnknownFields,assertObject,requiredString,uuid}from"../_shared/validation.ts";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { ApiError } from "../_shared/errors.ts";
+import { createHandler } from "../_shared/handler.ts";
+import { jsonBody } from "../_shared/request.ts";
+import { assertNoUnknownFields,assertObject,requiredString,uuid } from "../_shared/validation.ts";
 Deno.serve(createHandler({methods:["POST"],authentication:"required",organization:"optional"},async({request,auth})=>{const body=assertObject(await jsonBody(request));assertNoUnknownFields(body,["streamId","action","reaction","message","type"]);const action=requiredString(body.action,"action",20),value=action==="react"?requiredString(body.reaction,"reaction",20):action==="chat"?requiredString(body.message,"message",1000):requiredString(body.type,"type",40);const{data,error}=await auth!.client.rpc("add_stream_interaction",{target_stream_id:uuid(requiredString(body.streamId,"streamId",36),"streamId",true),interaction_action:action,interaction_value:value});if(error?.code==="42501")throw new ApiError("INTERACTION_DENIED","This action is not available to you",403);if(error)throw new ApiError("INTERACTION_FAILED","Unable to complete this live action",400);return{data};}));
