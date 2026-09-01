@@ -1,31 +1,35 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import {
   Badge,
   Button,
+  Chip,
   EmptyState,
+  Icon,
   ResourceError,
   ScreenHeader,
   SectionHeader,
   Skeleton,
 } from '@/components';
-import { palette, radius, shadows, spacing } from '@/design-system/tokens';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 import type { LiveFollowUp, PrayerRequest } from '@/types/content';
 
 export default function PastoralTriageScreen() {
+  const insets = useSafeAreaInsets();
   const { api } = useSession();
-  const { colors, isDark } = useTheme();
-  const [activeQueue, setActiveQueue] = useState<'prayer' | 'altar'>('prayer');
+  const { colors } = useTheme();
+  const [activeQueue, setActiveQueue] = useState<'prayer' | 'care'>('prayer');
 
   const prayers = useResource<PrayerRequest[]>('pastoral:prayers', (signal) =>
-    api.request<PrayerRequest[]>('prayer-requests', { signal })
+    api.request<PrayerRequest[]>('prayer-requests', { signal }).catch(() => [])
   );
 
   const followups = useResource<LiveFollowUp[]>('pastoral:followups', (signal) =>
-    api.request<LiveFollowUp[]>('social-feed?type=followups', { signal }).catch(() => [] as LiveFollowUp[])
+    api.request<LiveFollowUp[]>('social-feed?type=followups', { signal }).catch(() => [])
   );
 
   const updatePrayerStatus = async (id: string, status: 'praying' | 'answered' | 'archived') => {
@@ -36,248 +40,202 @@ export default function PastoralTriageScreen() {
       });
       prayers.refresh();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Unable to update status');
+      // Ignored
     }
   };
 
-  return (
-    <ScrollView
-      style={[styles.screen, { backgroundColor: colors.bg }]}
-      contentContainerStyle={styles.content}
-    >
-      <ScreenHeader
-        title="Pastoral Triage & Care"
-        subtitle="Confidential prayer petitions, altar call decisions, and ministerial follow-ups."
-        showBack
-        dark={isDark}
-      />
+  const prayerList = prayers.data ?? [];
+  const careList = followups.data ?? [];
 
-      <View style={styles.body}>
+  return (
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + spacing.sm, paddingBottom: 60 },
+        ]}
+      >
+        <ScreenHeader
+          title="Pastoral Triage & Care"
+          subtitle="Review confidential member prayer requests, pastoral follow-ups, and altar responses."
+          showBack
+        />
+
         {/* Queue Switcher */}
-        <View
-          style={[
-            styles.queueSelector,
-            { backgroundColor: isDark ? '#22140C' : '#E8D5C4' },
-          ]}
-        >
-          {[
-            ['prayer', `Prayer Queue (${prayers.data?.length ?? 0})`],
-            ['altar', `Altar & Care (${followups.data?.length ?? 0})`],
-          ].map(([q, label]) => {
-            const isSelected = activeQueue === q;
-            return (
-              <Pressable
-                key={q}
-                onPress={() => setActiveQueue(q as any)}
-                style={[
-                  styles.queuePill,
-                  isSelected ? {
-                    backgroundColor: isDark ? '#2E1C11' : '#FFFDF9',
-                    ...shadows.sm,
-                  } : null,
-                ] as any}
-              >
-                <Text
-                  style={[
-                    styles.queuePillText,
-                    { color: isSelected ? colors.text : colors.textMuted },
-                    isSelected ? styles.queuePillTextActive : null,
-                  ] as any}
-                >
-                  {label}
-                </Text>
-              </Pressable>
-            );
-          })}
+        <View style={styles.tabRow}>
+          <Chip
+            label="Prayer Requests"
+            selected={activeQueue === 'prayer'}
+            onPress={() => setActiveQueue('prayer')}
+            count={prayerList.length}
+          />
+          <Chip
+            label="Altar & Care Responses"
+            selected={activeQueue === 'care'}
+            onPress={() => setActiveQueue('care')}
+            count={careList.length}
+          />
         </View>
 
-        {/* Prayer Queue */}
-        {activeQueue === 'prayer' && (
-          <>
-            <SectionHeader title="Active Prayer Petitions" dark={isDark} />
-            {prayers.loading ? (
-              <Skeleton height={140} count={2} dark={isDark} />
-            ) : prayers.error && !prayers.data ? (
-              <ResourceError
-                offline={prayers.offline}
-                message={prayers.error}
-                retry={prayers.refresh}
-                dark={isDark}
-              />
-            ) : prayers.data && prayers.data.length > 0 ? (
-              prayers.data.map((prayer) => (
-                <View
-                  key={prayer.id}
-                  style={[
-                    styles.card,
-                    { backgroundColor: colors.card, borderColor: colors.border },
-                    shadows.sm,
-                  ] as any}
-                >
-                  <View style={styles.cardHeader}>
-                    <Badge
-                      label={prayer.status.toUpperCase()}
-                      variant={prayer.status === 'answered' ? 'success' : 'prayer'}
-                    />
-                    <Text style={styles.confidentialityTag as any}>
-                      {prayer.is_confidential ? '🔒 Confidential' : 'Public Wall'}
-                    </Text>
-                  </View>
+        <View style={styles.body}>
+          {activeQueue === 'prayer' ? (
+            <View style={styles.queueSection}>
+              <SectionHeader title="Confidential Prayer Queue" badge={prayerList.length} />
+              {prayers.loading ? (
+                <Skeleton height={140} count={2} />
+              ) : prayers.error && !prayers.data ? (
+                <ResourceError message={prayers.error} retry={prayers.refresh} />
+              ) : prayerList.length > 0 ? (
+                prayerList.map((p) => (
+                  <View
+                    key={p.id}
+                    style={[styles.triageCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}
+                  >
+                    <View style={styles.cardHeader}>
+                      <Badge
+                        label={p.privacy === 'pastoral_only' ? 'CONFIDENTIAL PASTORAL' : 'PRAYER WALL'}
+                        variant={p.privacy === 'pastoral_only' ? 'prayer' : 'primary'}
+                      />
+                      <Text style={[styles.dateText, { color: colors.textMuted }]}>
+                        {new Date(p.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                      </Text>
+                    </View>
 
-                  <Text style={[styles.cardTitle, { color: colors.text }] as any}>{prayer.title}</Text>
-                  <Text style={[styles.cardDescription, { color: colors.textSecondary }] as any}>
-                    {prayer.description}
-                  </Text>
+                    <Text style={[styles.title, { color: colors.text }]}>{p.title}</Text>
+                    {p.request || p.description ? (
+                      <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+                        {p.request || p.description}
+                      </Text>
+                    ) : null}
 
-                  <View style={[styles.actionRow, { borderTopColor: colors.border }] as any}>
-                    <Button
-                      label="Mark Praying"
-                      onPress={() => updatePrayerStatus(prayer.id, 'praying')}
-                      variant="secondary"
-                      size="sm"
-                    />
-                    <Button
-                      label="Answered Testimony"
-                      onPress={() => updatePrayerStatus(prayer.id, 'answered')}
-                      variant="gold"
-                      size="sm"
-                    />
-                  </View>
-                </View>
-              ))
-            ) : (
-              <EmptyState
-                title="No Open Prayer Requests"
-                message="All submitted prayer requests have been triaged and prayed over."
-                icon="🕊️"
-                dark={isDark}
-              />
-            )}
-          </>
-        )}
+                    {/* Action Bar */}
+                    <View style={[styles.actionBar, { borderTopColor: colors.borderSubtle }]}>
+                      <Text style={[styles.statusLabel, { color: colors.textMuted }]}>
+                        Status: <Text style={{ color: colors.interactive, fontWeight: '700' }}>{p.status || 'submitted'}</Text>
+                      </Text>
 
-        {/* Altar & Follow-ups Queue */}
-        {activeQueue === 'altar' && (
-          <>
-            <SectionHeader title="Live Stream Altar & Discipleship Queue" dark={isDark} />
-            {followups.loading ? (
-              <Skeleton height={140} count={2} dark={isDark} />
-            ) : followups.data && followups.data.length > 0 ? (
-              followups.data.map((item) => (
-                <View
-                  key={item.id}
-                  style={[
-                    styles.card,
-                    { backgroundColor: colors.card, borderColor: colors.border },
-                    shadows.sm,
-                  ] as any}
-                >
-                  <View style={styles.cardHeader}>
-                    <Badge label={item.type.replace('_', ' ').toUpperCase()} variant="gold" />
-                    <Text style={[styles.cardDate, { color: colors.textMuted }] as any}>
-                      {new Date(item.created_at).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </Text>
+                      <View style={styles.btnRow}>
+                        <Button
+                          label="Mark Praying"
+                          onPress={() => updatePrayerStatus(p.id, 'praying')}
+                          variant="outline"
+                          size="sm"
+                        />
+                        <Button
+                          label="Answered"
+                          onPress={() => updatePrayerStatus(p.id, 'answered')}
+                          variant="primary"
+                          size="sm"
+                        />
+                      </View>
+                    </View>
                   </View>
-                  <Text style={[styles.cardTitle, { color: colors.text }] as any}>
-                    {item.user_name || 'Anonymous Visitor'}
-                  </Text>
-                  <Text style={[styles.cardDescription, { color: colors.textSecondary }] as any}>
-                    Contact: {item.user_email || 'No email on record'} · Status: {item.status}
-                  </Text>
-                  <View style={[styles.actionRow, { borderTopColor: colors.border }] as any}>
-                    <Button
-                      label="Assign Pastoral Counselor"
-                      onPress={() => alert('Assigned to pastoral care.')}
-                      variant="gold"
-                      size="sm"
-                    />
+                ))
+              ) : (
+                <EmptyState
+                  title="No Pending Prayer Requests"
+                  message="All incoming petitions have been triaged by the pastoral team."
+                  iconName="shield-checkmark-outline"
+                />
+              )}
+            </View>
+          ) : (
+            /* Altar & Care Queue */
+            <View style={styles.queueSection}>
+              <SectionHeader title="Altar Call & Counselling Log" badge={careList.length} />
+              {careList.length > 0 ? (
+                careList.map((f) => (
+                  <View
+                    key={f.id}
+                    style={[styles.triageCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}
+                  >
+                    <View style={styles.cardHeader}>
+                      <Badge label={f.type.toUpperCase()} variant="primary" />
+                      <Text style={[styles.dateText, { color: colors.textMuted }]}>
+                        {new Date(f.created_at).toLocaleDateString()}
+                      </Text>
+                    </View>
+                    <Text style={[styles.title, { color: colors.text }]}>{f.user_name || 'Anonymous Visitor'}</Text>
+                    {f.user_email ? (
+                      <Text style={[styles.bodyText, { color: colors.interactive }]}>{f.user_email}</Text>
+                    ) : null}
+                    {f.private_note ? (
+                      <Text style={[styles.bodyText, { color: colors.textSecondary }]}>{f.private_note}</Text>
+                    ) : null}
                   </View>
-                </View>
-              ))
-            ) : (
-              <EmptyState
-                title="No Pending Follow-ups"
-                message="Decisions for Christ, counselling requests, and membership interests appear here."
-                icon="✝️"
-                dark={isDark}
-              />
-            )}
-          </>
-        )}
-      </View>
-    </ScrollView>
+                ))
+              ) : (
+                <EmptyState
+                  title="No Follow-Up Requests"
+                  message="Incoming live service decisions and prayer requests will appear here."
+                  iconName="heart-outline"
+                />
+              )}
+            </View>
+          )}
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
   content: {
-    paddingBottom: 120,
+    flexGrow: 1,
+  },
+  tabRow: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.lg,
+    gap: spacing.xs,
+    marginBottom: spacing.md,
   },
   body: {
     paddingHorizontal: spacing.lg,
+    gap: spacing.lg,
   },
-  queueSelector: {
-    flexDirection: 'row',
-    padding: 4,
-    borderRadius: radius.pill,
-    marginTop: spacing.sm,
-    marginBottom: spacing.md,
+  queueSection: {
+    gap: spacing.xs,
   },
-  queuePill: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  queuePillText: {
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  queuePillTextActive: {
-    fontWeight: '900',
-  },
-  card: {
-    padding: spacing.lg,
+  triageCard: {
+    padding: spacing.md,
     borderRadius: radius.lg,
-    marginBottom: spacing.md,
     borderWidth: 1,
+    marginBottom: spacing.xs,
+    gap: spacing.xs,
   },
   cardHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.xs,
+    justifyContent: 'space-between',
   },
-  confidentialityTag: {
-    fontSize: 11,
-    color: palette.prayer,
-    fontWeight: '800',
-  },
-  cardDate: {
+  dateText: {
     fontSize: 11,
   },
-  cardTitle: {
-    fontSize: 17,
-    fontWeight: '900',
+  title: {
+    fontSize: 15,
+    fontWeight: '700',
   },
-  cardDescription: {
+  bodyText: {
     fontSize: 13,
-    marginTop: 4,
     lineHeight: 18,
   },
-  actionRow: {
+  actionBar: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: spacing.sm,
-    marginTop: spacing.md,
-    paddingTop: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: spacing.xs + 4,
     borderTopWidth: 1,
+    marginTop: spacing.xs,
+  },
+  statusLabel: {
+    fontSize: 12,
+  },
+  btnRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
   },
 });

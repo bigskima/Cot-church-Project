@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Pressable,
   StyleProp,
@@ -9,16 +9,18 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
-import { palette, radius, spacing } from '../design-system/tokens';
+import { useTheme } from '@/state/theme';
+import { radius, spacing, typography } from '@/design-system/tokens';
+import { Icon } from './primitives/Icon';
 
-interface InputFieldProps extends TextInputProps {
+export interface InputFieldProps extends TextInputProps {
   label?: string;
   error?: string;
   helperText?: string;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
-  dark?: boolean;
-  containerStyle?: any;
+  containerStyle?: StyleProp<ViewStyle>;
+  dark?: boolean; // kept for compatibility
 }
 
 export function InputField({
@@ -27,57 +29,82 @@ export function InputField({
   helperText,
   leftIcon,
   rightIcon,
-  dark = false,
   containerStyle,
   style,
+  onFocus,
+  onBlur,
   ...props
 }: InputFieldProps) {
+  const { colors } = useTheme();
+  const [isFocused, setIsFocused] = useState(false);
+
   return (
-    <View style={[styles.container, containerStyle] as any}>
-      {label && (
-        <Text style={[styles.label, dark ? styles.labelDark : styles.labelLight] as any}>{label}</Text>
-      )}
+    <View style={[styles.container, containerStyle]}>
+      {label && <Text style={[styles.label, { color: colors.text }]}>{label}</Text>}
       <View
         style={[
           styles.inputWrapper,
-          dark ? styles.inputWrapperDark : styles.inputWrapperLight,
-          error ? styles.inputError : undefined,
-        ] as any}
+          {
+            backgroundColor: colors.inputBg,
+            borderColor: error
+              ? colors.live
+              : isFocused
+              ? colors.interactive
+              : colors.inputBorder,
+          },
+        ]}
       >
         {leftIcon && <View style={styles.iconLeft}>{leftIcon}</View>}
         <TextInput
-          placeholderTextColor={dark ? '#A68A75' : '#8C6549'}
-          style={[styles.input, dark ? styles.textDark : styles.textLight, style] as any}
+          placeholderTextColor={colors.textMuted}
+          style={[
+            styles.input,
+            { color: colors.text },
+            style,
+          ]}
+          onFocus={(e) => {
+            setIsFocused(true);
+            onFocus?.(e);
+          }}
+          onBlur={(e) => {
+            setIsFocused(false);
+            onBlur?.(e);
+          }}
           {...props}
         />
         {rightIcon && <View style={styles.iconRight}>{rightIcon}</View>}
       </View>
       {error ? (
-        <Text style={styles.errorText}>{error}</Text>
+        <Text style={[styles.errorText, { color: colors.live }]}>{error}</Text>
       ) : helperText ? (
-        <Text style={[styles.helperText, dark ? styles.helperDark : styles.helperLight] as any}>
-          {helperText}
-        </Text>
+        <Text style={[styles.helperText, { color: colors.textMuted }]}>{helperText}</Text>
       ) : null}
     </View>
   );
 }
 
-interface SearchBarProps {
+export interface SearchBarProps {
   value: string;
   onChangeText: (text: string) => void;
   placeholder?: string;
   onClear?: () => void;
-  dark?: boolean;
+  onSubmitEditing?: () => void;
+  autoFocus?: boolean;
+  style?: StyleProp<ViewStyle>;
+  dark?: boolean; // kept for compatibility
 }
 
 export function SearchBar({
   value,
   onChangeText,
-  placeholder = 'Search...',
+  placeholder = 'Search sermons, events, series, topics...',
   onClear,
-  dark = false,
+  onSubmitEditing,
+  autoFocus = false,
+  style,
 }: SearchBarProps) {
+  const { colors } = useTheme();
+
   const handleClear = () => {
     onChangeText('');
     onClear?.();
@@ -87,72 +114,60 @@ export function SearchBar({
     <View
       style={[
         styles.searchContainer,
-        dark ? styles.searchContainerDark : styles.searchContainerLight,
-      ] as any}
+        {
+          backgroundColor: colors.bgSecondary,
+          borderColor: colors.border,
+        },
+        style,
+      ]}
     >
-      <Text style={styles.searchIcon}>⌕</Text>
+      <Icon name="search" size={18} color={colors.textMuted} style={styles.searchIcon} />
       <TextInput
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={dark ? '#A68A75' : '#8C6549'}
-        style={[styles.searchInput, dark ? styles.textDark : styles.textLight] as any}
+        placeholderTextColor={colors.textMuted}
+        style={[styles.searchInput, { color: colors.text }]}
+        returnKeyType="search"
+        onSubmitEditing={onSubmitEditing}
+        autoFocus={autoFocus}
       />
       {value.length > 0 && (
-        <Pressable onPress={handleClear} style={styles.clearButton as any}>
-          <Text style={styles.clearIcon}>✕</Text>
+        <Pressable
+          onPress={handleClear}
+          hitSlop={8}
+          style={styles.clearButton}
+          accessibilityRole="button"
+          accessibilityLabel="Clear search"
+        >
+          <Icon name="close-circle" size={18} color={colors.textMuted} />
         </Pressable>
       )}
     </View>
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
     marginBottom: spacing.md,
   },
   label: {
-    fontSize: 12,
-    fontWeight: '800',
-    marginBottom: 6,
-    letterSpacing: 0.2,
-  },
-  labelLight: {
-    color: '#26140A',
-  },
-  labelDark: {
-    color: '#E6CCB2',
+    ...typography.caption,
+    fontWeight: '600',
+    marginBottom: spacing.xxs + 2,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: radius.md,
-    borderWidth: 1.5,
+    borderWidth: 1,
     paddingHorizontal: spacing.md,
-    minHeight: 48,
-  },
-  inputWrapperLight: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E8D5C4',
-  },
-  inputWrapperDark: {
-    backgroundColor: '#1C1009',
-    borderColor: '#452A1A',
-  },
-  inputError: {
-    borderColor: palette.live,
+    minHeight: 46,
   },
   input: {
     flex: 1,
     fontSize: 14,
-    fontWeight: '600',
     paddingVertical: 10,
-  },
-  textLight: {
-    color: '#26140A',
-  },
-  textDark: {
-    color: '#FFFDF9',
   },
   iconLeft: {
     marginRight: spacing.sm,
@@ -162,53 +177,29 @@ const styles: Record<string, any> = StyleSheet.create({
   },
   errorText: {
     fontSize: 12,
-    fontWeight: '700',
-    color: palette.live,
     marginTop: 4,
   },
   helperText: {
     fontSize: 12,
     marginTop: 4,
   },
-  helperLight: {
-    color: '#8C6549',
-  },
-  helperDark: {
-    color: '#A68A75',
-  },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: radius.pill,
+    borderRadius: radius.md,
     paddingHorizontal: spacing.md,
-    height: 44,
+    height: 42,
     borderWidth: 1,
   },
-  searchContainerLight: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E8D5C4',
-  },
-  searchContainerDark: {
-    backgroundColor: '#22140C',
-    borderColor: '#452A1A',
-  },
   searchIcon: {
-    fontSize: 18,
-    color: '#F59E0B',
     marginRight: spacing.sm,
-    fontWeight: '900',
   },
   searchInput: {
     flex: 1,
     fontSize: 14,
-    fontWeight: '600',
+    paddingVertical: 8,
   },
   clearButton: {
-    padding: 4,
-  },
-  clearIcon: {
-    fontSize: 12,
-    color: '#8C6549',
-    fontWeight: '900',
+    padding: 2,
   },
 });

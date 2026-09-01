@@ -1,393 +1,256 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
-import { Badge, Button, MediaPlayer, ResourceError, Skeleton } from '@/components';
-import { palette, radius, shadows, spacing } from '@/design-system/tokens';
+import {
+  Badge,
+  Chip,
+  Icon,
+  MediaPlayer,
+  ResourceError,
+  ScreenHeader,
+  Skeleton,
+} from '@/components';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 import type { Sermon } from '@/types/content';
 
 export default function SermonDetailScreen() {
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { api, mode } = useSession();
-  const { colors, isDark } = useTheme();
+  const { api } = useSession();
+  const { colors } = useTheme();
   const [activeTab, setActiveTab] = useState<'study' | 'summary' | 'scriptures'>('study');
 
   const sermonResource = useResource<Sermon>(`sermon:${id}`, async (signal) => {
-    try {
-      const res = await api.request<Sermon | { data: Sermon }>(`sermons?id=${id}`, { signal });
-      if ('data' in (res as any)) return (res as any).data;
-      return res as Sermon;
-    } catch {
-      // Fallback preview
-      return {
-        id: id ?? 'sermon-1',
-        organization_id: 'org-1',
-        title: 'Walking in Unwavering Faith & Authority',
-        description: 'A transformative expository study on operating in spiritual authority and divine confidence.',
-        preacher: 'Pastor David Alexander',
-        sermon_date: '2026-08-23',
-        status: 'published',
-        visibility: 'public',
-        audio_url: 'https://example.com/sermon.mp3',
-        video_url: 'x36xhzz',
-        scripture_references: ['Hebrews 11:1-6', 'Ephesians 6:10-18', 'Romans 8:31-39'],
-        ai_summary:
-          'In this powerful message, Pastor David breaks down the principles of kingdom faith. Faith is not mere positive thinking; it is spiritual conviction anchored in God’s unfailing covenant promise.',
-      };
-    }
+    const res = await api.request<Sermon | { data: Sermon }>(`sermons?id=${id}`, { signal });
+    if ('data' in (res as any)) return (res as any).data;
+    return res as Sermon;
   });
 
   const sermon = sermonResource.data;
 
-  if (sermonResource.loading) {
-    return (
-      <View style={[styles.loadingScreen, { backgroundColor: colors.bg }] as any}>
-        <Skeleton height={260} dark={isDark} />
-        <View style={{ padding: spacing.lg, gap: spacing.md }}>
-          <Skeleton height={24} width="50%" dark={isDark} />
-          <Skeleton height={32} width="80%" dark={isDark} />
-          <Skeleton height={100} dark={isDark} />
-        </View>
-      </View>
-    );
-  }
-
-  if (sermonResource.error && !sermon) {
-    return (
-      <View style={[styles.errorScreen, { backgroundColor: colors.bg }] as any}>
-        <Pressable onPress={() => router.back()} style={styles.backButton as any}>
-          <Text style={[styles.backButtonText, { color: colors.text }] as any}>‹ Back to Sermons</Text>
-        </Pressable>
-        <View style={styles.errorWrapper}>
-          <ResourceError
-            offline={sermonResource.offline}
-            message={sermonResource.error}
-            retry={sermonResource.refresh}
-            dark={isDark}
-          />
-        </View>
-      </View>
-    );
-  }
+  const formattedDate = sermon?.sermon_date
+    ? new Date(sermon.sermon_date).toLocaleDateString(undefined, {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : null;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.bg }] as any}>
-      {/* Top Floating Back Header */}
-      <View
-        style={[
-          styles.topBar,
-          { backgroundColor: colors.card, borderBottomColor: colors.border },
-        ] as any}
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + spacing.sm, paddingBottom: 60 },
+        ]}
       >
-        <Pressable onPress={() => router.back()} style={styles.backButton as any}>
-          <Text style={[styles.backButtonText, { color: colors.text }] as any}>‹ Back</Text>
-        </Pressable>
-        <Text style={[styles.topTitle, { color: colors.text }] as any} numberOfLines={1}>
-          Sermon Teaching
-        </Text>
-        <View style={{ width: 40 }} />
-      </View>
+        <ScreenHeader
+          title={sermon?.title ?? 'Sermon Teaching'}
+          subtitle={sermon?.preacher ? `By ${sermon.preacher}` : undefined}
+          showBack
+        />
 
-      <ScrollView contentContainerStyle={styles.content as any}>
-        {/* Adaptive Dual-Format Media Player */}
-        {sermon ? (
-          <MediaPlayer
-            title={sermon.title}
-            preacherOrArtist={sermon.preacher}
-            hasAudio={!!sermon.audio_url || !!sermon.audio_asset_id}
-            hasVideo={!!sermon.video_url || !!sermon.video_asset_id}
-            durationSeconds={sermon.duration_seconds}
-            scriptureReferences={sermon.scripture_references}
-            chapters={sermon.chapters}
-            dark={isDark}
-          />
+        {sermonResource.loading ? (
+          <View style={styles.pad}>
+            <Skeleton height={220} borderRadius={radius.lg} />
+            <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
+              <Skeleton height={24} width="40%" />
+              <Skeleton height={32} width="80%" />
+              <Skeleton height={80} />
+            </View>
+          </View>
+        ) : sermonResource.error && !sermon ? (
+          <View style={styles.pad}>
+            <ResourceError message={sermonResource.error} retry={sermonResource.refresh} />
+          </View>
+        ) : sermon ? (
+          <View style={styles.pad}>
+            {/* Media Player */}
+            <MediaPlayer
+              title={sermon.title}
+              preacherOrArtist={sermon.preacher}
+              posterUrl={sermon.thumbnail_url}
+              hasAudio={!!sermon.audio_url || !!sermon.audio_asset_id}
+              hasVideo={!!sermon.video_url || !!sermon.video_asset_id}
+              scriptureReferences={sermon.scripture_references}
+            />
+
+            {/* Sermon Metadata Header */}
+            <View style={[styles.metaCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+              {sermon.series?.title ? (
+                <Text style={[styles.seriesTag, { color: colors.interactive }]}>
+                  SERIES: {sermon.series.title.toUpperCase()}
+                </Text>
+              ) : null}
+              <Text style={[styles.title, { color: colors.text }]}>{sermon.title}</Text>
+
+              <View style={styles.metaRow}>
+                {sermon.preacher ? (
+                  <View style={styles.metaItem}>
+                    <Icon name="person-outline" size={14} color={colors.textMuted} />
+                    <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+                      {sermon.preacher}
+                    </Text>
+                  </View>
+                ) : null}
+                {formattedDate ? (
+                  <View style={styles.metaItem}>
+                    <Icon name="calendar-outline" size={14} color={colors.textMuted} />
+                    <Text style={[styles.metaText, { color: colors.textMuted }]}>
+                      {formattedDate}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+
+            {/* Study Navigation Tabs */}
+            <View style={styles.tabRow}>
+              <Chip
+                label="Message Overview"
+                selected={activeTab === 'study'}
+                onPress={() => setActiveTab('study')}
+              />
+              {sermon.ai_summary ? (
+                <Chip
+                  label="Study Summary"
+                  selected={activeTab === 'summary'}
+                  onPress={() => setActiveTab('summary')}
+                  icon={<Icon name="sparkles" size={12} color={colors.interactive} />}
+                />
+              ) : null}
+              {sermon.scripture_references && sermon.scripture_references.length > 0 ? (
+                <Chip
+                  label="Scriptures"
+                  selected={activeTab === 'scriptures'}
+                  onPress={() => setActiveTab('scriptures')}
+                  count={sermon.scripture_references.length}
+                />
+              ) : null}
+            </View>
+
+            {/* Tab Body */}
+            {activeTab === 'study' ? (
+              <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Description</Text>
+                <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+                  {sermon.description || 'No extended description available for this teaching.'}
+                </Text>
+              </View>
+            ) : activeTab === 'summary' && sermon.ai_summary ? (
+              <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={styles.aiHeader}>
+                  <Icon name="sparkles" size={16} color={colors.interactive} />
+                  <Text style={[styles.sectionTitle, { color: colors.text }]}>Teaching Synthesis</Text>
+                </View>
+                <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+                  {sermon.ai_summary}
+                </Text>
+              </View>
+            ) : (
+              <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Scripture Passages</Text>
+                <View style={styles.scripturesWrap}>
+                  {sermon.scripture_references?.map((ref, idx) => (
+                    <View key={idx} style={[styles.scriptureBlock, { backgroundColor: colors.bgSecondary }]}>
+                      <Icon name="book-outline" size={16} color={colors.interactive} />
+                      <Text style={[styles.scriptureRefText, { color: colors.text }]}>{ref}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+          </View>
         ) : null}
-
-        {/* Sermon Title & Info Header */}
-        <View style={styles.headerInfo as any}>
-          <View style={styles.badgeRow as any}>
-            <Badge label="SERMON ARCHIVE" variant="gold" />
-            <Text style={[styles.dateText, { color: colors.textMuted }] as any}>
-              📅 {sermon?.sermon_date}
-            </Text>
-          </View>
-
-          <Text style={[styles.title, { color: colors.text }] as any}>{sermon?.title}</Text>
-
-          <View style={styles.preacherRow as any}>
-            <View style={styles.preacherAvatar as any}>
-              <Text style={{ fontSize: 16 } as any}>🎙️</Text>
-            </View>
-            <View>
-              <Text style={[styles.preacherName, { color: colors.text }] as any}>
-                {sermon?.preacher}
-              </Text>
-              <Text style={[styles.preacherRole, { color: palette.gold }] as any}>
-                Pastor & Teacher
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Tab Navigation */}
-        <View
-          style={[
-            styles.tabRow,
-            { backgroundColor: isDark ? '#1C1008' : '#E8D5C4' },
-          ] as any}
-        >
-          {(['study', 'summary', 'scriptures'] as const).map((tab) => {
-            const isSelected = activeTab === tab;
-            return (
-              <Pressable
-                key={tab}
-                onPress={() => setActiveTab(tab)}
-                style={[
-                  styles.tabPill,
-                  isSelected ? {
-                    backgroundColor: isDark ? '#2E1C11' : '#FFFDF9',
-                    ...shadows.sm,
-                  } : null,
-                ] as any}
-              >
-                <Text
-                  style={[
-                    styles.tabText,
-                    { color: isSelected ? colors.text : colors.textMuted },
-                    isSelected ? styles.tabTextActive : null,
-                  ] as any}
-                >
-                  {tab === 'study'
-                    ? '📖 Study Notes'
-                    : tab === 'summary'
-                    ? '✦ AI Synthesis'
-                    : '📜 Scriptures'}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        {/* Tab Content Panes */}
-        {activeTab === 'study' && (
-          <View
-            style={[
-              styles.card,
-              { backgroundColor: colors.card, borderColor: colors.border },
-              shadows.sm,
-            ] as any}
-          >
-            <Text style={[styles.cardTitle, { color: palette.gold }] as any}>
-              EXPOSITORY OVERVIEW
-            </Text>
-            <Text style={[styles.bodyText, { color: colors.text }] as any}>
-              {sermon?.description ||
-                'This message provides a rich theological exploration of living under covenant promises with boldness and faith.'}
-            </Text>
-
-            {sermon?.transcript ? (
-              <View style={styles.transcriptSection as any}>
-                <Text style={[styles.cardTitle, { color: palette.gold }] as any}>
-                  TRANSCRIPT EXCERPT
-                </Text>
-                <Text style={[styles.bodyText, { color: colors.textMuted }] as any}>
-                  {sermon.transcript}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        )}
-
-        {activeTab === 'summary' && (
-          <View
-            style={[
-              styles.card,
-              { backgroundColor: colors.card, borderColor: colors.border },
-              shadows.sm,
-            ] as any}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={{ fontSize: 16 } as any}>✦</Text>
-              <Text style={[styles.cardTitle, { color: palette.gold }] as any}>
-                PASTORAL TAKEAWAYS
-              </Text>
-            </View>
-
-            <Text style={[styles.bodyText, { color: colors.text }] as any}>
-              {sermon?.ai_summary ??
-                'Faith requires spiritual alignment, persistent prayer, and stepping out upon the Word of God.'}
-            </Text>
-          </View>
-        )}
-
-        {activeTab === 'scriptures' && (
-          <View style={styles.scripturesContainer as any}>
-            {(sermon?.scripture_references ?? []).map((ref, idx) => (
-              <View
-                key={idx}
-                style={[
-                  styles.scriptureCard,
-                  { backgroundColor: colors.card, borderColor: colors.border },
-                  shadows.sm,
-                ] as any}
-              >
-                <Text style={styles.scriptureRef as any}>📖 {ref}</Text>
-                <Text style={[styles.scriptureSnippet, { color: colors.textMuted }] as any}>
-                  "Now faith is confidence in what we hope for and assurance about what we do not see."
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
       </ScrollView>
     </View>
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
-  container: {
+const styles = StyleSheet.create({
+  screen: {
     flex: 1,
-  },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingTop: 54,
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-  },
-  backButton: {
-    paddingVertical: 4,
-    paddingRight: 8,
-  },
-  backButtonText: {
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  topTitle: {
-    fontSize: 15,
-    fontWeight: '900',
-    flex: 1,
-    textAlign: 'center',
   },
   content: {
+    flexGrow: 1,
+  },
+  pad: {
+    paddingHorizontal: spacing.lg,
+    gap: spacing.md,
+  },
+  metaCard: {
     padding: spacing.lg,
-    gap: spacing.lg,
-    paddingBottom: 100,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    gap: spacing.xs,
   },
-  headerInfo: {
-    gap: spacing.sm,
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  dateText: {
-    fontSize: 12,
-    fontWeight: '700',
+  seriesTag: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   title: {
-    fontSize: 22,
-    fontWeight: '900',
+    ...typography.h2,
     lineHeight: 28,
-    letterSpacing: -0.3,
   },
-  preacherRow: {
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginTop: 4,
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    marginTop: spacing.xs,
   },
-  preacherAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#2E1C11',
+  metaItem: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 4,
   },
-  preacherName: {
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  preacherRole: {
+  metaText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '500',
   },
   tabRow: {
     flexDirection: 'row',
-    borderRadius: radius.pill,
-    padding: 4,
-  },
-  tabPill: {
-    flex: 1,
-    paddingVertical: 8,
     alignItems: 'center',
-    borderRadius: radius.pill,
-  },
-  tabText: {
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  tabTextActive: {
-    fontWeight: '900',
-  },
-  card: {
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    gap: spacing.md,
-  },
-  cardTitle: {
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-  },
-  bodyText: {
-    fontSize: 14,
-    lineHeight: 22,
-    fontWeight: '500',
-  },
-  transcriptSection: {
-    marginTop: spacing.md,
     gap: spacing.xs,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.08)',
-    paddingTop: spacing.md,
   },
-  scripturesContainer: {
-    gap: spacing.md,
-  },
-  scriptureCard: {
-    padding: spacing.md,
-    borderRadius: radius.md,
+  sectionCard: {
+    padding: spacing.lg,
+    borderRadius: radius.lg,
     borderWidth: 1,
+    gap: spacing.sm,
+  },
+  aiHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
   },
-  scriptureRef: {
-    color: palette.gold,
+  sectionTitle: {
+    ...typography.h3,
+  },
+  bodyText: {
+    ...typography.body,
+    lineHeight: 22,
+  },
+  scripturesWrap: {
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  scriptureBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: radius.md,
+    gap: spacing.sm,
+  },
+  scriptureRefText: {
     fontSize: 14,
-    fontWeight: '900',
-  },
-  scriptureSnippet: {
-    fontSize: 13,
-    lineHeight: 18,
-    fontStyle: 'italic',
-  },
-  loadingScreen: {
-    flex: 1,
-  },
-  errorScreen: {
-    flex: 1,
-    padding: spacing.lg,
-    paddingTop: 60,
-  },
-  errorWrapper: {
-    flex: 1,
-    justifyContent: 'center',
+    fontWeight: '600',
   },
 });

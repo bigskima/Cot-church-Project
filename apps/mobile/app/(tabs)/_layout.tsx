@@ -1,86 +1,118 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/state/theme';
-
-const TabIcon = ({ value, color }: { value: string; color: any }) => (
-  <Text style={[styles.icon, { color }] as any}>{value}</Text>
-);
+import { Icon } from '@/components/primitives/Icon';
 
 export default function TabLayout() {
   const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
+
+  const activeTintColor = isDark ? '#FFFFFF' : '#0D294B';
+  const inactiveTintColor = isDark ? '#64748B' : '#94A3B8';
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         lazy: true,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: isDark ? '#A68A75' : '#8C6549',
-        tabBarLabelStyle: styles.label as any,
+        tabBarActiveTintColor: activeTintColor,
+        tabBarInactiveTintColor: inactiveTintColor,
+        tabBarLabelStyle: styles.label,
         tabBarStyle: {
           backgroundColor: colors.card,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          height: 76,
-          paddingBottom: 12,
+          height: 60 + Math.max(insets.bottom, 8),
+          paddingBottom: Math.max(insets.bottom, 8),
           paddingTop: 8,
-        } as any,
+          maxWidth: Platform.OS === 'web' ? 860 : undefined,
+          width: '100%',
+          alignSelf: 'center',
+        },
       }}
     >
       <Tabs.Screen
         name="home"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <TabIcon value="⌂" color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Icon
+              name={focused ? 'home' : 'home-outline'}
+              size={22}
+              color={color as string}
+            />
+          ),
         }}
       />
       <Tabs.Screen
         name="discover"
         options={{
           title: 'Discover',
-          tabBarIcon: ({ color }) => <TabIcon value="⌕" color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Icon
+              name={focused ? 'compass' : 'compass-outline'}
+              size={22}
+              color={color as string}
+            />
+          ),
         }}
       />
       <Tabs.Screen
         name="reels"
         options={{
           title: 'Reels',
-          tabBarIcon: ({ color }) => <TabIcon value="🎬" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="live"
-        options={{
-          title: 'Live',
-          tabBarIcon: ({ color }) => <TabIcon value="▶" color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Icon
+              name={focused ? 'play-circle' : 'play-circle-outline'}
+              size={22}
+              color={color as string}
+            />
+          ),
         }}
       />
       <Tabs.Screen
         name="community"
         options={{
           title: 'Community',
-          tabBarIcon: ({ color }) => <TabIcon value="◉" color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Icon
+              name={focused ? 'people' : 'people-outline'}
+              size={22}
+              color={color as string}
+            />
+          ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color }) => <TabIcon value="○" color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Icon
+              name={focused ? 'person' : 'person-outline'}
+              size={22}
+              color={color as string}
+            />
+          ),
+        }}
+      />
+      {/* Live is accessible via Home hero & Discover; hidden from bottom tab bar */}
+      <Tabs.Screen
+        name="live"
+        options={{
+          href: null,
         }}
       />
     </Tabs>
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
-  icon: {
-    fontSize: 20,
-    fontWeight: '800',
-  },
+const styles = StyleSheet.create({
   label: {
-    fontWeight: '800',
-    fontSize: 10,
+    fontWeight: '600',
+    fontSize: 11,
+    marginTop: 2,
   },
 });

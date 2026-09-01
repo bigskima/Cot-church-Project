@@ -1,29 +1,31 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View, StyleProp, ViewStyle } from 'react-native';
 import { useTheme } from '@/state/theme';
-import { palette, radius, shadows, spacing } from '@/design-system/tokens';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
+import { Icon } from '../primitives/Icon';
+import { Badge } from '../Badge';
 import type { Video } from '@/types/content';
 
-interface VideoCardProps {
+export interface VideoCardProps {
   video: Video;
   expressionName?: string;
   onPress?: () => void;
   onBookmark?: () => void;
-  dark?: boolean;
+  style?: StyleProp<ViewStyle>;
+  dark?: boolean; // backwards compatibility
 }
 
 export function VideoCard({
   video,
-  expressionName = 'Sanctuary Expression',
+  expressionName,
   onPress,
   onBookmark,
-  dark: forceDark,
+  style,
 }: VideoCardProps) {
-  const { colors, isDark: themeDark } = useTheme();
-  const isDark = forceDark !== undefined ? forceDark : themeDark;
+  const { colors } = useTheme();
 
   const formatDuration = (secs?: number | null) => {
-    if (!secs || secs <= 0) return 'Watch';
+    if (!secs || secs <= 0) return null;
     const m = Math.floor(secs / 60);
     const s = Math.floor(secs % 60);
     return `${m}:${s < 10 ? '0' : ''}${s}`;
@@ -35,58 +37,75 @@ export function VideoCard({
     return `${views} views`;
   };
 
+  const thumbnailUrl = video.media_assets?.thumbnailUrl || video.media_assets?.url;
+  const duration = formatDuration(video.media_assets?.duration_seconds);
+
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
         {
-          backgroundColor: isDark ? '#1C1008' : '#FFFDF9',
-          borderColor: isDark ? '#3D2415' : palette.line,
+          backgroundColor: colors.card,
+          borderColor: colors.border,
         },
         shadows.sm,
-        pressed ? styles.pressed : null,
-      ] as any}
+        pressed && styles.pressed,
+        style,
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={`Video: ${video.title}`}
     >
       {/* 16:9 Thumbnail Banner */}
-      <View
-        style={[
-          styles.thumbnailFrame,
-          { backgroundColor: isDark ? '#0D0805' : '#22140C' },
-        ] as any}
-      >
-        <Text style={{ fontSize: 32 } as any}>🎬</Text>
+      <View style={[styles.thumbnailFrame, { backgroundColor: '#091B33' }]}>
+        {thumbnailUrl ? (
+          <Image source={{ uri: thumbnailUrl }} style={styles.thumbnail} resizeMode="cover" />
+        ) : (
+          <View style={styles.placeholder}>
+            <Icon name="play-circle-outline" size={40} color="#5C8FF5" />
+          </View>
+        )}
+
+        {/* Category Badge */}
+        {video.category ? (
+          <View style={styles.categoryBadge}>
+            <Badge label={video.category} variant="primary" />
+          </View>
+        ) : null}
+
         {/* Duration Pill */}
-        <View style={styles.durationPill as any}>
-          <Text style={styles.durationText as any}>
-            {formatDuration(video.media_assets?.duration_seconds)}
-          </Text>
-        </View>
-        {/* Category Pill */}
-        <View style={styles.categoryPill as any}>
-          <Text style={styles.categoryText as any}>{video.category.toUpperCase()}</Text>
-        </View>
+        {duration ? (
+          <View style={styles.durationPill}>
+            <Text style={styles.durationText}>{duration}</Text>
+          </View>
+        ) : null}
       </View>
 
       {/* Video Details Body */}
-      <View style={styles.body as any}>
-        <View style={styles.avatarCircle as any}>
-          <Text style={{ fontSize: 14 } as any}>🏛️</Text>
-        </View>
-        <View style={{ flex: 1, gap: 3 }}>
-          <Text style={[styles.title, { color: colors.text }] as any} numberOfLines={2}>
+      <View style={styles.body}>
+        <View style={styles.contentColumn}>
+          <Text style={[styles.title, { color: colors.text }]} numberOfLines={2}>
             {video.title}
           </Text>
-          <Text style={[styles.expressionText, { color: palette.gold }] as any} numberOfLines={1}>
-            {expressionName}
-          </Text>
-          <Text style={[styles.metaText, { color: colors.textMuted }] as any}>
+          {expressionName ? (
+            <Text style={[styles.expressionText, { color: colors.interactive }]} numberOfLines={1}>
+              {expressionName}
+            </Text>
+          ) : null}
+          <Text style={[styles.metaText, { color: colors.textMuted }]}>
             {formatViews(video.views_count)} • {new Date(video.created_at).toLocaleDateString()}
           </Text>
         </View>
+
         {onBookmark ? (
-          <Pressable onPress={onBookmark} style={styles.bookmarkBtn as any}>
-            <Text style={{ fontSize: 16 } as any}>🔖</Text>
+          <Pressable
+            onPress={onBookmark}
+            hitSlop={8}
+            style={styles.bookmarkBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Bookmark video"
+          >
+            <Icon name="bookmark-outline" size={18} color={colors.textMuted} />
           </Pressable>
         ) : null}
       </View>
@@ -94,7 +113,7 @@ export function VideoCard({
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   card: {
     borderRadius: radius.lg,
     overflow: 'hidden',
@@ -104,70 +123,61 @@ const styles: Record<string, any> = StyleSheet.create({
   thumbnailFrame: {
     width: '100%',
     aspectRatio: 16 / 9,
+    position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
+  },
+  thumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  placeholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
   },
   durationPill: {
     position: 'absolute',
     bottom: 8,
     right: 8,
-    backgroundColor: 'rgba(20, 12, 7, 0.85)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    backgroundColor: 'rgba(6, 20, 38, 0.85)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: 4,
   },
   durationText: {
-    color: '#FFFDF9',
+    color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '800',
-  },
-  categoryPill: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    backgroundColor: 'rgba(120, 53, 15, 0.85)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: palette.gold,
-  },
-  categoryText: {
-    color: palette.yellow,
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 0.5,
+    fontWeight: '700',
   },
   body: {
     flexDirection: 'row',
     padding: spacing.md,
-    gap: 12,
+    gap: 10,
     alignItems: 'flex-start',
   },
-  avatarCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#2E1C11',
-    alignItems: 'center',
-    justifyContent: 'center',
+  contentColumn: {
+    flex: 1,
+    gap: 2,
   },
   title: {
+    ...typography.h3,
     fontSize: 14,
-    fontWeight: '800',
     lineHeight: 19,
   },
   expressionText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   metaText: {
     fontSize: 11,
-    fontWeight: '600',
   },
   bookmarkBtn: {
-    padding: 6,
+    padding: 4,
   },
   pressed: {
     opacity: 0.9,

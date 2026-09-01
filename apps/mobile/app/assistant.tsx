@@ -10,9 +10,11 @@ import {
   View,
 } from 'react-native';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
-import { palette, radius, spacing } from '@/design-system/tokens';
+import { Button, Chip, Icon, ScreenHeader } from '@/components';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 
 type Message = {
   id: string;
@@ -21,256 +23,288 @@ type Message = {
   pending?: boolean;
 };
 
+const suggestedPrompts = [
+  'What was last Sunday’s sermon about?',
+  'Where can I read scripture on divine peace?',
+  'What are the upcoming church fellowship events?',
+  'How do I submit a confidential prayer request?',
+];
+
 export default function AssistantScreen() {
+  const insets = useSafeAreaInsets();
   const { api, mode } = useSession();
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
       role: 'assistant',
-      text: 'Hello. I can help with verified service times, sermon insights, expression directions, prayer support, and church events.',
+      text: 'Grace and peace to you. I am your church assistant. You can ask me about recent sermon teachings, scripture references, service schedules, prayer support, or campus locations.',
     },
   ]);
   const [text, setText] = useState('');
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  async function send() {
-    const prompt = text.trim();
-    if (!prompt || mode !== 'authenticated') return;
-    const user = {
-      id: Math.random().toString(36).substring(2),
-      role: 'user' as const,
-      text: prompt,
+  async function handleSend(customPrompt?: string) {
+    const promptToSend = (customPrompt || text).trim();
+    if (!promptToSend || loading) return;
+
+    const userMsg: Message = {
+      id: String(Date.now()),
+      role: 'user',
+      text: promptToSend,
     };
-    const pending = {
-      id: Math.random().toString(36).substring(2),
-      role: 'assistant' as const,
-      text: 'Seeking verified church information…',
+    const pendingMsg: Message = {
+      id: `pending_${Date.now()}`,
+      role: 'assistant',
+      text: 'Searching sermon teachings and scriptures...',
       pending: true,
     };
 
-    setMessages((prev) => [...prev, user, pending]);
+    setMessages((prev) => [...prev, userMsg, pendingMsg]);
     setText('');
     setError('');
+    setLoading(true);
 
     try {
-      const result = await api.request<{ content: string }>('ai-gateway', {
+      const result = await api.request<{ content?: string; text?: string; response?: string }>('ai-gateway', {
         method: 'POST',
-        body: JSON.stringify({ capability: 'assistant.answer', prompt }),
+        body: JSON.stringify({ capability: 'assistant.answer', prompt: promptToSend }),
       });
+      const responseText = result.content || result.text || result.response || 'I am currently unable to retrieve an answer.';
       setMessages((prev) =>
         prev.map((item) =>
-          item.id === pending.id
-            ? { ...item, text: result.content, pending: false }
+          item.id === pendingMsg.id
+            ? { ...item, text: responseText, pending: false }
             : item
         )
       );
     } catch (err) {
-      setMessages((prev) => prev.filter((item) => item.id !== pending.id));
-      setError(err instanceof Error ? err.message : 'The assistant is unavailable.');
+      setMessages((prev) => prev.filter((item) => item.id !== pendingMsg.id));
+      setError(err instanceof Error ? err.message : 'The assistant is temporarily unreachable.');
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
     <KeyboardAvoidingView
-      style={[styles.screen, { backgroundColor: colors.bg }] as any}
+      style={[styles.screen, { backgroundColor: colors.bg }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={[styles.header, { backgroundColor: isDark ? '#140C07' : '#22140C' }] as any}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn as any}>
-          <Text style={styles.backIcon}>‹</Text>
-        </Pressable>
-        <View style={styles.headerTitleWrap}>
-          <Text style={styles.headerTitle}>Sanctuary Assistant</Text>
-          <Text style={styles.headerSubtitle}>Verified Church AI Guidance</Text>
-        </View>
+      <View style={{ paddingTop: insets.top + spacing.xs }}>
+        <ScreenHeader
+          title="Spiritual Assistant"
+          subtitle="Scriptures, sermon insights, and church ministry guidance."
+          showBack
+        />
       </View>
 
-      {mode === 'visitor' ? (
-        <View style={styles.visitorGate}>
-          <Text style={[styles.visitorTitle, { color: colors.text }] as any}>Sign in for church assistant</Text>
-          <Text style={[styles.visitorSubtitle, { color: colors.textMuted }] as any}>
-            Sign in with your member account to access pastoral study summaries and personal schedule assistance.
-          </Text>
-        </View>
-      ) : (
-        <>
-          <FlatList
-            data={messages}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.listContent}
-            renderItem={({ item }) => {
-              const isUser = item.role === 'user';
-              return (
-                <View
-                  style={[
-                    styles.messageBubble,
-                    isUser
-                      ? [styles.userBubble, { backgroundColor: isDark ? '#78350F' : '#26140A' }]
-                      : [styles.assistantBubble, { backgroundColor: isDark ? '#22140C' : '#FFFDF9', borderColor: isDark ? '#452A1A' : '#E8D5C4' }],
-                    item.pending ? styles.pendingBubble : null,
-                  ] as any}
-                >
-                  <Text
-                    style={[
-                      styles.messageText,
-                      isUser
-                        ? styles.userText
-                        : [styles.assistantText, { color: isDark ? '#FFFDF9' : '#26140A' }],
-                    ] as any}
-                  >
-                    {item.text}
-                  </Text>
-                </View>
-              );
-            }}
-          />
-
-          {error ? <Text style={styles.errorBanner}>{error}</Text> : null}
-
-          <View style={[styles.inputRow, { backgroundColor: colors.card, borderTopColor: colors.border }] as any}>
-            <TextInput
-              value={text}
-              onChangeText={setText}
-              multiline
-              placeholder="Ask about sermons, services, or events…"
-              placeholderTextColor={colors.textMuted}
-              style={[styles.inputField, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }] as any}
-            />
-            <Pressable
-              onPress={send}
-              style={({ pressed }) => [
-                styles.sendBtn,
-                { opacity: pressed || !text.trim() ? 0.6 : 1 },
-              ] as any}
+      {/* Messages Feed */}
+      <FlatList
+        data={messages}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.chatList}
+        showsVerticalScrollIndicator={false}
+        ListFooterComponent={() => (
+          messages.length <= 2 ? (
+            <View style={styles.suggestionsWrap}>
+              <Text style={[styles.suggestionsLabel, { color: colors.textMuted }]}>
+                Suggested Questions
+              </Text>
+              <View style={styles.chipsWrap}>
+                {suggestedPrompts.map((p, idx) => (
+                  <Chip
+                    key={idx}
+                    label={p}
+                    onPress={() => handleSend(p)}
+                  />
+                ))}
+              </View>
+            </View>
+          ) : null
+        )}
+        renderItem={({ item }) => {
+          const isUser = item.role === 'user';
+          return (
+            <View
+              style={[
+                styles.bubbleRow,
+                isUser ? styles.userRow : styles.assistantRow,
+              ]}
             >
-              <Text style={styles.sendIcon}>↑</Text>
-            </Pressable>
-          </View>
-        </>
-      )}
+              {!isUser && (
+                <View style={[styles.assistantIcon, { backgroundColor: colors.primarySoft }]}>
+                  <Icon name="sparkles" size={16} color={colors.interactive} />
+                </View>
+              )}
+              <View
+                style={[
+                  styles.bubble,
+                  isUser
+                    ? { backgroundColor: colors.interactive }
+                    : { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 },
+                  shadows.sm,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.bubbleText,
+                    { color: isUser ? '#FFFFFF' : colors.text },
+                    item.pending && { color: colors.textMuted, fontStyle: 'italic' },
+                  ]}
+                >
+                  {item.text}
+                </Text>
+              </View>
+            </View>
+          );
+        }}
+      />
+
+      {/* Error Alert */}
+      {error ? (
+        <View style={[styles.errorBar, { backgroundColor: 'rgba(229, 72, 77, 0.12)' }]}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : null}
+
+      {/* Input Composer Bar */}
+      <View
+        style={[
+          styles.composer,
+          {
+            backgroundColor: colors.card,
+            borderTopColor: colors.border,
+            paddingBottom: Math.max(insets.bottom, spacing.md),
+          },
+        ]}
+      >
+        <TextInput
+          value={text}
+          onChangeText={setText}
+          placeholder="Ask about sermons, scriptures, prayer..."
+          placeholderTextColor={colors.textMuted}
+          style={[
+            styles.input,
+            {
+              backgroundColor: colors.inputBg,
+              color: colors.text,
+              borderColor: colors.border,
+            },
+          ]}
+          multiline
+          maxLength={400}
+        />
+        <Pressable
+          onPress={() => handleSend()}
+          disabled={!text.trim() || loading}
+          style={({ pressed }) => [
+            styles.sendBtn,
+            {
+              backgroundColor: text.trim() ? colors.interactive : colors.bgSecondary,
+              opacity: pressed ? 0.8 : 1,
+            },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Send prompt"
+        >
+          <Icon
+            name="arrow-up"
+            size={18}
+            color={text.trim() ? '#FFFFFF' : colors.textMuted}
+          />
+        </Pressable>
+      </View>
     </KeyboardAvoidingView>
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
-  header: {
-    paddingTop: 56,
+  chatList: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
+    paddingVertical: spacing.md,
+    gap: spacing.md,
+  },
+  bubbleRow: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.xs,
+  },
+  userRow: {
+    justifyContent: 'flex-end',
+  },
+  assistantRow: {
+    justifyContent: 'flex-start',
+  },
+  assistantIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
-  },
-  backBtn: {
-    padding: spacing.xs,
-    marginRight: spacing.sm,
-  },
-  backIcon: {
-    color: '#FFFDF9',
-    fontSize: 28,
-    lineHeight: 28,
-  },
-  headerTitleWrap: {
-    flex: 1,
-  },
-  headerTitle: {
-    color: '#FFFDF9',
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  headerSubtitle: {
-    color: '#FCD34D',
-    fontSize: 12,
-    fontWeight: '700',
+    justifyContent: 'center',
     marginTop: 2,
   },
-  visitorGate: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.xl,
-  },
-  visitorTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  visitorSubtitle: {
-    textAlign: 'center',
-    marginTop: spacing.sm,
-    lineHeight: 20,
-    maxWidth: 280,
-  },
-  listContent: {
-    padding: spacing.lg,
-    gap: spacing.sm,
-  },
-  messageBubble: {
-    maxWidth: '82%',
-    padding: 14,
-    borderRadius: radius.lg,
-    marginBottom: spacing.xs,
-  },
-  userBubble: {
-    alignSelf: 'flex-end',
-    borderBottomRightRadius: 4,
-  },
-  assistantBubble: {
-    alignSelf: 'flex-start',
-    borderBottomLeftRadius: 4,
-    borderWidth: 1,
-  },
-  pendingBubble: {
-    opacity: 0.7,
-  },
-  messageText: {
-    fontSize: 14,
-    lineHeight: 21,
-  },
-  userText: {
-    color: '#FFFDF9',
-    fontWeight: '600',
-  },
-  assistantText: {
-    fontWeight: '500',
-  },
-  errorBanner: {
-    color: palette.live,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xs,
-    fontSize: 12,
-  },
-  inputRow: {
-    padding: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    borderTopWidth: 1,
-  },
-  inputField: {
-    flex: 1,
-    maxHeight: 90,
-    minHeight: 46,
-    borderRadius: radius.md,
+  bubble: {
+    maxWidth: '80%',
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderWidth: 1,
+    borderRadius: radius.lg,
+  },
+  bubbleText: {
     fontSize: 14,
+    lineHeight: 20,
+  },
+  suggestionsWrap: {
+    marginTop: spacing.lg,
+    gap: spacing.xs,
+  },
+  suggestionsLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+  },
+  chipsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  errorBar: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 6,
+  },
+  errorText: {
+    color: '#E5484D',
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  composer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    gap: spacing.sm,
+  },
+  input: {
+    flex: 1,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    fontSize: 14,
+    maxHeight: 90,
   },
   sendBtn: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: palette.yellow,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  sendIcon: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#140C07',
   },
 });

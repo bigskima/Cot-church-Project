@@ -1,20 +1,29 @@
 import React from 'react';
 import {
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
+  StyleProp,
+  ViewStyle,
 } from 'react-native';
-import { palette, radius, shadows, spacing } from '../design-system/tokens';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '@/state/theme';
+import { radius, spacing, typography } from '@/design-system/tokens';
+import { Icon } from './primitives/Icon';
 
-interface BottomSheetProps {
+export interface BottomSheetProps {
   visible: boolean;
   onClose: () => void;
   title?: string;
   subtitle?: string;
   children: React.ReactNode;
+  maxHeightPercent?: number;
+  style?: StyleProp<ViewStyle>;
 }
 
 export function BottomSheet({
@@ -23,7 +32,12 @@ export function BottomSheet({
   title,
   subtitle,
   children,
+  maxHeightPercent = 85,
+  style,
 }: BottomSheetProps) {
+  const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
+
   return (
     <Modal
       visible={visible}
@@ -32,68 +46,103 @@ export function BottomSheet({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <Pressable style={styles.backdrop as any} onPress={onClose} />
-        <View style={[styles.sheetContainer, shadows.lg] as any}>
-          <View style={styles.handleBar} />
-          {title && (
-            <View style={styles.header}>
-              <Text style={styles.title}>{title}</Text>
-              {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+        <Pressable
+          style={styles.backdrop}
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Close sheet"
+        />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={[
+            styles.sheetContainer,
+            {
+              backgroundColor: colors.card,
+              borderTopColor: colors.border,
+              paddingBottom: Math.max(insets.bottom, spacing.lg),
+              maxHeight: `${maxHeightPercent}%`,
+            },
+            style,
+          ]}
+        >
+          <View style={[styles.handleBar, { backgroundColor: colors.borderStrong }]} />
+
+          {(title || subtitle) && (
+            <View style={[styles.header, { borderBottomColor: colors.border }]}>
+              <View style={{ flex: 1 }}>
+                {title && <Text style={[styles.title, { color: colors.text }]}>{title}</Text>}
+                {subtitle && (
+                  <Text style={[styles.subtitle, { color: colors.textMuted }]}>{subtitle}</Text>
+                )}
+              </View>
+              <Pressable
+                onPress={onClose}
+                hitSlop={8}
+                style={styles.closeButton}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+              >
+                <Icon name="close" size={20} color={colors.textMuted} />
+              </Pressable>
             </View>
           )}
+
           <ScrollView
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.contentContainer}
           >
             {children}
           </ScrollView>
-        </View>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(20, 12, 7, 0.75)',
+    backgroundColor: 'rgba(6, 20, 38, 0.65)',
   },
   backdrop: {
     flex: 1,
   },
   sheetContainer: {
-    backgroundColor: palette.surface,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
-    maxHeight: '85%',
-    paddingBottom: spacing.xl,
+    borderTopWidth: 1,
+    width: '100%',
+    maxWidth: Platform.OS === 'web' ? 680 : undefined,
+    alignSelf: 'center',
   },
   handleBar: {
-    width: 42,
-    height: 5,
-    backgroundColor: '#E8D5C4',
+    width: 36,
+    height: 4,
     borderRadius: radius.pill,
     alignSelf: 'center',
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
     marginBottom: spacing.xs,
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#E8D5C4',
   },
   title: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#26140A',
-    letterSpacing: -0.3,
+    ...typography.h3,
   },
   subtitle: {
-    fontSize: 12,
-    color: '#8C6549',
+    ...typography.caption,
     marginTop: 2,
+  },
+  closeButton: {
+    padding: 4,
+    marginLeft: spacing.sm,
   },
   contentContainer: {
     padding: spacing.lg,

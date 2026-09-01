@@ -1,12 +1,23 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import {
   Badge,
   Button,
+  Chip,
   EmptyState,
+  Icon,
   InputField,
   PrayerCard,
   ResourceError,
@@ -14,12 +25,15 @@ import {
   SectionHeader,
   Skeleton,
 } from '@/components';
-import { palette, radius, shadows, spacing } from '@/design-system/tokens';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 import type { PrayerRequest } from '@/types/content';
 
 export default function PrayerScreen() {
+  const insets = useSafeAreaInsets();
   const { api, mode } = useSession();
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
+
+  const [activeTab, setActiveTab] = useState<'my_prayers' | 'wall'>('wall');
   const [title, setTitle] = useState('');
   const [request, setRequest] = useState('');
   const [privacy, setPrivacy] = useState<'pastoral_only' | 'prayer_team' | 'public_approved'>('pastoral_only');
@@ -27,15 +41,13 @@ export default function PrayerScreen() {
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  const myRequests = useResource<PrayerRequest[]>('profile:prayer', (signal) =>
-    mode === 'authenticated'
-      ? api.request<PrayerRequest[]>('prayer-requests', { signal })
-      : Promise.resolve([])
+  const prayerFeed = useResource<PrayerRequest[]>('prayer:feed', (signal) =>
+    api.request<PrayerRequest[]>('prayer-requests', { signal }).catch(() => [])
   );
 
   const handleSubmitPrayer = async () => {
     if (!title.trim() || !request.trim()) {
-      setErrorMsg('Please enter both a title and prayer request details.');
+      setErrorMsg('Please enter both a focus title and petition details.');
       return;
     }
     setSubmitting(true);
@@ -52,8 +64,8 @@ export default function PrayerScreen() {
       });
       setTitle('');
       setRequest('');
-      setSuccessMsg('Your prayer petition has been confidentially submitted to the pastoral team.');
-      myRequests.refresh();
+      setSuccessMsg('Your prayer petition has been confidentially submitted.');
+      prayerFeed.refresh();
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Unable to submit prayer request.');
     } finally {
@@ -61,198 +73,186 @@ export default function PrayerScreen() {
     }
   };
 
+  const prayers = prayerFeed.data ?? [];
+  const publicPrayers = prayers.filter((p) => p.privacy !== 'pastoral_only');
+
   return (
-    <ScrollView
+    <KeyboardAvoidingView
       style={[styles.screen, { backgroundColor: colors.bg }]}
-      contentContainerStyle={styles.content}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScreenHeader
-        title="Sanctuary Prayer Wall"
-        subtitle="Bring your burdens before the altar in faith and unity."
-        showBack
-        dark={isDark}
-      />
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + spacing.sm, paddingBottom: 100 },
+        ]}
+      >
+        <ScreenHeader
+          title="Prayer Petitions & Wall"
+          subtitle="Bring your petitions before the Lord with confidence and fellowship."
+          showBack
+        />
 
-      <View style={styles.body}>
-        {/* Submit Prayer Request Form Card */}
-        <View
-          style={[
-            styles.card,
-            { backgroundColor: colors.card, borderColor: colors.border },
-            shadows.md,
-          ] as any}
-        >
-          <Text style={[styles.cardHeaderTitle, { color: colors.textMuted }] as any}>
-            SUBMIT A PRAYER PETITION
-          </Text>
+        <View style={styles.body}>
+          {/* Notification Messages */}
+          {successMsg ? (
+            <View style={[styles.banner, { backgroundColor: 'rgba(22, 163, 106, 0.12)', borderColor: 'rgba(22, 163, 106, 0.3)' }]}>
+              <Icon name="checkmark-circle" size={18} color="#16A36A" style={{ marginRight: 8 }} />
+              <Text style={[styles.bannerText, { color: '#16A36A' }]}>{successMsg}</Text>
+            </View>
+          ) : null}
 
-          <InputField
-            label="Prayer Focus / Title"
-            value={title}
-            onChangeText={setTitle}
-            placeholder="e.g. Healing for mother, Career breakthrough..."
-            dark={isDark}
-          />
+          {errorMsg ? (
+            <View style={[styles.banner, { backgroundColor: 'rgba(229, 72, 77, 0.12)', borderColor: 'rgba(229, 72, 77, 0.3)' }]}>
+              <Icon name="alert-circle" size={18} color="#E5484D" style={{ marginRight: 8 }} />
+              <Text style={[styles.bannerText, { color: '#E5484D' }]}>{errorMsg}</Text>
+            </View>
+          ) : null}
 
-          <InputField
-            label="Petition Details"
-            value={request}
-            onChangeText={setRequest}
-            placeholder="Describe your request. Our pastoral team and intercessors will stand with you in faith..."
-            multiline
-            numberOfLines={4}
-            dark={isDark}
-          />
+          {/* Submit Prayer Request Form Card */}
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: colors.card, borderColor: colors.border },
+              shadows.sm,
+            ]}
+          >
+            <View style={styles.cardHeader}>
+              <Icon name="heart" size={18} color={colors.interactive} />
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Submit a Prayer Petition</Text>
+            </View>
 
-          {/* Privacy Level Selector */}
-          <Text style={[styles.privacyLabel, { color: colors.text }] as any}>CONFIDENTIALITY SCOPE</Text>
-          <View style={styles.privacyRow}>
-            {[
-              ['pastoral_only', '🔒 Pastoral Care Only'],
-              ['prayer_team', '🕊️ Prayer Team'],
-              ['public_approved', '✦ Sanctuary Wall'],
-            ].map(([key, label]) => {
-              const isSelected = privacy === key;
-              return (
-                <Pressable
-                  key={key}
-                  onPress={() => setPrivacy(key as any)}
-                  style={[
-                    styles.privacyChip,
-                    {
-                      backgroundColor: isSelected
-                        ? colors.primary
-                        : isDark
-                        ? '#2E1C11'
-                        : '#F1E3D3',
-                      borderColor: isSelected ? colors.primaryDark : colors.border,
-                    },
-                  ] as any}
-                >
-                  <Text
-                    style={[
-                      styles.privacyText,
-                      {
-                        color: isSelected
-                          ? '#140C07'
-                          : isDark
-                          ? '#FFFDF9'
-                          : '#26140A',
-                        fontWeight: isSelected ? '900' : '700',
-                      },
-                    ] as any}
-                  >
-                    {label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
-          {successMsg ? <Text style={styles.successText}>{successMsg}</Text> : null}
-
-          <Button
-            label="Submit Prayer Petition ➔"
-            onPress={handleSubmitPrayer}
-            variant="gold"
-            size="lg"
-            loading={submitting}
-            style={{ marginTop: spacing.md } as any}
-          />
-        </View>
-
-        {/* My Petitions List */}
-        {mode === 'authenticated' && (
-          <>
-            <SectionHeader
-              title="My Submitted Petitions"
-              badge={myRequests.data?.length ?? 0}
-              dark={isDark}
+            <InputField
+              label="Prayer Focus / Title"
+              value={title}
+              onChangeText={setTitle}
+              placeholder="e.g. Healing, Family Breakthrough, Guidance..."
             />
 
-            {myRequests.loading ? (
-              <Skeleton height={120} count={2} dark={isDark} />
-            ) : myRequests.error && !myRequests.data ? (
-              <ResourceError
-                offline={myRequests.offline}
-                message={myRequests.error}
-                retry={myRequests.refresh}
-                dark={isDark}
-              />
-            ) : myRequests.data && myRequests.data.length > 0 ? (
-              myRequests.data.map((item) => (
-                <PrayerCard key={item.id} prayer={item} />
+            <InputField
+              label="Petition Details"
+              value={request}
+              onChangeText={setRequest}
+              multiline
+              numberOfLines={4}
+              placeholder="Share what is on your heart..."
+            />
+
+            {/* Privacy Scope Selector */}
+            <View style={styles.privacySection}>
+              <Text style={[styles.privacyLabel, { color: colors.textSecondary }]}>
+                Confidentiality Scope
+              </Text>
+              <View style={styles.privacyChips}>
+                <Chip
+                  label="Pastoral Care Only"
+                  selected={privacy === 'pastoral_only'}
+                  onPress={() => setPrivacy('pastoral_only')}
+                  icon={<Icon name="lock-closed" size={12} color={privacy === 'pastoral_only' ? colors.interactive : colors.textSecondary} />}
+                />
+                <Chip
+                  label="Prayer Team"
+                  selected={privacy === 'prayer_team'}
+                  onPress={() => setPrivacy('prayer_team')}
+                />
+                <Chip
+                  label="Public Prayer Wall"
+                  selected={privacy === 'public_approved'}
+                  onPress={() => setPrivacy('public_approved')}
+                />
+              </View>
+            </View>
+
+            <Button
+              label="Submit Prayer Request"
+              onPress={handleSubmitPrayer}
+              loading={submitting}
+              variant="primary"
+              size="lg"
+              style={{ marginTop: spacing.xs }}
+            />
+          </View>
+
+          {/* Prayer Wall Feed */}
+          <View style={styles.wallSection}>
+            <SectionHeader title="Community Prayer Wall" badge={publicPrayers.length} />
+            {prayerFeed.loading ? (
+              <Skeleton height={120} count={2} />
+            ) : publicPrayers.length > 0 ? (
+              publicPrayers.map((p) => (
+                <PrayerCard
+                  key={p.id}
+                  prayer={p}
+                />
               ))
             ) : (
               <EmptyState
-                title="No Petitions Recorded"
-                message="Your submitted prayer petitions and pastoral updates will appear here."
-                icon="🙏"
-                dark={isDark}
+                title="No Public Prayers Yet"
+                message="Be the first to share an encouragement or prayer request with the church."
+                iconName="heart-outline"
               />
             )}
-          </>
-        )}
-      </View>
-    </ScrollView>
+          </View>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
   content: {
-    paddingBottom: 120,
+    flexGrow: 1,
   },
   body: {
     paddingHorizontal: spacing.lg,
+    gap: spacing.lg,
+  },
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+  },
+  bannerText: {
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
   },
   card: {
-    borderRadius: radius.xl,
     padding: spacing.lg,
+    borderRadius: radius.xl,
     borderWidth: 1,
-    marginBottom: spacing.lg,
+    gap: spacing.md,
   },
-  cardHeaderTitle: {
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-    marginBottom: spacing.sm,
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  privacySection: {
+    gap: spacing.xs,
   },
   privacyLabel: {
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-    marginTop: spacing.xs,
-    marginBottom: spacing.xs + 2,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
   },
-  privacyRow: {
+  privacyChips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xs,
-    marginBottom: spacing.md,
   },
-  privacyChip: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-  },
-  privacyText: {
-    fontSize: 12,
-  },
-  errorText: {
-    color: palette.live,
-    fontSize: 13,
-    fontWeight: '800',
-    marginBottom: spacing.sm,
-  },
-  successText: {
-    color: palette.success,
-    fontSize: 13,
-    fontWeight: '800',
-    marginBottom: spacing.sm,
+  wallSection: {
+    gap: spacing.xs,
   },
 });

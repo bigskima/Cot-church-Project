@@ -1,24 +1,28 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import {
   Badge,
   Button,
+  Chip,
   EmptyState,
+  Icon,
   InputField,
   ResourceError,
   ScreenHeader,
   SectionHeader,
   Skeleton,
 } from '@/components';
-import { palette, radius, shadows, spacing } from '@/design-system/tokens';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 import type { BankAccount, GivingCampaign } from '@/types/content';
 
 export default function GivingManageScreen() {
+  const insets = useSafeAreaInsets();
   const { api } = useSession();
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const [activeTab, setActiveTab] = useState<'campaigns' | 'bank_accounts'>('campaigns');
 
   // Campaign Form State
@@ -40,7 +44,7 @@ export default function GivingManageScreen() {
   const [successMsg, setSuccessMsg] = useState('');
 
   const campaigns = useResource<GivingCampaign[]>('leadership:campaigns', (signal) =>
-    api.request<GivingCampaign[]>('giving?view=campaigns', { signal })
+    api.request<GivingCampaign[]>('giving?view=campaigns', { signal }).catch(() => [])
   );
 
   const handleCreateCampaign = async () => {
@@ -64,7 +68,7 @@ export default function GivingManageScreen() {
       });
       setCampaignName('');
       setCampaignDesc('');
-      setSuccessMsg('Giving campaign / purpose created and published!');
+      setSuccessMsg('Giving campaign created successfully.');
       campaigns.refresh();
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Unable to create campaign.');
@@ -94,332 +98,261 @@ export default function GivingManageScreen() {
           isPublic: true,
         }),
       });
-      setSuccessMsg('Church bank transfer instructions saved and published to members/guests!');
-    } catch (_err) {
-      setSuccessMsg('Church bank transfer instructions saved successfully!');
+      setSuccessMsg('Bank transfer instructions updated successfully.');
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Unable to update bank account.');
     } finally {
       setSavingBank(false);
     }
   };
 
-  return (
-    <ScrollView
-      style={[styles.screen, { backgroundColor: colors.bg }]}
-      contentContainerStyle={styles.content}
-    >
-      <ScreenHeader
-        title="Giving & Finance Management"
-        subtitle="Administer church giving campaigns, special building funds, and direct bank transfer instructions."
-        showBack
-        dark={isDark}
-      />
+  const campaignList = campaigns.data ?? [];
 
-      <View style={styles.body}>
-        {/* Navigation Tabs */}
-        <View
-          style={[
-            styles.tabBar,
-            { backgroundColor: isDark ? '#22140C' : '#E8D5C4' },
-          ] as any}
-        >
-          <Pressable
+  return (
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + spacing.sm, paddingBottom: 60 },
+        ]}
+      >
+        <ScreenHeader
+          title="Giving & Finance Management"
+          subtitle="Configure fundraising campaigns, offering categories, and bank wire details."
+          showBack
+        />
+
+        {/* Tab Toggle */}
+        <View style={styles.tabRow}>
+          <Chip
+            label="Campaigns & Funds"
+            selected={activeTab === 'campaigns'}
             onPress={() => setActiveTab('campaigns')}
-            style={[
-              styles.tabBtn,
-              activeTab === 'campaigns' ? {
-                backgroundColor: isDark ? '#2E1C11' : '#FFFDF9',
-                ...shadows.sm,
-              } : null,
-            ] as any}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                { color: activeTab === 'campaigns' ? colors.text : colors.textMuted },
-                activeTab === 'campaigns' ? styles.tabTextActive : null,
-              ] as any}
-            >
-              🎯 Giving Campaigns
-            </Text>
-          </Pressable>
-          <Pressable
+          />
+          <Chip
+            label="Bank Wire Setup"
+            selected={activeTab === 'bank_accounts'}
             onPress={() => setActiveTab('bank_accounts')}
-            style={[
-              styles.tabBtn,
-              activeTab === 'bank_accounts' ? {
-                backgroundColor: isDark ? '#2E1C11' : '#FFFDF9',
-                ...shadows.sm,
-              } : null,
-            ] as any}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                { color: activeTab === 'bank_accounts' ? colors.text : colors.textMuted },
-                activeTab === 'bank_accounts' ? styles.tabTextActive : null,
-              ] as any}
-            >
-              🏛 Church Bank Accounts
-            </Text>
-          </Pressable>
+          />
         </View>
 
-        {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
-        {successMsg ? <Text style={styles.successText}>{successMsg}</Text> : null}
+        <View style={styles.body}>
+          {/* Notification Messages */}
+          {successMsg ? (
+            <View style={[styles.banner, { backgroundColor: 'rgba(22, 163, 106, 0.12)', borderColor: 'rgba(22, 163, 106, 0.3)' }]}>
+              <Icon name="checkmark-circle" size={18} color="#16A36A" style={{ marginRight: 8 }} />
+              <Text style={[styles.bannerText, { color: '#16A36A' }]}>{successMsg}</Text>
+            </View>
+          ) : null}
 
-        {activeTab === 'campaigns' ? (
-          <>
-            {/* Create Campaign Card */}
-            <View
-              style={[
-                styles.card,
-                { backgroundColor: colors.card, borderColor: colors.border },
-                shadows.md,
-              ] as any}
-            >
-              <Text style={[styles.cardHeaderTitle, { color: colors.textMuted }] as any}>
-                CREATE GIVING CAMPAIGN / PURPOSE
-              </Text>
+          {errorMsg ? (
+            <View style={[styles.banner, { backgroundColor: 'rgba(229, 72, 77, 0.12)', borderColor: 'rgba(229, 72, 77, 0.3)' }]}>
+              <Icon name="alert-circle" size={18} color="#E5484D" style={{ marginRight: 8 }} />
+              <Text style={[styles.bannerText, { color: '#E5484D' }]}>{errorMsg}</Text>
+            </View>
+          ) : null}
+
+          {activeTab === 'campaigns' ? (
+            <>
+              {/* Create Campaign Card */}
+              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+                <View style={styles.cardHeader}>
+                  <Icon name="gift-outline" size={18} color={colors.interactive} />
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>Create Campaign / Fund</Text>
+                </View>
+
+                <InputField
+                  label="Campaign Name"
+                  value={campaignName}
+                  onChangeText={setCampaignName}
+                  placeholder="e.g. Missions Outreach Fund"
+                />
+
+                <InputField
+                  label="Goal Amount ($)"
+                  value={campaignGoal}
+                  onChangeText={setCampaignGoal}
+                  keyboardType="numeric"
+                  placeholder="50000"
+                />
+
+                <InputField
+                  label="Description / Purpose"
+                  value={campaignDesc}
+                  onChangeText={setCampaignDesc}
+                  multiline
+                  numberOfLines={3}
+                  placeholder="Explain how funds will be deployed..."
+                />
+
+                <Button
+                  label="Publish Campaign"
+                  onPress={handleCreateCampaign}
+                  loading={creatingCampaign}
+                  variant="primary"
+                  size="md"
+                  style={{ marginTop: spacing.xs }}
+                />
+              </View>
+
+              {/* Published Campaigns */}
+              <View style={styles.listSection}>
+                <SectionHeader title="Active Giving Funds" badge={campaignList.length} />
+                {campaigns.loading ? (
+                  <Skeleton height={80} count={2} />
+                ) : campaignList.length > 0 ? (
+                  campaignList.map((c) => (
+                    <View
+                      key={c.id}
+                      style={[styles.tile, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}
+                    >
+                      <View style={styles.tileInfo}>
+                        <Text style={[styles.tileTitle, { color: colors.text }]}>{c.name}</Text>
+                        {c.description ? (
+                          <Text numberOfLines={2} style={[styles.tileSub, { color: colors.textSecondary }]}>
+                            {c.description}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <Badge label={c.status?.toUpperCase() || 'ACTIVE'} variant="primary" />
+                    </View>
+                  ))
+                ) : (
+                  <EmptyState
+                    title="No Campaigns Created"
+                    message="Create a campaign above to accept directed donations."
+                    iconName="gift-outline"
+                  />
+                )}
+              </View>
+            </>
+          ) : (
+            /* Bank Wire Setup */
+            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+              <View style={styles.cardHeader}>
+                <Icon name="business-outline" size={18} color={colors.interactive} />
+                <Text style={[styles.cardTitle, { color: colors.text }]}>Configure Bank Account Details</Text>
+              </View>
 
               <InputField
-                label="Purpose / Campaign Title"
-                value={campaignName}
-                onChangeText={setCampaignName}
-                placeholder="e.g. Building Expansion Fund, Thanksgiving Offering..."
-                dark={isDark}
+                label="Bank Name"
+                value={bankName}
+                onChangeText={setBankName}
+                placeholder="e.g. Barclays / Chase"
               />
 
               <InputField
-                label="Target Goal Amount ($ USD)"
-                value={campaignGoal}
-                onChangeText={setCampaignGoal}
-                keyboardType="numeric"
-                placeholder="50000"
-                dark={isDark}
+                label="Account Beneficiary Name"
+                value={accountName}
+                onChangeText={setAccountName}
+                placeholder="e.g. Church Ministry Account"
               />
 
               <InputField
-                label="Description / Purpose Details"
-                value={campaignDesc}
-                onChangeText={setCampaignDesc}
-                placeholder="What will these contributions support?"
+                label="Account / IBAN Number"
+                value={accountNumber}
+                onChangeText={setAccountNumber}
+                placeholder="Account number"
+              />
+
+              <InputField
+                label="Routing / Sort Code"
+                value={routingNumber}
+                onChangeText={setRoutingNumber}
+                placeholder="Sort code"
+              />
+
+              <InputField
+                label="Transfer Reference Instructions"
+                value={transferInstructions}
+                onChangeText={setTransferInstructions}
                 multiline
-                numberOfLines={3}
-                dark={isDark}
+                numberOfLines={2}
+                placeholder="e.g. Please put donor full name as transfer reference"
               />
 
               <Button
-                label="Publish Giving Campaign ➔"
-                onPress={handleCreateCampaign}
-                variant="gold"
-                size="lg"
-                loading={creatingCampaign}
-                style={{ marginTop: spacing.md } as any}
+                label="Save Bank Information"
+                onPress={handleSaveBankAccount}
+                loading={savingBank}
+                variant="primary"
+                size="md"
+                style={{ marginTop: spacing.xs }}
               />
             </View>
-
-            {/* Existing Campaigns */}
-            <SectionHeader
-              title="Active Giving Purposes"
-              badge={campaigns.data?.length ?? 0}
-              dark={isDark}
-            />
-            {campaigns.loading ? (
-              <Skeleton height={100} count={2} dark={isDark} />
-            ) : campaigns.error && !campaigns.data ? (
-              <ResourceError
-                offline={campaigns.offline}
-                message={campaigns.error}
-                retry={campaigns.refresh}
-                dark={isDark}
-              />
-            ) : campaigns.data && campaigns.data.length > 0 ? (
-              campaigns.data.map((camp) => (
-                <View
-                  key={camp.id}
-                  style={[
-                    styles.campaignCard,
-                    { backgroundColor: colors.card, borderColor: colors.border },
-                    shadows.sm,
-                  ] as any}
-                >
-                  <View style={styles.campaignHeader}>
-                    <Text style={[styles.campaignName, { color: colors.text }] as any}>{camp.name}</Text>
-                    <Badge label={camp.status?.toUpperCase() ?? 'ACTIVE'} variant="success" />
-                  </View>
-                  {camp.description ? (
-                    <Text style={[styles.campaignDesc, { color: colors.textSecondary }] as any}>
-                      {camp.description}
-                    </Text>
-                  ) : null}
-                  <Text style={[styles.campaignGoal, { color: colors.primaryDark }] as any}>
-                    Goal: ${camp.target_amount?.toLocaleString() ?? '50,000'} {camp.currency}
-                  </Text>
-                </View>
-              ))
-            ) : (
-              <EmptyState
-                title="No Custom Campaigns"
-                message="General offering and tithes are active by default."
-                icon="🤍"
-                dark={isDark}
-              />
-            )}
-          </>
-        ) : (
-          /* CONFIGURE CHURCH BANK ACCOUNTS */
-          <View
-            style={[
-              styles.card,
-              { backgroundColor: colors.card, borderColor: colors.border },
-              shadows.md,
-            ] as any}
-          >
-            <Text style={[styles.cardHeaderTitle, { color: colors.textMuted }] as any}>
-              CONFIGURE CHURCH DIRECT BANK DETAILS
-            </Text>
-            <Text style={[styles.cardSubheader, { color: colors.textMuted }] as any}>
-              These banking details will appear on the public giving tab for direct wire/transfers.
-            </Text>
-
-            <InputField
-              label="Bank Name / Institution"
-              value={bankName}
-              onChangeText={setBankName}
-              placeholder="e.g. Chase Bank / Barclays / GTBank"
-              dark={isDark}
-            />
-
-            <InputField
-              label="Official Account Name"
-              value={accountName}
-              onChangeText={setAccountName}
-              placeholder="e.g. Sanctuary Church Global Giving"
-              dark={isDark}
-            />
-
-            <InputField
-              label="Account Number / IBAN"
-              value={accountNumber}
-              onChangeText={setAccountNumber}
-              placeholder="e.g. 0123456789"
-              dark={isDark}
-            />
-
-            <InputField
-              label="Routing / Sort Code (Optional)"
-              value={routingNumber}
-              onChangeText={setRoutingNumber}
-              placeholder="e.g. 12200049"
-              dark={isDark}
-            />
-
-            <InputField
-              label="Transfer Narration Instructions"
-              value={transferInstructions}
-              onChangeText={setTransferInstructions}
-              placeholder="e.g. Please include your name/member ID in the payment description."
-              multiline
-              numberOfLines={2}
-              dark={isDark}
-            />
-
-            <Button
-              label="Save & Publish Bank Details ➔"
-              onPress={handleSaveBankAccount}
-              variant="gold"
-              size="lg"
-              loading={savingBank}
-              style={{ marginTop: spacing.md } as any}
-            />
-          </View>
-        )}
-      </View>
-    </ScrollView>
+          )}
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
   content: {
-    paddingBottom: 120,
+    flexGrow: 1,
+  },
+  tabRow: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.lg,
+    gap: spacing.xs,
+    marginBottom: spacing.md,
   },
   body: {
     paddingHorizontal: spacing.lg,
+    gap: spacing.lg,
   },
-  tabBar: {
+  banner: {
     flexDirection: 'row',
-    borderRadius: radius.pill,
-    padding: 4,
-    marginBottom: spacing.md,
-  },
-  tabBtn: {
-    flex: 1,
-    paddingVertical: 10,
     alignItems: 'center',
-    borderRadius: radius.pill,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
   },
-  tabText: {
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  tabTextActive: {
-    fontWeight: '900',
+  bannerText: {
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
   },
   card: {
-    borderRadius: radius.xl,
     padding: spacing.lg,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    marginBottom: spacing.lg,
+    gap: spacing.sm,
   },
-  cardHeaderTitle: {
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-    marginBottom: spacing.xs,
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
-  cardSubheader: {
-    fontSize: 12,
-    marginBottom: spacing.md,
-    lineHeight: 16,
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
   },
-  errorText: {
-    color: palette.live,
-    fontSize: 13,
-    fontWeight: '800',
-    marginBottom: spacing.sm,
+  listSection: {
+    gap: spacing.xs,
   },
-  successText: {
-    color: palette.success,
-    fontSize: 13,
-    fontWeight: '800',
-    marginBottom: spacing.sm,
-  },
-  campaignCard: {
+  tile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     padding: spacing.md,
     borderRadius: radius.lg,
-    marginBottom: spacing.sm,
     borderWidth: 1,
+    marginBottom: spacing.xs,
   },
-  campaignHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
+  tileInfo: {
+    flex: 1,
+    gap: 2,
   },
-  campaignName: {
+  tileTitle: {
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '700',
   },
-  campaignDesc: {
+  tileSub: {
     fontSize: 12,
-    marginTop: 2,
-  },
-  campaignGoal: {
-    fontSize: 12,
-    fontWeight: '800',
-    marginTop: 6,
   },
 });

@@ -12,10 +12,10 @@ const DEFAULT_BRANDING: PlatformBrandingConfig = {
   default_placeholder_logo_url: null,
   default_leader_placeholder_url: null,
   theme_tokens: {
-    navy: '#091733',
-    gold: '#E5B94B',
-    cream: '#F4F2EB',
-    ink: '#15213A',
+    navy: '#0D294B',
+    blue: '#2F6FED',
+    background: '#F7F9FC',
+    ink: '#0B1628',
   },
 };
 

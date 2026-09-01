@@ -1,10 +1,23 @@
 import React, { useState } from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/state/theme';
-import { palette, radius, shadows, spacing } from '@/design-system/tokens';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
+import { Avatar } from '../primitives/Avatar';
+import { Icon } from '../primitives/Icon';
 import type { ContentComment } from '@/types/content';
 
-interface CommentSheetProps {
+export interface CommentSheetProps {
   visible: boolean;
   onClose: () => void;
   comments: ContentComment[];
@@ -19,6 +32,7 @@ export function CommentSheet({
   onSubmitComment,
   loading = false,
 }: CommentSheetProps) {
+  const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const [text, setText] = useState('');
   const [replyingTo, setReplyingTo] = useState<ContentComment | null>(null);
@@ -39,24 +53,35 @@ export function CommentSheet({
       transparent
       onRequestClose={onClose}
     >
-      <View style={styles.backdrop as any}>
-        <Pressable style={styles.dismissArea as any} onPress={onClose} />
-        <View
+      <View style={styles.backdrop}>
+        <Pressable style={styles.dismissArea} onPress={onClose} />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={[
             styles.sheet,
-            { backgroundColor: isDark ? '#1C1008' : '#FFFDF9', borderColor: isDark ? '#3D2415' : palette.line },
+            {
+              backgroundColor: colors.card,
+              borderTopColor: colors.border,
+              paddingBottom: Math.max(insets.bottom, spacing.md),
+            },
             shadows.lg,
-          ] as any}
+          ]}
         >
-          {/* Sheet Header */}
-          <View style={styles.header as any}>
-            <View style={styles.dragHandle as any} />
-            <View style={styles.headerRow as any}>
-              <Text style={[styles.headerTitle, { color: colors.text }] as any}>
-                💬 Fellowship & Comments ({comments.length})
+          {/* Header */}
+          <View style={[styles.header, { borderBottomColor: colors.border }]}>
+            <View style={[styles.dragHandle, { backgroundColor: colors.borderStrong }]} />
+            <View style={styles.headerRow}>
+              <Text style={[styles.headerTitle, { color: colors.text }]}>
+                Comments ({comments.length})
               </Text>
-              <Pressable onPress={onClose} style={styles.closeBtn as any}>
-                <Text style={[styles.closeText, { color: colors.textMuted }] as any}>✕</Text>
+              <Pressable
+                onPress={onClose}
+                hitSlop={8}
+                style={styles.closeBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+              >
+                <Icon name="close" size={20} color={colors.textMuted} />
               </Pressable>
             </View>
           </View>
@@ -65,162 +90,184 @@ export function CommentSheet({
           <FlatList
             data={comments}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.listContent as any}
+            contentContainerStyle={styles.listContent}
+            keyboardShouldPersistTaps="handled"
             renderItem={({ item }) => {
               const isReply = !!item.parent_comment_id;
+              const timeStr = new Date(item.created_at).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+              });
+
               return (
                 <View
                   style={[
                     styles.commentItem,
-                    isReply ? styles.replyItem : null,
-                    { borderBottomColor: isDark ? '#2E1C11' : '#F4EAE0' },
-                  ] as any}
+                    isReply && styles.replyItem,
+                    { borderBottomColor: colors.borderSubtle },
+                  ]}
                 >
-                  <View style={styles.commentAvatar as any}>
-                    <Text style={{ fontSize: 13 } as any}>👤</Text>
-                  </View>
-                  <View style={{ flex: 1, gap: 3 }}>
-                    <View style={styles.authorRow as any}>
-                      <Text style={[styles.authorName, { color: colors.text }] as any}>
+                  <Avatar
+                    url={item.profiles?.avatar_url}
+                    name={item.profiles?.display_name}
+                    size="sm"
+                  />
+                  <View style={styles.commentContent}>
+                    <View style={styles.authorRow}>
+                      <Text style={[styles.authorName, { color: colors.text }]}>
                         {item.profiles?.display_name ?? 'Church Member'}
                       </Text>
-                      <Text style={[styles.commentTime, { color: colors.textMuted }] as any}>
-                        {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      <Text style={[styles.commentTime, { color: colors.textMuted }]}>
+                        {timeStr}
                       </Text>
                     </View>
-                    <Text style={[styles.commentBody, { color: colors.text }] as any}>
+                    <Text style={[styles.commentBody, { color: colors.text }]}>
                       {item.body}
                     </Text>
-                    <Pressable onPress={() => setReplyingTo(item)} style={styles.replyTrigger as any}>
-                      <Text style={styles.replyTriggerText as any}>Reply</Text>
+                    <Pressable
+                      onPress={() => setReplyingTo(item)}
+                      hitSlop={4}
+                      style={styles.replyTrigger}
+                    >
+                      <Text style={[styles.replyTriggerText, { color: colors.interactive }]}>
+                        Reply
+                      </Text>
                     </Pressable>
                   </View>
                 </View>
               );
             }}
             ListEmptyComponent={() => (
-              <View style={styles.emptyState as any}>
-                <Text style={{ fontSize: 32 } as any}>🕊️</Text>
-                <Text style={[styles.emptyText, { color: colors.textMuted }] as any}>
-                  Be the first to share an encouragement or prayer.
+              <View style={styles.emptyWrap}>
+                <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+                  No comments yet. Share your thoughts or encouragement below.
                 </Text>
               </View>
             )}
           />
 
-          {/* Replying Banner if set */}
+          {/* Replying Banner */}
           {replyingTo ? (
-            <View style={styles.replyBanner as any}>
-              <Text style={styles.replyBannerText as any}>
+            <View style={[styles.replyBanner, { backgroundColor: colors.primarySoft }]}>
+              <Text style={[styles.replyBannerText, { color: colors.interactive }]}>
                 Replying to {replyingTo.profiles?.display_name ?? 'Member'}
               </Text>
-              <Pressable onPress={() => setReplyingTo(null)}>
-                <Text style={styles.cancelReplyText as any}>Cancel</Text>
+              <Pressable onPress={() => setReplyingTo(null)} hitSlop={6}>
+                <Icon name="close" size={16} color={colors.interactive} />
               </Pressable>
             </View>
           ) : null}
 
-          {/* Input Bar */}
+          {/* Composer Input Bar */}
           <View
             style={[
               styles.inputBar,
-              { backgroundColor: isDark ? '#140C07' : '#F8EDE2', borderTopColor: isDark ? '#2E1C11' : palette.line },
-            ] as any}
+              {
+                backgroundColor: colors.card,
+                borderTopColor: colors.border,
+              },
+            ]}
           >
             <TextInput
-              style={[
-                styles.inputField,
-                { backgroundColor: isDark ? '#22140C' : '#FFFDF9', color: colors.text, borderColor: isDark ? '#3D2415' : palette.line },
-              ] as any}
-              placeholder="Write an encouragement..."
-              placeholderTextColor={colors.textMuted}
               value={text}
               onChangeText={setText}
+              placeholder={replyingTo ? 'Write a reply...' : 'Add a thoughtful comment...'}
+              placeholderTextColor={colors.textMuted}
+              style={[
+                styles.textInput,
+                {
+                  backgroundColor: colors.inputBg,
+                  color: colors.text,
+                  borderColor: colors.border,
+                },
+              ]}
               multiline
+              maxLength={500}
             />
             <Pressable
               onPress={handleSend}
               disabled={!text.trim() || loading}
-              style={[
+              style={({ pressed }) => [
                 styles.sendBtn,
-                !text.trim() ? styles.sendBtnDisabled : null,
-              ] as any}
+                {
+                  backgroundColor: text.trim() ? colors.interactive : colors.bgSecondary,
+                  opacity: pressed ? 0.8 : 1,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Send comment"
             >
-              <Text style={styles.sendBtnText as any}>➔</Text>
+              <Icon
+                name="arrow-up"
+                size={18}
+                color={text.trim() ? '#FFFFFF' : colors.textMuted}
+              />
             </Pressable>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     justifyContent: 'flex-end',
+    backgroundColor: 'rgba(6, 20, 38, 0.65)',
   },
   dismissArea: {
     flex: 1,
   },
   sheet: {
-    height: '65%',
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
     borderTopWidth: 1,
-    overflow: 'hidden',
+    height: '75%',
+    width: '100%',
+    maxWidth: Platform.OS === 'web' ? 680 : undefined,
+    alignSelf: 'center',
   },
   header: {
-    padding: spacing.md,
-    alignItems: 'center',
-    gap: 8,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
   },
   dragHandle: {
-    width: 40,
+    width: 36,
     height: 4,
-    borderRadius: 2,
-    backgroundColor: '#A68A75',
+    borderRadius: radius.pill,
+    alignSelf: 'center',
+    marginBottom: spacing.sm,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    width: '100%',
   },
   headerTitle: {
-    fontSize: 15,
-    fontWeight: '900',
+    ...typography.h3,
   },
   closeBtn: {
     padding: 4,
   },
-  closeText: {
-    fontSize: 16,
-    fontWeight: '800',
-  },
   listContent: {
-    padding: spacing.md,
-    gap: 12,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
   },
   commentItem: {
     flexDirection: 'row',
-    gap: 10,
-    paddingBottom: 10,
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
     borderBottomWidth: 1,
   },
   replyItem: {
-    marginLeft: 32,
+    paddingLeft: spacing.xl,
   },
-  commentAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#2E1C11',
-    alignItems: 'center',
-    justifyContent: 'center',
+  commentContent: {
+    flex: 1,
+    gap: 3,
   },
   authorRow: {
     flexDirection: 'row',
@@ -229,10 +276,10 @@ const styles: Record<string, any> = StyleSheet.create({
   },
   authorName: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   commentTime: {
-    fontSize: 10,
+    fontSize: 11,
   },
   commentBody: {
     fontSize: 13,
@@ -240,72 +287,53 @@ const styles: Record<string, any> = StyleSheet.create({
   },
   replyTrigger: {
     alignSelf: 'flex-start',
-    marginTop: 2,
+    marginTop: 3,
   },
   replyTriggerText: {
-    color: palette.gold,
-    fontSize: 11,
-    fontWeight: '800',
+    fontSize: 12,
+    fontWeight: '600',
   },
-  emptyState: {
+  emptyWrap: {
+    padding: spacing.xl,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 40,
-    gap: 8,
   },
   emptyText: {
     fontSize: 13,
-    fontWeight: '600',
     textAlign: 'center',
   },
   replyBanner: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.lg,
     paddingVertical: 6,
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
   },
   replyBannerText: {
-    color: palette.gold,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  cancelReplyText: {
-    color: '#FF6B6B',
-    fontSize: 11,
-    fontWeight: '800',
+    fontSize: 12,
+    fontWeight: '600',
   },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
     borderTopWidth: 1,
-    gap: 10,
   },
-  inputField: {
+  textInput: {
     flex: 1,
-    minHeight: 40,
-    maxHeight: 90,
     borderRadius: radius.md,
+    borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderWidth: 1,
-    fontSize: 13,
+    maxHeight: 80,
+    fontSize: 14,
   },
   sendBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: palette.gold,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  sendBtnDisabled: {
-    opacity: 0.4,
-  },
-  sendBtnText: {
-    color: '#140C07',
-    fontSize: 16,
-    fontWeight: '900',
   },
 });

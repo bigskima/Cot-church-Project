@@ -1,28 +1,40 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
-import { Button, EmptyState, InputField, ResourceError, Skeleton, ScreenHeader } from '@/components';
-import { palette, radius, shadows, spacing } from '@/design-system/tokens';
+import {
+  Badge,
+  Button,
+  EmptyState,
+  Icon,
+  InputField,
+  LeaderCard,
+  ResourceError,
+  ScreenHeader,
+  SectionHeader,
+  Skeleton,
+} from '@/components';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 import type { LeadershipProfile } from '@church/types';
 
 export default function ExpressionLeadershipManage() {
-  const { api, auth } = useSession();
-  const { colors, isDark } = useTheme();
-  const branchId = auth?.branchId;
+  const insets = useSafeAreaInsets();
+  const { api, context } = useSession();
+  const { colors } = useTheme();
+  const branchId = context?.expression?.id;
 
   const [displayName, setDisplayName] = useState('');
   const [roleTitle, setRoleTitle] = useState('');
   const [ministry, setMinistry] = useState('');
   const [shortBio, setShortBio] = useState('');
-  const [isFeaturedPublic, setIsFeaturedPublic] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
   const leaders = useResource<LeadershipProfile[]>('leadership:expression:manage', (signal) =>
-    api.request(`church-story?view=leadership${branchId ? `&expressionId=${branchId}` : ''}`, { signal })
+    api.request<LeadershipProfile[]>(`church-story?view=leadership${branchId ? `&expressionId=${branchId}` : ''}`, { signal }).catch(() => [])
   );
 
   async function handleAddLeader() {
@@ -32,6 +44,7 @@ export default function ExpressionLeadershipManage() {
     }
     setSaving(true);
     setErrorMsg('');
+    setSuccessMsg('');
     try {
       await api.request('church-story', {
         method: 'POST',
@@ -41,16 +54,15 @@ export default function ExpressionLeadershipManage() {
           roleTitle: roleTitle.trim(),
           ministry: ministry.trim() || null,
           shortBio: shortBio.trim() || '',
-          isFeaturedPublic,
+          isFeaturedPublic: true,
         }),
       });
       setDisplayName('');
       setRoleTitle('');
       setMinistry('');
       setShortBio('');
-      setIsFeaturedPublic(false);
+      setSuccessMsg('Leader profile added successfully.');
       leaders.refresh();
-      alert('Expression leader profile created successfully!');
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Failed to create leader profile.');
     } finally {
@@ -58,219 +70,152 @@ export default function ExpressionLeadershipManage() {
     }
   }
 
+  const leaderList = leaders.data ?? [];
+
   return (
-    <ScrollView
-      style={[styles.screen, { backgroundColor: colors.bg }]}
-      contentContainerStyle={styles.content}
-    >
-      <ScreenHeader
-        title="Expression Leadership Directory"
-        subtitle="Manage local pastoral staff, directors, and ministry coordinators."
-        showBack
-        dark={isDark}
-      />
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + spacing.sm, paddingBottom: 60 },
+        ]}
+      >
+        <ScreenHeader
+          title="Campus Leadership Directory"
+          subtitle="Configure pastoral staff, ministry directors, and coordinators."
+          showBack
+        />
 
-      <View style={styles.body}>
-        {/* Add Leader Card */}
-        <View
-          style={[
-            styles.card,
-            { backgroundColor: colors.card, borderColor: colors.border },
-            shadows.md,
-          ]}
-        >
-          <Text style={[styles.cardTitle, { color: colors.text }]}>
-            Add Expression Leader
-          </Text>
-
-          <InputField
-            label="Full Name"
-            value={displayName}
-            onChangeText={setDisplayName}
-            placeholder="e.g. Pastor John Example"
-            dark={isDark}
-          />
-
-          <InputField
-            label="Configurable Role Title"
-            value={roleTitle}
-            onChangeText={setRoleTitle}
-            placeholder="e.g. Lead Pastor, Worship Director, Campus Coordinator"
-            dark={isDark}
-          />
-
-          <InputField
-            label="Ministry / Responsibility Area"
-            value={ministry}
-            onChangeText={setMinistry}
-            placeholder="e.g. Pastoral Care, Youth Ministry, Media Production"
-            dark={isDark}
-          />
-
-          <InputField
-            label="Short Bio / Background"
-            value={shortBio}
-            onChangeText={setShortBio}
-            placeholder="Describe background and ministry calling..."
-            multiline
-            numberOfLines={3}
-            dark={isDark}
-          />
-
-          <Pressable
-            onPress={() => setIsFeaturedPublic(!isFeaturedPublic)}
-            style={styles.checkboxRow}
-          >
-            <View
-              style={[
-                styles.checkbox,
-                { borderColor: colors.border },
-                isFeaturedPublic && {
-                  backgroundColor: colors.primary,
-                  borderColor: colors.primary,
-                },
-              ]}
-            >
-              {isFeaturedPublic && <Text style={styles.checkmark}>✓</Text>}
+        <View style={styles.body}>
+          {/* Notification Messages */}
+          {successMsg ? (
+            <View style={[styles.banner, { backgroundColor: 'rgba(22, 163, 106, 0.12)', borderColor: 'rgba(22, 163, 106, 0.3)' }]}>
+              <Icon name="checkmark-circle" size={18} color="#16A36A" style={{ marginRight: 8 }} />
+              <Text style={[styles.bannerText, { color: '#16A36A' }]}>{successMsg}</Text>
             </View>
-            <Text style={[styles.checkboxLabel, { color: colors.textSecondary }]}>
-              Feature on global public Church Leadership directory
-            </Text>
-          </Pressable>
+          ) : null}
 
-          {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
+          {errorMsg ? (
+            <View style={[styles.banner, { backgroundColor: 'rgba(229, 72, 77, 0.12)', borderColor: 'rgba(229, 72, 77, 0.3)' }]}>
+              <Icon name="alert-circle" size={18} color="#E5484D" style={{ marginRight: 8 }} />
+              <Text style={[styles.bannerText, { color: '#E5484D' }]}>{errorMsg}</Text>
+            </View>
+          ) : null}
 
-          <Button
-            label="Add Leader to Directory ➔"
-            onPress={handleAddLeader}
-            variant="gold"
-            size="lg"
-            loading={saving}
-            style={{ marginTop: spacing.md } as any}
-          />
+          {/* Add Leader Card */}
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+            <View style={styles.cardHeader}>
+              <Icon name="person-add-outline" size={18} color={colors.interactive} />
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Add Leader to Directory</Text>
+            </View>
+
+            <InputField
+              label="Full Name"
+              value={displayName}
+              onChangeText={setDisplayName}
+              placeholder="e.g. Pastor David Alexander"
+            />
+
+            <InputField
+              label="Role Title"
+              value={roleTitle}
+              onChangeText={setRoleTitle}
+              placeholder="e.g. Lead Pastor, Worship Director"
+            />
+
+            <InputField
+              label="Ministry Department (Optional)"
+              value={ministry}
+              onChangeText={setMinistry}
+              placeholder="e.g. Pastoral Care, Youth & Families"
+            />
+
+            <InputField
+              label="Short Biography"
+              value={shortBio}
+              onChangeText={setShortBio}
+              multiline
+              numberOfLines={3}
+              placeholder="Summary of ministerial calling and role..."
+            />
+
+            <Button
+              label="Save Leader Profile"
+              onPress={handleAddLeader}
+              loading={saving}
+              variant="primary"
+              size="md"
+              style={{ marginTop: spacing.xs }}
+            />
+          </View>
+
+          {/* Leaders List */}
+          <View style={styles.listSection}>
+            <SectionHeader title="Configured Leaders" badge={leaderList.length} />
+            {leaders.loading ? (
+              <Skeleton height={80} count={2} />
+            ) : leaderList.length > 0 ? (
+              leaderList.map((leader) => (
+                <LeaderCard
+                  key={leader.id}
+                  leader={leader}
+                  variant="standard"
+                />
+              ))
+            ) : (
+              <EmptyState
+                title="No Leaders Configured"
+                message="Add your pastoral team using the form above."
+                iconName="people-outline"
+              />
+            )}
+          </View>
         </View>
-
-        <Text style={[styles.sectionHeading, { color: colors.text }] as any}>
-          Current Campus Leaders
-        </Text>
-
-        {leaders.loading ? (
-          <Skeleton height={90} count={2} dark={isDark} />
-        ) : leaders.error && !leaders.data ? (
-          <ResourceError
-            offline={leaders.offline}
-            message={leaders.error}
-            retry={leaders.refresh}
-            dark={isDark}
-          />
-        ) : leaders.data && leaders.data.length > 0 ? (
-          leaders.data.map((l) => (
-            <View
-              key={l.id}
-              style={[
-                styles.leaderItemCard,
-                { backgroundColor: colors.card, borderColor: colors.border },
-                shadows.sm,
-              ] as any}
-            >
-              <Text style={[styles.leaderItemName, { color: colors.text }] as any}>{l.display_name}</Text>
-              <Text style={styles.leaderItemRole as any}>
-                {l.role_title} {l.ministry ? `· ${l.ministry}` : ''}
-              </Text>
-              {l.short_bio ? (
-                <Text style={[styles.leaderItemBio, { color: colors.textMuted }] as any}>{l.short_bio}</Text>
-              ) : null}
-            </View>
-          ))
-        ) : (
-          <EmptyState
-            title="No Campus Leaders Registered"
-            message="Add campus leaders using the form above."
-            icon="👥"
-            dark={isDark}
-          />
-        )}
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
   content: {
-    paddingBottom: 120,
+    flexGrow: 1,
   },
   body: {
     paddingHorizontal: spacing.lg,
+    gap: spacing.lg,
   },
-  card: {
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-    borderWidth: 1,
-    marginBottom: spacing.lg,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    marginBottom: spacing.sm,
-  },
-  checkboxRow: {
+  banner: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.sm,
-    marginBottom: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
   },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  checkmark: {
-    color: '#140C07',
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  checkboxLabel: {
+  bannerText: {
     fontSize: 13,
     fontWeight: '600',
     flex: 1,
   },
-  errorText: {
-    color: palette.live,
-    fontSize: 13,
-    fontWeight: '800',
-    marginBottom: spacing.sm,
-  },
-  sectionHeading: {
-    fontSize: 18,
-    fontWeight: '900',
-    marginBottom: spacing.sm,
-  },
-  leaderItemCard: {
+  card: {
+    padding: spacing.lg,
     borderRadius: radius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
     borderWidth: 1,
+    gap: spacing.sm,
   },
-  leaderItemName: {
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  cardTitle: {
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '700',
   },
-  leaderItemRole: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: palette.yellowDark,
-    marginTop: 2,
-  },
-  leaderItemBio: {
-    fontSize: 12,
-    marginTop: 4,
-    lineHeight: 16,
+  listSection: {
+    gap: spacing.xs,
   },
 });

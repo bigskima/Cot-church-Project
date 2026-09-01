@@ -1,11 +1,13 @@
 import React from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { palette, radius, shadows, spacing } from '../design-system/tokens';
+import { useTheme } from '@/state/theme';
+import { radius, spacing, typography } from '@/design-system/tokens';
 import { Badge } from './Badge';
 import { Button } from './Button';
-import type { ChurchOrganization } from '../types/content';
+import { Icon } from './primitives/Icon';
+import type { ChurchOrganization } from '@/types/content';
 
-interface ChurchPickerModalProps {
+export interface ChurchPickerModalProps {
   visible: boolean;
   onClose: () => void;
   churches: ChurchOrganization[];
@@ -20,6 +22,8 @@ export function ChurchPickerModal({
   selectedChurchId,
   onSelectChurch,
 }: ChurchPickerModalProps) {
+  const { colors } = useTheme();
+
   return (
     <Modal
       visible={visible}
@@ -28,21 +32,29 @@ export function ChurchPickerModal({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <Pressable style={styles.backdrop as any} onPress={onClose} />
-        <View style={[styles.sheet, shadows.lg] as any}>
-          <View style={styles.handle} />
-          
+        <Pressable style={styles.backdrop} onPress={onClose} />
+        <View style={[styles.sheet, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
+          <View style={[styles.handle, { backgroundColor: colors.borderStrong }]} />
+
           <View style={styles.header}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.title}>Discover Churches</Text>
-              <Text style={styles.subtitle}>Select a church sanctuary or expression to browse.</Text>
+              <Text style={[styles.title, { color: colors.text }]}>Select Organization</Text>
+              <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+                Choose a church organization or expression to browse.
+              </Text>
             </View>
-            <Pressable onPress={onClose} style={styles.closeBtn as any}>
-              <Text style={styles.closeBtnText}>✕</Text>
+            <Pressable
+              onPress={onClose}
+              hitSlop={8}
+              style={styles.closeBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
+              <Icon name="close" size={20} color={colors.textMuted} />
             </Pressable>
           </View>
 
-          <ScrollView style={styles.list} contentContainerStyle={{ paddingBottom: spacing.xl }}>
+          <ScrollView style={styles.list} contentContainerStyle={{ paddingBottom: spacing.lg }}>
             {churches.length > 0 ? (
               churches.map((church) => {
                 const isSelected = selectedChurchId === church.id;
@@ -55,28 +67,39 @@ export function ChurchPickerModal({
                     }}
                     style={({ pressed }) => [
                       styles.churchTile,
-                      isSelected ? styles.churchTileSelected : null,
-                      pressed ? styles.pressed : null,
-                    ] as any}
+                      {
+                        backgroundColor: isSelected ? colors.primarySoft : colors.bgSecondary,
+                        borderColor: isSelected ? colors.interactive : colors.border,
+                      },
+                      pressed && styles.pressed,
+                    ]}
                   >
-                    <View style={styles.churchIcon}>
-                      <Text style={styles.churchIconText}>🏛️</Text>
+                    <View style={[styles.churchIcon, { backgroundColor: colors.card }]}>
+                      <Icon
+                        name="business-outline"
+                        size={20}
+                        color={isSelected ? colors.interactive : colors.textSecondary}
+                      />
                     </View>
                     <View style={styles.churchInfo}>
-                      <Text style={styles.churchName}>{church.name}</Text>
-                      <Text style={styles.churchSlug}>/{church.slug} · {church.timezone || 'UTC'}</Text>
+                      <Text style={[styles.churchName, { color: colors.text }]}>{church.name}</Text>
+                      <Text style={[styles.churchSlug, { color: colors.textMuted }]}>
+                        /{church.slug} {church.timezone ? `· ${church.timezone}` : ''}
+                      </Text>
                     </View>
                     {isSelected ? (
-                      <Badge label="ACTIVE" variant="gold" />
+                      <Badge label="ACTIVE" variant="primary" />
                     ) : (
-                      <Text style={styles.chevron}>›</Text>
+                      <Icon name="chevron-forward" size={18} color={colors.textMuted} />
                     )}
                   </Pressable>
                 );
               })
             ) : (
               <View style={styles.empty}>
-                <Text style={styles.emptyText}>Global Central Sanctuary active.</Text>
+                <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+                  No other organizations available.
+                </Text>
               </View>
             )}
           </ScrollView>
@@ -86,7 +109,7 @@ export function ChurchPickerModal({
             onPress={onClose}
             variant="outline"
             size="md"
-            style={{ marginTop: spacing.md } as any}
+            style={{ marginTop: spacing.sm }}
           />
         </View>
       </View>
@@ -94,27 +117,26 @@ export function ChurchPickerModal({
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(20, 12, 7, 0.75)',
+    backgroundColor: 'rgba(6, 20, 38, 0.65)',
   },
   backdrop: {
     flex: 1,
   },
   sheet: {
-    backgroundColor: palette.surface,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
+    borderTopWidth: 1,
     padding: spacing.lg,
     maxHeight: '80%',
   },
   handle: {
-    width: 44,
-    height: 5,
+    width: 36,
+    height: 4,
     borderRadius: radius.pill,
-    backgroundColor: '#E8D5C4',
     alignSelf: 'center',
     marginBottom: spacing.md,
   },
@@ -125,78 +147,53 @@ const styles: Record<string, any> = StyleSheet.create({
     marginBottom: spacing.md,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#26140A',
+    ...typography.h2,
   },
   subtitle: {
-    fontSize: 13,
-    color: '#8C6549',
+    ...typography.caption,
     marginTop: 2,
   },
   closeBtn: {
-    padding: 6,
-  },
-  closeBtnText: {
-    fontSize: 18,
-    color: '#8C6549',
+    padding: 4,
   },
   list: {
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
   },
   churchTile: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8EDE2',
     padding: spacing.md,
     borderRadius: radius.lg,
     marginBottom: spacing.sm,
     borderWidth: 1,
-    borderColor: '#E8D5C4',
-  },
-  churchTileSelected: {
-    borderColor: '#F59E0B',
-    backgroundColor: '#FEF3C7',
   },
   pressed: {
-    opacity: 0.85,
+    opacity: 0.8,
   },
   churchIcon: {
-    width: 42,
-    height: 42,
+    width: 38,
+    height: 38,
     borderRadius: radius.md,
-    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
-  },
-  churchIconText: {
-    fontSize: 20,
   },
   churchInfo: {
     flex: 1,
   },
   churchName: {
     fontSize: 15,
-    fontWeight: '800',
-    color: '#26140A',
+    fontWeight: '600',
   },
   churchSlug: {
     fontSize: 12,
-    color: '#8C6549',
     marginTop: 2,
-  },
-  chevron: {
-    fontSize: 20,
-    color: '#C4AFA0',
-    fontWeight: '700',
   },
   empty: {
     padding: spacing.xl,
     alignItems: 'center',
   },
   emptyText: {
-    color: '#8C6549',
     fontSize: 14,
   },
 });

@@ -1,20 +1,34 @@
 import React, { useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
-import { EmptyState, PostCard, ResourceError, ScreenHeader, Skeleton } from '@/components';
-import { palette, radius, shadows, spacing } from '@/design-system/tokens';
-import type { SocialPost } from '@/types/content';
+import {
+  Chip,
+  CommentSheet,
+  EmptyState,
+  Icon,
+  PostCard,
+  ResourceError,
+  ScreenHeader,
+  Skeleton,
+} from '@/components';
+import { radius, spacing } from '@/design-system/tokens';
+import type { ContentComment, SocialPost } from '@/types/content';
 
 const organization = process.env.EXPO_PUBLIC_ORGANIZATION_ID;
-type Scope = 'global' | 'expression';
+type Scope = 'all' | 'expression';
 
 export default function CommunityScreen() {
-  const { api, mode, context } = useSession();
-  const { colors, isDark } = useTheme();
-  const [scope, setScope] = useState<Scope>('global');
+  const insets = useSafeAreaInsets();
+  const { api, mode, context, hasCapability } = useSession();
+  const { colors } = useTheme();
+  const [scope, setScope] = useState<Scope>('all');
+  const [activePostForComments, setActivePostForComments] = useState<SocialPost | null>(null);
+  const [comments, setComments] = useState<ContentComment[]>([]);
+  const [commentLoading, setCommentLoading] = useState(false);
 
   const feed = useResource<SocialPost[]>(`feed:${scope}`, (signal) =>
     mode === 'visitor'
@@ -27,7 +41,7 @@ export default function CommunityScreen() {
 
   const posts =
     feed.data?.filter((post) =>
-      scope === 'global' ? post.visibility === 'public' : post.visibility !== 'public'
+      scope === 'all' ? true : post.visibility !== 'public'
     ) ?? [];
 
   const handleReact = async (postId: string, reaction: string) => {
@@ -37,7 +51,39 @@ export default function CommunityScreen() {
         method: 'POST',
         body: JSON.stringify({ action: 'react', postId, reaction }),
       });
-      feed.refresh();
+    } catch {
+      // Ignored
+    }
+  };
+
+  const handleOpenComments = async (post: SocialPost) => {
+    setActivePostForComments(post);
+    setCommentLoading(true);
+    try {
+      const res = await api.request<ContentComment[]>(`engagement?contentId=${post.id}`);
+      setComments(res ?? []);
+    } catch {
+      setComments([]);
+    } finally {
+      setCommentLoading(false);
+    }
+  };
+
+  const handleSendComment = async (body: string, parentCommentId?: string | null) => {
+    if (!activePostForComments) return;
+    try {
+      const res = await api.request<ContentComment>('engagement', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'comment',
+          contentId: activePostForComments.id,
+          body,
+          parentCommentId,
+        }),
+      });
+      if (res) {
+        setComments((prev) => [...prev, res]);
+      }
     } catch {
       // Ignored
     }
@@ -45,179 +91,135 @@ export default function CommunityScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <ScreenHeader
-        title="Sanctuary Community"
-        subtitle="Encouragement, testimonies, and updates from your spiritual family."
-        dark={isDark}
+      <FlatList
+        data={posts}
+        keyExtractor={(item) => item.id}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + spacing.sm, paddingBottom: 100 },
+        ]}
+        refreshControl={
+          <RefreshControl
+            refreshing={feed.loading}
+            onRefresh={feed.refresh}
+            tintColor={colors.interactive}
+          />
+        }
+        ListHeaderComponent={() => (
+          <View>
+            <ScreenHeader
+              title="Community Fellowship"
+              subtitle="Testimonies, praise reports, and encouraging updates from your church family."
+            />
+
+            {/* Filter Tabs & Leadership Entry */}
+            <View style={styles.filterRow}>
+              <View style={styles.chipsWrap}>
+                <Chip
+                  label="All Updates"
+                  selected={scope === 'all'}
+                  onPress={() => setScope('all')}
+                />
+                {mode === 'authenticated' && (
+                  <Chip
+                    label="My Campus"
+                    selected={scope === 'expression'}
+                    onPress={() => setScope('expression')}
+                  />
+                )}
+              </View>
+
+              <Pressable
+                onPress={() => router.push('/(tabs)/community/leadership')}
+                style={({ pressed }) => [
+                  styles.leadershipBtn,
+                  { backgroundColor: colors.bgSecondary, borderColor: colors.border },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Icon name="people-outline" size={14} color={colors.interactive} />
+                <Text style={[styles.leadershipBtnText, { color: colors.text }]}>Leaders</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+        renderItem={({ item }) => (
+          <PostCard
+            post={item}
+            onReact={(r) => handleReact(item.id, r)}
+            onComment={() => handleOpenComments(item)}
+          />
+        )}
+        ListEmptyComponent={() => (
+          feed.loading ? (
+            <View style={styles.loadingPad}>
+              <Skeleton height={140} count={3} />
+            </View>
+          ) : feed.error && !feed.data ? (
+            <View style={styles.loadingPad}>
+              <ResourceError message={feed.error} retry={feed.refresh} />
+            </View>
+          ) : (
+            <View style={styles.loadingPad}>
+              <EmptyState
+                title="No Community Posts Yet"
+                message="Be the first to share a testimony or encouragement with your spiritual family."
+                iconName="chatbubbles-outline"
+              />
+            </View>
+          )
+        )}
       />
 
-      {/* Scope Selector Tabs */}
-      <View style={styles.tabContainer}>
-        <View
-          style={[
-            styles.tabPillContainer,
-            { backgroundColor: isDark ? '#22140C' : '#E8D5C4' },
-          ]}
-        >
-          {(['global', 'expression'] as Scope[]).map((val) => {
-            const isSelected = scope === val;
-            const isDisabled = mode === 'visitor' && val === 'expression';
-            const label =
-              val === 'global'
-                ? 'Global Church'
-                : 'My Expression';
-
-            return (
-              <Pressable
-                key={val}
-                disabled={isDisabled}
-                onPress={() => setScope(val)}
-                style={({ pressed }) => [
-                  styles.tabPill,
-                  isSelected ? {
-                    backgroundColor: isDark ? '#2E1C11' : '#FFFDF9',
-                    ...shadows.sm,
-                  } : null,
-                  isDisabled ? styles.disabledPill : null,
-                  pressed ? styles.pressed : null,
-                ] as any}
-              >
-                <Text
-                  style={[
-                    styles.tabPillText,
-                    { color: isSelected ? colors.text : colors.textMuted },
-                    isSelected ? styles.tabPillTextActive : null,
-                  ] as any}
-                >
-                  {label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        {/* Expression Leadership Quick Button */}
-        {scope === 'expression' && mode === 'authenticated' && (
-          <Pressable
-            onPress={() => router.push('/(tabs)/community/leadership' as any)}
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              backgroundColor: isDark ? '#1C1008' : '#FFFDF9',
-              padding: 12,
-              borderRadius: radius.md,
-              marginTop: 10,
-              borderWidth: 1,
-              borderColor: isDark ? '#3D2415' : palette.line,
-            } as any}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Text style={{ fontSize: 18 } as any}>👥</Text>
-              <Text style={{ fontWeight: '800', color: colors.text, fontSize: 13 } as any}>
-                View Campus Pastoral & Ministry Leadership
-              </Text>
-            </View>
-            <Text style={{ color: palette.gold, fontSize: 14, fontWeight: '900' } as any}>›</Text>
-          </Pressable>
-        )}
-      </View>
-
-      {/* Feed List */}
-      {feed.loading ? (
-        <View style={styles.loadingWrapper as any}>
-          <Skeleton height={200} count={2} dark={isDark} />
-        </View>
-      ) : feed.error && !feed.data ? (
-        <View style={styles.errorWrapper as any}>
-          <ResourceError
-            offline={feed.offline}
-            message={feed.error}
-            retry={feed.refresh}
-            dark={isDark}
-          />
-        </View>
-      ) : posts.length > 0 ? (
-        <FlatList
-          data={posts}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <PostCard
-              post={item}
-              onReact={(reaction) => handleReact(item.id, reaction)}
-            />
-          )}
-          contentContainerStyle={styles.listContent as any}
-          refreshControl={
-            <RefreshControl
-              refreshing={feed.loading}
-              onRefresh={feed.refresh}
-              tintColor={colors.primary}
-            />
-          }
-        />
-      ) : (
-        <View style={styles.emptyWrapper as any}>
-          <EmptyState
-            title="No Community Posts Yet"
-            message={
-              scope === 'expression'
-                ? 'Your church expression feed is quiet right now. Check back soon for announcements and fellowship.'
-                : 'Global church feed has no published updates.'
-            }
-            icon="✦"
-            dark={isDark}
-          />
-        </View>
-      )}
+      {/* Fellowship Comments Sheet */}
+      <CommentSheet
+        visible={!!activePostForComments}
+        onClose={() => setActivePostForComments(null)}
+        comments={comments}
+        onSubmitComment={handleSendComment}
+        loading={commentLoading}
+      />
     </View>
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
-  tabContainer: {
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.md,
+  content: {
+    flexGrow: 1,
   },
-  tabPillContainer: {
+  filterRow: {
     flexDirection: 'row',
-    borderRadius: radius.pill,
-    padding: 4,
-  },
-  tabPill: {
-    flex: 1,
-    paddingVertical: 10,
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
+  chipsWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  leadershipBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: radius.pill,
+    borderWidth: 1,
+    gap: 4,
   },
-  tabPillText: {
+  leadershipBtnText: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
-  tabPillTextActive: {
-    fontWeight: '900',
-  },
-  disabledPill: {
-    opacity: 0.45,
+  loadingPad: {
+    padding: spacing.lg,
   },
   pressed: {
-    opacity: 0.85,
-  },
-  listContent: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: 120,
-  },
-  loadingWrapper: {
-    paddingHorizontal: spacing.lg,
-    gap: spacing.md,
-  },
-  errorWrapper: {
-    paddingHorizontal: spacing.lg,
-  },
-  emptyWrapper: {
-    paddingHorizontal: spacing.lg,
+    opacity: 0.8,
   },
 });

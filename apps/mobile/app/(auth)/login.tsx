@@ -11,8 +11,8 @@ import {
 import { router } from 'expo-router';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
-import { Button, InputField } from '@/components';
-import { palette, radius, shadows, spacing } from '@/design-system/tokens';
+import { Button, InputField, Icon } from '@/components';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 
 type Method = 'email' | 'phone';
 
@@ -24,6 +24,7 @@ export default function Login() {
   const [callingCode, setCallingCode] = useState('1');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -49,7 +50,7 @@ export default function Login() {
       await authenticate({ session: data.session });
       router.replace('/(tabs)/home');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to sign in');
+      setError(err instanceof Error ? err.message : 'Unable to sign in. Please check your credentials.');
     } finally {
       setLoading(false);
     }
@@ -62,208 +63,269 @@ export default function Login() {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: colors.bg }] as any}
+      style={[styles.container, { backgroundColor: colors.bg }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Header Branding */}
-        <View style={styles.brandHeader}>
-          <Text style={styles.brandKicker as any}>SANCTUARY DIGITAL PLATFORM</Text>
-          <Text style={[styles.title, { color: colors.text }] as any}>Welcome Home</Text>
-          <Text style={[styles.subtitle, { color: colors.textMuted }] as any}>
-            Worship, fellowship, prayer, and spiritual growth — wherever you are.
-          </Text>
-        </View>
-
-        {/* Login Card */}
-        <View
-          style={[
-            styles.card,
-            { backgroundColor: colors.card, borderColor: colors.border },
-            shadows.md,
-          ] as any}
-        >
-          {/* Method Pill Selector */}
-          <View
-            style={[
-              styles.methodPillContainer,
-              { backgroundColor: isDark ? '#1C1009' : '#E8D5C4' },
-            ] as any}
-          >
-            {(['email', 'phone'] as Method[]).map((val) => {
-              const isSelected = method === val;
-              return (
-                <Pressable
-                  key={val}
-                  onPress={() => setMethod(val)}
-                  style={[
-                    styles.methodPill,
-                    isSelected ? {
-                      backgroundColor: isDark ? '#2E1C11' : '#FFFDF9',
-                      ...shadows.sm,
-                    } : null,
-                  ] as any}
-                >
-                  <Text
-                    style={[
-                      styles.methodPillText,
-                      { color: isSelected ? colors.text : colors.textMuted },
-                      isSelected ? styles.methodPillTextActive : null,
-                    ] as any}
-                  >
-                    {val === 'email' ? '✉️ Email Sign In' : '📱 Mobile Phone'}
-                  </Text>
-                </Pressable>
-              );
-            })}
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.formWrapper}>
+          {/* Header Branding */}
+          <View style={styles.brandHeader}>
+            <View style={[styles.brandIconWrapper, { backgroundColor: colors.primarySoft }]}>
+              <Icon name="business" size={28} color={colors.interactive} />
+            </View>
+            <Text style={[styles.title, { color: colors.text }]}>Welcome Back</Text>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+              Sign in to your church community, teachings, giving, and pastoral care.
+            </Text>
           </View>
 
-          {method === 'email' ? (
-            <InputField
-              label="Email Address"
-              autoCapitalize="none"
-              keyboardType="email-address"
-              placeholder="pastor@church.org / member@example.com"
-              value={email}
-              onChangeText={setEmail}
-              dark={isDark}
-            />
-          ) : (
-            <View style={styles.phoneRow}>
-              <View style={{ width: 90 }}>
-                <InputField
-                  label="Code"
-                  keyboardType="phone-pad"
-                  placeholder="+1"
-                  value={callingCode}
-                  onChangeText={setCallingCode}
-                  dark={isDark}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <InputField
-                  label="Phone Number"
-                  keyboardType="phone-pad"
-                  placeholder="(555) 000-0000"
-                  value={phone}
-                  onChangeText={setPhone}
-                  dark={isDark}
-                />
-              </View>
+          {/* Login Card */}
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: colors.card, borderColor: colors.border },
+              shadows.sm,
+            ]}
+          >
+            {/* Method Pill Selector */}
+            <View
+              style={[
+                styles.methodPillContainer,
+                { backgroundColor: colors.bgSecondary },
+              ]}
+            >
+              {(['email', 'phone'] as Method[]).map((val) => {
+                const isSelected = method === val;
+                return (
+                  <Pressable
+                    key={val}
+                    onPress={() => {
+                      setMethod(val);
+                      setError('');
+                    }}
+                    style={[
+                      styles.methodPill,
+                      isSelected && {
+                        backgroundColor: colors.card,
+                        ...shadows.sm,
+                      },
+                    ]}
+                  >
+                    <Icon
+                      name={val === 'email' ? 'mail-outline' : 'call-outline'}
+                      size={16}
+                      color={isSelected ? colors.text : colors.textMuted}
+                      style={{ marginRight: 6 }}
+                    />
+                    <Text
+                      style={[
+                        styles.methodPillText,
+                        { color: isSelected ? colors.text : colors.textMuted },
+                      ]}
+                    >
+                      {val === 'email' ? 'Email Address' : 'Phone Number'}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
-          )}
 
-          <InputField
-            label="Password"
-            secureTextEntry
-            placeholder="Enter your sanctuary password"
-            value={password}
-            onChangeText={setPassword}
-            dark={isDark}
-          />
+            {/* Error Banner */}
+            {error ? (
+              <View style={[styles.errorBanner, { backgroundColor: 'rgba(229, 72, 77, 0.12)', borderColor: 'rgba(229, 72, 77, 0.3)' }]}>
+                <Icon name="alert-circle" size={16} color="#E5484D" style={{ marginRight: 6 }} />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
 
-          {error ? <Text style={styles.errorText as any}>{error}</Text> : null}
+            {/* Inputs */}
+            {method === 'email' ? (
+              <InputField
+                label="Email"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="name@example.com"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+                leftIcon={<Icon name="mail-outline" size={18} color={colors.textMuted} />}
+              />
+            ) : (
+              <View style={styles.phoneInputRow}>
+                <View style={{ width: 80 }}>
+                  <InputField
+                    label="Code"
+                    value={callingCode}
+                    onChangeText={setCallingCode}
+                    keyboardType="number-pad"
+                    placeholder="1"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <InputField
+                    label="Phone Number"
+                    value={phone}
+                    onChangeText={setPhone}
+                    keyboardType="phone-pad"
+                    placeholder="5550199"
+                    autoComplete="tel"
+                    leftIcon={<Icon name="call-outline" size={18} color={colors.textMuted} />}
+                  />
+                </View>
+              </View>
+            )}
 
-          <Button
-            label="Sign In to Sanctuary ➔"
-            onPress={submit}
-            variant="gold"
-            size="lg"
-            loading={loading}
-            style={{ marginTop: spacing.md } as any}
-          />
+            <InputField
+              label="Password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              placeholder="Enter your password"
+              autoCapitalize="none"
+              leftIcon={<Icon name="lock-closed-outline" size={18} color={colors.textMuted} />}
+              rightIcon={
+                <Pressable onPress={() => setShowPassword(!showPassword)} hitSlop={8}>
+                  <Icon
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={18}
+                    color={colors.textMuted}
+                  />
+                </Pressable>
+              }
+            />
 
-          <Button
-            label="Create New Account"
-            onPress={() => router.push('/(auth)/signup')}
-            variant="outline"
-            size="md"
-            style={{ marginTop: spacing.sm } as any}
-          />
+            <Button
+              label="Sign In"
+              onPress={submit}
+              loading={loading}
+              variant="primary"
+              size="lg"
+              style={{ marginTop: spacing.xs }}
+            />
+
+            {/* Guest / Visitor Access */}
+            <Button
+              label="Continue as Guest"
+              onPress={visit}
+              variant="ghost"
+              size="md"
+              style={{ marginTop: spacing.xxs }}
+            />
+          </View>
+
+          {/* Footer Navigation */}
+          <View style={styles.footerRow}>
+            <Text style={[styles.footerText, { color: colors.textSecondary }]}>
+              Don't have an account?
+            </Text>
+            <Pressable onPress={() => router.push('/(auth)/signup')}>
+              <Text style={[styles.footerLink, { color: colors.interactive }]}>
+                Create Account
+              </Text>
+            </Pressable>
+          </View>
         </View>
-
-        {/* Public Visitor Link (No Auth Required) */}
-        <Pressable onPress={visit} style={styles.visitorLink as any}>
-          <Text style={[styles.visitorLinkText, { color: colors.primaryDark }] as any}>
-            ✦ Continue as Guest / Browse Public Services
-          </Text>
-        </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
   content: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: 70,
-    paddingBottom: 60,
+    flexGrow: 1,
     justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xxl,
+  },
+  formWrapper: {
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
+    gap: spacing.lg,
   },
   brandHeader: {
-    marginBottom: spacing.xl,
+    alignItems: 'center',
+    gap: spacing.xs,
   },
-  brandKicker: {
-    color: palette.yellow,
-    fontWeight: '900',
-    fontSize: 11,
-    letterSpacing: 0.8,
+  brandIconWrapper: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xs,
   },
   title: {
-    fontSize: 32,
-    fontWeight: '900',
-    letterSpacing: -0.6,
-    marginTop: 4,
+    ...typography.h1,
+    textAlign: 'center',
   },
   subtitle: {
-    fontSize: 14,
-    marginTop: 6,
-    lineHeight: 20,
+    ...typography.bodySmall,
+    textAlign: 'center',
+    lineHeight: 18,
+    maxWidth: 320,
   },
   card: {
-    borderRadius: radius.xl,
     padding: spacing.lg,
+    borderRadius: radius.xl,
     borderWidth: 1,
+    gap: spacing.sm,
   },
   methodPillContainer: {
     flexDirection: 'row',
-    borderRadius: radius.pill,
-    padding: 4,
-    marginBottom: spacing.md,
+    borderRadius: radius.md,
+    padding: 3,
+    marginBottom: spacing.xs,
   },
   methodPill: {
     flex: 1,
-    paddingVertical: 10,
+    flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: radius.pill,
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: radius.sm,
   },
   methodPillText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    marginBottom: spacing.xs,
+  },
+  errorText: {
+    color: '#E5484D',
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
+    flex: 1,
   },
-  methodPillTextActive: {
-    fontWeight: '900',
-  },
-  phoneRow: {
+  phoneInputRow: {
     flexDirection: 'row',
     gap: spacing.sm,
   },
-  errorText: {
-    color: palette.live,
-    fontSize: 13,
-    fontWeight: '800',
-    marginTop: 4,
-  },
-  visitorLink: {
-    padding: spacing.lg,
+  footerRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.md,
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: spacing.xs,
   },
-  visitorLinkText: {
-    fontWeight: '800',
+  footerText: {
     fontSize: 14,
+  },
+  footerLink: {
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

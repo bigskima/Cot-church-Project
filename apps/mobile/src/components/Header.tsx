@@ -1,7 +1,9 @@
 import React from 'react';
 import { Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { router } from 'expo-router';
-import { palette, radius, spacing } from '../design-system/tokens';
+import { useTheme } from '@/state/theme';
+import { radius, spacing, typography } from '@/design-system/tokens';
+import { Icon } from './primitives/Icon';
 
 interface ScreenHeaderProps {
   title: string;
@@ -11,6 +13,7 @@ interface ScreenHeaderProps {
   rightAction?: React.ReactNode;
   dark?: boolean;
   style?: StyleProp<ViewStyle>;
+  kicker?: string;
 }
 
 export function ScreenHeader({
@@ -19,9 +22,11 @@ export function ScreenHeader({
   showBack = false,
   onBack,
   rightAction,
-  dark = false,
   style,
+  kicker,
 }: ScreenHeaderProps) {
+  const { colors } = useTheme();
+
   const handleBack = () => {
     if (onBack) {
       onBack();
@@ -31,29 +36,39 @@ export function ScreenHeader({
   };
 
   return (
-    <View style={[styles.headerContainer, dark && styles.headerDark, style]}>
-      <View style={styles.topRow}>
-        {showBack && (
-          <Pressable
-            onPress={handleBack}
-            style={({ pressed }) => [
-              styles.backButton,
-              dark ? styles.backButtonDark : styles.backButtonLight,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Text style={[styles.backIcon, dark ? styles.textWhite : styles.textInk]}>‹</Text>
-            <Text style={[styles.backLabel, dark ? styles.textWhite : styles.textInk]}>Back</Text>
-          </Pressable>
-        )}
-        <View style={styles.spacer} />
-        {rightAction && <View style={styles.rightActionContainer}>{rightAction}</View>}
-      </View>
-      <Text style={[styles.title, dark ? styles.textWhite : styles.textInk]}>{title}</Text>
+    <View style={[styles.headerContainer, style]}>
+      {(showBack || rightAction || kicker) && (
+        <View style={styles.topRow}>
+          {showBack ? (
+            <Pressable
+              onPress={handleBack}
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.backButton,
+                { backgroundColor: colors.bgSecondary },
+                pressed && styles.pressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+            >
+              <Icon name="chevron-back" size={20} color={colors.text} />
+            </Pressable>
+          ) : kicker ? (
+            <Text style={[styles.kickerText, { color: colors.interactive }]}>{kicker}</Text>
+          ) : (
+            <View style={styles.spacer} />
+          )}
+
+          <View style={styles.spacer} />
+          {rightAction && <View style={styles.rightActionContainer}>{rightAction}</View>}
+        </View>
+      )}
+
+      <Text style={[styles.title, { color: colors.text }]} numberOfLines={2}>
+        {title}
+      </Text>
       {subtitle && (
-        <Text style={[styles.subtitle, dark ? styles.textMutedDark : styles.textMutedLight]}>
-          {subtitle}
-        </Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{subtitle}</Text>
       )}
     </View>
   );
@@ -75,88 +90,61 @@ export function SectionHeader({
   badge,
   actionLabel,
   onAction,
-  dark = false,
   style,
 }: SectionHeaderProps) {
+  const { colors } = useTheme();
+
   return (
     <View style={[styles.sectionContainer, style]}>
-      <View style={styles.sectionTitleRow}>
-        <Text style={[styles.sectionTitle, dark ? styles.textWhite : styles.textInk]}>
-          {title}
-        </Text>
-        {badge !== undefined && (
-          <View
-            style={[
-              styles.sectionBadge,
-              { backgroundColor: dark ? '#2E1C11' : '#F1E3D3' },
-            ]}
-          >
-            <Text
-              style={[
-                styles.sectionBadgeText,
-                { color: dark ? '#FDE047' : '#78350F' },
-              ]}
-            >
-              {badge}
-            </Text>
-          </View>
+      <View style={{ flex: 1 }}>
+        <View style={styles.sectionTitleRow}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
+          {badge !== undefined && (
+            <View style={[styles.sectionBadge, { backgroundColor: colors.primarySoft }]}>
+              <Text style={[styles.sectionBadgeText, { color: colors.interactive }]}>{badge}</Text>
+            </View>
+          )}
+        </View>
+        {subtitle && (
+          <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>{subtitle}</Text>
         )}
       </View>
-      {subtitle && (
-        <Text style={[styles.sectionSubtitle, dark ? styles.textMutedDark : styles.textMutedLight]}>
-          {subtitle}
-        </Text>
-      )}
+
       {actionLabel && onAction && (
         <Pressable
           onPress={onAction}
-          style={({ pressed }) => [styles.actionButton, pressed ? styles.pressed : null] as any}
+          hitSlop={8}
+          style={({ pressed }) => [styles.actionButton, pressed ? styles.pressed : null]}
         >
-          <Text style={[styles.actionLabel, { color: dark ? '#FDE047' : '#B45309' }] as any}>
-            {actionLabel} ➔
-          </Text>
+          <Text style={[styles.actionLabel, { color: colors.interactive }]}>{actionLabel}</Text>
+          <Icon name="chevron-forward" size={14} color={colors.interactive} />
         </Pressable>
       )}
     </View>
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   headerContainer: {
-    paddingTop: 54,
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-  },
-  headerDark: {
-    backgroundColor: '#140C07',
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: spacing.xs,
-    minHeight: 36,
+    minHeight: 38,
   },
   backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    width: 36,
+    height: 36,
     borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  backButtonLight: {
-    backgroundColor: '#F1E3D3',
-  },
-  backButtonDark: {
-    backgroundColor: '#2E1C11',
-  },
-  backIcon: {
-    fontSize: 18,
-    fontWeight: '900',
-    marginRight: 4,
-  },
-  backLabel: {
-    fontSize: 13,
-    fontWeight: '800',
+  kickerText: {
+    ...typography.kicker,
   },
   spacer: {
     flex: 1,
@@ -164,49 +152,34 @@ const styles: Record<string, any> = StyleSheet.create({
   rightActionContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.xs,
   },
   title: {
-    fontSize: 26,
-    fontWeight: '900',
-    letterSpacing: -0.5,
-    marginTop: spacing.xs,
+    ...typography.h1,
+    marginTop: spacing.xxs,
   },
   subtitle: {
-    fontSize: 13,
-    lineHeight: 18,
-    marginTop: 4,
-  },
-  textWhite: {
-    color: '#FFFDF9',
-  },
-  textInk: {
-    color: '#26140A',
-  },
-  textMutedLight: {
-    color: '#8C6549',
-  },
-  textMutedDark: {
-    color: '#A68A75',
+    ...typography.bodySmall,
+    marginTop: spacing.xxs,
   },
   pressed: {
-    opacity: 0.75,
+    opacity: 0.7,
   },
   sectionContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: spacing.lg,
-    marginBottom: spacing.sm + 2,
+    paddingHorizontal: spacing.lg,
+    marginTop: spacing.xl,
+    marginBottom: spacing.sm,
   },
   sectionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs + 2,
+    gap: spacing.xs,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    letterSpacing: -0.3,
+    ...typography.h2,
   },
   sectionBadge: {
     paddingHorizontal: 8,
@@ -215,18 +188,21 @@ const styles: Record<string, any> = StyleSheet.create({
   },
   sectionBadgeText: {
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   sectionSubtitle: {
-    fontSize: 12,
+    ...typography.caption,
     marginTop: 2,
   },
   actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
     paddingVertical: 4,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
   },
   actionLabel: {
-    fontSize: 12,
-    fontWeight: '800',
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

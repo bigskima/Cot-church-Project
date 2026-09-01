@@ -1,34 +1,34 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/state/theme';
-import { palette, radius, shadows, spacing } from '@/design-system/tokens';
+import { radius, shadows, spacing } from '@/design-system/tokens';
+import { Icon } from '../primitives/Icon';
 
 const reactions = [
-  { key: 'love', emoji: '❤️', label: 'Love' },
-  { key: 'pray', emoji: '🙏', label: 'Pray' },
-  { key: 'celebrate', emoji: '🔥', label: 'Fire' },
-  { key: 'amen', emoji: '🕊️', label: 'Amen' },
-  { key: 'support', emoji: '🤝', label: 'Support' },
+  { key: 'amen', label: 'Amen', icon: 'heart' },
+  { key: 'pray', label: 'Pray', icon: 'hand-left-outline' },
+  { key: 'praise', label: 'Praise', icon: 'sparkles-outline' },
+  { key: 'support', label: 'Support', icon: 'people-outline' },
 ];
 
-interface ReactionDrawerProps {
+export interface ReactionDrawerProps {
   currentReaction?: string | null;
   onReact: (reactionKey: string) => void;
 }
 
 export function ReactionDrawer({ currentReaction, onReact }: ReactionDrawerProps) {
-  const { isDark } = useTheme();
+  const { colors, isDark } = useTheme();
 
   return (
     <View
       style={[
         styles.container,
         {
-          backgroundColor: isDark ? '#1C1008' : '#FFFDF9',
-          borderColor: isDark ? '#3D2415' : palette.line,
+          backgroundColor: colors.card,
+          borderColor: colors.border,
         },
         shadows.sm,
-      ] as any}
+      ]}
     >
       {reactions.map((r) => {
         const isSelected = currentReaction === r.key;
@@ -38,16 +38,25 @@ export function ReactionDrawer({ currentReaction, onReact }: ReactionDrawerProps
             onPress={() => onReact(r.key)}
             style={({ pressed }) => [
               styles.pill,
-              isSelected ? styles.pillSelected : null,
-              pressed ? styles.pressed : null,
-            ] as any}
+              {
+                backgroundColor: isSelected ? colors.primarySoft : colors.bgSecondary,
+                borderColor: isSelected ? colors.interactive : colors.border,
+              },
+              pressed && styles.pressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={`React ${r.label}`}
           >
-            <Text style={{ fontSize: 16 } as any}>{r.emoji}</Text>
+            <Icon
+              name={r.icon}
+              size={15}
+              color={isSelected ? colors.interactive : colors.textSecondary}
+            />
             <Text
               style={[
                 styles.label,
-                { color: isSelected ? palette.gold : isDark ? '#A68A75' : '#8C6549' },
-              ] as any}
+                { color: isSelected ? colors.interactive : colors.textSecondary },
+              ]}
             >
               {r.label}
             </Text>
@@ -58,7 +67,7 @@ export function ReactionDrawer({ currentReaction, onReact }: ReactionDrawerProps
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -73,18 +82,14 @@ const styles: Record<string, any> = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: radius.pill,
-  },
-  pillSelected: {
-    backgroundColor: 'rgba(245, 158, 11, 0.2)',
     borderWidth: 1,
-    borderColor: palette.gold,
   },
   label: {
-    fontSize: 11,
-    fontWeight: '800',
+    fontSize: 12,
+    fontWeight: '700',
   },
   pressed: {
     transform: [{ scale: 0.95 }],

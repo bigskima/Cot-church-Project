@@ -1,11 +1,18 @@
 import React, { useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
-import { EmptyState, LeaderCard, ResourceError, Skeleton, ScreenHeader } from '@/components';
-import { palette, radius, shadows, spacing } from '@/design-system/tokens';
+import {
+  Chip,
+  EmptyState,
+  LeaderCard,
+  ResourceError,
+  ScreenHeader,
+  Skeleton,
+} from '@/components';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 import type { ChurchStory, LeadershipProfile } from '@church/types';
 
 interface StoryResponse {
@@ -16,8 +23,9 @@ interface StoryResponse {
 const publicOrg = process.env.EXPO_PUBLIC_ORGANIZATION_ID;
 
 export default function ChurchStoryScreen() {
+  const insets = useSafeAreaInsets();
   const { api, mode } = useSession();
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const [activeTab, setActiveTab] = useState<'story' | 'leadership'>('story');
 
   const orgParam = mode === 'visitor' ? `?organizationId=${publicOrg}` : '';
@@ -29,378 +37,170 @@ export default function ChurchStoryScreen() {
   const story = resource.data?.story;
   const leaders = resource.data?.leadership ?? [];
 
+  const hasStoryContent =
+    story && (story.mission || story.vision || story.founding_story || story.values?.length || story.history_milestones?.length);
+
   return (
-    <ScrollView
-      style={[styles.screen, { backgroundColor: colors.bg }]}
-      contentContainerStyle={styles.content}
-    >
-      <ScreenHeader
-        title={story?.title ?? 'Our Story & Heritage'}
-        subtitle={story?.subtitle ?? 'A global sanctuary family devoted to Christ, community, and service.'}
-        showBack
-        dark={isDark}
-      />
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + spacing.sm, paddingBottom: 60 },
+        ]}
+      >
+        <ScreenHeader
+          title={story?.title ?? 'Our Story & Heritage'}
+          subtitle={story?.subtitle ?? 'Learn more about our mission, vision, and pastoral leadership.'}
+          showBack
+        />
 
-      {/* Tabs */}
-      <View style={styles.tabContainer}>
-        <View
-          style={[
-            styles.tabPillContainer,
-            { backgroundColor: isDark ? '#22140C' : '#E8D5C4' },
-          ]}
-        >
-          {(['story', 'leadership'] as const).map((tab) => {
-            const isSelected = activeTab === tab;
-            return (
-              <Pressable
-                key={tab}
-                onPress={() => setActiveTab(tab)}
-                style={[
-                  styles.tabPill,
-                  isSelected && {
-                    backgroundColor: isDark ? '#2E1C11' : '#FFFDF9',
-                    ...shadows.sm,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.tabPillText,
-                    { color: isSelected ? colors.text : colors.textMuted },
-                    isSelected && styles.tabPillTextActive,
-                  ]}
-                >
-                  {tab === 'story' ? 'History & Vision' : 'Our Leaders'}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
-
-      <View style={styles.body}>
-        {resource.loading ? (
-          <View style={{ gap: spacing.md }}>
-            <Skeleton height={140} dark={isDark} />
-            <Skeleton height={100} dark={isDark} />
-          </View>
-        ) : resource.error && !resource.data ? (
-          <ResourceError
-            offline={resource.offline}
-            message={resource.error}
-            retry={resource.refresh}
-            dark={isDark}
+        {/* Tab Toggle */}
+        <View style={styles.tabContainer}>
+          <Chip
+            label="History & Vision"
+            selected={activeTab === 'story'}
+            onPress={() => setActiveTab('story')}
           />
-        ) : activeTab === 'story' ? (
-          <View style={{ gap: spacing.md }}>
-            {/* Mission & Vision Card */}
-            <View style={[styles.missionCard, shadows.md] as any}>
-              <Text style={styles.cardKicker as any}>OUR MISSION</Text>
-              <Text style={styles.missionText as any}>
-                {story?.mission || 'To proclaim the Gospel of Jesus Christ and build authentic disciples worldwide.'}
-              </Text>
+          <Chip
+            label="Our Leaders"
+            selected={activeTab === 'leadership'}
+            onPress={() => setActiveTab('leadership')}
+            count={leaders.length}
+          />
+        </View>
 
-              <View style={styles.cardDivider as any} />
-
-              <Text style={styles.cardKicker as any}>OUR VISION</Text>
-              <Text style={styles.visionText as any}>
-                {story?.vision || 'A multi-generational, spirit-filled movement transforming cities through love and truth.'}
-              </Text>
+        <View style={styles.body}>
+          {resource.loading ? (
+            <View style={{ gap: spacing.md }}>
+              <Skeleton height={120} borderRadius={radius.lg} />
+              <Skeleton height={160} borderRadius={radius.lg} />
             </View>
+          ) : resource.error && !resource.data ? (
+            <ResourceError message={resource.error} retry={resource.refresh} />
+          ) : activeTab === 'story' ? (
+            hasStoryContent ? (
+              <View style={styles.storySection}>
+                {story.mission ? (
+                  <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+                    <Text style={[styles.cardKicker, { color: colors.interactive }]}>OUR MISSION</Text>
+                    <Text style={[styles.cardBody, { color: colors.text }]}>{story.mission}</Text>
+                  </View>
+                ) : null}
 
-            {/* Founding Heritage */}
-            <View
-              style={[
-                styles.storyCard,
-                { backgroundColor: colors.card, borderColor: colors.border },
-                shadows.sm,
-              ] as any}
-            >
-              <Text style={[styles.cardTitle, { color: colors.text }] as any}>Founding & Heritage</Text>
-              <Text style={styles.foundingYearText as any}>
-                ESTABLISHED {story?.founding_year ?? 2010}
-              </Text>
-              <Text style={[styles.storyBodyText, { color: colors.textSecondary }] as any}>
-                {story?.founding_story ||
-                  'Founded with a passion for biblical orthodoxy, passionate worship, and caring fellowship. Over the years, God has expanded this work across multiple expressions while maintaining our core family heartbeat.'}
-              </Text>
-            </View>
+                {story.vision ? (
+                  <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+                    <Text style={[styles.cardKicker, { color: colors.interactive }]}>OUR VISION</Text>
+                    <Text style={[styles.cardBody, { color: colors.text }]}>{story.vision}</Text>
+                  </View>
+                ) : null}
 
-            {/* Historical Milestones */}
-            {story?.history_milestones && story.history_milestones.length > 0 && (
-              <View
-                style={[
-                  styles.storyCard,
-                  { backgroundColor: colors.card, borderColor: colors.border },
-                  shadows.sm,
-                ] as any}
-              >
-                <Text style={[styles.cardTitle, { color: colors.text, marginBottom: 14 }] as any}>
-                  Key Milestones
-                </Text>
-                {story.history_milestones.map((m, idx) => (
-                  <View key={idx} style={styles.milestoneRow as any}>
-                    <View
-                      style={[
-                        styles.milestoneYearBox,
-                        { backgroundColor: isDark ? '#2E1C11' : '#F1E3D3' },
-                      ] as any}
-                    >
-                      <Text style={styles.milestoneYearText as any}>{m.year}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.milestoneTitle, { color: colors.text }] as any}>{m.title}</Text>
-                      <Text style={[styles.milestoneDesc, { color: colors.textMuted }] as any}>
-                        {m.description}
-                      </Text>
+                {story.founding_story ? (
+                  <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+                    <Text style={[styles.cardKicker, { color: colors.interactive }]}>FOUNDING HERITAGE {story.founding_year ? `(${story.founding_year})` : ''}</Text>
+                    <Text style={[styles.cardBody, { color: colors.textSecondary }]}>{story.founding_story}</Text>
+                  </View>
+                ) : null}
+
+                {story.values && story.values.length > 0 ? (
+                  <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+                    <Text style={[styles.cardKicker, { color: colors.interactive }]}>CORE VALUES</Text>
+                    <View style={styles.valuesList}>
+                      {story.values.map((val, idx) => (
+                        <View key={idx} style={[styles.valueBlock, { backgroundColor: colors.bgSecondary }]}>
+                          <Text style={[styles.valueTitle, { color: colors.text }]}>{val.title}</Text>
+                          {val.description ? (
+                            <Text style={[styles.valueDesc, { color: colors.textSecondary }]}>{val.description}</Text>
+                          ) : null}
+                        </View>
+                      ))}
                     </View>
                   </View>
-                ))}
+                ) : null}
               </View>
-            )}
-
-            {/* Core Values */}
-            {story?.values && story.values.length > 0 && (
-              <View
-                style={[
-                  styles.storyCard,
-                  { backgroundColor: colors.card, borderColor: colors.border },
-                  shadows.sm,
-                ] as any}
-              >
-                <Text style={[styles.cardTitle, { color: colors.text, marginBottom: 12 }] as any}>
-                  Our Core Values
-                </Text>
-                {story.values.map((v, idx) => (
-                  <View key={idx} style={{ marginBottom: 12 }}>
-                    <Text style={styles.valueTitle as any}>✦ {v.title}</Text>
-                    <Text style={[styles.valueDesc, { color: colors.textMuted }] as any}>
-                      {v.description}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-        ) : (
-          /* Leadership Directory */
-          <View>
-            <Text style={[styles.sectionHeading, { color: colors.text }] as any}>
-              Church Leadership
-            </Text>
-            <Text style={[styles.sectionSubheading, { color: colors.textMuted }] as any}>
-              Founding ministers, lead pastors, and expression leaders serving our global sanctuary.
-            </Text>
-
-            {leaders.length > 0 ? (
-              leaders.map((leader) => (
-                <LeaderCard
-                  key={leader.id}
-                  leader={leader}
-                  variant={leader.is_founder ? 'featured' : 'standard'}
-                  dark={isDark}
-                />
-              ))
             ) : (
               <EmptyState
-                title="Leadership Directory"
-                message="Public leadership profiles will appear here once curated."
-                icon="👥"
-                dark={isDark}
+                title="Story Not Published Yet"
+                message="The church leadership has not published mission, vision, or heritage information yet."
+                iconName="library-outline"
               />
-            )}
-          </View>
-        )}
-      </View>
-    </ScrollView>
+            )
+          ) : (
+            /* Leadership Tab */
+            leaders.length > 0 ? (
+              <View style={styles.leadersList}>
+                {leaders.map((leader) => (
+                  <LeaderCard
+                    key={leader.id}
+                    leader={leader}
+                    variant="standard"
+                  />
+                ))}
+              </View>
+            ) : (
+              <EmptyState
+                title="No Leaders Listed"
+                message="Leadership profiles will appear here once configured by pastoral administration."
+                iconName="people-outline"
+              />
+            )
+          )}
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
   content: {
-    paddingBottom: 120,
+    flexGrow: 1,
   },
   tabContainer: {
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  tabPillContainer: {
     flexDirection: 'row',
-    borderRadius: radius.pill,
-    padding: 4,
-  },
-  tabPill: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: radius.pill,
-  },
-  tabPillText: {
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  tabPillTextActive: {
-    fontWeight: '900',
+    paddingHorizontal: spacing.lg,
+    gap: spacing.xs,
+    marginBottom: spacing.md,
   },
   body: {
     paddingHorizontal: spacing.lg,
   },
-  missionCard: {
-    backgroundColor: '#140C07',
-    borderRadius: radius.xl,
+  storySection: {
+    gap: spacing.md,
+  },
+  sectionCard: {
     padding: spacing.lg,
-    borderWidth: 1.5,
-    borderColor: '#452A1A',
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    gap: 6,
   },
   cardKicker: {
-    color: palette.yellow,
-    fontWeight: '900',
-    fontSize: 11,
-    letterSpacing: 0.8,
+    ...typography.kicker,
   },
-  missionText: {
-    color: '#FFFDF9',
-    fontSize: 18,
-    fontWeight: '900',
-    marginTop: 4,
-    lineHeight: 24,
+  cardBody: {
+    ...typography.body,
+    lineHeight: 22,
   },
-  cardDivider: {
-    height: 1,
-    backgroundColor: '#2E1C11',
-    marginVertical: 16,
+  valuesList: {
+    gap: spacing.sm,
+    marginTop: spacing.xs,
   },
-  visionText: {
-    color: '#E6CCB2',
-    fontSize: 14,
-    marginTop: 4,
-    lineHeight: 20,
-  },
-  storyCard: {
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-    borderWidth: 1,
-  },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  foundingYearText: {
-    color: palette.yellowDark,
-    marginTop: 4,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  storyBodyText: {
-    marginTop: 10,
-    lineHeight: 24,
-    fontSize: 15,
-  },
-  milestoneRow: {
-    flexDirection: 'row',
-    gap: 14,
-    marginBottom: 16,
-  },
-  milestoneYearBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  milestoneYearText: {
-    fontWeight: '900',
-    color: palette.yellowDark,
-    fontSize: 12,
-  },
-  milestoneTitle: {
-    fontWeight: '800',
-    fontSize: 15,
-  },
-  milestoneDesc: {
-    fontSize: 12,
-    marginTop: 2,
-    lineHeight: 16,
+  valueBlock: {
+    padding: spacing.md,
+    borderRadius: radius.md,
+    gap: 2,
   },
   valueTitle: {
-    fontWeight: '800',
-    color: palette.yellowDark,
-    fontSize: 15,
+    fontSize: 14,
+    fontWeight: '700',
   },
   valueDesc: {
     fontSize: 12,
-    marginTop: 2,
     lineHeight: 16,
   },
-  sectionHeading: {
-    fontSize: 20,
-    fontWeight: '900',
-    marginBottom: 4,
-  },
-  sectionSubheading: {
-    fontSize: 13,
-    marginBottom: 16,
-  },
-  leaderCard: {
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-    borderWidth: 1,
-  },
-  leaderHeaderRow: {
-    flexDirection: 'row',
-    gap: 14,
-    alignItems: 'center',
-  },
-  leaderPortrait: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-  },
-  leaderAvatarFallback: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: palette.yellow,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  leaderAvatarText: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#140C07',
-  },
-  leaderName: {
-    fontSize: 17,
-    fontWeight: '900',
-  },
-  founderTag: {
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  founderTagText: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: '#92400E',
-  },
-  leaderRoleText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: palette.yellowDark,
-    marginTop: 2,
-  },
-  leaderMinistryText: {
-    fontSize: 11,
-    marginTop: 2,
-  },
-  leaderBioText: {
-    fontSize: 13,
-    lineHeight: 18,
-    marginTop: 12,
+  leadersList: {
+    gap: spacing.xs,
   },
 });

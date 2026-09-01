@@ -1,85 +1,113 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { palette, radius, shadows } from '@/design-system/tokens';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '@/state/theme';
+import { radius, shadows, spacing } from '@/design-system/tokens';
+import { Icon } from '../primitives/Icon';
 import type { Reel } from '@/types/content';
 
-interface ReelCardProps {
+export interface ReelCardProps {
   reel: Reel;
   onPress?: () => void;
   width?: number;
 }
 
 export function ReelCard({ reel, onPress, width = 130 }: ReelCardProps) {
+  const { colors } = useTheme();
+
   const formatViews = (views: number) => {
     if (views >= 1000000) return `${(views / 1000000).toFixed(1)}M`;
     if (views >= 1000) return `${(views / 1000).toFixed(1)}K`;
     return `${views}`;
   };
 
+  const thumbnailUrl = reel.media_assets?.thumbnailUrl || reel.media_assets?.url;
+
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
-        { width },
+        { width, backgroundColor: colors.card, borderColor: colors.border },
         shadows.sm,
-        pressed ? styles.pressed : null,
-      ] as any}
+        pressed && styles.pressed,
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={`Reel: ${reel.caption}`}
     >
-      {/* 9:16 Background Frame */}
-      <View style={styles.frame as any}>
-        <Text style={{ fontSize: 28 } as any}>🎬</Text>
+      <View style={styles.frame}>
+        {thumbnailUrl ? (
+          <Image source={{ uri: thumbnailUrl }} style={styles.thumbnail} resizeMode="cover" />
+        ) : (
+          <View style={[styles.placeholder, { backgroundColor: '#091B33' }]}>
+            <Icon name="film-outline" size={24} color="#5C8FF5" />
+          </View>
+        )}
 
         {/* Top Views Badge */}
-        <View style={styles.viewsBadge as any}>
-          <Text style={styles.viewsText as any}>▶ {formatViews(reel.views_count)}</Text>
+        <View style={styles.viewsBadge}>
+          <Icon name="play" size={10} color="#FFFFFF" style={{ marginRight: 3 }} />
+          <Text style={styles.viewsText}>{formatViews(reel.views_count)}</Text>
         </View>
 
         {/* Bottom Caption Overlay */}
-        <View style={styles.captionOverlay as any}>
-          <Text style={styles.captionText as any} numberOfLines={2}>
+        <LinearGradient
+          colors={['transparent', 'rgba(6, 20, 38, 0.85)', 'rgba(6, 20, 38, 0.98)']}
+          style={styles.captionOverlay}
+        >
+          <Text style={styles.captionText} numberOfLines={2}>
             {reel.caption}
           </Text>
           {reel.audio_title ? (
-            <Text style={styles.audioText as any} numberOfLines={1}>
-              🎵 {reel.audio_title}
-            </Text>
+            <View style={styles.audioRow}>
+              <Icon name="musical-notes" size={10} color="#8FB4F8" style={{ marginRight: 3 }} />
+              <Text style={styles.audioText} numberOfLines={1}>
+                {reel.audio_title}
+              </Text>
+            </View>
           ) : null}
-        </View>
+        </LinearGradient>
       </View>
     </Pressable>
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   card: {
     borderRadius: radius.md,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#3D2415',
-    backgroundColor: '#1C1008',
   },
   frame: {
     width: '100%',
     aspectRatio: 9 / 16,
+    position: 'relative',
+  },
+  thumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  placeholder: {
+    width: '100%',
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
-    backgroundColor: '#22140C',
   },
   viewsBadge: {
     position: 'absolute',
     top: 8,
     left: 8,
-    backgroundColor: 'rgba(20, 12, 7, 0.8)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(6, 20, 38, 0.75)',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: radius.pill,
   },
   viewsText: {
-    color: palette.gold,
+    color: '#FFFFFF',
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   captionOverlay: {
     position: 'absolute',
@@ -87,19 +115,22 @@ const styles: Record<string, any> = StyleSheet.create({
     left: 0,
     right: 0,
     padding: 8,
-    backgroundColor: 'rgba(13, 8, 5, 0.85)',
     gap: 2,
   },
   captionText: {
-    color: '#FFFDF9',
+    color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '600',
     lineHeight: 14,
   },
+  audioRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   audioText: {
-    color: palette.yellow,
+    color: '#8FB4F8',
     fontSize: 9,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   pressed: {
     opacity: 0.85,

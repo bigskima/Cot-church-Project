@@ -1,81 +1,119 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { palette, radius, spacing } from '../design-system/tokens';
+import { StyleSheet, Text, View, StyleProp, ViewStyle } from 'react-native';
+import { radius, spacing } from '@/design-system/tokens';
 
-export type BadgeVariant = 'live' | 'gold' | 'success' | 'prayer' | 'giving' | 'neutral' | 'outline';
+export type BadgeVariant =
+  | 'live'
+  | 'primary'
+  | 'success'
+  | 'warning'
+  | 'info'
+  | 'prayer'
+  | 'neutral'
+  | 'outline'
+  | 'gold'; // backwards compatibility
 
-interface BadgeProps {
+export interface BadgeProps {
   label: string;
   variant?: BadgeVariant;
   pulse?: boolean;
   icon?: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+  size?: 'sm' | 'md';
 }
 
-export function Badge({ label, variant = 'neutral', pulse = false, icon }: BadgeProps) {
-  const getContainerStyle = () => {
+export function Badge({
+  label,
+  variant = 'neutral',
+  pulse = false,
+  icon,
+  style,
+  size = 'sm',
+}: BadgeProps) {
+  const getStyles = () => {
     switch (variant) {
       case 'live':
-        return styles.live;
-      case 'gold':
-        return styles.gold;
+        return {
+          container: { backgroundColor: 'rgba(229, 72, 77, 0.12)', borderColor: 'rgba(229, 72, 77, 0.35)', borderWidth: 1 },
+          text: { color: '#E5484D' },
+          dot: '#E5484D',
+        };
       case 'success':
-        return styles.success;
+        return {
+          container: { backgroundColor: 'rgba(22, 163, 106, 0.12)', borderColor: 'rgba(22, 163, 106, 0.3)', borderWidth: 1 },
+          text: { color: '#16A36A' },
+          dot: '#16A36A',
+        };
+      case 'warning':
+        return {
+          container: { backgroundColor: 'rgba(233, 162, 59, 0.12)', borderColor: 'rgba(233, 162, 59, 0.3)', borderWidth: 1 },
+          text: { color: '#E9A23B' },
+          dot: '#E9A23B',
+        };
       case 'prayer':
-        return styles.prayer;
-      case 'giving':
-        return styles.giving;
+        return {
+          container: { backgroundColor: 'rgba(139, 92, 246, 0.12)', borderColor: 'rgba(139, 92, 246, 0.3)', borderWidth: 1 },
+          text: { color: '#8B5CF6' },
+          dot: '#8B5CF6',
+        };
       case 'outline':
-        return styles.outline;
+        return {
+          container: { backgroundColor: 'transparent', borderColor: '#CBD5E1', borderWidth: 1 },
+          text: { color: '#475467' },
+          dot: '#475467',
+        };
+      case 'gold':
+      case 'primary':
+      case 'info':
+        return {
+          container: { backgroundColor: '#EAF1FA', borderColor: '#CBDDF8', borderWidth: 1 },
+          text: { color: '#18528B' },
+          dot: '#2F6FED',
+        };
       case 'neutral':
       default:
-        return styles.neutral;
+        return {
+          container: { backgroundColor: '#F1F5F9', borderColor: '#E2E8F0', borderWidth: 1 },
+          text: { color: '#475467' },
+          dot: '#64748B',
+        };
     }
   };
 
-  const getTextStyle = () => {
-    switch (variant) {
-      case 'live':
-        return styles.liveText;
-      case 'gold':
-        return styles.goldText;
-      case 'success':
-        return styles.successText;
-      case 'prayer':
-        return styles.prayerText;
-      case 'giving':
-        return styles.givingText;
-      case 'outline':
-        return styles.outlineText;
-      case 'neutral':
-      default:
-        return styles.neutralText;
-    }
-  };
+  const v = getStyles();
 
   return (
-    <View style={[styles.base, getContainerStyle()] as any}>
-      {pulse && (
-        <View
-          style={[
-            styles.pulseDot,
-            { backgroundColor: variant === 'live' ? '#FFFFFF' : '#F59E0B' },
-          ]}
-        />
-      )}
+    <View
+      style={[
+        styles.base,
+        size === 'md' ? styles.sizeMd : styles.sizeSm,
+        v.container,
+        style,
+      ]}
+    >
+      {pulse && <View style={[styles.pulseDot, { backgroundColor: v.dot }]} />}
       {icon && <View style={styles.iconContainer}>{icon}</View>}
-      <Text style={[styles.text, getTextStyle()] as any}>{label}</Text>
+      <Text style={[styles.text, size === 'md' ? styles.textMd : styles.textSm, v.text]}>
+        {label}
+      </Text>
     </View>
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   base: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radius.pill,
+    borderRadius: radius.sm,
     alignSelf: 'flex-start',
+  },
+  sizeSm: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  sizeMd: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
   pulseDot: {
     width: 6,
@@ -87,65 +125,16 @@ const styles: Record<string, any> = StyleSheet.create({
     marginRight: 4,
   },
   text: {
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 0.4,
+    fontWeight: '700',
+    letterSpacing: 0.3,
     textTransform: 'uppercase',
   },
-  live: {
-    backgroundColor: 'rgba(239, 68, 68, 0.18)',
-    borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.4)',
+  textSm: {
+    fontSize: 10,
+    lineHeight: 13,
   },
-  liveText: {
-    color: '#EF4444',
-  },
-  gold: {
-    backgroundColor: '#FEF3C7',
-    borderWidth: 1,
-    borderColor: '#F59E0B',
-  },
-  goldText: {
-    color: '#B45309',
-  },
-  success: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.35)',
-  },
-  successText: {
-    color: '#10B981',
-  },
-  prayer: {
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.35)',
-  },
-  prayerText: {
-    color: '#8B5CF6',
-  },
-  giving: {
-    backgroundColor: '#FEF3C7',
-    borderWidth: 1,
-    borderColor: '#F59E0B',
-  },
-  givingText: {
-    color: '#92400E',
-  },
-  neutral: {
-    backgroundColor: '#F1E3D3',
-    borderWidth: 1,
-    borderColor: '#E8D5C4',
-  },
-  neutralText: {
-    color: '#5C3D28',
-  },
-  outline: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#E8D5C4',
-  },
-  outlineText: {
-    color: '#78350F',
+  textMd: {
+    fontSize: 11,
+    lineHeight: 15,
   },
 });

@@ -11,8 +11,8 @@ import {
 import { router } from 'expo-router';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
-import { Button, InputField } from '@/components';
-import { palette, radius, shadows, spacing } from '@/design-system/tokens';
+import { Button, InputField, Icon } from '@/components';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 
 type Method = 'email' | 'phone';
 
@@ -25,12 +25,20 @@ export default function Signup() {
   const [callingCode, setCode] = useState('1');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState('');
+  const [isSuccess, setIsSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function submit() {
     if (!displayName.trim()) {
       setMessage('Please enter your full name.');
+      setIsSuccess(false);
+      return;
+    }
+    if (password.length < 6) {
+      setMessage('Password must be at least 6 characters.');
+      setIsSuccess(false);
       return;
     }
     setLoading(true);
@@ -44,10 +52,12 @@ export default function Signup() {
         method: 'POST',
         body: JSON.stringify({ displayName: displayName.trim(), ...identity, password }),
       });
-      setMessage('Account created! Check your email or SMS for verification.');
+      setIsSuccess(true);
+      setMessage('Account created successfully! Check your email or phone for verification.');
       setTimeout(() => router.replace('/(auth)/login'), 2000);
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Unable to create your account');
+      setIsSuccess(false);
+      setMessage(err instanceof Error ? err.message : 'Unable to create your account.');
     } finally {
       setLoading(false);
     }
@@ -55,199 +65,291 @@ export default function Signup() {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: colors.bg }] as any}
+      style={[styles.container, { backgroundColor: colors.bg }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Header */}
-        <View style={styles.brandHeader}>
-          <Text style={styles.brandKicker as any}>SANCTUARY MEMBERSHIP</Text>
-          <Text style={[styles.title, { color: colors.text }] as any}>Join the Sanctuary</Text>
-          <Text style={[styles.subtitle, { color: colors.textMuted }] as any}>
-            Connect with pastoral care, local expression campuses, and giving receipts.
-          </Text>
-        </View>
-
-        {/* Signup Form Card */}
-        <View
-          style={[
-            styles.card,
-            { backgroundColor: colors.card, borderColor: colors.border },
-            shadows.md,
-          ] as any}
-        >
-          <InputField
-            label="Full Name"
-            placeholder="e.g. Johnathan Doe"
-            value={displayName}
-            onChangeText={setName}
-            dark={isDark}
-          />
-
-          {/* Method Pill Selector */}
-          <View
-            style={[
-              styles.methodPillContainer,
-              { backgroundColor: isDark ? '#1C1009' : '#E8D5C4' },
-            ] as any}
-          >
-            {(['email', 'phone'] as Method[]).map((val) => {
-              const isSelected = method === val;
-              return (
-                <Pressable
-                  key={val}
-                  onPress={() => setMethod(val)}
-                  style={[
-                    styles.methodPill,
-                    isSelected ? {
-                      backgroundColor: isDark ? '#2E1C11' : '#FFFDF9',
-                      ...shadows.sm,
-                    } : null,
-                  ] as any}
-                >
-                  <Text
-                    style={[
-                      styles.methodPillText,
-                      { color: isSelected ? colors.text : colors.textMuted },
-                      isSelected ? styles.methodPillTextActive : null,
-                    ] as any}
-                  >
-                    {val === 'email' ? '✉️ Email Sign Up' : '📱 Mobile Phone'}
-                  </Text>
-                </Pressable>
-              );
-            })}
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.formWrapper}>
+          {/* Header */}
+          <View style={styles.brandHeader}>
+            <View style={[styles.brandIconWrapper, { backgroundColor: colors.primarySoft }]}>
+              <Icon name="person-add" size={28} color={colors.interactive} />
+            </View>
+            <Text style={[styles.title, { color: colors.text }]}>Create Your Account</Text>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+              Join your church family for sermon archives, events, giving, and community prayer.
+            </Text>
           </View>
 
-          {method === 'email' ? (
+          {/* Signup Form Card */}
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: colors.card, borderColor: colors.border },
+              shadows.sm,
+            ]}
+          >
+            {/* Notification Banner */}
+            {message ? (
+              <View
+                style={[
+                  styles.messageBanner,
+                  {
+                    backgroundColor: isSuccess
+                      ? 'rgba(22, 163, 106, 0.12)'
+                      : 'rgba(229, 72, 77, 0.12)',
+                    borderColor: isSuccess
+                      ? 'rgba(22, 163, 106, 0.3)'
+                      : 'rgba(229, 72, 77, 0.3)',
+                  },
+                ]}
+              >
+                <Icon
+                  name={isSuccess ? 'checkmark-circle' : 'alert-circle'}
+                  size={16}
+                  color={isSuccess ? '#16A36A' : '#E5484D'}
+                  style={{ marginRight: 6 }}
+                />
+                <Text
+                  style={[
+                    styles.messageText,
+                    { color: isSuccess ? '#16A36A' : '#E5484D' },
+                  ]}
+                >
+                  {message}
+                </Text>
+              </View>
+            ) : null}
+
             <InputField
-              label="Email Address"
-              autoCapitalize="none"
-              keyboardType="email-address"
-              placeholder="member@church.org"
-              value={email}
-              onChangeText={setEmail}
-              dark={isDark}
+              label="Full Name"
+              placeholder="e.g. Sarah Jenkins"
+              value={displayName}
+              onChangeText={setName}
+              autoComplete="name"
+              leftIcon={<Icon name="person-outline" size={18} color={colors.textMuted} />}
             />
-          ) : (
-            <View style={styles.phoneRow}>
-              <View style={{ width: 90 }}>
-                <InputField
-                  label="Code"
-                  keyboardType="phone-pad"
-                  placeholder="+1"
-                  value={callingCode}
-                  onChangeText={setCode}
-                  dark={isDark}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <InputField
-                  label="Phone Number"
-                  keyboardType="phone-pad"
-                  placeholder="(555) 000-0000"
-                  value={phone}
-                  onChangeText={setPhone}
-                  dark={isDark}
-                />
-              </View>
+
+            {/* Method Pill Selector */}
+            <View
+              style={[
+                styles.methodPillContainer,
+                { backgroundColor: colors.bgSecondary },
+              ]}
+            >
+              {(['email', 'phone'] as Method[]).map((val) => {
+                const isSelected = method === val;
+                return (
+                  <Pressable
+                    key={val}
+                    onPress={() => {
+                      setMethod(val);
+                      setMessage('');
+                    }}
+                    style={[
+                      styles.methodPill,
+                      isSelected && {
+                        backgroundColor: colors.card,
+                        ...shadows.sm,
+                      },
+                    ]}
+                  >
+                    <Icon
+                      name={val === 'email' ? 'mail-outline' : 'call-outline'}
+                      size={16}
+                      color={isSelected ? colors.text : colors.textMuted}
+                      style={{ marginRight: 6 }}
+                    />
+                    <Text
+                      style={[
+                        styles.methodPillText,
+                        { color: isSelected ? colors.text : colors.textMuted },
+                      ]}
+                    >
+                      {val === 'email' ? 'Email Address' : 'Phone Number'}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
-          )}
 
-          <InputField
-            label="Create Secure Password"
-            secureTextEntry
-            placeholder="At least 8 characters"
-            value={password}
-            onChangeText={setPassword}
-            dark={isDark}
-          />
+            {method === 'email' ? (
+              <InputField
+                label="Email"
+                placeholder="name@example.com"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+                leftIcon={<Icon name="mail-outline" size={18} color={colors.textMuted} />}
+              />
+            ) : (
+              <View style={styles.phoneInputRow}>
+                <View style={{ width: 80 }}>
+                  <InputField
+                    label="Code"
+                    value={callingCode}
+                    onChangeText={setCode}
+                    keyboardType="number-pad"
+                    placeholder="1"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <InputField
+                    label="Phone Number"
+                    placeholder="5550199"
+                    value={phone}
+                    onChangeText={setPhone}
+                    keyboardType="phone-pad"
+                    autoComplete="tel"
+                    leftIcon={<Icon name="call-outline" size={18} color={colors.textMuted} />}
+                  />
+                </View>
+              </View>
+            )}
 
-          {message ? <Text style={styles.messageText as any}>{message}</Text> : null}
+            <InputField
+              label="Create Password"
+              placeholder="Minimum 6 characters"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              leftIcon={<Icon name="lock-closed-outline" size={18} color={colors.textMuted} />}
+              rightIcon={
+                <Pressable onPress={() => setShowPassword(!showPassword)} hitSlop={8}>
+                  <Icon
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={18}
+                    color={colors.textMuted}
+                  />
+                </Pressable>
+              }
+            />
 
-          <Button
-            label="Complete Registration ➔"
-            onPress={submit}
-            variant="gold"
-            size="lg"
-            loading={loading}
-            style={{ marginTop: spacing.md } as any}
-          />
+            <Button
+              label="Create Account"
+              onPress={submit}
+              loading={loading}
+              variant="primary"
+              size="lg"
+              style={{ marginTop: spacing.xs }}
+            />
+          </View>
 
-          <Button
-            label="Already have an account? Sign In"
-            onPress={() => router.back()}
-            variant="outline"
-            size="md"
-            style={{ marginTop: spacing.sm } as any}
-          />
+          {/* Footer Navigation */}
+          <View style={styles.footerRow}>
+            <Text style={[styles.footerText, { color: colors.textSecondary }]}>
+              Already have an account?
+            </Text>
+            <Pressable onPress={() => router.push('/(auth)/login')}>
+              <Text style={[styles.footerLink, { color: colors.interactive }]}>
+                Sign In
+              </Text>
+            </Pressable>
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
   content: {
+    flexGrow: 1,
+    justifyContent: 'center',
     paddingHorizontal: spacing.lg,
-    paddingTop: 60,
-    paddingBottom: 60,
+    paddingVertical: spacing.xxl,
+  },
+  formWrapper: {
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
+    gap: spacing.lg,
   },
   brandHeader: {
-    marginBottom: spacing.lg,
+    alignItems: 'center',
+    gap: spacing.xs,
   },
-  brandKicker: {
-    color: palette.yellow,
-    fontWeight: '900',
-    fontSize: 11,
-    letterSpacing: 0.8,
+  brandIconWrapper: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xs,
   },
   title: {
-    fontSize: 30,
-    fontWeight: '900',
-    letterSpacing: -0.5,
-    marginTop: 4,
+    ...typography.h1,
+    textAlign: 'center',
   },
   subtitle: {
-    fontSize: 13,
-    marginTop: 4,
-    lineHeight: 19,
+    ...typography.bodySmall,
+    textAlign: 'center',
+    lineHeight: 18,
+    maxWidth: 320,
   },
   card: {
-    borderRadius: radius.xl,
     padding: spacing.lg,
+    borderRadius: radius.xl,
     borderWidth: 1,
+    gap: spacing.sm,
   },
   methodPillContainer: {
     flexDirection: 'row',
-    borderRadius: radius.pill,
-    padding: 4,
-    marginBottom: spacing.md,
+    borderRadius: radius.md,
+    padding: 3,
+    marginBottom: spacing.xs,
   },
   methodPill: {
     flex: 1,
-    paddingVertical: 10,
+    flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: radius.pill,
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: radius.sm,
   },
   methodPillText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  messageBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    marginBottom: spacing.xs,
+  },
+  messageText: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
+    flex: 1,
   },
-  methodPillTextActive: {
-    fontWeight: '900',
-  },
-  phoneRow: {
+  phoneInputRow: {
     flexDirection: 'row',
     gap: spacing.sm,
   },
-  messageText: {
-    color: palette.yellowDark,
-    fontSize: 13,
-    fontWeight: '800',
-    marginTop: 4,
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: spacing.xs,
+  },
+  footerText: {
+    fontSize: 14,
+  },
+  footerLink: {
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

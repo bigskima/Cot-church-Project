@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, StyleProp, ViewStyle } from 'react-native';
 import { useTheme } from '@/state/theme';
-import { palette, radius, shadows, spacing } from '@/design-system/tokens';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
+import { Icon } from '../primitives/Icon';
 
-interface AudioPlayerProps {
+export interface AudioPlayerProps {
   title: string;
   preacherOrArtist?: string;
   durationSeconds?: number | null;
   currentSeconds?: number;
   onSeek?: (seconds: number) => void;
   scriptureReferences?: string[];
-  dark?: boolean;
+  style?: StyleProp<ViewStyle>;
+  dark?: boolean; // backwards compatibility
 }
 
 export function AudioPlayer({
@@ -20,10 +22,9 @@ export function AudioPlayer({
   currentSeconds: initialSeconds = 0,
   onSeek,
   scriptureReferences = [],
-  dark: forceDark,
+  style,
 }: AudioPlayerProps) {
-  const { colors, isDark: themeDark } = useTheme();
-  const isDark = forceDark !== undefined ? forceDark : themeDark;
+  const { colors, isDark } = useTheme();
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [position, setPosition] = useState(initialSeconds);
@@ -58,85 +59,105 @@ export function AudioPlayer({
       style={[
         styles.container,
         {
-          backgroundColor: isDark ? '#1C1008' : '#FFFDF9',
-          borderColor: isDark ? '#3D2415' : palette.line,
+          backgroundColor: colors.card,
+          borderColor: colors.border,
         },
-        shadows.md,
-      ] as any}
+        shadows.sm,
+        style,
+      ]}
     >
-      {/* Audio Waveform Banner */}
-      <View style={styles.headerRow as any}>
-        <View style={styles.iconCircle as any}>
-          <Text style={{ fontSize: 20 } as any}>🎙️</Text>
+      {/* Header Info */}
+      <View style={styles.headerRow}>
+        <View style={[styles.iconCircle, { backgroundColor: colors.primarySoft }]}>
+          <Icon name="headset-outline" size={20} color={colors.interactive} />
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.title, { color: colors.text }] as any} numberOfLines={1}>
+        <View style={styles.titleCol}>
+          <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
             {title}
           </Text>
           {preacherOrArtist ? (
-            <Text style={[styles.subtitle, { color: palette.gold }] as any} numberOfLines={1}>
+            <Text style={[styles.subtitle, { color: colors.interactive }]} numberOfLines={1}>
               {preacherOrArtist}
             </Text>
           ) : null}
         </View>
-        <Pressable onPress={cycleSpeed} style={styles.speedPill as any}>
-          <Text style={styles.speedText as any}>{speeds[speedIndex]}</Text>
+        <Pressable
+          onPress={cycleSpeed}
+          hitSlop={6}
+          style={[styles.speedPill, { backgroundColor: colors.bgSecondary }]}
+        >
+          <Text style={[styles.speedText, { color: colors.textSecondary }]}>
+            {speeds[speedIndex]}
+          </Text>
         </Pressable>
       </View>
 
-      {/* Progress Track */}
-      <View style={styles.progressContainer as any}>
-        <View
-          style={[
-            styles.progressBarTrack,
-            { backgroundColor: isDark ? '#2E1C11' : '#E8D5C4' },
-          ] as any}
-        >
+      {/* Progress Bar */}
+      <View style={styles.progressContainer}>
+        <View style={[styles.progressBarTrack, { backgroundColor: colors.bgSecondary }]}>
           <View
             style={[
               styles.progressBarFill,
-              { width: `${progressPercent}%`, backgroundColor: palette.gold },
-            ] as any}
+              { width: `${progressPercent}%`, backgroundColor: colors.interactive },
+            ]}
           />
         </View>
-        <View style={styles.timeRow as any}>
-          <Text style={[styles.timeText, { color: colors.textMuted }] as any}>
-            {formatTime(position)}
-          </Text>
-          <Text style={[styles.timeText, { color: colors.textMuted }] as any}>
-            -{formatTime(Math.max(0, total - position))}
-          </Text>
+        <View style={styles.timeRow}>
+          <Text style={[styles.timeText, { color: colors.textMuted }]}>{formatTime(position)}</Text>
+          <Text style={[styles.timeText, { color: colors.textMuted }]}>{formatTime(total)}</Text>
         </View>
       </View>
 
-      {/* Playback Controls */}
-      <View style={styles.controlsRow as any}>
-        <Pressable onPress={() => skip(-15)} style={styles.skipBtn as any}>
-          <Text style={[styles.skipText, { color: colors.textMuted }] as any}>⟲ 15s</Text>
+      {/* Player Controls */}
+      <View style={styles.controlsRow}>
+        <Pressable
+          onPress={() => skip(-15)}
+          hitSlop={8}
+          style={styles.skipButton}
+          accessibilityRole="button"
+          accessibilityLabel="Skip backward 15 seconds"
+        >
+          <Icon name="play-back-outline" size={22} color={colors.text} />
+          <Text style={[styles.skipLabel, { color: colors.textMuted }]}>15s</Text>
         </Pressable>
 
         <Pressable
           onPress={togglePlay}
-          style={({ pressed }) => [
-            styles.playBtn,
-            { backgroundColor: palette.gold },
-            pressed ? styles.pressed : null,
-          ] as any}
+          style={[
+            styles.playButton,
+            { backgroundColor: isDark ? '#FFFFFF' : '#0D294B' },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={isPlaying ? 'Pause audio' : 'Play audio'}
         >
-          <Text style={styles.playIcon as any}>{isPlaying ? '❚❚' : '▶'}</Text>
+          <Icon
+            name={isPlaying ? 'pause' : 'play'}
+            size={24}
+            color={isDark ? '#0D294B' : '#FFFFFF'}
+          />
         </Pressable>
 
-        <Pressable onPress={() => skip(15)} style={styles.skipBtn as any}>
-          <Text style={[styles.skipText, { color: colors.textMuted }] as any}>15s ⟳</Text>
+        <Pressable
+          onPress={() => skip(15)}
+          hitSlop={8}
+          style={styles.skipButton}
+          accessibilityRole="button"
+          accessibilityLabel="Skip forward 15 seconds"
+        >
+          <Icon name="play-forward-outline" size={22} color={colors.text} />
+          <Text style={[styles.skipLabel, { color: colors.textMuted }]}>15s</Text>
         </Pressable>
       </View>
 
-      {/* Scripture Reference Badges if provided */}
-      {scriptureReferences.length > 0 ? (
-        <View style={styles.scripturesRow as any}>
+      {/* Scripture Pills */}
+      {scriptureReferences && scriptureReferences.length > 0 ? (
+        <View style={[styles.scriptureRow, { borderTopColor: colors.borderSubtle }]}>
+          <Text style={[styles.scriptureLabel, { color: colors.textMuted }]}>Scripture:</Text>
           {scriptureReferences.map((ref, idx) => (
-            <View key={idx} style={styles.scriptureBadge as any}>
-              <Text style={styles.scriptureText as any}>📖 {ref}</Text>
+            <View key={idx} style={[styles.scripturePill, { backgroundColor: colors.bgSecondary }]}>
+              <Text style={[styles.scripturePillText, { color: colors.textSecondary }]}>
+                {ref}
+              </Text>
             </View>
           ))}
         </View>
@@ -145,60 +166,59 @@ export function AudioPlayer({
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
     borderRadius: radius.lg,
-    padding: spacing.lg,
     borderWidth: 1,
-    gap: spacing.md,
+    padding: spacing.md,
+    gap: spacing.sm,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#2E1C11',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  titleCol: {
+    flex: 1,
+    gap: 1,
+  },
   title: {
-    fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: -0.2,
+    ...typography.h3,
+    fontSize: 15,
   },
   subtitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    marginTop: 2,
+    fontSize: 12,
+    fontWeight: '600',
   },
   speedPill: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: radius.pill,
-    backgroundColor: '#2E1C11',
-    borderWidth: 1,
-    borderColor: palette.gold,
   },
   speedText: {
-    color: palette.gold,
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   progressContainer: {
+    marginTop: spacing.xs,
     gap: 4,
   },
   progressBarTrack: {
-    height: 6,
-    borderRadius: 3,
+    height: 5,
+    borderRadius: radius.pill,
     overflow: 'hidden',
+    width: '100%',
   },
   progressBarFill: {
     height: '100%',
-    borderRadius: 3,
+    borderRadius: radius.pill,
   },
   timeRow: {
     flexDirection: 'row',
@@ -206,53 +226,51 @@ const styles: Record<string, any> = StyleSheet.create({
   },
   timeText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '500',
   },
   controlsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
+    justifyContent: 'center',
+    gap: spacing.xxl,
+    marginVertical: spacing.xs,
   },
-  skipBtn: {
-    padding: 8,
-  },
-  skipText: {
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  playBtn: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+  skipButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    ...shadows.md,
+    gap: 2,
   },
-  playIcon: {
-    fontSize: 20,
-    color: '#140C07',
-    fontWeight: '900',
+  skipLabel: {
+    fontSize: 10,
+    fontWeight: '600',
   },
-  scripturesRow: {
+  playButton: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scriptureRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 4,
+    gap: spacing.xs,
+    paddingTop: spacing.xs,
+    borderTopWidth: 1,
+    marginTop: spacing.xs,
   },
-  scriptureBadge: {
-    backgroundColor: '#2E1C11',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-  },
-  scriptureText: {
-    color: palette.yellow,
+  scriptureLabel: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
   },
-  pressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.96 }],
+  scripturePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+  },
+  scripturePillText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
 });

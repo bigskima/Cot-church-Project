@@ -1,19 +1,32 @@
-import React, { useState } from 'react';
-import { Dimensions, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import {
+  Dimensions,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  View,
+  ViewToken,
+} from 'react-native';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
-import { CommentSheet, EmptyState, ReelPlayer, ResourceError, Skeleton } from '@/components';
-import { palette, spacing } from '@/design-system/tokens';
+import {
+  CommentSheet,
+  EmptyState,
+  ReelPlayer,
+  ResourceError,
+  Skeleton,
+} from '@/components';
 import type { ContentComment, Reel } from '@/types/content';
 
 const { height: screenHeight } = Dimensions.get('window');
 const organization = process.env.EXPO_PUBLIC_ORGANIZATION_ID;
 
 export default function ReelsScreen() {
-  const { api, mode } = useSession();
-  const { colors, isDark } = useTheme();
+  const { api, mode, context } = useSession();
+  const { colors } = useTheme();
 
+  const [activeIndex, setActiveIndex] = useState(0);
   const [activeReelForComments, setActiveReelForComments] = useState<Reel | null>(null);
   const [comments, setComments] = useState<ContentComment[]>([]);
   const [commentLoading, setCommentLoading] = useState(false);
@@ -26,6 +39,18 @@ export default function ReelsScreen() {
   );
 
   const reels = reelsResource.data ?? [];
+
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      if (viewableItems.length > 0 && viewableItems[0].index !== null) {
+        setActiveIndex(viewableItems[0].index);
+      }
+    }
+  ).current;
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 70,
+  }).current;
 
   const handleOpenComments = async (reel: Reel) => {
     setActiveReelForComments(reel);
@@ -53,7 +78,7 @@ export default function ReelsScreen() {
         }),
       });
       if (res) {
-        setComments([...comments, res]);
+        setComments((prev) => [...prev, res]);
       }
     } catch {
       // Ignored
@@ -65,7 +90,7 @@ export default function ReelsScreen() {
     try {
       await api.request('engagement', {
         method: 'POST',
-        body: JSON.stringify({ action: 'react', contentId: reelId, reaction: 'love' }),
+        body: JSON.stringify({ action: 'react', contentId: reelId, reaction: 'amen' }),
       });
     } catch {
       // Ignored
@@ -84,58 +109,61 @@ export default function ReelsScreen() {
     }
   };
 
+  const expressionName = context?.expression?.name || context?.organizations?.[0]?.name;
+
   return (
-    <View style={[styles.screen, { backgroundColor: '#0D0805' }] as any}>
+    <View style={styles.screen}>
       {reelsResource.loading ? (
-        <View style={styles.loadingContainer as any}>
-          <Skeleton height={screenHeight - 140} dark />
+        <View style={styles.loadingContainer}>
+          <Skeleton height={screenHeight - 120} />
         </View>
       ) : reelsResource.error && !reelsResource.data ? (
-        <View style={styles.centerWrapper as any}>
+        <View style={styles.centerWrapper}>
           <ResourceError
-            offline={reelsResource.offline}
             message={reelsResource.error}
             retry={reelsResource.refresh}
-            dark
           />
         </View>
-      ) : reels.length > 0 ? (
+      ) : reels.length === 0 ? (
+        <View style={styles.centerWrapper}>
+          <EmptyState
+            title="No Short Clips Yet"
+            message="Highlights and sermon clips will appear here as soon as published."
+            iconName="film-outline"
+          />
+        </View>
+      ) : (
         <FlatList
           data={reels}
           keyExtractor={(item) => item.id}
           pagingEnabled
-          snapToInterval={screenHeight - 120}
-          decelerationRate="fast"
           showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <ReelPlayer
-              reel={item}
-              expressionName="Sanctuary Expression"
-              onLike={() => handleLikeReel(item.id)}
-              onOpenComments={() => handleOpenComments(item)}
-              onSave={() => handleSaveReel(item.id)}
-            />
-          )}
+          snapToInterval={screenHeight - 80}
+          snapToAlignment="start"
+          decelerationRate="fast"
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
           refreshControl={
             <RefreshControl
               refreshing={reelsResource.loading}
               onRefresh={reelsResource.refresh}
-              tintColor={palette.gold}
+              tintColor="#2F6FED"
             />
           }
+          renderItem={({ item, index }) => (
+            <ReelPlayer
+              reel={item}
+              expressionName={expressionName}
+              isActive={index === activeIndex}
+              onLike={() => handleLikeReel(item.id)}
+              onSave={() => handleSaveReel(item.id)}
+              onOpenComments={() => handleOpenComments(item)}
+            />
+          )}
         />
-      ) : (
-        <View style={styles.centerWrapper as any}>
-          <EmptyState
-            title="No Reels Published Yet"
-            message="Inspiring short-form messages and worship highlights will appear here."
-            icon="🎬"
-            dark
-          />
-        </View>
       )}
 
-      {/* Threaded Comments Sheet */}
+      {/* Fellowship Comments Sheet */}
       <CommentSheet
         visible={!!activeReelForComments}
         onClose={() => setActiveReelForComments(null)}
@@ -147,17 +175,20 @@ export default function ReelsScreen() {
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   screen: {
     flex: 1,
+    backgroundColor: '#061426',
   },
   loadingContainer: {
-    padding: spacing.md,
+    flex: 1,
     justifyContent: 'center',
+    padding: 16,
   },
   centerWrapper: {
     flex: 1,
     justifyContent: 'center',
-    padding: spacing.xl,
+    alignItems: 'center',
+    padding: 24,
   },
 });

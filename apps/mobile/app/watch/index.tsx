@@ -1,28 +1,38 @@
 import React, { useState } from 'react';
-import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
-import { EmptyState, ResourceError, ScreenHeader, SectionHeader, Skeleton, VideoCard } from '@/components';
-import { palette, radius, shadows, spacing } from '@/design-system/tokens';
+import {
+  Chip,
+  EmptyState,
+  ResourceError,
+  ScreenHeader,
+  SectionHeader,
+  Skeleton,
+  VideoCard,
+} from '@/components';
+import { spacing } from '@/design-system/tokens';
 import type { Video, VideoCategory } from '@/types/content';
 
 const organization = process.env.EXPO_PUBLIC_ORGANIZATION_ID;
 
-const categories: Array<{ id: 'all' | VideoCategory; label: string; icon: string }> = [
-  { id: 'all', label: 'All Watch', icon: '🎬' },
-  { id: 'worship', label: 'Worship Sessions', icon: '🕊️' },
-  { id: 'teaching', label: 'Expository Teachings', icon: '📖' },
-  { id: 'conference', label: 'Conferences', icon: '🏛️' },
-  { id: 'interview', label: 'Interviews', icon: '🎙️' },
-  { id: 'testimony', label: 'Testimonies', icon: '✨' },
-  { id: 'documentary', label: 'Documentaries', icon: '🎥' },
+const categories: Array<{ id: 'all' | VideoCategory; label: string }> = [
+  { id: 'all', label: 'All Videos' },
+  { id: 'worship', label: 'Worship Sessions' },
+  { id: 'teaching', label: 'Expository Teachings' },
+  { id: 'conference', label: 'Conferences' },
+  { id: 'interview', label: 'Interviews' },
+  { id: 'testimony', label: 'Testimonies' },
+  { id: 'documentary', label: 'Documentaries' },
 ];
 
 export default function WatchCatalogScreen() {
-  const { api, mode } = useSession();
-  const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { api, context } = useSession();
+  const { colors } = useTheme();
   const [selectedCategory, setSelectedCategory] = useState<'all' | VideoCategory>('all');
 
   const videosResource = useResource<Video[]>('watch:catalog', (signal) =>
@@ -38,212 +48,94 @@ export default function WatchCatalogScreen() {
       ? videos
       : videos.filter((v) => v.category === selectedCategory);
 
-  const featured = filteredVideos[0];
-  const list = filteredVideos.slice(1);
+  const expressionName = context?.expression?.name || context?.organizations?.[0]?.name;
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.bg }] as any}>
-      {/* Top Navbar Header */}
-      <View
-        style={[
-          styles.topBar,
-          { backgroundColor: colors.card, borderBottomColor: colors.border },
-        ] as any}
-      >
-        <Pressable onPress={() => router.back()} style={styles.backBtn as any}>
-          <Text style={[styles.backText, { color: colors.text }] as any}>‹ Back</Text>
-        </Pressable>
-        <Text style={[styles.topTitle, { color: colors.text }] as any} numberOfLines={1}>
-          Watch Catalog
-        </Text>
-        <View style={{ width: 40 }} />
-      </View>
-
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ScrollView
-        contentContainerStyle={styles.content as any}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + spacing.sm, paddingBottom: 60 },
+        ]}
         refreshControl={
           <RefreshControl
             refreshing={videosResource.loading}
             onRefresh={videosResource.refresh}
-            tintColor={palette.gold}
+            tintColor={colors.interactive}
           />
         }
       >
+        <ScreenHeader
+          title="Watch Catalog"
+          subtitle="Documentaries, worship sessions, conferences, and pastoral teachings."
+          showBack
+        />
+
         {/* Category Horizontal Selector Pills */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesRow as any}
+          contentContainerStyle={styles.categoriesRow}
         >
-          {categories.map((cat) => {
-            const isSelected = selectedCategory === cat.id;
-            return (
-              <Pressable
-                key={cat.id}
-                onPress={() => setSelectedCategory(cat.id)}
-                style={[
-                  styles.categoryPill,
-                  {
-                    backgroundColor: isSelected
-                      ? palette.gold
-                      : isDark
-                      ? '#1C1008'
-                      : '#FFFDF9',
-                    borderColor: isSelected
-                      ? palette.gold
-                      : isDark
-                      ? '#3D2415'
-                      : palette.line,
-                  },
-                ] as any}
-              >
-                <Text style={{ fontSize: 13 } as any}>{cat.icon}</Text>
-                <Text
-                  style={[
-                    styles.categoryText,
-                    {
-                      color: isSelected
-                        ? '#140C07'
-                        : isDark
-                        ? '#FFFDF9'
-                        : colors.text,
-                    },
-                  ] as any}
-                >
-                  {cat.label}
-                </Text>
-              </Pressable>
-            );
-          })}
+          {categories.map((cat) => (
+            <Chip
+              key={cat.id}
+              label={cat.label}
+              selected={selectedCategory === cat.id}
+              onPress={() => setSelectedCategory(cat.id)}
+            />
+          ))}
         </ScrollView>
 
-        {videosResource.loading ? (
-          <View style={{ gap: spacing.md, paddingHorizontal: spacing.lg }}>
-            <Skeleton height={200} dark={isDark} />
-            <Skeleton height={120} dark={isDark} />
-            <Skeleton height={120} dark={isDark} />
-          </View>
-        ) : videosResource.error && !videos.length ? (
-          <View style={styles.centerWrapper as any}>
-            <ResourceError
-              offline={videosResource.offline}
-              message={videosResource.error}
-              retry={videosResource.refresh}
-              dark={isDark}
-            />
-          </View>
-        ) : filteredVideos.length === 0 ? (
-          <View style={styles.centerWrapper as any}>
-            <EmptyState
-              title="No Watch Videos Available"
-              message="New documentaries, conference sessions, and worship broadcasts will be published here soon."
-              icon="🎬"
-              dark={isDark}
-            />
-          </View>
-        ) : (
-          <View style={styles.listContainer as any}>
-            {/* Featured Showcase Video */}
-            {featured && (
-              <View style={styles.featuredWrapper as any}>
-                <SectionHeader
-                  title="FEATURED BROADCAST"
-                  subtitle="Editor's spotlight from our sanctuary archive"
-                  dark={isDark}
-                />
+        <View style={styles.body}>
+          {videosResource.loading ? (
+            <View style={{ gap: spacing.md }}>
+              <Skeleton height={200} />
+              <Skeleton height={200} />
+            </View>
+          ) : videosResource.error && !videosResource.data ? (
+            <ResourceError message={videosResource.error} retry={videosResource.refresh} />
+          ) : filteredVideos.length > 0 ? (
+            <View style={styles.list}>
+              {filteredVideos.map((vid) => (
                 <VideoCard
-                  video={featured}
-                  expressionName="Main Sanctuary Campus"
-                  onPress={() => router.push(`/watch/${featured.id}` as any)}
-                  dark={isDark}
+                  key={vid.id}
+                  video={vid}
+                  expressionName={expressionName}
+                  onPress={() => router.push(`/watch/${vid.id}`)}
                 />
-              </View>
-            )}
-
-            {/* Remaining Video List */}
-            {list.length > 0 && (
-              <View style={{ gap: spacing.md }}>
-                <SectionHeader
-                  title="LATEST RELEASES"
-                  subtitle="Explore all teachings, documentaries, and worship"
-                  dark={isDark}
-                />
-                {list.map((video) => (
-                  <VideoCard
-                    key={video.id}
-                    video={video}
-                    expressionName="Sanctuary Expression"
-                    onPress={() => router.push(`/watch/${video.id}` as any)}
-                    dark={isDark}
-                  />
-                ))}
-              </View>
-            )}
-          </View>
-        )}
+              ))}
+            </View>
+          ) : (
+            <EmptyState
+              title="No Videos in Category"
+              message="No video publications match this category filter currently."
+              iconName="videocam-outline"
+            />
+          )}
+        </View>
       </ScrollView>
     </View>
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingTop: 54,
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-  },
-  backBtn: {
-    paddingVertical: 4,
-    paddingRight: 8,
-  },
-  backText: {
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  topTitle: {
-    fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: -0.2,
-  },
   content: {
-    paddingVertical: spacing.md,
-    gap: spacing.lg,
-    paddingBottom: 100,
+    flexGrow: 1,
   },
   categoriesRow: {
     paddingHorizontal: spacing.lg,
-    gap: 8,
+    gap: spacing.xs,
+    paddingBottom: spacing.md,
   },
-  categoryPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-  },
-  categoryText: {
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  listContainer: {
+  body: {
     paddingHorizontal: spacing.lg,
-    gap: spacing.lg,
   },
-  featuredWrapper: {
-    gap: spacing.sm,
-  },
-  centerWrapper: {
-    padding: spacing.xl,
-    justifyContent: 'center',
-    alignItems: 'center',
+  list: {
+    gap: spacing.xs,
   },
 });

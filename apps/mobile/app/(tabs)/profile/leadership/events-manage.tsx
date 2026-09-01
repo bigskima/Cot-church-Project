@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
@@ -7,21 +8,24 @@ import {
   Badge,
   Button,
   EmptyState,
+  Icon,
   InputField,
   ResourceError,
   ScreenHeader,
   SectionHeader,
   Skeleton,
 } from '@/components';
-import { palette, radius, shadows, spacing } from '@/design-system/tokens';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 import type { Event } from '@/types/content';
 
 export default function EventsManageScreen() {
+  const insets = useSafeAreaInsets();
   const { api } = useSession();
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [locationName, setLocationName] = useState('Main Sanctuary & Online');
+  const [locationName, setLocationName] = useState('Campus Sanctuary');
   const [capacity, setCapacity] = useState('200');
   const [creating, setCreating] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -60,207 +64,172 @@ export default function EventsManageScreen() {
     }
   };
 
+  const list = events.data ?? [];
+
   return (
-    <ScrollView
-      style={[styles.screen, { backgroundColor: colors.bg }]}
-      contentContainerStyle={styles.content}
-    >
-      <ScreenHeader
-        title="Events & Gatherings Coordinator"
-        subtitle="Schedule sanctuary worship services, configure attendance limits, and track registrations."
-        showBack
-        dark={isDark}
-      />
-
-      <View style={styles.body}>
-        {/* Create Event Card */}
-        <View
-          style={[
-            styles.card,
-            { backgroundColor: colors.card, borderColor: colors.border },
-            shadows.md,
-          ] as any}
-        >
-          <Text style={[styles.cardHeaderTitle, { color: colors.textMuted }] as any}>
-            SCHEDULE NEW GATHERING
-          </Text>
-
-          <InputField
-            label="Gathering Title"
-            value={title}
-            onChangeText={setTitle}
-            placeholder="e.g. Midweek Revival Service, Leaders Encounter..."
-            dark={isDark}
-          />
-
-          <InputField
-            label="Location & Venue"
-            value={locationName}
-            onChangeText={setLocationName}
-            placeholder="e.g. Main Auditorium / Hybrid Online"
-            dark={isDark}
-          />
-
-          <InputField
-            label="Registration Capacity (Optional)"
-            value={capacity}
-            onChangeText={setCapacity}
-            keyboardType="numeric"
-            placeholder="e.g. 250"
-            dark={isDark}
-          />
-
-          <InputField
-            label="Description & Schedule"
-            value={description}
-            onChangeText={setDescription}
-            placeholder="Keynote speakers, worship team, notes..."
-            multiline
-            numberOfLines={3}
-            dark={isDark}
-          />
-
-          {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
-
-          <Button
-            label="Publish Gathering ➔"
-            onPress={handleCreateEvent}
-            variant="gold"
-            size="lg"
-            loading={creating}
-            style={{ marginTop: spacing.md } as any}
-          />
-        </View>
-
-        {/* Existing Events List */}
-        <SectionHeader
-          title="Active Church Gatherings"
-          badge={events.data?.length ?? 0}
-          dark={isDark}
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + spacing.sm, paddingBottom: 60 },
+        ]}
+      >
+        <ScreenHeader
+          title="Events & Gatherings"
+          subtitle="Schedule worship services, conferences, and fellowships."
+          showBack
         />
-        {events.loading ? (
-          <Skeleton height={100} count={2} dark={isDark} />
-        ) : events.error && !events.data ? (
-          <ResourceError
-            offline={events.offline}
-            message={events.error}
-            retry={events.refresh}
-            dark={isDark}
-          />
-        ) : events.data && events.data.length > 0 ? (
-          events.data.map((event) => {
-            const date = new Date(event.starts_at);
-            return (
-              <View
-                key={event.id}
-                style={[
-                  styles.eventCard,
-                  { backgroundColor: colors.card, borderColor: colors.border },
-                  shadows.sm,
-                ] as any}
-              >
-                <View
-                  style={[
-                    styles.dateBlock,
-                    { backgroundColor: isDark ? '#2E1C11' : '#F1E3D3' },
-                  ] as any}
-                >
-                  <Text style={[styles.dateMonth, { color: colors.primaryDark }] as any}>
-                    {date.toLocaleString(undefined, { month: 'short' }).toUpperCase()}
-                  </Text>
-                  <Text style={[styles.dateDay, { color: colors.primaryDark }] as any}>
-                    {date.getDate()}
-                  </Text>
-                </View>
-                <View style={styles.eventInfo}>
-                  <Text style={[styles.eventTitle, { color: colors.text }] as any}>{event.title}</Text>
-                  <Text style={[styles.eventMeta, { color: colors.textMuted }] as any}>
-                    {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {event.location?.name ?? 'Main Sanctuary'}
-                  </Text>
-                  <View style={styles.badgeRow}>
-                    <Badge label={`Capacity: ${event.capacity ?? 'Open'}`} variant="neutral" />
-                  </View>
-                </View>
+
+        <View style={styles.body}>
+          {/* Create Event Card */}
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+            <View style={styles.cardHeader}>
+              <Icon name="calendar-outline" size={18} color={colors.interactive} />
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Schedule New Gathering</Text>
+            </View>
+
+            {errorMsg ? (
+              <View style={[styles.errorBar, { backgroundColor: 'rgba(229, 72, 77, 0.12)' }]}>
+                <Text style={styles.errorText}>{errorMsg}</Text>
               </View>
-            );
-          })
-        ) : (
-          <EmptyState
-            title="No Gatherings Scheduled"
-            message="Schedule upcoming worship services and conferences above."
-            icon="🗓️"
-            dark={isDark}
-          />
-        )}
-      </View>
-    </ScrollView>
+            ) : null}
+
+            <InputField
+              label="Gathering Title"
+              value={title}
+              onChangeText={setTitle}
+              placeholder="e.g. Sunday Celebration Service"
+            />
+
+            <InputField
+              label="Venue Location"
+              value={locationName}
+              onChangeText={setLocationName}
+              placeholder="e.g. Main Sanctuary / Online Stream"
+            />
+
+            <InputField
+              label="Description"
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              numberOfLines={3}
+              placeholder="Provide agenda, guest minister details..."
+            />
+
+            <Button
+              label="Publish Gathering"
+              onPress={handleCreateEvent}
+              loading={creating}
+              variant="primary"
+              size="md"
+              style={{ marginTop: spacing.xs }}
+            />
+          </View>
+
+          {/* Scheduled Gatherings List */}
+          <View style={styles.listSection}>
+            <SectionHeader title="Published Church Calendar" badge={list.length} />
+            {events.loading ? (
+              <Skeleton height={80} count={3} />
+            ) : events.error && !events.data ? (
+              <ResourceError message={events.error} retry={events.refresh} />
+            ) : list.length > 0 ? (
+              list.map((ev) => (
+                <View
+                  key={ev.id}
+                  style={[styles.eventTile, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}
+                >
+                  <View style={styles.eventInfo}>
+                    <Text style={[styles.eventTitle, { color: colors.text }]}>{ev.title}</Text>
+                    {ev.location?.name ? (
+                      <Text style={[styles.eventMeta, { color: colors.interactive }]}>
+                        {ev.location.name}
+                      </Text>
+                    ) : null}
+                    {ev.starts_at ? (
+                      <Text style={[styles.eventDate, { color: colors.textMuted }]}>
+                        {new Date(ev.starts_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <Badge label="UPCOMING" variant="primary" />
+                </View>
+              ))
+            ) : (
+              <EmptyState
+                title="No Events Scheduled"
+                message="Use the form above to schedule your first church gathering."
+                iconName="calendar-outline"
+              />
+            )}
+          </View>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
   content: {
-    paddingBottom: 120,
+    flexGrow: 1,
   },
   body: {
     paddingHorizontal: spacing.lg,
+    gap: spacing.lg,
   },
   card: {
-    borderRadius: radius.xl,
     padding: spacing.lg,
-    marginTop: spacing.sm,
+    borderRadius: radius.lg,
     borderWidth: 1,
+    gap: spacing.sm,
   },
-  cardHeaderTitle: {
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-    marginBottom: spacing.md,
-  },
-  errorText: {
-    color: palette.live,
-    fontSize: 13,
-    fontWeight: '800',
-    marginVertical: 4,
-  },
-  eventCard: {
+  cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.xs,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  errorBar: {
+    padding: spacing.sm,
+    borderRadius: radius.md,
+  },
+  errorText: {
+    color: '#E5484D',
+    fontSize: 12,
+  },
+  listSection: {
+    gap: spacing.xs,
+  },
+  eventTile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     padding: spacing.md,
     borderRadius: radius.lg,
-    marginBottom: spacing.sm,
     borderWidth: 1,
-  },
-  dateBlock: {
-    width: 54,
-    height: 54,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dateMonth: {
-    fontSize: 10,
-    fontWeight: '900',
-  },
-  dateDay: {
-    fontSize: 20,
-    fontWeight: '900',
+    marginBottom: spacing.xs,
   },
   eventInfo: {
     flex: 1,
-    marginLeft: spacing.md,
+    gap: 2,
   },
   eventTitle: {
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   eventMeta: {
     fontSize: 12,
-    marginTop: 2,
+    fontWeight: '600',
   },
-  badgeRow: {
-    marginTop: 4,
+  eventDate: {
+    fontSize: 11,
   },
 });

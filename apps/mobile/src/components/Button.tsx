@@ -1,11 +1,29 @@
 import React from 'react';
-import { ActivityIndicator, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { palette, radius, shadows, spacing } from '../design-system/tokens';
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleProp,
+  StyleSheet,
+  Text,
+  View,
+  ViewStyle,
+  TextStyle,
+} from 'react-native';
+import { useTheme } from '@/state/theme';
+import { radius, spacing, typography } from '@/design-system/tokens';
 
-export type ButtonVariant = 'gold' | 'primary' | 'secondary' | 'outline' | 'live' | 'glass' | 'ghost';
+export type ButtonVariant =
+  | 'primary'
+  | 'secondary'
+  | 'outline'
+  | 'ghost'
+  | 'destructive'
+  | 'live'
+  | 'gold'; // backwards compatibility mapping
+
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
-interface ButtonProps {
+export interface ButtonProps {
   label: string;
   onPress: () => void;
   variant?: ButtonVariant;
@@ -15,6 +33,7 @@ interface ButtonProps {
   loading?: boolean;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
   badge?: string | number;
 }
 
@@ -28,71 +47,137 @@ export function Button({
   loading = false,
   disabled = false,
   style,
+  textStyle,
   badge,
 }: ButtonProps) {
-  const getContainerStyle = () => {
+  const { colors, isDark } = useTheme();
+
+  const getVariantStyles = (): { container: ViewStyle; text: TextStyle; indicatorColor: string } => {
     switch (variant) {
-      case 'gold':
-        return [styles.gold, shadows.glowGold];
-      case 'live':
-        return [styles.live, shadows.glowLive];
       case 'secondary':
-        return styles.secondary;
+        return {
+          container: {
+            backgroundColor: colors.bgSecondary,
+            borderColor: colors.border,
+            borderWidth: 1,
+          },
+          text: {
+            color: colors.text,
+          },
+          indicatorColor: colors.text,
+        };
       case 'outline':
-        return styles.outline;
-      case 'glass':
-        return styles.glass;
+        return {
+          container: {
+            backgroundColor: 'transparent',
+            borderColor: colors.borderStrong,
+            borderWidth: 1,
+          },
+          text: {
+            color: colors.interactive,
+          },
+          indicatorColor: colors.interactive,
+        };
       case 'ghost':
-        return styles.ghost;
+        return {
+          container: {
+            backgroundColor: 'transparent',
+            borderColor: 'transparent',
+            borderWidth: 0,
+          },
+          text: {
+            color: colors.textSecondary,
+          },
+          indicatorColor: colors.textSecondary,
+        };
+      case 'destructive':
+        return {
+          container: {
+            backgroundColor: '#E5484D',
+            borderColor: '#E5484D',
+            borderWidth: 1,
+          },
+          text: {
+            color: '#FFFFFF',
+          },
+          indicatorColor: '#FFFFFF',
+        };
+      case 'live':
+        return {
+          container: {
+            backgroundColor: '#E5484D',
+            borderColor: '#E5484D',
+            borderWidth: 1,
+          },
+          text: {
+            color: '#FFFFFF',
+          },
+          indicatorColor: '#FFFFFF',
+        };
+      case 'gold':
       case 'primary':
       default:
-        return [styles.primary, shadows.md];
+        return {
+          container: {
+            backgroundColor: isDark ? '#FFFFFF' : '#0D294B',
+            borderColor: isDark ? '#FFFFFF' : '#0D294B',
+            borderWidth: 1,
+          },
+          text: {
+            color: isDark ? '#0D294B' : '#FFFFFF',
+          },
+          indicatorColor: isDark ? '#0D294B' : '#FFFFFF',
+        };
     }
   };
 
-  const getTextStyle = () => {
-    switch (variant) {
-      case 'gold':
-        return styles.goldText;
-      case 'live':
-        return styles.liveText;
-      case 'secondary':
-        return styles.secondaryText;
-      case 'outline':
-        return styles.outlineText;
-      case 'glass':
-        return styles.glassText;
-      case 'ghost':
-        return styles.ghostText;
-      case 'primary':
-      default:
-        return styles.primaryText;
-    }
-  };
-
-  const getSizeStyle = () => {
+  const getSizeStyles = (): { container: ViewStyle; text: TextStyle } => {
     switch (size) {
       case 'sm':
-        return styles.sizeSm;
+        return {
+          container: {
+            paddingVertical: 6,
+            paddingHorizontal: spacing.md,
+            minHeight: 34,
+            borderRadius: radius.md,
+          },
+          text: {
+            fontSize: 13,
+            fontWeight: '600',
+          },
+        };
       case 'lg':
-        return styles.sizeLg;
+        return {
+          container: {
+            paddingVertical: 14,
+            paddingHorizontal: spacing.xxl,
+            minHeight: 52,
+            borderRadius: radius.lg,
+          },
+          text: {
+            fontSize: 16,
+            fontWeight: '600',
+          },
+        };
       case 'md':
       default:
-        return styles.sizeMd;
+        return {
+          container: {
+            paddingVertical: 10,
+            paddingHorizontal: spacing.lg,
+            minHeight: 44,
+            borderRadius: radius.md,
+          },
+          text: {
+            fontSize: 14,
+            fontWeight: '600',
+          },
+        };
     }
   };
 
-  const getTextSizeStyle = () => {
-    switch (size) {
-      case 'sm':
-        return styles.textSm;
-      case 'lg':
-        return styles.textLg;
-      case 'md':
-      default:
-        return styles.textMd;
-    }
-  };
+  const vStyles = getVariantStyles();
+  const sStyles = getSizeStyles();
 
   return (
     <Pressable
@@ -100,44 +185,103 @@ export function Button({
       disabled={disabled || loading}
       style={({ pressed }) => [
         styles.base,
-        getContainerStyle(),
-        getSizeStyle(),
-        (disabled || loading) ? styles.disabled : null,
-        (pressed && !disabled && !loading) ? styles.pressed : null,
+        vStyles.container,
+        sStyles.container,
+        disabled && styles.disabled,
+        pressed && !disabled && !loading && styles.pressed,
         style,
-      ] as any}
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={label}
     >
       {loading ? (
-        <ActivityIndicator
-          size="small"
-          color={variant === 'gold' ? '#140C07' : '#FFFFFF'}
-        />
+        <ActivityIndicator size="small" color={vStyles.indicatorColor} />
       ) : (
         <View style={styles.contentRow}>
-          {icon && <View style={styles.iconSlotLeft}>{icon}</View>}
-          <Text style={[styles.baseText, getTextStyle(), getTextSizeStyle()] as any}>
+          {icon && <View style={styles.iconLeft}>{icon}</View>}
+          <Text style={[styles.baseText, sStyles.text, vStyles.text, textStyle]}>
             {label}
           </Text>
           {badge !== undefined && (
-            <View style={styles.badgeWrapper}>
-              <Text style={styles.badgeText}>{badge}</Text>
+            <View style={[styles.badgeWrapper, { backgroundColor: colors.bgSecondary }]}>
+              <Text style={[styles.badgeText, { color: colors.text }]}>{badge}</Text>
             </View>
           )}
-          {iconRight && <View style={styles.iconSlotRight}>{iconRight}</View>}
+          {iconRight && <View style={styles.iconRight}>{iconRight}</View>}
         </View>
       )}
     </Pressable>
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+export interface IconButtonProps {
+  icon: React.ReactNode;
+  onPress: () => void;
+  size?: 'sm' | 'md' | 'lg';
+  variant?: 'default' | 'filled' | 'outline' | 'ghost';
+  disabled?: boolean;
+  style?: StyleProp<ViewStyle>;
+  accessibilityLabel: string;
+}
+
+export function IconButton({
+  icon,
+  onPress,
+  size = 'md',
+  variant = 'default',
+  disabled = false,
+  style,
+  accessibilityLabel,
+}: IconButtonProps) {
+  const { colors } = useTheme();
+
+  const dim = size === 'sm' ? 32 : size === 'lg' ? 48 : 40;
+
+  const getBgStyle = (): ViewStyle => {
+    switch (variant) {
+      case 'filled':
+        return { backgroundColor: colors.bgSecondary, borderWidth: 0 };
+      case 'outline':
+        return { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border };
+      case 'ghost':
+        return { backgroundColor: 'transparent', borderWidth: 0 };
+      case 'default':
+      default:
+        return { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border };
+    }
+  };
+
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      hitSlop={6}
+      style={({ pressed }) => [
+        {
+          width: dim,
+          height: dim,
+          borderRadius: dim / 2,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        getBgStyle(),
+        disabled && styles.disabled,
+        pressed && styles.pressed,
+        style,
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+    >
+      {icon}
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
   base: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: 'transparent',
   },
   contentRow: {
     flexDirection: 'row',
@@ -145,97 +289,16 @@ const styles: Record<string, any> = StyleSheet.create({
     justifyContent: 'center',
   },
   baseText: {
-    fontWeight: '900',
-    letterSpacing: -0.2,
     textAlign: 'center',
+    letterSpacing: -0.2,
   },
-  sizeSm: {
-    paddingVertical: 8,
-    paddingHorizontal: spacing.md,
-    minHeight: 36,
-  },
-  sizeMd: {
-    paddingVertical: 12,
-    paddingHorizontal: spacing.lg,
-    minHeight: 48,
-  },
-  sizeLg: {
-    paddingVertical: 16,
-    paddingHorizontal: spacing.xl,
-    minHeight: 56,
-  },
-  textSm: {
-    fontSize: 13,
-  },
-  textMd: {
-    fontSize: 15,
-  },
-  textLg: {
-    fontSize: 17,
-  },
-  gold: {
-    backgroundColor: palette.yellow,
-    borderColor: '#D97706',
-  },
-  goldText: {
-    color: '#140C07',
-  },
-  primary: {
-    backgroundColor: '#2E1C11',
-    borderColor: '#452A1A',
-  },
-  primaryText: {
-    color: '#FFFDF9',
-  },
-  secondary: {
-    backgroundColor: '#F1E3D3',
-    borderColor: '#E8D5C4',
-  },
-  secondaryText: {
-    color: '#26140A',
-  },
-  outline: {
-    backgroundColor: 'transparent',
-    borderColor: '#E8D5C4',
-  },
-  outlineText: {
-    color: '#78350F',
-  },
-  live: {
-    backgroundColor: palette.live,
-    borderColor: '#B91C1C',
-  },
-  liveText: {
-    color: '#FFFFFF',
-  },
-  glass: {
-    backgroundColor: 'rgba(255, 253, 249, 0.15)',
-    borderColor: 'rgba(245, 158, 11, 0.4)',
-  },
-  glassText: {
-    color: '#FFFDF9',
-  },
-  ghost: {
-    backgroundColor: 'transparent',
-  },
-  ghostText: {
-    color: '#8C6549',
-  },
-  disabled: {
-    opacity: 0.45,
-  },
-  pressed: {
-    opacity: 0.88,
-    transform: [{ scale: 0.98 }],
-  },
-  iconSlotLeft: {
+  iconLeft: {
     marginRight: spacing.xs + 2,
   },
-  iconSlotRight: {
+  iconRight: {
     marginLeft: spacing.xs + 2,
   },
   badgeWrapper: {
-    backgroundColor: 'rgba(20, 12, 7, 0.15)',
     borderRadius: radius.pill,
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -243,7 +306,13 @@ const styles: Record<string, any> = StyleSheet.create({
   },
   badgeText: {
     fontSize: 11,
-    fontWeight: '900',
-    color: 'inherit' as any,
+    fontWeight: '700',
+  },
+  disabled: {
+    opacity: 0.45,
+  },
+  pressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.98 }],
   },
 });

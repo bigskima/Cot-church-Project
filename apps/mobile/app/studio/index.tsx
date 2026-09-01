@@ -1,31 +1,48 @@
 import React, { useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
-import { Badge, Button, InputField, Skeleton } from '@/components';
-import { palette, radius, shadows, spacing } from '@/design-system/tokens';
+import {
+  Badge,
+  Button,
+  Icon,
+  InputField,
+  LeadershipModuleCard,
+  ScreenHeader,
+  SectionHeader,
+  Skeleton,
+} from '@/components';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 
 interface StudioOverview {
-  drafts: { id: string; content_type: string; status: string; created_at: string }[];
-  mediaQueue: { id: string; media_type: string; processing_state: string; created_at: string }[];
-  totalPublished: number;
+  drafts?: { id: string; content_type: string; status: string; created_at: string }[];
+  mediaQueue?: { id: string; media_type: string; processing_state: string; created_at: string }[];
+  totalPublished?: number;
 }
 
 export default function CreatorStudioScreen() {
-  const { api } = useSession();
-  const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { api, hasCapability } = useSession();
+  const { colors } = useTheme();
 
-  const [activeModal, setActiveModal] = useState<'post' | 'reel' | 'video' | null>(null);
+  const [activeModal, setActiveModal] = useState<'post' | null>(null);
   const [postBody, setPostBody] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const studioResource = useResource<StudioOverview>('studio:overview', (signal) =>
-    api.request<StudioOverview>('creator-studio', { signal })
+    api.request<StudioOverview>('creator-studio', { signal }).catch(() => ({}))
   );
-
-  const studioData = studioResource.data;
 
   const handlePublishPost = async () => {
     if (!postBody.trim()) return;
@@ -50,190 +67,154 @@ export default function CreatorStudioScreen() {
     }
   };
 
+  const leadershipModules = [
+    {
+      title: 'Sermons & Archives',
+      description: 'Upload sermon audio/video, manage series, and add scripture notes',
+      iconName: 'book-outline',
+      badge: 'MEDIA',
+      route: '/(tabs)/profile/leadership/sermons-manage',
+    },
+    {
+      title: 'Events & Calendar',
+      description: 'Create Sunday services, retreats, conferences, and prayer meetings',
+      iconName: 'calendar-outline',
+      badge: 'EVENTS',
+      route: '/(tabs)/profile/leadership/events-manage',
+    },
+    {
+      title: 'Live Media Studio',
+      description: 'Broadcast live services, stream ingest keys, and Mux playback status',
+      iconName: 'radio-outline',
+      badge: 'BROADCAST',
+      route: '/(tabs)/profile/leadership/media-studio',
+    },
+    {
+      title: 'Pastoral Triage & Care',
+      description: 'Review confidential member prayer requests and assign pastoral responses',
+      iconName: 'heart-outline',
+      badge: 'PASTORAL',
+      route: '/(tabs)/profile/leadership/pastoral-triage',
+    },
+    {
+      title: 'Giving & Financial Reports',
+      description: 'Track tithes, offering campaign goals, receipts, and bank wire setups',
+      iconName: 'gift-outline',
+      badge: 'FINANCE',
+      route: '/(tabs)/profile/leadership/giving-manage',
+    },
+    {
+      title: 'Church Expressions & Campuses',
+      description: 'Manage multi-campus directory, timezones, and leadership assignments',
+      iconName: 'business-outline',
+      badge: 'CAMPUS',
+      route: '/(tabs)/profile/leadership/expressions-manage',
+    },
+    {
+      title: 'Member Directory & Roster',
+      description: 'View active member rolls, communication channels, and roles',
+      iconName: 'people-outline',
+      badge: 'MEMBERS',
+      route: '/(tabs)/profile/leadership/members-manage',
+    },
+    {
+      title: 'Organization Settings',
+      description: 'Configure branding, church story, mission, and leadership bios',
+      iconName: 'settings-outline',
+      badge: 'SETTINGS',
+      route: '/(tabs)/profile/leadership/settings-manage',
+    },
+  ];
+
   return (
-    <View style={[styles.screen, { backgroundColor: colors.bg }] as any}>
-      {/* Top Header */}
-      <View
-        style={[
-          styles.header,
-          { backgroundColor: colors.card, borderBottomColor: colors.border },
-        ] as any}
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + spacing.sm, paddingBottom: 100 },
+        ]}
       >
-        <Pressable onPress={() => router.back()} style={styles.backBtn as any}>
-          <Text style={[styles.backText, { color: colors.text }] as any}>‹ Back</Text>
-        </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.text }] as any}>
-          Creator & Ministry Studio
-        </Text>
-        <View style={{ width: 40 }} />
-      </View>
+        <ScreenHeader
+          title="Ministry Studio Hub"
+          subtitle="Scoped leadership suite for content publishing, broadcasts, events, and pastoral operations."
+          showBack
+        />
 
-      <ScrollView contentContainerStyle={styles.content as any}>
-        {/* Studio Banner */}
-        <View
-          style={[
-            styles.bannerCard,
-            { backgroundColor: isDark ? '#1C1008' : '#FFFDF9', borderColor: isDark ? '#3D2415' : palette.line },
-            shadows.md,
-          ] as any}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Badge label="PRODUCTION STUDIO" variant="gold" />
-            <Text style={{ fontSize: 13, color: palette.gold, fontWeight: '800' } as any}>
-              ✦ Scoped Ministry Hub
+        <View style={styles.body}>
+          {/* Quick Post Creator CTA */}
+          <View style={[styles.quickPostCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+            <View style={styles.quickPostHeader}>
+              <Icon name="create-outline" size={20} color={colors.interactive} />
+              <Text style={[styles.quickPostTitle, { color: colors.text }]}>Quick Community Announcement</Text>
+            </View>
+            <Text style={[styles.quickPostSub, { color: colors.textSecondary }]}>
+              Post an instant encouragement or ministry update to all church members.
             </Text>
+            <Button
+              label="Compose Announcement"
+              onPress={() => setActiveModal('post')}
+              variant="primary"
+              size="md"
+              style={{ marginTop: spacing.xs }}
+            />
           </View>
-          <Text style={[styles.bannerTitle, { color: colors.text }] as any}>
-            Author, Produce & Distribute
-          </Text>
-          <Text style={[styles.bannerSub, { color: colors.textMuted }] as any}>
-            Publish social conversations, vertical short reels, expository sermons, and long-form watch videos.
-          </Text>
-        </View>
 
-        {/* Quick Publishing Actions Grid */}
-        <Text style={[styles.sectionHeading, { color: colors.text }] as any}>
-          Content Publishing Tools
-        </Text>
-        <View style={styles.actionsGrid as any}>
-          <Pressable
-            onPress={() => setActiveModal('post')}
-            style={[
-              styles.actionCard,
-              { backgroundColor: colors.card, borderColor: colors.border },
-              shadows.sm,
-            ] as any}
-          >
-            <Text style={{ fontSize: 24 } as any}>📝</Text>
-            <Text style={[styles.actionTitle, { color: colors.text }] as any}>Create Post</Text>
-            <Text style={[styles.actionSub, { color: colors.textMuted }] as any}>
-              Text, reflections & updates
-            </Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => setActiveModal('reel')}
-            style={[
-              styles.actionCard,
-              { backgroundColor: colors.card, borderColor: colors.border },
-              shadows.sm,
-            ] as any}
-          >
-            <Text style={{ fontSize: 24 } as any}>🎬</Text>
-            <Text style={[styles.actionTitle, { color: colors.text }] as any}>Upload Reel</Text>
-            <Text style={[styles.actionSub, { color: colors.textMuted }] as any}>
-              Vertical 9:16 video highlights
-            </Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => setActiveModal('video')}
-            style={[
-              styles.actionCard,
-              { backgroundColor: colors.card, borderColor: colors.border },
-              shadows.sm,
-            ] as any}
-          >
-            <Text style={{ fontSize: 24 } as any}>📹</Text>
-            <Text style={[styles.actionTitle, { color: colors.text }] as any}>Upload Video</Text>
-            <Text style={[styles.actionSub, { color: colors.textMuted }] as any}>
-              Long-form Watch documentaries
-            </Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => router.push('/(tabs)/profile/leadership/sermons-manage' as any)}
-            style={[
-              styles.actionCard,
-              { backgroundColor: colors.card, borderColor: colors.border },
-              shadows.sm,
-            ] as any}
-          >
-            <Text style={{ fontSize: 24 } as any}>🎙️</Text>
-            <Text style={[styles.actionTitle, { color: colors.text }] as any}>Manage Sermons</Text>
-            <Text style={[styles.actionSub, { color: colors.textMuted }] as any}>
-              Expository series & archives
-            </Text>
-          </Pressable>
-        </View>
-
-        {/* Media Processing Queue */}
-        <Text style={[styles.sectionHeading, { color: colors.text }] as any}>
-          Media Processing Queue
-        </Text>
-        {studioResource.loading ? (
-          <Skeleton height={80} count={2} dark={isDark} />
-        ) : (studioData?.mediaQueue.length ?? 0) > 0 ? (
-          <View style={{ gap: 8 }}>
-            {studioData?.mediaQueue.map((item) => (
-              <View
-                key={item.id}
-                style={[
-                  styles.queueItem,
-                  { backgroundColor: colors.card, borderColor: colors.border },
-                ] as any}
-              >
-                <Text style={{ fontSize: 18 } as any}>⚙️</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.queueTitle, { color: colors.text }] as any}>
-                    {item.media_type.toUpperCase()} Asset Pipeline
-                  </Text>
-                  <Text style={[styles.queueSub, { color: palette.gold }] as any}>
-                    State: {item.processing_state}
-                  </Text>
-                </View>
-                <Badge label="IN PROGRESS" variant="gold" />
-              </View>
+          {/* Operational Leadership Modules Grid */}
+          <View style={styles.modulesSection}>
+            <SectionHeader title="Ministry Operations & Tools" />
+            {leadershipModules.map((module, idx) => (
+              <LeadershipModuleCard
+                key={idx}
+                title={module.title}
+                description={module.description}
+                iconName={module.iconName}
+                badge={module.badge}
+                onPress={() => router.push(module.route as any)}
+              />
             ))}
           </View>
-        ) : (
-          <View
-            style={[
-              styles.emptyQueue,
-              { backgroundColor: colors.card, borderColor: colors.border },
-            ] as any}
-          >
-            <Text style={{ fontSize: 20 } as any}>✓</Text>
-            <Text style={[styles.emptyQueueText, { color: colors.textMuted }] as any}>
-              All uploaded media assets have finished transcoding.
-            </Text>
-          </View>
-        )}
+        </View>
       </ScrollView>
 
       {/* Post Modal */}
-      <Modal visible={activeModal === 'post'} transparent animationType="slide">
-        <View style={styles.modalBackdrop as any}>
-          <View
-            style={[
-              styles.modalCard,
-              { backgroundColor: isDark ? '#1C1008' : '#FFFDF9', borderColor: colors.border },
-            ] as any}
-          >
-            <Text style={[styles.modalHeading, { color: colors.text }] as any}>
-              Publish New Social Post
-            </Text>
+      <Modal
+        visible={activeModal === 'post'}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setActiveModal(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalSheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Publish Announcement</Text>
+              <Pressable onPress={() => setActiveModal(null)} hitSlop={8}>
+                <Icon name="close" size={20} color={colors.textMuted} />
+              </Pressable>
+            </View>
+
             <InputField
-              label="Post Message"
-              placeholder="Share ministry update, testimony, or reflection..."
+              label="Announcement Content"
               value={postBody}
               onChangeText={setPostBody}
               multiline
-              dark={isDark}
+              numberOfLines={5}
+              placeholder="Write your pastoral announcement or spiritual encouragement..."
             />
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+
+            <View style={styles.modalActions}>
               <Button
                 label="Cancel"
-                variant="outline"
                 onPress={() => setActiveModal(null)}
-                style={{ flex: 1 } as any}
+                variant="outline"
+                size="md"
               />
               <Button
-                label="Publish Now ➔"
-                variant="gold"
-                loading={submitting}
+                label="Publish Post"
                 onPress={handlePublishPost}
-                style={{ flex: 1 } as any}
+                loading={submitting}
+                variant="primary"
+                size="md"
               />
             </View>
           </View>
@@ -243,121 +224,63 @@ export default function CreatorStudioScreen() {
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingTop: 54,
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-  },
-  backBtn: {
-    paddingVertical: 4,
-    paddingRight: 8,
-  },
-  backText: {
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '900',
-    flex: 1,
-    textAlign: 'center',
-  },
   content: {
-    padding: spacing.lg,
-    gap: spacing.lg,
-    paddingBottom: 100,
+    flexGrow: 1,
   },
-  bannerCard: {
+  body: {
+    paddingHorizontal: spacing.lg,
+    gap: spacing.lg,
+  },
+  quickPostCard: {
     padding: spacing.lg,
     borderRadius: radius.lg,
     borderWidth: 1,
-    gap: 8,
+    gap: spacing.xs,
   },
-  bannerTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-    letterSpacing: -0.3,
+  quickPostHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
-  bannerSub: {
+  quickPostTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  quickPostSub: {
     fontSize: 13,
     lineHeight: 18,
   },
-  sectionHeading: {
-    fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: -0.2,
-  },
-  actionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  actionCard: {
-    width: '48%',
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    gap: 6,
-  },
-  actionTitle: {
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  actionSub: {
-    fontSize: 11,
-    lineHeight: 15,
-  },
-  queueItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    gap: 10,
-  },
-  queueTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  queueSub: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  emptyQueue: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    gap: 12,
-  },
-  emptyQueueText: {
-    fontSize: 12,
-    fontWeight: '600',
-    flex: 1,
+  modulesSection: {
+    gap: spacing.xs,
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    padding: spacing.lg,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(6, 20, 38, 0.65)',
   },
-  modalCard: {
-    borderRadius: radius.lg,
-    padding: spacing.xl,
-    borderWidth: 1,
+  modalSheet: {
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    borderTopWidth: 1,
+    padding: spacing.lg,
     gap: spacing.md,
   },
-  modalHeading: {
-    fontSize: 18,
-    fontWeight: '900',
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  modalTitle: {
+    ...typography.h2,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
   },
 });

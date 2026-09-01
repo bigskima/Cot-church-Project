@@ -1,24 +1,29 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import {
   Badge,
   Button,
+  Chip,
   EmptyState,
+  Icon,
   InputField,
   ResourceError,
   ScreenHeader,
   SectionHeader,
   Skeleton,
 } from '@/components';
-import { palette, radius, shadows, spacing } from '@/design-system/tokens';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 import type { LiveStream } from '@/types/content';
 
 export default function MediaStudioScreen() {
+  const insets = useSafeAreaInsets();
   const { api } = useSession();
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [latencyMode, setLatencyMode] = useState<'standard' | 'reduced' | 'low'>('reduced');
@@ -57,7 +62,7 @@ export default function MediaStudioScreen() {
       setTitle('');
       setDescription('');
       setCreatedIngest(res.ingest);
-      setActionMsg('Broadcast created successfully! Connect your hardware/OBS encoder using the credentials below.');
+      setActionMsg('Broadcast created successfully. Use the RTMP credentials below to start encoding.');
       streams.refresh();
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Unable to create broadcast.');
@@ -66,396 +71,264 @@ export default function MediaStudioScreen() {
     }
   };
 
-  const handleStopStream = async (streamId: string) => {
-    try {
-      await api.request(`streaming-broadcasts?id=${streamId}`, {
-        method: 'DELETE',
-      });
-      setActionMsg('Broadcast ended successfully. Processing cloud recording...');
-      streams.refresh();
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Unable to stop stream.');
-    }
-  };
+  const streamList = streams.data ?? [];
 
   return (
-    <ScrollView
-      style={[styles.screen, { backgroundColor: colors.bg }]}
-      contentContainerStyle={styles.content}
-    >
-      <ScreenHeader
-        title="Expression Media Studio"
-        subtitle="Manage live encoders, RTMP broadcast keys, and convert recordings to sermon drafts."
-        showBack
-        dark={isDark}
-      />
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + spacing.sm, paddingBottom: 60 },
+        ]}
+      >
+        <ScreenHeader
+          title="Live Media Studio"
+          subtitle="Manage live encoders, RTMP broadcast keys, and live service status."
+          showBack
+        />
 
-      <View style={styles.body}>
-        {/* Create Broadcast Stage */}
-        <View
-          style={[
-            styles.createCard,
-            { backgroundColor: colors.card, borderColor: colors.border },
-            shadows.md,
-          ]}
-        >
-          <View style={styles.cardHeaderRow}>
-            <Text style={[styles.cardHeaderTitle, { color: colors.textMuted }]}>
-              CREATE NEW LIVESTREAM
-            </Text>
-            <Badge label="ENCODER OPS" variant="gold" />
-          </View>
-
-          <InputField
-            label="Service / Gathering Title"
-            value={title}
-            onChangeText={setTitle}
-            placeholder="e.g. Sunday Celebration Service - 10:00 AM"
-            dark={isDark}
-          />
-
-          <InputField
-            label="Description (Optional)"
-            value={description}
-            onChangeText={setDescription}
-            placeholder="Message theme or order of service..."
-            multiline
-            numberOfLines={2}
-            dark={isDark}
-          />
-
-          {/* Latency Selection */}
-          <Text style={[styles.latencyLabel, { color: colors.text }] as any}>STREAM LATENCY TARGET</Text>
-          <View style={styles.latencySelector}>
-            {[
-              ['reduced', 'Reduced (~4s)', 'Best for real-time interaction & prayer'],
-              ['standard', 'Standard (~12s)', 'Optimal stability for variable bandwidth'],
-            ].map(([key, label, desc]) => {
-              const isSelected = latencyMode === key;
-              return (
-                <Pressable
-                  key={key}
-                  onPress={() => setLatencyMode(key as any)}
-                  style={[
-                    styles.latencyPill,
-                    {
-                      backgroundColor: isSelected
-                        ? colors.primary
-                        : isDark
-                        ? '#2E1C11'
-                        : '#F1E3D3',
-                      borderColor: isSelected ? colors.primaryDark : colors.border,
-                    },
-                  ] as any}
-                >
-                  <Text
-                    style={[
-                      styles.latencyPillTitle,
-                      {
-                        color: isSelected
-                          ? '#140C07'
-                          : isDark
-                          ? '#FFFDF9'
-                          : '#26140A',
-                        fontWeight: isSelected ? '900' : '700',
-                      },
-                    ] as any}
-                  >
-                    {label}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.latencyPillDesc,
-                      { color: isSelected ? '#362215' : colors.textMuted },
-                    ] as any}
-                  >
-                    {desc}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
+        <View style={styles.body}>
+          {/* Notification Messages */}
           {actionMsg ? (
-            <View
-              style={[
-                styles.successBox,
-                { backgroundColor: isDark ? '#1C3A27' : '#ECFDF5' },
-              ] as any}
-            >
-              <Text style={styles.successText}>{actionMsg}</Text>
+            <View style={[styles.banner, { backgroundColor: 'rgba(22, 163, 106, 0.12)', borderColor: 'rgba(22, 163, 106, 0.3)' }]}>
+              <Icon name="checkmark-circle" size={18} color="#16A36A" style={{ marginRight: 8 }} />
+              <Text style={[styles.bannerText, { color: '#16A36A' }]}>{actionMsg}</Text>
             </View>
           ) : null}
 
-          <Button
-            label="Provision Live Broadcast ➔"
-            onPress={handleCreateBroadcast}
-            variant="gold"
-            size="lg"
-            loading={creating}
-            style={{ marginTop: spacing.md } as any}
-          />
-        </View>
-
-        {/* RTMP Encoder Ingest Credentials Card */}
-        {createdIngest && (
-          <View style={[styles.ingestCard, shadows.lg] as any}>
-            <View style={styles.ingestHeader}>
-              <Text style={styles.ingestTitle}>OBS / vMix Ingest Credentials</Text>
-              <Badge label="CONFIDENTIAL" variant="live" />
+          {errorMsg ? (
+            <View style={[styles.banner, { backgroundColor: 'rgba(229, 72, 77, 0.12)', borderColor: 'rgba(229, 72, 77, 0.3)' }]}>
+              <Icon name="alert-circle" size={18} color="#E5484D" style={{ marginRight: 8 }} />
+              <Text style={[styles.bannerText, { color: '#E5484D' }]}>{errorMsg}</Text>
             </View>
-            <Text style={styles.ingestWarning}>
-              Do not share this key publicly. Paste into your broadcasting software (OBS, vMix, ATEM, etc.).
-            </Text>
+          ) : null}
 
-            <View style={styles.credentialField}>
-              <Text style={styles.credentialLabel}>RTMP SERVER URL</Text>
-              <Text selectable style={styles.credentialValue}>
-                {createdIngest.rtmpUrl}
-              </Text>
-            </View>
+          {/* Ingest Keys Card if created */}
+          {createdIngest ? (
+            <View style={[styles.ingestCard, { backgroundColor: colors.card, borderColor: colors.interactive }, shadows.sm]}>
+              <View style={styles.ingestHeader}>
+                <Icon name="key-outline" size={18} color={colors.interactive} />
+                <Text style={[styles.ingestTitle, { color: colors.text }]}>OBS / Encoder Ingest Setup</Text>
+              </View>
 
-            <View style={styles.credentialField}>
-              <Text style={styles.credentialLabel}>STREAM KEY</Text>
-              <View style={styles.keyRow}>
-                <Text selectable style={styles.credentialValue}>
-                  {showKey ? createdIngest.streamKey : '••••••••••••••••••••••••••••••••'}
+              <View style={styles.ingestField}>
+                <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Server URL / RTMP:</Text>
+                <Text style={[styles.fieldCode, { backgroundColor: colors.bgSecondary, color: colors.text }]}>
+                  {createdIngest.rtmpUrl}
                 </Text>
-                <Pressable
-                  onPress={() => setShowKey(!showKey)}
-                  style={styles.showKeyButton as any}
-                >
-                  <Text style={styles.showKeyText}>{showKey ? 'Hide' : 'Reveal'}</Text>
-                </Pressable>
+              </View>
+
+              <View style={styles.ingestField}>
+                <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Stream Key:</Text>
+                <Text style={[styles.fieldCode, { backgroundColor: colors.bgSecondary, color: colors.text }]}>
+                  {showKey ? createdIngest.streamKey : '••••••••••••••••••••••••'}
+                </Text>
+              </View>
+
+              <Button
+                label={showKey ? 'Hide Stream Key' : 'Reveal Stream Key'}
+                onPress={() => setShowKey(!showKey)}
+                variant="outline"
+                size="sm"
+              />
+            </View>
+          ) : null}
+
+          {/* Create Broadcast Stage */}
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+            <View style={styles.cardHeader}>
+              <Icon name="radio-outline" size={18} color={colors.interactive} />
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Initialize Live Service Broadcast</Text>
+            </View>
+
+            <InputField
+              label="Broadcast Title"
+              value={title}
+              onChangeText={setTitle}
+              placeholder="e.g. Sunday Morning Worship"
+            />
+
+            <InputField
+              label="Description"
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              numberOfLines={3}
+              placeholder="Service theme, speaker, notes..."
+            />
+
+            {/* Latency Chips */}
+            <View style={styles.latencySection}>
+              <Text style={[styles.latencyLabel, { color: colors.textSecondary }]}>Latency Optimization</Text>
+              <View style={styles.chipsRow}>
+                <Chip
+                  label="Reduced (Recommended)"
+                  selected={latencyMode === 'reduced'}
+                  onPress={() => setLatencyMode('reduced')}
+                />
+                <Chip
+                  label="Ultra Low"
+                  selected={latencyMode === 'low'}
+                  onPress={() => setLatencyMode('low')}
+                />
+                <Chip
+                  label="Standard 1080p"
+                  selected={latencyMode === 'standard'}
+                  onPress={() => setLatencyMode('standard')}
+                />
               </View>
             </View>
+
+            <Button
+              label="Generate Ingest Keys & Create Stream"
+              onPress={handleCreateBroadcast}
+              loading={creating}
+              variant="primary"
+              size="md"
+              style={{ marginTop: spacing.xs }}
+            />
           </View>
-        )}
 
-        {/* Active & Scheduled Streams List */}
-        <SectionHeader
-          title="Expression Streams"
-          badge={streams.data?.length ?? 0}
-          dark={isDark}
-        />
-        {streams.loading ? (
-          <Skeleton height={140} count={2} dark={isDark} />
-        ) : streams.error && !streams.data ? (
-          <ResourceError
-            offline={streams.offline}
-            message={streams.error}
-            retry={streams.refresh}
-            dark={isDark}
-          />
-        ) : streams.data && streams.data.length > 0 ? (
-          streams.data.map((stream) => {
-            const isLive = stream.status === 'live';
-            return (
-              <View
-                key={stream.id}
-                style={[
-                  styles.streamCard,
-                  { backgroundColor: colors.card, borderColor: colors.border },
-                  shadows.sm,
-                ] as any}
-              >
-                <View style={styles.streamCardHeader}>
+          {/* Stream Broadcasts List */}
+          <View style={styles.listSection}>
+            <SectionHeader title="Active & Recent Streams" badge={streamList.length} />
+            {streams.loading ? (
+              <Skeleton height={80} count={2} />
+            ) : streamList.length > 0 ? (
+              streamList.map((s) => (
+                <View
+                  key={s.id}
+                  style={[styles.tile, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}
+                >
+                  <View style={styles.tileInfo}>
+                    <Text style={[styles.tileTitle, { color: colors.text }]}>{s.title}</Text>
+                    <Text style={[styles.tileDate, { color: colors.textMuted }]}>
+                      Created: {new Date(s.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </View>
                   <Badge
-                    label={stream.status.toUpperCase()}
-                    variant={isLive ? 'live' : stream.status === 'scheduled' ? 'gold' : 'neutral'}
-                    pulse={isLive}
+                    label={s.status ? s.status.toUpperCase() : 'BROADCAST'}
+                    variant={s.status === 'live' ? 'live' : 'neutral'}
+                    pulse={s.status === 'live'}
                   />
-                  <Text style={[styles.streamCreated, { color: colors.textMuted }] as any}>
-                    {new Date(stream.created_at || Date.now()).toLocaleDateString()}
-                  </Text>
                 </View>
-
-                <Text style={[styles.streamCardTitle, { color: colors.text }] as any}>{stream.title}</Text>
-                {stream.description ? (
-                  <Text style={[styles.streamCardDescription, { color: colors.textSecondary }] as any}>
-                    {stream.description}
-                  </Text>
-                ) : null}
-
-                <View style={styles.streamCardFooter}>
-                  {isLive && (
-                    <Button
-                      label="End Broadcast"
-                      onPress={() => handleStopStream(stream.id)}
-                      variant="live"
-                      size="sm"
-                    />
-                  )}
-                  {stream.status === 'ended' && (
-                    <Badge label="RECORDING ARCHIVED" variant="success" />
-                  )}
-                </View>
-              </View>
-            );
-          })
-        ) : (
-          <EmptyState
-            title="No Expression Streams Found"
-            message="Provision a livestream above to start broadcasting to your congregation."
-            icon="📡"
-            dark={isDark}
-          />
-        )}
-      </View>
-    </ScrollView>
+              ))
+            ) : (
+              <EmptyState
+                title="No Active Streams"
+                message="Create a broadcast above to generate live streaming credentials."
+                iconName="radio-outline"
+              />
+            )}
+          </View>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
   content: {
-    paddingBottom: 120,
+    flexGrow: 1,
   },
   body: {
     paddingHorizontal: spacing.lg,
+    gap: spacing.lg,
   },
-  createCard: {
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-    marginTop: spacing.sm,
-    borderWidth: 1,
-  },
-  cardHeaderRow: {
+  banner: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  cardHeaderTitle: {
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-  },
-  latencyLabel: {
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-    marginTop: spacing.sm,
-    marginBottom: spacing.xs,
-  },
-  latencySelector: {
-    gap: spacing.xs,
-    marginBottom: spacing.md,
-  },
-  latencyPill: {
     padding: spacing.md,
     borderRadius: radius.md,
     borderWidth: 1,
   },
-  latencyPillTitle: {
+  bannerText: {
     fontSize: 13,
-  },
-  latencyPillDesc: {
-    fontSize: 11,
-    marginTop: 2,
-  },
-  errorText: {
-    color: palette.live,
-    fontSize: 13,
-    fontWeight: '800',
-    marginVertical: 4,
-  },
-  successBox: {
-    padding: spacing.md,
-    borderRadius: radius.md,
-    marginVertical: spacing.sm,
-  },
-  successText: {
-    color: palette.success,
-    fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
+    flex: 1,
   },
   ingestCard: {
-    backgroundColor: '#140C07',
-    borderRadius: radius.xl,
     padding: spacing.lg,
-    marginTop: spacing.lg,
-    borderWidth: 1.5,
-    borderColor: palette.yellow,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    gap: spacing.sm,
   },
   ingestHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: spacing.xs,
   },
   ingestTitle: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: '#FFFDF9',
+    fontSize: 15,
+    fontWeight: '700',
   },
-  ingestWarning: {
+  ingestField: {
+    gap: 4,
+  },
+  fieldLabel: {
     fontSize: 12,
-    color: '#E6CCB2',
-    marginVertical: spacing.sm,
+    fontWeight: '600',
   },
-  credentialField: {
-    marginTop: spacing.sm,
-    backgroundColor: '#2E1C11',
-    padding: spacing.md,
-    borderRadius: radius.md,
+  fieldCode: {
+    padding: spacing.sm,
+    borderRadius: radius.sm,
+    fontSize: 12,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
-  credentialLabel: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: palette.yellow,
-    letterSpacing: 0.5,
-  },
-  credentialValue: {
-    color: '#FFFDF9',
-    fontFamily: 'monospace',
-    fontSize: 13,
-    marginTop: 4,
-  },
-  keyRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  showKeyButton: {
-    backgroundColor: '#FFFFFF26',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-  },
-  showKeyText: {
-    color: '#FFFDF9',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  streamCard: {
-    borderRadius: radius.lg,
+  card: {
     padding: spacing.lg,
-    marginBottom: spacing.md,
+    borderRadius: radius.lg,
     borderWidth: 1,
+    gap: spacing.sm,
   },
-  streamCardHeader: {
+  cardHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: spacing.xs,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  latencySection: {
+    gap: spacing.xs,
+  },
+  latencyLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  listSection: {
+    gap: spacing.xs,
+  },
+  tile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
     marginBottom: spacing.xs,
   },
-  streamCreated: {
-    fontSize: 12,
+  tileInfo: {
+    flex: 1,
+    gap: 2,
   },
-  streamCardTitle: {
-    fontSize: 17,
-    fontWeight: '900',
+  tileTitle: {
+    fontSize: 15,
+    fontWeight: '700',
   },
-  streamCardDescription: {
-    fontSize: 13,
-    marginTop: 4,
-  },
-  streamCardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: spacing.md,
+  tileDate: {
+    fontSize: 11,
   },
 });

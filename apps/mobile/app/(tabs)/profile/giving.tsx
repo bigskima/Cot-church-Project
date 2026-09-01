@@ -1,91 +1,72 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import {
   Badge,
   Button,
+  Chip,
   EmptyState,
+  Icon,
   InputField,
   ResourceError,
   ScreenHeader,
   SectionHeader,
   Skeleton,
 } from '@/components';
-import { palette, radius, shadows, spacing } from '@/design-system/tokens';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 import type { BankAccount, GivingCampaign, PublicGivingDetails, Receipt } from '@/types/content';
 
+const quickAmounts = ['20', '50', '100', '250', '500'];
+const givingPurposes = [
+  'General Offering',
+  'Tithe (10%)',
+  'Kingdom Missions',
+  'Building & Capital',
+  'Benevolence / Pastoral Care',
+];
+
 export default function GivingScreen() {
+  const insets = useSafeAreaInsets();
   const { api, mode, context } = useSession();
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
+
   const [selectedMethod, setSelectedMethod] = useState<'online' | 'bank_transfer'>('online');
+  const [frequency, setFrequency] = useState<'one_time' | 'monthly'>('one_time');
   const [amount, setAmount] = useState('50');
   const [currency, setCurrency] = useState('USD');
   const [selectedPurpose, setSelectedPurpose] = useState('General Offering');
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
-  const [donorName, setDonorName] = useState('');
-  const [donorEmail, setDonorEmail] = useState('');
+  const [donorName, setDonorName] = useState(context?.profile?.display_name ?? '');
+  const [donorEmail, setDonorEmail] = useState(context?.profile?.email ?? '');
   const [anonymous, setAnonymous] = useState(false);
   const [donorNote, setDonorNote] = useState('');
   const [givingBusy, setGivingBusy] = useState(false);
-  const [copiedField, setCopiedField] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Fetch giving campaigns and church bank accounts (publicly accessible)
+  // Fetch verified campaigns and bank accounts directly from backend
   const givingDetails = useResource<PublicGivingDetails>('public:giving', async (signal) => {
-    try {
-      const res = await api.request<{ data?: PublicGivingDetails; campaigns?: GivingCampaign[]; bankAccounts?: BankAccount[] }>(
-        'public-content?type=giving',
-        { signal }
-      );
-      if (res.data) return res.data;
-      return {
-        campaigns: res.campaigns ?? [],
-        bankAccounts: res.bankAccounts ?? [],
-        supportedMethods: ['manual_bank_transfer', 'online_payment'],
-      };
-    } catch {
-      // Fallback default organization giving configuration
-      return {
-        campaigns: [
-          {
-            id: 'camp-1',
-            name: 'Kingdom Expansion & Building Project',
-            description: 'Acquisition and architectural expansion of new worship facilities.',
-            currency: 'USD',
-            target_amount: 150000,
-            raised_amount: 92400,
-            status: 'active',
-          },
-          {
-            id: 'camp-2',
-            name: 'Global Gospel Missions Fund',
-            description: 'Supporting church planting missionaries and rural outreaches.',
-            currency: 'USD',
-            target_amount: 50000,
-            raised_amount: 38750,
-            status: 'active',
-          },
-        ],
-        bankAccounts: [
-          {
-            id: 'bank-1',
-            organization_id: 'org-1',
-            bank_name: 'Kingdom Trust / Chase Bank',
-            account_name: 'Sanctuary Church Giving & Tithes',
-            account_number: '984021940182',
-            routing_number: '12200049',
-            currency: 'USD',
-            transfer_instructions: 'Please include your giving reference in the wire/transfer description note.',
-            reference_prefix: 'GIVE-',
-            is_public: true,
-          },
-        ],
-        supportedMethods: ['manual_bank_transfer', 'online_payment'],
-      };
-    }
+    const res = await api.request<{ data?: PublicGivingDetails; campaigns?: GivingCampaign[]; bankAccounts?: BankAccount[] }>(
+      'public-content?type=giving',
+      { signal }
+    );
+    if (res.data) return res.data;
+    return {
+      campaigns: res.campaigns ?? [],
+      bankAccounts: res.bankAccounts ?? [],
+      supportedMethods: ['manual_bank_transfer', 'online_payment'],
+    };
   });
 
   const receipts = useResource<Receipt[]>('profile:receipts', (signal) =>
@@ -94,782 +75,552 @@ export default function GivingScreen() {
       : Promise.resolve([])
   );
 
-  const givingPurposes = [
-    'General Offering',
-    'Tithe (10%)',
-    'Kingdom Missions',
-    'Building Project',
-    'Special Thanksgiving',
-    'Community Outreach & Charity',
-  ];
+  const campaigns = givingDetails.data?.campaigns ?? [];
+  const bankAccounts = givingDetails.data?.bankAccounts ?? [];
 
-  const presetAmounts = ['25', '50', '100', '250', '500', '1000'];
-
-  const churchName = context?.organizations?.[0]?.name ?? 'Global Church Sanctuary';
-  const primaryBank = givingDetails.data?.bankAccounts?.[0] ?? {
-    bank_name: 'Kingdom Trust / Chase Bank',
-    account_name: `${churchName} Giving Fund`,
-    account_number: '984021940182',
-    routing_number: '12200049',
-    currency: 'USD',
-    transfer_instructions: 'Include reference code in transfer description note.',
-    reference_prefix: 'GIVE-',
-    is_public: true,
-  };
-
-  const handleCopy = (field: string, text: string) => {
-    setCopiedField(field);
-    setTimeout(() => setCopiedField(null), 2500);
-  };
-
-  const handleGiveOnline = async () => {
-    const numAmount = parseFloat(amount);
-    if (!numAmount || numAmount <= 0) {
-      setErrorMsg('Please enter a valid donation amount.');
+  const handleInitiateGiving = async () => {
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      setErrorMsg('Please enter a valid giving amount.');
       return;
     }
+
     setGivingBusy(true);
     setErrorMsg('');
     setSuccessMsg('');
+
     try {
-      await api.request('giving', {
-        method: 'POST',
-        body: JSON.stringify({
-          action: 'donate',
-          amountMinor: Math.round(numAmount * 100),
-          currency,
-          campaignId: selectedCampaignId,
-          anonymous,
-          provider: 'stripe',
-          idempotencyKey: `don_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
-          note: `${selectedPurpose}: ${donorNote}`.trim(),
-        }),
-      });
-      setSuccessMsg(
-        `Thank you for your cheerful giving of ${currency} ${numAmount.toFixed(2)} towards ${selectedPurpose}!`
-      );
-      if (mode === 'authenticated') receipts.refresh();
+      if (selectedMethod === 'online') {
+        const res = await api.request<{ success: boolean; redirectUrl?: string; reference?: string }>('giving/checkout', {
+          method: 'POST',
+          body: JSON.stringify({
+            amount: parsedAmount,
+            currency,
+            purpose: selectedPurpose,
+            campaignId: selectedCampaignId,
+            donorName: anonymous ? 'Anonymous' : donorName,
+            donorEmail: anonymous ? undefined : donorEmail,
+            frequency,
+            note: donorNote,
+          }),
+        });
+        setSuccessMsg('Your giving transaction has been initiated. Thank you for your generosity!');
+        if (mode === 'authenticated') receipts.refresh();
+      } else {
+        setSuccessMsg('Please complete your transfer using the bank account instructions below.');
+      }
     } catch (err) {
-      setErrorMsg(
-        err instanceof Error
-          ? err.message
-          : 'Online gateway currently routing. You may also complete your gift via Direct Bank Transfer below.'
-      );
+      setErrorMsg(err instanceof Error ? err.message : 'Unable to complete giving transaction.');
     } finally {
       setGivingBusy(false);
     }
   };
 
   return (
-    <ScrollView
+    <KeyboardAvoidingView
       style={[styles.screen, { backgroundColor: colors.bg }]}
-      contentContainerStyle={styles.content}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScreenHeader
-        title="Sanctuary Giving"
-        subtitle={`Worship the Lord with generosity towards ${churchName}.`}
-        showBack
-        dark={isDark}
-      />
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + spacing.sm, paddingBottom: 100 },
+        ]}
+      >
+        <ScreenHeader
+          title="Giving & Stewardship"
+          subtitle="Support your church ministry, kingdom missions, and building expansions."
+          showBack
+        />
 
-      <View style={styles.body}>
-        {/* Payment Method Selector Pill (Online vs Manual Bank Transfer) */}
-        <View
-          style={[
-            styles.methodSelector,
-            { backgroundColor: isDark ? '#22140C' : '#E8D5C4' },
-          ]}
-        >
-          <Pressable
-            onPress={() => setSelectedMethod('online')}
-            style={[
-              styles.methodPill,
-              selectedMethod === 'online' && {
-                backgroundColor: isDark ? '#2E1C11' : '#FFFDF9',
-                ...shadows.sm,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.methodText,
-                { color: selectedMethod === 'online' ? colors.text : colors.textMuted },
-                selectedMethod === 'online' && styles.methodTextActive,
-              ]}
-            >
-              💳 Instant Online Payment
-            </Text>
-          </Pressable>
+        <View style={styles.body}>
+          {/* Notification Messages */}
+          {successMsg ? (
+            <View style={[styles.banner, { backgroundColor: 'rgba(22, 163, 106, 0.12)', borderColor: 'rgba(22, 163, 106, 0.3)' }]}>
+              <Icon name="checkmark-circle" size={18} color="#16A36A" style={{ marginRight: 8 }} />
+              <Text style={[styles.bannerText, { color: '#16A36A' }]}>{successMsg}</Text>
+            </View>
+          ) : null}
 
-          <Pressable
-            onPress={() => setSelectedMethod('bank_transfer')}
-            style={[
-              styles.methodPill,
-              selectedMethod === 'bank_transfer' && {
-                backgroundColor: isDark ? '#2E1C11' : '#FFFDF9',
-                ...shadows.sm,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.methodText,
-                { color: selectedMethod === 'bank_transfer' ? colors.text : colors.textMuted },
-                selectedMethod === 'bank_transfer' && styles.methodTextActive,
-              ]}
-            >
-              🏛 Direct Bank Transfer
-            </Text>
-          </Pressable>
-        </View>
+          {errorMsg ? (
+            <View style={[styles.banner, { backgroundColor: 'rgba(229, 72, 77, 0.12)', borderColor: 'rgba(229, 72, 77, 0.3)' }]}>
+              <Icon name="alert-circle" size={18} color="#E5484D" style={{ marginRight: 8 }} />
+              <Text style={[styles.bannerText, { color: '#E5484D' }]}>{errorMsg}</Text>
+            </View>
+          ) : null}
 
-        {/* ONLINE PAYMENT TERMINAL */}
-        {selectedMethod === 'online' ? (
+          {/* Giving Configuration Card */}
           <View
             style={[
               styles.card,
               { backgroundColor: colors.card, borderColor: colors.border },
-              shadows.md,
+              shadows.sm,
             ]}
           >
-            <Text style={[styles.cardHeaderTitle, { color: colors.textMuted }]}>
-              SELECT GIVING PURPOSE
-            </Text>
-
-            {/* Purpose Selector Grid */}
-            <View style={styles.purposesGrid}>
-              {givingPurposes.map((purpose) => {
-                const isSelected = selectedPurpose === purpose;
-                return (
-                  <Pressable
-                    key={purpose}
-                    onPress={() => {
-                      setSelectedPurpose(purpose);
-                      setSelectedCampaignId(null);
-                    }}
-                    style={[
-                      styles.purposeChip,
-                      {
-                        backgroundColor: isSelected
-                          ? colors.primary
-                          : isDark
-                          ? '#2E1C11'
-                          : '#F1E3D3',
-                        borderColor: isSelected ? colors.primaryDark : colors.border,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.purposeText,
-                        {
-                          color: isSelected
-                            ? '#140C07'
-                            : isDark
-                            ? '#FFFDF9'
-                            : '#26140A',
-                          fontWeight: isSelected ? '900' : '700',
-                        },
-                      ]}
-                    >
-                      {purpose}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            {/* Currency & Amount Input */}
-            <View style={styles.amountInputRow}>
-              <View
+            {/* Payment Method Selector */}
+            <View style={[styles.methodSelector, { backgroundColor: colors.bgSecondary }]}>
+              <Pressable
+                onPress={() => setSelectedMethod('online')}
                 style={[
-                  styles.currencyBadge,
-                  { backgroundColor: isDark ? '#2E1C11' : '#F1E3D3' },
-                ]}
-              >
-                <Text style={[styles.currencyBadgeText, { color: colors.primaryDark }]}>
-                  {currency}
-                </Text>
-              </View>
-              <InputField
-                label="Donation Amount"
-                value={amount}
-                onChangeText={setAmount}
-                keyboardType="numeric"
-                placeholder="100.00"
-                dark={isDark}
-              />
-            </View>
-
-            {/* Preset Amount Pills */}
-            <View style={styles.presetsRow}>
-              {presetAmounts.map((val) => {
-                const isSelected = amount === val;
-                return (
-                  <Pressable
-                    key={val}
-                    onPress={() => setAmount(val)}
-                    style={[
-                      styles.presetPill,
-                      {
-                        backgroundColor: isSelected
-                          ? colors.primary
-                          : isDark
-                          ? '#2E1C11'
-                          : '#F1E3D3',
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.presetText,
-                        {
-                          color: isSelected
-                            ? '#140C07'
-                            : isDark
-                            ? '#FFFDF9'
-                            : '#26140A',
-                          fontWeight: isSelected ? '900' : '800',
-                        },
-                      ]}
-                    >
-                      ${val}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            {/* Guest Details If Visitor */}
-            {mode === 'visitor' && (
-              <View style={{ marginTop: spacing.md }}>
-                <InputField
-                  label="Your Name (Optional)"
-                  value={donorName}
-                  onChangeText={setDonorName}
-                  placeholder="e.g. John Doe"
-                  dark={isDark}
-                />
-                <InputField
-                  label="Email for Receipt (Optional)"
-                  value={donorEmail}
-                  onChangeText={setDonorEmail}
-                  keyboardType="email-address"
-                  placeholder="john@example.com"
-                  dark={isDark}
-                />
-              </View>
-            )}
-
-            {/* Anonymous Toggle */}
-            <Pressable
-              onPress={() => setAnonymous(!anonymous)}
-              style={styles.anonymousToggle}
-            >
-              <View
-                style={[
-                  styles.checkbox,
-                  { borderColor: colors.border },
-                  anonymous && {
-                    backgroundColor: colors.primary,
-                    borderColor: colors.primary,
+                  styles.methodPill,
+                  selectedMethod === 'online' && {
+                    backgroundColor: colors.card,
+                    ...shadows.sm,
                   },
                 ]}
               >
-                {anonymous && <Text style={styles.checkmark}>✓</Text>}
-              </View>
-              <Text style={[styles.anonymousLabel, { color: colors.textSecondary }]}>
-                Make this gift anonymous
-              </Text>
-            </Pressable>
-
-            {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
-            {successMsg ? <Text style={styles.successText}>{successMsg}</Text> : null}
-
-            <Button
-              label={`Give ${currency} $${amount || '0'} towards ${selectedPurpose} ➔`}
-              onPress={handleGiveOnline}
-              variant="gold"
-              size="lg"
-              loading={givingBusy}
-              style={{ marginTop: spacing.md } as any}
-            />
-          </View>
-        ) : (
-          /* MANUAL BANK TRANSFER INSTRUCTIONS (First-class rail) */
-          <View
-            style={[
-              styles.card,
-              { backgroundColor: colors.card, borderColor: colors.border },
-              shadows.md,
-            ] as any}
-          >
-            <View style={styles.bankHeaderRow}>
-              <View style={{ flex: 1, marginRight: spacing.sm }}>
-                <Text style={[styles.cardHeaderTitle, { color: colors.textMuted }] as any}>
-                  CHURCH DIRECT BANK TRANSFER
+                <Icon
+                  name="card-outline"
+                  size={15}
+                  color={selectedMethod === 'online' ? colors.interactive : colors.textMuted}
+                  style={{ marginRight: 5 }}
+                />
+                <Text
+                  style={[
+                    styles.methodPillText,
+                    { color: selectedMethod === 'online' ? colors.text : colors.textMuted },
+                  ]}
+                >
+                  Card / Online
                 </Text>
-                <Text style={[styles.bankSubheader, { color: colors.textMuted }] as any}>
-                  Send your tithes & offerings directly to {churchName} via your banking app or wire.
-                </Text>
-              </View>
-              <Badge label="VERIFIED ACCOUNT" variant="success" />
-            </View>
+              </Pressable>
 
-            {/* Bank Details Table Tile */}
-            <View
-              style={[
-                styles.bankTile,
-                {
-                  backgroundColor: isDark ? '#1C1009' : '#F8EDE2',
-                  borderColor: colors.border,
-                },
-              ] as any}
-            >
-              <View style={[styles.bankDetailRow, { borderBottomColor: colors.border }] as any}>
-                <Text style={[styles.bankLabel, { color: colors.textMuted }] as any}>Bank Name</Text>
-                <Text style={[styles.bankValue, { color: colors.text }] as any}>{primaryBank.bank_name}</Text>
-              </View>
-
-              <View style={[styles.bankDetailRow, { borderBottomColor: colors.border }] as any}>
-                <Text style={[styles.bankLabel, { color: colors.textMuted }] as any}>Account Name</Text>
-                <Text style={[styles.bankValue, { color: colors.text }] as any}>{primaryBank.account_name}</Text>
-              </View>
-
-              <View style={[styles.bankDetailRow, { borderBottomColor: colors.border }] as any}>
-                <Text style={[styles.bankLabel, { color: colors.textMuted }] as any}>Account Number</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={[styles.bankValue, styles.monoText, { color: colors.text }] as any}>
-                    {primaryBank.account_number}
-                  </Text>
-                  <Pressable
-                    onPress={() => handleCopy('account', primaryBank.account_number)}
-                    style={[
-                      styles.copyPill,
-                      {
-                        backgroundColor: isDark ? '#2E1C11' : '#FFFFFF',
-                        borderColor: colors.border,
-                      },
-                    ] as any}
-                  >
-                    <Text style={[styles.copyText, { color: colors.primaryDark }] as any}>
-                      {copiedField === 'account' ? '✓ Copied' : 'Copy'}
-                    </Text>
-                  </Pressable>
-                </View>
-              </View>
-
-              {primaryBank.routing_number && (
-                <View style={[styles.bankDetailRow, { borderBottomColor: colors.border }] as any}>
-                  <Text style={[styles.bankLabel, { color: colors.textMuted }] as any}>Routing / Sort Code</Text>
-                  <Text style={[styles.bankValue, styles.monoText, { color: colors.text }] as any}>
-                    {primaryBank.routing_number}
-                  </Text>
-                </View>
-              )}
-
-              <View style={[styles.bankDetailRow, { borderBottomColor: colors.border }] as any}>
-                <Text style={[styles.bankLabel, { color: colors.textMuted }] as any}>Giving Reference</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={[styles.bankValue, styles.monoText, { color: colors.primaryDark }] as any}>
-                    {primaryBank.reference_prefix ?? 'GIVE-'}
-                    {mode === 'authenticated' && context?.profile?.id
-                      ? context.profile.id.slice(0, 6).toUpperCase()
-                      : 'OFFERING'}
-                  </Text>
-                  <Pressable
-                    onPress={() =>
-                      handleCopy(
-                        'reference',
-                        `${primaryBank.reference_prefix ?? 'GIVE-'}OFFERING`
-                      )
-                    }
-                    style={[
-                      styles.copyPill,
-                      {
-                        backgroundColor: isDark ? '#2E1C11' : '#FFFFFF',
-                        borderColor: colors.border,
-                      },
-                    ] as any}
-                  >
-                    <Text style={[styles.copyText, { color: colors.primaryDark }] as any}>
-                      {copiedField === 'reference' ? '✓ Copied' : 'Copy'}
-                    </Text>
-                  </Pressable>
-                </View>
-              </View>
-            </View>
-
-            <View
-              style={[
-                styles.transferNoteBox,
-                {
-                  backgroundColor: isDark ? '#2E1C11' : '#FEF3C7',
-                  borderLeftColor: colors.primary,
-                },
-              ] as any}
-            >
-              <Text style={[styles.transferNoteText, { color: isDark ? '#FDE047' : '#92400E' }] as any}>
-                📌 {primaryBank.transfer_instructions || 'Please include your giving reference code in the bank transfer narration so our finance team can acknowledge and receipt your stewardship.'}
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* Active Church Campaigns */}
-        <SectionHeader
-          title="Active Church Campaigns"
-          badge={givingDetails.data?.campaigns?.length ?? 0}
-          dark={isDark}
-        />
-
-        {givingDetails.loading ? (
-          <Skeleton height={120} count={2} dark={isDark} />
-        ) : givingDetails.data?.campaigns && givingDetails.data.campaigns.length > 0 ? (
-          givingDetails.data.campaigns.map((camp) => {
-            const target = camp.target_amount ?? 50000;
-            const raised = camp.raised_amount ?? 25000;
-            const percent = Math.min(100, Math.round((raised / target) * 100));
-
-            return (
-              <View
-                key={camp.id}
+              <Pressable
+                onPress={() => setSelectedMethod('bank_transfer')}
                 style={[
-                  styles.campaignCard,
-                  { backgroundColor: colors.card, borderColor: colors.border },
-                  shadows.sm,
-                ] as any}
+                  styles.methodPill,
+                  selectedMethod === 'bank_transfer' && {
+                    backgroundColor: colors.card,
+                    ...shadows.sm,
+                  },
+                ]}
               >
-                <View style={styles.campaignHeader}>
-                  <Text style={[styles.campaignName, { color: colors.text }] as any}>{camp.name}</Text>
-                  <Badge label={`${percent}%`} variant="gold" />
-                </View>
-                <Text style={[styles.campaignDesc, { color: colors.textMuted }] as any}>{camp.description}</Text>
+                <Icon
+                  name="business-outline"
+                  size={15}
+                  color={selectedMethod === 'bank_transfer' ? colors.interactive : colors.textMuted}
+                  style={{ marginRight: 5 }}
+                />
+                <Text
+                  style={[
+                    styles.methodPillText,
+                    { color: selectedMethod === 'bank_transfer' ? colors.text : colors.textMuted },
+                  ]}
+                >
+                  Bank Transfer
+                </Text>
+              </Pressable>
+            </View>
 
-                <View style={[styles.progressBar, { backgroundColor: isDark ? '#2E1C11' : '#E8D5C4' }] as any}>
-                  <View style={[styles.progressFill, { width: `${percent}%` }] as any} />
+            {selectedMethod === 'online' ? (
+              <>
+                {/* Frequency Toggle */}
+                <View style={styles.frequencyRow}>
+                  <Chip
+                    label="One-Time Gift"
+                    selected={frequency === 'one_time'}
+                    onPress={() => setFrequency('one_time')}
+                  />
+                  <Chip
+                    label="Monthly Recurring"
+                    selected={frequency === 'monthly'}
+                    onPress={() => setFrequency('monthly')}
+                    icon={<Icon name="repeat" size={13} color={frequency === 'monthly' ? colors.interactive : colors.textSecondary} />}
+                  />
                 </View>
 
-                <View style={styles.campaignStats}>
-                  <Text style={[styles.campaignStatText, { color: colors.textSecondary }] as any}>
-                    Raised: <Text style={{ fontWeight: '900', color: colors.text } as any}>${raised.toLocaleString()}</Text>
+                {/* Amount Display & Input */}
+                <View style={styles.amountWrap}>
+                  <Text style={[styles.currencyPrefix, { color: colors.textSecondary }]}>$</Text>
+                  <InputField
+                    value={amount}
+                    onChangeText={setAmount}
+                    keyboardType="numeric"
+                    placeholder="0.00"
+                    style={styles.amountInput}
+                  />
+                </View>
+
+                {/* Quick Amount Chips */}
+                <View style={styles.quickChipsRow}>
+                  {quickAmounts.map((q) => (
+                    <Pressable
+                      key={q}
+                      onPress={() => setAmount(q)}
+                      style={[
+                        styles.quickChip,
+                        {
+                          backgroundColor: amount === q ? colors.primarySoft : colors.bgSecondary,
+                          borderColor: amount === q ? colors.interactive : colors.border,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.quickChipText,
+                          { color: amount === q ? colors.interactive : colors.textSecondary },
+                        ]}
+                      >
+                        ${q}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                {/* Giving Purpose */}
+                <View style={styles.fieldSection}>
+                  <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
+                    Designated Purpose
                   </Text>
-                  <Text style={[styles.campaignStatText, { color: colors.textSecondary }] as any}>
-                    Goal: <Text style={{ fontWeight: '900', color: colors.text } as any}>${target.toLocaleString()}</Text>
-                  </Text>
+                  <View style={styles.purposeChips}>
+                    {givingPurposes.map((p) => (
+                      <Chip
+                        key={p}
+                        label={p}
+                        selected={selectedPurpose === p}
+                        onPress={() => {
+                          setSelectedPurpose(p);
+                          setSelectedCampaignId(null);
+                        }}
+                      />
+                    ))}
+                  </View>
+                </View>
+
+                {/* Active Campaigns */}
+                {campaigns.length > 0 ? (
+                  <View style={styles.fieldSection}>
+                    <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
+                      Special Project Campaigns
+                    </Text>
+                    {campaigns.map((camp) => {
+                      const isSelected = selectedCampaignId === camp.id;
+                      return (
+                        <Pressable
+                          key={camp.id}
+                          onPress={() => {
+                            setSelectedCampaignId(camp.id);
+                            setSelectedPurpose(camp.name);
+                          }}
+                          style={[
+                            styles.campaignTile,
+                            {
+                              backgroundColor: isSelected ? colors.primarySoft : colors.bgSecondary,
+                              borderColor: isSelected ? colors.interactive : colors.border,
+                            },
+                          ]}
+                        >
+                          <View style={{ flex: 1, gap: 2 }}>
+                            <Text style={[styles.campaignName, { color: colors.text }]}>{camp.name}</Text>
+                            {camp.description ? (
+                              <Text numberOfLines={1} style={[styles.campaignDesc, { color: colors.textMuted }]}>
+                                {camp.description}
+                              </Text>
+                            ) : null}
+                          </View>
+                          {isSelected ? (
+                            <Icon name="checkmark-circle" size={20} color={colors.interactive} />
+                          ) : null}
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ) : null}
+
+                {/* Donor Details */}
+                <View style={styles.donorSection}>
+                  <InputField
+                    label="Donor Full Name"
+                    value={donorName}
+                    onChangeText={setDonorName}
+                    placeholder="Enter your name"
+                    editable={!anonymous}
+                  />
+                  <InputField
+                    label="Email Address for Receipt"
+                    value={donorEmail}
+                    onChangeText={setDonorEmail}
+                    keyboardType="email-address"
+                    placeholder="name@example.com"
+                    editable={!anonymous}
+                  />
+                  <InputField
+                    label="Personal Note / Dedication (Optional)"
+                    value={donorNote}
+                    onChangeText={setDonorNote}
+                    placeholder="e.g. In thanksgiving for God's blessings"
+                  />
                 </View>
 
                 <Button
-                  label="Support This Project ➔"
-                  onPress={() => {
-                    setSelectedPurpose(camp.name);
-                    setSelectedCampaignId(camp.id);
-                    setSelectedMethod('online');
-                  }}
-                  variant="outline"
-                  size="sm"
-                  style={{ marginTop: spacing.sm } as any}
+                  label={`Give $${amount || '0'} ${frequency === 'monthly' ? '/ Month' : ''}`}
+                  onPress={handleInitiateGiving}
+                  loading={givingBusy}
+                  variant="primary"
+                  size="lg"
+                  style={{ marginTop: spacing.sm }}
                 />
-              </View>
-            );
-          })
-        ) : (
-          <EmptyState
-            title="No Special Campaigns"
-            message="General tithes and offerings are currently being received."
-            icon="🤍"
-            dark={isDark}
-          />
-        )}
+              </>
+            ) : (
+              /* Bank Transfer Details */
+              <View style={styles.bankTransferSection}>
+                {bankAccounts.length > 0 ? (
+                  bankAccounts.map((account) => (
+                    <View
+                      key={account.id}
+                      style={[styles.bankCard, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}
+                    >
+                      <View style={styles.bankHeader}>
+                        <Icon name="business" size={20} color={colors.interactive} />
+                        <Text style={[styles.bankName, { color: colors.text }]}>{account.bank_name}</Text>
+                      </View>
 
-        {/* Member Statements (If Authenticated) */}
-        {mode === 'authenticated' && (
-          <>
-            <SectionHeader
-              title="My Giving Statements & Receipts"
-              badge={receipts.data?.length ?? 0}
-              dark={isDark}
-            />
-            {receipts.loading ? (
-              <Skeleton height={80} count={2} dark={isDark} />
-            ) : receipts.data && receipts.data.length > 0 ? (
-              receipts.data.map((rcpt) => (
-                <View
-                  key={rcpt.id}
-                  style={[
-                    styles.receiptCard,
-                    { backgroundColor: colors.card, borderColor: colors.border },
-                    shadows.sm,
-                  ] as any}
-                >
-                  <View>
-                    <Text style={[styles.receiptNumber, { color: colors.text }] as any}>
-                      {rcpt.receipt_number}
-                    </Text>
-                    <Text style={[styles.receiptDate, { color: colors.textMuted }] as any}>
-                      {new Date(rcpt.issued_at || rcpt.created_at).toLocaleDateString()}
+                      <View style={styles.bankField}>
+                        <Text style={[styles.bankFieldLabel, { color: colors.textMuted }]}>Account Name:</Text>
+                        <Text style={[styles.bankFieldValue, { color: colors.text }]}>{account.account_name}</Text>
+                      </View>
+
+                      <View style={styles.bankField}>
+                        <Text style={[styles.bankFieldLabel, { color: colors.textMuted }]}>Account Number:</Text>
+                        <Text style={[styles.bankFieldValue, { color: colors.text }]}>{account.account_number}</Text>
+                      </View>
+
+                      {account.routing_number ? (
+                        <View style={styles.bankField}>
+                          <Text style={[styles.bankFieldLabel, { color: colors.textMuted }]}>Routing / Sort Code:</Text>
+                          <Text style={[styles.bankFieldValue, { color: colors.text }]}>{account.routing_number}</Text>
+                        </View>
+                      ) : null}
+
+                      {account.transfer_instructions ? (
+                        <Text style={[styles.instructionsText, { color: colors.textSecondary }]}>
+                          {account.transfer_instructions}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ))
+                ) : (
+                  <EmptyState
+                    title="No Bank Accounts Listed"
+                    message="Direct wire details are not publicly published. Please contact church administration for wire instructions."
+                    iconName="business-outline"
+                  />
+                )}
+              </View>
+            )}
+          </View>
+
+          {/* Giving Statements & Receipts (Authenticated Users) */}
+          {mode === 'authenticated' && (
+            <View style={styles.receiptsSection}>
+              <SectionHeader title="Your Giving History & Receipts" badge={receipts.data?.length} />
+              {receipts.loading ? (
+                <Skeleton height={80} count={2} />
+              ) : receipts.data && receipts.data.length > 0 ? (
+                receipts.data.map((r) => (
+                  <View
+                    key={r.id}
+                    style={[styles.receiptCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}
+                  >
+                    <View style={styles.receiptHeader}>
+                      <Text style={[styles.receiptAmount, { color: colors.text }]}>
+                        ${(r.amount_minor / 100).toFixed(2)} {r.currency}
+                      </Text>
+                      <Badge label={r.receipt_number} variant="success" />
+                    </View>
+                    <Text style={[styles.receiptPurpose, { color: colors.interactive }]}>{r.category || 'General Offering'}</Text>
+                    <Text style={[styles.receiptDate, { color: colors.textMuted }]}>
+                      {new Date(r.created_at || r.issued_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                     </Text>
                   </View>
-                  <Text style={styles.receiptAmount as any}>
-                    {rcpt.currency} ${(rcpt.amount_minor / 100).toFixed(2)}
-                  </Text>
-                </View>
-              ))
-            ) : (
-              <EmptyState
-                title="No Receipts Yet"
-                message="Your official tax receipts and statements will appear here after your first donation."
-                icon="📜"
-                dark={isDark}
-              />
-            )}
-          </>
-        )}
-      </View>
-    </ScrollView>
+                ))
+              ) : (
+                <EmptyState
+                  title="No Giving Records Yet"
+                  message="Your tax receipts and transaction records will appear here as soon as gifts are recorded."
+                  iconName="receipt-outline"
+                />
+              )}
+            </View>
+          )}
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
   content: {
-    paddingBottom: 120,
+    flexGrow: 1,
   },
   body: {
     paddingHorizontal: spacing.lg,
+    gap: spacing.lg,
+  },
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+  },
+  bannerText: {
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
+  },
+  card: {
+    padding: spacing.lg,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    gap: spacing.md,
   },
   methodSelector: {
     flexDirection: 'row',
     borderRadius: radius.pill,
-    padding: 4,
-    marginBottom: spacing.md,
+    padding: 3,
   },
   methodPill: {
     flex: 1,
-    paddingVertical: 10,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
     borderRadius: radius.pill,
   },
-  methodText: {
-    fontSize: 12,
+  methodPillText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  frequencyRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  amountWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  currencyPrefix: {
+    fontSize: 28,
     fontWeight: '800',
   },
-  methodTextActive: {
-    fontWeight: '900',
+  amountInput: {
+    flex: 1,
   },
-  card: {
-    borderRadius: radius.xl,
-    padding: spacing.lg,
+  quickChipsRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  quickChip: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: radius.md,
     borderWidth: 1,
-    marginBottom: spacing.lg,
   },
-  cardHeaderTitle: {
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-    marginBottom: spacing.sm,
+  quickChipText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
-  purposesGrid: {
+  fieldSection: {
+    gap: spacing.xs,
+  },
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+  },
+  purposeChips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xs,
-    marginBottom: spacing.md,
   },
-  purposeChip: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: radius.pill,
+  campaignTile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: radius.md,
     borderWidth: 1,
+    marginBottom: spacing.xs,
   },
-  purposeText: {
+  campaignName: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  campaignDesc: {
     fontSize: 12,
   },
-  amountInputRow: {
-    position: 'relative',
+  donorSection: {
+    gap: spacing.xs,
+    marginTop: spacing.xs,
   },
-  currencyBadge: {
-    position: 'absolute',
-    left: 12,
-    top: 36,
-    zIndex: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: radius.xs,
+  bankTransferSection: {
+    gap: spacing.md,
   },
-  currencyBadgeText: {
-    fontSize: 12,
-    fontWeight: '900',
+  bankCard: {
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    gap: spacing.xs,
   },
-  presetsRow: {
+  bankHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: 4,
+  },
+  bankName: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  bankField: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginVertical: spacing.sm,
   },
-  presetPill: {
-    flex: 1,
-    paddingVertical: 8,
-    alignItems: 'center',
-    borderRadius: radius.md,
-    marginHorizontal: 3,
+  bankFieldLabel: {
+    fontSize: 12,
+    fontWeight: '500',
   },
-  presetText: {
+  bankFieldValue: {
     fontSize: 13,
+    fontWeight: '700',
   },
-  anonymousToggle: {
+  instructionsText: {
+    fontSize: 12,
+    marginTop: 6,
+    lineHeight: 16,
+  },
+  receiptsSection: {
+    gap: spacing.xs,
+  },
+  receiptCard: {
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    marginBottom: spacing.xs,
+    gap: 2,
+  },
+  receiptHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.sm,
-    marginBottom: spacing.md,
+    justifyContent: 'space-between',
   },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
+  receiptAmount: {
+    fontSize: 16,
+    fontWeight: '700',
   },
-  checkmark: {
-    color: '#140C07',
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  anonymousLabel: {
+  receiptPurpose: {
     fontSize: 13,
     fontWeight: '600',
   },
-  errorText: {
-    color: palette.live,
-    fontSize: 13,
-    fontWeight: '800',
-    marginBottom: spacing.sm,
-  },
-  successText: {
-    color: palette.success,
-    fontSize: 13,
-    fontWeight: '800',
-    marginBottom: spacing.sm,
-  },
-  bankHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.md,
-  },
-  bankSubheader: {
-    fontSize: 13,
-    marginTop: 2,
-    lineHeight: 18,
-  },
-  bankTile: {
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    gap: spacing.sm,
-    borderWidth: 1,
-  },
-  bankDetailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 4,
-    borderBottomWidth: 1,
-  },
-  bankLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  bankValue: {
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  monoText: {
-    fontFamily: 'monospace',
-    letterSpacing: 0.5,
-  },
-  copyPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-  },
-  copyText: {
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  transferNoteBox: {
-    padding: spacing.md,
-    borderRadius: radius.md,
-    marginTop: spacing.md,
-    borderLeftWidth: 3,
-  },
-  transferNoteText: {
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  campaignCard: {
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-    borderWidth: 1,
-  },
-  campaignHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  campaignName: {
-    fontSize: 15,
-    fontWeight: '900',
-    flex: 1,
-    marginRight: 8,
-  },
-  campaignDesc: {
-    fontSize: 13,
-    lineHeight: 18,
-    marginBottom: spacing.md,
-  },
-  progressBar: {
-    height: 8,
-    borderRadius: radius.pill,
-    overflow: 'hidden',
-    marginBottom: spacing.sm,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: palette.yellow,
-    borderRadius: radius.pill,
-  },
-  campaignStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  campaignStatText: {
-    fontSize: 12,
-  },
-  receiptCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: radius.md,
-    marginBottom: spacing.xs,
-    borderWidth: 1,
-  },
-  receiptNumber: {
-    fontSize: 13,
-    fontWeight: '800',
-  },
   receiptDate: {
     fontSize: 11,
-    marginTop: 2,
-  },
-  receiptAmount: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: palette.success,
   },
 });

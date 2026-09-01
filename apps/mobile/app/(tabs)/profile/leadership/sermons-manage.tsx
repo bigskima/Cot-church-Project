@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
@@ -7,24 +8,28 @@ import {
   Badge,
   Button,
   EmptyState,
+  Icon,
   InputField,
   ResourceError,
   ScreenHeader,
   SectionHeader,
   Skeleton,
 } from '@/components';
-import { palette, radius, shadows, spacing } from '@/design-system/tokens';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 import type { Sermon } from '@/types/content';
 
 export default function SermonsManageScreen() {
+  const insets = useSafeAreaInsets();
   const { api } = useSession();
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
+
   const [title, setTitle] = useState('');
   const [preacher, setPreacher] = useState('');
   const [scripture, setScripture] = useState('');
   const [description, setDescription] = useState('');
   const [creating, setCreating] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
   const sermons = useResource<Sermon[]>('leadership:sermons', (signal) =>
     api.request<Sermon[]>('sermons', { signal })
@@ -37,6 +42,7 @@ export default function SermonsManageScreen() {
     }
     setCreating(true);
     setErrorMsg('');
+    setSuccessMsg('');
     try {
       await api.request('sermons', {
         method: 'POST',
@@ -53,195 +59,201 @@ export default function SermonsManageScreen() {
       setPreacher('');
       setScripture('');
       setDescription('');
+      setSuccessMsg('Sermon teaching published to global library.');
       sermons.refresh();
-      alert('Sermon published to global discover library!');
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Unable to create sermon.');
+      setErrorMsg(err instanceof Error ? err.message : 'Unable to publish sermon.');
     } finally {
       setCreating(false);
     }
   };
 
+  const list = sermons.data ?? [];
+
   return (
-    <ScrollView
-      style={[styles.screen, { backgroundColor: colors.bg }]}
-      contentContainerStyle={styles.content}
-    >
-      <ScreenHeader
-        title="Sermons & Media Publishing"
-        subtitle="Review recorded message drafts, assign scripture topics, and publish sermons to members."
-        showBack
-        dark={isDark}
-      />
-
-      <View style={styles.body}>
-        {/* Publish Sermon Card */}
-        <View
-          style={[
-            styles.card,
-            { backgroundColor: colors.card, borderColor: colors.border },
-            shadows.md,
-          ] as any}
-        >
-          <Text style={[styles.cardHeaderTitle, { color: colors.textMuted }] as any}>
-            PUBLISH NEW SERMON MESSAGE
-          </Text>
-
-          <InputField
-            label="Sermon Title"
-            value={title}
-            onChangeText={setTitle}
-            placeholder="e.g. Walking in Divine Alignment"
-            dark={isDark}
-          />
-
-          <InputField
-            label="Preacher / Speaker"
-            value={preacher}
-            onChangeText={setPreacher}
-            placeholder="e.g. Pastor David"
-            dark={isDark}
-          />
-
-          <InputField
-            label="Key Scriptures (Comma-separated)"
-            value={scripture}
-            onChangeText={setScripture}
-            placeholder="e.g. Proverbs 3:5-6, Romans 8:28"
-            dark={isDark}
-          />
-
-          <InputField
-            label="Message Overview & Notes"
-            value={description}
-            onChangeText={setDescription}
-            placeholder="Key sermon outline and spiritual summary..."
-            multiline
-            numberOfLines={3}
-            dark={isDark}
-          />
-
-          {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
-
-          <Button
-            label="Publish to Sanctuary Library ➔"
-            onPress={handleCreateSermon}
-            variant="gold"
-            size="lg"
-            loading={creating}
-            style={{ marginTop: spacing.md } as any}
-          />
-        </View>
-
-        {/* Existing Sermons List */}
-        <SectionHeader
-          title="Published Sermons Library"
-          badge={sermons.data?.length ?? 0}
-          dark={isDark}
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + spacing.sm, paddingBottom: 60 },
+        ]}
+      >
+        <ScreenHeader
+          title="Sermons & Media Publishing"
+          subtitle="Publish expository teachings, add scripture references, and manage series."
+          showBack
         />
-        {sermons.loading ? (
-          <Skeleton height={100} count={2} dark={isDark} />
-        ) : sermons.error && !sermons.data ? (
-          <ResourceError
-            offline={sermons.offline}
-            message={sermons.error}
-            retry={sermons.refresh}
-            dark={isDark}
-          />
-        ) : sermons.data && sermons.data.length > 0 ? (
-          sermons.data.map((sermon) => (
-            <View
-              key={sermon.id}
-              style={[
-                styles.sermonCard,
-                { backgroundColor: colors.card, borderColor: colors.border },
-                shadows.sm,
-              ] as any}
-            >
-              <View style={styles.sermonHeader}>
-                <Badge label={sermon.status.toUpperCase()} variant="success" />
-                <Text style={[styles.sermonDate, { color: colors.textMuted }] as any}>
-                  {new Date(sermon.sermon_date || Date.now()).toLocaleDateString()}
-                </Text>
-              </View>
-              <Text style={[styles.sermonTitle, { color: colors.text }] as any}>{sermon.title}</Text>
-              <Text style={[styles.sermonPreacher, { color: colors.primaryDark }] as any}>
-                Speaker: {sermon.preacher}
-              </Text>
-              {sermon.scripture_references && sermon.scripture_references.length > 0 && (
-                <Text style={[styles.sermonScripture, { color: colors.textMuted }] as any}>
-                  📖 {sermon.scripture_references.join(', ')}
-                </Text>
-              )}
+
+        <View style={styles.body}>
+          {/* Notification Messages */}
+          {successMsg ? (
+            <View style={[styles.banner, { backgroundColor: 'rgba(22, 163, 106, 0.12)', borderColor: 'rgba(22, 163, 106, 0.3)' }]}>
+              <Icon name="checkmark-circle" size={18} color="#16A36A" style={{ marginRight: 8 }} />
+              <Text style={[styles.bannerText, { color: '#16A36A' }]}>{successMsg}</Text>
             </View>
-          ))
-        ) : (
-          <EmptyState
-            title="No Sermons Published"
-            message="Publish sermons above or convert recorded broadcasts into messages."
-            icon="📖"
-            dark={isDark}
-          />
-        )}
-      </View>
-    </ScrollView>
+          ) : null}
+
+          {errorMsg ? (
+            <View style={[styles.banner, { backgroundColor: 'rgba(229, 72, 77, 0.12)', borderColor: 'rgba(229, 72, 77, 0.3)' }]}>
+              <Icon name="alert-circle" size={18} color="#E5484D" style={{ marginRight: 8 }} />
+              <Text style={[styles.bannerText, { color: '#E5484D' }]}>{errorMsg}</Text>
+            </View>
+          ) : null}
+
+          {/* Create Sermon Form Card */}
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+            <View style={styles.cardHeader}>
+              <Icon name="book-outline" size={18} color={colors.interactive} />
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Publish New Sermon</Text>
+            </View>
+
+            <InputField
+              label="Sermon Title"
+              value={title}
+              onChangeText={setTitle}
+              placeholder="e.g. Walking in Divine Alignment"
+            />
+
+            <InputField
+              label="Preacher / Speaker"
+              value={preacher}
+              onChangeText={setPreacher}
+              placeholder="e.g. Pastor David"
+            />
+
+            <InputField
+              label="Scripture References (Comma-Separated)"
+              value={scripture}
+              onChangeText={setScripture}
+              placeholder="e.g. Romans 8:28, Hebrews 11:1"
+            />
+
+            <InputField
+              label="Summary Description"
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              numberOfLines={3}
+              placeholder="Expository breakdown, sermon notes..."
+            />
+
+            <Button
+              label="Publish Teaching"
+              onPress={handleCreateSermon}
+              loading={creating}
+              variant="primary"
+              size="md"
+              style={{ marginTop: spacing.xs }}
+            />
+          </View>
+
+          {/* Published Sermons List */}
+          <View style={styles.listSection}>
+            <SectionHeader title="Published Sermon Archives" badge={list.length} />
+            {sermons.loading ? (
+              <Skeleton height={80} count={3} />
+            ) : sermons.error && !sermons.data ? (
+              <ResourceError message={sermons.error} retry={sermons.refresh} />
+            ) : list.length > 0 ? (
+              list.map((sermon) => (
+                <View
+                  key={sermon.id}
+                  style={[styles.tile, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}
+                >
+                  <View style={styles.tileInfo}>
+                    <Text style={[styles.tileTitle, { color: colors.text }]}>{sermon.title}</Text>
+                    {sermon.preacher ? (
+                      <Text style={[styles.tilePreacher, { color: colors.interactive }]}>
+                        {sermon.preacher}
+                      </Text>
+                    ) : null}
+                    {sermon.sermon_date ? (
+                      <Text style={[styles.tileDate, { color: colors.textMuted }]}>
+                        {new Date(sermon.sermon_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <Badge label={sermon.status?.toUpperCase() || 'PUBLISHED'} variant="primary" />
+                </View>
+              ))
+            ) : (
+              <EmptyState
+                title="No Sermons Published"
+                message="Use the form above to publish your first sermon recording."
+                iconName="book-outline"
+              />
+            )}
+          </View>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
   content: {
-    paddingBottom: 120,
+    flexGrow: 1,
   },
   body: {
     paddingHorizontal: spacing.lg,
+    gap: spacing.lg,
+  },
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+  },
+  bannerText: {
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
   },
   card: {
-    borderRadius: radius.xl,
     padding: spacing.lg,
-    marginTop: spacing.sm,
+    borderRadius: radius.lg,
     borderWidth: 1,
+    gap: spacing.sm,
   },
-  cardHeaderTitle: {
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-    marginBottom: spacing.md,
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
-  errorText: {
-    color: palette.live,
-    fontSize: 13,
-    fontWeight: '800',
-    marginVertical: 4,
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
   },
-  sermonCard: {
+  listSection: {
+    gap: spacing.xs,
+  },
+  tile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     padding: spacing.md,
     borderRadius: radius.lg,
-    marginBottom: spacing.sm,
     borderWidth: 1,
+    marginBottom: spacing.xs,
   },
-  sermonHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
+  tileInfo: {
+    flex: 1,
+    gap: 2,
   },
-  sermonDate: {
-    fontSize: 11,
-  },
-  sermonTitle: {
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  sermonPreacher: {
-    fontSize: 12,
+  tileTitle: {
+    fontSize: 15,
     fontWeight: '700',
-    marginTop: 2,
   },
-  sermonScripture: {
+  tilePreacher: {
     fontSize: 12,
-    marginTop: 4,
+    fontWeight: '600',
+  },
+  tileDate: {
+    fontSize: 11,
   },
 });

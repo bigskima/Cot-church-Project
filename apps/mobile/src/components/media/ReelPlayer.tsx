@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
-import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
-import { palette, radius, shadows, spacing } from '@/design-system/tokens';
+import { Dimensions, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { radius, spacing } from '@/design-system/tokens';
+import { Icon } from '../primitives/Icon';
+import { Avatar } from '../primitives/Avatar';
 import type { Reel } from '@/types/content';
 
-const { height: screenHeight } = Dimensions.get('window');
+const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
-interface ReelPlayerProps {
+export interface ReelPlayerProps {
   reel: Reel;
   expressionName?: string;
   isFollowing?: boolean;
+  isActive?: boolean;
   onFollow?: () => void;
   onLike?: () => void;
   onOpenComments?: () => void;
@@ -18,8 +22,9 @@ interface ReelPlayerProps {
 
 export function ReelPlayer({
   reel,
-  expressionName = 'Sanctuary Campus',
+  expressionName,
   isFollowing = false,
+  isActive = true,
   onFollow,
   onLike,
   onOpenComments,
@@ -29,6 +34,7 @@ export function ReelPlayer({
   const [isPlaying, setIsPlaying] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [isCaptionExpanded, setIsCaptionExpanded] = useState(false);
 
   const toggleLike = () => {
     setIsLiked(!isLiked);
@@ -40,112 +46,164 @@ export function ReelPlayer({
     onSave?.();
   };
 
-  return (
-    <View style={styles.container as any}>
-      {/* 9:16 Video Canvas Layer */}
-      <View style={styles.videoCanvas as any}>
-        {/* Placeholder dynamic video layer */}
-        <View style={styles.videoBackground as any}>
-          <Text style={{ fontSize: 48 } as any}>🎬</Text>
-        </View>
+  const thumbnailUrl = reel.media_assets?.thumbnailUrl || reel.media_assets?.url;
 
-        {/* Tap to Play/Pause Overlay */}
+  return (
+    <View style={styles.container}>
+      {/* 9:16 Media Canvas */}
+      <View style={styles.videoCanvas}>
+        {thumbnailUrl ? (
+          <Image source={{ uri: thumbnailUrl }} style={styles.videoPoster} resizeMode="cover" />
+        ) : (
+          <View style={styles.placeholderCanvas}>
+            <Icon name="film-outline" size={48} color="#5C8FF5" />
+          </View>
+        )}
+
+        {/* Tap to Play/Pause Layer */}
         <Pressable
           onPress={() => setIsPlaying(!isPlaying)}
-          style={styles.tapLayer as any}
+          style={styles.tapLayer}
         >
           {!isPlaying ? (
-            <View style={styles.pauseIndicator as any}>
-              <Text style={{ fontSize: 32, color: '#FFFDF9' } as any}>▶</Text>
+            <View style={styles.pauseIndicator}>
+              <Icon name="play" size={36} color="#FFFFFF" style={{ marginLeft: 3 }} />
             </View>
           ) : null}
         </Pressable>
 
-        {/* Right Side Vertical Action Rail */}
-        <View style={styles.actionRail as any}>
-          {/* Reaction Button */}
-          <Pressable onPress={toggleLike} style={styles.actionBtn as any}>
-            <View style={[styles.actionCircle, isLiked ? styles.likedCircle : null] as any}>
-              <Text style={{ fontSize: 22 } as any}>{isLiked ? '❤️' : '🤍'}</Text>
+        {/* Right Interaction Action Rail */}
+        <View style={styles.actionRail}>
+          {/* Like / Reaction */}
+          <Pressable
+            onPress={toggleLike}
+            hitSlop={6}
+            style={styles.actionBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Like reel"
+          >
+            <View style={[styles.actionCircle, isLiked && styles.likedCircle]}>
+              <Icon
+                name={isLiked ? 'heart' : 'heart-outline'}
+                size={24}
+                color={isLiked ? '#E5484D' : '#FFFFFF'}
+              />
             </View>
-            <Text style={styles.actionLabel as any}>{reel.likes_count + (isLiked ? 1 : 0)}</Text>
+            <Text style={styles.actionLabel}>
+              {reel.likes_count + (isLiked ? 1 : 0)}
+            </Text>
           </Pressable>
 
           {/* Comment Trigger */}
-          <Pressable onPress={onOpenComments} style={styles.actionBtn as any}>
-            <View style={styles.actionCircle as any}>
-              <Text style={{ fontSize: 20 } as any}>💬</Text>
+          <Pressable
+            onPress={onOpenComments}
+            hitSlop={6}
+            style={styles.actionBtn}
+            accessibilityRole="button"
+            accessibilityLabel="View comments"
+          >
+            <View style={styles.actionCircle}>
+              <Icon name="chatbubble-outline" size={22} color="#FFFFFF" />
             </View>
-            <Text style={styles.actionLabel as any}>{reel.comments_count}</Text>
+            <Text style={styles.actionLabel}>{reel.comments_count}</Text>
           </Pressable>
 
           {/* Save/Bookmark */}
-          <Pressable onPress={toggleSave} style={styles.actionBtn as any}>
-            <View style={[styles.actionCircle, isSaved ? styles.savedCircle : null] as any}>
-              <Text style={{ fontSize: 20 } as any}>{isSaved ? '🔖' : '🏷️'}</Text>
+          <Pressable
+            onPress={toggleSave}
+            hitSlop={6}
+            style={styles.actionBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Bookmark reel"
+          >
+            <View style={[styles.actionCircle, isSaved && styles.savedCircle]}>
+              <Icon
+                name={isSaved ? 'bookmark' : 'bookmark-outline'}
+                size={22}
+                color={isSaved ? '#5C8FF5' : '#FFFFFF'}
+              />
             </View>
-            <Text style={styles.actionLabel as any}>{isSaved ? 'Saved' : 'Save'}</Text>
+            <Text style={styles.actionLabel}>{isSaved ? 'Saved' : 'Save'}</Text>
           </Pressable>
 
           {/* Share */}
-          <Pressable onPress={onShare} style={styles.actionBtn as any}>
-            <View style={styles.actionCircle as any}>
-              <Text style={{ fontSize: 20 } as any}>↗️</Text>
+          <Pressable
+            onPress={onShare}
+            hitSlop={6}
+            style={styles.actionBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Share reel"
+          >
+            <View style={styles.actionCircle}>
+              <Icon name="share-social-outline" size={22} color="#FFFFFF" />
             </View>
-            <Text style={styles.actionLabel as any}>Share</Text>
+            <Text style={styles.actionLabel}>Share</Text>
           </Pressable>
         </View>
 
-        {/* Bottom Content Metadata Drawer */}
-        <View style={styles.bottomMeta as any}>
-          {/* Expression Header & Follow Button */}
-          <View style={styles.creatorRow as any}>
-            <View style={styles.avatarCircle as any}>
-              <Text style={{ fontSize: 16 } as any}>🏛️</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.expressionName as any} numberOfLines={1}>
-                {expressionName}
+        {/* Bottom Metadata Gradient & Details */}
+        <LinearGradient
+          colors={['transparent', 'rgba(6, 20, 38, 0.7)', 'rgba(6, 20, 38, 0.95)']}
+          style={styles.bottomGradient}
+        >
+          {/* Creator & Expression Info */}
+          <View style={styles.creatorRow}>
+            <Avatar name={expressionName || 'Church'} size="sm" showBorder />
+            <View style={styles.creatorCol}>
+              <Text style={styles.creatorName} numberOfLines={1}>
+                {expressionName || 'Church Expression'}
               </Text>
             </View>
-            <Pressable
-              onPress={onFollow}
-              style={[
-                styles.followPill,
-                isFollowing ? styles.followingPill : null,
-              ] as any}
-            >
-              <Text style={[styles.followText, isFollowing ? styles.followingText : null] as any}>
-                {isFollowing ? '✓ Following' : '+ Follow'}
-              </Text>
-            </Pressable>
+            {onFollow ? (
+              <Pressable
+                onPress={onFollow}
+                style={[
+                  styles.followBtn,
+                  isFollowing ? styles.followingBtn : styles.notFollowingBtn,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.followBtnText,
+                    { color: isFollowing ? '#CBD5E1' : '#0D294B' },
+                  ]}
+                >
+                  {isFollowing ? 'Following' : 'Follow'}
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
 
           {/* Caption */}
-          <Text style={styles.caption as any} numberOfLines={3}>
-            {reel.caption}
-          </Text>
+          <Pressable onPress={() => setIsCaptionExpanded(!isCaptionExpanded)}>
+            <Text
+              style={styles.captionText}
+              numberOfLines={isCaptionExpanded ? undefined : 2}
+            >
+              {reel.caption}
+            </Text>
+          </Pressable>
 
-          {/* Audio Information Pill */}
+          {/* Audio Info */}
           {reel.audio_title ? (
-            <View style={styles.audioPill as any}>
-              <Text style={styles.audioIcon as any}>🎵</Text>
-              <Text style={styles.audioText as any} numberOfLines={1}>
-                {reel.audio_title} {reel.audio_artist ? `• ${reel.audio_artist}` : ''}
+            <View style={styles.audioRow}>
+              <Icon name="musical-note" size={13} color="#8FB4F8" style={{ marginRight: 5 }} />
+              <Text style={styles.audioText} numberOfLines={1}>
+                {reel.audio_title} {reel.audio_artist ? `· ${reel.audio_artist}` : ''}
               </Text>
             </View>
           ) : null}
-        </View>
+        </LinearGradient>
       </View>
     </View>
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
-    height: screenHeight - 120,
-    width: '100%',
-    backgroundColor: '#0D0805',
+    width: screenWidth,
+    height: screenHeight - 80, // Accounts for tab bar & header
+    backgroundColor: '#061426',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -153,17 +211,18 @@ const styles: Record<string, any> = StyleSheet.create({
     width: '100%',
     height: '100%',
     position: 'relative',
-    justifyContent: 'space-between',
+    backgroundColor: '#061426',
   },
-  videoBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#140C07',
+  videoPoster: {
+    width: '100%',
+    height: '100%',
+  },
+  placeholderCanvas: {
+    width: '100%',
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#091B33',
   },
   tapLayer: {
     position: 'absolute',
@@ -175,19 +234,19 @@ const styles: Record<string, any> = StyleSheet.create({
     justifyContent: 'center',
   },
   pauseIndicator: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: 'rgba(20, 12, 7, 0.7)',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(6, 20, 38, 0.65)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   actionRail: {
     position: 'absolute',
-    right: 12,
-    bottom: 120,
-    gap: 16,
+    right: spacing.md,
+    bottom: 90,
     alignItems: 'center',
+    gap: spacing.lg,
     zIndex: 10,
   },
   actionBtn: {
@@ -198,100 +257,73 @@ const styles: Record<string, any> = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(34, 20, 12, 0.85)',
-    borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.3)',
+    backgroundColor: 'rgba(6, 20, 38, 0.55)',
     alignItems: 'center',
     justifyContent: 'center',
-    ...shadows.md,
   },
   likedCircle: {
-    borderColor: palette.gold,
-    backgroundColor: 'rgba(120, 53, 15, 0.9)',
+    backgroundColor: 'rgba(229, 72, 77, 0.25)',
   },
   savedCircle: {
-    borderColor: palette.yellow,
-    backgroundColor: 'rgba(120, 53, 15, 0.9)',
+    backgroundColor: 'rgba(47, 111, 237, 0.25)',
   },
   actionLabel: {
-    color: '#FFFDF9',
+    color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '800',
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    fontWeight: '700',
   },
-  bottomMeta: {
+  bottomGradient: {
     position: 'absolute',
     bottom: 0,
     left: 0,
-    right: 60,
-    padding: spacing.lg,
-    paddingBottom: 24,
-    gap: 10,
-    backgroundColor: 'rgba(13, 8, 5, 0.85)',
+    right: 0,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl,
+    paddingTop: spacing.xxl,
+    gap: spacing.xs,
   },
   creatorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: spacing.sm,
+    marginBottom: spacing.xxs,
   },
-  avatarCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#2E1C11',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: palette.gold,
+  creatorCol: {
+    flex: 1,
   },
-  expressionName: {
-    color: '#FFFDF9',
+  creatorName: {
+    color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '700',
   },
-  followPill: {
-    backgroundColor: palette.gold,
+  followBtn: {
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: radius.pill,
   },
-  followingPill: {
-    backgroundColor: 'rgba(255, 253, 249, 0.2)',
-    borderWidth: 1,
-    borderColor: '#FFFDF9',
+  notFollowingBtn: {
+    backgroundColor: '#FFFFFF',
   },
-  followText: {
-    color: '#140C07',
-    fontSize: 11,
-    fontWeight: '900',
+  followingBtn: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
-  followingText: {
-    color: '#FFFDF9',
+  followBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
-  caption: {
-    color: '#FFFDF9',
+  captionText: {
+    color: '#F8FAFC',
     fontSize: 13,
     lineHeight: 18,
-    fontWeight: '600',
   },
-  audioPill: {
+  audioRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-    alignSelf: 'flex-start',
-  },
-  audioIcon: {
-    fontSize: 12,
+    marginTop: spacing.xxs,
   },
   audioText: {
-    color: palette.yellow,
-    fontSize: 11,
-    fontWeight: '700',
+    color: '#8FB4F8',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

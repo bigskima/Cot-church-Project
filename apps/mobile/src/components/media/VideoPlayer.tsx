@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View, StyleProp, ViewStyle } from 'react-native';
 import { useTheme } from '@/state/theme';
-import { palette, radius, shadows, spacing } from '@/design-system/tokens';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
+import { Icon } from '../primitives/Icon';
 
-interface VideoPlayerProps {
+export interface VideoPlayerProps {
   title: string;
   posterUrl?: string | null;
   durationSeconds?: number | null;
   currentSeconds?: number;
   onSeek?: (seconds: number) => void;
   chapters?: { title: string; timestamp_seconds: number }[];
-  dark?: boolean;
+  style?: StyleProp<ViewStyle>;
+  dark?: boolean; // backwards compatibility
 }
 
 export function VideoPlayer({
@@ -20,10 +22,9 @@ export function VideoPlayer({
   currentSeconds: initialSeconds = 0,
   onSeek,
   chapters = [],
-  dark: forceDark,
+  style,
 }: VideoPlayerProps) {
-  const { colors, isDark: themeDark } = useTheme();
-  const isDark = forceDark !== undefined ? forceDark : themeDark;
+  const { colors } = useTheme();
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [position, setPosition] = useState(initialSeconds);
@@ -49,77 +50,84 @@ export function VideoPlayer({
   };
 
   return (
-    <View style={styles.container as any}>
+    <View style={[styles.container, style]}>
       {/* 16:9 Video Canvas Frame */}
-      <View
-        style={[
-          styles.videoFrame,
-          { backgroundColor: isDark ? '#0D0805' : '#140C07' },
-        ] as any}
-      >
+      <View style={[styles.videoFrame, { backgroundColor: '#061426' }]}>
+        {posterUrl && !isPlaying ? (
+          <Image source={{ uri: posterUrl }} style={styles.posterImage} resizeMode="cover" />
+        ) : null}
+
         {/* Play Overlay */}
         <Pressable
           onPress={togglePlay}
-          style={({ pressed }) => [
-            styles.playOverlay,
-            pressed ? styles.pressed : null,
-          ] as any}
+          style={styles.playOverlay}
+          accessibilityRole="button"
+          accessibilityLabel={isPlaying ? 'Pause' : 'Play'}
         >
-          <View style={styles.playCircle as any}>
-            <Text style={styles.playIcon as any}>{isPlaying ? '❚❚' : '▶'}</Text>
+          <View style={[styles.playCircle, { backgroundColor: 'rgba(13, 41, 75, 0.85)' }]}>
+            <Icon
+              name={isPlaying ? 'pause' : 'play'}
+              size={28}
+              color="#FFFFFF"
+              style={isPlaying ? undefined : { marginLeft: 3 }}
+            />
           </View>
         </Pressable>
 
         {/* Video Scrubber & Overlays */}
-        <View style={styles.controlsOverlay as any}>
-          {/* Active Chapter Pill if set */}
+        <View style={styles.controlsOverlay}>
           {activeChapter ? (
-            <View style={styles.chapterPill as any}>
-              <Text style={styles.chapterText as any}>📍 {activeChapter}</Text>
+            <View style={styles.chapterPill}>
+              <Icon name="bookmark" size={11} color="#8FB4F8" style={{ marginRight: 4 }} />
+              <Text style={styles.chapterText}>{activeChapter}</Text>
             </View>
           ) : null}
 
           {/* Scrubber Track */}
-          <View style={styles.scrubberContainer as any}>
-            <View style={styles.scrubberTrack as any}>
-              <View style={[styles.scrubberFill, { width: `${progressPercent}%` }] as any} />
+          <View style={styles.scrubberContainer}>
+            <View style={styles.scrubberTrack}>
+              <View style={[styles.scrubberFill, { width: `${progressPercent}%` }]} />
             </View>
-            <View style={styles.timeRow as any}>
-              <Text style={styles.timeText as any}>{formatTime(position)}</Text>
-              <Text style={styles.timeText as any}>{formatTime(total)}</Text>
+            <View style={styles.timeRow}>
+              <Text style={styles.timeText}>{formatTime(position)}</Text>
+              <Text style={styles.timeText}>{formatTime(total)}</Text>
             </View>
           </View>
         </View>
       </View>
 
-      {/* Chapters Carousel if available */}
+      {/* Chapters List if available */}
       {chapters.length > 0 ? (
-        <View style={styles.chaptersSection as any}>
-          <Text style={[styles.chaptersKicker, { color: palette.gold }] as any}>
+        <View style={styles.chaptersSection}>
+          <Text style={[styles.chaptersKicker, { color: colors.interactive }]}>
             CHAPTER TIMESTAMPS
           </Text>
-          <View style={styles.chaptersList as any}>
+          <View style={styles.chaptersList}>
             {chapters.map((ch, idx) => (
               <Pressable
                 key={idx}
                 onPress={() => seekTo(ch.timestamp_seconds, ch.title)}
-                style={[
+                style={({ pressed }) => [
                   styles.chapterItem,
                   {
-                    backgroundColor: isDark ? '#1C1008' : '#FFFDF9',
-                    borderColor: isDark ? '#3D2415' : palette.line,
+                    backgroundColor: colors.card,
+                    borderColor: colors.border,
                   },
-                ] as any}
+                  pressed && styles.pressed,
+                ]}
               >
-                <Text style={styles.chapterTimeTag as any}>
-                  {formatTime(ch.timestamp_seconds)}
-                </Text>
+                <View style={[styles.chapterTimeTag, { backgroundColor: colors.primarySoft }]}>
+                  <Text style={[styles.chapterTimeText, { color: colors.interactive }]}>
+                    {formatTime(ch.timestamp_seconds)}
+                  </Text>
+                </View>
                 <Text
-                  style={[styles.chapterItemTitle, { color: colors.text }] as any}
+                  style={[styles.chapterItemTitle, { color: colors.text }]}
                   numberOfLines={1}
                 >
                   {ch.title}
                 </Text>
+                <Icon name="chevron-forward" size={16} color={colors.textMuted} />
               </Pressable>
             ))}
           </View>
@@ -129,7 +137,7 @@ export function VideoPlayer({
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
     gap: spacing.md,
   },
@@ -141,7 +149,12 @@ const styles: Record<string, any> = StyleSheet.create({
     position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
-    ...shadows.lg,
+    ...shadows.md,
+  },
+  posterImage: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
   },
   playOverlay: {
     position: 'absolute',
@@ -153,19 +166,11 @@ const styles: Record<string, any> = StyleSheet.create({
     justifyContent: 'center',
   },
   playCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(245, 158, 11, 0.9)',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    ...shadows.md,
-  },
-  playIcon: {
-    fontSize: 24,
-    color: '#140C07',
-    fontWeight: '900',
-    marginLeft: 2,
   },
   controlsOverlay: {
     position: 'absolute',
@@ -173,20 +178,22 @@ const styles: Record<string, any> = StyleSheet.create({
     left: 0,
     right: 0,
     padding: spacing.md,
-    backgroundColor: 'rgba(20, 12, 7, 0.75)',
-    gap: 8,
+    backgroundColor: 'rgba(6, 20, 38, 0.75)',
+    gap: 6,
   },
   chapterPill: {
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(245, 158, 11, 0.25)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(47, 111, 237, 0.25)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: radius.pill,
   },
   chapterText: {
-    color: palette.gold,
+    color: '#8FB4F8',
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   scrubberContainer: {
     gap: 4,
@@ -199,7 +206,7 @@ const styles: Record<string, any> = StyleSheet.create({
   },
   scrubberFill: {
     height: '100%',
-    backgroundColor: palette.gold,
+    backgroundColor: '#2F6FED',
     borderRadius: 2,
   },
   timeRow: {
@@ -207,20 +214,18 @@ const styles: Record<string, any> = StyleSheet.create({
     justifyContent: 'space-between',
   },
   timeText: {
-    color: '#FFFDF9',
+    color: '#CBD5E1',
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   chaptersSection: {
-    gap: 6,
+    gap: spacing.xs,
   },
   chaptersKicker: {
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.8,
+    ...typography.kicker,
   },
   chaptersList: {
-    gap: 6,
+    gap: spacing.xs,
   },
   chapterItem: {
     flexDirection: 'row',
@@ -231,17 +236,17 @@ const styles: Record<string, any> = StyleSheet.create({
     gap: 10,
   },
   chapterTimeTag: {
-    backgroundColor: '#2E1C11',
-    color: palette.gold,
-    fontSize: 11,
-    fontWeight: '800',
     paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
+  },
+  chapterTimeText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   chapterItemTitle: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     flex: 1,
   },
   pressed: {

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, StyleProp, ViewStyle } from 'react-native';
 import { AudioPlayer } from './AudioPlayer';
 import { VideoPlayer } from './VideoPlayer';
 import { useTheme } from '@/state/theme';
-import { palette, radius, spacing } from '@/design-system/tokens';
+import { radius, shadows, spacing } from '@/design-system/tokens';
+import { Icon } from '../primitives/Icon';
 
 export interface MediaPlayerProps {
   title: string;
@@ -16,7 +17,8 @@ export interface MediaPlayerProps {
   scriptureReferences?: string[];
   initialMode?: 'watch' | 'listen';
   onSeek?: (seconds: number) => void;
-  dark?: boolean;
+  style?: StyleProp<ViewStyle>;
+  dark?: boolean; // backwards compatibility
 }
 
 export function MediaPlayer({
@@ -30,43 +32,43 @@ export function MediaPlayer({
   scriptureReferences = [],
   initialMode = 'watch',
   onSeek,
-  dark,
+  style,
 }: MediaPlayerProps) {
-  const { colors, isDark: themeDark } = useTheme();
-  const isDark = dark !== undefined ? dark : themeDark;
+  const { colors } = useTheme();
 
-  // Decide active format
   const canChoose = hasAudio && hasVideo;
   const [activeFormat, setActiveFormat] = useState<'watch' | 'listen'>(
     hasVideo ? initialMode : 'listen'
   );
 
   return (
-    <View style={styles.container as any}>
+    <View style={[styles.container, style]}>
       {/* Format Toggle Pill if dual format exists */}
       {canChoose ? (
-        <View
-          style={[
-            styles.modeSelector,
-            { backgroundColor: isDark ? '#1C1008' : '#E8D5C4' },
-          ] as any}
-        >
+        <View style={[styles.modeSelector, { backgroundColor: colors.bgSecondary }]}>
           <Pressable
             onPress={() => setActiveFormat('watch')}
             style={[
               styles.modePill,
-              activeFormat === 'watch' ? {
-                backgroundColor: isDark ? '#2E1C11' : '#FFFDF9',
-              } : null,
-            ] as any}
+              activeFormat === 'watch' && {
+                backgroundColor: colors.card,
+                ...shadows.sm,
+              },
+            ]}
           >
+            <Icon
+              name="videocam-outline"
+              size={15}
+              color={activeFormat === 'watch' ? colors.interactive : colors.textMuted}
+              style={{ marginRight: 5 }}
+            />
             <Text
               style={[
                 styles.modePillText,
-                { color: activeFormat === 'watch' ? palette.gold : colors.textMuted },
-              ] as any}
+                { color: activeFormat === 'watch' ? colors.text : colors.textMuted },
+              ]}
             >
-              ▶ Watch Video
+              Watch Video
             </Text>
           </Pressable>
 
@@ -74,18 +76,25 @@ export function MediaPlayer({
             onPress={() => setActiveFormat('listen')}
             style={[
               styles.modePill,
-              activeFormat === 'listen' ? {
-                backgroundColor: isDark ? '#2E1C11' : '#FFFDF9',
-              } : null,
-            ] as any}
+              activeFormat === 'listen' && {
+                backgroundColor: colors.card,
+                ...shadows.sm,
+              },
+            ]}
           >
+            <Icon
+              name="headset-outline"
+              size={15}
+              color={activeFormat === 'listen' ? colors.interactive : colors.textMuted}
+              style={{ marginRight: 5 }}
+            />
             <Text
               style={[
                 styles.modePillText,
-                { color: activeFormat === 'listen' ? palette.gold : colors.textMuted },
-              ] as any}
+                { color: activeFormat === 'listen' ? colors.text : colors.textMuted },
+              ]}
             >
-              🎙️ Listen Audio
+              Listen Audio
             </Text>
           </Pressable>
         </View>
@@ -99,7 +108,6 @@ export function MediaPlayer({
           durationSeconds={durationSeconds}
           chapters={chapters}
           onSeek={onSeek}
-          dark={isDark}
         />
       ) : (
         <AudioPlayer
@@ -108,30 +116,31 @@ export function MediaPlayer({
           durationSeconds={durationSeconds}
           scriptureReferences={scriptureReferences}
           onSeek={onSeek}
-          dark={isDark}
         />
       )}
     </View>
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
     gap: spacing.md,
   },
   modeSelector: {
     flexDirection: 'row',
     borderRadius: radius.pill,
-    padding: 4,
+    padding: 3,
     alignSelf: 'flex-start',
   },
   modePill: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
     borderRadius: radius.pill,
   },
   modePillText: {
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: '700',
   },
 });

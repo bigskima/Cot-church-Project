@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
@@ -7,13 +8,14 @@ import {
   Badge,
   Button,
   EmptyState,
+  Icon,
   InputField,
   ResourceError,
   ScreenHeader,
   SectionHeader,
   Skeleton,
 } from '@/components';
-import { palette, radius, shadows, spacing } from '@/design-system/tokens';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 
 interface ExpressionItem {
   id: string;
@@ -24,8 +26,10 @@ interface ExpressionItem {
 }
 
 export default function ExpressionsManageScreen() {
+  const insets = useSafeAreaInsets();
   const { api } = useSession();
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
+
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [timezone, setTimezone] = useState('America/New_York');
@@ -34,7 +38,7 @@ export default function ExpressionsManageScreen() {
   const [successMsg, setSuccessMsg] = useState('');
 
   const expressions = useResource<ExpressionItem[]>('leadership:expressions', (signal) =>
-    api.request<ExpressionItem[]>('branches', { signal })
+    api.request<ExpressionItem[]>('branches', { signal }).catch(() => [])
   );
 
   const handleBootstrapExpression = async () => {
@@ -56,209 +60,185 @@ export default function ExpressionsManageScreen() {
       });
       setName('');
       setCode('');
-      setSuccessMsg(`Campus expression "${name.trim()}" bootstrapped successfully with initial leadership authority!`);
+      setSuccessMsg(`Campus expression "${name.trim()}" created successfully.`);
       expressions.refresh();
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Unable to bootstrap expression campus.');
+      setErrorMsg(err instanceof Error ? err.message : 'Unable to create expression campus.');
     } finally {
       setBootstrapping(false);
     }
   };
 
+  const list = expressions.data ?? [];
+
   return (
-    <ScrollView
-      style={[styles.screen, { backgroundColor: colors.bg }]}
-      contentContainerStyle={styles.content}
-    >
-      <ScreenHeader
-        title="Expressions & Campus Bootstrap"
-        subtitle="Provision local church campuses, daughter churches, and establish responsible authority."
-        showBack
-        dark={isDark}
-      />
-
-      <View style={styles.body}>
-        {/* Bootstrap New Campus Card */}
-        <View
-          style={[
-            styles.card,
-            { backgroundColor: colors.card, borderColor: colors.border },
-            shadows.md,
-          ] as any}
-        >
-          <Text style={[styles.cardHeaderTitle, { color: colors.textMuted }] as any}>
-            BOOTSTRAP NEW CHURCH EXPRESSION
-          </Text>
-          <Text style={[styles.cardHelper, { color: colors.textMuted }] as any}>
-            Every church expression is established with designated leadership authority to assign local pastors, media operators, and department coordinators.
-          </Text>
-
-          <InputField
-            label="Expression / Campus Name"
-            value={name}
-            onChangeText={(val) => {
-              setName(val);
-              if (!code) {
-                setCode(val.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase());
-              }
-            }}
-            placeholder="e.g. North Sanctuary Campus, Downtown Expression"
-            dark={isDark}
-          />
-
-          <InputField
-            label="Unique Campus Code"
-            value={code}
-            onChangeText={(val) => setCode(val.toUpperCase())}
-            placeholder="e.g. NORTH-01"
-            helperText="Used for check-in scanners, department namespaces, and routing."
-            dark={isDark}
-          />
-
-          <InputField
-            label="Campus Timezone"
-            value={timezone}
-            onChangeText={setTimezone}
-            placeholder="e.g. America/New_York, Europe/London"
-            dark={isDark}
-          />
-
-          {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
-          {successMsg ? <Text style={styles.successText}>{successMsg}</Text> : null}
-
-          <Button
-            label="Bootstrap Church Expression ➔"
-            onPress={handleBootstrapExpression}
-            variant="gold"
-            size="lg"
-            loading={bootstrapping}
-            style={{ marginTop: spacing.md } as any}
-          />
-        </View>
-
-        {/* Existing Expressions List */}
-        <SectionHeader
-          title="Active Church Expressions"
-          badge={expressions.data?.length ?? 0}
-          dark={isDark}
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + spacing.sm, paddingBottom: 60 },
+        ]}
+      >
+        <ScreenHeader
+          title="Campus Expressions & Directory"
+          subtitle="Provision new sanctuary campuses and daughter church locations."
+          showBack
         />
-        {expressions.loading ? (
-          <Skeleton height={90} count={2} dark={isDark} />
-        ) : expressions.error && !expressions.data ? (
-          <ResourceError
-            offline={expressions.offline}
-            message={expressions.error}
-            retry={expressions.refresh}
-            dark={isDark}
-          />
-        ) : expressions.data && expressions.data.length > 0 ? (
-          expressions.data.map((exp) => (
-            <View
-              key={exp.id}
-              style={[
-                styles.expCard,
-                { backgroundColor: colors.card, borderColor: colors.border },
-                shadows.sm,
-              ] as any}
-            >
-              <View
-                style={[
-                  styles.expIconCircle,
-                  { backgroundColor: isDark ? '#2E1C11' : '#F1E3D3' },
-                ] as any}
-              >
-                <Text style={styles.expIcon as any}>🏛️</Text>
-              </View>
-              <View style={styles.expInfo}>
-                <Text style={[styles.expTitle, { color: colors.text }] as any}>{exp.name}</Text>
-                <Text style={[styles.expMeta, { color: colors.textMuted }] as any}>
-                  Code: <Text style={{ fontWeight: '900', color: colors.text } as any}>{exp.code}</Text> · {exp.timezone || 'UTC'}
-                </Text>
-              </View>
-              <Badge label={exp.is_active !== false ? 'ACTIVE' : 'INACTIVE'} variant="success" />
+
+        <View style={styles.body}>
+          {/* Notification Messages */}
+          {successMsg ? (
+            <View style={[styles.banner, { backgroundColor: 'rgba(22, 163, 106, 0.12)', borderColor: 'rgba(22, 163, 106, 0.3)' }]}>
+              <Icon name="checkmark-circle" size={18} color="#16A36A" style={{ marginRight: 8 }} />
+              <Text style={[styles.bannerText, { color: '#16A36A' }]}>{successMsg}</Text>
             </View>
-          ))
-        ) : (
-          <EmptyState
-            title="No Additional Expressions"
-            message="Main sanctuary is currently active. Bootstrap new campuses above."
-            icon="🏛️"
-            dark={isDark}
-          />
-        )}
-      </View>
-    </ScrollView>
+          ) : null}
+
+          {errorMsg ? (
+            <View style={[styles.banner, { backgroundColor: 'rgba(229, 72, 77, 0.12)', borderColor: 'rgba(229, 72, 77, 0.3)' }]}>
+              <Icon name="alert-circle" size={18} color="#E5484D" style={{ marginRight: 8 }} />
+              <Text style={[styles.bannerText, { color: '#E5484D' }]}>{errorMsg}</Text>
+            </View>
+          ) : null}
+
+          {/* Create Expression Card */}
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+            <View style={styles.cardHeader}>
+              <Icon name="business-outline" size={18} color={colors.interactive} />
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Add Church Expression Campus</Text>
+            </View>
+
+            <InputField
+              label="Expression / Campus Name"
+              value={name}
+              onChangeText={(val) => {
+                setName(val);
+                if (!code) setCode(val.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase());
+              }}
+              placeholder="e.g. London City Sanctuary"
+            />
+
+            <InputField
+              label="Campus Short Code"
+              value={code}
+              onChangeText={(val) => setCode(val.toUpperCase())}
+              placeholder="e.g. LON-01"
+            />
+
+            <InputField
+              label="Timezone"
+              value={timezone}
+              onChangeText={setTimezone}
+              placeholder="e.g. Europe/London"
+            />
+
+            <Button
+              label="Provision Campus Expression"
+              onPress={handleBootstrapExpression}
+              loading={bootstrapping}
+              variant="primary"
+              size="md"
+              style={{ marginTop: spacing.xs }}
+            />
+          </View>
+
+          {/* Active Expressions List */}
+          <View style={styles.listSection}>
+            <SectionHeader title="Active Church Campuses" badge={list.length} />
+            {expressions.loading ? (
+              <Skeleton height={80} count={2} />
+            ) : expressions.error && !expressions.data ? (
+              <ResourceError message={expressions.error} retry={expressions.refresh} />
+            ) : list.length > 0 ? (
+              list.map((exp) => (
+                <View
+                  key={exp.id}
+                  style={[styles.tile, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}
+                >
+                  <View style={styles.tileInfo}>
+                    <Text style={[styles.tileTitle, { color: colors.text }]}>{exp.name}</Text>
+                    <Text style={[styles.tileMeta, { color: colors.interactive }]}>
+                      Code: {exp.code} {exp.timezone ? `· ${exp.timezone}` : ''}
+                    </Text>
+                  </View>
+                  <Badge label="ACTIVE" variant="primary" />
+                </View>
+              ))
+            ) : (
+              <EmptyState
+                title="No Expressions Registered"
+                message="Provision your first church campus using the form above."
+                iconName="business-outline"
+              />
+            )}
+          </View>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
-const styles: Record<string, any> = StyleSheet.create({
+const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
   content: {
-    paddingBottom: 120,
+    flexGrow: 1,
   },
   body: {
     paddingHorizontal: spacing.lg,
+    gap: spacing.lg,
   },
-  card: {
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-    marginTop: spacing.sm,
-    borderWidth: 1,
-    marginBottom: spacing.lg,
-  },
-  cardHeaderTitle: {
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-  },
-  cardHelper: {
-    fontSize: 12,
-    marginTop: 4,
-    marginBottom: spacing.md,
-    lineHeight: 16,
-  },
-  errorText: {
-    color: palette.live,
-    fontSize: 13,
-    fontWeight: '800',
-    marginBottom: spacing.sm,
-  },
-  successText: {
-    color: palette.success,
-    fontSize: 13,
-    fontWeight: '800',
-    marginBottom: spacing.sm,
-  },
-  expCard: {
+  banner: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: radius.lg,
-    marginBottom: spacing.sm,
+    borderRadius: radius.md,
     borderWidth: 1,
   },
-  expIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  expIcon: {
-    fontSize: 20,
-  },
-  expInfo: {
+  bannerText: {
+    fontSize: 13,
+    fontWeight: '600',
     flex: 1,
-    marginLeft: spacing.md,
   },
-  expTitle: {
+  card: {
+    padding: spacing.lg,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    gap: spacing.sm,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  listSection: {
+    gap: spacing.xs,
+  },
+  tile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    marginBottom: spacing.xs,
+  },
+  tileInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  tileTitle: {
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '700',
   },
-  expMeta: {
+  tileMeta: {
     fontSize: 12,
-    marginTop: 2,
+    fontWeight: '600',
   },
 });
