@@ -33,7 +33,7 @@ interface StudioOverview {
 
 export default function CreatorStudioScreen() {
   const insets = useSafeAreaInsets();
-  const { api, hasCapability } = useSession();
+  const { api } = useSession();
   const { colors } = useTheme();
 
   const [activeModal, setActiveModal] = useState<'post' | null>(null);
@@ -41,7 +41,7 @@ export default function CreatorStudioScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   const studioResource = useResource<StudioOverview>('studio:overview', (signal) =>
-    api.request<StudioOverview>('creator-studio', { signal }).catch(() => ({}))
+    api.request<StudioOverview>('creator-studio', { signal })
   );
 
   const handlePublishPost = async () => {
@@ -73,56 +73,49 @@ export default function CreatorStudioScreen() {
       description: 'Upload sermon audio/video, manage series, and add scripture notes',
       iconName: 'book-outline',
       badge: 'MEDIA',
-      route: '/(tabs)/profile/leadership/sermons-manage',
+      route: '/leadership/sermons',
     },
     {
       title: 'Events & Calendar',
       description: 'Create Sunday services, retreats, conferences, and prayer meetings',
       iconName: 'calendar-outline',
       badge: 'EVENTS',
-      route: '/(tabs)/profile/leadership/events-manage',
+      route: '/leadership/events',
     },
     {
       title: 'Live Media Studio',
-      description: 'Broadcast live services, stream ingest keys, and Mux playback status',
+      description: 'Broadcast live services, stream ingest keys, and stream health status',
       iconName: 'radio-outline',
       badge: 'BROADCAST',
-      route: '/(tabs)/profile/leadership/media-studio',
+      route: '/leadership/media-studio',
     },
     {
       title: 'Pastoral Triage & Care',
       description: 'Review confidential member prayer requests and assign pastoral responses',
       iconName: 'heart-outline',
       badge: 'PASTORAL',
-      route: '/(tabs)/profile/leadership/pastoral-triage',
+      route: '/leadership/pastoral-triage',
     },
     {
-      title: 'Giving & Financial Reports',
-      description: 'Track tithes, offering campaign goals, receipts, and bank wire setups',
+      title: 'Giving & Financial Configuration',
+      description: 'Track offering campaign goals, receipts, and configure bank wire setups',
       iconName: 'gift-outline',
       badge: 'FINANCE',
-      route: '/(tabs)/profile/leadership/giving-manage',
+      route: '/leadership/giving',
     },
     {
       title: 'Church Expressions & Campuses',
       description: 'Manage multi-campus directory, timezones, and leadership assignments',
       iconName: 'business-outline',
       badge: 'CAMPUS',
-      route: '/(tabs)/profile/leadership/expressions-manage',
+      route: '/leadership/expressions',
     },
     {
-      title: 'Member Directory & Roster',
-      description: 'View active member rolls, communication channels, and roles',
+      title: 'Campus Leadership Directory',
+      description: 'View active pastoral rolls, communication channels, and ministry roles',
       iconName: 'people-outline',
-      badge: 'MEMBERS',
-      route: '/(tabs)/profile/leadership/members-manage',
-    },
-    {
-      title: 'Organization Settings',
-      description: 'Configure branding, church story, mission, and leadership bios',
-      iconName: 'settings-outline',
-      badge: 'SETTINGS',
-      route: '/(tabs)/profile/leadership/settings-manage',
+      badge: 'DIRECTORY',
+      route: '/leadership/directory',
     },
   ];
 

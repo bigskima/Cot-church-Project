@@ -1,37 +1,81 @@
-import React, { useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View, StyleProp, ViewStyle } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Image, Pressable, StyleSheet, Text, View, StyleProp, ViewStyle, ActivityIndicator } from 'react-native';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useTheme } from '@/state/theme';
-import { radius, shadows, spacing, typography } from '@/design-system/tokens';
+import { radius, spacing } from '@/design-system/tokens';
 import { Icon } from '../primitives/Icon';
 
 export interface VideoPlayerProps {
   title: string;
+  sourceUrl?: string | null;
   posterUrl?: string | null;
   durationSeconds?: number | null;
-  currentSeconds?: number;
   onSeek?: (seconds: number) => void;
   chapters?: { title: string; timestamp_seconds: number }[];
   style?: StyleProp<ViewStyle>;
-  dark?: boolean; // backwards compatibility
 }
 
 export function VideoPlayer({
   title,
+  sourceUrl,
   posterUrl,
-  durationSeconds = 2400,
-  currentSeconds: initialSeconds = 0,
+  durationSeconds = 0,
   onSeek,
   chapters = [],
   style,
 }: VideoPlayerProps) {
   const { colors } = useTheme();
-
   const [isPlaying, setIsPlaying] = useState(false);
-  const [position, setPosition] = useState(initialSeconds);
-  const [activeChapter, setActiveChapter] = useState<string | null>(null);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(durationSeconds || 0);
+  const [isBuffering, setIsBuffering] = useState(false);
 
-  const total = durationSeconds && durationSeconds > 0 ? durationSeconds : 2400;
-  const progressPercent = Math.min(100, Math.max(0, (position / total) * 100));
+  const player = useVideoPlayer(sourceUrl || '', (p) => {
+    p.loop = false;
+    p.timeUpdateEventInterval = 0.5;
+  });
+
+  useEffect(() => {
+    if (!player) return;
+
+    const playingSub = player.addListener('playingChange', (status) => {
+      setIsPlaying(status.isPlaying);
+    });
+
+    const statusSub = player.addListener('statusChange', (status) => {
+      setIsBuffering(status.status === 'loading');
+      if (player.duration) {
+        setDuration(player.duration);
+      }
+    });
+
+    const timeSub = player.addListener('timeUpdate', (event) => {
+      setCurrentTime(event.currentTime);
+      if (player.duration && player.duration > 0) {
+        setDuration(player.duration);
+      }
+    });
+
+    return () => {
+      playingSub.remove();
+      statusSub.remove();
+      timeSub.remove();
+    };
+  }, [player]);
+
+  const togglePlay = () => {
+    if (!player) return;
+    if (isPlaying) {
+      player.pause();
+    } else {
+      player.play();
+    }
+  };
+
+  const skip = (secs: number) => {
+    if (!player) return;
+    player.seekBy(secs);
+  };
 
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60);
@@ -39,95 +83,92 @@ export function VideoPlayer({
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  const togglePlay = () => {
-    setIsPlaying(!isPlaying);
-  };
-
-  const seekTo = (secs: number, chapterTitle?: string) => {
-    setPosition(secs);
-    if (chapterTitle) setActiveChapter(chapterTitle);
-    onSeek?.(secs);
-  };
+  const progressPercent = duration > 0 ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0;
 
   return (
     <View style={[styles.container, style]}>
       {/* 16:9 Video Canvas Frame */}
-      <View style={[styles.videoFrame, { backgroundColor: '#061426' }]}>
-        {posterUrl && !isPlaying ? (
+      <View style={[styles.videoFrame, { backgroundColor: '#000000' }]}>
+        {sourceUrl && player ? (
+          <VideoView
+            player={player}
+            style={styles.videoView}
+          />
+        ) : posterUrl ? (
           <Image source={{ uri: posterUrl }} style={styles.posterImage} resizeMode="cover" />
-        ) : null}
+        ) : (
+          <View style={styles.placeholder}>
+            <Icon name="play-circle-outline" size={48} color={colors.interactive} />
+          </View>
+        )}
 
-        {/* Play Overlay */}
-        <Pressable
-          onPress={togglePlay}
-          style={styles.playOverlay}
-          accessibilityRole="button"
-          accessibilityLabel={isPlaying ? 'Pause' : 'Play'}
-        >
-          <View style={[styles.playCircle, { backgroundColor: 'rgba(13, 41, 75, 0.85)' }]}>
+        {isBuffering && (
+          <View style={styles.bufferingOverlay}>
+            <ActivityIndicator size="large" color="#FFFFFF" />
+          </View>
+        )}
+      </View>
+
+      {/* Scrubber & Progress Bar */}
+      <View style={[styles.progressBarBg, { backgroundColor: colors.borderSubtle }]}>
+        <View
+          style={[
+            styles.progressBarFill,
+            { width: `${progressPercent}%`, backgroundColor: colors.interactive },
+          ]}
+        />
+      </View>
+
+      {/* Playback Controls Row */}
+      <View style={[styles.controlsRow, { backgroundColor: colors.card }]}>
+        <View style={styles.timeGroup}>
+          <Text style={[styles.timeText, { color: colors.text }]}>{formatTime(currentTime)}</Text>
+          <Text style={[styles.timeText, { color: colors.textMuted }]}> / {formatTime(duration)}</Text>
+        </View>
+
+        <View style={styles.btnGroup}>
+          <Pressable onPress={() => skip(-15)} hitSlop={8} style={styles.controlBtn}>
+            <Icon name="play-back-outline" size={20} color={colors.text} />
+          </Pressable>
+
+          <Pressable
+            onPress={togglePlay}
+            style={[styles.playBtn, { backgroundColor: colors.interactive }]}
+          >
             <Icon
               name={isPlaying ? 'pause' : 'play'}
-              size={28}
+              size={22}
               color="#FFFFFF"
-              style={isPlaying ? undefined : { marginLeft: 3 }}
+              style={!isPlaying ? { marginLeft: 2 } : undefined}
             />
-          </View>
-        </Pressable>
+          </Pressable>
 
-        {/* Video Scrubber & Overlays */}
-        <View style={styles.controlsOverlay}>
-          {activeChapter ? (
-            <View style={styles.chapterPill}>
-              <Icon name="bookmark" size={11} color="#8FB4F8" style={{ marginRight: 4 }} />
-              <Text style={styles.chapterText}>{activeChapter}</Text>
-            </View>
-          ) : null}
-
-          {/* Scrubber Track */}
-          <View style={styles.scrubberContainer}>
-            <View style={styles.scrubberTrack}>
-              <View style={[styles.scrubberFill, { width: `${progressPercent}%` }]} />
-            </View>
-            <View style={styles.timeRow}>
-              <Text style={styles.timeText}>{formatTime(position)}</Text>
-              <Text style={styles.timeText}>{formatTime(total)}</Text>
-            </View>
-          </View>
+          <Pressable onPress={() => skip(15)} hitSlop={8} style={styles.controlBtn}>
+            <Icon name="play-forward-outline" size={20} color={colors.text} />
+          </Pressable>
         </View>
       </View>
 
-      {/* Chapters List if available */}
+      {/* Chapters Carousel if present */}
       {chapters.length > 0 ? (
         <View style={styles.chaptersSection}>
-          <Text style={[styles.chaptersKicker, { color: colors.interactive }]}>
-            CHAPTER TIMESTAMPS
-          </Text>
-          <View style={styles.chaptersList}>
+          <Text style={[styles.chaptersTitle, { color: colors.textSecondary }]}>CHAPTERS</Text>
+          <View style={styles.chapterChips}>
             {chapters.map((ch, idx) => (
               <Pressable
                 key={idx}
-                onPress={() => seekTo(ch.timestamp_seconds, ch.title)}
-                style={({ pressed }) => [
-                  styles.chapterItem,
-                  {
-                    backgroundColor: colors.card,
-                    borderColor: colors.border,
-                  },
-                  pressed && styles.pressed,
+                onPress={() => {
+                  player?.currentTime && (player.currentTime = ch.timestamp_seconds);
+                  onSeek?.(ch.timestamp_seconds);
+                }}
+                style={[
+                  styles.chapterPill,
+                  { backgroundColor: colors.bgSecondary, borderColor: colors.border },
                 ]}
               >
-                <View style={[styles.chapterTimeTag, { backgroundColor: colors.primarySoft }]}>
-                  <Text style={[styles.chapterTimeText, { color: colors.interactive }]}>
-                    {formatTime(ch.timestamp_seconds)}
-                  </Text>
-                </View>
-                <Text
-                  style={[styles.chapterItemTitle, { color: colors.text }]}
-                  numberOfLines={1}
-                >
-                  {ch.title}
+                <Text style={[styles.chapterPillText, { color: colors.text }]}>
+                  {formatTime(ch.timestamp_seconds)} {ch.title}
                 </Text>
-                <Icon name="chevron-forward" size={16} color={colors.textMuted} />
               </Pressable>
             ))}
           </View>
@@ -139,117 +180,93 @@ export function VideoPlayer({
 
 const styles = StyleSheet.create({
   container: {
-    gap: spacing.md,
+    width: '100%',
   },
   videoFrame: {
     width: '100%',
     aspectRatio: 16 / 9,
-    borderRadius: radius.lg,
-    overflow: 'hidden',
     position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...shadows.md,
+    overflow: 'hidden',
+  },
+  videoView: {
+    width: '100%',
+    height: '100%',
   },
   posterImage: {
     width: '100%',
     height: '100%',
-    position: 'absolute',
   },
-  playOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+  placeholder: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  playCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+  bufferingOverlay: {
+    ...StyleSheet.absoluteFill as any,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
   },
-  controlsOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: spacing.md,
-    backgroundColor: 'rgba(6, 20, 38, 0.75)',
-    gap: 6,
-  },
-  chapterPill: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(47, 111, 237, 0.25)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radius.pill,
-  },
-  chapterText: {
-    color: '#8FB4F8',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  scrubberContainer: {
-    gap: 4,
-  },
-  scrubberTrack: {
+  progressBarBg: {
+    width: '100%',
     height: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 2,
-    overflow: 'hidden',
   },
-  scrubberFill: {
+  progressBarFill: {
     height: '100%',
-    backgroundColor: '#2F6FED',
-    borderRadius: 2,
   },
-  timeRow: {
+  controlsRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  timeGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   timeText: {
-    color: '#CBD5E1',
-    fontSize: 11,
+    fontSize: 12,
+    fontVariant: ['tabular-nums'],
     fontWeight: '600',
   },
-  chaptersSection: {
-    gap: spacing.xs,
-  },
-  chaptersKicker: {
-    ...typography.kicker,
-  },
-  chaptersList: {
-    gap: spacing.xs,
-  },
-  chapterItem: {
+  btnGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    gap: 10,
+    gap: spacing.md,
   },
-  chapterTimeTag: {
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: radius.sm,
+  controlBtn: {
+    padding: 6,
   },
-  chapterTimeText: {
+  playBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chaptersSection: {
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
+  chaptersTitle: {
     fontSize: 11,
     fontWeight: '700',
+    letterSpacing: 0.5,
   },
-  chapterItemTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    flex: 1,
+  chapterChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
   },
-  pressed: {
-    opacity: 0.8,
+  chapterPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+  },
+  chapterPillText: {
+    fontSize: 12,
+    fontWeight: '500',
   },
 });

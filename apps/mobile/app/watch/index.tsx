@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  FlatList,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
@@ -10,112 +17,91 @@ import {
   EmptyState,
   ResourceError,
   ScreenHeader,
-  SectionHeader,
-  Skeleton,
   VideoCard,
+  WatchSkeleton,
 } from '@/components';
 import { spacing } from '@/design-system/tokens';
-import type { Video, VideoCategory } from '@/types/content';
+import type { Video } from '@/types/content';
 
-const organization = process.env.EXPO_PUBLIC_ORGANIZATION_ID;
-
-const categories: Array<{ id: 'all' | VideoCategory; label: string }> = [
-  { id: 'all', label: 'All Videos' },
-  { id: 'worship', label: 'Worship Sessions' },
-  { id: 'teaching', label: 'Expository Teachings' },
-  { id: 'conference', label: 'Conferences' },
-  { id: 'interview', label: 'Interviews' },
-  { id: 'testimony', label: 'Testimonies' },
-  { id: 'documentary', label: 'Documentaries' },
-];
-
-export default function WatchCatalogScreen() {
+export default function WatchCatalogueScreen() {
   const insets = useSafeAreaInsets();
-  const { api, context } = useSession();
+  const { api, mode, context } = useSession();
   const { colors } = useTheme();
-  const [selectedCategory, setSelectedCategory] = useState<'all' | VideoCategory>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
-  const videosResource = useResource<Video[]>('watch:catalog', (signal) =>
-    api.request<Video[]>(
-      `public-content?type=videos${organization ? `&organizationId=${organization}` : ''}`,
-      { signal }
-    )
-  );
+  const orgParam =
+    mode === 'visitor'
+      ? `?organizationId=${process.env.EXPO_PUBLIC_ORGANIZATION_ID || ''}`
+      : context?.expression?.id
+      ? `?expressionId=${context.expression.id}`
+      : '';
 
-  const videos = videosResource.data ?? [];
+  const resource = useResource<Video[]>('watch:catalogue', (signal) => {
+    return api.request<Video[]>(`public-content?type=videos${orgParam ? `&${orgParam.slice(1)}` : ''}`, { signal });
+  });
+
+  const videos = resource.data ?? [];
   const filteredVideos =
     selectedCategory === 'all'
       ? videos
-      : videos.filter((v) => v.category === selectedCategory);
+      : videos.filter((v) => v.category?.toLowerCase() === selectedCategory.toLowerCase());
 
-  const expressionName = context?.expression?.name || context?.organizations?.[0]?.name;
+  const categories = ['all', 'Sermons', 'Worship', 'Conferences', 'Devotionals', 'Documentary'];
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.content,
-          { paddingTop: insets.top + spacing.sm, paddingBottom: 60 },
-        ]}
-        refreshControl={
-          <RefreshControl
-            refreshing={videosResource.loading}
-            onRefresh={videosResource.refresh}
-            tintColor={colors.interactive}
-          />
-        }
-      >
-        <ScreenHeader
-          title="Watch Catalog"
-          subtitle="Documentaries, worship sessions, conferences, and pastoral teachings."
-          showBack
-        />
+      <ScreenHeader
+        title="Watch Video Library"
+        subtitle="Explore long-form teachings, worship sets, and full-length ministry broadcasts."
+        showBack
+      />
 
-        {/* Category Horizontal Selector Pills */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesRow}
-        >
+      {/* Category Chips Bar */}
+      <View style={[styles.categoriesContainer, { borderBottomColor: colors.borderSubtle }]}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
           {categories.map((cat) => (
             <Chip
-              key={cat.id}
-              label={cat.label}
-              selected={selectedCategory === cat.id}
-              onPress={() => setSelectedCategory(cat.id)}
+              key={cat}
+              label={cat === 'all' ? 'All Videos' : cat}
+              selected={selectedCategory === cat}
+              onPress={() => setSelectedCategory(cat)}
             />
           ))}
         </ScrollView>
+      </View>
 
-        <View style={styles.body}>
-          {videosResource.loading ? (
-            <View style={{ gap: spacing.md }}>
-              <Skeleton height={200} />
-              <Skeleton height={200} />
-            </View>
-          ) : videosResource.error && !videosResource.data ? (
-            <ResourceError message={videosResource.error} retry={videosResource.refresh} />
-          ) : filteredVideos.length > 0 ? (
-            <View style={styles.list}>
-              {filteredVideos.map((vid) => (
-                <VideoCard
-                  key={vid.id}
-                  video={vid}
-                  expressionName={expressionName}
-                  onPress={() => router.push(`/watch/${vid.id}`)}
-                />
-              ))}
-            </View>
+      <FlatList
+        data={filteredVideos}
+        keyExtractor={(item) => item.id}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 40 }]}
+        refreshControl={
+          <RefreshControl
+            refreshing={resource.loading}
+            onRefresh={resource.refresh}
+            tintColor={colors.interactive}
+          />
+        }
+        ListEmptyComponent={
+          resource.loading && !resource.data ? (
+            <WatchSkeleton />
+          ) : resource.error && !resource.data ? (
+            <ResourceError message={resource.error} retry={resource.refresh} />
           ) : (
             <EmptyState
-              title="No Videos in Category"
-              message="No video publications match this category filter currently."
+              title="No Videos in this Category"
+              message="New video teachings and broadcast recordings will appear here soon."
               iconName="videocam-outline"
             />
-          )}
-        </View>
-      </ScrollView>
+          )
+        }
+        renderItem={({ item }) => (
+          <VideoCard
+            video={item}
+            onPress={() => router.push(`/watch/${item.id}` as any)}
+          />
+        )}
+      />
     </View>
   );
 }
@@ -124,18 +110,17 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
-  content: {
-    flexGrow: 1,
+  categoriesContainer: {
+    paddingVertical: spacing.xs,
+    borderBottomWidth: 1,
   },
-  categoriesRow: {
+  chipsRow: {
     paddingHorizontal: spacing.lg,
     gap: spacing.xs,
-    paddingBottom: spacing.md,
   },
-  body: {
+  listContent: {
     paddingHorizontal: spacing.lg,
-  },
-  list: {
-    gap: spacing.xs,
+    paddingTop: spacing.md,
+    gap: spacing.md,
   },
 });

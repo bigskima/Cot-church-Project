@@ -431,7 +431,7 @@ export default function GivingScreen() {
                     </View>
                     <Text style={[styles.receiptPurpose, { color: colors.interactive }]}>{r.category || 'General Offering'}</Text>
                     <Text style={[styles.receiptDate, { color: colors.textMuted }]}>
-                      {new Date(r.created_at || r.issued_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                      {new Date(r.created_at || r.issued_at || '').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                     </Text>
                   </View>
                 ))

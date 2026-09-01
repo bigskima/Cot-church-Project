@@ -1,222 +1,243 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import {
+  FlatList,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import {
+  Avatar,
   Badge,
+  Button,
   CommentSheet,
-  EmptyState,
   Icon,
-  ReactionDrawer,
   ResourceError,
   ScreenHeader,
-  SectionHeader,
-  Skeleton,
   VideoCard,
   VideoPlayer,
+  WatchSkeleton,
 } from '@/components';
-import { radius, shadows, spacing, typography } from '@/design-system/tokens';
-import type { ContentComment, Video } from '@/types/content';
+import { radius, shadows, spacing } from '@/design-system/tokens';
+import type { Video } from '@/types/content';
 
-const organization = process.env.EXPO_PUBLIC_ORGANIZATION_ID;
-
-export default function WatchScreen() {
-  const insets = useSafeAreaInsets();
+export default function WatchDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const insets = useSafeAreaInsets();
   const { api, mode, context } = useSession();
   const { colors } = useTheme();
 
-  const [commentsVisible, setCommentsVisible] = useState(false);
-  const [comments, setComments] = useState<ContentComment[]>([]);
-  const [commentLoading, setCommentLoading] = useState(false);
-  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [isLiked, setIsLiked] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
 
-  // Fetch Video Details
-  const videoResource = useResource<Video>(`watch:${id}`, (signal) =>
-    api.request<Video[]>(`public-content?type=videos&id=${id}${organization ? `&organizationId=${organization}` : ''}`, { signal })
-      .then((res) => (Array.isArray(res) ? res.find((v) => v.id === id) ?? res[0] : res))
-  );
-
-  // Fetch Related Videos
-  const relatedResource = useResource<Video[]>('watch:related', (signal) =>
-    api.request<Video[]>(`public-content?type=videos${organization ? `&organizationId=${organization}` : ''}`, { signal })
-  );
-
-  const video = videoResource.data;
-  const related = (relatedResource.data ?? []).filter((v) => v.id !== id);
-
-  const handleOpenComments = async () => {
-    if (!video) return;
-    setCommentsVisible(true);
-    setCommentLoading(true);
-    try {
-      const res = await api.request<ContentComment[]>(`engagement?contentId=${video.id}`);
-      setComments(res ?? []);
-    } catch {
-      setComments([]);
-    } finally {
-      setCommentLoading(false);
+  const resource = useResource<Video>(`watch:detail:${id}`, (signal) => {
+    if (mode === 'visitor') {
+      return api
+        .request<Video[]>(`public-content?type=videos`, { signal })
+        .then((list) => {
+          const match = list.find((v) => v.id === id);
+          if (!match) throw new Error('Video not found.');
+          return match;
+        });
     }
-  };
+    return api.request<Video[]>(`public-content?type=videos`, { signal }).then((list) => {
+      const match = list.find((v) => v.id === id);
+      if (!match) throw new Error('Video not found.');
+      return match;
+    });
+  });
 
-  const handleSendComment = async (body: string, parentCommentId?: string | null) => {
-    if (!video) return;
+  const relatedResource = useResource<Video[]>('watch:related', (signal) => {
+    return api.request<Video[]>('public-content?type=videos', { signal });
+  });
+
+  const video = resource.data;
+  const relatedVideos = (relatedResource.data ?? []).filter((v) => v.id !== id);
+
+  const videoUrl =
+    video?.media_assets?.renditions?.find((r) => r.rendition_kind === 'video_stream')?.storage_path ||
+    video?.media_assets?.url;
+  const posterUrl = video?.media_assets?.thumbnailUrl || video?.media_assets?.url;
+
+  const handleLike = async () => {
+    if (mode === 'visitor') return;
+    setIsLiked(!isLiked);
     try {
-      const res = await api.request<ContentComment>('engagement', {
+      await api.request('engagement', {
         method: 'POST',
         body: JSON.stringify({
-          action: 'comment',
-          contentId: video.id,
-          body,
-          parentCommentId,
+          action: 'react',
+          targetId: id,
+          targetType: 'video',
+          reaction: 'like',
         }),
       });
-      if (res) setComments([...comments, res]);
     } catch {
       // Ignored
     }
   };
 
-  const handleReact = async (reaction: string) => {
-    if (mode === 'visitor' || !video) return;
+  const handleSave = async () => {
+    if (mode === 'visitor') return;
+    setIsSaved(!isSaved);
     try {
       await api.request('engagement', {
         method: 'POST',
-        body: JSON.stringify({ action: 'react', contentId: video.id, reaction }),
+        body: JSON.stringify({
+          action: 'bookmark',
+          targetId: id,
+          targetType: 'video',
+        }),
       });
     } catch {
       // Ignored
     }
   };
 
-  const handleToggleBookmark = async () => {
-    if (mode === 'visitor' || !video) return;
+  const handleShare = async () => {
+    if (!video) return;
     try {
-      await api.request('engagement', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'bookmark', contentId: video.id }),
+      await Share.share({
+        message: `Watch "${video.title}" on Church of the Truth.`,
       });
-      setIsBookmarked(!isBookmarked);
     } catch {
       // Ignored
     }
   };
-
-  const expressionName = context?.expression?.name || context?.organizations?.[0]?.name;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.content,
-          { paddingTop: insets.top + spacing.sm, paddingBottom: 60 },
-        ]}
-      >
-        <ScreenHeader
-          title={video?.title ?? 'Video Presentation'}
-          subtitle={video?.category ? `${video.category.toUpperCase()} • Watch Library` : undefined}
-          showBack
-        />
+      <ScreenHeader title="" showBack style={{ backgroundColor: 'transparent' }} />
 
-        <View style={styles.body}>
-          {videoResource.loading ? (
-            <Skeleton height={220} />
-          ) : videoResource.error && !video ? (
-            <ResourceError message={videoResource.error} retry={videoResource.refresh} />
-          ) : video ? (
-            <>
-              {/* Video Player Canvas */}
-              <VideoPlayer
-                title={video.title}
-                posterUrl={video.media_assets?.thumbnailUrl}
-                durationSeconds={video.media_assets?.duration_seconds}
-              />
+      {resource.loading ? (
+        <WatchSkeleton />
+      ) : resource.error && !video ? (
+        <ResourceError message={resource.error} retry={resource.refresh} />
+      ) : video ? (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 60 }}
+        >
+          {/* Dominant 16:9 Video Canvas */}
+          <VideoPlayer
+            title={video.title}
+            sourceUrl={videoUrl}
+            posterUrl={posterUrl}
+            durationSeconds={video.media_assets?.duration_seconds}
+          />
 
-              {/* Title & Metadata Details */}
-              <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
-                {video.category ? (
-                  <Badge label={video.category.toUpperCase()} variant="primary" />
-                ) : null}
-                <Text style={[styles.title, { color: colors.text }]}>{video.title}</Text>
-                {video.description ? (
-                  <Text style={[styles.description, { color: colors.textSecondary }]}>
-                    {video.description}
-                  </Text>
-                ) : null}
+          {/* Video Metadata & Title */}
+          <View style={styles.metadataSection}>
+            <Text style={[styles.title, { color: colors.text }]}>{video.title}</Text>
 
-                {/* Interaction Action Row */}
-                <View style={[styles.actionRow, { borderTopColor: colors.borderSubtle }]}>
-                  <Pressable
-                    onPress={handleOpenComments}
-                    style={({ pressed }) => [
-                      styles.actionBtn,
-                      { backgroundColor: colors.bgSecondary },
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <Icon name="chatbubble-outline" size={16} color={colors.text} />
-                    <Text style={[styles.actionBtnText, { color: colors.text }]}>Comments</Text>
-                  </Pressable>
-
-                  <Pressable
-                    onPress={handleToggleBookmark}
-                    style={({ pressed }) => [
-                      styles.actionBtn,
-                      {
-                        backgroundColor: isBookmarked ? colors.primarySoft : colors.bgSecondary,
-                        borderColor: isBookmarked ? colors.interactive : 'transparent',
-                        borderWidth: 1,
-                      },
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <Icon
-                      name={isBookmarked ? 'bookmark' : 'bookmark-outline'}
-                      size={16}
-                      color={isBookmarked ? colors.interactive : colors.text}
-                    />
-                    <Text
-                      style={[
-                        styles.actionBtnText,
-                        { color: isBookmarked ? colors.interactive : colors.text },
-                      ]}
-                    >
-                      {isBookmarked ? 'Saved' : 'Save'}
-                    </Text>
-                  </Pressable>
-                </View>
+            <View style={styles.authorRow}>
+              <Avatar name={context?.expression?.name || 'Church'} size="sm" />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.authorName, { color: colors.text }]} numberOfLines={1}>
+                  {context?.expression?.name || 'Church of the Truth'}
+                </Text>
+                <Text style={[styles.authorSub, { color: colors.textSecondary }]}>
+                  {video.category || 'Ministry Teaching'}
+                </Text>
               </View>
+            </View>
 
-              {/* Related Videos */}
-              {related.length > 0 ? (
-                <View style={styles.relatedSection}>
-                  <SectionHeader title="Related Teachings & Videos" />
-                  {related.slice(0, 3).map((r) => (
+            {/* YouTube-Style Action Rail (Like, Save, Share, Comments) */}
+            <View style={[styles.actionsBar, { borderTopColor: colors.borderSubtle, borderBottomColor: colors.borderSubtle }]}>
+              <Pressable
+                onPress={handleLike}
+                style={[styles.actionBtn, isLiked && { backgroundColor: colors.primarySoft }]}
+              >
+                <Icon
+                  name={isLiked ? 'heart' : 'heart-outline'}
+                  size={20}
+                  color={isLiked ? '#EF4444' : colors.text}
+                />
+                <Text style={[styles.actionBtnText, { color: isLiked ? '#EF4444' : colors.text }]}>
+                  {isLiked ? 'Liked' : 'Like'}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={handleSave}
+                style={[styles.actionBtn, isSaved && { backgroundColor: colors.primarySoft }]}
+              >
+                <Icon
+                  name={isSaved ? 'bookmark' : 'bookmark-outline'}
+                  size={20}
+                  color={isSaved ? colors.interactive : colors.text}
+                />
+                <Text style={[styles.actionBtnText, { color: isSaved ? colors.interactive : colors.text }]}>
+                  {isSaved ? 'Saved' : 'Save'}
+                </Text>
+              </Pressable>
+
+              <Pressable onPress={handleShare} style={styles.actionBtn}>
+                <Icon name="share-social-outline" size={20} color={colors.text} />
+                <Text style={[styles.actionBtnText, { color: colors.text }]}>Share</Text>
+              </Pressable>
+
+              <Pressable onPress={() => setCommentsOpen(true)} style={styles.actionBtn}>
+                <Icon name="chatbubble-ellipses-outline" size={20} color={colors.text} />
+                <Text style={[styles.actionBtnText, { color: colors.text }]}>Comments</Text>
+              </Pressable>
+            </View>
+
+            {/* Description */}
+            {video.description ? (
+              <View style={[styles.descCard, { backgroundColor: colors.bgSecondary }]}>
+                <Text style={[styles.descText, { color: colors.text }]}>{video.description}</Text>
+              </View>
+            ) : null}
+
+            {/* Related Videos Stack */}
+            {relatedVideos.length > 0 && (
+              <View style={styles.relatedSection}>
+                <Text style={[styles.relatedHeading, { color: colors.text }]}>Related Teachings</Text>
+                <View style={styles.relatedGrid}>
+                  {relatedVideos.slice(0, 3).map((v) => (
                     <VideoCard
-                      key={r.id}
-                      video={r}
-                      expressionName={expressionName}
-                      onPress={() => router.push(`/watch/${r.id}`)}
+                      key={v.id}
+                      video={v}
+                      onPress={() => router.push(`/watch/${v.id}` as any)}
                     />
                   ))}
                 </View>
-              ) : null}
-            </>
-          ) : null}
-        </View>
-      </ScrollView>
+              </View>
+            )}
+          </View>
+        </ScrollView>
+      ) : null}
 
       {/* Comments Sheet */}
       <CommentSheet
-        visible={commentsVisible}
-        onClose={() => setCommentsVisible(false)}
-        comments={comments}
-        onSubmitComment={handleSendComment}
-        loading={commentLoading}
+        visible={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        comments={[]}
+        onSubmitComment={async (body) => {
+          try {
+            await api.request('engagement', {
+              method: 'POST',
+              body: JSON.stringify({
+                action: 'comment',
+                targetId: id,
+                targetType: 'video',
+                body,
+              }),
+            });
+            setCommentsOpen(false);
+          } catch (err) {
+            alert(err instanceof Error ? err.message : 'Unable to post comment');
+          }
+        }}
       />
     </View>
   );
@@ -226,53 +247,64 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
-  content: {
-    flexGrow: 1,
-  },
-  body: {
-    paddingHorizontal: spacing.lg,
+  metadataSection: {
+    padding: spacing.lg,
     gap: spacing.md,
   },
-  infoCard: {
-    padding: spacing.lg,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    gap: spacing.xs,
-  },
   title: {
-    ...typography.h2,
-    lineHeight: 28,
+    fontSize: 18,
+    fontWeight: '800',
+    lineHeight: 24,
   },
-  description: {
-    ...typography.body,
-    lineHeight: 22,
-    marginTop: 4,
-  },
-  actionRow: {
+  authorRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    paddingTop: spacing.md,
+  },
+  authorName: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  authorSub: {
+    fontSize: 12,
+  },
+  actionsBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingVertical: spacing.sm,
     borderTopWidth: 1,
-    marginTop: spacing.xs,
+    borderBottomWidth: 1,
   },
   actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
     gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
   },
   actionBtnText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
   },
-  relatedSection: {
-    gap: spacing.xs,
-    marginTop: spacing.sm,
+  descCard: {
+    padding: spacing.md,
+    borderRadius: radius.md,
   },
-  pressed: {
-    opacity: 0.8,
+  descText: {
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  relatedSection: {
+    marginTop: spacing.md,
+    gap: spacing.sm,
+  },
+  relatedHeading: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  relatedGrid: {
+    gap: spacing.md,
   },
 });

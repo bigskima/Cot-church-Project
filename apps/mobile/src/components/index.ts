@@ -2,6 +2,7 @@ export * from './primitives/Icon';
 export * from './primitives/AppScreen';
 export * from './primitives/Avatar';
 export * from './primitives/Divider';
+export * from './primitives/BrandMark';
 export * from './Button';
 export * from './Badge';
 export * from './Chip';

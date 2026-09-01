@@ -114,7 +114,7 @@ export default function ProfileScreen() {
           <SectionHeader title="Spiritual & Community Services" />
           <View style={styles.linksList}>
             <Pressable
-              onPress={() => router.push('/(tabs)/profile/prayer')}
+              onPress={() => router.push('/(tabs)/profile/prayer' as any)}
               style={({ pressed }) => [
                 styles.linkTile,
                 { backgroundColor: colors.card, borderColor: colors.border },
@@ -135,7 +135,7 @@ export default function ProfileScreen() {
             </Pressable>
 
             <Pressable
-              onPress={() => router.push('/(tabs)/profile/giving')}
+              onPress={() => router.push('/(tabs)/profile/giving' as any)}
               style={({ pressed }) => [
                 styles.linkTile,
                 { backgroundColor: colors.card, borderColor: colors.border },

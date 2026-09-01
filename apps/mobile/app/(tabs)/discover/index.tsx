@@ -149,7 +149,7 @@ export default function DiscoverScreen() {
             />
             <Chip
               label="Our Story"
-              onPress={() => router.push('/(tabs)/discover/church-story')}
+              onPress={() => router.push('/(tabs)/discover/church-story' as any)}
               icon={<Icon name="library-outline" size={13} color={colors.textSecondary} />}
             />
           </View>
@@ -175,7 +175,7 @@ export default function DiscoverScreen() {
                     <SermonCard
                       key={sermon.id}
                       sermon={sermon}
-                      onPress={() => router.push(`/(tabs)/discover/sermon/${sermon.id}`)}
+                      onPress={() => router.push(`/(tabs)/discover/sermon/${sermon.id}` as any)}
                     />
                   ))
                 ) : (

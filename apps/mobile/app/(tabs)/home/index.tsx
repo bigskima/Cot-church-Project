@@ -182,7 +182,7 @@ export default function HomeScreen() {
 
           {/* Live broadcast shortcut */}
           <Pressable
-            onPress={() => router.push('/(tabs)/live')}
+            onPress={() => router.push('/(tabs)/live' as any)}
             hitSlop={8}
             style={[styles.iconButton, { backgroundColor: colors.bgSecondary }]}
             accessibilityRole="button"
@@ -224,7 +224,7 @@ export default function HomeScreen() {
           <View style={styles.feedSection}>
             <View style={styles.sectionHeaderRow}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>Featured Teachings</Text>
-              <Pressable onPress={() => router.push('/watch')}>
+              <Pressable onPress={() => router.push('/watch' as any)}>
                 <Text style={[styles.seeAllText, { color: colors.interactive }]}>Explore all</Text>
               </Pressable>
             </View>

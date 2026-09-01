@@ -4,12 +4,10 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { SessionProvider } from '@/state/session';
 import { ThemeProvider, useTheme } from '@/state/theme';
+import { BrandingProvider } from '@/state/branding';
 import { fetchPlatformBranding } from '@/services/branding';
 
-// Prevent native splash from auto-hiding until initial state and branding are ready
-SplashScreen.preventAutoHideAsync().catch(() => {
-  // Catch splash screen prevention errors in development/web
-});
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function AppContent() {
   const { isDark } = useTheme();
@@ -18,7 +16,6 @@ function AppContent() {
   useEffect(() => {
     async function prepare() {
       try {
-        // Pre-fetch platform dynamic branding config in parallel with auth restoration
         await fetchPlatformBranding();
       } catch (_e) {
         // Fallback handles branding gracefully
@@ -26,13 +23,11 @@ function AppContent() {
         setAppIsReady(true);
       }
     }
-
     prepare();
   }, []);
 
   useEffect(() => {
     if (appIsReady) {
-      // Smoothly dismiss the native splash screen with no flash
       SplashScreen.hideAsync().catch(() => {});
     }
   }, [appIsReady]);
@@ -44,7 +39,36 @@ function AppContent() {
   return (
     <>
       <StatusBar style={isDark ? 'light' : 'dark'} />
-      <Stack screenOptions={{ headerShown: false }} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: 'fade_from_bottom',
+        }}
+      >
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="live/index" options={{ headerShown: false }} />
+        <Stack.Screen name="live/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="watch/index" options={{ headerShown: false }} />
+        <Stack.Screen name="watch/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="sermon/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="event/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="church-story" options={{ headerShown: false }} />
+        <Stack.Screen name="giving/index" options={{ headerShown: false }} />
+        <Stack.Screen name="prayer/index" options={{ headerShown: false }} />
+        <Stack.Screen name="settings/index" options={{ headerShown: false }} />
+        <Stack.Screen name="expression/[id]/index" options={{ headerShown: false }} />
+        <Stack.Screen name="assistant" options={{ headerShown: false }} />
+        <Stack.Screen name="studio/index" options={{ headerShown: false }} />
+        <Stack.Screen name="leadership/index" options={{ headerShown: false }} />
+        <Stack.Screen name="leadership/media-studio" options={{ headerShown: false }} />
+        <Stack.Screen name="leadership/pastoral-triage" options={{ headerShown: false }} />
+        <Stack.Screen name="leadership/sermons" options={{ headerShown: false }} />
+        <Stack.Screen name="leadership/events" options={{ headerShown: false }} />
+        <Stack.Screen name="leadership/giving" options={{ headerShown: false }} />
+        <Stack.Screen name="leadership/expressions" options={{ headerShown: false }} />
+        <Stack.Screen name="leadership/directory" options={{ headerShown: false }} />
+      </Stack>
     </>
   );
 }
@@ -53,7 +77,9 @@ export default function RootLayout() {
   return (
     <ThemeProvider>
       <SessionProvider>
-        <AppContent />
+        <BrandingProvider>
+          <AppContent />
+        </BrandingProvider>
       </SessionProvider>
     </ThemeProvider>
   );

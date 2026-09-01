@@ -1,5 +1,13 @@
-import React from 'react';
-import { ActivityIndicator, StyleSheet, Text, View, StyleProp, ViewStyle } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import {
+  ActivityIndicator,
+  Animated,
+  StyleProp,
+  StyleSheet,
+  Text,
+  View,
+  ViewStyle,
+} from 'react-native';
 import { useTheme } from '@/state/theme';
 import { radius, spacing, typography } from '@/design-system/tokens';
 import { Button } from './Button';
@@ -11,7 +19,6 @@ export interface SkeletonProps {
   borderRadius?: number;
   count?: number;
   style?: StyleProp<ViewStyle>;
-  dark?: boolean; // kept for backwards compatibility
 }
 
 export function Skeleton({
@@ -22,12 +29,32 @@ export function Skeleton({
   style,
 }: SkeletonProps) {
   const { colors } = useTheme();
+  const opacityAnim = useRef(new Animated.Value(0.4)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacityAnim, {
+          toValue: 0.85,
+          duration: 750,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 0.4,
+          duration: 750,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [opacityAnim]);
 
   if (count > 1) {
     return (
       <View style={{ gap: spacing.sm }}>
         {Array.from({ length: count }).map((_, i) => (
-          <View
+          <Animated.View
             key={i}
             style={[
               styles.skeleton,
@@ -36,6 +63,7 @@ export function Skeleton({
                 width: width as any,
                 borderRadius,
                 backgroundColor: colors.bgSecondary,
+                opacity: opacityAnim,
               },
               style,
             ]}
@@ -46,7 +74,7 @@ export function Skeleton({
   }
 
   return (
-    <View
+    <Animated.View
       style={[
         styles.skeleton,
         {
@@ -54,6 +82,7 @@ export function Skeleton({
           width: width as any,
           borderRadius,
           backgroundColor: colors.bgSecondary,
+          opacity: opacityAnim,
         },
         style,
       ]}
@@ -61,34 +90,166 @@ export function Skeleton({
   );
 }
 
-export function SkeletonCardList({
-  count = 3,
-  cardHeight = 100,
-}: {
-  count?: number;
-  cardHeight?: number;
-  dark?: boolean;
-}) {
+export function HomeFeedSkeleton() {
   const { colors } = useTheme();
+  return (
+    <View style={styles.feedSkeleton}>
+      {/* Stories Tray Placeholder */}
+      <View style={styles.storiesTraySkeleton}>
+        {Array.from({ length: 5 }).map((_, i) => (
+          <View key={i} style={styles.storyBubbleSkeleton}>
+            <Skeleton height={56} width={56} borderRadius={28} />
+            <Skeleton height={10} width={44} borderRadius={4} />
+          </View>
+        ))}
+      </View>
 
+      {/* Hero Live Video Placeholder */}
+      <View style={{ paddingHorizontal: spacing.lg }}>
+        <Skeleton height={200} borderRadius={radius.lg} />
+      </View>
+
+      {/* YouTube-Style Video Card Placeholder */}
+      <View style={{ paddingHorizontal: spacing.lg, gap: spacing.sm }}>
+        <Skeleton height={180} borderRadius={radius.md} />
+        <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }}>
+          <Skeleton height={36} width={36} borderRadius={18} />
+          <View style={{ flex: 1, gap: 4 }}>
+            <Skeleton height={14} width="80%" />
+            <Skeleton height={12} width="40%" />
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+export function CommunityPostSkeleton() {
+  const { colors } = useTheme();
   return (
     <View style={{ gap: spacing.md, paddingVertical: spacing.sm }}>
-      {Array.from({ length: count }).map((_, idx) => (
-        <View
-          key={idx}
-          style={[
-            styles.skeletonCard,
-            {
-              backgroundColor: colors.card,
-              borderColor: colors.border,
-            },
-          ]}
-        >
-          <Skeleton height={20} width="60%" />
-          <Skeleton height={14} width="90%" />
-          <Skeleton height={14} width="40%" />
+      {Array.from({ length: 4 }).map((_, i) => (
+        <View key={i} style={[styles.postSkeletonRow, { borderBottomColor: colors.borderSubtle }]}>
+          <Skeleton height={40} width={40} borderRadius={20} />
+          <View style={{ flex: 1, gap: spacing.xs }}>
+            <View style={{ flexDirection: 'row', gap: spacing.xs }}>
+              <Skeleton height={14} width={100} />
+              <Skeleton height={14} width={60} />
+            </View>
+            <Skeleton height={14} width="95%" />
+            <Skeleton height={14} width="70%" />
+            <View style={{ flexDirection: 'row', gap: spacing.xxl, marginTop: spacing.xs }}>
+              <Skeleton height={12} width={24} />
+              <Skeleton height={12} width={24} />
+              <Skeleton height={12} width={24} />
+            </View>
+          </View>
         </View>
       ))}
+    </View>
+  );
+}
+
+export function DiscoverSkeleton() {
+  return (
+    <View style={{ paddingHorizontal: spacing.lg, gap: spacing.md }}>
+      <Skeleton height={44} borderRadius={radius.pill} />
+      <View style={{ flexDirection: 'row', gap: spacing.xs }}>
+        <Skeleton height={32} width={60} borderRadius={radius.pill} />
+        <Skeleton height={32} width={80} borderRadius={radius.pill} />
+        <Skeleton height={32} width={70} borderRadius={radius.pill} />
+      </View>
+      <Skeleton height={120} count={3} borderRadius={radius.lg} />
+    </View>
+  );
+}
+
+export function WatchSkeleton() {
+  return (
+    <View style={{ gap: spacing.lg }}>
+      <Skeleton height={220} width="100%" borderRadius={0} />
+      <View style={{ paddingHorizontal: spacing.lg, gap: spacing.sm }}>
+        <Skeleton height={20} width="85%" />
+        <Skeleton height={14} width="40%" />
+        <Skeleton height={40} borderRadius={radius.md} style={{ marginTop: spacing.sm }} />
+      </View>
+    </View>
+  );
+}
+
+export function SermonSkeleton() {
+  return (
+    <View style={{ gap: spacing.md, paddingHorizontal: spacing.lg }}>
+      <Skeleton height={220} borderRadius={radius.lg} />
+      <Skeleton height={22} width="80%" />
+      <Skeleton height={14} width="50%" />
+      <Skeleton height={80} borderRadius={radius.md} />
+    </View>
+  );
+}
+
+export function ProfileSkeleton() {
+  return (
+    <View style={{ paddingHorizontal: spacing.lg, gap: spacing.lg }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+        <Skeleton height={68} width={68} borderRadius={34} />
+        <View style={{ flex: 1, gap: 6 }}>
+          <Skeleton height={18} width="60%" />
+          <Skeleton height={14} width="40%" />
+        </View>
+      </View>
+      <Skeleton height={50} count={4} borderRadius={radius.lg} />
+    </View>
+  );
+}
+
+export function ExpressionSkeleton() {
+  return (
+    <View style={{ gap: spacing.md }}>
+      <Skeleton height={160} width="100%" borderRadius={0} />
+      <View style={{ paddingHorizontal: spacing.lg, gap: spacing.sm }}>
+        <Skeleton height={24} width="70%" />
+        <Skeleton height={14} width="45%" />
+        <Skeleton height={36} borderRadius={radius.pill} style={{ marginTop: spacing.xs }} />
+      </View>
+      <View style={{ paddingHorizontal: spacing.lg, gap: spacing.md, marginTop: spacing.md }}>
+        <Skeleton height={100} count={3} borderRadius={radius.lg} />
+      </View>
+    </View>
+  );
+}
+
+export function CommentsSkeleton() {
+  return (
+    <View style={{ gap: spacing.md, padding: spacing.md }}>
+      {Array.from({ length: 3 }).map((_, i) => (
+        <View key={i} style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <Skeleton height={32} width={32} borderRadius={16} />
+          <View style={{ flex: 1, gap: 4 }}>
+            <Skeleton height={12} width={80} />
+            <Skeleton height={14} width="90%" />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+export function ReelLoadingSkeleton() {
+  return (
+    <View style={styles.reelSkeleton}>
+      <Skeleton height="100%" width="100%" borderRadius={0} />
+      <View style={styles.reelSkeletonOverlay}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', gap: spacing.xs, paddingBottom: 60 }}>
+          <Skeleton height={16} width={140} />
+          <Skeleton height={14} width="80%" />
+        </View>
+        <View style={{ gap: spacing.md, alignItems: 'center', paddingBottom: 60 }}>
+          <Skeleton height={40} width={40} borderRadius={20} />
+          <Skeleton height={40} width={40} borderRadius={20} />
+          <Skeleton height={40} width={40} borderRadius={20} />
+        </View>
+      </View>
     </View>
   );
 }
@@ -97,11 +258,10 @@ export interface EmptyStateProps {
   title: string;
   message: string;
   iconName?: string;
-  icon?: string; // backwards compatibility
+  icon?: string;
   actionLabel?: string;
   onAction?: () => void;
   style?: StyleProp<ViewStyle>;
-  dark?: boolean; // backwards compatibility
 }
 
 export function EmptyState({
@@ -148,7 +308,6 @@ export interface ResourceErrorProps {
   retry?: () => void;
   offline?: boolean;
   style?: StyleProp<ViewStyle>;
-  dark?: boolean; // backwards compatibility
 }
 
 export function ResourceError({
@@ -203,7 +362,6 @@ export function LoadingSpinner({
 }: {
   label?: string;
   style?: StyleProp<ViewStyle>;
-  dark?: boolean;
 }) {
   const { colors } = useTheme();
 
@@ -221,11 +379,35 @@ const styles = StyleSheet.create({
   skeleton: {
     overflow: 'hidden',
   },
-  skeletonCard: {
-    padding: spacing.lg,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    gap: spacing.sm,
+  feedSkeleton: {
+    gap: spacing.lg,
+  },
+  storiesTraySkeleton: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  storyBubbleSkeleton: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  postSkeletonRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+  },
+  reelSkeleton: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+  },
+  reelSkeletonOverlay: {
+    ...StyleSheet.absoluteFill as any,
+    flexDirection: 'row',
+    paddingHorizontal: spacing.lg,
   },
   emptyContainer: {
     padding: spacing.xxl,

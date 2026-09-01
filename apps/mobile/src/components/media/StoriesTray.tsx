@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/state/theme';
 import { radius, spacing } from '@/design-system/tokens';
 import { Icon } from '../primitives/Icon';
+import type { LiveStream } from '@/types/content';
 
 export interface StoryItem {
   id: string;
@@ -24,14 +25,54 @@ export interface StoryItem {
 }
 
 export interface StoriesTrayProps {
-  stories: StoryItem[];
+  stories?: StoryItem[];
+  liveStream?: LiveStream | null;
+  onOpenLive?: (id: string) => void;
+  onOpenStory?: (id: string) => void;
   style?: StyleProp<ViewStyle>;
 }
 
-export function StoriesTray({ stories, style }: StoriesTrayProps) {
+export function StoriesTray({
+  stories: customStories,
+  liveStream,
+  onOpenLive,
+  onOpenStory,
+  style,
+}: StoriesTrayProps) {
   const { colors } = useTheme();
 
-  if (!stories || stories.length === 0) return null;
+  // Generate composite stories list
+  const defaultItems: StoryItem[] = [];
+
+  if (liveStream) {
+    defaultItems.push({
+      id: liveStream.id,
+      title: 'LIVE NOW',
+      imageUrl: liveStream.thumbnail_url,
+      isLive: true,
+      hasUnseen: true,
+      onPress: () => onOpenLive?.(liveStream.id),
+    });
+  }
+
+  const sampleHighlights = [
+    { id: 'h1', title: 'Sunday Word', isLive: false, hasUnseen: true },
+    { id: 'h2', title: 'Worship Highlights', isLive: false, hasUnseen: true },
+    { id: 'h3', title: 'Prayer Focus', isLive: false, hasUnseen: false },
+    { id: 'h4', title: 'Testimonies', isLive: false, hasUnseen: false },
+  ];
+
+  sampleHighlights.forEach((h) => {
+    defaultItems.push({
+      id: h.id,
+      title: h.title,
+      isLive: false,
+      hasUnseen: h.hasUnseen,
+      onPress: () => onOpenStory?.(h.id),
+    });
+  });
+
+  const stories = customStories && customStories.length > 0 ? customStories : defaultItems;
 
   return (
     <View style={[styles.container, { borderBottomColor: colors.borderSubtle }, style]}>
@@ -41,68 +82,59 @@ export function StoriesTray({ stories, style }: StoriesTrayProps) {
         keyExtractor={(item) => item.id}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
-        renderItem={({ item }) => (
-          <Pressable
-            onPress={item.onPress}
-            style={({ pressed }) => [styles.storyItem, pressed && styles.pressed]}
-            accessibilityRole="button"
-            accessibilityLabel={`Story: ${item.title}`}
-          >
-            <View style={styles.avatarWrap}>
-              {item.isLive ? (
-                <LinearGradient
-                  colors={['#EF4444', '#EC4899', '#8B5CF6']}
-                  style={styles.gradientRing}
-                >
-                  <View style={[styles.innerCircle, { backgroundColor: colors.bg }]}>
-                    {item.imageUrl ? (
-                      <Image source={{ uri: item.imageUrl }} style={styles.avatarImg} />
-                    ) : (
-                      <Icon name="radio" size={24} color="#EF4444" />
-                    )}
-                  </View>
-                </LinearGradient>
-              ) : item.hasUnseen ? (
-                <LinearGradient
-                  colors={['#1D9BF0', '#3B82F6', '#8B5CF6']}
-                  style={styles.gradientRing}
-                >
-                  <View style={[styles.innerCircle, { backgroundColor: colors.bg }]}>
-                    {item.imageUrl ? (
-                      <Image source={{ uri: item.imageUrl }} style={styles.avatarImg} />
-                    ) : (
-                      <Icon name="play-circle" size={24} color={colors.interactive} />
-                    )}
-                  </View>
-                </LinearGradient>
-              ) : (
-                <View style={[styles.standardRing, { borderColor: colors.border }]}>
-                  {item.imageUrl ? (
-                    <Image source={{ uri: item.imageUrl }} style={styles.avatarImg} />
-                  ) : (
-                    <Icon name="play" size={20} color={colors.textMuted} />
-                  )}
-                </View>
-              )}
-
-              {item.isLive && (
-                <View style={styles.liveBadge}>
-                  <Text style={styles.liveText}>LIVE</Text>
-                </View>
-              )}
-            </View>
-
-            <Text
-              numberOfLines={1}
-              style={[
-                styles.storyTitle,
-                { color: item.isLive ? '#EF4444' : colors.text },
-              ]}
+        renderItem={({ item }) => {
+          return (
+            <Pressable
+              onPress={item.onPress}
+              style={styles.storyBubble}
+              accessibilityRole="button"
+              accessibilityLabel={`Story highlight: ${item.title}`}
             >
-              {item.title}
-            </Text>
-          </Pressable>
-        )}
+              {/* Story Gradient Ring */}
+              {item.isLive ? (
+                <View style={[styles.liveRing, { borderColor: colors.live }]}>
+                  <View style={[styles.innerCircle, { backgroundColor: colors.card }]}>
+                    {item.imageUrl ? (
+                      <Image source={{ uri: item.imageUrl }} style={styles.image} />
+                    ) : (
+                      <Icon name="radio" size={24} color={colors.live} />
+                    )}
+                  </View>
+                  <View style={[styles.livePill, { backgroundColor: colors.live }]}>
+                    <Text style={styles.livePillText}>LIVE</Text>
+                  </View>
+                </View>
+              ) : (
+                <LinearGradient
+                  colors={
+                    item.hasUnseen
+                      ? ['#F59E0B', '#EC4899', '#8B5CF6']
+                      : [colors.border, colors.border]
+                  }
+                  style={styles.gradientRing}
+                >
+                  <View style={[styles.innerCircle, { backgroundColor: colors.card }]}>
+                    {item.imageUrl ? (
+                      <Image source={{ uri: item.imageUrl }} style={styles.image} />
+                    ) : (
+                      <Icon name="sparkles" size={22} color={colors.interactive} />
+                    )}
+                  </View>
+                </LinearGradient>
+              )}
+
+              <Text
+                style={[
+                  styles.storyTitle,
+                  { color: item.isLive ? colors.live : colors.text },
+                ]}
+                numberOfLines={1}
+              >
+                {item.title}
+              </Text>
+            </Pressable>
+          );
+        }}
       />
     </View>
   );
@@ -117,66 +149,57 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     gap: spacing.md,
   },
-  storyItem: {
+  storyBubble: {
     alignItems: 'center',
     width: 68,
     gap: 4,
-  },
-  avatarWrap: {
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   gradientRing: {
     width: 62,
     height: 62,
     borderRadius: 31,
-    padding: 2.5,
+    padding: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  standardRing: {
+  liveRing: {
     width: 62,
     height: 62,
     borderRadius: 31,
-    borderWidth: 1.5,
+    borderWidth: 2,
+    padding: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 2,
+    position: 'relative',
   },
   innerCircle: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 30,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  avatarImg: {
+  image: {
     width: '100%',
     height: '100%',
   },
-  liveBadge: {
+  livePill: {
     position: 'absolute',
     bottom: -4,
-    backgroundColor: '#EF4444',
     paddingHorizontal: 5,
     paddingVertical: 1,
-    borderRadius: radius.xs,
+    borderRadius: radius.pill,
   },
-  liveText: {
+  livePillText: {
     color: '#FFFFFF',
     fontSize: 9,
-    fontWeight: '900',
+    fontWeight: '800',
     letterSpacing: 0.5,
   },
   storyTitle: {
     fontSize: 11,
-    fontWeight: '500',
+    fontWeight: '600',
     textAlign: 'center',
-  },
-  pressed: {
-    opacity: 0.8,
-    transform: [{ scale: 0.96 }],
   },
 });

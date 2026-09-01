@@ -1,12 +1,19 @@
-import React, { useState } from 'react';
-import { Dimensions, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { radius, spacing } from '@/design-system/tokens';
 import { Icon } from '../primitives/Icon';
 import { Avatar } from '../primitives/Avatar';
 import type { Reel } from '@/types/content';
-
-const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
 export interface ReelPlayerProps {
   reel: Reel;
@@ -18,6 +25,7 @@ export interface ReelPlayerProps {
   onOpenComments?: () => void;
   onSave?: () => void;
   onShare?: () => void;
+  containerHeight?: number;
 }
 
 export function ReelPlayer({
@@ -30,11 +38,60 @@ export function ReelPlayer({
   onOpenComments,
   onSave,
   onShare,
+  containerHeight,
 }: ReelPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [isCaptionExpanded, setIsCaptionExpanded] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
+
+  const videoUrl =
+    reel.media_assets?.renditions?.find((r) => r.rendition_kind === 'video_stream')?.storage_path ||
+    reel.media_assets?.url;
+  const thumbnailUrl = reel.media_assets?.thumbnailUrl || reel.media_assets?.url;
+
+  const player = useVideoPlayer(videoUrl || '', (p) => {
+    p.loop = true;
+    p.timeUpdateEventInterval = 0.5;
+  });
+
+  useEffect(() => {
+    if (!player) return;
+    if (isActive) {
+      player.play();
+      setIsPlaying(true);
+    } else {
+      player.pause();
+      setIsPlaying(false);
+    }
+  }, [isActive, player]);
+
+  useEffect(() => {
+    if (!player) return;
+
+    const statusSub = player.addListener('statusChange', (status) => {
+      setIsBuffering(status.status === 'loading');
+    });
+
+    const playingSub = player.addListener('playingChange', (status) => {
+      setIsPlaying(status.isPlaying);
+    });
+
+    return () => {
+      statusSub.remove();
+      playingSub.remove();
+    };
+  }, [player]);
+
+  const togglePlay = () => {
+    if (!player) return;
+    if (isPlaying) {
+      player.pause();
+    } else {
+      player.play();
+    }
+  };
 
   const toggleLike = () => {
     setIsLiked(!isLiked);
@@ -46,23 +103,45 @@ export function ReelPlayer({
     onSave?.();
   };
 
-  const thumbnailUrl = reel.media_assets?.thumbnailUrl || reel.media_assets?.url;
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `Watch this reel on Church: ${reel.caption || 'Spiritual teaching'}`,
+      });
+      onShare?.();
+    } catch {
+      // Ignored
+    }
+  };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, containerHeight ? { height: containerHeight } : null]}>
       {/* 9:16 Media Canvas */}
       <View style={styles.videoCanvas}>
-        {thumbnailUrl ? (
+        {videoUrl && player ? (
+          <VideoView
+            player={player}
+            style={styles.videoView}
+            contentFit="cover"
+          />
+        ) : thumbnailUrl ? (
           <Image source={{ uri: thumbnailUrl }} style={styles.videoPoster} resizeMode="cover" />
         ) : (
           <View style={styles.placeholderCanvas}>
-            <Icon name="film-outline" size={48} color="#5C8FF5" />
+            <Icon name="film-outline" size={48} color="#1D9BF0" />
+          </View>
+        )}
+
+        {/* Buffering Indicator */}
+        {isBuffering && (
+          <View style={styles.bufferingOverlay}>
+            <ActivityIndicator size="large" color="#FFFFFF" />
           </View>
         )}
 
         {/* Tap to Play/Pause Layer */}
         <Pressable
-          onPress={() => setIsPlaying(!isPlaying)}
+          onPress={togglePlay}
           style={styles.tapLayer}
         >
           {!isPlaying ? (
@@ -72,9 +151,9 @@ export function ReelPlayer({
           ) : null}
         </Pressable>
 
-        {/* Right Interaction Action Rail */}
+        {/* Right Interaction Action Rail (TikTok / Reels style) */}
         <View style={styles.actionRail}>
-          {/* Like / Reaction */}
+          {/* Like */}
           <Pressable
             onPress={toggleLike}
             hitSlop={6}
@@ -86,7 +165,7 @@ export function ReelPlayer({
               <Icon
                 name={isLiked ? 'heart' : 'heart-outline'}
                 size={24}
-                color={isLiked ? '#E5484D' : '#FFFFFF'}
+                color={isLiked ? '#EF4444' : '#FFFFFF'}
               />
             </View>
             <Text style={styles.actionLabel}>
@@ -94,21 +173,21 @@ export function ReelPlayer({
             </Text>
           </Pressable>
 
-          {/* Comment Trigger */}
+          {/* Comment */}
           <Pressable
             onPress={onOpenComments}
             hitSlop={6}
             style={styles.actionBtn}
             accessibilityRole="button"
-            accessibilityLabel="View comments"
+            accessibilityLabel="Comments"
           >
             <View style={styles.actionCircle}>
-              <Icon name="chatbubble-outline" size={22} color="#FFFFFF" />
+              <Icon name="chatbubble-ellipses-outline" size={24} color="#FFFFFF" />
             </View>
             <Text style={styles.actionLabel}>{reel.comments_count}</Text>
           </Pressable>
 
-          {/* Save/Bookmark */}
+          {/* Bookmark */}
           <Pressable
             onPress={toggleSave}
             hitSlop={6}
@@ -119,55 +198,45 @@ export function ReelPlayer({
             <View style={[styles.actionCircle, isSaved && styles.savedCircle]}>
               <Icon
                 name={isSaved ? 'bookmark' : 'bookmark-outline'}
-                size={22}
-                color={isSaved ? '#5C8FF5' : '#FFFFFF'}
+                size={24}
+                color={isSaved ? '#1D9BF0' : '#FFFFFF'}
               />
             </View>
-            <Text style={styles.actionLabel}>{isSaved ? 'Saved' : 'Save'}</Text>
+            <Text style={styles.actionLabel}>Save</Text>
           </Pressable>
 
           {/* Share */}
           <Pressable
-            onPress={onShare}
+            onPress={handleShare}
             hitSlop={6}
             style={styles.actionBtn}
             accessibilityRole="button"
             accessibilityLabel="Share reel"
           >
             <View style={styles.actionCircle}>
-              <Icon name="share-social-outline" size={22} color="#FFFFFF" />
+              <Icon name="share-social-outline" size={24} color="#FFFFFF" />
             </View>
             <Text style={styles.actionLabel}>Share</Text>
           </Pressable>
         </View>
 
-        {/* Bottom Metadata Gradient & Details */}
+        {/* Bottom Overlay Gradient & Metadata */}
         <LinearGradient
-          colors={['transparent', 'rgba(6, 20, 38, 0.7)', 'rgba(6, 20, 38, 0.95)']}
+          colors={['transparent', 'rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.85)']}
           style={styles.bottomGradient}
         >
-          {/* Creator & Expression Info */}
+          {/* Creator Identity */}
           <View style={styles.creatorRow}>
-            <Avatar name={expressionName || 'Church'} size="sm" showBorder />
-            <View style={styles.creatorCol}>
-              <Text style={styles.creatorName} numberOfLines={1}>
-                {expressionName || 'Church Expression'}
-              </Text>
-            </View>
+            <Avatar name={expressionName || 'Church'} size="sm" />
+            <Text style={styles.creatorName} numberOfLines={1}>
+              {expressionName || 'Church Fellowship'}
+            </Text>
             {onFollow ? (
               <Pressable
                 onPress={onFollow}
-                style={[
-                  styles.followBtn,
-                  isFollowing ? styles.followingBtn : styles.notFollowingBtn,
-                ]}
+                style={[styles.followBtn, isFollowing && styles.followingBtn]}
               >
-                <Text
-                  style={[
-                    styles.followBtnText,
-                    { color: isFollowing ? '#CBD5E1' : '#0D294B' },
-                  ]}
-                >
+                <Text style={styles.followBtnText}>
                   {isFollowing ? 'Following' : 'Follow'}
                 </Text>
               </Pressable>
@@ -175,19 +244,21 @@ export function ReelPlayer({
           </View>
 
           {/* Caption */}
-          <Pressable onPress={() => setIsCaptionExpanded(!isCaptionExpanded)}>
-            <Text
-              style={styles.captionText}
-              numberOfLines={isCaptionExpanded ? undefined : 2}
-            >
-              {reel.caption}
-            </Text>
-          </Pressable>
+          {reel.caption ? (
+            <Pressable onPress={() => setIsCaptionExpanded(!isCaptionExpanded)}>
+              <Text
+                style={styles.captionText}
+                numberOfLines={isCaptionExpanded ? undefined : 2}
+              >
+                {reel.caption}
+              </Text>
+            </Pressable>
+          ) : null}
 
-          {/* Audio Info */}
+          {/* Audio track tag */}
           {reel.audio_title ? (
             <View style={styles.audioRow}>
-              <Icon name="musical-note" size={13} color="#8FB4F8" style={{ marginRight: 5 }} />
+              <Icon name="musical-note" size={13} color="#FFFFFF" />
               <Text style={styles.audioText} numberOfLines={1}>
                 {reel.audio_title} {reel.audio_artist ? `· ${reel.audio_artist}` : ''}
               </Text>
@@ -201,43 +272,46 @@ export function ReelPlayer({
 
 const styles = StyleSheet.create({
   container: {
-    width: screenWidth,
-    height: screenHeight - 80, // Accounts for tab bar & header
-    backgroundColor: '#061426',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#000000',
   },
   videoCanvas: {
     width: '100%',
     height: '100%',
     position: 'relative',
-    backgroundColor: '#061426',
+    overflow: 'hidden',
+  },
+  videoView: {
+    width: '100%',
+    height: '100%',
   },
   videoPoster: {
     width: '100%',
     height: '100%',
   },
   placeholderCanvas: {
-    width: '100%',
-    height: '100%',
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#091B33',
+    backgroundColor: '#050B14',
+  },
+  bufferingOverlay: {
+    ...StyleSheet.absoluteFill as any,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   tapLayer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    ...StyleSheet.absoluteFill as any,
     alignItems: 'center',
     justifyContent: 'center',
   },
   pauseIndicator: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(6, 20, 38, 0.65)',
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -257,73 +331,83 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(6, 20, 38, 0.55)',
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   likedCircle: {
-    backgroundColor: 'rgba(229, 72, 77, 0.25)',
+    backgroundColor: 'rgba(239, 68, 68, 0.25)',
   },
   savedCircle: {
-    backgroundColor: 'rgba(47, 111, 237, 0.25)',
+    backgroundColor: 'rgba(29, 155, 240, 0.25)',
   },
   actionLabel: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   bottomGradient: {
     position: 'absolute',
-    bottom: 0,
     left: 0,
     right: 0,
+    bottom: 0,
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl,
-    paddingTop: spacing.xxl,
+    paddingBottom: 24,
+    paddingTop: 60,
     gap: spacing.xs,
   },
   creatorRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    marginBottom: spacing.xxs,
-  },
-  creatorCol: {
-    flex: 1,
   },
   creatorName: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
+    flexShrink: 1,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   followBtn: {
     paddingHorizontal: 12,
-    paddingVertical: 5,
+    paddingVertical: 4,
     borderRadius: radius.pill,
-  },
-  notFollowingBtn: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
   },
   followingBtn: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'transparent',
+    borderColor: 'rgba(255, 255, 255, 0.6)',
   },
   followBtnText: {
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700',
   },
   captionText: {
-    color: '#F8FAFC',
-    fontSize: 13,
-    lineHeight: 18,
+    color: '#FFFFFF',
+    fontSize: 14,
+    lineHeight: 19,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   audioRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.xxs,
+    gap: 4,
+    marginTop: 2,
   },
   audioText: {
-    color: '#8FB4F8',
+    color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '500',
+    opacity: 0.9,
   },
 });

@@ -9,192 +9,129 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { router } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
-import { Icon } from '@/components';
+import { BrandMark } from '@/components/primitives/BrandMark';
+import { Icon } from '@/components/primitives/Icon';
+import { Button } from '@/components/Button';
 import { radius, spacing, typography } from '@/design-system/tokens';
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
-  const { api, authenticate, continueAsVisitor } = useSession();
-  const { colors, isDark } = useTheme();
+  const { login, enterAsVisitor } = useSession();
+  const { colors } = useTheme();
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
-  async function handleSignIn() {
-    if (!identifier.trim() || !password) {
-      setError('Please enter your email, phone, or username and password.');
+  const handleLogin = async () => {
+    setErrorMsg('');
+    if (!identifier.trim()) {
+      setErrorMsg('Please enter your email or phone number.');
+      return;
+    }
+    if (!password) {
+      setErrorMsg('Please enter your password.');
       return;
     }
 
     setLoading(true);
-    setError('');
-
     try {
-      const isEmail = identifier.includes('@');
-      const isPhone = /^\+?[0-9\s\-()]{7,}$/.test(identifier.trim());
-
-      const payload = isEmail
-        ? { email: identifier.trim().toLowerCase() }
-        : isPhone
-        ? { phoneNumber: identifier.trim().replace(/\s+/g, '') }
-        : { email: identifier.trim().toLowerCase() };
-
-      const data = await api.request<{
-        session: {
-          accessToken: string;
-          refreshToken: string;
-          expiresAt?: number;
-          tokenType: string;
-        };
-      }>('login', {
-        method: 'POST',
-        body: JSON.stringify({ ...payload, password }),
-      });
-
-      await authenticate({ session: data.session });
+      await login(identifier.trim(), password);
       router.replace('/(tabs)/home');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid credentials. Please try again.');
+      setErrorMsg(err instanceof Error ? err.message : 'Invalid credentials. Please check your details.');
     } finally {
       setLoading(false);
     }
-  }
+  };
 
-  function handleContinueAsGuest() {
-    continueAsVisitor();
+  const handleGuestEntry = async () => {
+    await enterAsVisitor();
     router.replace('/(tabs)/home');
-  }
+  };
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: colors.bg }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={[styles.screen, { backgroundColor: colors.bg }]}
     >
-      {/* Top Header Bar */}
-      <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
-        <View style={styles.logoBadge}>
-          <Icon name="business" size={26} color={colors.interactive} />
-        </View>
-      </View>
-
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: insets.top + spacing.xxl, paddingBottom: insets.bottom + spacing.xxl },
+        ]}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.mainColumn}>
-          {/* Headline */}
-          <Text style={[styles.headline, { color: colors.text }]}>
-            Sign in to Church
+        {/* Platform Brand Mark */}
+        <View style={styles.brandMarkContainer}>
+          <BrandMark variant="auth" size={72} />
+        </View>
+
+        <View style={styles.header}>
+          <Text style={[styles.title, { color: colors.text }]}>Welcome Back</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+            Sign in to access sermons, giving, prayer wall, and your campus fellowship.
           </Text>
-          <Text style={[styles.subheadline, { color: colors.textSecondary }]}>
-            Connect to live broadcasts, sermon teachings, giving receipts, and spiritual community.
-          </Text>
+        </View>
 
-          {/* Social / Fast OAuth Buttons (Twitter / Instagram style) */}
-          <View style={styles.oauthContainer}>
-            <Pressable
-              onPress={() => setError('Google sign-in is coming soon.')}
-              style={({ pressed }) => [
-                styles.oauthBtn,
-                { backgroundColor: colors.card, borderColor: colors.border },
-                pressed && styles.pressed,
-              ]}
-            >
-              <Icon name="logo-google" size={18} color={colors.text} style={{ marginRight: 10 }} />
-              <Text style={[styles.oauthBtnText, { color: colors.text }]}>
-                Continue with Google
-              </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => setError('Apple sign-in is coming soon.')}
-              style={({ pressed }) => [
-                styles.oauthBtn,
-                { backgroundColor: colors.card, borderColor: colors.border },
-                pressed && styles.pressed,
-              ]}
-            >
-              <Icon name="logo-apple" size={18} color={colors.text} style={{ marginRight: 10 }} />
-              <Text style={[styles.oauthBtnText, { color: colors.text }]}>
-                Continue with Apple
-              </Text>
-            </Pressable>
+        {errorMsg ? (
+          <View style={[styles.errorBanner, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
+            <Icon name="alert-circle" size={18} color="#EF4444" style={{ marginRight: 8 }} />
+            <Text style={[styles.errorText, { color: '#EF4444' }]}>{errorMsg}</Text>
           </View>
+        ) : null}
 
-          {/* Minimal Divider */}
-          <View style={styles.dividerRow}>
-            <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-            <Text style={[styles.dividerText, { color: colors.textMuted }]}>or</Text>
-            <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-          </View>
-
-          {/* Error Banner */}
-          {error ? (
-            <View style={[styles.errorBanner, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
-              <Icon name="alert-circle" size={16} color="#EF4444" style={{ marginRight: 8 }} />
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          ) : null}
-
-          {/* Minimal Inputs */}
-          <View style={styles.formGroup}>
-            <View
+        <View style={styles.form}>
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>EMAIL OR PHONE NUMBER</Text>
+            <TextInput
+              value={identifier}
+              onChangeText={setIdentifier}
+              placeholder="name@example.com or +15550000000"
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="none"
+              keyboardType="email-address"
               style={[
-                styles.inputWrapper,
+                styles.input,
                 {
-                  backgroundColor: colors.inputBg,
+                  backgroundColor: colors.bgSecondary,
                   borderColor: colors.border,
+                  color: colors.text,
                 },
               ]}
-            >
-              <TextInput
-                value={identifier}
-                onChangeText={(val) => {
-                  setIdentifier(val);
-                  setError('');
-                }}
-                placeholder="Phone, email, or username"
-                placeholderTextColor={colors.textMuted}
-                autoCapitalize="none"
-                autoComplete="email"
-                keyboardType="email-address"
-                style={[styles.inputField, { color: colors.text }]}
-              />
-            </View>
+            />
+          </View>
 
-            <View
-              style={[
-                styles.inputWrapper,
-                {
-                  backgroundColor: colors.inputBg,
-                  borderColor: colors.border,
-                },
-              ]}
-            >
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>PASSWORD</Text>
+            <View style={styles.passwordContainer}>
               <TextInput
                 value={password}
-                onChangeText={(val) => {
-                  setPassword(val);
-                  setError('');
-                }}
-                placeholder="Password"
+                onChangeText={setPassword}
+                placeholder="Enter your password"
                 placeholderTextColor={colors.textMuted}
                 secureTextEntry={!showPassword}
-                autoCapitalize="none"
-                style={[styles.inputField, { color: colors.text }]}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.bgSecondary,
+                    borderColor: colors.border,
+                    color: colors.text,
+                    paddingRight: 44,
+                  },
+                ]}
               />
               <Pressable
                 onPress={() => setShowPassword(!showPassword)}
-                hitSlop={10}
                 style={styles.eyeBtn}
+                hitSlop={8}
               >
                 <Icon
                   name={showPassword ? 'eye-off-outline' : 'eye-outline'}
@@ -205,53 +142,32 @@ export default function LoginScreen() {
             </View>
           </View>
 
-          {/* Primary Pill Action Button */}
-          <Pressable
-            onPress={handleSignIn}
-            disabled={loading}
-            style={({ pressed }) => [
-              styles.primaryPillBtn,
-              {
-                backgroundColor: isDark ? '#FFFFFF' : '#0F172A',
-                opacity: pressed || loading ? 0.85 : 1,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.primaryPillBtnText,
-                { color: isDark ? '#0F172A' : '#FFFFFF' },
-              ]}
-            >
-              {loading ? 'Signing In...' : 'Log In'}
-            </Text>
-          </Pressable>
+          <Button
+            label="Sign In"
+            onPress={handleLogin}
+            loading={loading}
+            variant="primary"
+            size="lg"
+            style={{ marginTop: spacing.sm }}
+          />
 
-          {/* Guest / Visitor Access Button */}
-          <Pressable
-            onPress={handleContinueAsGuest}
-            style={({ pressed }) => [
-              styles.guestPillBtn,
-              { borderColor: colors.border },
-              pressed && styles.pressed,
-            ]}
-          >
-            <Text style={[styles.guestPillBtnText, { color: colors.textSecondary }]}>
-              Continue as Guest
-            </Text>
-          </Pressable>
+          <Button
+            label="Continue as Guest"
+            onPress={handleGuestEntry}
+            variant="outline"
+            size="lg"
+          />
         </View>
 
-        {/* Bottom Pinned Footer */}
-        <View style={styles.footerRow}>
+        <View style={styles.footer}>
           <Text style={[styles.footerText, { color: colors.textSecondary }]}>
             Don't have an account?{' '}
           </Text>
-          <Pressable onPress={() => router.push('/(auth)/signup')}>
-            <Text style={[styles.footerLink, { color: colors.interactive }]}>
-              Sign up
-            </Text>
-          </Pressable>
+          <Link href="/(auth)/signup" asChild>
+            <Pressable>
+              <Text style={[styles.footerLink, { color: colors.interactive }]}>Sign up</Text>
+            </Pressable>
+          </Link>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -259,141 +175,81 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-  },
-  topBar: {
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.sm,
-  },
-  logoBadge: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xxl,
-  },
-  mainColumn: {
+    paddingHorizontal: spacing.xxl,
+    maxWidth: 440,
     width: '100%',
-    maxWidth: 420,
     alignSelf: 'center',
-    marginTop: spacing.sm,
   },
-  headline: {
-    fontSize: 28,
-    fontWeight: '800',
-    letterSpacing: -0.7,
-    marginBottom: spacing.xs,
+  brandMarkContainer: {
+    alignItems: 'center',
+    marginBottom: spacing.lg,
   },
-  subheadline: {
-    fontSize: 14,
+  header: {
+    marginBottom: spacing.xxl,
+    alignItems: 'center',
+  },
+  title: {
+    ...typography.h1,
+    textAlign: 'center',
+  },
+  subtitle: {
+    ...typography.bodySmall,
+    textAlign: 'center',
+    marginTop: 6,
     lineHeight: 20,
-    marginBottom: spacing.xl,
-  },
-  oauthContainer: {
-    gap: spacing.sm,
-  },
-  oauthBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-  },
-  oauthBtnText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: spacing.lg,
-    gap: spacing.md,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-  },
-  dividerText: {
-    fontSize: 13,
-    fontWeight: '500',
   },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
     borderRadius: radius.md,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   errorText: {
-    color: '#EF4444',
     fontSize: 13,
     fontWeight: '600',
     flex: 1,
   },
-  formGroup: {
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
+  form: {
+    gap: spacing.md,
   },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  inputGroup: {
+    gap: 4,
+  },
+  inputLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  input: {
+    height: 48,
     borderRadius: radius.md,
     borderWidth: 1,
-    paddingHorizontal: spacing.lg,
-    height: 52,
-  },
-  inputField: {
-    flex: 1,
+    paddingHorizontal: spacing.md,
     fontSize: 15,
-    height: '100%',
+  },
+  passwordContainer: {
+    position: 'relative',
   },
   eyeBtn: {
-    padding: 4,
+    position: 'absolute',
+    right: 12,
+    top: 14,
   },
-  primaryPillBtn: {
-    height: 48,
-    borderRadius: radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
-  },
-  primaryPillBtnText: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  guestPillBtn: {
-    height: 48,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  guestPillBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  footerRow: {
+  footer: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
-    marginTop: spacing.xl,
+    marginTop: spacing.xxl,
   },
   footerText: {
-    fontSize: 14,
+    ...typography.bodySmall,
   },
   footerLink: {
-    fontSize: 14,
+    ...typography.bodySmall,
     fontWeight: '700',
-  },
-  pressed: {
-    opacity: 0.75,
   },
 });

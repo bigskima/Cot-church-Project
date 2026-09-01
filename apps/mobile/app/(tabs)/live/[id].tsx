@@ -73,8 +73,9 @@ export default function LivePlayerScreen() {
             });
           }
         } else {
-          const data = await api.request<StreamAccess>(`live-streams/${id}/access`, {
+          const data = await api.request<StreamAccess>('stream-access', {
             method: 'POST',
+            body: JSON.stringify({ streamId: id }),
           });
           if (isMounted) setAccess(data);
         }
@@ -114,6 +115,19 @@ export default function LivePlayerScreen() {
 
   const submitSupport = async () => {
     if (!supportName.trim()) return;
+    try {
+      await api.request('live-interactions', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'follow_up',
+          streamId: id,
+          userName: supportName.trim(),
+          contact: supportContact.trim(),
+        }),
+      });
+    } catch {
+      // Ignored for offline/guest
+    }
     setSupportSent(true);
     setTimeout(() => {
       setShowSupportSheet(false);
@@ -205,7 +219,7 @@ export default function LivePlayerScreen() {
         <View style={styles.actionPillsRow}>
           {access.givingEnabled && (
             <Pressable
-              onPress={() => router.push('/(tabs)/profile/giving')}
+              onPress={() => router.push('/(tabs)/profile/giving' as any)}
               style={[styles.givingPill, { backgroundColor: colors.primarySoft }]}
             >
               <Icon name="gift-outline" size={14} color={colors.interactive} />

@@ -11,8 +11,12 @@ type Value = {
   hasCapability: (code: string) => boolean;
   api: ApiClient;
   authenticate: (value: StoredAuth) => Promise<void>;
+  setSession: (session: any) => Promise<void>;
+  login: (identifier: string, password: string) => Promise<void>;
   continueAsVisitor: () => void;
+  enterAsVisitor: () => Promise<void>;
   selectContext: (organizationId: string, branchId?: string) => Promise<void>;
+  switchOrganization: (organizationId: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 const SessionContext = createContext<Value | null>(null);
@@ -43,6 +47,50 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
   const api = useMemo(() => new ApiClient(apiUrl, () => auth), [auth]);
 
+  const login = async (identifier: string, password: string) => {
+    const isEmail = identifier.includes('@');
+    const res = await api.request<{
+      session: {
+        accessToken: string;
+        refreshToken: string;
+        expiresAt?: number;
+        tokenType?: string;
+      };
+      userId: string;
+    }>('login', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: isEmail ? identifier : undefined,
+        phoneNumber: !isEmail ? identifier : undefined,
+        password,
+      }),
+    });
+
+    if (res.session) {
+      await persist({
+        session: {
+          accessToken: res.session.accessToken,
+          refreshToken: res.session.refreshToken,
+          expiresAt: res.session.expiresAt,
+          tokenType: res.session.tokenType || 'bearer',
+        },
+      });
+    }
+  };
+
+  const setSession = async (session: any) => {
+    if (session) {
+      await persist({
+        session: {
+          accessToken: session.accessToken,
+          refreshToken: session.refreshToken,
+          expiresAt: session.expiresAt,
+          tokenType: session.tokenType || 'bearer',
+        },
+      });
+    }
+  };
+
   useEffect(() => {
     if (mode !== 'authenticated') return;
     api
@@ -50,7 +98,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
       .then((value) => {
         setContext(value);
         if (!auth?.organizationId && value.organizations[0]) {
-          const membership = value.organizations[0].memberships[0];
+          const membership = value.organizations[0].memberships?.[0];
           void persist({
             ...auth!,
             organizationId: value.organizations[0].id,
@@ -75,6 +123,10 @@ export function SessionProvider({ children }: PropsWithChildren) {
     if (auth) await persist({ ...auth, organizationId, branchId });
   };
 
+  const switchOrganization = async (organizationId: string) => {
+    await selectContext(organizationId);
+  };
+
   const signOut = async () => {
     setContext(null);
     await persist(null);
@@ -90,8 +142,14 @@ export function SessionProvider({ children }: PropsWithChildren) {
         hasCapability,
         api,
         authenticate: persist,
+        setSession,
+        login,
         continueAsVisitor: () => setMode('visitor'),
+        enterAsVisitor: async () => {
+          setMode('visitor');
+        },
         selectContext,
+        switchOrganization,
         signOut,
       }}
     >

@@ -1,33 +1,39 @@
 import React, { useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View, StyleProp, ViewStyle } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View, StyleProp, ViewStyle, Share } from 'react-native';
 import { useTheme } from '@/state/theme';
 import { radius, spacing } from '@/design-system/tokens';
 import { Avatar } from '../primitives/Avatar';
 import { Icon } from '../primitives/Icon';
-import type { SocialPost } from '@/types/content';
+import type { Post, SocialPost } from '@/types/content';
 
 export interface PostCardProps {
-  post: SocialPost;
+  post: Post | SocialPost;
   authorName?: string;
   authorHandle?: string;
   authorAvatar?: string | null;
   expressionName?: string;
   onPress?: () => void;
+  onPressAuthor?: () => void;
+  onLike?: () => void;
+  onComment?: () => void;
   onReply?: () => void;
   onReact?: (reaction: string) => void;
   onBookmark?: () => void;
   onShare?: () => void;
   style?: StyleProp<ViewStyle>;
-  dark?: boolean; // backwards compatibility
+  dark?: boolean;
 }
 
 export function PostCard({
   post,
-  authorName = 'Church Member',
+  authorName,
   authorHandle,
   authorAvatar,
   expressionName,
   onPress,
+  onPressAuthor,
+  onLike,
+  onComment,
   onReply,
   onReact,
   onBookmark,
@@ -36,18 +42,41 @@ export function PostCard({
 }: PostCardProps) {
   const { colors } = useTheme();
 
+  const postAsAny = post as any;
+  const displayName =
+    authorName ||
+    postAsAny.author?.display_name ||
+    postAsAny.author_name ||
+    'Church Member';
+  const handle =
+    authorHandle ||
+    postAsAny.author?.handle ||
+    postAsAny.author_handle ||
+    'fellowship';
+  const avatarUrl =
+    authorAvatar ||
+    postAsAny.author?.avatar_url ||
+    postAsAny.author_avatar;
+  const isVerified =
+    postAsAny.author?.is_verified ||
+    postAsAny.is_verified ||
+    false;
+
   const [hasLiked, setHasLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(post.social_reactions?.length || 0);
+  const [likeCount, setLikeCount] = useState(
+    postAsAny.likes_count ?? (post.social_reactions?.length || 0)
+  );
   const [hasSaved, setHasSaved] = useState(false);
 
   const handleLike = () => {
     if (hasLiked) {
       setHasLiked(false);
-      setLikeCount((c) => Math.max(0, c - 1));
+      setLikeCount((c: number) => Math.max(0, c - 1));
     } else {
       setHasLiked(true);
-      setLikeCount((c) => c + 1);
+      setLikeCount((c: number) => c + 1);
       onReact?.('amen');
+      onLike?.();
     }
   };
 
@@ -56,135 +85,141 @@ export function PostCard({
     onBookmark?.();
   };
 
+  const handleNativeShare = async () => {
+    try {
+      await Share.share({
+        message: `${displayName} on Church: "${post.body}"`,
+      });
+      onShare?.();
+    } catch {
+      // Ignored
+    }
+  };
+
   const formatTime = () => {
-    const d = new Date(post.published_at || Date.now());
-    const diff = (Date.now() - d.getTime()) / 1000;
+    const d = new Date(post.published_at || (post as any).created_at || Date.now());
+    const diff = Math.floor((Date.now() - d.getTime()) / 1000);
     if (diff < 60) return 'now';
     if (diff < 3600) return `${Math.floor(diff / 60)}m`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return `${Math.floor(diff / 86400)}d`;
   };
 
-  const mediaUrl = post.media?.[0]?.url || post.media?.[0]?.thumbnailUrl;
+  const mediaItem = post.media?.[0];
 
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.rowContainer,
-        { borderBottomColor: colors.borderSubtle },
-        pressed && styles.pressed,
+      style={[
+        styles.container,
+        {
+          backgroundColor: colors.bg,
+          borderBottomColor: colors.borderSubtle,
+        },
         style,
       ]}
-      accessibilityRole="button"
     >
       {/* Left Column: Avatar */}
-      <View style={styles.leftCol}>
-        <Avatar url={authorAvatar} name={authorName} size="md" />
-      </View>
+      <Pressable onPress={onPressAuthor || onPress} style={styles.avatarColumn}>
+        <Avatar name={displayName} url={avatarUrl} size="md" />
+      </Pressable>
 
-      {/* Right Column: Content + Actions (Twitter / Threads style) */}
-      <View style={styles.rightCol}>
+      {/* Right Column: Post Body & Thread Action Rail */}
+      <View style={styles.contentColumn}>
         {/* Author Header Row */}
-        <View style={styles.headerRow}>
-          <View style={styles.nameGroup}>
-            <Text style={[styles.authorName, { color: colors.text }]} numberOfLines={1}>
-              {authorName}
+        <View style={styles.authorRow}>
+          <Pressable onPress={onPressAuthor || onPress} style={styles.nameGroup}>
+            <Text style={[styles.displayName, { color: colors.text }]} numberOfLines={1}>
+              {displayName}
             </Text>
-            <Icon name="checkmark-circle" size={14} color={colors.interactive} />
+            {isVerified && (
+              <Icon name="checkmark-circle" size={14} color="#1D9BF0" style={styles.verifiedIcon} />
+            )}
             <Text style={[styles.handleText, { color: colors.textMuted }]} numberOfLines={1}>
-              {authorHandle ? `@${authorHandle}` : expressionName ? `· ${expressionName}` : ''}
+              @{handle}
             </Text>
-          </View>
+          </Pressable>
 
-          <Text style={[styles.timeText, { color: colors.textMuted }]}>
-            {formatTime()}
-          </Text>
+          <Text style={[styles.timestamp, { color: colors.textMuted }]}>· {formatTime()}</Text>
         </View>
 
-        {/* Post Body Text */}
-        <Text style={[styles.bodyText, { color: colors.text }]}>
-          {post.body}
-        </Text>
+        {/* Post Text */}
+        <Text style={[styles.bodyText, { color: colors.text }]}>{post.body}</Text>
 
-        {/* Media Attachment (if present) */}
-        {mediaUrl ? (
-          <View style={[styles.mediaContainer, { borderColor: colors.border }]}>
-            <Image source={{ uri: mediaUrl }} style={styles.mediaImage} resizeMode="cover" />
+        {/* Media Attachment if present */}
+        {mediaItem?.url ? (
+          <View style={[styles.mediaFrame, { backgroundColor: colors.bgSecondary }]}>
+            <Image
+              source={{ uri: mediaItem.url }}
+              style={styles.mediaImage}
+              resizeMode="cover"
+            />
           </View>
         ) : null}
 
-        {/* Twitter / Threads Action Rail */}
+        {/* Twitter / Threads Interaction Rail */}
         <View style={styles.actionRail}>
-          {/* Reply */}
+          {/* Reply / Comment */}
           <Pressable
-            onPress={onReply}
-            hitSlop={8}
-            style={styles.actionItem}
-            accessibilityLabel="Reply"
+            onPress={onComment || onReply}
+            hitSlop={6}
+            style={styles.actionButton}
+            accessibilityRole="button"
+            accessibilityLabel="Reply to post"
           >
-            <Icon name="chatbubble-outline" size={16} color={colors.textMuted} />
+            <Icon name="chatbubble-outline" size={17} color={colors.textMuted} />
             <Text style={[styles.actionCount, { color: colors.textMuted }]}>
-              {/* replies */}
+              {postAsAny.comments_count || 0}
             </Text>
           </Pressable>
 
-          {/* Repost / Fellowship */}
-          <Pressable
-            onPress={onShare}
-            hitSlop={8}
-            style={styles.actionItem}
-            accessibilityLabel="Repost"
-          >
-            <Icon name="repeat-outline" size={17} color={colors.textMuted} />
-          </Pressable>
-
-          {/* Amen / Like */}
+          {/* Like / Amen */}
           <Pressable
             onPress={handleLike}
-            hitSlop={8}
-            style={styles.actionItem}
-            accessibilityLabel="Amen reaction"
+            hitSlop={6}
+            style={styles.actionButton}
+            accessibilityRole="button"
+            accessibilityLabel="Amen or like post"
           >
             <Icon
               name={hasLiked ? 'heart' : 'heart-outline'}
               size={17}
               color={hasLiked ? '#EF4444' : colors.textMuted}
             />
-            {likeCount > 0 ? (
-              <Text
-                style={[
-                  styles.actionCount,
-                  { color: hasLiked ? '#EF4444' : colors.textMuted },
-                ]}
-              >
-                {likeCount}
-              </Text>
-            ) : null}
+            <Text
+              style={[
+                styles.actionCount,
+                { color: hasLiked ? '#EF4444' : colors.textMuted },
+              ]}
+            >
+              {likeCount > 0 ? likeCount : ''}
+            </Text>
           </Pressable>
 
           {/* Bookmark */}
           <Pressable
             onPress={handleSave}
-            hitSlop={8}
-            style={styles.actionItem}
-            accessibilityLabel="Bookmark"
+            hitSlop={6}
+            style={styles.actionButton}
+            accessibilityRole="button"
+            accessibilityLabel="Bookmark post"
           >
             <Icon
               name={hasSaved ? 'bookmark' : 'bookmark-outline'}
-              size={16}
+              size={17}
               color={hasSaved ? colors.interactive : colors.textMuted}
             />
           </Pressable>
 
           {/* Share */}
           <Pressable
-            onPress={onShare}
-            hitSlop={8}
-            style={styles.actionItem}
-            accessibilityLabel="Share"
+            onPress={handleNativeShare}
+            hitSlop={6}
+            style={styles.actionButton}
+            accessibilityRole="button"
+            accessibilityLabel="Share post"
           >
-            <Icon name="share-outline" size={16} color={colors.textMuted} />
+            <Icon name="share-social-outline" size={17} color={colors.textMuted} />
           </Pressable>
         </View>
       </View>
@@ -193,20 +228,20 @@ export function PostCard({
 }
 
 const styles = StyleSheet.create({
-  rowContainer: {
+  container: {
     flexDirection: 'row',
-    paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     borderBottomWidth: 1,
   },
-  leftCol: {
+  avatarColumn: {
     marginRight: spacing.md,
   },
-  rightCol: {
+  contentColumn: {
     flex: 1,
     gap: 4,
   },
-  headerRow: {
+  authorRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -214,34 +249,36 @@ const styles = StyleSheet.create({
   nameGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    flex: 1,
+    flexShrink: 1,
+    gap: 3,
   },
-  authorName: {
+  displayName: {
     fontSize: 15,
     fontWeight: '700',
-    letterSpacing: -0.2,
+    flexShrink: 1,
+  },
+  verifiedIcon: {
+    marginLeft: 1,
   },
   handleText: {
     fontSize: 13,
     flexShrink: 1,
   },
-  timeText: {
-    fontSize: 12,
+  timestamp: {
+    fontSize: 13,
+    marginLeft: 4,
   },
   bodyText: {
     fontSize: 15,
     lineHeight: 21,
     marginTop: 2,
-    letterSpacing: -0.1,
   },
-  mediaContainer: {
+  mediaFrame: {
     width: '100%',
     aspectRatio: 16 / 9,
     borderRadius: radius.md,
     overflow: 'hidden',
-    borderWidth: 1,
-    marginTop: spacing.xs,
+    marginTop: spacing.sm,
   },
   mediaImage: {
     width: '100%',
@@ -252,19 +289,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: spacing.sm,
-    paddingRight: spacing.xl,
+    paddingRight: spacing.xxl,
   },
-  actionItem: {
+  actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    minWidth: 32,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
   },
   actionCount: {
     fontSize: 12,
     fontWeight: '500',
-  },
-  pressed: {
-    opacity: 0.85,
   },
 });

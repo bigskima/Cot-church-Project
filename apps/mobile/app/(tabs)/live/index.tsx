@@ -36,7 +36,7 @@ export default function LiveDiscoveryScreen() {
   );
 
   const openStream = (id: string) =>
-    router.push(`/(tabs)/live/${id}`);
+    router.push(`/(tabs)/live/${id}` as any);
 
   const liveStreams = resource.data?.filter((item) => item.status === 'live') ?? [];
   const scheduledStreams = resource.data?.filter((item) => item.status === 'scheduled' || item.status === 'ready') ?? [];

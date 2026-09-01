@@ -82,9 +82,29 @@ export type SocialPost = {
   body: string;
   visibility: ContentVisibility;
   media?: MediaAsset[];
-  published_at: string;
+  published_at?: string;
   social_reactions?: { reaction: string }[];
   content_items?: ContentItem;
+};
+
+export type Post = SocialPost & {
+  author?: {
+    id?: string;
+    display_name?: string;
+    handle?: string;
+    avatar_url?: string;
+    is_verified?: boolean;
+    role_title?: string;
+  };
+  author_name?: string;
+  author_handle?: string;
+  author_avatar?: string;
+  is_verified?: boolean;
+  role_title?: string;
+  likes_count?: number;
+  comments_count?: number;
+  bookmarks_count?: number;
+  created_at?: string;
 };
 
 export type Reel = {
@@ -150,17 +170,19 @@ export type ContentCollection = {
 
 export type Leader = {
   id: string;
-  organization_id: string;
+  organization_id?: string;
   expression_id?: string | null;
   profile_id?: string | null;
   name: string;
   role_title: string;
-  biography: string;
+  biography?: string;
   avatar_url?: string | null;
-  is_founder: boolean;
-  is_historic: boolean;
-  display_order: number;
+  is_founder?: boolean;
+  is_historic?: boolean;
+  display_order?: number;
 };
+
+export type LeadershipProfile = Leader;
 
 export type Follow = {
   id: string;
@@ -252,14 +274,13 @@ export type Sermon = {
   description: string;
   transcript?: string | null;
   
-  // Authoritative Asset References
   audio_asset_id?: string | null;
   video_asset_id?: string | null;
   
-  // Derived/Read-only Playback URLs
   audio_url?: string | null;
   video_url?: string | null;
   thumbnail_url?: string | null;
+  media_assets?: MediaAsset;
   
   duration_seconds?: number | null;
   chapters?: { title: string; timestamp_seconds: number }[];
@@ -274,6 +295,18 @@ export type Sermon = {
     takeaways?: string[];
     review_status?: 'draft' | 'reviewed' | 'approved' | 'rejected';
   } | null;
+};
+
+export type CampusBranch = {
+  id: string;
+  organization_id?: string;
+  name: string;
+  code?: string;
+  timezone?: string;
+  address?: string | null;
+  city?: string;
+  country?: string;
+  is_active?: boolean;
 };
 
 export type GivingCampaign = {
@@ -315,9 +348,11 @@ export type PublicGivingDetails = {
 export type ChurchOrganization = {
   id: string;
   name: string;
-  slug: string;
-  timezone: string;
-  created_at: string;
+  slug?: string;
+  timezone?: string;
+  city?: string;
+  country?: string;
+  created_at?: string;
 };
 
 export type Receipt = {
@@ -326,7 +361,7 @@ export type Receipt = {
   amount_minor: number;
   currency: string;
   category?: string;
-  issued_at: string;
+  issued_at?: string;
   created_at: string;
 };
 
@@ -356,14 +391,23 @@ export type LiveFollowUp = {
 };
 
 export type MembershipContext = {
-  profile: { id: string; display_name: string; email?: string; avatar_url?: string };
+  profile: {
+    id: string;
+    display_name: string;
+    email?: string;
+    avatar_url?: string;
+    handle?: string;
+    bio?: string;
+  };
   effectivePermissions?: string[];
   organization?: { id: string; name: string; slug: string };
   expression?: { id: string; name: string };
   organizations: {
     id: string;
     name: string;
-    slug: string;
-    memberships: { id: string; status: string; branch_id?: string }[];
+    slug?: string;
+    city?: string;
+    country?: string;
+    memberships?: { id: string; status: string; branch_id?: string }[];
   }[];
 };
