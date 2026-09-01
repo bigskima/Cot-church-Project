@@ -1,9 +1,9 @@
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View, StyleProp, ViewStyle } from 'react-native';
 import { useTheme } from '@/state/theme';
-import { radius, shadows, spacing, typography } from '@/design-system/tokens';
+import { radius, spacing, typography } from '@/design-system/tokens';
 import { Icon } from '../primitives/Icon';
-import { Badge } from '../Badge';
+import { Avatar } from '../primitives/Avatar';
 import type { Video } from '@/types/content';
 
 export interface VideoCardProps {
@@ -40,111 +40,98 @@ export function VideoCard({
   const thumbnailUrl = video.media_assets?.thumbnailUrl || video.media_assets?.url;
   const duration = formatDuration(video.media_assets?.duration_seconds);
 
+  const timeAgo = () => {
+    const d = new Date(video.created_at);
+    const diff = (Date.now() - d.getTime()) / 1000;
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  };
+
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
-        styles.card,
-        {
-          backgroundColor: colors.card,
-          borderColor: colors.border,
-        },
-        shadows.sm,
+        styles.container,
         pressed && styles.pressed,
         style,
       ]}
       accessibilityRole="button"
       accessibilityLabel={`Video: ${video.title}`}
     >
-      {/* 16:9 Thumbnail Banner */}
-      <View style={[styles.thumbnailFrame, { backgroundColor: '#091B33' }]}>
+      {/* 16:9 Thumbnail Banner (YouTube style) */}
+      <View style={[styles.thumbnailFrame, { backgroundColor: colors.cardBorder }]}>
         {thumbnailUrl ? (
           <Image source={{ uri: thumbnailUrl }} style={styles.thumbnail} resizeMode="cover" />
         ) : (
           <View style={styles.placeholder}>
-            <Icon name="play-circle-outline" size={40} color="#5C8FF5" />
+            <Icon name="play-circle-outline" size={44} color={colors.interactive} />
           </View>
         )}
 
-        {/* Category Badge */}
-        {video.category ? (
-          <View style={styles.categoryBadge}>
-            <Badge label={video.category} variant="primary" />
-          </View>
-        ) : null}
-
-        {/* Duration Pill */}
+        {/* Duration Badge Bottom Right */}
         {duration ? (
-          <View style={styles.durationPill}>
+          <View style={styles.durationBadge}>
             <Text style={styles.durationText}>{duration}</Text>
           </View>
         ) : null}
       </View>
 
-      {/* Video Details Body */}
-      <View style={styles.body}>
-        <View style={styles.contentColumn}>
+      {/* Video Details Row (Avatar + Title + Meta + Menu) */}
+      <View style={styles.metaRow}>
+        <Avatar name={expressionName || 'Church'} size="sm" />
+
+        <View style={styles.textColumn}>
           <Text style={[styles.title, { color: colors.text }]} numberOfLines={2}>
             {video.title}
           </Text>
-          {expressionName ? (
-            <Text style={[styles.expressionText, { color: colors.interactive }]} numberOfLines={1}>
-              {expressionName}
-            </Text>
-          ) : null}
-          <Text style={[styles.metaText, { color: colors.textMuted }]}>
-            {formatViews(video.views_count)} • {new Date(video.created_at).toLocaleDateString()}
+          <Text style={[styles.metaText, { color: colors.textSecondary }]} numberOfLines={1}>
+            {expressionName ? `${expressionName} · ` : ''}
+            {formatViews(video.views_count)} · {timeAgo()}
           </Text>
         </View>
 
-        {onBookmark ? (
-          <Pressable
-            onPress={onBookmark}
-            hitSlop={8}
-            style={styles.bookmarkBtn}
-            accessibilityRole="button"
-            accessibilityLabel="Bookmark video"
-          >
-            <Icon name="bookmark-outline" size={18} color={colors.textMuted} />
-          </Pressable>
-        ) : null}
+        <Pressable
+          onPress={onBookmark}
+          hitSlop={8}
+          style={styles.moreBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Options"
+        >
+          <Icon name="ellipsis-vertical" size={16} color={colors.textMuted} />
+        </Pressable>
       </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: radius.lg,
-    overflow: 'hidden',
-    borderWidth: 1,
-    marginBottom: spacing.md,
+  container: {
+    width: '100%',
+    marginBottom: spacing.lg,
   },
   thumbnailFrame: {
     width: '100%',
     aspectRatio: 16 / 9,
     position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: radius.md,
+    overflow: 'hidden',
   },
   thumbnail: {
     width: '100%',
     height: '100%',
   },
   placeholder: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  categoryBadge: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-  },
-  durationPill: {
+  durationBadge: {
     position: 'absolute',
     bottom: 8,
     right: 8,
-    backgroundColor: 'rgba(6, 20, 38, 0.85)',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
@@ -153,33 +140,33 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '700',
+    fontVariant: ['tabular-nums'],
   },
-  body: {
+  metaRow: {
     flexDirection: 'row',
-    padding: spacing.md,
-    gap: 10,
     alignItems: 'flex-start',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    paddingHorizontal: 2,
   },
-  contentColumn: {
+  textColumn: {
     flex: 1,
     gap: 2,
   },
   title: {
-    ...typography.h3,
     fontSize: 14,
-    lineHeight: 19,
-  },
-  expressionText: {
-    fontSize: 12,
     fontWeight: '600',
+    lineHeight: 19,
+    letterSpacing: -0.1,
   },
   metaText: {
-    fontSize: 11,
+    fontSize: 12,
+    lineHeight: 16,
   },
-  bookmarkBtn: {
+  moreBtn: {
     padding: 4,
   },
   pressed: {
-    opacity: 0.9,
+    opacity: 0.85,
   },
 });

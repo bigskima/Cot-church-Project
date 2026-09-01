@@ -101,10 +101,7 @@ export default function DiscoverScreen() {
         {/* Header Bar */}
         <View style={styles.header}>
           <View style={styles.headerTitleRow}>
-            <View>
-              <Text style={[styles.kicker, { color: colors.interactive }]}>CONTENT & COMMUNITY DISCOVERY</Text>
-              <Text style={[styles.title, { color: colors.text }]}>Discover</Text>
-            </View>
+            <Text style={[styles.title, { color: colors.text }]}>Discover</Text>
             {churches.data && churches.data.length > 1 ? (
               <Pressable
                 onPress={() => setShowChurchPicker(true)}

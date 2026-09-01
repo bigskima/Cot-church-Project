@@ -1,104 +1,61 @@
 export type ColorMode = 'light' | 'dark';
 
-// Brand Foundation Tokens
 export const brand = {
-  navy: {
-    950: '#061426',
-    900: '#091B33',
-    800: '#0D294B',
-    700: '#123A66',
-    600: '#18528B',
-    500: '#2062A5',
-  },
-  blue: {
-    600: '#205BD6',
-    500: '#2F6FED',
-    400: '#5C8FF5',
-    300: '#8FB4F8',
-    100: '#EAF1FA',
-  },
+  navy950: '#050B14',
+  navy900: '#0C1322',
+  navy800: '#111A2E',
+  navy700: '#16223B',
+  navy600: '#1D2D4E',
+  blue500: '#1D9BF0',
+  blue400: '#38BDF8',
   white: '#FFFFFF',
-  slate: {
-    50: '#F8FAFC',
-    100: '#F1F5F9',
-    200: '#E2E8F0',
-    300: '#CBD5E1',
-    400: '#94A3B8',
-    500: '#64748B',
-    600: '#475467',
-    700: '#334155',
-    800: '#1E293B',
-    900: '#0F172A',
-  },
 };
 
-// Semantic Status Colors
-export const semantic = {
-  live: '#E5484D',
-  liveGlow: 'rgba(229, 72, 77, 0.35)',
-  success: '#16A36A',
-  successSoft: 'rgba(22, 163, 106, 0.12)',
-  warning: '#E9A23B',
-  warningSoft: 'rgba(233, 162, 59, 0.12)',
-  info: '#2F6FED',
-  infoSoft: 'rgba(47, 111, 237, 0.12)',
+export const palette = {
+  // OLED & Pitch Dark (Twitter / Instagram / YouTube Dark)
+  black: '#000000',
+  darkBg: '#050B14',
+  darkCard: '#0C1322',
+  darkCardElevated: '#111A2E',
+  darkBorder: '#1A263D',
+  darkBorderSubtle: '#141E30',
+
+  // Light Theme (Pure Modern White)
+  white: '#FFFFFF',
+  lightBg: '#FFFFFF',
+  lightBgSecondary: '#F8FAFC',
+  lightCard: '#FFFFFF',
+  lightCardElevated: '#FFFFFF',
+  lightBorder: '#E2E8F0',
+  lightBorderSubtle: '#F1F5F9',
+
+  // Interactive Accents (Twitter Blue / Modern Consumer Indigo)
+  blue: '#1D9BF0',
+  blueHover: '#1A8CD8',
+  blueSoft: 'rgba(29, 155, 240, 0.12)',
+  indigo: '#3B82F6',
+  indigoSoft: 'rgba(59, 130, 246, 0.12)',
+
+  // Semantic
+  live: '#EF4444',
+  liveSoft: 'rgba(239, 68, 68, 0.15)',
+  success: '#10B981',
+  successSoft: 'rgba(16, 185, 129, 0.12)',
+  warning: '#F59E0B',
+  warningSoft: 'rgba(245, 158, 11, 0.12)',
   prayer: '#8B5CF6',
   prayerSoft: 'rgba(139, 92, 246, 0.12)',
-};
 
-// Theme Color Token Generator
-export const getThemeColors = (isDark: boolean) => ({
-  isDark,
-  // Canvas & Backgrounds
-  bg: isDark ? '#07111F' : '#F7F9FC',
-  bgElevated: isDark ? '#0C1929' : '#FFFFFF',
-  bgSecondary: isDark ? '#112238' : '#F1F5F9',
+  // Text Grays
+  textDarkPrimary: '#F8FAFC',
+  textDarkSecondary: '#94A3B8',
+  textDarkMuted: '#64748B',
 
-  // Surfaces & Cards
-  card: isDark ? '#0C1929' : '#FFFFFF',
-  cardElevated: isDark ? '#152A43' : '#FFFFFF',
-  cardBorder: isDark ? '#21344B' : '#E4E7EC',
+  textLightPrimary: '#0F172A',
+  textLightSecondary: '#475569',
+  textLightMuted: '#94A3B8',
+} as const;
 
-  // Typography
-  text: isDark ? '#F8FAFC' : '#0B1628',
-  textSecondary: isDark ? '#CBD5E1' : '#475467',
-  textMuted: isDark ? '#94A3B8' : '#667085',
-  textInverse: isDark ? '#0B1628' : '#FFFFFF',
-
-  // Borders & Dividers
-  border: isDark ? '#21344B' : '#E4E7EC',
-  borderStrong: isDark ? '#304762' : '#D0D5DD',
-  borderSubtle: isDark ? '#16283E' : '#EEF2F6',
-
-  // Interactive & Brand
-  primary: isDark ? '#FFFFFF' : '#0D294B',
-  primaryPressed: isDark ? '#E2E8F0' : '#091B33',
-  primaryInverse: isDark ? '#0D294B' : '#FFFFFF',
-  primarySoft: isDark ? '#122844' : '#EAF1FA',
-  accent: '#2F6FED',
-  accentLight: '#5C8FF5',
-  interactive: isDark ? '#6EA8FF' : '#2F6FED',
-  link: isDark ? '#6EA8FF' : '#18528B',
-
-  // Form Inputs
-  inputBg: isDark ? '#0C1929' : '#FFFFFF',
-  inputBorder: isDark ? '#21344B' : '#D0D5DD',
-  inputFocus: '#2F6FED',
-
-  // UI Tags & Active Elements
-  tagBg: isDark ? '#152A43' : '#F1F5F9',
-  activeTabBg: isDark ? '#152A43' : '#EAF1FA',
-
-  // Status Colors
-  live: semantic.live,
-  liveGlow: semantic.liveGlow,
-  success: semantic.success,
-  warning: semantic.warning,
-  info: semantic.info,
-  prayer: semantic.prayer,
-});
-
-// 4/8pt Spacing Scale
 export const spacing = {
   xxs: 2,
   xs: 4,
@@ -107,129 +64,189 @@ export const spacing = {
   lg: 16,
   xl: 20,
   xxl: 24,
-  '3xl': 32,
-  '4xl': 40,
-  '5xl': 48,
-};
+  xxxl: 32,
+  huge: 48,
+} as const;
 
-// Corner Radii (Disciplined, avoiding excessive 24 everywhere)
 export const radius = {
-  none: 0,
   xs: 4,
   sm: 6,
-  md: 8,
-  lg: 12,
-  xl: 16,
+  md: 10,
+  lg: 14,
+  xl: 20,
+  xxl: 28,
   pill: 9999,
-};
+} as const;
 
-// Subtle Modern Shadows
-export const shadows: Record<string, any> = {
+export const typography = {
+  h1: {
+    fontSize: 22,
+    fontWeight: '800' as const,
+    letterSpacing: -0.5,
+    lineHeight: 28,
+  },
+  h2: {
+    fontSize: 18,
+    fontWeight: '700' as const,
+    letterSpacing: -0.3,
+    lineHeight: 24,
+  },
+  h3: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    letterSpacing: -0.2,
+    lineHeight: 20,
+  },
+  body: {
+    fontSize: 15,
+    fontWeight: '400' as const,
+    lineHeight: 22,
+    letterSpacing: -0.1,
+  },
+  bodySmall: {
+    fontSize: 13,
+    fontWeight: '400' as const,
+    lineHeight: 18,
+  },
+  caption: {
+    fontSize: 12,
+    fontWeight: '500' as const,
+    lineHeight: 16,
+  },
+  kicker: {
+    fontSize: 11,
+    fontWeight: '700' as const,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase' as const,
+  },
+} as const;
+
+export const shadows = {
+  none: {},
   sm: {
-    shadowColor: '#061426',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
-    shadowRadius: 3,
+    shadowRadius: 2,
     elevation: 1,
   },
   md: {
-    shadowColor: '#061426',
-    shadowOffset: { width: 0, height: 3 },
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 3,
   },
   lg: {
-    shadowColor: '#061426',
-    shadowOffset: { width: 0, height: 6 },
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.12,
     shadowRadius: 16,
     elevation: 6,
   },
   live: {
-    shadowColor: '#E5484D',
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.35,
     shadowRadius: 8,
     elevation: 4,
   },
+} as const;
+
+export const tokens = {
+  light: {
+    isDark: false,
+    bg: palette.lightBg,
+    bgElevated: palette.lightBgSecondary,
+    bgSecondary: palette.lightBgSecondary,
+    card: palette.lightCard,
+    cardElevated: palette.lightCardElevated,
+    cardBorder: palette.lightBorder,
+    border: palette.lightBorder,
+    borderStrong: '#CBD5E1',
+    borderSubtle: palette.lightBorderSubtle,
+    text: palette.textLightPrimary,
+    textSecondary: palette.textLightSecondary,
+    textMuted: palette.textLightMuted,
+    textInverse: palette.textDarkPrimary,
+    interactive: palette.blue,
+    interactiveHover: palette.blueHover,
+    primarySoft: palette.blueSoft,
+    inputBg: '#F8FAFC',
+    inputBorder: '#E2E8F0',
+    inputBorderFocus: palette.blue,
+    live: palette.live,
+    liveSoft: palette.liveSoft,
+    success: palette.success,
+    successSoft: palette.successSoft,
+    warning: palette.warning,
+    warningSoft: palette.warningSoft,
+    prayer: palette.prayer,
+    prayerSoft: palette.prayerSoft,
+  },
+  dark: {
+    isDark: true,
+    bg: palette.darkBg,
+    bgElevated: palette.darkCard,
+    bgSecondary: palette.darkCard,
+    card: palette.darkCard,
+    cardElevated: palette.darkCardElevated,
+    cardBorder: palette.darkBorder,
+    border: palette.darkBorder,
+    borderStrong: '#263550',
+    borderSubtle: palette.darkBorderSubtle,
+    text: palette.textDarkPrimary,
+    textSecondary: palette.textDarkSecondary,
+    textMuted: palette.textDarkMuted,
+    textInverse: palette.textLightPrimary,
+    interactive: palette.blue,
+    interactiveHover: palette.blueHover,
+    primarySoft: palette.blueSoft,
+    inputBg: '#0C1322',
+    inputBorder: '#1A263D',
+    inputBorderFocus: palette.blue,
+    live: palette.live,
+    liveSoft: palette.liveSoft,
+    success: palette.success,
+    successSoft: palette.successSoft,
+    warning: palette.warning,
+    warningSoft: palette.warningSoft,
+    prayer: palette.prayer,
+    prayerSoft: palette.prayerSoft,
+  },
 };
 
-// Clean Typography Scale
-export const typography = {
-  display: {
-    fontSize: 30,
-    lineHeight: 36,
-    fontWeight: '700' as const,
-    letterSpacing: -0.8,
-  },
-  h1: {
-    fontSize: 24,
-    lineHeight: 30,
-    fontWeight: '700' as const,
-    letterSpacing: -0.6,
-  },
-  h2: {
-    fontSize: 20,
-    lineHeight: 26,
-    fontWeight: '600' as const,
-    letterSpacing: -0.4,
-  },
-  h3: {
-    fontSize: 17,
-    lineHeight: 22,
-    fontWeight: '600' as const,
-    letterSpacing: -0.2,
-  },
-  body: {
-    fontSize: 15,
-    lineHeight: 22,
-    fontWeight: '400' as const,
-  },
-  bodyMedium: {
-    fontSize: 15,
-    lineHeight: 22,
-    fontWeight: '500' as const,
-  },
-  bodySmall: {
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '400' as const,
-  },
-  caption: {
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '500' as const,
-  },
-  kicker: {
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '700' as const,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase' as const,
-  },
-  button: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: '600' as const,
-  },
+export type ThemeColors = {
+  isDark: boolean;
+  bg: string;
+  bgElevated: string;
+  bgSecondary: string;
+  card: string;
+  cardElevated: string;
+  cardBorder: string;
+  border: string;
+  borderStrong: string;
+  borderSubtle: string;
+  text: string;
+  textSecondary: string;
+  textMuted: string;
+  textInverse: string;
+  interactive: string;
+  interactiveHover: string;
+  primarySoft: string;
+  inputBg: string;
+  inputBorder: string;
+  inputBorderFocus: string;
+  live: string;
+  liveSoft: string;
+  success: string;
+  successSoft: string;
+  warning: string;
+  warningSoft: string;
+  prayer: string;
+  prayerSoft: string;
 };
 
-// Legacy mappings for transitional safety
-export const palette = {
-  ...semantic,
-  navy: brand.navy[800],
-  navyDarkest: brand.navy[950],
-  navyDark: brand.navy[900],
-  blue: brand.blue[500],
-  blueLight: brand.blue[400],
-  white: brand.white,
-  slate: brand.slate[600],
-  surface: '#FFFFFF',
-  line: '#E4E7EC',
-  cream: '#F7F9FC',
-  midnight: '#07111F',
-  gold: brand.blue[500], // retired gold mapping to blue
-  yellow: brand.blue[500],
-  yellowDark: brand.navy[700],
-};
+export function getThemeColors(isDark: boolean): ThemeColors {
+  return isDark ? tokens.dark : tokens.light;
+}

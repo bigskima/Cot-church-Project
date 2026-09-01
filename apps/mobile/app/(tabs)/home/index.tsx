@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -16,276 +16,258 @@ import { useResource } from '@/hooks/use-resource';
 import {
   Avatar,
   Badge,
-  EventCard,
+  ChurchPickerModal,
+  EmptyState,
   HeroLiveCard,
   Icon,
-  LiveCard,
   PostCard,
   ReelCard,
   ResourceError,
-  SectionHeader,
   SermonCard,
   Skeleton,
+  StoriesTray,
   VideoCard,
 } from '@/components';
-import { radius, shadows, spacing, typography } from '@/design-system/tokens';
+import { radius, spacing } from '@/design-system/tokens';
 import type { Event, LiveStream, Reel, Sermon, SocialPost, Video } from '@/types/content';
 
-const publicOrganization = process.env.EXPO_PUBLIC_ORGANIZATION_ID;
+interface HomePayload {
+  streams: LiveStream[];
+  reels: Reel[];
+  sermons: Sermon[];
+  videos: Video[];
+  events: Event[];
+  posts: SocialPost[];
+}
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { api, mode, context, hasCapability } = useSession();
+  const { api, context, mode, hasCapability } = useSession();
   const { colors, isDark } = useTheme();
 
-  const publicBase = publicOrganization
-    ? `public-content?organizationId=${publicOrganization}`
-    : 'public-content';
+  const [churchPickerVisible, setChurchPickerVisible] = useState(false);
 
-  const streams = useResource<LiveStream[]>('home:streams', (signal) =>
-    api.request<LiveStream[]>(
-      mode === 'authenticated' ? 'live-streams' : `${publicBase}${publicBase.includes('?') ? '&' : '?'}type=streams`,
-      { signal }
-    )
-  );
-
-  const reels = useResource<Reel[]>('home:reels', (signal) =>
-    api.request<Reel[]>(`${publicBase}${publicBase.includes('?') ? '&' : '?'}type=reels`, { signal })
-  );
-
-  const videos = useResource<Video[]>('home:videos', (signal) =>
-    api.request<Video[]>(`${publicBase}${publicBase.includes('?') ? '&' : '?'}type=videos`, { signal })
-  );
-
-  const sermons = useResource<Sermon[]>('home:sermons', (signal) =>
-    api.request<Sermon[]>(`${publicBase}${publicBase.includes('?') ? '&' : '?'}type=sermons`, { signal })
-  );
-
-  const posts = useResource<SocialPost[]>('home:posts', (signal) =>
-    api.request<SocialPost[]>(
-      mode === 'authenticated' ? 'social-feed' : `${publicBase}${publicBase.includes('?') ? '&' : '?'}type=feed`,
-      { signal }
-    )
-  );
-
-  const events = useResource<Event[]>('home:events', (signal) =>
-    api.request<Event[]>(
-      mode === 'authenticated' ? 'events' : `${publicBase}${publicBase.includes('?') ? '&' : '?'}type=events`,
-      { signal }
-    )
-  );
-
-  const handleRefreshAll = () => {
-    streams.refresh();
-    reels.refresh();
-    videos.refresh();
-    sermons.refresh();
-    posts.refresh();
-    events.refresh();
-  };
-
-  const isRefreshing =
-    streams.loading ||
-    reels.loading ||
-    videos.loading ||
-    sermons.loading ||
-    posts.loading ||
-    events.loading;
-
-  const name = context?.profile?.display_name?.split(' ')[0];
-  const orgName = context?.organizations?.[0]?.name;
-  const expressionName = context?.expression?.name;
-
-  // Capability check for Studio: only authorized users see it
-  const canCreateContent =
+  const hasAnyLeadershipCapability =
     hasCapability('content.create') ||
     hasCapability('streams.broadcast') ||
     hasCapability('sermons.create') ||
     hasCapability('*');
 
-  const activeStream = streams.data?.find((s) => s.status === 'live') ?? streams.data?.[0];
-  const reelsList = reels.data ?? [];
-  const videosList = videos.data ?? [];
-  const sermonsList = sermons.data ?? [];
-  const eventsList = events.data ?? [];
-  const postsList = posts.data ?? [];
+  const organization = context?.organization ?? context?.organizations?.[0];
+  const expression = context?.expression;
+
+  const orgParam =
+    mode === 'visitor'
+      ? `?organizationId=${process.env.EXPO_PUBLIC_ORGANIZATION_ID || ''}`
+      : expression?.id
+      ? `?expressionId=${expression.id}`
+      : '';
+
+  const resource = useResource<HomePayload>('mobile:home:consumer', async (signal) => {
+    if (mode === 'visitor') {
+      const [streams, sermons, events, posts, reels, videos] = await Promise.all([
+        api.request<LiveStream[]>(`public-content?type=streams${orgParam ? `&${orgParam.slice(1)}` : ''}`, { signal }).catch(() => []),
+        api.request<Sermon[]>(`public-content?type=sermons${orgParam ? `&${orgParam.slice(1)}` : ''}`, { signal }).catch(() => []),
+        api.request<Event[]>(`public-content?type=events${orgParam ? `&${orgParam.slice(1)}` : ''}`, { signal }).catch(() => []),
+        api.request<SocialPost[]>(`public-content?type=posts${orgParam ? `&${orgParam.slice(1)}` : ''}`, { signal }).catch(() => []),
+        api.request<Reel[]>(`reels${orgParam}`, { signal }).catch(() => []),
+        api.request<Video[]>(`videos${orgParam}`, { signal }).catch(() => []),
+      ]);
+      return { streams, sermons, events, posts, reels, videos };
+    }
+
+    const [streams, reels, sermons, videos, events, posts] = await Promise.all([
+      api.request<LiveStream[]>(`live-streams${orgParam}`, { signal }).catch(() => []),
+      api.request<Reel[]>(`reels${orgParam}`, { signal }).catch(() => []),
+      api.request<Sermon[]>(`sermons${orgParam}`, { signal }).catch(() => []),
+      api.request<Video[]>(`videos${orgParam}`, { signal }).catch(() => []),
+      api.request<Event[]>(`events${orgParam}`, { signal }).catch(() => []),
+      api.request<SocialPost[]>(`social-feed${orgParam}`, { signal }).catch(() => []),
+    ]);
+
+    return { streams, reels, sermons, videos, events, posts };
+  });
+
+  const activeStream = useMemo(
+    () => resource.data?.streams?.find((s) => s.status === 'live') ?? resource.data?.streams?.[0],
+    [resource.data?.streams]
+  );
+
+  const reels = resource.data?.reels ?? [];
+  const videos = resource.data?.videos ?? [];
+  const sermons = resource.data?.sermons ?? [];
+  const posts = resource.data?.posts ?? [];
+  const events = resource.data?.events ?? [];
+
+  // Instagram-style stories / live bubbles
+  const stories = useMemo(() => {
+    const list = [];
+    if (activeStream) {
+      list.push({
+        id: 'live_story',
+        title: activeStream.status === 'live' ? 'LIVE NOW' : 'Broadcast',
+        imageUrl: undefined,
+        isLive: activeStream.status === 'live',
+        hasUnseen: true,
+        onPress: () => router.push(`/(tabs)/live/${activeStream.id}` as any),
+      });
+    }
+    reels.slice(0, 5).forEach((r, idx) => {
+      list.push({
+        id: `reel_story_${r.id}`,
+        title: r.caption ? r.caption.slice(0, 10) : `Reel ${idx + 1}`,
+        imageUrl: undefined,
+        isLive: false,
+        hasUnseen: idx < 2,
+        onPress: () => router.push('/(tabs)/reels'),
+      });
+    });
+    return list;
+  }, [activeStream, reels]);
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.content,
-          { paddingTop: insets.top + spacing.sm, paddingBottom: 100 },
+      {/* Sleek Top Navigation Bar (YouTube / Instagram style) */}
+      <View
+        style={[
+          styles.topBar,
+          {
+            paddingTop: insets.top + spacing.xs,
+            backgroundColor: colors.bg,
+            borderBottomColor: colors.borderSubtle,
+          },
         ]}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={handleRefreshAll}
-            tintColor={colors.interactive}
-          />
-        }
       >
-        {/* App Bar / Top Identity Header */}
-        <View style={styles.topHeader}>
-          <View style={styles.headerIdentityCol}>
-            <Text style={[styles.greeting, { color: colors.textSecondary }]}>
-              {name ? `Good morning, ${name}` : 'Welcome'}
-            </Text>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>
-              {orgName || expressionName || 'Church Platform'}
-            </Text>
-          </View>
-
-          <View style={styles.headerActionsRow}>
-            {/* AI Sparkle Assistant Entry (Direct route to assistant) */}
+        <View style={styles.topBarLeft}>
+          <Text style={[styles.brandWordmark, { color: colors.text }]}>
+            {organization?.name ?? 'Church'}
+          </Text>
+          {expression?.name ? (
             <Pressable
-              onPress={() => router.push('/assistant')}
-              hitSlop={8}
-              style={({ pressed }) => [
-                styles.iconBtn,
-                { backgroundColor: colors.primarySoft },
-                pressed && styles.pressed,
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel="AI Assistant"
+              onPress={() => setChurchPickerVisible(true)}
+              style={[styles.campusPill, { backgroundColor: colors.bgSecondary }]}
             >
-              <Icon name="sparkles" size={18} color={colors.interactive} />
-            </Pressable>
-
-            {/* Profile Avatar Entry */}
-            <Pressable
-              onPress={() => router.push('/(tabs)/profile')}
-              hitSlop={6}
-              accessibilityRole="button"
-              accessibilityLabel="Profile"
-            >
-              <Avatar
-                url={context?.profile?.avatar_url}
-                name={context?.profile?.display_name}
-                size="sm"
-              />
-            </Pressable>
-          </View>
-        </View>
-
-        {/* Quick Action Navigation Strip */}
-        <View style={styles.quickActionsStrip}>
-          <Pressable
-            onPress={() => router.push('/(tabs)/live')}
-            style={({ pressed }) => [
-              styles.quickActionPill,
-              { backgroundColor: colors.bgSecondary, borderColor: colors.border },
-              pressed && styles.pressed,
-            ]}
-          >
-            <Icon name="radio-outline" size={16} color={colors.interactive} />
-            <Text style={[styles.quickActionLabel, { color: colors.text }]}>Live</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => router.push('/(tabs)/discover')}
-            style={({ pressed }) => [
-              styles.quickActionPill,
-              { backgroundColor: colors.bgSecondary, borderColor: colors.border },
-              pressed && styles.pressed,
-            ]}
-          >
-            <Icon name="book-outline" size={16} color={colors.interactive} />
-            <Text style={[styles.quickActionLabel, { color: colors.text }]}>Sermons</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => router.push('/(tabs)/discover')}
-            style={({ pressed }) => [
-              styles.quickActionPill,
-              { backgroundColor: colors.bgSecondary, borderColor: colors.border },
-              pressed && styles.pressed,
-            ]}
-          >
-            <Icon name="calendar-outline" size={16} color={colors.interactive} />
-            <Text style={[styles.quickActionLabel, { color: colors.text }]}>Events</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => router.push('/(tabs)/profile/prayer')}
-            style={({ pressed }) => [
-              styles.quickActionPill,
-              { backgroundColor: colors.bgSecondary, borderColor: colors.border },
-              pressed && styles.pressed,
-            ]}
-          >
-            <Icon name="heart-outline" size={16} color={colors.interactive} />
-            <Text style={[styles.quickActionLabel, { color: colors.text }]}>Prayer</Text>
-          </Pressable>
-
-          {/* Studio button only visible to authorized creators/leaders */}
-          {canCreateContent ? (
-            <Pressable
-              onPress={() => router.push('/studio')}
-              style={({ pressed }) => [
-                styles.quickActionPill,
-                { backgroundColor: colors.primarySoft, borderColor: colors.interactive },
-                pressed && styles.pressed,
-              ]}
-            >
-              <Icon name="create-outline" size={16} color={colors.interactive} />
-              <Text style={[styles.quickActionLabel, { color: colors.interactive }]}>Studio</Text>
+              <Text style={[styles.campusPillText, { color: colors.interactive }]} numberOfLines={1}>
+                {expression.name}
+              </Text>
+              <Icon name="chevron-down" size={12} color={colors.interactive} />
             </Pressable>
           ) : null}
         </View>
 
-        {/* Live Broadcast Hero Card */}
-        {streams.loading ? (
-          <View style={styles.sectionPad}>
-            <Skeleton height={200} borderRadius={radius.lg} />
-          </View>
-        ) : activeStream ? (
-          <View style={styles.sectionPad}>
+        <View style={styles.topBarRight}>
+          {/* AI Assistant Button */}
+          <Pressable
+            onPress={() => router.push('/assistant')}
+            hitSlop={8}
+            style={[styles.iconButton, { backgroundColor: colors.bgSecondary }]}
+            accessibilityRole="button"
+            accessibilityLabel="Spiritual AI Assistant"
+          >
+            <Icon name="sparkles" size={18} color={colors.interactive} />
+          </Pressable>
+
+          {/* Ministry Studio if leader */}
+          {hasAnyLeadershipCapability ? (
+            <Pressable
+              onPress={() => router.push('/studio')}
+              hitSlop={8}
+              style={[styles.iconButton, { backgroundColor: colors.bgSecondary }]}
+              accessibilityRole="button"
+              accessibilityLabel="Ministry Studio"
+            >
+              <Icon name="grid-outline" size={18} color={colors.interactive} />
+            </Pressable>
+          ) : null}
+
+          {/* Live broadcast shortcut */}
+          <Pressable
+            onPress={() => router.push('/(tabs)/live')}
+            hitSlop={8}
+            style={[styles.iconButton, { backgroundColor: colors.bgSecondary }]}
+            accessibilityRole="button"
+            accessibilityLabel="Live Broadcasts"
+          >
+            <Icon name="radio" size={18} color={activeStream?.status === 'live' ? '#EF4444' : colors.text} />
+          </Pressable>
+        </View>
+      </View>
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 80 }]}
+        refreshControl={
+          <RefreshControl
+            refreshing={resource.loading}
+            onRefresh={resource.refresh}
+            tintColor={colors.interactive}
+          />
+        }
+      >
+        {/* 1. Instagram-Style Stories / Highlights Tray */}
+        {stories.length > 0 ? (
+          <StoriesTray stories={stories} />
+        ) : null}
+
+        {/* 2. Hero Live Stream Banner (if stream exists) */}
+        {activeStream ? (
+          <View style={styles.heroSection}>
             <HeroLiveCard
               stream={activeStream}
-              onPress={() => router.push(`/(tabs)/live/${activeStream.id}`)}
+              onPress={() => router.push(`/(tabs)/live/${activeStream.id}` as any)}
             />
           </View>
         ) : null}
 
-        {/* Featured / Public Heritage Banner */}
-        <Pressable
-          onPress={() => router.push('/(tabs)/discover/church-story')}
-          style={({ pressed }) => [
-            styles.storyBanner,
-            { backgroundColor: colors.card, borderColor: colors.border },
-            shadows.sm,
-            pressed && styles.pressed,
-          ]}
-        >
-          <View style={[styles.storyIconWrap, { backgroundColor: colors.primarySoft }]}>
-            <Icon name="library-outline" size={20} color={colors.interactive} />
-          </View>
-          <View style={styles.storyCol}>
-            <Text style={[styles.storyKicker, { color: colors.interactive }]}>HERITAGE & LEADERSHIP</Text>
-            <Text style={[styles.storyTitle, { color: colors.text }]}>Discover Our Story & Pastors</Text>
-            <Text style={[styles.storySub, { color: colors.textMuted }]}>
-              Learn about our mission, founding history, and campus directors.
-            </Text>
-          </View>
-          <Icon name="chevron-forward" size={18} color={colors.textMuted} />
-        </Pressable>
+        {/* 3. YouTube-Style Video / Sermon Section */}
+        {videos.length > 0 || sermons.length > 0 ? (
+          <View style={styles.feedSection}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Featured Teachings</Text>
+              <Pressable onPress={() => router.push('/watch')}>
+                <Text style={[styles.seeAllText, { color: colors.interactive }]}>Explore all</Text>
+              </Pressable>
+            </View>
 
-        {/* Short Clips / Reels Carousel */}
-        {reelsList.length > 0 ? (
-          <View style={styles.sectionWrapper}>
-            <SectionHeader
-              title="Short Highlights"
-              actionLabel="All Reels"
-              onAction={() => router.push('/(tabs)/reels')}
-            />
+            {videos.slice(0, 2).map((vid) => (
+              <VideoCard
+                key={vid.id}
+                video={vid}
+                expressionName={expression?.name}
+                onPress={() => router.push(`/watch/${vid.id}` as any)}
+              />
+            ))}
+
+            {sermons.slice(0, 2).map((sermon) => (
+              <SermonCard
+                key={sermon.id}
+                sermon={sermon}
+                variant="row"
+                onPress={() => router.push(`/(tabs)/discover/sermon/${sermon.id}` as any)}
+              />
+            ))}
+          </View>
+        ) : null}
+
+        {/* 4. Shorts / Reels Horizontal Shelf (YouTube Shorts style) */}
+        {reels.length > 0 ? (
+          <View style={styles.reelsSection}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.shortsHeader}>
+                <Icon name="flash" size={18} color="#EF4444" style={{ marginRight: 6 }} />
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Reels & Shorts</Text>
+              </View>
+              <Pressable onPress={() => router.push('/(tabs)/reels')}>
+                <Text style={[styles.seeAllText, { color: colors.interactive }]}>View all</Text>
+              </Pressable>
+            </View>
+
             <FlatList
               horizontal
-              data={reelsList}
+              data={reels.slice(0, 6)}
               keyExtractor={(item) => item.id}
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalList}
+              contentContainerStyle={styles.reelsList}
               renderItem={({ item }) => (
                 <ReelCard
                   reel={item}
@@ -296,85 +278,47 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        {/* Latest Sermons Section */}
-        {sermonsList.length > 0 ? (
-          <View style={styles.sectionWrapper}>
-            <SectionHeader
-              title="Latest Sermons"
-              actionLabel="Browse All"
-              onAction={() => router.push('/(tabs)/discover')}
-            />
-            <View style={styles.sectionPad}>
-              {sermonsList.slice(0, 3).map((sermon) => (
-                <SermonCard
-                  key={sermon.id}
-                  sermon={sermon}
-                  onPress={() => router.push(`/(tabs)/discover/sermon/${sermon.id}`)}
-                />
-              ))}
+        {/* 5. Twitter / Threads Style Community Feed */}
+        {posts.length > 0 ? (
+          <View style={styles.communitySection}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Community Fellowship</Text>
+              <Pressable onPress={() => router.push('/(tabs)/community')}>
+                <Text style={[styles.seeAllText, { color: colors.interactive }]}>See timeline</Text>
+              </Pressable>
             </View>
-          </View>
-        ) : null}
 
-        {/* Watch Videos Section */}
-        {videosList.length > 0 ? (
-          <View style={styles.sectionWrapper}>
-            <SectionHeader
-              title="Watch & Documentaries"
-              actionLabel="All Videos"
-              onAction={() => router.push('/watch')}
-            />
-            <View style={styles.sectionPad}>
-              {videosList.slice(0, 2).map((vid) => (
-                <VideoCard
-                  key={vid.id}
-                  video={vid}
-                  expressionName={expressionName}
-                  onPress={() => router.push(`/watch/${vid.id}`)}
-                />
-              ))}
-            </View>
-          </View>
-        ) : null}
-
-        {/* Upcoming Gatherings / Events */}
-        {eventsList.length > 0 ? (
-          <View style={styles.sectionWrapper}>
-            <SectionHeader
-              title="Upcoming Events"
-              actionLabel="Calendar"
-              onAction={() => router.push('/(tabs)/discover')}
-            />
-            <View style={styles.sectionPad}>
-              {eventsList.slice(0, 3).map((ev) => (
-                <EventCard
-                  key={ev.id}
-                  event={ev}
-                  onPress={() => router.push('/(tabs)/discover')}
-                />
-              ))}
-            </View>
-          </View>
-        ) : null}
-
-        {/* Community Highlights */}
-        {postsList.length > 0 ? (
-          <View style={styles.sectionWrapper}>
-            <SectionHeader
-              title="Community Fellowship"
-              actionLabel="Social Feed"
-              onAction={() => router.push('/(tabs)/community')}
-            />
-            {postsList.slice(0, 2).map((p) => (
+            {posts.slice(0, 4).map((post) => (
               <PostCard
-                key={p.id}
-                post={p}
-                onComment={() => router.push('/(tabs)/community')}
+                key={post.id}
+                post={post}
+                expressionName={expression?.name}
+                onReply={() => router.push('/(tabs)/community')}
+                onShare={() => {}}
               />
             ))}
           </View>
         ) : null}
+
+        {/* Loading / Error States */}
+        {resource.loading && !resource.data ? (
+          <View style={styles.loadingContainer}>
+            <Skeleton height={200} borderRadius={radius.lg} />
+            <Skeleton height={80} count={3} />
+          </View>
+        ) : resource.error && !resource.data ? (
+          <ResourceError message={resource.error} retry={resource.refresh} />
+        ) : null}
       </ScrollView>
+
+      {/* Church Switcher Modal */}
+      <ChurchPickerModal
+        visible={churchPickerVisible}
+        onClose={() => setChurchPickerVisible(false)}
+        churches={(context?.organizations as any) ?? []}
+        selectedChurchId={organization?.id}
+        onSelectChurch={(_church) => setChurchPickerVisible(false)}
+      />
     </View>
   );
 }
@@ -383,105 +327,94 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
-  content: {
-    flexGrow: 1,
-  },
-  topHeader: {
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
   },
-  headerIdentityCol: {
-    flex: 1,
-    gap: 2,
-  },
-  greeting: {
-    ...typography.caption,
-    fontWeight: '600',
-  },
-  headerTitle: {
-    ...typography.h2,
-  },
-  headerActionsRow: {
+  topBarLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    flex: 1,
   },
-  iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
+  brandWordmark: {
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
-  quickActionsStrip: {
+  campusPill: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    maxWidth: 160,
+  },
+  campusPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  topBarRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.xs,
   },
-  quickActionPill: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    gap: 5,
-  },
-  quickActionLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  sectionPad: {
-    paddingHorizontal: spacing.lg,
-  },
-  sectionWrapper: {
-    marginTop: spacing.sm,
-  },
-  horizontalList: {
-    paddingHorizontal: spacing.lg,
-    gap: spacing.md,
-  },
-  storyBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: spacing.lg,
-    marginVertical: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    gap: spacing.md,
-  },
-  storyIconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: radius.md,
+  iconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  storyCol: {
-    flex: 1,
-    gap: 2,
+  scrollContent: {
+    flexGrow: 1,
   },
-  storyKicker: {
-    fontSize: 10,
+  heroSection: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+  },
+  feedSection: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+    paddingHorizontal: 2,
+  },
+  sectionTitle: {
+    fontSize: 18,
     fontWeight: '800',
-    letterSpacing: 0.4,
+    letterSpacing: -0.3,
   },
-  storyTitle: {
-    fontSize: 14,
+  shortsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  seeAllText: {
+    fontSize: 13,
     fontWeight: '700',
   },
-  storySub: {
-    fontSize: 12,
-    lineHeight: 16,
+  reelsSection: {
+    paddingTop: spacing.lg,
+    paddingHorizontal: spacing.lg,
   },
-  pressed: {
-    opacity: 0.8,
+  reelsList: {
+    gap: spacing.sm,
+    paddingRight: spacing.lg,
+  },
+  communitySection: {
+    paddingTop: spacing.lg,
+  },
+  loadingContainer: {
+    padding: spacing.lg,
+    gap: spacing.md,
   },
 });

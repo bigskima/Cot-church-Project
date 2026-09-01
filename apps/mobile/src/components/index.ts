@@ -19,6 +19,7 @@ export * from './community/PostCard';
 export * from './leadership/LeadershipModuleCard';
 export * from './leadership/LeaderCard';
 export * from './prayer/PrayerCard';
+export * from './media/StoriesTray';
 export * from './media/AudioPlayer';
 export * from './media/VideoPlayer';
 export * from './media/MediaPlayer';

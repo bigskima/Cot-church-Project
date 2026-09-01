@@ -1,263 +1,270 @@
 import React, { useState } from 'react';
-import {
-  Image,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  StyleProp,
-  ViewStyle,
-} from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View, StyleProp, ViewStyle } from 'react-native';
 import { useTheme } from '@/state/theme';
-import type { SocialPost } from '@/types/content';
-import { radius, spacing, typography } from '@/design-system/tokens';
+import { radius, spacing } from '@/design-system/tokens';
 import { Avatar } from '../primitives/Avatar';
 import { Icon } from '../primitives/Icon';
+import type { SocialPost } from '@/types/content';
 
 export interface PostCardProps {
   post: SocialPost;
+  authorName?: string;
+  authorHandle?: string;
+  authorAvatar?: string | null;
+  expressionName?: string;
+  onPress?: () => void;
+  onReply?: () => void;
   onReact?: (reaction: string) => void;
-  onComment?: () => void;
-  onShare?: () => void;
   onBookmark?: () => void;
-  onAuthorPress?: () => void;
+  onShare?: () => void;
   style?: StyleProp<ViewStyle>;
+  dark?: boolean; // backwards compatibility
 }
 
 export function PostCard({
   post,
+  authorName = 'Church Member',
+  authorHandle,
+  authorAvatar,
+  expressionName,
+  onPress,
+  onReply,
   onReact,
-  onComment,
-  onShare,
   onBookmark,
-  onAuthorPress,
+  onShare,
   style,
 }: PostCardProps) {
-  const { colors, isDark } = useTheme();
-  const [reacted, setReacted] = useState(false);
-  const [reactionCount, setReactionCount] = useState(post.social_reactions?.length ?? 0);
-  const [bookmarked, setBookmarked] = useState(false);
+  const { colors } = useTheme();
 
-  const formattedDate = post.published_at
-    ? new Date(post.published_at).toLocaleDateString(undefined, {
-        month: 'short',
-        day: 'numeric',
-      })
-    : null;
+  const [hasLiked, setHasLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(post.social_reactions?.length || 0);
+  const [hasSaved, setHasSaved] = useState(false);
 
-  const handleToggleReact = () => {
-    const next = !reacted;
-    setReacted(next);
-    setReactionCount((prev) => (next ? prev + 1 : Math.max(0, prev - 1)));
-    onReact?.('amen');
+  const handleLike = () => {
+    if (hasLiked) {
+      setHasLiked(false);
+      setLikeCount((c) => Math.max(0, c - 1));
+    } else {
+      setHasLiked(true);
+      setLikeCount((c) => c + 1);
+      onReact?.('amen');
+    }
   };
 
-  const handleToggleBookmark = () => {
-    setBookmarked(!bookmarked);
+  const handleSave = () => {
+    setHasSaved(!hasSaved);
     onBookmark?.();
   };
 
+  const formatTime = () => {
+    const d = new Date(post.published_at || Date.now());
+    const diff = (Date.now() - d.getTime()) / 1000;
+    if (diff < 60) return 'now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  };
+
+  const mediaUrl = post.media?.[0]?.url || post.media?.[0]?.thumbnailUrl;
+
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          backgroundColor: colors.card,
-          borderBottomColor: colors.border,
-        },
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.rowContainer,
+        { borderBottomColor: colors.borderSubtle },
+        pressed && styles.pressed,
         style,
       ]}
+      accessibilityRole="button"
     >
-      {/* Author Header */}
-      <View style={styles.headerRow}>
-        <Pressable onPress={onAuthorPress} style={styles.authorGroup}>
-          <Avatar name="Community Member" size="sm" />
-          <View style={styles.authorMeta}>
-            <View style={styles.authorNameRow}>
-              <Text style={[styles.authorName, { color: colors.text }]}>Church Member</Text>
-              {post.visibility === 'public' ? (
-                <View style={[styles.verifiedPill, { backgroundColor: colors.primarySoft }]}>
-                  <Text style={[styles.verifiedText, { color: colors.interactive }]}>Public</Text>
-                </View>
-              ) : null}
-            </View>
-            {formattedDate ? (
-              <Text style={[styles.timestamp, { color: colors.textMuted }]}>{formattedDate}</Text>
-            ) : null}
+      {/* Left Column: Avatar */}
+      <View style={styles.leftCol}>
+        <Avatar url={authorAvatar} name={authorName} size="md" />
+      </View>
+
+      {/* Right Column: Content + Actions (Twitter / Threads style) */}
+      <View style={styles.rightCol}>
+        {/* Author Header Row */}
+        <View style={styles.headerRow}>
+          <View style={styles.nameGroup}>
+            <Text style={[styles.authorName, { color: colors.text }]} numberOfLines={1}>
+              {authorName}
+            </Text>
+            <Icon name="checkmark-circle" size={14} color={colors.interactive} />
+            <Text style={[styles.handleText, { color: colors.textMuted }]} numberOfLines={1}>
+              {authorHandle ? `@${authorHandle}` : expressionName ? `· ${expressionName}` : ''}
+            </Text>
           </View>
-        </Pressable>
 
-        <Pressable
-          hitSlop={8}
-          style={styles.moreButton}
-          accessibilityRole="button"
-          accessibilityLabel="Post options"
-        >
-          <Icon name="ellipsis-horizontal" size={18} color={colors.textMuted} />
-        </Pressable>
-      </View>
-
-      {/* Post Body */}
-      <Text style={[styles.bodyText, { color: colors.text }]}>{post.body}</Text>
-
-      {/* Post Media if available */}
-      {post.media && post.media.length > 0 && post.media[0]?.url ? (
-        <View style={styles.mediaContainer}>
-          <Image
-            source={{ uri: post.media[0].url }}
-            style={styles.postImage}
-            resizeMode="cover"
-          />
-        </View>
-      ) : null}
-
-      {/* Social Action Bar */}
-      <View style={[styles.actionBar, { borderTopColor: colors.borderSubtle }]}>
-        {/* Amen / Reaction */}
-        <Pressable
-          onPress={handleToggleReact}
-          hitSlop={6}
-          style={styles.actionBtn}
-          accessibilityRole="button"
-          accessibilityLabel="React"
-        >
-          <Icon
-            name={reacted ? 'heart' : 'heart-outline'}
-            size={18}
-            color={reacted ? '#E5484D' : colors.textMuted}
-          />
-          <Text
-            style={[
-              styles.actionLabel,
-              { color: reacted ? '#E5484D' : colors.textSecondary },
-            ]}
-          >
-            {reactionCount > 0 ? reactionCount : 'Amen'}
+          <Text style={[styles.timeText, { color: colors.textMuted }]}>
+            {formatTime()}
           </Text>
-        </Pressable>
+        </View>
 
-        {/* Comment Action */}
-        <Pressable
-          onPress={onComment}
-          hitSlop={6}
-          style={styles.actionBtn}
-          accessibilityRole="button"
-          accessibilityLabel="Comment"
-        >
-          <Icon name="chatbubble-outline" size={18} color={colors.textMuted} />
-          <Text style={[styles.actionLabel, { color: colors.textSecondary }]}>Reply</Text>
-        </Pressable>
+        {/* Post Body Text */}
+        <Text style={[styles.bodyText, { color: colors.text }]}>
+          {post.body}
+        </Text>
 
-        {/* Bookmark Action */}
-        <Pressable
-          onPress={handleToggleBookmark}
-          hitSlop={6}
-          style={styles.actionBtn}
-          accessibilityRole="button"
-          accessibilityLabel="Save post"
-        >
-          <Icon
-            name={bookmarked ? 'bookmark' : 'bookmark-outline'}
-            size={18}
-            color={bookmarked ? colors.interactive : colors.textMuted}
-          />
-        </Pressable>
+        {/* Media Attachment (if present) */}
+        {mediaUrl ? (
+          <View style={[styles.mediaContainer, { borderColor: colors.border }]}>
+            <Image source={{ uri: mediaUrl }} style={styles.mediaImage} resizeMode="cover" />
+          </View>
+        ) : null}
 
-        {/* Share Action */}
-        <Pressable
-          onPress={onShare}
-          hitSlop={6}
-          style={styles.actionBtn}
-          accessibilityRole="button"
-          accessibilityLabel="Share post"
-        >
-          <Icon name="share-outline" size={18} color={colors.textMuted} />
-        </Pressable>
+        {/* Twitter / Threads Action Rail */}
+        <View style={styles.actionRail}>
+          {/* Reply */}
+          <Pressable
+            onPress={onReply}
+            hitSlop={8}
+            style={styles.actionItem}
+            accessibilityLabel="Reply"
+          >
+            <Icon name="chatbubble-outline" size={16} color={colors.textMuted} />
+            <Text style={[styles.actionCount, { color: colors.textMuted }]}>
+              {/* replies */}
+            </Text>
+          </Pressable>
+
+          {/* Repost / Fellowship */}
+          <Pressable
+            onPress={onShare}
+            hitSlop={8}
+            style={styles.actionItem}
+            accessibilityLabel="Repost"
+          >
+            <Icon name="repeat-outline" size={17} color={colors.textMuted} />
+          </Pressable>
+
+          {/* Amen / Like */}
+          <Pressable
+            onPress={handleLike}
+            hitSlop={8}
+            style={styles.actionItem}
+            accessibilityLabel="Amen reaction"
+          >
+            <Icon
+              name={hasLiked ? 'heart' : 'heart-outline'}
+              size={17}
+              color={hasLiked ? '#EF4444' : colors.textMuted}
+            />
+            {likeCount > 0 ? (
+              <Text
+                style={[
+                  styles.actionCount,
+                  { color: hasLiked ? '#EF4444' : colors.textMuted },
+                ]}
+              >
+                {likeCount}
+              </Text>
+            ) : null}
+          </Pressable>
+
+          {/* Bookmark */}
+          <Pressable
+            onPress={handleSave}
+            hitSlop={8}
+            style={styles.actionItem}
+            accessibilityLabel="Bookmark"
+          >
+            <Icon
+              name={hasSaved ? 'bookmark' : 'bookmark-outline'}
+              size={16}
+              color={hasSaved ? colors.interactive : colors.textMuted}
+            />
+          </Pressable>
+
+          {/* Share */}
+          <Pressable
+            onPress={onShare}
+            hitSlop={8}
+            style={styles.actionItem}
+            accessibilityLabel="Share"
+          >
+            <Icon name="share-outline" size={16} color={colors.textMuted} />
+          </Pressable>
+        </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    paddingTop: spacing.md,
+  rowContainer: {
+    flexDirection: 'row',
+    paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     borderBottomWidth: 1,
+  },
+  leftCol: {
+    marginRight: spacing.md,
+  },
+  rightCol: {
+    flex: 1,
+    gap: 4,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.xs,
   },
-  authorGroup: {
+  nameGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: 4,
     flex: 1,
-  },
-  authorMeta: {
-    flex: 1,
-  },
-  authorNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
   },
   authorName: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
+    letterSpacing: -0.2,
   },
-  verifiedPill: {
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: radius.pill,
+  handleText: {
+    fontSize: 13,
+    flexShrink: 1,
   },
-  verifiedText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  timestamp: {
-    fontSize: 11,
-    marginTop: 1,
-  },
-  moreButton: {
-    padding: 4,
+  timeText: {
+    fontSize: 12,
   },
   bodyText: {
-    ...typography.body,
-    lineHeight: 22,
-    marginVertical: spacing.xs,
+    fontSize: 15,
+    lineHeight: 21,
+    marginTop: 2,
+    letterSpacing: -0.1,
   },
   mediaContainer: {
     width: '100%',
-    height: 220,
+    aspectRatio: 16 / 9,
     borderRadius: radius.md,
     overflow: 'hidden',
+    borderWidth: 1,
     marginTop: spacing.xs,
-    marginBottom: spacing.sm,
   },
-  postImage: {
+  mediaImage: {
     width: '100%',
     height: '100%',
   },
-  actionBar: {
+  actionRail: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: spacing.sm + 2,
-    borderTopWidth: 1,
-    marginTop: spacing.xs,
+    marginTop: spacing.sm,
+    paddingRight: spacing.xl,
   },
-  actionBtn: {
+  actionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingVertical: 4,
-    paddingHorizontal: 6,
+    gap: 4,
+    minWidth: 32,
   },
-  actionLabel: {
+  actionCount: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '500',
+  },
+  pressed: {
+    opacity: 0.85,
   },
 });

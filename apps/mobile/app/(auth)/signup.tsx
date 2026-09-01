@@ -6,58 +6,61 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
-import { Button, InputField, Icon } from '@/components';
-import { radius, shadows, spacing, typography } from '@/design-system/tokens';
+import { Icon } from '@/components';
+import { radius, spacing } from '@/design-system/tokens';
 
-type Method = 'email' | 'phone';
-
-export default function Signup() {
+export default function SignupScreen() {
+  const insets = useSafeAreaInsets();
   const { api } = useSession();
   const { colors, isDark } = useTheme();
-  const [method, setMethod] = useState<Method>('email');
-  const [displayName, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [callingCode, setCode] = useState('1');
-  const [phone, setPhone] = useState('');
+
+  const [displayName, setDisplayName] = useState('');
+  const [emailOrPhone, setEmailOrPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [message, setMessage] = useState('');
-  const [isSuccess, setIsSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
 
-  async function submit() {
-    if (!displayName.trim()) {
-      setMessage('Please enter your full name.');
-      setIsSuccess(false);
+  async function handleSignUp() {
+    if (!displayName.trim() || !emailOrPhone.trim() || !password) {
+      setError('Please fill in all fields.');
       return;
     }
     if (password.length < 6) {
-      setMessage('Password must be at least 6 characters.');
-      setIsSuccess(false);
+      setError('Password must be at least 6 characters.');
       return;
     }
+
     setLoading(true);
-    setMessage('');
+    setError('');
+
     try {
-      const identity =
-        method === 'email'
-          ? { email: email.trim().toLowerCase() }
-          : { phoneNumber: `+${callingCode.replace(/\D/g, '')}${phone.replace(/\D/g, '')}` };
+      const isEmail = emailOrPhone.includes('@');
+      const identity = isEmail
+        ? { email: emailOrPhone.trim().toLowerCase() }
+        : { phoneNumber: emailOrPhone.trim().replace(/\s+/g, '') };
+
       await api.request('signup', {
         method: 'POST',
-        body: JSON.stringify({ displayName: displayName.trim(), ...identity, password }),
+        body: JSON.stringify({
+          displayName: displayName.trim(),
+          ...identity,
+          password,
+        }),
       });
-      setIsSuccess(true);
-      setMessage('Account created successfully! Check your email or phone for verification.');
-      setTimeout(() => router.replace('/(auth)/login'), 2000);
+
+      setSuccess(true);
+      setTimeout(() => router.replace('/(auth)/login'), 1500);
     } catch (err) {
-      setIsSuccess(false);
-      setMessage(err instanceof Error ? err.message : 'Unable to create your account.');
+      setError(err instanceof Error ? err.message : 'Unable to create account. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -68,191 +71,172 @@ export default function Signup() {
       style={[styles.container, { backgroundColor: colors.bg }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      {/* Top Header Bar */}
+      <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
+        <Pressable
+          onPress={() => router.back()}
+          hitSlop={10}
+          style={styles.backBtn}
+        >
+          <Icon name="arrow-back" size={22} color={colors.text} />
+        </Pressable>
+        <View style={styles.logoBadge}>
+          <Icon name="business" size={24} color={colors.interactive} />
+        </View>
+        <View style={{ width: 22 }} />
+      </View>
+
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.formWrapper}>
-          {/* Header */}
-          <View style={styles.brandHeader}>
-            <View style={[styles.brandIconWrapper, { backgroundColor: colors.primarySoft }]}>
-              <Icon name="person-add" size={28} color={colors.interactive} />
+        <View style={styles.mainColumn}>
+          {/* Headline */}
+          <Text style={[styles.headline, { color: colors.text }]}>
+            Create your account
+          </Text>
+          <Text style={[styles.subheadline, { color: colors.textSecondary }]}>
+            Join your church fellowship, sermon archives, and prayer community.
+          </Text>
+
+          {/* Error Banner */}
+          {error ? (
+            <View style={[styles.banner, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
+              <Icon name="alert-circle" size={16} color="#EF4444" style={{ marginRight: 8 }} />
+              <Text style={styles.errorText}>{error}</Text>
             </View>
-            <Text style={[styles.title, { color: colors.text }]}>Create Your Account</Text>
-            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              Join your church family for sermon archives, events, giving, and community prayer.
-            </Text>
-          </View>
+          ) : null}
 
-          {/* Signup Form Card */}
-          <View
-            style={[
-              styles.card,
-              { backgroundColor: colors.card, borderColor: colors.border },
-              shadows.sm,
-            ]}
-          >
-            {/* Notification Banner */}
-            {message ? (
-              <View
-                style={[
-                  styles.messageBanner,
-                  {
-                    backgroundColor: isSuccess
-                      ? 'rgba(22, 163, 106, 0.12)'
-                      : 'rgba(229, 72, 77, 0.12)',
-                    borderColor: isSuccess
-                      ? 'rgba(22, 163, 106, 0.3)'
-                      : 'rgba(229, 72, 77, 0.3)',
-                  },
-                ]}
-              >
-                <Icon
-                  name={isSuccess ? 'checkmark-circle' : 'alert-circle'}
-                  size={16}
-                  color={isSuccess ? '#16A36A' : '#E5484D'}
-                  style={{ marginRight: 6 }}
-                />
-                <Text
-                  style={[
-                    styles.messageText,
-                    { color: isSuccess ? '#16A36A' : '#E5484D' },
-                  ]}
-                >
-                  {message}
-                </Text>
-              </View>
-            ) : null}
+          {/* Success Banner */}
+          {success ? (
+            <View style={[styles.banner, { backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
+              <Icon name="checkmark-circle" size={16} color="#10B981" style={{ marginRight: 8 }} />
+              <Text style={styles.successText}>Account created! Redirecting to sign in...</Text>
+            </View>
+          ) : null}
 
-            <InputField
-              label="Full Name"
-              placeholder="e.g. Sarah Jenkins"
-              value={displayName}
-              onChangeText={setName}
-              autoComplete="name"
-              leftIcon={<Icon name="person-outline" size={18} color={colors.textMuted} />}
-            />
-
-            {/* Method Pill Selector */}
+          {/* Minimal Inputs */}
+          <View style={styles.formGroup}>
             <View
               style={[
-                styles.methodPillContainer,
-                { backgroundColor: colors.bgSecondary },
+                styles.inputWrapper,
+                {
+                  backgroundColor: colors.inputBg,
+                  borderColor: colors.border,
+                },
               ]}
             >
-              {(['email', 'phone'] as Method[]).map((val) => {
-                const isSelected = method === val;
-                return (
-                  <Pressable
-                    key={val}
-                    onPress={() => {
-                      setMethod(val);
-                      setMessage('');
-                    }}
-                    style={[
-                      styles.methodPill,
-                      isSelected && {
-                        backgroundColor: colors.card,
-                        ...shadows.sm,
-                      },
-                    ]}
-                  >
-                    <Icon
-                      name={val === 'email' ? 'mail-outline' : 'call-outline'}
-                      size={16}
-                      color={isSelected ? colors.text : colors.textMuted}
-                      style={{ marginRight: 6 }}
-                    />
-                    <Text
-                      style={[
-                        styles.methodPillText,
-                        { color: isSelected ? colors.text : colors.textMuted },
-                      ]}
-                    >
-                      {val === 'email' ? 'Email Address' : 'Phone Number'}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+              <TextInput
+                value={displayName}
+                onChangeText={(val) => {
+                  setDisplayName(val);
+                  setError('');
+                }}
+                placeholder="Full Name"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="words"
+                autoComplete="name"
+                style={[styles.inputField, { color: colors.text }]}
+              />
             </View>
 
-            {method === 'email' ? (
-              <InputField
-                label="Email"
-                placeholder="name@example.com"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
+            <View
+              style={[
+                styles.inputWrapper,
+                {
+                  backgroundColor: colors.inputBg,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <TextInput
+                value={emailOrPhone}
+                onChangeText={(val) => {
+                  setEmailOrPhone(val);
+                  setError('');
+                }}
+                placeholder="Email or Phone Number"
+                placeholderTextColor={colors.textMuted}
                 autoCapitalize="none"
-                autoComplete="email"
-                leftIcon={<Icon name="mail-outline" size={18} color={colors.textMuted} />}
+                keyboardType="email-address"
+                style={[styles.inputField, { color: colors.text }]}
               />
-            ) : (
-              <View style={styles.phoneInputRow}>
-                <View style={{ width: 80 }}>
-                  <InputField
-                    label="Code"
-                    value={callingCode}
-                    onChangeText={setCode}
-                    keyboardType="number-pad"
-                    placeholder="1"
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <InputField
-                    label="Phone Number"
-                    placeholder="5550199"
-                    value={phone}
-                    onChangeText={setPhone}
-                    keyboardType="phone-pad"
-                    autoComplete="tel"
-                    leftIcon={<Icon name="call-outline" size={18} color={colors.textMuted} />}
-                  />
-                </View>
-              </View>
-            )}
+            </View>
 
-            <InputField
-              label="Create Password"
-              placeholder="Minimum 6 characters"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-              autoCapitalize="none"
-              leftIcon={<Icon name="lock-closed-outline" size={18} color={colors.textMuted} />}
-              rightIcon={
-                <Pressable onPress={() => setShowPassword(!showPassword)} hitSlop={8}>
-                  <Icon
-                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                    size={18}
-                    color={colors.textMuted}
-                  />
-                </Pressable>
-              }
-            />
-
-            <Button
-              label="Create Account"
-              onPress={submit}
-              loading={loading}
-              variant="primary"
-              size="lg"
-              style={{ marginTop: spacing.xs }}
-            />
+            <View
+              style={[
+                styles.inputWrapper,
+                {
+                  backgroundColor: colors.inputBg,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <TextInput
+                value={password}
+                onChangeText={(val) => {
+                  setPassword(val);
+                  setError('');
+                }}
+                placeholder="Password (6+ characters)"
+                placeholderTextColor={colors.textMuted}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                style={[styles.inputField, { color: colors.text }]}
+              />
+              <Pressable
+                onPress={() => setShowPassword(!showPassword)}
+                hitSlop={10}
+                style={styles.eyeBtn}
+              >
+                <Icon
+                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                  size={20}
+                  color={colors.textMuted}
+                />
+              </Pressable>
+            </View>
           </View>
 
-          {/* Footer Navigation */}
-          <View style={styles.footerRow}>
-            <Text style={[styles.footerText, { color: colors.textSecondary }]}>
-              Already have an account?
+          {/* Terms Disclaimer */}
+          <Text style={[styles.disclaimerText, { color: colors.textMuted }]}>
+            By signing up, you agree to our Terms of Service, Privacy Policy, and Community Guidelines.
+          </Text>
+
+          {/* Primary Pill Button */}
+          <Pressable
+            onPress={handleSignUp}
+            disabled={loading}
+            style={({ pressed }) => [
+              styles.primaryPillBtn,
+              {
+                backgroundColor: isDark ? '#FFFFFF' : '#0F172A',
+                opacity: pressed || loading ? 0.85 : 1,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.primaryPillBtnText,
+                { color: isDark ? '#0F172A' : '#FFFFFF' },
+              ]}
+            >
+              {loading ? 'Creating Account...' : 'Create Account'}
             </Text>
-            <Pressable onPress={() => router.push('/(auth)/login')}>
-              <Text style={[styles.footerLink, { color: colors.interactive }]}>
-                Sign In
-              </Text>
-            </Pressable>
-          </View>
+          </Pressable>
+        </View>
+
+        {/* Bottom Pinned Footer */}
+        <View style={styles.footerRow}>
+          <Text style={[styles.footerText, { color: colors.textSecondary }]}>
+            Already have an account?{' '}
+          </Text>
+          <Pressable onPress={() => router.push('/(auth)/login')}>
+            <Text style={[styles.footerLink, { color: colors.interactive }]}>
+              Log in
+            </Text>
+          </Pressable>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -263,87 +247,105 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  content: {
-    flexGrow: 1,
-    justifyContent: 'center',
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.xxl,
+    paddingBottom: spacing.sm,
   },
-  formWrapper: {
+  backBtn: {
+    padding: 4,
+  },
+  logoBadge: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xxl,
+  },
+  mainColumn: {
     width: '100%',
-    maxWidth: 440,
+    maxWidth: 420,
     alignSelf: 'center',
-    gap: spacing.lg,
+    marginTop: spacing.sm,
   },
-  brandHeader: {
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  brandIconWrapper: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
+  headline: {
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: -0.7,
     marginBottom: spacing.xs,
   },
-  title: {
-    ...typography.h1,
-    textAlign: 'center',
+  subheadline: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: spacing.xl,
   },
-  subtitle: {
-    ...typography.bodySmall,
-    textAlign: 'center',
-    lineHeight: 18,
-    maxWidth: 320,
-  },
-  card: {
-    padding: spacing.lg,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    gap: spacing.sm,
-  },
-  methodPillContainer: {
+  banner: {
     flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
     borderRadius: radius.md,
-    padding: 3,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.md,
   },
-  methodPill: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    borderRadius: radius.sm,
-  },
-  methodPillText: {
+  errorText: {
+    color: '#EF4444',
     fontSize: 13,
     fontWeight: '600',
+    flex: 1,
   },
-  messageBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.sm,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    marginBottom: spacing.xs,
-  },
-  messageText: {
-    fontSize: 12,
+  successText: {
+    color: '#10B981',
+    fontSize: 13,
     fontWeight: '600',
     flex: 1,
   },
-  phoneInputRow: {
-    flexDirection: 'row',
+  formGroup: {
     gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    paddingHorizontal: spacing.lg,
+    height: 52,
+  },
+  inputField: {
+    flex: 1,
+    fontSize: 15,
+    height: '100%',
+  },
+  eyeBtn: {
+    padding: 4,
+  },
+  disclaimerText: {
+    fontSize: 12,
+    lineHeight: 16,
+    marginBottom: spacing.lg,
+  },
+  primaryPillBtn: {
+    height: 48,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
+  },
+  primaryPillBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
   },
   footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    marginTop: spacing.xs,
+    marginTop: spacing.xl,
   },
   footerText: {
     fontSize: 14,
