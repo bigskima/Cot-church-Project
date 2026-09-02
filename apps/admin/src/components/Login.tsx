@@ -1,6 +1,6 @@
 import React, { useState, type FormEvent } from 'react';
-import type { ApiClient, AuthState } from '../api';
-import { Badge, Button, Card, InputField } from './ui';
+import { ApiClient, type ApiError, type AuthState } from '../api';
+import { Button, Card, InputField } from './ui';
 
 export function Login({
   api,
@@ -22,120 +22,72 @@ export function Login({
     try {
       const data = await api.request<{ session: { accessToken: string } }>('login', {
         method: 'POST',
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
       });
-      onAuthenticated({ accessToken: data.session.accessToken });
+      const provisional: AuthState = { accessToken: data.session.accessToken };
+      const platformApi = new ApiClient(() => provisional);
+      await platformApi.request('platform-context');
+      onAuthenticated(provisional);
     } catch (value) {
-      setError(value instanceof Error ? value.message : 'Unable to authenticate leadership session');
+      const maybeApiError = value as ApiError;
+      if (maybeApiError?.code === 'PLATFORM_PERMISSION_DENIED') {
+        setError('This account does not have Platform Administration access. Church roles belong in the church application.');
+      } else {
+        setError(value instanceof Error ? value.message : 'Unable to sign in to Platform Administration.');
+      }
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <main
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'radial-gradient(circle at 50% 20%, #16284c 0%, #040914 70%)',
-        padding: 24,
-      }}
-    >
-      <div style={{ width: '100%', maxWidth: 460 }}>
-        {/* Brand Header */}
-        <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div
-            style={{
-              width: 56,
-              height: 56,
-              background: 'linear-gradient(135deg, var(--gold-light), var(--gold-dark))',
-              borderRadius: 'var(--radius-lg)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 28,
-              color: '#040914',
-              fontWeight: 900,
-              boxShadow: 'var(--gold-glow)',
-              marginBottom: 16,
-            }}
-          >
-            ✦
-          </div>
-          <h1 style={{ fontSize: 26, fontWeight: 900, letterSpacing: -0.5 }}>Sanctuary OS</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginTop: 4 }}>
-            Platform Control Plane & Global Governance
-          </p>
-          <div style={{ marginTop: 12 }}>
-            <Badge label="LEVEL 1 SUPER ADMIN" variant="gold" />
+    <main className="platform-login-shell">
+      <section className="platform-login-panel" aria-labelledby="platform-login-title">
+        <div className="platform-login-brand">
+          <div className="platform-login-mark" aria-hidden="true">C</div>
+          <div>
+            <p className="platform-login-kicker">Church Digital Platform</p>
+            <h1 id="platform-login-title">Platform Administration</h1>
           </div>
         </div>
 
-        {/* Login Card */}
-        <Card glass>
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column' }}>
+        <p className="platform-login-copy">
+          Sign in with an account that has Level-1 platform authority. Organisation and expression leaders manage their churches inside the church application, not here.
+        </p>
+
+        <Card>
+          <form onSubmit={handleSubmit} className="platform-login-form">
             <InputField
-              label="Administrative Email"
+              label="Email"
               type="email"
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="platform.admin@church.org"
+              placeholder="admin@example.com"
               required
             />
-
             <InputField
-              label="Master Access Credential"
+              label="Password"
               type="password"
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••••••••••"
+              placeholder="Enter your password"
               required
             />
 
-            {error ? (
-              <div
-                style={{
-                  backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                  padding: 12,
-                  borderRadius: 'var(--radius-md)',
-                  color: '#FCA5A5',
-                  fontSize: 13,
-                  fontWeight: 700,
-                  marginBottom: 18,
-                }}
-              >
-                {error}
-              </div>
-            ) : null}
+            {error ? <div className="admin-inline-error" role="alert">{error}</div> : null}
 
-            <Button
-              variant="gold"
-              size="lg"
-              loading={busy}
-              type="submit"
-              style={{ width: '100%' }}
-            >
-              Sign In to Sanctuary Control Plane ➔
+            <Button variant="primary" size="lg" loading={busy} type="submit" style={{ width: '100%' }}>
+              Sign in
             </Button>
           </form>
         </Card>
 
-        <p
-          style={{
-            textAlign: 'center',
-            fontSize: 12,
-            color: 'var(--text-muted)',
-            marginTop: 20,
-          }}
-        >
-          Protected by Platform Security Authority. All access attempts logged.
+        <p className="platform-login-footnote">
+          Platform actions are permission checked and auditable.
         </p>
-      </div>
+      </section>
     </main>
   );
 }
