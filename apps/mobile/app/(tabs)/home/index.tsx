@@ -119,7 +119,7 @@ export default function HomeScreen() {
         imageUrl: undefined,
         isLive: false,
         hasUnseen: idx < 2,
-        onPress: () => router.push('/(tabs)/reels'),
+        onPress: () => router.push('/reels'),
       });
     });
     return list;
@@ -257,7 +257,7 @@ export default function HomeScreen() {
                 <Icon name="flash" size={18} color="#EF4444" style={{ marginRight: 6 }} />
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>Reels & Shorts</Text>
               </View>
-              <Pressable onPress={() => router.push('/(tabs)/reels')}>
+              <Pressable onPress={() => router.push('/reels')}>
                 <Text style={[styles.seeAllText, { color: colors.interactive }]}>View all</Text>
               </Pressable>
             </View>
@@ -271,7 +271,7 @@ export default function HomeScreen() {
               renderItem={({ item }) => (
                 <ReelCard
                   reel={item}
-                  onPress={() => router.push('/(tabs)/reels')}
+                  onPress={() => router.push('/reels')}
                 />
               )}
             />

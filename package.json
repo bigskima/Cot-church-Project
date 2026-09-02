@@ -30,8 +30,7 @@
     "services:check": "node scripts/check-production-services.mjs"
   },
   "devDependencies": {
-    "@pgsql/parser": "1.5.0",
-    "supabase": "2.115.0"
+    "@pgsql/parser": "1.5.0"
   },
   "dependencies": {
     "react-native": "^0.86.3",

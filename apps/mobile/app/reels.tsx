@@ -2,27 +2,31 @@ import React, { useRef, useState } from 'react';
 import {
   Dimensions,
   FlatList,
+  Pressable,
   RefreshControl,
   StyleSheet,
   View,
   ViewToken,
 } from 'react-native';
+import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import {
   CommentSheet,
-  EmptyState,
+  Icon,
   ReelPlayer,
   ResourceError,
   Skeleton,
 } from '@/components';
 import type { ContentComment, Reel } from '@/types/content';
 
-const { height: screenHeight } = Dimensions.get('window');
+const { height: windowHeight } = Dimensions.get('window');
 const organization = process.env.EXPO_PUBLIC_ORGANIZATION_ID;
 
-export default function ReelsScreen() {
+export default function FullScreenReelsScreen() {
+  const insets = useSafeAreaInsets();
   const { api, mode, context } = useSession();
   const { colors } = useTheme();
 
@@ -31,7 +35,7 @@ export default function ReelsScreen() {
   const [comments, setComments] = useState<ContentComment[]>([]);
   const [commentLoading, setCommentLoading] = useState(false);
 
-  const reelsResource = useResource<Reel[]>('reels:feed', (signal) =>
+  const reelsResource = useResource<Reel[]>('reels:immersive', (signal) =>
     api.request<Reel[]>(
       `public-content?type=reels${organization ? `&organizationId=${organization}` : ''}`,
       { signal }
@@ -48,9 +52,7 @@ export default function ReelsScreen() {
     }
   ).current;
 
-  const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 70,
-  }).current;
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 70 }).current;
 
   const handleOpenComments = async (reel: Reel) => {
     setActiveReelForComments(reel);
@@ -113,11 +115,21 @@ export default function ReelsScreen() {
 
   return (
     <View style={styles.screen}>
-      {reelsResource.loading ? (
-        <View style={styles.loadingContainer}>
-          <Skeleton height={screenHeight - 120} />
-        </View>
-      ) : reelsResource.error && !reelsResource.data ? (
+      <View style={[styles.closeButton, { top: insets.top + 8 }]}>
+        <Pressable
+          onPress={() => router.back()}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Close Reels"
+          style={[styles.closeBtnInner, { backgroundColor: colors.cardElevated }]}
+        >
+          <Icon name="close" size={22} color="#FFFFFF" />
+        </Pressable>
+      </View>
+
+      {reelsResource.loading && !reels.length ? (
+        <Skeleton height={windowHeight} />
+      ) : reelsResource.error && !reels.length ? (
         <View style={styles.centerWrapper}>
           <ResourceError
             message={reelsResource.error}
@@ -126,10 +138,9 @@ export default function ReelsScreen() {
         </View>
       ) : reels.length === 0 ? (
         <View style={styles.centerWrapper}>
-          <EmptyState
-            title="No Short Clips Yet"
-            message="Highlights and sermon clips will appear here as soon as published."
-            iconName="film-outline"
+          <ResourceError
+            message="No Short Clips Yet"
+            retry={reelsResource.refresh}
           />
         </View>
       ) : (
@@ -138,7 +149,7 @@ export default function ReelsScreen() {
           keyExtractor={(item) => item.id}
           pagingEnabled
           showsVerticalScrollIndicator={false}
-          snapToInterval={screenHeight - 80}
+          snapToInterval={windowHeight}
           snapToAlignment="start"
           decelerationRate="fast"
           onViewableItemsChanged={onViewableItemsChanged}
@@ -163,7 +174,6 @@ export default function ReelsScreen() {
         />
       )}
 
-      {/* Fellowship Comments Sheet */}
       <CommentSheet
         visible={!!activeReelForComments}
         onClose={() => setActiveReelForComments(null)}
@@ -180,10 +190,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#061426',
   },
-  loadingContainer: {
-    flex: 1,
+  closeButton: {
+    position: 'absolute',
+    right: 16,
+    zIndex: 10,
+  },
+  closeBtnInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
+    opacity: 0.9,
   },
   centerWrapper: {
     flex: 1,
