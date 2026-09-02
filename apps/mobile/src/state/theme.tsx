@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, type PropsWithChildren } from 'react';
-import { useColorScheme } from 'react-native';
+import { Platform, useColorScheme } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { getThemeColors, type ColorMode } from '../design-system/tokens';
 
@@ -15,33 +15,58 @@ interface ThemeContextValue {
 }
 
 const THEME_STORAGE_KEY = 'church-os-theme-preference';
-
 const ThemeContext = createContext<ThemeContextValue | null>(null);
+
+function isThemePreference(value: string | null): value is ThemePreference {
+  return value === 'light' || value === 'dark' || value === 'system';
+}
+
+async function readThemePreference(): Promise<ThemePreference | null> {
+  try {
+    if (Platform.OS === 'web') {
+      if (typeof window === 'undefined') return null;
+      const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
+      return isThemePreference(saved) ? saved : null;
+    }
+
+    const available = await SecureStore.isAvailableAsync().catch(() => false);
+    if (!available) return null;
+    const saved = await SecureStore.getItemAsync(THEME_STORAGE_KEY);
+    return isThemePreference(saved) ? saved : null;
+  } catch {
+    return null;
+  }
+}
+
+async function persistThemePreference(preference: ThemePreference) {
+  try {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(THEME_STORAGE_KEY, preference);
+      }
+      return;
+    }
+
+    const available = await SecureStore.isAvailableAsync().catch(() => false);
+    if (available) await SecureStore.setItemAsync(THEME_STORAGE_KEY, preference);
+  } catch {
+    // Theme persistence must never block rendering or user navigation.
+  }
+}
 
 export function ThemeProvider({ children }: PropsWithChildren) {
   const systemColorScheme = useColorScheme();
   const [preference, setPreferenceState] = useState<ThemePreference>('system');
 
   useEffect(() => {
-    SecureStore.getItemAsync(THEME_STORAGE_KEY)
-      .then((saved) => {
-        if (saved === 'light' || saved === 'dark' || saved === 'system') {
-          setPreferenceState(saved);
-        }
-      })
-      .catch(() => {});
+    void readThemePreference().then((saved) => {
+      if (saved) setPreferenceState(saved);
+    });
   }, []);
 
   const setPreference = async (newPref: ThemePreference) => {
     setPreferenceState(newPref);
-    try {
-      await SecureStore.setItemAsync(THEME_STORAGE_KEY, newPref);
-    } catch {}
-  };
-
-  const toggleTheme = async () => {
-    const nextPref = mode === 'dark' ? 'light' : 'dark';
-    await setPreference(nextPref);
+    await persistThemePreference(newPref);
   };
 
   const mode: ColorMode =
@@ -50,6 +75,10 @@ export function ThemeProvider({ children }: PropsWithChildren) {
         ? 'dark'
         : 'light'
       : preference;
+
+  const toggleTheme = async () => {
+    await setPreference(mode === 'dark' ? 'light' : 'dark');
+  };
 
   const isDark = mode === 'dark';
   const colors = getThemeColors(isDark);
@@ -72,16 +101,14 @@ export function ThemeProvider({ children }: PropsWithChildren) {
 
 export function useTheme() {
   const ctx = useContext(ThemeContext);
-  if (!ctx) {
-    const isDark = false;
-    return {
-      preference: 'system' as ThemePreference,
-      mode: 'light' as ColorMode,
-      isDark: false,
-      colors: getThemeColors(false),
-      setPreference: async () => {},
-      toggleTheme: async () => {},
-    };
-  }
-  return ctx;
+  if (ctx) return ctx;
+
+  return {
+    preference: 'system' as ThemePreference,
+    mode: 'light' as ColorMode,
+    isDark: false,
+    colors: getThemeColors(false),
+    setPreference: async () => {},
+    toggleTheme: async () => {},
+  };
 }
