@@ -35,7 +35,10 @@ Deno.serve(
           .order("created_at", { ascending: false })
           .range(from, to);
         if (status) query = query.eq("status", status);
-        if (search) query = query.or(`name.ilike.%${search.replaceAll("%", "\\%")}%,slug.ilike.%${search.replaceAll("%", "\\%")} %`.replace("}% ", "}"));
+        if (search) {
+          const safeSearch = search.replace(/[,%()]/g, " ").replace(/\s+/g, " ").trim().slice(0, 120);
+          if (safeSearch) query = query.or(`name.ilike.%${safeSearch}%,slug.ilike.%${safeSearch}%`);
+        }
 
         const { data, error, count } = await query;
         if (error) throw new ApiError("PLATFORM_ORGANIZATIONS_FAILED", "Unable to retrieve platform organizations", 500, undefined, false);
