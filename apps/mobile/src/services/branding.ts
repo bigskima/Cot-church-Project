@@ -20,23 +20,46 @@ const DEFAULT_BRANDING: PlatformBrandingConfig = {
 };
 
 let cachedBranding: PlatformBrandingConfig | null = null;
+let inFlightBranding: Promise<PlatformBrandingConfig> | null = null;
 
-export async function fetchPlatformBranding(apiClient?: ApiClient): Promise<PlatformBrandingConfig> {
-  if (cachedBranding) return cachedBranding;
-
+async function loadBranding(apiClient?: ApiClient): Promise<PlatformBrandingConfig> {
   try {
     const client = apiClient ?? new ApiClient(apiUrl, () => null);
     const data = await client.request<PlatformBrandingConfig>('branding');
     if (data) {
-      cachedBranding = { ...DEFAULT_BRANDING, ...data };
+      cachedBranding = {
+        ...DEFAULT_BRANDING,
+        ...data,
+        theme_tokens: {
+          ...DEFAULT_BRANDING.theme_tokens,
+          ...(data.theme_tokens ?? {}),
+        },
+      };
       return cachedBranding;
     }
-  } catch (_err) {
-    // Network or remote failure -> gracefully fallback to bundled default branding
+  } catch {
+    // Branding is non-critical bootstrap data. The bundled brand remains usable
+    // when the API is offline, misconfigured or temporarily unavailable.
   }
 
   cachedBranding = DEFAULT_BRANDING;
   return cachedBranding;
+}
+
+export function fetchPlatformBranding(apiClient?: ApiClient): Promise<PlatformBrandingConfig> {
+  if (cachedBranding) return Promise.resolve(cachedBranding);
+  if (inFlightBranding) return inFlightBranding;
+
+  inFlightBranding = loadBranding(apiClient).finally(() => {
+    inFlightBranding = null;
+  });
+  return inFlightBranding;
+}
+
+export async function refreshPlatformBranding(apiClient?: ApiClient) {
+  cachedBranding = null;
+  inFlightBranding = null;
+  return fetchPlatformBranding(apiClient);
 }
 
 export function getCachedBranding(): PlatformBrandingConfig {
