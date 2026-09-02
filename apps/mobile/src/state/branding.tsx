@@ -1,9 +1,14 @@
-import React, { createContext, useContext, useEffect, useState, type PropsWithChildren } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState, type PropsWithChildren } from 'react';
 import { useSession } from './session';
 import type { PlatformBrandingConfig } from '@church/types';
+import {
+  fetchPlatformBranding,
+  getCachedBranding,
+  refreshPlatformBranding,
+} from '@/services/branding';
 
 interface BrandingContextValue {
-  branding: PlatformBrandingConfig | null;
+  branding: PlatformBrandingConfig;
   loading: boolean;
   platformName: string;
   primaryLogoUrl?: string | null;
@@ -16,40 +21,43 @@ interface BrandingContextValue {
 const BrandingContext = createContext<BrandingContextValue | null>(null);
 
 export function BrandingProvider({ children }: PropsWithChildren) {
-  const { api, mode } = useSession();
-  const [branding, setBranding] = useState<PlatformBrandingConfig | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { api } = useSession();
+  const [branding, setBranding] = useState<PlatformBrandingConfig>(() => getCachedBranding());
+  const [loading, setLoading] = useState(false);
 
-  const fetchBranding = async () => {
+  const load = useCallback(async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const res = await api.request<PlatformBrandingConfig>('branding');
-      if (res && typeof res === 'object') {
-        setBranding(res);
-      }
-    } catch {
-      // Fallback to local default if remote request fails
-      setBranding(null);
+      setBranding(await fetchPlatformBranding(api));
     } finally {
       setLoading(false);
     }
-  };
+  }, [api]);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      setBranding(await refreshPlatformBranding(api));
+    } finally {
+      setLoading(false);
+    }
+  }, [api]);
 
   useEffect(() => {
-    fetchBranding();
-  }, [mode]);
+    void load();
+  }, [load]);
 
   return (
     <BrandingContext.Provider
       value={{
         branding,
         loading,
-        platformName: branding?.platform_name || 'Church of the Truth',
-        primaryLogoUrl: branding?.primary_logo_url,
-        compactLogoUrl: branding?.compact_logo_url,
-        darkLogoUrl: branding?.dark_logo_url,
-        launchLogoUrl: branding?.launch_logo_url,
-        refresh: fetchBranding,
+        platformName: branding.platform_name || 'Church Digital Platform',
+        primaryLogoUrl: branding.primary_logo_url,
+        compactLogoUrl: branding.compact_logo_url,
+        darkLogoUrl: branding.dark_logo_url,
+        launchLogoUrl: branding.launch_logo_url,
+        refresh,
       }}
     >
       {children}
@@ -59,17 +67,17 @@ export function BrandingProvider({ children }: PropsWithChildren) {
 
 export function useBranding(): BrandingContextValue {
   const ctx = useContext(BrandingContext);
-  if (!ctx) {
-    return {
-      branding: null,
-      loading: false,
-      platformName: 'Church of the Truth',
-      primaryLogoUrl: null,
-      compactLogoUrl: null,
-      darkLogoUrl: null,
-      launchLogoUrl: null,
-      refresh: async () => {},
-    };
-  }
-  return ctx;
+  if (ctx) return ctx;
+
+  const fallback = getCachedBranding();
+  return {
+    branding: fallback,
+    loading: false,
+    platformName: fallback.platform_name || 'Church Digital Platform',
+    primaryLogoUrl: fallback.primary_logo_url,
+    compactLogoUrl: fallback.compact_logo_url,
+    darkLogoUrl: fallback.dark_logo_url,
+    launchLogoUrl: fallback.launch_logo_url,
+    refresh: async () => {},
+  };
 }
