@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { ApiError } from "../_shared/errors.ts";
-import { authorize } from "../_shared/context.ts";
+import { authorizePlatform } from "../_shared/context.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString } from "../_shared/validation.ts";
@@ -8,7 +8,7 @@ import { publicClient } from "../_shared/supabase.ts";
 
 Deno.serve(
   createHandler(
-    { methods: ["GET", "PATCH"], authentication: "optional", organization: "optional" },
+    { methods: ["GET", "PATCH"], authentication: "optional", organization: "none" },
     async ({ request, auth }) => {
       if (request.method === "GET") {
         const client = auth?.client ?? publicClient();
@@ -18,9 +18,9 @@ Deno.serve(
           .eq("is_active", true)
           .order("updated_at", { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
-        if (error && error.code !== "PGRST116") {
+        if (error) {
           throw new ApiError("BRANDING_FETCH_FAILED", "Unable to retrieve platform branding", 500, undefined, false);
         }
 
@@ -35,20 +35,20 @@ Deno.serve(
           default_placeholder_logo_url: null,
           default_leader_placeholder_url: null,
           theme_tokens: {
-            primary: "#091733",
-            accent: "#E5B94B",
-            cream: "#F4F2EB",
+            navy: "#0D294B",
+            navyDark: "#07111F",
+            interactive: "#2F6FED",
+            white: "#FFFFFF",
+            background: "#F7F9FC",
+            ink: "#0B1628",
           },
         };
 
         return { data: data ?? fallbackBranding };
       }
 
-      // PATCH
-      if (!auth?.user) {
-        throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication required", 401);
-      }
-      await authorize(auth, "platform.branding.manage");
+      if (!auth?.user) throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication required", 401);
+      await authorizePlatform(auth, "platform.branding.manage");
 
       const body = assertObject(await jsonBody(request));
       assertNoUnknownFields(body, [
@@ -64,10 +64,7 @@ Deno.serve(
         "themeTokens",
       ]);
 
-      const updates: Record<string, unknown> = {
-        updated_by: auth.user.id,
-      };
-
+      const updates: Record<string, unknown> = { updated_by: auth.user.id };
       if (body.platformName !== undefined) updates.platform_name = requiredString(body.platformName, "platformName", 120);
       if (body.primaryLogoUrl !== undefined) updates.primary_logo_url = optionalString(body.primaryLogoUrl, "primaryLogoUrl", 2000);
       if (body.compactLogoUrl !== undefined) updates.compact_logo_url = optionalString(body.compactLogoUrl, "compactLogoUrl", 2000);
@@ -77,11 +74,22 @@ Deno.serve(
       if (body.launchBackgroundUrl !== undefined) updates.launch_background_url = optionalString(body.launchBackgroundUrl, "launchBackgroundUrl", 2000);
       if (body.defaultPlaceholderLogoUrl !== undefined) updates.default_placeholder_logo_url = optionalString(body.defaultPlaceholderLogoUrl, "defaultPlaceholderLogoUrl", 2000);
       if (body.defaultLeaderPlaceholderUrl !== undefined) updates.default_leader_placeholder_url = optionalString(body.defaultLeaderPlaceholderUrl, "defaultLeaderPlaceholderUrl", 2000);
-      if (body.themeTokens !== undefined && typeof body.themeTokens === "object") updates.theme_tokens = body.themeTokens;
+      if (body.themeTokens !== undefined) {
+        if (!body.themeTokens || typeof body.themeTokens !== "object" || Array.isArray(body.themeTokens)) {
+          throw new ApiError("VALIDATION_FAILED", "themeTokens must be an object", 422);
+        }
+        updates.theme_tokens = body.themeTokens;
+      }
 
-      const { data: existing } = await auth.client.from("platform_branding").select("id").limit(1).single();
+      const { data: existing, error: existingError } = await auth.client
+        .from("platform_branding")
+        .select("id")
+        .eq("is_active", true)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (existingError) throw new ApiError("BRANDING_FETCH_FAILED", "Unable to retrieve platform branding", 500, undefined, false);
 
-      let result;
       if (existing?.id) {
         const { data, error } = await auth.client
           .from("platform_branding")
@@ -90,18 +98,16 @@ Deno.serve(
           .select()
           .single();
         if (error) throw new ApiError("BRANDING_UPDATE_FAILED", "Unable to update platform branding", 500, undefined, false);
-        result = data;
-      } else {
-        const { data, error } = await auth.client
-          .from("platform_branding")
-          .insert({ ...updates, is_active: true })
-          .select()
-          .single();
-        if (error) throw new ApiError("BRANDING_CREATE_FAILED", "Unable to create platform branding", 500, undefined, false);
-        result = data;
+        return { data };
       }
 
-      return { data: result };
-    }
-  )
+      const { data, error } = await auth.client
+        .from("platform_branding")
+        .insert({ ...updates, is_active: true })
+        .select()
+        .single();
+      if (error) throw new ApiError("BRANDING_CREATE_FAILED", "Unable to create platform branding", 500, undefined, false);
+      return { data };
+    },
+  ),
 );
