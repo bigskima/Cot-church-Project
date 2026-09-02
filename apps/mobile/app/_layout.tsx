@@ -1,40 +1,27 @@
-import React, { useEffect, useState } from 'react';
-import { Stack } from 'expo-router';
+import React, { useEffect } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Stack, type ErrorBoundaryProps } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { SessionProvider } from '@/state/session';
 import { ThemeProvider, useTheme } from '@/state/theme';
 import { BrandingProvider } from '@/state/branding';
 import { fetchPlatformBranding } from '@/services/branding';
 
+// Keep the native splash visible only until the React application shell mounts.
+// Remote configuration must never block every route from rendering.
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function AppContent() {
   const { isDark } = useTheme();
-  const [appIsReady, setAppIsReady] = useState(false);
 
   useEffect(() => {
-    async function prepare() {
-      try {
-        await fetchPlatformBranding();
-      } catch (_e) {
-        // Fallback handles branding gracefully
-      } finally {
-        setAppIsReady(true);
-      }
-    }
-    prepare();
+    // Warm runtime branding in the background. The branding service owns its
+    // local fallback, so offline/CORS/provider failures cannot blank the app.
+    void fetchPlatformBranding();
+    SplashScreen.hideAsync().catch(() => {});
   }, []);
-
-  useEffect(() => {
-    if (appIsReady) {
-      SplashScreen.hideAsync().catch(() => {});
-    }
-  }, [appIsReady]);
-
-  if (!appIsReady) {
-    return null;
-  }
 
   return (
     <>
@@ -74,14 +61,76 @@ function AppContent() {
   );
 }
 
-export default function RootLayout() {
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   return (
-    <ThemeProvider>
-      <SessionProvider>
-        <BrandingProvider>
-          <AppContent />
-        </BrandingProvider>
-      </SessionProvider>
-    </ThemeProvider>
+    <View style={styles.errorScreen}>
+      <View style={styles.errorCard}>
+        <Text style={styles.errorTitle}>We couldn’t open this screen</Text>
+        <Text style={styles.errorMessage}>
+          {error?.message || 'An unexpected application error occurred.'}
+        </Text>
+        <Pressable onPress={retry} style={styles.retryButton} accessibilityRole="button">
+          <Text style={styles.retryText}>Try again</Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }
+
+export default function RootLayout() {
+  return (
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <SessionProvider>
+          <BrandingProvider>
+            <AppContent />
+          </BrandingProvider>
+        </SessionProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>
+  );
+}
+
+const styles = StyleSheet.create({
+  errorScreen: {
+    flex: 1,
+    backgroundColor: '#07111F',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  errorCard: {
+    width: '100%',
+    maxWidth: 460,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#21344B',
+    backgroundColor: '#0C1929',
+    padding: 24,
+  },
+  errorTitle: {
+    color: '#F8FAFC',
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  errorMessage: {
+    color: '#CBD5E1',
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  retryButton: {
+    minHeight: 46,
+    borderRadius: 10,
+    backgroundColor: '#2F6FED',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+  },
+  retryText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+});
