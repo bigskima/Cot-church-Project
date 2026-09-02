@@ -15,7 +15,7 @@ export interface HandlerResult {
 
 export interface HandlerOptions {
   methods: string[];
-  authentication?: "required" | "none";
+  authentication?: "required" | "optional" | "none";
   organization?: "required" | "optional" | "none";
   permission?: string;
 }
@@ -38,8 +38,14 @@ export function createHandler(options: HandlerOptions, callback: (context: Reque
       if (!methods.includes(request.method)) {
         throw new ApiError("METHOD_NOT_ALLOWED", "Method not allowed", 405, undefined, true, { Allow: methods.join(", ") });
       }
-      const needsAuth = options.authentication !== "none";
-      const auth = needsAuth ? await authenticate(request, options.organization === "required") : null;
+
+      const authMode = options.authentication ?? "required";
+      const hasBearer = /^Bearer\s+.+$/i.test(request.headers.get("authorization") ?? "");
+      let auth: AuthContext | null = null;
+      if (authMode === "required" || (authMode === "optional" && hasBearer)) {
+        auth = await authenticate(request, options.organization === "required");
+      }
+
       if (options.permission) {
         if (!auth) throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication required", 401);
         await authorize(auth, options.permission);
