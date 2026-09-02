@@ -21,7 +21,7 @@ export async function authenticate(request: Request, requireOrganization: boolea
 
   const organizationId = uuid(request.headers.get("x-organization-id"), "organizationId", requireOrganization);
   const branchId = uuid(request.headers.get("x-branch-id"), "branchId");
-  if (branchId && !organizationId) throw new ApiError("ORGANIZATION_REQUIRED", "Organization context is required when a branch is selected", 400);
+  if (branchId && !organizationId) throw new ApiError("ORGANIZATION_REQUIRED", "Organization context is required when an expression is selected", 400);
 
   let membershipId: string | null = null;
   if (organizationId) {
@@ -33,9 +33,30 @@ export async function authenticate(request: Request, requireOrganization: boolea
       .eq("status", "active")
       .maybeSingle();
     if (membershipError || !membership) throw new ApiError("ORGANIZATION_ACCESS_DENIED", "No active membership for this organization", 403);
+
+    const { data: organization, error: organizationError } = await client
+      .from("organizations")
+      .select("id,status")
+      .eq("id", organizationId)
+      .maybeSingle();
+    if (organizationError || !organization) {
+      throw new ApiError("ORGANIZATION_ACCESS_DENIED", "Organization is unavailable", 403);
+    }
+    if (organization.status !== "active") {
+      throw new ApiError("ORGANIZATION_UNAVAILABLE", "This church organization is currently unavailable on the platform", 403);
+    }
+
     if (branchId) {
-      const { data: branch } = await client.from("branches").select("id").eq("id", branchId).eq("organization_id", organizationId).maybeSingle();
-      if (!branch) throw new ApiError("BRANCH_ACCESS_DENIED", "Branch does not belong to the selected organization", 403);
+      const { data: branch, error: branchError } = await client
+        .from("branches")
+        .select("id,is_active")
+        .eq("id", branchId)
+        .eq("organization_id", organizationId)
+        .maybeSingle();
+      if (branchError || !branch) throw new ApiError("BRANCH_ACCESS_DENIED", "Expression does not belong to the selected organization", 403);
+      if (!branch.is_active) {
+        throw new ApiError("EXPRESSION_UNAVAILABLE", "This expression is currently unavailable on the platform", 403);
+      }
     }
     membershipId = membership.id;
   }
@@ -51,4 +72,16 @@ export async function authorize(context: AuthContext, permission: string) {
     target_branch_id: context.branchId,
   });
   if (error || data !== true) throw new ApiError("PERMISSION_DENIED", "You do not have permission to perform this action", 403);
+}
+
+export async function authorizePlatform(context: AuthContext, permission: string) {
+  if (!permission.startsWith("platform.")) {
+    throw new ApiError("INVALID_PLATFORM_PERMISSION", "Platform authorization requires a platform-scoped capability", 500, undefined, false);
+  }
+  const { data, error } = await context.client.rpc("has_platform_permission", {
+    requested_permission: permission,
+  });
+  if (error || data !== true) {
+    throw new ApiError("PLATFORM_PERMISSION_DENIED", "You do not have permission to perform this platform action", 403);
+  }
 }
