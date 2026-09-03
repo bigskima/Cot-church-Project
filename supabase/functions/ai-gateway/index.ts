@@ -6,6 +6,7 @@ import { jsonBody } from "../_shared/request.ts";
 import { runAi } from "../_shared/ai/router.ts";
 import { aiProvider } from "../_shared/ai/registry.ts";
 import { adminClient } from "../_shared/supabase.ts";
+import { resolveSecretValue } from "../_shared/secrets.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString, uuid } from "../_shared/validation.ts";
 
 const allowed = new Set([
@@ -77,9 +78,9 @@ async function readiness(organizationId: string, capability: string) {
     const model: any = modelMap.get(modelId);
     if (!model?.is_active) continue;
     const provider = Array.isArray(model.ai_providers) ? model.ai_providers[0] : model.ai_providers;
-    if (!provider || provider.status !== "active") continue;
-    if (!provider.secret_reference || !Deno.env.get(provider.secret_reference)?.trim()) continue;
+    if (!provider || provider.status !== "active" || !provider.secret_reference) continue;
     try {
+      await resolveSecretValue(provider.secret_reference);
       const adapter = aiProvider(provider.code);
       if (!adapter.supports(adapterMethod[capability] as any)) continue;
     } catch {
