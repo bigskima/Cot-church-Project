@@ -3,6 +3,7 @@ import { ApiError } from "../_shared/errors.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { adminClient } from "../_shared/supabase.ts";
+import { resolveSecretValue } from "../_shared/secrets.ts";
 import { defaultStreamingConfig, loadStreamingConfig } from "../_shared/streaming/configuration.ts";
 import { streamingProvider } from "../_shared/streaming/registry.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString, uuid } from "../_shared/validation.ts";
@@ -27,6 +28,15 @@ function reconnectWindow(value: unknown) {
   return seconds;
 }
 
+async function secretReady(reference?: string | null) {
+  if (!reference) return false;
+  try {
+    return Boolean((await resolveSecretValue(reference)).trim());
+  } catch {
+    return false;
+  }
+}
+
 async function streamingReadiness(organizationId: string) {
   try {
     const loaded = await defaultStreamingConfig(organizationId);
@@ -38,8 +48,11 @@ async function streamingReadiness(organizationId: string) {
     } catch {
       return { ready: false, reason: "adapter_unavailable" as const, providerCode: loaded.provider.providerCode };
     }
-    const primarySecretReady = Boolean(loaded.provider.secretReference && Deno.env.get(loaded.provider.secretReference)?.trim());
-    const webhookSecretReady = Boolean(loaded.provider.webhookSecretReference && Deno.env.get(loaded.provider.webhookSecretReference)?.trim());
+    const [primarySecretReady, webhookSecretReady, signingSecretReady] = await Promise.all([
+      secretReady(loaded.provider.secretReference),
+      secretReady(loaded.provider.webhookSecretReference),
+      secretReady(loaded.provider.signingKeyReference),
+    ]);
     if (!primarySecretReady || !webhookSecretReady) {
       return {
         ready: false,
@@ -47,13 +60,14 @@ async function streamingReadiness(organizationId: string) {
         providerCode: loaded.provider.providerCode,
         primarySecretReady,
         webhookSecretReady,
+        signedPlaybackConfigured: signingSecretReady,
       };
     }
     return {
       ready: true,
       reason: null,
       providerCode: loaded.provider.providerCode,
-      signedPlaybackConfigured: Boolean(loaded.provider.signingKeyReference && Deno.env.get(loaded.provider.signingKeyReference)?.trim()),
+      signedPlaybackConfigured: signingSecretReady,
     };
   } catch (error) {
     if (error instanceof ApiError && ["STREAMING_NOT_CONFIGURED", "STREAMING_PROVIDER_DISABLED"].includes(error.code)) {
@@ -133,7 +147,7 @@ Deno.serve(createHandler(
         ? await loadStreamingConfig(uuid(String(body.providerConfigId), "providerConfigId", true)!)
         : await defaultStreamingConfig(auth.organizationId);
       if (loaded.organizationId && loaded.organizationId !== auth.organizationId) throw new ApiError("PROVIDER_SCOPE_DENIED", "Provider configuration is outside this organization", 403);
-      if (!loaded.provider.secretReference || !Deno.env.get(loaded.provider.secretReference)?.trim() || !loaded.provider.webhookSecretReference || !Deno.env.get(loaded.provider.webhookSecretReference)?.trim()) {
+      if (!(await secretReady(loaded.provider.secretReference)) || !(await secretReady(loaded.provider.webhookSecretReference))) {
         throw new ApiError("STREAMING_NOT_READY", "The active streaming provider is missing required runtime secrets", 503, undefined, false);
       }
 
