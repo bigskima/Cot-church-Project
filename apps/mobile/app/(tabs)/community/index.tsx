@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Alert,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,6 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
@@ -30,7 +32,7 @@ import {
 import { radius, spacing } from '@/design-system/tokens';
 import type { ContentComment, SocialPost } from '@/types/content';
 
-type FeedScope = 'church' | 'expression';
+type FeedScope = 'general' | 'expression';
 type PublicBadge = { id?: string; code?: string; label: string; backgroundColor: string; textColor: string; priority?: number };
 type CommunityPost = SocialPost & {
   author?: { id: string; displayName?: string; username?: string; avatarUrl?: string | null; bio?: string | null; badges?: PublicBadge[] } | null;
@@ -39,6 +41,43 @@ type CommunityPost = SocialPost & {
 type CommunityComment = ContentComment & {
   author?: { id: string; displayName?: string; username?: string; avatarUrl?: string | null; badges?: PublicBadge[] } | null;
 };
+type MediaAttachment = {
+  uploadId: string;
+  type: 'image' | 'video' | 'audio';
+  mimeType: string;
+  url: string;
+  fileName?: string | null;
+  sizeBytes: number;
+};
+type UploadIntent = {
+  uploadId: string;
+  type: 'image' | 'video' | 'audio';
+  mimeType: string;
+  sizeBytes: number;
+  signedUploadUrl: string;
+};
+
+const MAX_MEDIA_BYTES = 50 * 1024 * 1024;
+
+function inferPickerMime(asset: ImagePicker.ImagePickerAsset) {
+  if (asset.mimeType) return asset.mimeType.toLowerCase();
+  const name = (asset.fileName ?? asset.uri).toLowerCase();
+  if (name.endsWith('.png')) return 'image/png';
+  if (name.endsWith('.webp')) return 'image/webp';
+  if (name.endsWith('.gif')) return 'image/gif';
+  if (name.endsWith('.mp4')) return 'video/mp4';
+  if (name.endsWith('.webm')) return 'video/webm';
+  if (name.endsWith('.mov')) return 'video/quicktime';
+  return asset.type === 'video' ? 'video/mp4' : 'image/jpeg';
+}
+
+async function pickerAssetBody(asset: ImagePicker.ImagePickerAsset) {
+  const webFile = (asset as any).file as File | undefined;
+  if (webFile) return webFile;
+  const response = await fetch(asset.uri);
+  if (!response.ok) throw new Error('Unable to read the selected media file.');
+  return response.blob();
+}
 
 export default function CommunityScreen() {
   const insets = useSafeAreaInsets();
@@ -47,10 +86,12 @@ export default function CommunityScreen() {
   const expression = context?.expression;
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
 
-  const [activeTab, setActiveTab] = useState<FeedScope>('church');
+  const [activeTab, setActiveTab] = useState<FeedScope>('general');
   const [composerOpen, setComposerOpen] = useState(false);
   const [postText, setPostText] = useState('');
-  const [postDestination, setPostDestination] = useState<FeedScope>('church');
+  const [postDestination, setPostDestination] = useState<FeedScope>('general');
+  const [attachments, setAttachments] = useState<MediaAttachment[]>([]);
+  const [mediaUploading, setMediaUploading] = useState(false);
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState('');
   const [commentTargetPostId, setCommentTargetPostId] = useState<string | null>(null);
@@ -58,30 +99,143 @@ export default function CommunityScreen() {
   const [commentsLoading, setCommentsLoading] = useState(false);
 
   useEffect(() => {
-    if (!expression?.id && activeTab === 'expression') setActiveTab('church');
+    if (!expression?.id && activeTab === 'expression') setActiveTab('general');
   }, [activeTab, expression?.id]);
 
-  const feedKey = `mobile:community:${mode}:${activeTab}:${organizationId}:${expression?.id ?? 'none'}`;
+  const feedKey = `mobile:community:${activeTab}:${organizationId}:${expression?.id ?? 'none'}`;
   const resource = useResource<CommunityPost[]>(feedKey, (signal) => {
-    if (mode === 'visitor') {
+    if (activeTab === 'general') {
+      // General Community is always the same public feed for visitors, signed-in
+      // accounts, and Expression members. Membership never makes this feed disappear.
       const query = new URLSearchParams({ scope: 'church', organizationId });
       return api.request<CommunityPost[]>(`public-social-feed?${query.toString()}`, { signal });
     }
-    return api.request<CommunityPost[]>(`social-feed?scope=${activeTab}`, { signal });
+    return api.request<CommunityPost[]>('social-feed?scope=expression', { signal });
   });
 
-  const canPost = mode === 'authenticated' && Boolean(expression?.id);
-  const canEngage = mode === 'authenticated';
+  const hasChurchMembership = Boolean(context?.memberships?.length);
+  const canPost = mode === 'authenticated' && Boolean(expression?.id) && hasChurchMembership;
+  const canEngage = mode === 'authenticated' && hasChurchMembership;
+
+  const cleanupAttachments = async (items = attachments) => {
+    if (!items.length) return;
+    await Promise.allSettled(items.map((item) => api.request('community-media', {
+      method: 'DELETE',
+      body: JSON.stringify({ uploadId: item.uploadId }),
+    })));
+  };
 
   const openComposer = () => {
     if (!canPost) return;
     setPostError('');
-    setPostDestination(activeTab === 'expression' ? 'expression' : 'church');
+    setPostDestination(activeTab === 'expression' ? 'expression' : 'general');
     setComposerOpen(true);
   };
 
+  const closeComposer = () => {
+    if (posting || mediaUploading) return;
+    const pending = attachments;
+    setComposerOpen(false);
+    setPostText('');
+    setAttachments([]);
+    setPostError('');
+    void cleanupAttachments(pending);
+  };
+
+  const changeDestination = (destination: FeedScope) => {
+    if (destination === postDestination) return;
+    const pending = attachments;
+    setAttachments([]);
+    setPostDestination(destination);
+    if (pending.length) void cleanupAttachments(pending);
+  };
+
+  const uploadPickerAsset = async (asset: ImagePicker.ImagePickerAsset) => {
+    const body = await pickerAssetBody(asset);
+    const sizeBytes = Number((body as Blob).size ?? asset.fileSize ?? 0);
+    if (!sizeBytes || sizeBytes > MAX_MEDIA_BYTES) {
+      throw new Error('Each image or video must be 50 MB or smaller.');
+    }
+    const mimeType = inferPickerMime(asset);
+    const branchId = postDestination === 'expression' ? expression?.id : undefined;
+    const intent = await api.request<UploadIntent>('community-media', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'create_upload',
+        mimeType,
+        fileName: asset.fileName ?? undefined,
+        sizeBytes,
+        branchId,
+      }),
+    });
+
+    try {
+      const uploaded = await fetch(intent.signedUploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': mimeType },
+        body: body as Blob,
+      });
+      if (!uploaded.ok) throw new Error(`Media upload failed (${uploaded.status}).`);
+      return await api.request<MediaAttachment>('community-media', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'complete_upload', uploadId: intent.uploadId }),
+      });
+    } catch (error) {
+      await api.request('community-media', {
+        method: 'DELETE',
+        body: JSON.stringify({ uploadId: intent.uploadId }),
+      }).catch(() => undefined);
+      throw error;
+    }
+  };
+
+  const choosePhotoOrVideo = async () => {
+    if (!canPost || mediaUploading || attachments.length >= 10) return;
+    setPostError('');
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        setPostError('Allow photo-library access to attach images or videos.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images', 'videos'],
+        allowsMultipleSelection: true,
+        selectionLimit: Math.max(1, 10 - attachments.length),
+        quality: 1,
+      });
+      if (result.canceled || !result.assets?.length) return;
+      setMediaUploading(true);
+      const uploaded: MediaAttachment[] = [];
+      try {
+        for (const asset of result.assets) uploaded.push(await uploadPickerAsset(asset));
+        setAttachments((current) => [...current, ...uploaded].slice(0, 10));
+      } catch (error) {
+        if (uploaded.length) await cleanupAttachments(uploaded);
+        setPostError(error instanceof Error ? error.message : 'Unable to upload selected media.');
+      } finally {
+        setMediaUploading(false);
+      }
+    } catch (error) {
+      setPostError(error instanceof Error ? error.message : 'Unable to choose media.');
+      setMediaUploading(false);
+    }
+  };
+
+  const removeAttachment = async (attachment: MediaAttachment) => {
+    setAttachments((current) => current.filter((item) => item.uploadId !== attachment.uploadId));
+    try {
+      await api.request('community-media', {
+        method: 'DELETE',
+        body: JSON.stringify({ uploadId: attachment.uploadId }),
+      });
+    } catch (error) {
+      setPostError(error instanceof Error ? error.message : 'Unable to remove the selected media.');
+    }
+  };
+
   const handleCreatePost = async () => {
-    if (!postText.trim() || !canPost) return;
+    if ((!postText.trim() && !attachments.length) || !canPost || mediaUploading) return;
     if (postDestination === 'expression' && !expression?.id) {
       setPostError('Select or join an Expression before posting to an Expression feed.');
       return;
@@ -95,9 +249,11 @@ export default function CommunityScreen() {
           body: postText.trim(),
           visibility: 'public',
           branchId: postDestination === 'expression' ? expression!.id : undefined,
+          mediaUploadIds: attachments.map((item) => item.uploadId),
         }),
       });
       setPostText('');
+      setAttachments([]);
       setComposerOpen(false);
       setActiveTab(postDestination);
       resource.refresh();
@@ -109,7 +265,7 @@ export default function CommunityScreen() {
   };
 
   useEffect(() => {
-    if (!commentTargetPostId || mode !== 'authenticated') {
+    if (!commentTargetPostId || !canEngage) {
       setComments([]);
       return;
     }
@@ -122,10 +278,10 @@ export default function CommunityScreen() {
       })
       .finally(() => { if (active) setCommentsLoading(false); });
     return () => { active = false; };
-  }, [api, commentTargetPostId, mode]);
+  }, [api, commentTargetPostId, canEngage]);
 
   const submitComment = async (body: string, parentCommentId?: string | null) => {
-    if (!commentTargetPostId) return;
+    if (!commentTargetPostId || !canEngage) return;
     try {
       await api.request('social-feed', {
         method: 'POST',
@@ -152,6 +308,7 @@ export default function CommunityScreen() {
   };
 
   const posts = resource.data ?? [];
+  const canPublishCurrent = Boolean(postText.trim() || attachments.length) && !posting && !mediaUploading;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -160,7 +317,7 @@ export default function CommunityScreen() {
           <BrandMark variant="compact" size={30} />
           <View>
             <Text style={[styles.headerTitle, { color: colors.text }]}>Community</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>Church conversations and fellowship</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>Public fellowship and Expression conversations</Text>
           </View>
         </View>
         <Pressable onPress={() => router.push('/(tabs)/community/leadership')} hitSlop={8} style={[styles.headerIconBtn, { backgroundColor: colors.bgSecondary }]}>
@@ -169,8 +326,8 @@ export default function CommunityScreen() {
       </View>
 
       <View style={[styles.tabBar, { borderBottomColor: colors.borderSubtle }]}>
-        <Pressable onPress={() => setActiveTab('church')} style={[styles.tabItem, activeTab === 'church' && { borderBottomColor: colors.interactive }]}>
-          <Text style={[styles.tabText, { color: activeTab === 'church' ? colors.text : colors.textMuted }, activeTab === 'church' && styles.tabTextActive]}>Church-wide</Text>
+        <Pressable onPress={() => setActiveTab('general')} style={[styles.tabItem, activeTab === 'general' && { borderBottomColor: colors.interactive }]}>
+          <Text style={[styles.tabText, { color: activeTab === 'general' ? colors.text : colors.textMuted }, activeTab === 'general' && styles.tabTextActive]}>General Community</Text>
         </Pressable>
         {expression?.id ? (
           <Pressable onPress={() => setActiveTab('expression')} style={[styles.tabItem, activeTab === 'expression' && { borderBottomColor: colors.interactive }]}>
@@ -182,13 +339,13 @@ export default function CommunityScreen() {
       {canPost ? (
         <Pressable onPress={openComposer} style={[styles.composerStrip, { borderBottomColor: colors.borderSubtle }]}>
           <Avatar url={context?.profile?.avatar_url} name={context?.profile?.display_name || 'Me'} size="sm" />
-          <Text style={[styles.composerPlaceholder, { color: colors.textMuted }]}>Share a testimony, scripture, or thought...</Text>
+          <Text style={[styles.composerPlaceholder, { color: colors.textMuted }]}>Share text, photos or video...</Text>
           <Icon name="create-outline" size={20} color={colors.interactive} />
         </Pressable>
       ) : mode === 'authenticated' ? (
         <View style={[styles.membershipNotice, { backgroundColor: colors.primarySoft, borderBottomColor: colors.borderSubtle }]}>
-          <Icon name="people-outline" size={17} color={colors.interactive} />
-          <Text style={[styles.membershipNoticeText, { color: colors.textSecondary }]}>Join an Expression to post. You can still read church-wide public conversations.</Text>
+          <Icon name="globe-outline" size={17} color={colors.interactive} />
+          <Text style={[styles.membershipNoticeText, { color: colors.textSecondary }]}>You can always read the General Community. Join an Expression to publish and join member conversations.</Text>
         </View>
       ) : null}
 
@@ -215,27 +372,27 @@ export default function CommunityScreen() {
         />
       ) : (
         <EmptyState
-          title={activeTab === 'expression' ? 'No Expression Posts Yet' : 'No Church-wide Posts Yet'}
-          message={canPost ? 'Share the first encouraging word or testimony in this feed.' : 'Published community posts will appear here.'}
+          title={activeTab === 'expression' ? 'No Expression Posts Yet' : 'No General Community Posts Yet'}
+          message={canPost ? 'Share the first encouraging word, photo, or video in this feed.' : 'Published public community posts will appear here.'}
           iconName="chatbubbles-outline"
         />
       )}
 
-      <BottomSheet visible={composerOpen} onClose={() => !posting && setComposerOpen(false)} title="Create Post">
+      <BottomSheet visible={composerOpen} onClose={closeComposer} title="Create Post">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.composerBody}>
           <View style={styles.destinationBlock}>
             <Text style={[styles.destinationLabel, { color: colors.textSecondary }]}>POST TO</Text>
             <View style={styles.destinationRow}>
               <Pressable
-                onPress={() => setPostDestination('church')}
-                style={[styles.destinationPill, { borderColor: postDestination === 'church' ? colors.interactive : colors.border, backgroundColor: postDestination === 'church' ? colors.primarySoft : colors.bgSecondary }]}
+                onPress={() => changeDestination('general')}
+                style={[styles.destinationPill, { borderColor: postDestination === 'general' ? colors.interactive : colors.border, backgroundColor: postDestination === 'general' ? colors.primarySoft : colors.bgSecondary }]}
               >
-                <Icon name="globe-outline" size={15} color={postDestination === 'church' ? colors.interactive : colors.textSecondary} />
-                <Text style={[styles.destinationText, { color: postDestination === 'church' ? colors.interactive : colors.textSecondary }]}>Church-wide</Text>
+                <Icon name="globe-outline" size={15} color={postDestination === 'general' ? colors.interactive : colors.textSecondary} />
+                <Text style={[styles.destinationText, { color: postDestination === 'general' ? colors.interactive : colors.textSecondary }]}>General Community</Text>
               </Pressable>
               {expression?.id ? (
                 <Pressable
-                  onPress={() => setPostDestination('expression')}
+                  onPress={() => changeDestination('expression')}
                   style={[styles.destinationPill, { borderColor: postDestination === 'expression' ? colors.interactive : colors.border, backgroundColor: postDestination === 'expression' ? colors.primarySoft : colors.bgSecondary }]}
                 >
                   <Icon name="people-outline" size={15} color={postDestination === 'expression' ? colors.interactive : colors.textSecondary} />
@@ -243,7 +400,7 @@ export default function CommunityScreen() {
                 </Pressable>
               ) : null}
             </View>
-            <Text style={[styles.destinationHelp, { color: colors.textMuted }]}>Church-wide posts appear in the general church feed. Expression posts are attached to your current Expression.</Text>
+            <Text style={[styles.destinationHelp, { color: colors.textMuted }]}>General Community posts are public. Expression posts are attached only to your selected Expression feed.</Text>
           </View>
 
           {postError ? <View style={[styles.errorBanner, { backgroundColor: colors.liveSoft }]}><Icon name="alert-circle" size={17} color={colors.live} /><Text style={[styles.errorText, { color: colors.live }]}>{postError}</Text></View> : null}
@@ -262,14 +419,60 @@ export default function CommunityScreen() {
             />
           </View>
 
+          <View style={styles.mediaToolbar}>
+            <Pressable onPress={() => void choosePhotoOrVideo()} disabled={mediaUploading || attachments.length >= 10} style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
+              <Icon name="images-outline" size={18} color={colors.interactive} />
+              <Text style={[styles.mediaButtonText, { color: colors.text }]}>Photo / Video</Text>
+            </Pressable>
+            <Pressable disabled style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.border, opacity: 0.55 }]}>
+              <Icon name="musical-notes-outline" size={18} color={colors.textMuted} />
+              <Text style={[styles.mediaButtonText, { color: colors.textMuted }]}>Audio</Text>
+            </Pressable>
+            <Pressable onPress={() => { setComposerOpen(false); router.push('/reels' as any); }} style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
+              <Icon name="flash-outline" size={18} color={colors.interactive} />
+              <Text style={[styles.mediaButtonText, { color: colors.text }]}>Reels</Text>
+            </Pressable>
+          </View>
+          <Text style={[styles.mediaHelp, { color: colors.textMuted }]}>Up to 10 attachments · 50 MB each. Image and video upload directly to protected Storage. Audio upload is being wired to the same production pipeline.</Text>
+
+          {mediaUploading ? (
+            <View style={[styles.uploadingRow, { backgroundColor: colors.primarySoft }]}>
+              <Icon name="cloud-upload-outline" size={17} color={colors.interactive} />
+              <Text style={[styles.uploadingText, { color: colors.textSecondary }]}>Uploading selected media…</Text>
+            </View>
+          ) : null}
+
+          {attachments.length ? (
+            <View style={styles.attachmentsGrid}>
+              {attachments.map((item) => (
+                <View key={item.uploadId} style={[styles.attachmentCard, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
+                  {item.type === 'image' ? (
+                    <Image source={{ uri: item.url }} style={styles.attachmentPreview} resizeMode="cover" />
+                  ) : (
+                    <View style={styles.attachmentTypePreview}>
+                      <Icon name={item.type === 'video' ? 'videocam-outline' : 'musical-notes-outline'} size={26} color={colors.interactive} />
+                    </View>
+                  )}
+                  <View style={styles.attachmentMeta}>
+                    <Text style={[styles.attachmentName, { color: colors.text }]} numberOfLines={1}>{item.fileName || item.type}</Text>
+                    <Text style={[styles.attachmentSize, { color: colors.textMuted }]}>{(item.sizeBytes / (1024 * 1024)).toFixed(1)} MB</Text>
+                  </View>
+                  <Pressable onPress={() => void removeAttachment(item)} hitSlop={6} style={styles.removeAttachment}>
+                    <Icon name="close-circle" size={20} color={colors.live} />
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
           <View style={[styles.composerFooter, { borderTopColor: colors.borderSubtle }]}>
-            <Text style={[styles.characterCount, { color: colors.textMuted }]}>{postText.length.toLocaleString()} / 10,000</Text>
+            <Text style={[styles.characterCount, { color: colors.textMuted }]}>{postText.length.toLocaleString()} / 10,000 · {attachments.length}/10 media</Text>
             <Pressable
               onPress={handleCreatePost}
-              disabled={!postText.trim() || posting}
-              style={({ pressed }) => [styles.postPillBtn, { backgroundColor: colors.interactive, opacity: !postText.trim() || posting ? 0.5 : pressed ? 0.85 : 1 }]}
+              disabled={!canPublishCurrent}
+              style={({ pressed }) => [styles.postPillBtn, { backgroundColor: colors.interactive, opacity: !canPublishCurrent ? 0.5 : pressed ? 0.85 : 1 }]}
             >
-              <Text style={styles.postPillText}>{posting ? 'Posting...' : 'Post'}</Text>
+              <Text style={styles.postPillText}>{posting ? 'Posting...' : mediaUploading ? 'Uploading...' : 'Post'}</Text>
             </Pressable>
           </View>
         </KeyboardAvoidingView>
@@ -314,9 +517,23 @@ const styles = StyleSheet.create({
   errorBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderRadius: radius.md, padding: spacing.sm },
   errorText: { flex: 1, fontSize: 12, fontWeight: '600' },
   composerRow: { flexDirection: 'row', gap: spacing.md },
-  composerInput: { flex: 1, fontSize: 16, minHeight: 120, textAlignVertical: 'top' },
-  composerFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: spacing.md, borderTopWidth: 1 },
-  characterCount: { fontSize: 11 },
+  composerInput: { flex: 1, fontSize: 16, minHeight: 100, textAlignVertical: 'top' },
+  mediaToolbar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  mediaButton: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: 9 },
+  mediaButtonText: { fontSize: 12, fontWeight: '700' },
+  mediaHelp: { fontSize: 10, lineHeight: 15 },
+  uploadingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderRadius: radius.md },
+  uploadingText: { fontSize: 12, fontWeight: '600' },
+  attachmentsGrid: { gap: spacing.xs },
+  attachmentCard: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: radius.md, overflow: 'hidden', minHeight: 64 },
+  attachmentPreview: { width: 72, height: 64 },
+  attachmentTypePreview: { width: 72, height: 64, alignItems: 'center', justifyContent: 'center' },
+  attachmentMeta: { flex: 1, paddingHorizontal: spacing.sm, gap: 2 },
+  attachmentName: { fontSize: 12, fontWeight: '700' },
+  attachmentSize: { fontSize: 10 },
+  removeAttachment: { padding: spacing.sm },
+  composerFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: spacing.md, borderTopWidth: 1, gap: spacing.sm },
+  characterCount: { fontSize: 11, flex: 1 },
   postPillBtn: { paddingHorizontal: 20, paddingVertical: 9, borderRadius: radius.pill },
   postPillText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
 });
