@@ -62,13 +62,22 @@ function AppContent() {
 }
 
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  const showTechnicalDetail = typeof __DEV__ !== 'undefined' && __DEV__;
+
+  useEffect(() => {
+    console.error('Route render failure', error);
+  }, [error]);
+
   return (
     <View style={styles.errorScreen}>
       <View style={styles.errorCard}>
         <Text style={styles.errorTitle}>We couldn’t open this screen</Text>
         <Text style={styles.errorMessage}>
-          {error?.message || 'An unexpected application error occurred.'}
+          Something went wrong while opening this page. Please try again.
         </Text>
+        {showTechnicalDetail && error?.message ? (
+          <Text style={styles.technicalMessage}>{error.message}</Text>
+        ) : null}
         <Pressable onPress={retry} style={styles.retryButton} accessibilityRole="button">
           <Text style={styles.retryText}>Try again</Text>
         </Pressable>
@@ -119,6 +128,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     marginBottom: 20,
+  },
+  technicalMessage: {
+    color: '#94A3B8',
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: -10,
+    marginBottom: 18,
   },
   retryButton: {
     minHeight: 46,
