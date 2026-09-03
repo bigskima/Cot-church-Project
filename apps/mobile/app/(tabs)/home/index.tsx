@@ -63,15 +63,18 @@ export default function HomeScreen() {
       ? `?expressionId=${expression.id}`
       : '';
 
+  const publicQuery = (type: string) =>
+    `public-content?type=${encodeURIComponent(type)}${orgParam ? `&${orgParam.slice(1)}` : ''}`;
+
   const resource = useResource<HomePayload>('mobile:home:consumer', async (signal) => {
     if (mode === 'visitor') {
       const [streams, sermons, events, posts, reels, videos] = await Promise.all([
-        api.request<LiveStream[]>(`public-content?type=streams${orgParam ? `&${orgParam.slice(1)}` : ''}`, { signal }).catch(() => []),
-        api.request<Sermon[]>(`public-content?type=sermons${orgParam ? `&${orgParam.slice(1)}` : ''}`, { signal }).catch(() => []),
-        api.request<Event[]>(`public-content?type=events${orgParam ? `&${orgParam.slice(1)}` : ''}`, { signal }).catch(() => []),
-        api.request<SocialPost[]>(`public-content?type=posts${orgParam ? `&${orgParam.slice(1)}` : ''}`, { signal }).catch(() => []),
-        api.request<Reel[]>(`reels${orgParam}`, { signal }).catch(() => []),
-        api.request<Video[]>(`videos${orgParam}`, { signal }).catch(() => []),
+        api.request<LiveStream[]>(publicQuery('streams'), { signal }).catch(() => []),
+        api.request<Sermon[]>(publicQuery('sermons'), { signal }).catch(() => []),
+        api.request<Event[]>(publicQuery('events'), { signal }).catch(() => []),
+        api.request<SocialPost[]>(publicQuery('posts'), { signal }).catch(() => []),
+        api.request<Reel[]>(publicQuery('reels'), { signal }).catch(() => []),
+        api.request<Video[]>(publicQuery('videos'), { signal }).catch(() => []),
       ]);
       return { streams, sermons, events, posts, reels, videos };
     }
@@ -99,7 +102,6 @@ export default function HomeScreen() {
   const posts = resource.data?.posts ?? [];
   const events = resource.data?.events ?? [];
 
-  // Instagram-style stories / live bubbles
   const stories = useMemo(() => {
     const list = [];
     if (activeStream) {
@@ -127,7 +129,6 @@ export default function HomeScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      {/* Sleek Top Navigation Bar (YouTube / Instagram style) */}
       <View
         style={[
           styles.topBar,
@@ -156,7 +157,6 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.topBarRight}>
-          {/* AI Assistant Button */}
           <Pressable
             onPress={() => router.push('/assistant')}
             hitSlop={8}
@@ -167,7 +167,6 @@ export default function HomeScreen() {
             <Icon name="sparkles" size={18} color={colors.interactive} />
           </Pressable>
 
-          {/* Ministry Studio if leader */}
           {hasAnyLeadershipCapability ? (
             <Pressable
               onPress={() => router.push('/studio')}
@@ -180,7 +179,6 @@ export default function HomeScreen() {
             </Pressable>
           ) : null}
 
-          {/* Live broadcast shortcut */}
           <Pressable
             onPress={() => router.push('/(tabs)/live' as any)}
             hitSlop={8}
@@ -204,12 +202,8 @@ export default function HomeScreen() {
           />
         }
       >
-        {/* 1. Instagram-Style Stories / Highlights Tray */}
-        {stories.length > 0 ? (
-          <StoriesTray stories={stories} />
-        ) : null}
+        {stories.length > 0 ? <StoriesTray stories={stories} /> : null}
 
-        {/* 2. Hero Live Stream Banner (if stream exists) */}
         {activeStream ? (
           <View style={styles.heroSection}>
             <HeroLiveCard
@@ -219,7 +213,6 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        {/* 3. YouTube-Style Video / Sermon Section */}
         {videos.length > 0 || sermons.length > 0 ? (
           <View style={styles.feedSection}>
             <View style={styles.sectionHeaderRow}>
@@ -249,7 +242,6 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        {/* 4. Shorts / Reels Horizontal Shelf (YouTube Shorts style) */}
         {reels.length > 0 ? (
           <View style={styles.reelsSection}>
             <View style={styles.sectionHeaderRow}>
@@ -268,17 +260,11 @@ export default function HomeScreen() {
               keyExtractor={(item) => item.id}
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.reelsList}
-              renderItem={({ item }) => (
-                <ReelCard
-                  reel={item}
-                  onPress={() => router.push('/reels')}
-                />
-              )}
+              renderItem={({ item }) => <ReelCard reel={item} onPress={() => router.push('/reels')} />}
             />
           </View>
         ) : null}
 
-        {/* 5. Twitter / Threads Style Community Feed */}
         {posts.length > 0 ? (
           <View style={styles.communitySection}>
             <View style={styles.sectionHeaderRow}>
@@ -300,7 +286,6 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        {/* Loading / Error States */}
         {resource.loading && !resource.data ? (
           <View style={styles.loadingContainer}>
             <Skeleton height={200} borderRadius={radius.lg} />
@@ -311,7 +296,6 @@ export default function HomeScreen() {
         ) : null}
       </ScrollView>
 
-      {/* Church Switcher Modal */}
       <ChurchPickerModal
         visible={churchPickerVisible}
         onClose={() => setChurchPickerVisible(false)}
@@ -324,9 +308,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
+  screen: { flex: 1 },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -335,17 +317,8 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
     borderBottomWidth: 1,
   },
-  topBarLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    flex: 1,
-  },
-  brandWordmark: {
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
+  topBarLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1 },
+  brandWordmark: { fontSize: 20, fontWeight: '800', letterSpacing: -0.5 },
   campusPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -355,33 +328,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     maxWidth: 160,
   },
-  campusPillText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  topBarRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
-  heroSection: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-  },
-  feedSection: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-  },
+  campusPillText: { fontSize: 12, fontWeight: '600' },
+  topBarRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  iconButton: { width: 36, height: 36, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  scrollContent: { flexGrow: 1 },
+  heroSection: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
+  feedSection: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -389,32 +341,11 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     paddingHorizontal: 2,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-  },
-  shortsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  seeAllText: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  reelsSection: {
-    paddingTop: spacing.lg,
-    paddingHorizontal: spacing.lg,
-  },
-  reelsList: {
-    gap: spacing.sm,
-    paddingRight: spacing.lg,
-  },
-  communitySection: {
-    paddingTop: spacing.lg,
-  },
-  loadingContainer: {
-    padding: spacing.lg,
-    gap: spacing.md,
-  },
+  sectionTitle: { fontSize: 18, fontWeight: '800', letterSpacing: -0.3 },
+  shortsHeader: { flexDirection: 'row', alignItems: 'center' },
+  seeAllText: { fontSize: 13, fontWeight: '700' },
+  reelsSection: { paddingTop: spacing.lg, paddingHorizontal: spacing.lg },
+  reelsList: { gap: spacing.sm, paddingRight: spacing.lg },
+  communitySection: { paddingTop: spacing.lg },
+  loadingContainer: { padding: spacing.lg, gap: spacing.md },
 });
