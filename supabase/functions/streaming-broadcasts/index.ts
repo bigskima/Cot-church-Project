@@ -27,10 +27,54 @@ function reconnectWindow(value: unknown) {
   return seconds;
 }
 
+async function streamingReadiness(organizationId: string) {
+  try {
+    const loaded = await defaultStreamingConfig(organizationId);
+    if (loaded.organizationId && loaded.organizationId !== organizationId) {
+      return { ready: false, reason: "provider_scope_invalid" as const };
+    }
+    try {
+      streamingProvider(loaded.provider.providerCode);
+    } catch {
+      return { ready: false, reason: "adapter_unavailable" as const, providerCode: loaded.provider.providerCode };
+    }
+    const primarySecretReady = Boolean(loaded.provider.secretReference && Deno.env.get(loaded.provider.secretReference)?.trim());
+    const webhookSecretReady = Boolean(loaded.provider.webhookSecretReference && Deno.env.get(loaded.provider.webhookSecretReference)?.trim());
+    if (!primarySecretReady || !webhookSecretReady) {
+      return {
+        ready: false,
+        reason: "runtime_secrets_missing" as const,
+        providerCode: loaded.provider.providerCode,
+        primarySecretReady,
+        webhookSecretReady,
+      };
+    }
+    return {
+      ready: true,
+      reason: null,
+      providerCode: loaded.provider.providerCode,
+      signedPlaybackConfigured: Boolean(loaded.provider.signingKeyReference && Deno.env.get(loaded.provider.signingKeyReference)?.trim()),
+    };
+  } catch (error) {
+    if (error instanceof ApiError && ["STREAMING_NOT_CONFIGURED", "STREAMING_PROVIDER_DISABLED"].includes(error.code)) {
+      return { ready: false, reason: "provider_not_configured" as const };
+    }
+    throw error;
+  }
+}
+
 Deno.serve(createHandler(
-  { methods: ["POST", "PATCH"], authentication: "required", organization: "required" },
+  { methods: ["GET", "POST", "PATCH"], authentication: "required", organization: "required" },
   async ({ request, auth }) => {
     if (!auth?.organizationId) throw new ApiError("ORGANIZATION_REQUIRED", "Organization context is required", 400);
+
+    if (request.method === "GET") {
+      if (!(await hasScopedPermission(auth, "streams.broadcast", auth.branchId))) {
+        throw new ApiError("PERMISSION_DENIED", "You cannot operate live broadcasts in this scope", 403);
+      }
+      return { data: await streamingReadiness(auth.organizationId) };
+    }
+
     const admin = adminClient();
     const body = assertObject(await jsonBody(request));
 
@@ -68,9 +112,7 @@ Deno.serve(createHandler(
           .eq("organization_id", auth.organizationId)
           .maybeSingle();
         if (groupError || !group || !group.is_active) throw new ApiError("GROUP_NOT_FOUND", "Group is unavailable", 404);
-        if (group.branch_id !== targetBranchId) {
-          throw new ApiError("EXPRESSION_SCOPE_DENIED", "The selected group is outside this broadcast scope", 403);
-        }
+        if (group.branch_id !== targetBranchId) throw new ApiError("EXPRESSION_SCOPE_DENIED", "The selected group is outside this broadcast scope", 403);
       }
 
       const eventId = body.eventId ? uuid(String(body.eventId), "eventId", true)! : null;
@@ -90,8 +132,9 @@ Deno.serve(createHandler(
       const loaded = body.providerConfigId
         ? await loadStreamingConfig(uuid(String(body.providerConfigId), "providerConfigId", true)!)
         : await defaultStreamingConfig(auth.organizationId);
-      if (loaded.organizationId && loaded.organizationId !== auth.organizationId) {
-        throw new ApiError("PROVIDER_SCOPE_DENIED", "Provider configuration is outside this organization", 403);
+      if (loaded.organizationId && loaded.organizationId !== auth.organizationId) throw new ApiError("PROVIDER_SCOPE_DENIED", "Provider configuration is outside this organization", 403);
+      if (!loaded.provider.secretReference || !Deno.env.get(loaded.provider.secretReference)?.trim() || !loaded.provider.webhookSecretReference || !Deno.env.get(loaded.provider.webhookSecretReference)?.trim()) {
+        throw new ApiError("STREAMING_NOT_READY", "The active streaming provider is missing required runtime secrets", 503, undefined, false);
       }
 
       const adapter = streamingProvider(loaded.provider.providerCode);
@@ -126,11 +169,7 @@ Deno.serve(createHandler(
         created_by: auth.user.id,
       };
 
-      const { data, error } = await admin
-        .from("live_streams")
-        .insert(record)
-        .select("id,branch_id,title,status,visibility,scheduled_start,latency_mode")
-        .single();
+      const { data, error } = await admin.from("live_streams").insert(record).select("id,branch_id,title,status,visibility,scheduled_start,latency_mode,created_at").single();
       if (error) {
         await adapter.stopBroadcast(loaded.provider, provisioned.providerBroadcastId).catch(() => {});
         throw new ApiError("BROADCAST_CREATE_FAILED", "Provider was rolled back after the broadcast record failed", 500, undefined, false);
@@ -147,20 +186,12 @@ Deno.serve(createHandler(
       .eq("organization_id", auth.organizationId)
       .maybeSingle();
     if (error || !stream) throw new ApiError("STREAM_NOT_FOUND", "Broadcast not found", 404);
-    if (auth.branchId && stream.branch_id !== auth.branchId) {
-      throw new ApiError("EXPRESSION_SCOPE_DENIED", "This broadcast belongs to another Expression", 403);
-    }
-    if (!(await hasScopedPermission(auth, "streams.broadcast", stream.branch_id))) {
-      throw new ApiError("PERMISSION_DENIED", "You cannot operate this broadcast", 403);
-    }
-    if (!stream.provider_config_id || !stream.provider_broadcast_id) {
-      throw new ApiError("STREAM_PROVIDER_STATE_INVALID", "This broadcast is not linked to a real provider lifecycle", 409);
-    }
+    if (auth.branchId && stream.branch_id !== auth.branchId) throw new ApiError("EXPRESSION_SCOPE_DENIED", "This broadcast belongs to another Expression", 403);
+    if (!(await hasScopedPermission(auth, "streams.broadcast", stream.branch_id))) throw new ApiError("PERMISSION_DENIED", "You cannot operate this broadcast", 403);
+    if (!stream.provider_config_id || !stream.provider_broadcast_id) throw new ApiError("STREAM_PROVIDER_STATE_INVALID", "This broadcast is not linked to a real provider lifecycle", 409);
 
     const loaded = await loadStreamingConfig(stream.provider_config_id);
-    if (loaded.organizationId && loaded.organizationId !== auth.organizationId) {
-      throw new ApiError("PROVIDER_SCOPE_DENIED", "Broadcast provider configuration is outside this organization", 403);
-    }
+    if (loaded.organizationId && loaded.organizationId !== auth.organizationId) throw new ApiError("PROVIDER_SCOPE_DENIED", "Broadcast provider configuration is outside this organization", 403);
     const adapter = streamingProvider(loaded.provider.providerCode);
     const action = requiredString(body.action, "action", 30);
 
