@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { ApiClient } from '../api';
 import { Badge, Button, Card, InputField, Modal, SearchBar, Table } from '../components/ui';
 
@@ -9,112 +9,106 @@ interface OrganizationItem {
   status: 'active' | 'suspended' | 'archived';
   timezone: string;
   created_at: string;
-  settings?: Record<string, unknown>;
+  updated_at?: string;
+  branches?: Array<{ count: number }>;
+  memberships?: Array<{ count: number }>;
+}
+
+interface OrganizationListResponse {
+  items: OrganizationItem[];
+  page: number;
+  pageSize: number;
+  total: number;
 }
 
 export function OrganizationsGovernance({ api }: { api: ApiClient }) {
   const [organizations, setOrganizations] = useState<OrganizationItem[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [selectedOrg, setSelectedOrg] = useState<OrganizationItem | null>(null);
+  const [lifecycleOrg, setLifecycleOrg] = useState<OrganizationItem | null>(null);
+  const [governanceReason, setGovernanceReason] = useState('');
   const [actionBusy, setActionBusy] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newOrgName, setNewOrgName] = useState('');
-  const [newOrgSlug, setNewOrgSlug] = useState('');
 
-  useEffect(() => {
-    loadOrganizations();
-  }, []);
-
-  const loadOrganizations = () => {
+  const loadOrganizations = async () => {
     setLoading(true);
     setError('');
-    api
-      .request<OrganizationItem[]>('organizations')
-      .then((data) => setOrganizations(Array.isArray(data) ? data : []))
-      .catch((err) => setError(err instanceof Error ? err.message : 'Unable to load organizations'))
-      .finally(() => setLoading(false));
-  };
-
-  const handleToggleSuspend = async (org: OrganizationItem) => {
-    const newStatus = org.status === 'active' ? 'suspended' : 'active';
-    setActionBusy(true);
     try {
-      await api.request(`organizations?id=${org.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: newStatus }),
-      });
-      setOrganizations((list) =>
-        list.map((item) => (item.id === org.id ? { ...item, status: newStatus } : item))
-      );
-      if (selectedOrg?.id === org.id) {
-        setSelectedOrg({ ...selectedOrg, status: newStatus });
-      }
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to update organization status');
+      const suffix = search.trim() ? `?q=${encodeURIComponent(search.trim())}&pageSize=100` : '?pageSize=100';
+      const data = await api.request<OrganizationListResponse>(`platform-organizations${suffix}`);
+      setOrganizations(data.items ?? []);
+      setTotal(data.total ?? 0);
+    } catch (value) {
+      setError(value instanceof Error ? value.message : 'Unable to load church organisations.');
     } finally {
-      setActionBusy(false);
+      setLoading(false);
     }
   };
 
-  const handleCreateOrg = async () => {
-    if (!newOrgName.trim() || !newOrgSlug.trim()) {
-      alert('Please provide name and slug.');
+  useEffect(() => {
+    const timer = window.setTimeout(() => void loadOrganizations(), 250);
+    return () => window.clearTimeout(timer);
+  }, [api, search]);
+
+  const lifecycleTarget = lifecycleOrg?.status === 'active' ? 'suspended' : 'active';
+
+  const applyLifecycleChange = async () => {
+    if (!lifecycleOrg) return;
+    if (lifecycleTarget === 'suspended' && !governanceReason.trim()) {
+      setError('A governance reason is required before suspending an organisation.');
       return;
     }
+
     setActionBusy(true);
+    setError('');
     try {
-      await api.request('organizations', {
-        method: 'POST',
+      const updated = await api.request<OrganizationItem>('platform-organizations', {
+        method: 'PATCH',
         body: JSON.stringify({
-          name: newOrgName.trim(),
-          slug: newOrgSlug.trim().toLowerCase(),
-          status: 'active',
+          organizationId: lifecycleOrg.id,
+          status: lifecycleTarget,
+          reason: lifecycleTarget === 'active' ? undefined : governanceReason.trim(),
         }),
       });
-      setShowCreateModal(false);
-      setNewOrgName('');
-      setNewOrgSlug('');
-      loadOrganizations();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to create organization');
+      setOrganizations((items) => items.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)));
+      if (selectedOrg?.id === updated.id) setSelectedOrg({ ...selectedOrg, ...updated });
+      setLifecycleOrg(null);
+      setGovernanceReason('');
+    } catch (value) {
+      setError(value instanceof Error ? value.message : 'Unable to change organisation lifecycle.');
     } finally {
       setActionBusy(false);
     }
   };
 
-  const filtered = organizations.filter(
-    (item) =>
-      item.name.toLowerCase().includes(search.toLowerCase()) ||
-      item.slug.toLowerCase().includes(search.toLowerCase())
-  );
+  const activeCount = useMemo(() => organizations.filter((item) => item.status === 'active').length, [organizations]);
 
   return (
     <div>
+      <div className="admin-stats-grid" style={{ marginBottom: 24 }}>
+        <div />
+      </div>
+
       <Card
         title="Church Organisations Governance"
-        subtitle="Global peer church jurisdictions operating underneath the Platform Authority"
+        subtitle={`${total} peer church organisation${total === 1 ? '' : 's'} · ${activeCount} active in the current result set`}
         headerAction={
-          <div style={{ display: 'flex', gap: 12 }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <SearchBar
               value={search}
               onChange={setSearch}
-              placeholder="Filter organisations by name or slug..."
+              placeholder="Search organisations..."
             />
-            <Button
-              variant="gold"
-              size="md"
-              onClick={() => setShowCreateModal(true)}
-              icon="+"
-            >
-              Onboard Organisation
+            <Button variant="outline" size="md" onClick={() => void loadOrganizations()}>
+              Refresh
             </Button>
           </div>
         }
       >
         {error ? (
-          <div className="admin-form-error" style={{ marginBottom: 16 }}>
+          <div className="admin-form-error" role="alert" style={{ marginBottom: 16 }}>
             {error}
           </div>
         ) : null}
@@ -122,7 +116,7 @@ export function OrganizationsGovernance({ api }: { api: ApiClient }) {
         <Table
           columns={[
             {
-              header: 'ORGANISATION NAME',
+              header: 'ORGANISATION',
               accessor: (item) => (
                 <div>
                   <div style={{ fontWeight: 800 }}>{item.name}</div>
@@ -135,157 +129,116 @@ export function OrganizationsGovernance({ api }: { api: ApiClient }) {
               accessor: (item) => (
                 <Badge
                   label={item.status.toUpperCase()}
-                  variant={item.status === 'active' ? 'active' : 'suspended'}
+                  variant={item.status === 'active' ? 'active' : item.status === 'suspended' ? 'suspended' : 'neutral'}
                   pulse={item.status === 'active'}
                 />
               ),
             },
-            {
-              header: 'TIMEZONE',
-              accessor: (item) => item.timezone || 'UTC (Universal)',
-            },
-            {
-              header: 'ESTABLISHED',
-              accessor: (item) => new Date(item.created_at).toLocaleDateString(),
-            },
+            { header: 'EXPRESSIONS', accessor: (item) => item.branches?.[0]?.count ?? 0 },
+            { header: 'MEMBERSHIPS', accessor: (item) => item.memberships?.[0]?.count ?? 0 },
+            { header: 'TIMEZONE', accessor: (item) => item.timezone || 'UTC' },
+            { header: 'CREATED', accessor: (item) => new Date(item.created_at).toLocaleDateString() },
             {
               header: 'ACTIONS',
               accessor: (item) => (
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedOrg(item);
-                    }}
-                  >
-                    Inspect Quotas
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <Button variant="outline" size="sm" onClick={() => setSelectedOrg(item)}>
+                    Inspect
                   </Button>
-                  <Button
-                    variant={item.status === 'active' ? 'danger' : 'gold'}
-                    size="sm"
-                    loading={actionBusy && selectedOrg?.id === item.id}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggleSuspend(item);
-                    }}
-                  >
-                    {item.status === 'active' ? 'Suspend' : 'Restore'}
-                  </Button>
+                  {item.status !== 'archived' ? (
+                    <Button
+                      variant={item.status === 'active' ? 'danger' : 'gold'}
+                      size="sm"
+                      onClick={() => {
+                        setLifecycleOrg(item);
+                        setGovernanceReason('');
+                      }}
+                    >
+                      {item.status === 'active' ? 'Suspend' : 'Restore'}
+                    </Button>
+                  ) : null}
                 </div>
               ),
             },
           ]}
-          data={filtered}
+          data={organizations}
           keyExtractor={(item) => item.id}
           loading={loading}
-          emptyMessage="No church organisations match your search query."
+          emptyMessage="No church organisations match the current filter."
         />
       </Card>
 
-      {/* Inspect Organisation Modal */}
       <Modal
         isOpen={!!selectedOrg}
         onClose={() => setSelectedOrg(null)}
         title={selectedOrg?.name ?? 'Organisation Governance'}
-        subtitle={`Unique Platform Identifier: ${selectedOrg?.id}`}
+        subtitle={selectedOrg ? `Platform organisation ID: ${selectedOrg.id}` : undefined}
         maxWidth="lg"
-        footer={
-          <Button variant="primary" size="md" onClick={() => setSelectedOrg(null)}>
-            Close Inspection
-          </Button>
-        }
+        footer={<Button variant="primary" size="md" onClick={() => setSelectedOrg(null)}>Close</Button>}
       >
-        {selectedOrg && (
+        {selectedOrg ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-              <div style={{ backgroundColor: 'var(--bg-elevated)', padding: 14, borderRadius: 8 }}>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 800 }}>SLUG</div>
-                <div style={{ fontSize: 15, fontWeight: 800, marginTop: 4 }}>/{selectedOrg.slug}</div>
-              </div>
-              <div style={{ backgroundColor: 'var(--bg-elevated)', padding: 14, borderRadius: 8 }}>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 800 }}>STATUS</div>
-                <Badge
-                  label={selectedOrg.status.toUpperCase()}
-                  variant={selectedOrg.status === 'active' ? 'active' : 'suspended'}
-                  className="mt-1"
-                />
-              </div>
-              <div style={{ backgroundColor: 'var(--bg-elevated)', padding: 14, borderRadius: 8 }}>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 800 }}>TIMEZONE</div>
-                <div style={{ fontSize: 15, fontWeight: 800, marginTop: 4 }}>
-                  {selectedOrg.timezone || 'UTC'}
-                </div>
-              </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16 }}>
+              <Metric label="STATUS" value={selectedOrg.status.toUpperCase()} />
+              <Metric label="EXPRESSIONS" value={String(selectedOrg.branches?.[0]?.count ?? 0)} />
+              <Metric label="MEMBERSHIPS" value={String(selectedOrg.memberships?.[0]?.count ?? 0)} />
+              <Metric label="TIMEZONE" value={selectedOrg.timezone || 'UTC'} />
             </div>
-
-            <Card title="Entitlement Quotas & Platform Limits">
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
-                <div style={{ fontSize: 13 }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Max Simultaneous Streams: </span>
-                  <strong>3 Live Ingest Channels</strong>
-                </div>
-                <div style={{ fontSize: 13 }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Monthly AI Inference Quota: </span>
-                  <strong>10,000 Generation Tokens</strong>
-                </div>
-                <div style={{ fontSize: 13 }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Expression Campus Limit: </span>
-                  <strong>Unlimited Expressions</strong>
-                </div>
-                <div style={{ fontSize: 13 }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Compliance Verification: </span>
-                  <span style={{ color: 'var(--success)', fontWeight: 800 }}>PASSED</span>
-                </div>
-              </div>
+            <Card title="Lifecycle boundary" subtitle="Level-1 governance changes are audited and enforced by backend policy.">
+              <p style={{ color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1.65 }}>
+                Suspending an organisation blocks active tenant operation while preserving its records for governance and restoration. This control plane does not invent quotas or compliance statuses that are not stored in the backend.
+              </p>
             </Card>
           </div>
-        )}
+        ) : null}
       </Modal>
 
-      {/* Onboard Organisation Modal */}
       <Modal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        title="Onboard New Church Organisation"
-        subtitle="Provision a top-level peer church organisation on the platform."
+        isOpen={!!lifecycleOrg}
+        onClose={() => {
+          if (!actionBusy) setLifecycleOrg(null);
+        }}
+        title={lifecycleTarget === 'suspended' ? 'Suspend church organisation' : 'Restore church organisation'}
+        subtitle={lifecycleOrg ? `${lifecycleOrg.name} · /${lifecycleOrg.slug}` : undefined}
         footer={
           <div style={{ display: 'flex', gap: 12 }}>
-            <Button variant="outline" size="md" onClick={() => setShowCreateModal(false)}>
+            <Button variant="outline" size="md" disabled={actionBusy} onClick={() => setLifecycleOrg(null)}>
               Cancel
             </Button>
             <Button
-              variant="gold"
+              variant={lifecycleTarget === 'suspended' ? 'danger' : 'gold'}
               size="md"
               loading={actionBusy}
-              onClick={handleCreateOrg}
+              onClick={() => void applyLifecycleChange()}
             >
-              Provision Organisation
+              {lifecycleTarget === 'suspended' ? 'Confirm suspension' : 'Restore organisation'}
             </Button>
           </div>
         }
       >
-        <InputField
-          label="Church Organisation Legal / Brand Name"
-          value={newOrgName}
-          onChange={(e) => {
-            setNewOrgName(e.target.value);
-            if (!newOrgSlug) {
-              setNewOrgSlug(e.target.value.toLowerCase().replace(/\s+/g, '-'));
-            }
-          }}
-          placeholder="e.g. Grace International Church"
-        />
-
-        <InputField
-          label="Unique System Slug"
-          value={newOrgSlug}
-          onChange={(e) => setNewOrgSlug(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
-          placeholder="e.g. grace-international"
-          helperText="Used for domain routing, tenant namespaces, and deep linking."
-        />
+        {lifecycleTarget === 'suspended' ? (
+          <InputField
+            label="Governance reason"
+            value={governanceReason}
+            onChange={(event) => setGovernanceReason(event.target.value)}
+            placeholder="Explain why this organisation is being restricted"
+            helperText="This reason is written to the immutable platform audit trail."
+          />
+        ) : (
+          <p style={{ color: 'var(--text-secondary)', lineHeight: 1.65 }}>
+            Restoring this organisation returns its lifecycle to active. The action is permission checked and audited.
+          </p>
+        )}
       </Modal>
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ backgroundColor: 'var(--bg-elevated)', padding: 14, borderRadius: 8 }}>
+      <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 800 }}>{label}</div>
+      <div style={{ fontSize: 15, fontWeight: 800, marginTop: 4 }}>{value}</div>
     </div>
   );
 }
