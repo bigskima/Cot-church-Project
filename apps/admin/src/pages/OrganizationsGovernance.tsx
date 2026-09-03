@@ -87,10 +87,6 @@ export function OrganizationsGovernance({ api }: { api: ApiClient }) {
 
   return (
     <div>
-      <div className="admin-stats-grid" style={{ marginBottom: 24 }}>
-        <div />
-      </div>
-
       <Card
         title="Church Organisations Governance"
         subtitle={`${total} peer church organisation${total === 1 ? '' : 's'} · ${activeCount} active in the current result set`}
