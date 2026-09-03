@@ -1,0 +1,50 @@
+name: Validate main
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-main-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  application:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate API structure
+        run: npm run api:check
+
+      - name: Validate application invariants
+        run: npm run apps:check
+
+      - name: Typecheck Platform Administration
+        run: npm run admin:typecheck
+
+      - name: Typecheck church application
+        run: npm run mobile:typecheck
+
+      - name: Build Platform Administration
+        run: npm run admin:build
+
+      - name: Export church web application
+        run: npm run mobile:build:web
+        env:
+          EXPO_PUBLIC_API_URL: https://example.invalid/functions/v1
