@@ -36,7 +36,7 @@ Deno.serve(createHandler(
 
     if (request.method === "PATCH") {
       const body = assertObject(await jsonBody(request));
-      assertNoUnknownFields(body, ["displayName", "username", "birthday", "birthdayExpressionVisible", "bio", "phoneNumber"]);
+      assertNoUnknownFields(body, ["displayName", "username", "birthday", "birthdayExpressionVisible", "birthdayPublicVisible", "bio", "phoneNumber"]);
       const displayName = optionalString(body.displayName, "displayName", 120);
       const username = normalizedUsername(body.username);
       const birthday = normalizedBirthday(body.birthday);
@@ -44,6 +44,9 @@ Deno.serve(createHandler(
       const phoneNumber = body.phoneNumber === null ? null : optionalString(body.phoneNumber, "phoneNumber", 32);
       if (body.birthdayExpressionVisible !== undefined && typeof body.birthdayExpressionVisible !== "boolean") {
         throw new ApiError("VALIDATION_FAILED", "birthdayExpressionVisible must be boolean", 422);
+      }
+      if (body.birthdayPublicVisible !== undefined && typeof body.birthdayPublicVisible !== "boolean") {
+        throw new ApiError("VALIDATION_FAILED", "birthdayPublicVisible must be boolean", 422);
       }
 
       const updates: Record<string, unknown> = {};
@@ -54,6 +57,7 @@ Deno.serve(createHandler(
       if (username !== undefined) updates.username = username;
       if (birthday !== undefined) updates.birthday = birthday;
       if (body.birthdayExpressionVisible !== undefined) updates.birthday_expression_visible = body.birthdayExpressionVisible;
+      if (body.birthdayPublicVisible !== undefined) updates.birthday_public_visible = body.birthdayPublicVisible;
       if (bio !== undefined) updates.bio = bio?.trim() || null;
       if (phoneNumber !== undefined) updates.phone_number = phoneNumber?.trim() || null;
       if (!Object.keys(updates).length) throw new ApiError("VALIDATION_FAILED", "At least one profile field is required", 422);
@@ -65,7 +69,7 @@ Deno.serve(createHandler(
 
     const { data: profile, error } = await auth.client
       .from("profiles")
-      .select("id,display_name,username,birthday,birthday_expression_visible,bio,phone_number,avatar_url,created_at,updated_at")
+      .select("id,display_name,username,birthday,birthday_expression_visible,birthday_public_visible,bio,phone_number,avatar_url,created_at,updated_at")
       .eq("id", auth.user.id)
       .single();
     if (error || !profile) throw new ApiError("PROFILE_NOT_FOUND", "Profile was not found", 404);
