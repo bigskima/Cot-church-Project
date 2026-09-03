@@ -4,30 +4,6 @@ import { createHandler } from "../_shared/handler.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { uuid } from "../_shared/validation.ts";
 
-async function onlinePaymentAvailable(organizationId: string) {
-  const admin = adminClient();
-  const { data: routes, error: routeError } = await admin
-    .from("payment_routing_rules")
-    .select("id,provider_id,payment_providers!inner(status)")
-    .eq("is_active", true)
-    .or(`organization_id.eq.${organizationId},organization_id.is.null`)
-    .limit(20);
-  if (routeError || !routes?.length) return false;
-
-  const activeProviderIds = routes
-    .filter((route: any) => route.payment_providers?.status === "active")
-    .map((route: any) => route.provider_id);
-  if (!activeProviderIds.length) return false;
-
-  const { count, error: configError } = await admin
-    .from("payment_provider_configs")
-    .select("id", { count: "exact", head: true })
-    .in("provider_id", activeProviderIds)
-    .eq("is_active", true)
-    .or(`organization_id.eq.${organizationId},organization_id.is.null`);
-  return !configError && (count ?? 0) > 0;
-}
-
 Deno.serve(
   createHandler(
     { methods: ["GET"], authentication: "none", organization: "none" },
@@ -108,15 +84,21 @@ Deno.serve(
       ]);
       for (const result of [settingsResult, purposesResult, accountsResult, campaignsResult]) {
         if (result.error) {
-          throw new ApiError("GIVING_LOAD_FAILED", "Unable to retrieve giving information", 500, undefined, false);
+          throw new ApiError(
+            "GIVING_LOAD_FAILED",
+            "Unable to retrieve giving information",
+            500,
+            undefined,
+            false,
+          );
         }
       }
 
       const settings = settingsResult.data;
       const accounts = accountsResult.data ?? [];
-      const providerReady = settings?.online_payment_enabled ? await onlinePaymentAvailable(organizationId) : false;
-      const manualAvailable = Boolean(settings?.is_enabled && settings.manual_transfer_enabled && accounts.length > 0);
-      const onlineAvailable = Boolean(settings?.is_enabled && settings.online_payment_enabled && providerReady);
+      const manualAvailable = Boolean(
+        settings?.is_enabled && settings.manual_transfer_enabled && accounts.length > 0,
+      );
 
       return {
         data: {
@@ -130,7 +112,7 @@ Deno.serve(
                 displaySubtitle: settings.display_subtitle,
                 isEnabled: settings.is_enabled,
                 manualTransferEnabled: settings.manual_transfer_enabled,
-                onlinePaymentEnabled: settings.online_payment_enabled,
+                onlinePaymentEnabled: false,
                 onlineUnavailableMessage: settings.online_unavailable_message,
               }
             : null,
@@ -140,7 +122,7 @@ Deno.serve(
           currencies: [...new Set(accounts.map((account: any) => account.currency))],
           methods: {
             manualBankTransfer: manualAvailable,
-            onlinePayment: onlineAvailable,
+            onlinePayment: false,
           },
         },
       };
