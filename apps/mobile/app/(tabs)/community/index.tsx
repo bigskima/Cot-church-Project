@@ -12,6 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -56,25 +57,41 @@ type UploadIntent = {
   sizeBytes: number;
   signedUploadUrl: string;
 };
+type UploadableMedia = {
+  uri: string;
+  fileName?: string | null;
+  mimeType: string;
+  reportedSize?: number | null;
+  webFile?: Blob | null;
+};
 
 const MAX_MEDIA_BYTES = 50 * 1024 * 1024;
 
-function inferPickerMime(asset: ImagePicker.ImagePickerAsset) {
+function inferImagePickerMime(asset: ImagePicker.ImagePickerAsset) {
   if (asset.mimeType) return asset.mimeType.toLowerCase();
   const name = (asset.fileName ?? asset.uri).toLowerCase();
   if (name.endsWith('.png')) return 'image/png';
   if (name.endsWith('.webp')) return 'image/webp';
   if (name.endsWith('.gif')) return 'image/gif';
-  if (name.endsWith('.mp4')) return 'video/mp4';
   if (name.endsWith('.webm')) return 'video/webm';
   if (name.endsWith('.mov')) return 'video/quicktime';
+  if (name.endsWith('.mp4')) return 'video/mp4';
   return asset.type === 'video' ? 'video/mp4' : 'image/jpeg';
 }
 
-async function pickerAssetBody(asset: ImagePicker.ImagePickerAsset) {
-  const webFile = (asset as any).file as File | undefined;
-  if (webFile) return webFile;
-  const response = await fetch(asset.uri);
+function inferAudioMime(name: string, supplied?: string | null) {
+  if (supplied?.startsWith('audio/')) return supplied.toLowerCase();
+  const value = name.toLowerCase();
+  if (value.endsWith('.m4a') || value.endsWith('.mp4')) return 'audio/mp4';
+  if (value.endsWith('.aac')) return 'audio/aac';
+  if (value.endsWith('.ogg') || value.endsWith('.oga')) return 'audio/ogg';
+  if (value.endsWith('.wav')) return 'audio/wav';
+  return 'audio/mpeg';
+}
+
+async function readUploadBody(media: UploadableMedia) {
+  if (media.webFile) return media.webFile;
+  const response = await fetch(media.uri);
   if (!response.ok) throw new Error('Unable to read the selected media file.');
   return response.blob();
 }
@@ -102,18 +119,19 @@ export default function CommunityScreen() {
     if (!expression?.id && activeTab === 'expression') setActiveTab('general');
   }, [activeTab, expression?.id]);
 
-  const feedKey = `mobile:community:${activeTab}:${organizationId}:${expression?.id ?? 'none'}`;
+  const feedKey = `mobile:community:${activeTab}:${organizationId || 'auto'}:${expression?.id ?? 'none'}`;
   const resource = useResource<CommunityPost[]>(feedKey, (signal) => {
     if (activeTab === 'general') {
-      // General Community is always the same public feed for visitors, signed-in
-      // accounts, and Expression members. Membership never makes this feed disappear.
-      const query = new URLSearchParams({ scope: 'church', organizationId });
+      const query = new URLSearchParams({ scope: 'church' });
+      if (organizationId) query.set('organizationId', organizationId);
       return api.request<CommunityPost[]>(`public-social-feed?${query.toString()}`, { signal });
     }
     return api.request<CommunityPost[]>('social-feed?scope=expression', { signal });
   });
 
-  const hasChurchMembership = Boolean(context?.memberships?.length);
+  const hasChurchMembership = Boolean(
+    context?.organizations?.some((organization) => organization.memberships?.some((membership) => membership.status === 'active')),
+  );
   const canPost = mode === 'authenticated' && Boolean(expression?.id) && hasChurchMembership;
   const canEngage = mode === 'authenticated' && hasChurchMembership;
 
@@ -150,20 +168,18 @@ export default function CommunityScreen() {
     if (pending.length) void cleanupAttachments(pending);
   };
 
-  const uploadPickerAsset = async (asset: ImagePicker.ImagePickerAsset) => {
-    const body = await pickerAssetBody(asset);
-    const sizeBytes = Number((body as Blob).size ?? asset.fileSize ?? 0);
-    if (!sizeBytes || sizeBytes > MAX_MEDIA_BYTES) {
-      throw new Error('Each image or video must be 50 MB or smaller.');
-    }
-    const mimeType = inferPickerMime(asset);
+  const uploadMedia = async (media: UploadableMedia) => {
+    const binary = await readUploadBody(media);
+    const sizeBytes = Number(binary.size || media.reportedSize || 0);
+    if (!sizeBytes || sizeBytes > MAX_MEDIA_BYTES) throw new Error('Each attachment must be 50 MB or smaller.');
+
     const branchId = postDestination === 'expression' ? expression?.id : undefined;
     const intent = await api.request<UploadIntent>('community-media', {
       method: 'POST',
       body: JSON.stringify({
         action: 'create_upload',
-        mimeType,
-        fileName: asset.fileName ?? undefined,
+        mimeType: media.mimeType,
+        fileName: media.fileName ?? undefined,
         sizeBytes,
         branchId,
       }),
@@ -172,8 +188,8 @@ export default function CommunityScreen() {
     try {
       const uploaded = await fetch(intent.signedUploadUrl, {
         method: 'PUT',
-        headers: { 'Content-Type': mimeType },
-        body: body as Blob,
+        headers: { 'Content-Type': media.mimeType },
+        body: binary,
       });
       if (!uploaded.ok) throw new Error(`Media upload failed (${uploaded.status}).`);
       return await api.request<MediaAttachment>('community-media', {
@@ -186,6 +202,23 @@ export default function CommunityScreen() {
         body: JSON.stringify({ uploadId: intent.uploadId }),
       }).catch(() => undefined);
       throw error;
+    }
+  };
+
+  const appendUploads = async (selected: UploadableMedia[]) => {
+    if (!selected.length) return;
+    setMediaUploading(true);
+    const uploaded: MediaAttachment[] = [];
+    try {
+      for (const media of selected.slice(0, Math.max(0, 10 - attachments.length))) {
+        uploaded.push(await uploadMedia(media));
+      }
+      setAttachments((current) => [...current, ...uploaded].slice(0, 10));
+    } catch (error) {
+      if (uploaded.length) await cleanupAttachments(uploaded);
+      setPostError(error instanceof Error ? error.message : 'Unable to upload selected media.');
+    } finally {
+      setMediaUploading(false);
     }
   };
 
@@ -205,19 +238,38 @@ export default function CommunityScreen() {
         quality: 1,
       });
       if (result.canceled || !result.assets?.length) return;
-      setMediaUploading(true);
-      const uploaded: MediaAttachment[] = [];
-      try {
-        for (const asset of result.assets) uploaded.push(await uploadPickerAsset(asset));
-        setAttachments((current) => [...current, ...uploaded].slice(0, 10));
-      } catch (error) {
-        if (uploaded.length) await cleanupAttachments(uploaded);
-        setPostError(error instanceof Error ? error.message : 'Unable to upload selected media.');
-      } finally {
-        setMediaUploading(false);
-      }
+      await appendUploads(result.assets.map((asset) => ({
+        uri: asset.uri,
+        fileName: asset.fileName,
+        mimeType: inferImagePickerMime(asset),
+        reportedSize: asset.fileSize,
+        webFile: ((asset as any).file as Blob | undefined) ?? null,
+      })));
     } catch (error) {
       setPostError(error instanceof Error ? error.message : 'Unable to choose media.');
+      setMediaUploading(false);
+    }
+  };
+
+  const chooseAudio = async () => {
+    if (!canPost || mediaUploading || attachments.length >= 10) return;
+    setPostError('');
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['audio/mpeg', 'audio/mp4', 'audio/aac', 'audio/ogg', 'audio/wav', 'audio/*'],
+        multiple: true,
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.length) return;
+      await appendUploads(result.assets.map((asset) => ({
+        uri: asset.uri,
+        fileName: asset.name,
+        mimeType: inferAudioMime(asset.name, asset.mimeType),
+        reportedSize: asset.size,
+        webFile: ((asset as any).file as Blob | undefined) ?? null,
+      })));
+    } catch (error) {
+      setPostError(error instanceof Error ? error.message : 'Unable to choose audio.');
       setMediaUploading(false);
     }
   };
@@ -240,6 +292,7 @@ export default function CommunityScreen() {
       setPostError('Select or join an Expression before posting to an Expression feed.');
       return;
     }
+
     setPosting(true);
     setPostError('');
     try {
@@ -247,7 +300,7 @@ export default function CommunityScreen() {
         method: 'POST',
         body: JSON.stringify({
           body: postText.trim(),
-          visibility: 'public',
+          visibility: postDestination === 'expression' ? 'branch' : 'public',
           branchId: postDestination === 'expression' ? expression!.id : undefined,
           mediaUploadIds: attachments.map((item) => item.uploadId),
         }),
@@ -339,7 +392,7 @@ export default function CommunityScreen() {
       {canPost ? (
         <Pressable onPress={openComposer} style={[styles.composerStrip, { borderBottomColor: colors.borderSubtle }]}>
           <Avatar url={context?.profile?.avatar_url} name={context?.profile?.display_name || 'Me'} size="sm" />
-          <Text style={[styles.composerPlaceholder, { color: colors.textMuted }]}>Share text, photos or video...</Text>
+          <Text style={[styles.composerPlaceholder, { color: colors.textMuted }]}>Share text, photos, video or audio...</Text>
           <Icon name="create-outline" size={20} color={colors.interactive} />
         </Pressable>
       ) : mode === 'authenticated' ? (
@@ -373,7 +426,7 @@ export default function CommunityScreen() {
       ) : (
         <EmptyState
           title={activeTab === 'expression' ? 'No Expression Posts Yet' : 'No General Community Posts Yet'}
-          message={canPost ? 'Share the first encouraging word, photo, or video in this feed.' : 'Published public community posts will appear here.'}
+          message={canPost ? 'Share the first encouraging word or media post in this feed.' : 'Published community posts will appear here.'}
           iconName="chatbubbles-outline"
         />
       )}
@@ -400,7 +453,7 @@ export default function CommunityScreen() {
                 </Pressable>
               ) : null}
             </View>
-            <Text style={[styles.destinationHelp, { color: colors.textMuted }]}>General Community posts are public. Expression posts are attached only to your selected Expression feed.</Text>
+            <Text style={[styles.destinationHelp, { color: colors.textMuted }]}>General Community posts are public. Expression posts remain inside your selected Expression.</Text>
           </View>
 
           {postError ? <View style={[styles.errorBanner, { backgroundColor: colors.liveSoft }]}><Icon name="alert-circle" size={17} color={colors.live} /><Text style={[styles.errorText, { color: colors.live }]}>{postError}</Text></View> : null}
@@ -424,16 +477,16 @@ export default function CommunityScreen() {
               <Icon name="images-outline" size={18} color={colors.interactive} />
               <Text style={[styles.mediaButtonText, { color: colors.text }]}>Photo / Video</Text>
             </Pressable>
-            <Pressable disabled style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.border, opacity: 0.55 }]}>
-              <Icon name="musical-notes-outline" size={18} color={colors.textMuted} />
-              <Text style={[styles.mediaButtonText, { color: colors.textMuted }]}>Audio</Text>
+            <Pressable onPress={() => void chooseAudio()} disabled={mediaUploading || attachments.length >= 10} style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
+              <Icon name="musical-notes-outline" size={18} color={colors.interactive} />
+              <Text style={[styles.mediaButtonText, { color: colors.text }]}>Audio</Text>
             </Pressable>
-            <Pressable onPress={() => { setComposerOpen(false); router.push('/reels' as any); }} style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
+            <Pressable onPress={() => { closeComposer(); router.push('/studio/reel' as any); }} style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
               <Icon name="flash-outline" size={18} color={colors.interactive} />
-              <Text style={[styles.mediaButtonText, { color: colors.text }]}>Reels</Text>
+              <Text style={[styles.mediaButtonText, { color: colors.text }]}>Create Reel</Text>
             </Pressable>
           </View>
-          <Text style={[styles.mediaHelp, { color: colors.textMuted }]}>Up to 10 attachments · 50 MB each. Image and video upload directly to protected Storage. Audio upload is being wired to the same production pipeline.</Text>
+          <Text style={[styles.mediaHelp, { color: colors.textMuted }]}>Up to 10 attachments · 50 MB each · images, videos and audio upload through the same validated Storage pipeline.</Text>
 
           {mediaUploading ? (
             <View style={[styles.uploadingRow, { backgroundColor: colors.primarySoft }]}>
