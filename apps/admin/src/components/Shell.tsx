@@ -37,6 +37,11 @@ const navSections = [
   },
 ] as const;
 
+type PlatformAuthority = {
+  displayName: string;
+  roleName: string;
+};
+
 export function Shell({
   api,
   auth,
@@ -47,35 +52,50 @@ export function Shell({
   updateAuth: (auth: AuthState | null) => void;
 }) {
   const [page, setPage] = useState<string>('overview');
-  const [loading, setLoading] = useState(!auth.organizationId);
+  const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [authority, setAuthority] = useState<PlatformAuthority>({
+    displayName: 'Platform Authority',
+    roleName: 'Platform Administrator',
+  });
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
+  useEffect(() => {
+    let active = true;
+    api
+      .request<{
+        profile?: { display_name?: string | null };
+        roles?: Array<{ platform_roles?: { name?: string | null } | null; role_code?: string }>;
+      }>('platform-context')
+      .then((data) => {
+        if (!active) return;
+        const firstRole = data.roles?.[0];
+        setAuthority({
+          displayName: data.profile?.display_name?.trim() || 'Platform Authority',
+          roleName:
+            firstRole?.platform_roles?.name?.trim() ||
+            firstRole?.role_code?.replaceAll('_', ' ') ||
+            'Platform Administrator',
+        });
+      })
+      .catch(() => {
+        if (active) updateAuth(null);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [api, updateAuth, auth.accessToken]);
+
   const toggleTheme = () => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
-
-  useEffect(() => {
-    if (auth.organizationId) return;
-    api
-      .request<{ memberships: Array<{ organization: { id: string; name: string }; branch?: { id: string } }> }>(
-        'organization-context'
-      )
-      .then((data) => {
-        const first = data.memberships?.[0];
-        if (first) {
-          updateAuth({
-            ...auth,
-            organizationId: first.organization.id,
-            branchId: first.branch?.id,
-          });
-        }
-      })
-      .finally(() => setLoading(false));
-  }, []);
 
   const renderContent = () => {
     switch (page) {
@@ -116,7 +136,6 @@ export function Shell({
 
   return (
     <div className="admin-shell">
-      {/* Sidebar */}
       <aside className="admin-sidebar">
         <div className="admin-brand">
           <div className="admin-brand-icon">✦</div>
@@ -151,8 +170,8 @@ export function Shell({
         <div className="admin-sidebar-footer">
           <div className="admin-user-pill">
             <div className="admin-user-info">
-              <span className="admin-user-name">Platform Authority</span>
-              <span className="admin-user-role">Super Administrator</span>
+              <span className="admin-user-name">{authority.displayName}</span>
+              <span className="admin-user-role">{authority.roleName}</span>
             </div>
             <button
               type="button"
@@ -166,7 +185,6 @@ export function Shell({
         </div>
       </aside>
 
-      {/* Main Content Stage */}
       <div className="admin-main-stage">
         <header className="admin-topbar">
           <div className="admin-topbar-left">
@@ -175,7 +193,6 @@ export function Shell({
           </div>
 
           <div className="admin-topbar-right">
-            {/* Theme Toggle Button */}
             <button
               type="button"
               onClick={toggleTheme}
@@ -189,7 +206,7 @@ export function Shell({
 
             <div className="admin-system-health-pill">
               <span className="pulse-live-dot" />
-              <span>All Systems Operational</span>
+              <span>Platform connected</span>
             </div>
           </div>
         </header>
@@ -198,7 +215,7 @@ export function Shell({
           {loading ? (
             <div className="admin-table-loading" style={{ padding: 120 }}>
               <span className="admin-spinner" />
-              <p>Authenticating Platform Authority session...</p>
+              <p>Validating Platform Authority session...</p>
             </div>
           ) : (
             renderContent()
