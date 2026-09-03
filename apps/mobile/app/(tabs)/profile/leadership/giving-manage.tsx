@@ -303,8 +303,8 @@ export default function ExpressionGivingManageScreen() {
             </View>
           ) : null}
           {error ? (
-            <View style={[styles.banner, { backgroundColor: colors.destructiveSoft, borderColor: colors.destructive }]}>
-              <Text style={[styles.bannerText, { color: colors.destructive }]}>{error}</Text>
+            <View style={[styles.banner, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}>
+              <Text style={[styles.bannerText, { color: colors.live }]}>{error}</Text>
             </View>
           ) : null}
 
@@ -317,7 +317,7 @@ export default function ExpressionGivingManageScreen() {
           {configuration.loading ? (
             <Skeleton height={120} count={3} />
           ) : configuration.error ? (
-            <ResourceError message={configuration.error.message} onRetry={configuration.refresh} />
+            <ResourceError message={configuration.error} retry={configuration.refresh} />
           ) : tab === 'settings' ? (
             <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
               <SectionHeader title="Giving presentation" />
