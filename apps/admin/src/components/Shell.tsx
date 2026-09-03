@@ -8,6 +8,7 @@ import { UserGovernance } from '../pages/UserGovernance';
 import { AdminInvitations } from '../pages/AdminInvitations';
 import { ExpressionCreators } from '../pages/ExpressionCreators';
 import { BrandingAppearance } from '../pages/BrandingAppearance';
+import { PublicDirectory } from '../pages/PublicDirectory';
 import { GivingConfiguration } from '../pages/GivingConfiguration';
 import { StreamingInfrastructure } from '../pages/StreamingInfrastructure';
 import { AiInfrastructure } from '../pages/AiInfrastructure';
@@ -31,7 +32,8 @@ const allNavSections: NavSection[] = [
       { key: 'admin-invitations', label: 'Admin Invitations', icon: '✉️', superAdminOnly: true },
       { key: 'expression-creators', label: 'Authorize Expression Creators', icon: '🔑', superAdminOnly: true },
       { key: 'branding', label: 'Branding & Identity', icon: '🎨' },
-      { key: 'giving', label: 'Church-wide Giving', icon: '🎁' },
+      { key: 'public-directory', label: 'General Community Directory', icon: '📖' },
+      { key: 'giving', label: 'General Giving', icon: '🎁' },
       { key: 'features', label: 'Tenant Feature Flags', icon: '⚑' },
     ],
   },
@@ -99,6 +101,7 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
       case 'admin-invitations': return isSuperAdmin ? <AdminInvitations api={api} /> : <PlatformOverview api={api} onNavigate={setPage} />;
       case 'expression-creators': return isSuperAdmin ? <ExpressionCreators api={api} /> : <PlatformOverview api={api} onNavigate={setPage} />;
       case 'branding': return <BrandingAppearance api={api} />;
+      case 'public-directory': return <PublicDirectory api={api} />;
       case 'giving': return <GivingConfiguration api={api} />;
       case 'credentials': return <ProviderCredentials api={api} />;
       case 'streaming': return <StreamingInfrastructure api={api} />;
@@ -122,7 +125,7 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
   return (
     <div className="admin-shell">
       <aside className="admin-sidebar">
-        <div className="admin-brand"><div className="admin-brand-icon">✦</div><div className="admin-brand-text"><h1>Sanctuary OS</h1><p>Platform Control Plane</p></div></div>
+        <div className="admin-brand"><div className="admin-brand-icon">COT</div><div className="admin-brand-text"><h1>City of Transformation</h1><p>Platform Control Plane</p></div></div>
         <nav className="admin-nav">
           {navSections.map((section) => (
             <div key={section.group} className="admin-nav-group">
@@ -143,7 +146,7 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
         <header className="admin-topbar">
           <div className="admin-topbar-left"><h2 className="admin-topbar-title">{getPageTitle()}</h2><Badge label="LEVEL 1 AUTHORITY" variant="gold" /></div>
           <div className="admin-topbar-right">
-            <button type="button" onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))} className="admin-btn-secondary admin-btn-sm" style={{ display: 'flex', alignItems: 'center', gap: 6 }} title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}><span>{theme === 'dark' ? '☀️' : '🌙'}</span><span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span></button>
+            <button type="button" onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))} className="admin-btn-secondary admin-btn-sm" style={{ display: 'flex', alignItems: 'center', gap: 6 }} title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}><span>{theme === 'dark' ? 'Light' : 'Dark'}</span></button>
             <div className="admin-system-health-pill"><span className="pulse-live-dot" /><span>Platform connected</span></div>
           </div>
         </header>
