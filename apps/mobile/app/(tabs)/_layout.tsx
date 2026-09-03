@@ -50,7 +50,6 @@ export default function TabLayout() {
     <Tabs
       screenOptions={screenOptions}
       backBehavior="history"
-      initialRouteName="home"
     >
       <Tabs.Screen
         name="home"
