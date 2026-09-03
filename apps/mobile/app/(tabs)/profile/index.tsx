@@ -4,33 +4,63 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
+import { useResource } from '@/hooks/use-resource';
 import { Avatar, Badge, Button, Chip, Icon, ScreenHeader, SectionHeader } from '@/components';
 import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 
+type AiReadiness = {
+  capability: string;
+  ready: boolean;
+  reason?: string | null;
+  providerName?: string;
+  modelName?: string;
+};
+
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { mode, context, hasCapability, signOut } = useSession();
+  const { mode, context, hasCapability, signOut, api } = useSession();
   const { preference, setPreference, colors } = useTheme();
   const profile = context?.profile;
   const organization = context?.organizations?.[0];
   const expression = context?.expression;
+  const hasOrganization = Boolean(context?.organization?.id ?? organization?.id);
+
+  const aiReadiness = useResource<AiReadiness>('profile:assistant-readiness', (signal) => {
+    if (mode !== 'authenticated' || !hasOrganization) {
+      return Promise.resolve({ capability: 'assistant.answer', ready: false, reason: 'active_membership_required' });
+    }
+    return api.request<AiReadiness>('ai-gateway?capability=assistant.answer', { signal });
+  });
+  const aiReady = aiReadiness.data?.ready === true;
+  const aiSubtitle = aiReady
+    ? `Available now${aiReadiness.data?.providerName ? ` via ${aiReadiness.data.providerName}` : ''}${aiReadiness.data?.modelName ? ` · ${aiReadiness.data.modelName}` : ''}`
+    : aiReadiness.loading
+      ? 'Checking configured AI provider readiness…'
+      : 'Not enabled yet. Platform Authority must configure an active provider, model, route, and runtime secret.';
 
   const hasLeadershipAccess =
     hasCapability('content.create') || hasCapability('streams.broadcast') || hasCapability('sermons.create') ||
     hasCapability('events.manage') || hasCapability('finance.manage') || hasCapability('pastoral.manage') ||
     hasCapability('members.manage') || hasCapability('*');
 
-  const serviceTile = (route: string, icon: string, title: string, subtitle: string) => (
+  const serviceTile = (route: string, icon: string, title: string, subtitle: string, disabled = false) => (
     <Pressable
-      onPress={() => router.push(route as any)}
-      style={({ pressed }) => [styles.linkTile, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm, pressed && styles.pressed]}
+      onPress={() => !disabled && router.push(route as any)}
+      disabled={disabled}
+      style={({ pressed }) => [
+        styles.linkTile,
+        { backgroundColor: colors.card, borderColor: colors.border },
+        shadows.sm,
+        disabled && styles.disabled,
+        pressed && !disabled && styles.pressed,
+      ]}
     >
-      <View style={[styles.tileIcon, { backgroundColor: colors.primarySoft }]}><Icon name={icon} size={20} color={colors.interactive} /></View>
+      <View style={[styles.tileIcon, { backgroundColor: colors.primarySoft }]}><Icon name={icon} size={20} color={disabled ? colors.textMuted : colors.interactive} /></View>
       <View style={styles.tileContent}>
-        <Text style={[styles.tileTitle, { color: colors.text }]}>{title}</Text>
+        <Text style={[styles.tileTitle, { color: disabled ? colors.textMuted : colors.text }]}>{title}</Text>
         <Text style={[styles.tileSub, { color: colors.textSecondary }]}>{subtitle}</Text>
       </View>
-      <Icon name="chevron-forward" size={18} color={colors.textMuted} />
+      {title === 'AI Spiritual Assistant' ? <Badge label={aiReady ? 'READY' : 'OFFLINE'} variant={aiReady ? 'active' : 'neutral'} /> : <Icon name="chevron-forward" size={18} color={colors.textMuted} />}
     </Pressable>
   );
 
@@ -66,7 +96,7 @@ export default function ProfileScreen() {
             {mode === 'authenticated' ? serviceTile('/(tabs)/profile/notifications', 'notifications-outline', 'Notifications & Invitations', 'Accept or decline role invitations and view church updates') : null}
             {serviceTile('/(tabs)/profile/prayer', 'heart-outline', 'Prayer Petitions & Wall', 'Submit private pastoral requests or view community prayer items')}
             {serviceTile('/(tabs)/profile/giving', 'gift-outline', 'Giving & Statements', 'View the configured church or Expression giving destinations and receipts')}
-            {serviceTile('/assistant', 'sparkles', 'AI Spiritual Assistant', 'Available automatically when Platform Authority configures an active AI provider')}
+            {mode === 'authenticated' ? serviceTile('/assistant', 'sparkles', 'AI Spiritual Assistant', aiSubtitle, !aiReady) : null}
           </View>
         </View>
 
@@ -117,5 +147,6 @@ const styles = StyleSheet.create({
   leadershipBanner: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, gap: spacing.md },
   leadershipIconWrap: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' }, leadershipContent: { flex: 1, gap: 2 },
   leadershipTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, leadershipTitle: { fontSize: 15, fontWeight: '700' }, leadershipSub: { fontSize: 12, lineHeight: 16 },
-  themeCard: { padding: spacing.md, borderRadius: radius.lg, borderWidth: 1 }, themeChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }, pressed: { opacity: 0.8 },
+  themeCard: { padding: spacing.md, borderRadius: radius.lg, borderWidth: 1 }, themeChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  disabled: { opacity: 0.58 }, pressed: { opacity: 0.8 },
 });
