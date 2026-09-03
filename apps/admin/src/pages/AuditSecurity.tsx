@@ -1,148 +1,148 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { ApiClient } from '../api';
 import { Badge, Button, Card, Modal, SearchBar, Table } from '../components/ui';
 
 interface AuditRecord {
-  id: string;
-  organization_id?: string;
-  actor_profile_id?: string;
+  id: number | string;
+  actor_profile_id?: string | null;
   action: string;
-  entity_type: string;
-  entity_id: string;
-  metadata?: Record<string, unknown>;
-  created_at: string;
+  target_type: string;
+  target_id?: string | null;
+  request_id?: string | null;
+  metadata?: Record<string, unknown> | null;
+  occurred_at: string;
+  profiles?: { display_name?: string | null; avatar_url?: string | null } | null;
+}
+
+interface AuditListResponse {
+  items: AuditRecord[];
+  page: number;
+  pageSize: number;
+  total: number;
 }
 
 export function AuditSecurity({ api }: { api: ApiClient }) {
   const [logs, setLogs] = useState<AuditRecord[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [selectedAudit, setSelectedAudit] = useState<AuditRecord | null>(null);
 
-  useEffect(() => {
-    loadAudit();
-  }, []);
-
-  const loadAudit = () => {
+  const loadAudit = async () => {
     setLoading(true);
     setError('');
-    api
-      .request<AuditRecord[]>('audit-log')
-      .then((data) => setLogs(Array.isArray(data) ? data : []))
-      .catch((err) => setError(err instanceof Error ? err.message : 'Unable to load audit log'))
-      .finally(() => setLoading(false));
+    try {
+      const data = await api.request<AuditListResponse>('platform-audit?pageSize=100');
+      setLogs(data.items ?? []);
+      setTotal(data.total ?? 0);
+    } catch (value) {
+      setError(value instanceof Error ? value.message : 'Unable to load platform audit records.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const filtered = logs.filter(
-    (l) =>
-      l.action.toLowerCase().includes(search.toLowerCase()) ||
-      l.entity_type.toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => {
+    void loadAudit();
+  }, [api]);
+
+  const filtered = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    if (!needle) return logs;
+    return logs.filter((record) =>
+      record.action.toLowerCase().includes(needle) ||
+      record.target_type.toLowerCase().includes(needle) ||
+      (record.target_id ?? '').toLowerCase().includes(needle) ||
+      (record.profiles?.display_name ?? '').toLowerCase().includes(needle) ||
+      (record.request_id ?? '').toLowerCase().includes(needle)
+    );
+  }, [logs, search]);
 
   return (
     <div>
       <Card
-        title="Immutable Platform Audit Trail & Security Ledger"
-        subtitle="Cryptographically verifiable audit records capturing every privileged action and security event"
+        title="Platform Audit Trail & Security Ledger"
+        subtitle={`${total} Level-1 governance event${total === 1 ? '' : 's'} · database-enforced append-only history`}
         headerAction={
           <div style={{ display: 'flex', gap: 12 }}>
             <SearchBar
               value={search}
               onChange={setSearch}
-              placeholder="Filter audit events by action or entity..."
+              placeholder="Filter action, target, actor, or request ID..."
             />
-            <Button variant="outline" size="md" onClick={loadAudit} loading={loading}>
+            <Button variant="outline" size="md" onClick={() => void loadAudit()} loading={loading}>
               Refresh Ledger
             </Button>
           </div>
         }
       >
-        {error ? (
-          <div className="admin-form-error" style={{ marginBottom: 16 }}>
-            {error}
-          </div>
-        ) : null}
+        {error ? <div className="admin-form-error" role="alert" style={{ marginBottom: 16 }}>{error}</div> : null}
 
         <Table
           columns={[
+            { header: 'EVENT ACTION', accessor: (item) => <Badge label={item.action} variant="gold" /> },
             {
-              header: 'EVENT ACTION',
-              accessor: (item) => <Badge label={item.action} variant="gold" />,
-            },
-            {
-              header: 'TARGET ENTITY',
+              header: 'TARGET',
               accessor: (item) => (
                 <div>
-                  <strong style={{ fontSize: 13 }}>{item.entity_type}</strong>
+                  <strong style={{ fontSize: 13 }}>{item.target_type}</strong>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                    ID: {item.entity_id.slice(0, 10)}...
+                    {item.target_id ? `ID: ${item.target_id}` : 'No target ID'}
                   </div>
                 </div>
               ),
             },
             {
               header: 'ACTOR',
-              accessor: (item) => item.actor_profile_id ?? 'Platform Super Admin',
+              accessor: (item) => item.profiles?.display_name ?? item.actor_profile_id ?? 'system',
             },
             {
-              header: 'RECORDED TIMESTAMP',
-              accessor: (item) => new Date(item.created_at).toLocaleString(),
+              header: 'REQUEST',
+              accessor: (item) => item.request_id ? (
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>{item.request_id}</span>
+              ) : '—',
             },
+            { header: 'RECORDED', accessor: (item) => new Date(item.occurred_at).toLocaleString() },
             {
-              header: 'VERIFICATION',
+              header: 'DETAILS',
               accessor: (item) => (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedAudit(item);
-                  }}
-                >
-                  Verify Metadata
+                <Button variant="outline" size="sm" onClick={() => setSelectedAudit(item)}>
+                  Inspect
                 </Button>
               ),
             },
           ]}
           data={filtered}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => String(item.id)}
           loading={loading}
-          emptyMessage="No audit logs match your search filter."
+          emptyMessage="No platform audit records match this filter."
         />
       </Card>
 
-      {/* Inspect Audit Record Modal */}
       <Modal
         isOpen={!!selectedAudit}
         onClose={() => setSelectedAudit(null)}
-        title="Audit Record Cryptographic Metadata"
-        subtitle={`Event ID: ${selectedAudit?.id}`}
+        title="Platform Audit Record"
+        subtitle={selectedAudit ? `Event ID: ${selectedAudit.id}` : undefined}
         maxWidth="lg"
-        footer={
-          <Button variant="primary" size="md" onClick={() => setSelectedAudit(null)}>
-            Close Inspection
-          </Button>
-        }
+        footer={<Button variant="primary" size="md" onClick={() => setSelectedAudit(null)}>Close</Button>}
       >
-        {selectedAudit && (
+        {selectedAudit ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14 }}>
+              <Metric label="ACTION" value={selectedAudit.action} />
+              <Metric label="TARGET TYPE" value={selectedAudit.target_type} />
+              <Metric label="TARGET ID" value={selectedAudit.target_id ?? 'None'} />
+              <Metric label="ACTOR" value={selectedAudit.profiles?.display_name ?? selectedAudit.actor_profile_id ?? 'system'} />
+              <Metric label="REQUEST ID" value={selectedAudit.request_id ?? 'None'} />
               <div style={{ backgroundColor: 'var(--bg-elevated)', padding: 14, borderRadius: 8 }}>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 800 }}>ACTION</div>
-                <div style={{ fontSize: 14, fontWeight: 800, marginTop: 4 }}>{selectedAudit.action}</div>
-              </div>
-              <div style={{ backgroundColor: 'var(--bg-elevated)', padding: 14, borderRadius: 8 }}>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 800 }}>ENTITY TYPE</div>
-                <div style={{ fontSize: 14, fontWeight: 800, marginTop: 4 }}>{selectedAudit.entity_type}</div>
-              </div>
-              <div style={{ backgroundColor: 'var(--bg-elevated)', padding: 14, borderRadius: 8 }}>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 800 }}>INTEGRITY</div>
-                <Badge label="HASH VERIFIED" variant="healthy" className="mt-1" />
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 800 }}>STORAGE GUARANTEE</div>
+                <div style={{ marginTop: 6 }}><Badge label="APPEND-ONLY" variant="healthy" /></div>
               </div>
             </div>
 
-            <Card title="Raw Event Payload & Metadata">
+            <Card title="Recorded metadata" subtitle="The payload below is the stored event metadata; no synthetic verification fields are added by the UI.">
               <pre
                 style={{
                   backgroundColor: 'var(--bg-input)',
@@ -152,14 +152,25 @@ export function AuditSecurity({ api }: { api: ApiClient }) {
                   fontFamily: 'var(--font-mono)',
                   color: 'var(--text-primary)',
                   overflowX: 'auto',
+                  whiteSpace: 'pre-wrap',
+                  overflowWrap: 'anywhere',
                 }}
               >
-                {JSON.stringify(selectedAudit.metadata ?? { actor_ip: '127.0.0.1', user_agent: 'Sanctuary Control Plane/2026.08', verified: true }, null, 2)}
+                {JSON.stringify(selectedAudit.metadata ?? {}, null, 2)}
               </pre>
             </Card>
           </div>
-        )}
+        ) : null}
       </Modal>
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ backgroundColor: 'var(--bg-elevated)', padding: 14, borderRadius: 8 }}>
+      <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 800 }}>{label}</div>
+      <div style={{ fontSize: 14, fontWeight: 800, marginTop: 4, overflowWrap: 'anywhere' }}>{value}</div>
     </div>
   );
 }
