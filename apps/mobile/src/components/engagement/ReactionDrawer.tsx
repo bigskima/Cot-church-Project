@@ -4,10 +4,11 @@ import { useTheme } from '@/state/theme';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { Icon } from '../primitives/Icon';
 
+// Keys match the backend reaction contract. Labels remain church-friendly presentation copy.
 const reactions = [
-  { key: 'amen', label: 'Amen', icon: 'heart' },
+  { key: 'like', label: 'Amen', icon: 'heart' },
   { key: 'pray', label: 'Pray', icon: 'hand-left-outline' },
-  { key: 'praise', label: 'Praise', icon: 'sparkles-outline' },
+  { key: 'celebrate', label: 'Praise', icon: 'sparkles-outline' },
   { key: 'support', label: 'Support', icon: 'people-outline' },
 ];
 
@@ -17,25 +18,16 @@ export interface ReactionDrawerProps {
 }
 
 export function ReactionDrawer({ currentReaction, onReact }: ReactionDrawerProps) {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
 
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          backgroundColor: colors.card,
-          borderColor: colors.border,
-        },
-        shadows.sm,
-      ]}
-    >
-      {reactions.map((r) => {
-        const isSelected = currentReaction === r.key;
+    <View style={[styles.container, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+      {reactions.map((reaction) => {
+        const isSelected = currentReaction === reaction.key;
         return (
           <Pressable
-            key={r.key}
-            onPress={() => onReact(r.key)}
+            key={reaction.key}
+            onPress={() => onReact(reaction.key)}
             style={({ pressed }) => [
               styles.pill,
               {
@@ -45,21 +37,10 @@ export function ReactionDrawer({ currentReaction, onReact }: ReactionDrawerProps
               pressed && styles.pressed,
             ]}
             accessibilityRole="button"
-            accessibilityLabel={`React ${r.label}`}
+            accessibilityLabel={`React ${reaction.label}`}
           >
-            <Icon
-              name={r.icon}
-              size={15}
-              color={isSelected ? colors.interactive : colors.textSecondary}
-            />
-            <Text
-              style={[
-                styles.label,
-                { color: isSelected ? colors.interactive : colors.textSecondary },
-              ]}
-            >
-              {r.label}
-            </Text>
+            <Icon name={reaction.icon} size={15} color={isSelected ? colors.interactive : colors.textSecondary} />
+            <Text style={[styles.label, { color: isSelected ? colors.interactive : colors.textSecondary }]}>{reaction.label}</Text>
           </Pressable>
         );
       })}
@@ -68,30 +49,8 @@ export function ReactionDrawer({ currentReaction, onReact }: ReactionDrawerProps
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    gap: 4,
-  },
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  pressed: {
-    transform: [{ scale: 0.95 }],
-  },
+  container: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingHorizontal: spacing.sm, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, gap: 4 },
+  pill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill, borderWidth: 1 },
+  label: { fontSize: 12, fontWeight: '700' },
+  pressed: { transform: [{ scale: 0.95 }] },
 });
