@@ -1,10 +1,11 @@
 import React from 'react';
 import { StyleSheet, Text, View, StyleProp, ViewStyle } from 'react-native';
-import { radius, spacing } from '@/design-system/tokens';
+import { radius } from '@/design-system/tokens';
 
 export type BadgeVariant =
   | 'live'
   | 'primary'
+  | 'active'
   | 'success'
   | 'warning'
   | 'info'
@@ -38,6 +39,7 @@ export function Badge({
           text: { color: '#E5484D' },
           dot: '#E5484D',
         };
+      case 'active':
       case 'success':
         return {
           container: { backgroundColor: 'rgba(22, 163, 106, 0.12)', borderColor: 'rgba(22, 163, 106, 0.3)', borderWidth: 1 },
@@ -83,58 +85,21 @@ export function Badge({
   const v = getStyles();
 
   return (
-    <View
-      style={[
-        styles.base,
-        size === 'md' ? styles.sizeMd : styles.sizeSm,
-        v.container,
-        style,
-      ]}
-    >
+    <View style={[styles.base, size === 'md' ? styles.sizeMd : styles.sizeSm, v.container, style]}>
       {pulse && <View style={[styles.pulseDot, { backgroundColor: v.dot }]} />}
       {icon && <View style={styles.iconContainer}>{icon}</View>}
-      <Text style={[styles.text, size === 'md' ? styles.textMd : styles.textSm, v.text]}>
-        {label}
-      </Text>
+      <Text style={[styles.text, size === 'md' ? styles.textMd : styles.textSm, v.text]}>{label}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  base: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: radius.sm,
-    alignSelf: 'flex-start',
-  },
-  sizeSm: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-  },
-  sizeMd: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  pulseDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 5,
-  },
-  iconContainer: {
-    marginRight: 4,
-  },
-  text: {
-    fontWeight: '700',
-    letterSpacing: 0.3,
-    textTransform: 'uppercase',
-  },
-  textSm: {
-    fontSize: 10,
-    lineHeight: 13,
-  },
-  textMd: {
-    fontSize: 11,
-    lineHeight: 15,
-  },
+  base: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.sm, alignSelf: 'flex-start' },
+  sizeSm: { paddingHorizontal: 7, paddingVertical: 2 },
+  sizeMd: { paddingHorizontal: 10, paddingVertical: 4 },
+  pulseDot: { width: 6, height: 6, borderRadius: 3, marginRight: 5 },
+  iconContainer: { marginRight: 4 },
+  text: { fontWeight: '700', letterSpacing: 0.3, textTransform: 'uppercase' },
+  textSm: { fontSize: 10, lineHeight: 13 },
+  textMd: { fontSize: 11, lineHeight: 15 },
 });
