@@ -3,6 +3,7 @@ import React from 'react';
 export type AdminBadgeVariant =
   | 'active'
   | 'healthy'
+  | 'success'
   | 'live'
   | 'degraded'
   | 'suspended'
