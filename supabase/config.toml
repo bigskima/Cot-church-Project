@@ -52,6 +52,12 @@ verify_jwt = false
 [functions.public-birthdays]
 verify_jwt = false
 
+# Visitors and authenticated accounts without an Expression can submit prayer
+# petitions. The handler performs optional bearer validation, church resolution,
+# rate limiting, confidentiality filtering, and moderator authorization itself.
+[functions.prayer-requests]
+verify_jwt = false
+
 [functions.public-giving]
 verify_jwt = false
 
