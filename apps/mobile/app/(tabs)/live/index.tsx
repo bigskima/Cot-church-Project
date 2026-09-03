@@ -17,30 +17,36 @@ import {
 import { spacing } from '@/design-system/tokens';
 import type { LiveStream } from '@/types/content';
 
-const organization = process.env.EXPO_PUBLIC_ORGANIZATION_ID;
+type LiveHomePayload = {
+  streams: LiveStream[];
+  mode: 'general' | 'expression';
+  degradedSections?: string[];
+};
 
 export default function LiveDiscoveryScreen() {
   const insets = useSafeAreaInsets();
-  const { api, mode } = useSession();
+  const { api, context } = useSession();
   const { colors } = useTheme();
 
-  const publicBase = organization
-    ? `public-content?organizationId=${organization}&type=streams`
-    : 'public-content?type=streams';
+  const organization = context?.organization ?? context?.organizations?.[0];
+  const expression = context?.expression;
+  const query = new URLSearchParams();
+  if (organization?.id) query.set('organizationId', organization.id);
+  if (expression?.id) query.set('expressionId', expression.id);
 
-  const resource = useResource<LiveStream[]>('live:discovery', (signal) =>
-    api.request<LiveStream[]>(
-      mode === 'visitor' ? publicBase : 'live-streams',
-      { signal }
-    )
+  // Use the same scope resolver as Home. General live content is always retained;
+  // selecting an active Expression adds that Expression's permitted broadcasts.
+  const resource = useResource<LiveHomePayload>(
+    `live:discovery:${organization?.id ?? 'default'}:${expression?.id ?? 'general'}`,
+    (signal) => api.request<LiveHomePayload>(`home-feed${query.size ? `?${query.toString()}` : ''}`, { signal })
   );
 
-  const openStream = (id: string) =>
-    router.push(`/(tabs)/live/${id}` as any);
+  const openStream = (id: string) => router.push(`/(tabs)/live/${id}` as any);
 
-  const liveStreams = resource.data?.filter((item) => item.status === 'live') ?? [];
-  const scheduledStreams = resource.data?.filter((item) => item.status === 'scheduled' || item.status === 'ready') ?? [];
-  const replays = resource.data?.filter((item) => item.status === 'ended') ?? [];
+  const streams = resource.data?.streams ?? [];
+  const liveStreams = streams.filter((item) => item.status === 'live');
+  const scheduledStreams = streams.filter((item) => item.status === 'scheduled' || item.status === 'ready');
+  const replays = streams.filter((item) => item.status === 'ended');
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -60,12 +66,12 @@ export default function LiveDiscoveryScreen() {
       >
         <ScreenHeader
           title="Live Broadcasts"
-          subtitle="Join live worship services, prayer sessions, and watch past service replays."
+          subtitle={expression?.name ? `General Community and ${expression.name} broadcasts.` : 'Live services and replays available to the General Community.'}
           showBack
         />
 
         <View style={styles.body}>
-          {resource.loading ? (
+          {resource.loading && !resource.data ? (
             <View style={styles.loadingWrapper}>
               <Skeleton height={200} />
               <Skeleton height={140} />
@@ -74,7 +80,6 @@ export default function LiveDiscoveryScreen() {
             <ResourceError message={resource.error} retry={resource.refresh} />
           ) : (
             <>
-              {/* Featured Active Broadcast */}
               {liveStreams.length > 0 ? (
                 <View style={styles.sectionWrap}>
                   <SectionHeader title="Broadcasting Now" />
@@ -85,12 +90,8 @@ export default function LiveDiscoveryScreen() {
                 </View>
               ) : null}
 
-              {/* Upcoming Broadcasts Carousel */}
               <View style={styles.sectionWrap}>
-                <SectionHeader
-                  title="Upcoming Services"
-                  badge={scheduledStreams.length}
-                />
+                <SectionHeader title="Upcoming" badge={scheduledStreams.length} />
                 {scheduledStreams.length > 0 ? (
                   <ScrollView
                     horizontal
@@ -98,37 +99,28 @@ export default function LiveDiscoveryScreen() {
                     contentContainerStyle={styles.carouselContainer}
                   >
                     {scheduledStreams.map((stream) => (
-                      <LiveCard
-                        key={stream.id}
-                        stream={stream}
-                        onPress={() => openStream(stream.id)}
-                      />
+                      <LiveCard key={stream.id} stream={stream} onPress={() => openStream(stream.id)} />
                     ))}
                   </ScrollView>
                 ) : (
                   <EmptyState
                     title="No Upcoming Broadcasts"
-                    message="Check back soon for upcoming Sunday services and midweek fellowships."
+                    message="No upcoming live broadcasts have been scheduled yet."
                     iconName="radio-outline"
                   />
                 )}
               </View>
 
-              {/* Replay Archives */}
               {replays.length > 0 ? (
                 <View style={styles.sectionWrap}>
-                  <SectionHeader title="Past Broadcast Replays" badge={replays.length} />
+                  <SectionHeader title="Recent Replays" badge={replays.length} />
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.carouselContainer}
                   >
                     {replays.map((stream) => (
-                      <LiveCard
-                        key={stream.id}
-                        stream={stream}
-                        onPress={() => openStream(stream.id)}
-                      />
+                      <LiveCard key={stream.id} stream={stream} onPress={() => openStream(stream.id)} />
                     ))}
                   </ScrollView>
                 </View>
@@ -142,24 +134,10 @@ export default function LiveDiscoveryScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  content: {
-    flexGrow: 1,
-  },
-  body: {
-    paddingHorizontal: spacing.lg,
-    gap: spacing.lg,
-  },
-  loadingWrapper: {
-    gap: spacing.md,
-  },
-  sectionWrap: {
-    gap: spacing.xs,
-  },
-  carouselContainer: {
-    gap: spacing.md,
-    paddingVertical: spacing.xs,
-  },
+  screen: { flex: 1 },
+  content: { flexGrow: 1 },
+  body: { paddingHorizontal: spacing.lg, gap: spacing.lg },
+  loadingWrapper: { gap: spacing.md },
+  sectionWrap: { gap: spacing.xs },
+  carouselContainer: { gap: spacing.md, paddingVertical: spacing.xs },
 });
