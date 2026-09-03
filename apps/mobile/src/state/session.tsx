@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
-import { ApiClient, apiUrl, loadAuth, saveAuth, type StoredAuth } from '../api';
+import { ApiClient, ApiError, apiUrl, loadAuth, saveAuth, type StoredAuth } from '../api';
 import type { MembershipContext } from '../types/content';
 
 type Mode = 'restoring' | 'visitor' | 'authenticated';
@@ -92,22 +92,61 @@ export function SessionProvider({ children }: PropsWithChildren) {
   };
 
   useEffect(() => {
-    if (mode !== 'authenticated') return;
-    api
-      .request<MembershipContext>('organization-context')
-      .then((value) => {
+    if (mode !== 'authenticated' || !auth) return;
+    let cancelled = false;
+
+    const loadContext = async () => {
+      try {
+        const value = await api.request<MembershipContext>('organization-context');
+        if (cancelled) return;
         setContext(value);
-        if (!auth?.organizationId && value.organizations[0]) {
-          const membership = value.organizations[0].memberships?.[0];
-          void persist({
-            ...auth!,
-            organizationId: value.organizations[0].id,
-            branchId: membership?.branch_id,
+
+        const selectedOrganizationStillAvailable = !auth.organizationId || value.organizations.some((item) => item.id === auth.organizationId);
+        if (!selectedOrganizationStillAvailable) {
+          await persist({ ...auth, organizationId: undefined, branchId: undefined });
+          return;
+        }
+
+        // A disabled/removed Expression must never remain in local auth just because it
+        // was selected previously. Falling back to the organization keeps General
+        // Community available while respecting Platform governance.
+        if (auth.branchId && !value.expression?.id) {
+          await persist({ ...auth, branchId: undefined });
+          return;
+        }
+
+        if (!auth.organizationId && value.organizations[0]) {
+          const firstOrganization = value.organizations[0];
+          const activeBranchId = firstOrganization.memberships?.find((membership) => membership.branch_id)?.branch_id;
+          await persist({
+            ...auth,
+            organizationId: firstOrganization.id,
+            branchId: activeBranchId || undefined,
           });
         }
-      })
-      .catch(() => setContext(null));
-  }, [mode, auth?.organizationId, api, persist]);
+      } catch (error) {
+        if (cancelled) return;
+        if (error instanceof ApiError) {
+          if (auth.branchId && ['EXPRESSION_UNAVAILABLE', 'BRANCH_ACCESS_DENIED'].includes(error.code)) {
+            setContext(null);
+            await persist({ ...auth, branchId: undefined });
+            return;
+          }
+          if (auth.organizationId && error.code === 'ORGANIZATION_ACCESS_DENIED') {
+            setContext(null);
+            await persist({ ...auth, organizationId: undefined, branchId: undefined });
+            return;
+          }
+        }
+        setContext(null);
+      }
+    };
+
+    void loadContext();
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, auth, api, persist]);
 
   const permissions = useMemo(() => context?.effectivePermissions ?? [], [context]);
 
