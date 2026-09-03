@@ -4,7 +4,9 @@ import { useTheme } from '@/state/theme';
 import { radius, spacing } from '@/design-system/tokens';
 import { Avatar } from '../primitives/Avatar';
 import { Icon } from '../primitives/Icon';
-import type { Post, SocialPost } from '@/types/content';
+import { AudioPlayer } from '../media/AudioPlayer';
+import { VideoPlayer } from '../media/VideoPlayer';
+import type { MediaAsset, Post, SocialPost } from '@/types/content';
 
 type PublicIdentityBadge = {
   id?: string;
@@ -32,6 +34,15 @@ export interface PostCardProps {
   onShare?: () => void;
   style?: StyleProp<ViewStyle>;
   dark?: boolean;
+}
+
+function mediaKind(media: MediaAsset) {
+  return media.type ?? media.media_type;
+}
+
+function mediaTitle(media: MediaAsset, fallback: string) {
+  const item = media as MediaAsset & { fileName?: string | null; filename?: string | null };
+  return item.fileName || item.filename || fallback;
 }
 
 export function PostCard({
@@ -81,8 +92,13 @@ export function PostCard({
   };
 
   const handleNativeShare = async () => {
+    const text = post.body?.trim();
+    const mediaCount = post.media?.length ?? 0;
+    const message = text
+      ? `${displayName} on Church: “${text}”`
+      : `${displayName} shared ${mediaCount > 1 ? `${mediaCount} media items` : 'media'} on Church.`;
     try {
-      await Share.share({ message: `${displayName} on Church: "${post.body}"` });
+      await Share.share({ message });
       onShare?.();
     } catch {
       // The native share sheet can be dismissed without changing post state.
@@ -98,7 +114,7 @@ export function PostCard({
     return `${Math.floor(diff / 86400)}d`;
   };
 
-  const mediaItem = post.media?.[0];
+  const media = Array.isArray(post.media) ? post.media.filter((item) => Boolean(item?.url)) : [];
 
   return (
     <Pressable onPress={onPress} style={[styles.container, { backgroundColor: colors.bg, borderBottomColor: colors.borderSubtle }, style]}>
@@ -127,11 +143,43 @@ export function PostCard({
           </View>
         ) : null}
 
-        <Text style={[styles.bodyText, { color: colors.text }]}>{post.body}</Text>
+        {post.body?.trim() ? <Text style={[styles.bodyText, { color: colors.text }]}>{post.body}</Text> : null}
 
-        {mediaItem?.url ? (
-          <View style={[styles.mediaFrame, { backgroundColor: colors.bgSecondary }]}>
-            <Image source={{ uri: mediaItem.url }} style={styles.mediaImage} resizeMode="cover" />
+        {media.length ? (
+          <View style={styles.mediaList}>
+            {media.map((item, index) => {
+              const kind = mediaKind(item);
+              const key = item.id || (item as any).uploadId || `${kind || 'media'}-${index}-${item.url}`;
+              if (kind === 'video') {
+                return (
+                  <View key={key} style={[styles.richMediaFrame, { borderColor: colors.borderSubtle }]}>
+                    <VideoPlayer
+                      title={mediaTitle(item, 'Community video')}
+                      sourceUrl={item.url}
+                      posterUrl={item.thumbnailUrl}
+                      durationSeconds={item.duration_seconds}
+                    />
+                  </View>
+                );
+              }
+              if (kind === 'audio') {
+                return (
+                  <AudioPlayer
+                    key={key}
+                    title={mediaTitle(item, 'Community audio')}
+                    speaker={displayName}
+                    sourceUrl={item.url}
+                    durationSeconds={item.duration_seconds}
+                    style={styles.audioPlayer}
+                  />
+                );
+              }
+              return (
+                <View key={key} style={[styles.mediaFrame, { backgroundColor: colors.bgSecondary }]}>
+                  <Image source={{ uri: item.url! }} style={styles.mediaImage} resizeMode="cover" accessibilityLabel={item.alt || 'Community post image'} />
+                </View>
+              );
+            })}
           </View>
         ) : null}
 
@@ -177,8 +225,11 @@ const styles = StyleSheet.create({
   identityBadgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.2 },
   expressionText: { fontSize: 11, fontWeight: '600', maxWidth: 160 },
   bodyText: { fontSize: 15, lineHeight: 21, marginTop: 2 },
-  mediaFrame: { width: '100%', aspectRatio: 16 / 9, borderRadius: radius.md, overflow: 'hidden', marginTop: spacing.sm },
+  mediaList: { gap: spacing.sm, marginTop: spacing.sm },
+  mediaFrame: { width: '100%', aspectRatio: 16 / 9, borderRadius: radius.md, overflow: 'hidden' },
   mediaImage: { width: '100%', height: '100%' },
+  richMediaFrame: { width: '100%', overflow: 'hidden', borderRadius: radius.md, borderWidth: 1 },
+  audioPlayer: { width: '100%' },
   actionRail: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm, paddingRight: spacing.xl },
   actionButton: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: 6 },
   actionCount: { fontSize: 12, fontWeight: '500' },
