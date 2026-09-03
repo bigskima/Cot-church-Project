@@ -23,3 +23,43 @@ port = 54323
 [storage]
 enabled = true
 file_size_limit = "50MiB"
+
+# Edge Function gateway policy is explicit so production deploys cannot silently
+# re-enable JWT verification on endpoints that must be callable before a user
+# has a session. Application-level handlers still perform their own validation,
+# rate limiting, webhook verification, or worker-secret verification as relevant.
+[functions.login]
+verify_jwt = false
+
+[functions.signup]
+verify_jwt = false
+
+[functions.verify-otp]
+verify_jwt = false
+
+[functions.password-recovery]
+verify_jwt = false
+
+[functions.health]
+verify_jwt = false
+
+[functions.public-content]
+verify_jwt = false
+
+[functions.branding]
+verify_jwt = false
+
+[functions.church-story]
+verify_jwt = false
+
+[functions.payment-events]
+verify_jwt = false
+
+[functions.streaming-webhook]
+verify_jwt = false
+
+[functions.notification-dispatch]
+verify_jwt = false
+
+[functions.workflow-dispatch]
+verify_jwt = false
