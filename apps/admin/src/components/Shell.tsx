@@ -6,6 +6,7 @@ import { OrganizationsGovernance } from '../pages/OrganizationsGovernance';
 import { ExpressionsGovernance } from '../pages/ExpressionsGovernance';
 import { UserGovernance } from '../pages/UserGovernance';
 import { BrandingAppearance } from '../pages/BrandingAppearance';
+import { GivingConfiguration } from '../pages/GivingConfiguration';
 import { StreamingInfrastructure } from '../pages/StreamingInfrastructure';
 import { AiInfrastructure } from '../pages/AiInfrastructure';
 import { PaymentInfrastructure } from '../pages/PaymentInfrastructure';
@@ -22,6 +23,7 @@ const navSections = [
       { key: 'expressions', label: 'Expression Campuses', icon: '🌿' },
       { key: 'users', label: 'Global Identities', icon: '👥' },
       { key: 'branding', label: 'Branding & Identity', icon: '🎨' },
+      { key: 'giving', label: 'Church-wide Giving', icon: '🎁' },
       { key: 'features', label: 'Tenant Feature Flags', icon: '⚑' },
     ],
   },
@@ -109,6 +111,8 @@ export function Shell({
         return <UserGovernance api={api} />;
       case 'branding':
         return <BrandingAppearance api={api} />;
+      case 'giving':
+        return <GivingConfiguration api={api} />;
       case 'streaming':
         return <StreamingInfrastructure api={api} />;
       case 'ai':
