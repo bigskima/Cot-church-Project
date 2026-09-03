@@ -1,8 +1,56 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { ApiError } from "../_shared/errors.ts";
-import { authorize } from "../_shared/context.ts";
 import { createHandler } from "../_shared/handler.ts";
-import { jsonBody } from "../_shared/request.ts";
-import { assertNoUnknownFields,assertObject,optionalString,requiredString,uuid } from "../_shared/validation.ts";
-const statuses=new Set(["draft","scheduled","live","ended","cancelled","archived"]),visibilities=new Set(["public","organization","branch","group","private"]);
-Deno.serve(createHandler({methods:["GET","POST","PATCH"],authentication:"required",organization:"required"},async({request,auth})=>{if(!auth?.organizationId)throw new ApiError("ORGANIZATION_REQUIRED","Organization context is required",400);if(request.method==="GET"){const{data,error}=await auth.client.from("live_streams").select("id,branch_id,group_id,event_id,title,description,status,visibility,provider,playback_url,playback_token_required,scheduled_start,started_at,ended_at,recording_url,thumbnail_url").eq("organization_id",auth.organizationId).order("scheduled_start",{ascending:false}).limit(100);if(error)throw new ApiError("STREAM_LIST_FAILED","Unable to retrieve live streams",500,undefined,false);return{data:data??[]};}await authorize(auth,"streams.manage");const body=assertObject(await jsonBody(request));assertNoUnknownFields(body,["id","branchId","eventId","groupId","title","description","status","visibility","provider","providerStreamId","playbackUrl","playbackTokenRequired","scheduledStart","recordingUrl","thumbnailUrl"]);const record:Record<string,unknown>={};if(request.method==="POST"||body.title!==undefined)record.title=requiredString(body.title,"title",180);if(body.description!==undefined)record.description=optionalString(body.description,"description",10000)??"";for(const[input,output]of[["branchId","branch_id"],["eventId","event_id"],["groupId","group_id"]]as const)if(body[input]!==undefined)record[output]=body[input]===null?null:uuid(String(body[input]),input,true);if(request.method==="POST"||body.provider!==undefined)record.provider=requiredString(body.provider,"provider",50);for(const[input,output]of[["providerStreamId","provider_stream_id"],["playbackUrl","playback_url"],["recordingUrl","recording_url"],["thumbnailUrl","thumbnail_url"],["scheduledStart","scheduled_start"]]as const)if(body[input]!==undefined)record[output]=body[input];if(body.status!==undefined){const value=requiredString(body.status,"status",20);if(!statuses.has(value))throw new ApiError("VALIDATION_FAILED","Invalid stream status",422);record.status=value;if(value==="live")record.started_at=new Date().toISOString();if(value==="ended")record.ended_at=new Date().toISOString();}if(body.visibility!==undefined){const value=requiredString(body.visibility,"visibility",20);if(!visibilities.has(value))throw new ApiError("VALIDATION_FAILED","Invalid visibility",422);record.visibility=value;}if(body.playbackTokenRequired!==undefined){if(typeof body.playbackTokenRequired!=="boolean")throw new ApiError("VALIDATION_FAILED","playbackTokenRequired must be boolean",422);record.playback_token_required=body.playbackTokenRequired;}if(request.method==="POST"){Object.assign(record,{organization_id:auth.organizationId,created_by:auth.user.id});const{data,error}=await auth.client.from("live_streams").insert(record).select().single();if(error)throw new ApiError("STREAM_CREATE_FAILED","Unable to create stream",500,undefined,false);return{data,status:201};}const id=uuid(requiredString(body.id,"id",36),"id",true)!;const{data,error}=await auth.client.from("live_streams").update(record).eq("id",id).eq("organization_id",auth.organizationId).select().single();if(error)throw new ApiError("STREAM_UPDATE_FAILED","Unable to update stream",500,undefined,false);return{data};}));
+import { uuid } from "../_shared/validation.ts";
+
+const scopes = new Set(["all", "expression", "church"]);
+
+Deno.serve(createHandler(
+  { methods: ["GET", "POST", "PATCH"], authentication: "required", organization: "required" },
+  async ({ request, auth }) => {
+    if (!auth?.organizationId) throw new ApiError("ORGANIZATION_REQUIRED", "Organization context is required", 400);
+
+    if (request.method !== "GET") {
+      throw new ApiError(
+        "STREAMING_ADAPTER_REQUIRED",
+        "Live broadcasts must be created and operated through the configured third-party streaming provider",
+        409
+      );
+    }
+
+    const url = new URL(request.url);
+    const scope = url.searchParams.get("scope") ?? "all";
+    if (!scopes.has(scope)) throw new ApiError("VALIDATION_FAILED", "Invalid stream scope", 422);
+
+    const expressionParam = url.searchParams.get("expressionId");
+    const expressionId = expressionParam ? uuid(expressionParam, "expressionId", true)! : null;
+    if (scope === "expression" && !auth.branchId && !expressionId) {
+      throw new ApiError("EXPRESSION_REQUIRED", "Select an Expression to view its streams", 400);
+    }
+    if (auth.branchId && expressionId && auth.branchId !== expressionId) {
+      throw new ApiError("EXPRESSION_SCOPE_DENIED", "The requested Expression does not match the selected context", 403);
+    }
+
+    let query = auth.client
+      .from("live_streams")
+      .select("id,organization_id,branch_id,group_id,event_id,title,description,status,visibility,provider,playback_url,playback_token_required,scheduled_start,started_at,ended_at,recording_url,thumbnail_url,latency_mode,created_at")
+      .eq("organization_id", auth.organizationId)
+      .order("scheduled_start", { ascending: false, nullsFirst: false })
+      .limit(100);
+
+    if (scope === "expression") query = query.eq("branch_id", expressionId ?? auth.branchId!);
+    if (scope === "church") query = query.is("branch_id", null);
+    if (expressionId && scope === "all") query = query.eq("branch_id", expressionId);
+
+    const { data, error } = await query;
+    if (error) throw new ApiError("STREAM_LIST_FAILED", "Unable to retrieve live streams", 500, undefined, false);
+
+    return {
+      data: (data ?? []).map((stream) => ({
+        ...stream,
+        playback_url: stream.playback_token_required ? null : stream.playback_url,
+        recording_url: stream.playback_token_required ? null : stream.recording_url,
+      })),
+    };
+  },
+));
