@@ -62,6 +62,7 @@ export default function ProfileScreen() {
         <View style={styles.sectionWrap}>
           <SectionHeader title="Account & Community" />
           <View style={styles.linksList}>
+            {mode === 'authenticated' ? serviceTile('/(tabs)/profile/settings', 'person-circle-outline', 'Account Settings', 'Edit your name, username, birthday, bio, phone, and profile photo') : null}
             {mode === 'authenticated' ? serviceTile('/(tabs)/profile/notifications', 'notifications-outline', 'Notifications & Invitations', 'Accept or decline role invitations and view church updates') : null}
             {serviceTile('/(tabs)/profile/prayer', 'heart-outline', 'Prayer Petitions & Wall', 'Submit private pastoral requests or view community prayer items')}
             {serviceTile('/(tabs)/profile/giving', 'gift-outline', 'Giving & Statements', 'View the configured church or Expression giving destinations and receipts')}
