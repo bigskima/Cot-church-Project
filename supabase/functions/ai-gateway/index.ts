@@ -26,11 +26,11 @@ const adapterMethod: Record<string, string> = {
   "admin.insight": "generateStructuredData",
 };
 
-async function requireActiveMembership(auth: NonNullable<Parameters<Parameters<typeof createHandler>[1]>[0]["auth"]>) {
+async function requireActiveMembership(auth: any) {
   const { data, error } = await auth.client
     .from("memberships")
     .select("id")
-    .eq("organization_id", auth.organizationId!)
+    .eq("organization_id", auth.organizationId)
     .eq("profile_id", auth.user.id)
     .eq("status", "active")
     .maybeSingle();
@@ -102,7 +102,7 @@ Deno.serve(createHandler(
   { methods: ["GET", "POST"], authentication: "required", organization: "required" },
   async ({ request, auth }) => {
     if (!auth?.organizationId) throw new ApiError("ORGANIZATION_REQUIRED", "Organization context is required", 400);
-    await requireActiveMembership(auth as any);
+    await requireActiveMembership(auth);
 
     if (request.method === "GET") {
       const url = new URL(request.url);
@@ -135,11 +135,7 @@ Deno.serve(createHandler(
         auth.client.from("events").select("title,starts_at,ends_at,location,visibility").eq("organization_id", auth.organizationId).gte("ends_at", new Date().toISOString()).limit(30),
         auth.client.from("announcements").select("title,body,published_at").eq("organization_id", auth.organizationId).eq("status", "published").limit(20),
       ]);
-      verifiedContext = JSON.stringify({
-        branches: branches.data ?? [],
-        events: events.data ?? [],
-        announcements: announcements.data ?? [],
-      });
+      verifiedContext = JSON.stringify({ branches: branches.data ?? [], events: events.data ?? [], announcements: announcements.data ?? [] });
     }
 
     const system = `You are the church platform assistant. Use only verified tenant-scoped context. Never invent people, times, policies or pastoral claims. Never reveal private prayer, counselling, giving or attendance records. If uncertain, say so. Verified context: ${verifiedContext}`;
