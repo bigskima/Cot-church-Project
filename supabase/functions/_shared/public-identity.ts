@@ -1,6 +1,6 @@
 import { adminClient } from "./supabase.ts";
 
-type SocialPostRow = Record<string, any> & { author_membership_id?: string | null; branch_id?: string | null; organization_id?: string | null };
+type MembershipAuthoredRow = Record<string, any> & { author_membership_id?: string | null; branch_id?: string | null; organization_id?: string | null };
 
 type PublicBadge = {
   id: string;
@@ -11,16 +11,13 @@ type PublicBadge = {
   priority: number;
 };
 
-export async function enrichSocialPosts<T extends SocialPostRow>(posts: T[]): Promise<Array<T & Record<string, unknown>>> {
-  if (!posts.length) return posts;
+async function enrichMembershipAuthors<T extends MembershipAuthoredRow>(rows: T[]): Promise<Array<T & Record<string, unknown>>> {
+  if (!rows.length) return rows;
   const admin = adminClient();
-  const membershipIds = [...new Set(posts.map((post) => post.author_membership_id).filter(Boolean))] as string[];
-  if (!membershipIds.length) return posts;
+  const membershipIds = [...new Set(rows.map((row) => row.author_membership_id).filter(Boolean))] as string[];
+  if (!membershipIds.length) return rows;
 
-  const { data: memberships } = await admin
-    .from("memberships")
-    .select("id,organization_id,branch_id,profile_id,status")
-    .in("id", membershipIds);
+  const { data: memberships } = await admin.from("memberships").select("id,organization_id,branch_id,profile_id,status").in("id", membershipIds);
   const activeMemberships = (memberships ?? []).filter((membership) => membership.status === "active");
   const membershipMap = new Map(activeMemberships.map((membership) => [membership.id, membership]));
   const profileIds = [...new Set(activeMemberships.map((membership) => membership.profile_id))];
@@ -61,24 +58,22 @@ export async function enrichSocialPosts<T extends SocialPostRow>(posts: T[]): Pr
     priority: Number(definition.priority ?? 0),
   });
 
-  return posts.map((post) => {
-    const membership = post.author_membership_id ? membershipMap.get(post.author_membership_id) : null;
-    if (!membership) return post;
+  return rows.map((row) => {
+    const membership = row.author_membership_id ? membershipMap.get(row.author_membership_id) : null;
+    if (!membership) return row;
     const profile = profileMap.get(membership.profile_id);
     const badges: PublicBadge[] = [];
     const membershipDefault = defaultByOrg.get(membership.organization_id);
     if (membership.branch_id && membershipDefault) badges.push(toBadge(membershipDefault));
     for (const assignment of assignedByProfile.get(membership.profile_id) ?? []) {
       if (assignment.branch_id !== membership.branch_id) continue;
-      const definition = Array.isArray(assignment.identity_badge_definitions)
-        ? assignment.identity_badge_definitions[0]
-        : assignment.identity_badge_definitions;
+      const definition = Array.isArray(assignment.identity_badge_definitions) ? assignment.identity_badge_definitions[0] : assignment.identity_badge_definitions;
       if (definition) badges.push(toBadge(definition));
     }
     badges.sort((a, b) => b.priority - a.priority);
 
     return {
-      ...post,
+      ...row,
       author: profile ? {
         id: profile.id,
         displayName: profile.display_name,
@@ -91,3 +86,6 @@ export async function enrichSocialPosts<T extends SocialPostRow>(posts: T[]): Pr
     };
   });
 }
+
+export const enrichSocialPosts = enrichMembershipAuthors;
+export const enrichSocialComments = enrichMembershipAuthors;
