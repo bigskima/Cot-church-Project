@@ -69,3 +69,9 @@ verify_jwt = false
 
 [functions.workflow-dispatch]
 verify_jwt = false
+
+# Sermon playback supports genuinely public published sermons for visitors. The
+# handler performs its own RLS-based visibility check before issuing a provider
+# playback grant, and authenticates bearer sessions when one is supplied.
+[functions.sermon-playback]
+verify_jwt = false
