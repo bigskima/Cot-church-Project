@@ -54,23 +54,9 @@ export function PostCard({
   const author = postAsAny.author ?? {};
   const expressionLabel = expressionName || postAsAny.expression?.name || undefined;
 
-  const displayName =
-    authorName ||
-    author.displayName ||
-    author.display_name ||
-    postAsAny.author_name ||
-    'Church Member';
-  const handle =
-    authorHandle ||
-    author.username ||
-    author.handle ||
-    postAsAny.author_handle ||
-    undefined;
-  const avatarUrl =
-    authorAvatar ||
-    author.avatarUrl ||
-    author.avatar_url ||
-    postAsAny.author_avatar;
+  const displayName = authorName || author.displayName || author.display_name || postAsAny.author_name || 'Church Member';
+  const handle = authorHandle || author.username || author.handle || postAsAny.author_handle || undefined;
+  const avatarUrl = authorAvatar || author.avatarUrl || author.avatar_url || postAsAny.author_avatar;
   const isVerified = author.isVerified || author.is_verified || postAsAny.is_verified || false;
   const badges: PublicIdentityBadge[] = Array.isArray(author.badges) ? author.badges : [];
 
@@ -79,15 +65,11 @@ export function PostCard({
   const [hasSaved, setHasSaved] = useState(false);
 
   const handleLike = () => {
-    if (hasLiked) {
-      setHasLiked(false);
-      setLikeCount((count: number) => Math.max(0, count - 1));
-    } else {
-      setHasLiked(true);
-      setLikeCount((count: number) => count + 1);
-      onReact?.('like');
-      onLike?.();
-    }
+    if (hasLiked) return;
+    setHasLiked(true);
+    setLikeCount((count: number) => count + 1);
+    onReact?.('like');
+    onLike?.();
   };
 
   const handleSave = () => {
@@ -118,11 +100,7 @@ export function PostCard({
   return (
     <Pressable
       onPress={onPress}
-      style={[
-        styles.container,
-        { backgroundColor: colors.bg, borderBottomColor: colors.borderSubtle },
-        style,
-      ]}
+      style={[styles.container, { backgroundColor: colors.bg, borderBottomColor: colors.borderSubtle }, style]}
     >
       <Pressable onPress={onPressAuthor || onPress} style={styles.avatarColumn}>
         <Avatar name={displayName} url={avatarUrl} size="md" />
@@ -131,15 +109,9 @@ export function PostCard({
       <View style={styles.contentColumn}>
         <View style={styles.authorRow}>
           <Pressable onPress={onPressAuthor || onPress} style={styles.nameGroup}>
-            <Text style={[styles.displayName, { color: colors.text }]} numberOfLines={1}>
-              {displayName}
-            </Text>
+            <Text style={[styles.displayName, { color: colors.text }]} numberOfLines={1}>{displayName}</Text>
             {isVerified ? <Icon name="checkmark-circle" size={14} color={colors.interactive} style={styles.verifiedIcon} /> : null}
-            {handle ? (
-              <Text style={[styles.handleText, { color: colors.textMuted }]} numberOfLines={1}>
-                @{handle}
-              </Text>
-            ) : null}
+            {handle ? <Text style={[styles.handleText, { color: colors.textMuted }]} numberOfLines={1}>@{handle}</Text> : null}
           </Pressable>
           <Text style={[styles.timestamp, { color: colors.textMuted }]}>· {formatTime()}</Text>
         </View>
@@ -147,18 +119,11 @@ export function PostCard({
         {badges.length || expressionLabel ? (
           <View style={styles.identityMetaRow}>
             {badges.map((badge, index) => (
-              <View
-                key={badge.id || badge.code || `${badge.label}-${index}`}
-                style={[styles.identityBadge, { backgroundColor: badge.backgroundColor }]}
-              >
+              <View key={badge.id || badge.code || `${badge.label}-${index}`} style={[styles.identityBadge, { backgroundColor: badge.backgroundColor }]}>
                 <Text style={[styles.identityBadgeText, { color: badge.textColor }]}>{badge.label}</Text>
               </View>
             ))}
-            {expressionLabel ? (
-              <Text style={[styles.expressionText, { color: colors.textMuted }]} numberOfLines={1}>
-                {expressionLabel}
-              </Text>
-            ) : null}
+            {expressionLabel ? <Text style={[styles.expressionText, { color: colors.textMuted }]} numberOfLines={1}>{expressionLabel}</Text> : null}
           </View>
         ) : null}
 
@@ -171,47 +136,21 @@ export function PostCard({
         ) : null}
 
         <View style={styles.actionRail}>
-          <Pressable
-            onPress={onComment || onReply}
-            hitSlop={6}
-            style={styles.actionButton}
-            accessibilityRole="button"
-            accessibilityLabel="Reply to post"
-          >
+          <Pressable onPress={onComment || onReply} hitSlop={6} style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Reply to post">
             <Icon name="chatbubble-outline" size={17} color={colors.textMuted} />
             <Text style={[styles.actionCount, { color: colors.textMuted }]}>{postAsAny.comments_count || 0}</Text>
           </Pressable>
 
-          <Pressable
-            onPress={handleLike}
-            hitSlop={6}
-            style={styles.actionButton}
-            accessibilityRole="button"
-            accessibilityLabel="Like post"
-          >
+          <Pressable onPress={handleLike} hitSlop={6} style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Like post">
             <Icon name={hasLiked ? 'heart' : 'heart-outline'} size={17} color={hasLiked ? colors.live : colors.textMuted} />
-            <Text style={[styles.actionCount, { color: hasLiked ? colors.live : colors.textMuted }]}>
-              {likeCount > 0 ? likeCount : ''}
-            </Text>
+            <Text style={[styles.actionCount, { color: hasLiked ? colors.live : colors.textMuted }]}>{likeCount > 0 ? likeCount : ''}</Text>
           </Pressable>
 
-          <Pressable
-            onPress={handleSave}
-            hitSlop={6}
-            style={styles.actionButton}
-            accessibilityRole="button"
-            accessibilityLabel="Bookmark post"
-          >
+          <Pressable onPress={handleSave} hitSlop={6} style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Bookmark post">
             <Icon name={hasSaved ? 'bookmark' : 'bookmark-outline'} size={17} color={hasSaved ? colors.interactive : colors.textMuted} />
           </Pressable>
 
-          <Pressable
-            onPress={handleNativeShare}
-            hitSlop={6}
-            style={styles.actionButton}
-            accessibilityRole="button"
-            accessibilityLabel="Share post"
-          >
+          <Pressable onPress={handleNativeShare} hitSlop={6} style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Share post">
             <Icon name="share-social-outline" size={17} color={colors.textMuted} />
           </Pressable>
         </View>
