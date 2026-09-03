@@ -17,6 +17,7 @@
     "@expo/vector-icons": "^15.1.1",
     "expo": "latest",
     "expo-constants": "^57.0.16",
+    "expo-image-picker": "~57.0.15",
     "expo-linear-gradient": "latest",
     "expo-linking": "^57.0.8",
     "expo-router": "latest",
