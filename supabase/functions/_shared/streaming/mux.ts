@@ -1,21 +1,163 @@
 import { ApiError } from '../errors.ts';
-import { secretJson,secretValue } from '../secrets.ts';
-import type{BroadcastRequest,PlaybackGrant,ProviderConfiguration,ProviderWebhook,ProvisionedBroadcast,StreamingProvider,StreamLifecycle } from './types.ts';
-type MuxCredentials={tokenId:string;tokenSecret:string};type SigningCredentials={keyId:string;privateKeyPem:string};const api='https://api.mux.com/video/v1';
-function credentials(config:ProviderConfiguration){return secretJson<MuxCredentials>(config.secretReference)}
-async function mux<T>(config:ProviderConfiguration,path:string,init:RequestInit={}){const value=credentials(config),controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20_000);try{const response=await fetch(`${api}${path}`,{...init,signal:controller.signal,headers:{Authorization:`Basic ${btoa(`${value.tokenId}:${value.tokenSecret}`)}`,'Content-Type':'application/json',...init.headers}}),payload=await response.json();if(!response.ok)throw new ApiError('STREAMING_PROVIDER_ERROR',payload.error?.message??`Mux returned ${response.status}`,502,undefined,false);return payload.data as T}finally{clearTimeout(timer)}}
-function lifecycle(type:string):StreamLifecycle|undefined{return({'video.live_stream.created':'provisioning','video.live_stream.connected':'ready','video.live_stream.active':'live','video.live_stream.disconnected':'ended','video.asset.created':'processing','video.asset.ready':'replay_ready','video.asset.errored':'failed','video.live_stream.idle':'ready'}as Record<string,StreamLifecycle>)[type]}
-function base64url(bytes:Uint8Array|string){const input=typeof bytes==='string'?new TextEncoder().encode(bytes):bytes;let binary='';input.forEach(value=>binary+=String.fromCharCode(value));return btoa(binary).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_')}
-async function signJwt(payload:Record<string,unknown>,secret:SigningCredentials){const pem=secret.privateKeyPem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g,'');const binary=Uint8Array.from(atob(pem),char=>char.charCodeAt(0));const key=await crypto.subtle.importKey('pkcs8',binary,{name:'RSASSA-PKCS1-v1_5',hash:'SHA-256'},false,['sign']);const encoded=`${base64url(JSON.stringify({alg:'RS256',typ:'JWT',kid:secret.keyId}))}.${base64url(JSON.stringify(payload))}`;const signature=await crypto.subtle.sign('RSASSA-PKCS1-v1_5',key,new TextEncoder().encode(encoded));return `${encoded}.${base64url(new Uint8Array(signature))}`}
-async function hmac(secret:string,value:string){const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);return [...new Uint8Array(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(value)))].map(byte=>byte.toString(16).padStart(2,'0')).join('')}
-function constantTime(a:string,b:string){if(a.length!==b.length)return false;let result=0;for(let i=0;i<a.length;i++)result|=a.charCodeAt(i)^b.charCodeAt(i);return result===0}
-export class MuxStreamingProvider implements StreamingProvider{readonly code='mux';
- async createBroadcast(config:ProviderConfiguration,request:BroadcastRequest):Promise<ProvisionedBroadcast>{const playbackPolicy=request.visibility==='public'?'public':'signed';const data=await mux<Record<string,any>>(config,'/live-streams',{method:'POST',body:JSON.stringify({playback_policies:[playbackPolicy],new_asset_settings:{playback_policies:[playbackPolicy]},latency_mode:request.latencyMode,reconnect_window:request.reconnectWindowSeconds,test:false})});const playbackId=data.playback_ids?.[0]?.id;return{providerBroadcastId:data.id,ingest:{protocols:['rtmp'],rtmpUrl:'rtmps://global-live.mux.com:443/app',streamKey:data.stream_key},playbackId,publicPlaybackUrl:playbackPolicy==='public'&&playbackId?`https://stream.mux.com/${playbackId}.m3u8`:undefined,raw:{status:data.status,playbackId}}}
- async createIngestEndpoint(config:ProviderConfiguration,broadcastId:string){const data=await mux<Record<string,any>>(config,`/live-streams/${broadcastId}`);return{protocols:['rtmp'],rtmpUrl:'rtmps://global-live.mux.com:443/app',streamKey:data.stream_key}}
- async getStreamStatus(config:ProviderConfiguration,broadcastId:string){const data=await mux<Record<string,any>>(config,`/live-streams/${broadcastId}`);return data.status==='active'?'live':data.status==='idle'?'ready':'provisioning'}
- async startBroadcast(){return}async stopBroadcast(config:ProviderConfiguration,broadcastId:string){await mux(config,`/live-streams/${broadcastId}/complete`,{method:'PUT'})}
- async createPlaybackToken(config:ProviderConfiguration,playbackId:string,ttlSeconds:number):Promise<PlaybackGrant>{if(!config.signingKeyReference)return{url:`https://stream.mux.com/${playbackId}.m3u8`,expiresAt:new Date(Date.now()+ttlSeconds*1000).toISOString()};const secret=secretJson<SigningCredentials>(config.signingKeyReference),exp=Math.floor(Date.now()/1000)+ttlSeconds,token=await signJwt({sub:playbackId,aud:'v',exp},secret);return{url:`https://stream.mux.com/${playbackId}.m3u8?token=${token}`,token,expiresAt:new Date(exp*1000).toISOString()}}
- async verifyWebhook(config:ProviderConfiguration,rawBody:string,headers:Headers):Promise<ProviderWebhook>{const header=headers.get('mux-signature')??'',parts=Object.fromEntries(header.split(',').map(item=>item.split('=',2))),timestamp=Number(parts.t);if(!timestamp||Math.abs(Date.now()/1000-timestamp)>300)throw new ApiError('WEBHOOK_EXPIRED','Webhook timestamp is outside tolerance',401);const expected=await hmac(secretValue(config.webhookSecretReference),`${parts.t}.${rawBody}`);if(!constantTime(expected,parts.v1??''))throw new ApiError('WEBHOOK_SIGNATURE_INVALID','Webhook signature is invalid',401);const event=JSON.parse(rawBody),object=event.data??{};return{eventId:event.id,eventType:event.type,providerBroadcastId:object.live_stream_id??(event.type?.startsWith('video.live_stream.')?object.id:undefined),providerAssetId:object.asset_id??(event.type?.startsWith('video.asset.')?object.id:undefined),lifecycle:lifecycle(event.type),recording:event.type?.startsWith('video.asset.')?{providerAssetId:object.id,playbackId:object.playback_ids?.[0]?.id,status:event.type.endsWith('.ready')?'ready':event.type.endsWith('.errored')?'errored':'preparing',durationSeconds:object.duration}:undefined,raw:event}}
- async getRecording(config:ProviderConfiguration,assetId:string){return mux(config,`/assets/${assetId}`)}async createClip(config:ProviderConfiguration,assetId:string,startSeconds:number,endSeconds:number){const data=await mux<Record<string,any>>(config,'/assets',{method:'POST',body:JSON.stringify({input:[{url:`mux://assets/${assetId}`,start_time:startSeconds,end_time:endSeconds}],playback_policies:['signed']})});return{providerClipId:data.id}}
- async getAnalytics(config:ProviderConfiguration,broadcastId:string){const data=await mux<Record<string,unknown>>(config,`/live-streams/${broadcastId}`);return{status:data.status,createdAt:data.created_at,recentAssetIds:data.recent_asset_ids}}
+import { resolveSecretJson, resolveSecretValue } from '../secrets.ts';
+import type { BroadcastRequest, PlaybackGrant, ProviderConfiguration, ProviderWebhook, ProvisionedBroadcast, StreamingProvider, StreamLifecycle } from './types.ts';
+
+type MuxCredentials = { tokenId: string; tokenSecret: string };
+type SigningCredentials = { keyId: string; privateKeyPem: string };
+const api = 'https://api.mux.com/video/v1';
+
+async function credentials(config: ProviderConfiguration) {
+  const value = await resolveSecretJson<MuxCredentials>(config.secretReference);
+  if (!value.tokenId || !value.tokenSecret) throw new ApiError('STREAMING_SECRET_INVALID', 'Mux credentials require tokenId and tokenSecret', 500, undefined, false);
+  return value;
+}
+
+async function mux<T>(config: ProviderConfiguration, path: string, init: RequestInit = {}) {
+  const value = await credentials(config);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20_000);
+  try {
+    const response = await fetch(`${api}${path}`, {
+      ...init,
+      signal: controller.signal,
+      headers: {
+        Authorization: `Basic ${btoa(`${value.tokenId}:${value.tokenSecret}`)}`,
+        'Content-Type': 'application/json',
+        ...init.headers,
+      },
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new ApiError('STREAMING_PROVIDER_ERROR', payload.error?.message ?? `Mux returned ${response.status}`, 502, undefined, false);
+    return payload.data as T;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function lifecycle(type: string): StreamLifecycle | undefined {
+  return ({
+    'video.live_stream.created': 'provisioning',
+    'video.live_stream.connected': 'ready',
+    'video.live_stream.active': 'live',
+    'video.live_stream.disconnected': 'ended',
+    'video.asset.created': 'processing',
+    'video.asset.ready': 'replay_ready',
+    'video.asset.errored': 'failed',
+    'video.live_stream.idle': 'ready',
+  } as Record<string, StreamLifecycle>)[type];
+}
+
+function base64url(bytes: Uint8Array | string) {
+  const input = typeof bytes === 'string' ? new TextEncoder().encode(bytes) : bytes;
+  let binary = '';
+  input.forEach((value) => binary += String.fromCharCode(value));
+  return btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
+
+async function signJwt(payload: Record<string, unknown>, secret: SigningCredentials) {
+  const pem = secret.privateKeyPem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, '');
+  const binary = Uint8Array.from(atob(pem), (char) => char.charCodeAt(0));
+  const key = await crypto.subtle.importKey('pkcs8', binary, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
+  const encoded = `${base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT', kid: secret.keyId }))}.${base64url(JSON.stringify(payload))}`;
+  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(encoded));
+  return `${encoded}.${base64url(new Uint8Array(signature))}`;
+}
+
+async function hmac(secret: string, value: string) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return [...new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value)))].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function constantTime(a: string, b: string) {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return result === 0;
+}
+
+export class MuxStreamingProvider implements StreamingProvider {
+  readonly code = 'mux';
+
+  async createBroadcast(config: ProviderConfiguration, request: BroadcastRequest): Promise<ProvisionedBroadcast> {
+    const playbackPolicy = request.visibility === 'public' ? 'public' : 'signed';
+    const data = await mux<Record<string, any>>(config, '/live-streams', {
+      method: 'POST',
+      body: JSON.stringify({
+        playback_policies: [playbackPolicy],
+        new_asset_settings: { playback_policies: [playbackPolicy] },
+        latency_mode: request.latencyMode,
+        reconnect_window: request.reconnectWindowSeconds,
+        test: false,
+      }),
+    });
+    const playbackId = data.playback_ids?.[0]?.id;
+    return {
+      providerBroadcastId: data.id,
+      ingest: { protocols: ['rtmp'], rtmpUrl: 'rtmps://global-live.mux.com:443/app', streamKey: data.stream_key },
+      playbackId,
+      publicPlaybackUrl: playbackPolicy === 'public' && playbackId ? `https://stream.mux.com/${playbackId}.m3u8` : undefined,
+      raw: { status: data.status, playbackId },
+    };
+  }
+
+  async createIngestEndpoint(config: ProviderConfiguration, broadcastId: string) {
+    const data = await mux<Record<string, any>>(config, `/live-streams/${broadcastId}`);
+    return { protocols: ['rtmp'], rtmpUrl: 'rtmps://global-live.mux.com:443/app', streamKey: data.stream_key };
+  }
+
+  async getStreamStatus(config: ProviderConfiguration, broadcastId: string) {
+    const data = await mux<Record<string, any>>(config, `/live-streams/${broadcastId}`);
+    return data.status === 'active' ? 'live' : data.status === 'idle' ? 'ready' : 'provisioning';
+  }
+
+  async startBroadcast() { return; }
+  async stopBroadcast(config: ProviderConfiguration, broadcastId: string) { await mux(config, `/live-streams/${broadcastId}/complete`, { method: 'PUT' }); }
+
+  async createPlaybackToken(config: ProviderConfiguration, playbackId: string, ttlSeconds: number): Promise<PlaybackGrant> {
+    if (!config.signingKeyReference) return { url: `https://stream.mux.com/${playbackId}.m3u8`, expiresAt: new Date(Date.now() + ttlSeconds * 1000).toISOString() };
+    const secret = await resolveSecretJson<SigningCredentials>(config.signingKeyReference);
+    if (!secret.keyId || !secret.privateKeyPem) throw new ApiError('STREAMING_SIGNING_SECRET_INVALID', 'Mux signing credentials require keyId and privateKeyPem', 500, undefined, false);
+    const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
+    const token = await signJwt({ sub: playbackId, aud: 'v', exp }, secret);
+    return { url: `https://stream.mux.com/${playbackId}.m3u8?token=${token}`, token, expiresAt: new Date(exp * 1000).toISOString() };
+  }
+
+  async verifyWebhook(config: ProviderConfiguration, rawBody: string, headers: Headers): Promise<ProviderWebhook> {
+    const header = headers.get('mux-signature') ?? '';
+    const parts = Object.fromEntries(header.split(',').map((item) => item.split('=', 2)));
+    const timestamp = Number(parts.t);
+    if (!timestamp || Math.abs(Date.now() / 1000 - timestamp) > 300) throw new ApiError('WEBHOOK_EXPIRED', 'Webhook timestamp is outside tolerance', 401);
+    const webhookSecret = await resolveSecretValue(config.webhookSecretReference);
+    const expected = await hmac(webhookSecret, `${parts.t}.${rawBody}`);
+    if (!constantTime(expected, parts.v1 ?? '')) throw new ApiError('WEBHOOK_SIGNATURE_INVALID', 'Webhook signature is invalid', 401);
+    const event = JSON.parse(rawBody);
+    const object = event.data ?? {};
+    return {
+      eventId: event.id,
+      eventType: event.type,
+      providerBroadcastId: object.live_stream_id ?? (event.type?.startsWith('video.live_stream.') ? object.id : undefined),
+      providerAssetId: object.asset_id ?? (event.type?.startsWith('video.asset.') ? object.id : undefined),
+      lifecycle: lifecycle(event.type),
+      recording: event.type?.startsWith('video.asset.') ? {
+        providerAssetId: object.id,
+        playbackId: object.playback_ids?.[0]?.id,
+        status: event.type.endsWith('.ready') ? 'ready' : event.type.endsWith('.errored') ? 'errored' : 'preparing',
+        durationSeconds: object.duration,
+      } : undefined,
+      raw: event,
+    };
+  }
+
+  async getRecording(config: ProviderConfiguration, assetId: string) { return mux(config, `/assets/${assetId}`); }
+  async createClip(config: ProviderConfiguration, assetId: string, startSeconds: number, endSeconds: number) {
+    const data = await mux<Record<string, any>>(config, '/assets', {
+      method: 'POST',
+      body: JSON.stringify({ input: [{ url: `mux://assets/${assetId}`, start_time: startSeconds, end_time: endSeconds }], playback_policies: ['signed'] }),
+    });
+    return { providerClipId: data.id };
+  }
+  async getAnalytics(config: ProviderConfiguration, broadcastId: string) {
+    const data = await mux<Record<string, unknown>>(config, `/live-streams/${broadcastId}`);
+    return { status: data.status, createdAt: data.created_at, recentAssetIds: data.recent_asset_ids };
+  }
 }
