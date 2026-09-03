@@ -25,14 +25,25 @@ export async function authenticate(request: Request, requireOrganization: boolea
 
   let membershipId: string | null = null;
   if (organizationId) {
-    const { data: membership, error: membershipError } = await client
+    let membershipQuery = client
       .from("memberships")
       .select("id, branch_id")
       .eq("organization_id", organizationId)
       .eq("profile_id", data.user.id)
-      .eq("status", "active")
+      .eq("status", "active");
+
+    // Expression-scoped requests must bind to the membership for that exact
+    // Expression. Organisation-only requests intentionally resolve one active
+    // membership so users can belong to multiple Expressions without maybeSingle()
+    // failing on more than one row.
+    if (branchId) membershipQuery = membershipQuery.eq("branch_id", branchId);
+    const { data: membership, error: membershipError } = await membershipQuery
+      .order("created_at", { ascending: true })
+      .limit(1)
       .maybeSingle();
-    if (membershipError || !membership) throw new ApiError("ORGANIZATION_ACCESS_DENIED", "No active membership for this organization", 403);
+    if (membershipError || !membership) {
+      throw new ApiError("ORGANIZATION_ACCESS_DENIED", "No active membership for this organization context", 403);
+    }
 
     const { data: organization, error: organizationError } = await client
       .from("organizations")
