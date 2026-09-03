@@ -46,6 +46,9 @@ verify_jwt = false
 [functions.public-content]
 verify_jwt = false
 
+[functions.public-giving]
+verify_jwt = false
+
 [functions.branding]
 verify_jwt = false
 
