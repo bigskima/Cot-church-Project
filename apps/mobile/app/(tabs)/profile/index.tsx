@@ -47,13 +47,7 @@ export default function ProfileScreen() {
     <Pressable
       onPress={() => !disabled && router.push(route as any)}
       disabled={disabled}
-      style={({ pressed }) => [
-        styles.linkTile,
-        { backgroundColor: colors.card, borderColor: colors.border },
-        shadows.sm,
-        disabled && styles.disabled,
-        pressed && !disabled && styles.pressed,
-      ]}
+      style={({ pressed }) => [styles.linkTile, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm, disabled && styles.disabled, pressed && !disabled && styles.pressed]}
     >
       <View style={[styles.tileIcon, { backgroundColor: colors.primarySoft }]}><Icon name={icon} size={20} color={disabled ? colors.textMuted : colors.interactive} /></View>
       <View style={styles.tileContent}>
@@ -94,6 +88,8 @@ export default function ProfileScreen() {
           <View style={styles.linksList}>
             {mode === 'authenticated' ? serviceTile('/(tabs)/profile/settings', 'person-circle-outline', 'Account Settings', 'Edit your name, username, birthday, bio, phone, and profile photo') : null}
             {mode === 'authenticated' ? serviceTile('/(tabs)/profile/notifications', 'notifications-outline', 'Notifications & Invitations', 'Accept or decline role invitations and view church updates') : null}
+            {mode === 'authenticated' && expression?.id ? serviceTile('/(tabs)/community/groups', 'people-outline', 'Expression Groups', `Discover and join groups inside ${expression.name}`) : null}
+            {mode === 'authenticated' && expression?.id ? serviceTile('/(tabs)/community/birthdays', 'gift-outline', 'Expression Birthdays', 'Private upcoming birthday calendar with month/day only') : null}
             {serviceTile('/(tabs)/profile/prayer', 'heart-outline', 'Prayer Petitions & Wall', 'Submit private pastoral requests or view community prayer items')}
             {serviceTile('/(tabs)/profile/giving', 'gift-outline', 'Giving & Statements', 'View the configured church or Expression giving destinations and receipts')}
             {mode === 'authenticated' ? serviceTile('/assistant', 'sparkles', 'AI Spiritual Assistant', aiSubtitle, !aiReady) : null}
@@ -103,10 +99,7 @@ export default function ProfileScreen() {
         {hasLeadershipAccess && (
           <View style={styles.sectionWrap}>
             <SectionHeader title="Leadership & Ministry Tools" />
-            <Pressable
-              onPress={() => router.push('/studio')}
-              style={({ pressed }) => [styles.leadershipBanner, { backgroundColor: colors.card, borderColor: colors.interactive }, shadows.sm, pressed && styles.pressed]}
-            >
+            <Pressable onPress={() => router.push('/studio')} style={({ pressed }) => [styles.leadershipBanner, { backgroundColor: colors.card, borderColor: colors.interactive }, shadows.sm, pressed && styles.pressed]}>
               <View style={[styles.leadershipIconWrap, { backgroundColor: colors.primarySoft }]}><Icon name="construct-outline" size={22} color={colors.interactive} /></View>
               <View style={styles.leadershipContent}>
                 <View style={styles.leadershipTitleRow}><Text style={[styles.leadershipTitle, { color: colors.text }]}>Leadership Studio Hub</Text><Badge label="MINISTRY" variant="primary" /></View>
@@ -136,17 +129,12 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 }, content: { flexGrow: 1, paddingHorizontal: spacing.lg, gap: spacing.lg },
-  visitorCard: { padding: spacing.xl, borderRadius: radius.xl, borderWidth: 1, alignItems: 'center', gap: spacing.xs },
-  visitorIconWrap: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xs },
+  visitorCard: { padding: spacing.xl, borderRadius: radius.xl, borderWidth: 1, alignItems: 'center', gap: spacing.xs }, visitorIconWrap: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xs },
   visitorTitle: { ...typography.h2, textAlign: 'center' }, visitorSubtitle: { ...typography.bodySmall, textAlign: 'center', lineHeight: 18 },
-  memberCard: { padding: spacing.lg, borderRadius: radius.xl, borderWidth: 1 }, memberHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  memberInfo: { flex: 1, gap: 2 }, memberName: { fontSize: 17, fontWeight: '700' }, memberEmail: { fontSize: 13 }, memberOrg: { fontSize: 12, fontWeight: '600', marginTop: 2 },
-  sectionWrap: { gap: spacing.xs }, linksList: { gap: spacing.xs },
-  linkTile: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, gap: spacing.md },
+  memberCard: { padding: spacing.lg, borderRadius: radius.xl, borderWidth: 1 }, memberHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md }, memberInfo: { flex: 1, gap: 2 }, memberName: { fontSize: 17, fontWeight: '700' }, memberEmail: { fontSize: 13 }, memberOrg: { fontSize: 12, fontWeight: '600', marginTop: 2 },
+  sectionWrap: { gap: spacing.xs }, linksList: { gap: spacing.xs }, linkTile: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, gap: spacing.md },
   tileIcon: { width: 42, height: 42, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' }, tileContent: { flex: 1, gap: 2 }, tileTitle: { fontSize: 15, fontWeight: '600' }, tileSub: { fontSize: 12, lineHeight: 16 },
-  leadershipBanner: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, gap: spacing.md },
-  leadershipIconWrap: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' }, leadershipContent: { flex: 1, gap: 2 },
+  leadershipBanner: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, gap: spacing.md }, leadershipIconWrap: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' }, leadershipContent: { flex: 1, gap: 2 },
   leadershipTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, leadershipTitle: { fontSize: 15, fontWeight: '700' }, leadershipSub: { fontSize: 12, lineHeight: 16 },
-  themeCard: { padding: spacing.md, borderRadius: radius.lg, borderWidth: 1 }, themeChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  disabled: { opacity: 0.58 }, pressed: { opacity: 0.8 },
+  themeCard: { padding: spacing.md, borderRadius: radius.lg, borderWidth: 1 }, themeChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }, disabled: { opacity: 0.58 }, pressed: { opacity: 0.8 },
 });
