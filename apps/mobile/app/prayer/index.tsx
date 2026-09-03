@@ -27,8 +27,15 @@ import type { PrayerRequest } from '@/types/content';
 
 export default function PrayerScreen() {
   const insets = useSafeAreaInsets();
-  const { api, mode } = useSession();
+  const { api, mode, context } = useSession();
   const { colors } = useTheme();
+
+  const organizationId =
+    context?.organization?.id ??
+    context?.organizations?.[0]?.id ??
+    process.env.EXPO_PUBLIC_ORGANIZATION_ID ??
+    '';
+  const prayerPath = `prayer-requests${organizationId ? `?organizationId=${encodeURIComponent(organizationId)}` : ''}`;
 
   const [activeTab, setActiveTab] = useState<'wall' | 'submit'>('wall');
   const [title, setTitle] = useState('');
@@ -37,26 +44,29 @@ export default function PrayerScreen() {
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
-  const prayers = useResource<PrayerRequest[]>('prayer:wall', (signal) => {
-    return api.request<PrayerRequest[]>('prayer-requests', { signal });
-  });
+  const prayers = useResource<PrayerRequest[]>(`prayer:wall:${organizationId || 'public'}`, (signal) =>
+    api.request<PrayerRequest[]>(prayerPath, { signal })
+  );
 
   const handleSubmitPrayer = async () => {
     if (!title.trim() || !request.trim()) {
-      alert('Please provide a title and your prayer request details.');
+      setSubmitError('Please provide a title and your prayer request details.');
       return;
     }
 
     setSubmitting(true);
+    setSubmitError('');
     try {
       await api.request('prayer-requests', {
         method: 'POST',
         body: JSON.stringify({
+          organizationId: organizationId || undefined,
           title: title.trim(),
           request: request.trim(),
           privacy,
-          isAnonymous,
+          isAnonymous: mode === 'visitor' ? true : isAnonymous,
         }),
       });
 
@@ -68,14 +78,14 @@ export default function PrayerScreen() {
         setSubmittedSuccess(false);
         setActiveTab('wall');
       }, 1500);
-    } catch {
-      alert('Unable to submit prayer request. Please try again.');
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Unable to submit prayer request.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const prayerList = prayers.data ?? [];
+  const publicPrayerList = (prayers.data ?? []).filter((prayer) => prayer.privacy === 'public_approved');
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -88,18 +98,17 @@ export default function PrayerScreen() {
       >
         <ScreenHeader
           title="Prayer Ministry & Intercession"
-          subtitle="Be anxious for nothing, but in everything by prayer and supplication, let your requests be made known to God."
+          subtitle="Bring your prayer petitions before the Lord and, when you choose, share them with the community."
           showBack
         />
 
         <View style={styles.body}>
-          {/* Tab Selector */}
           <View style={styles.tabRow}>
             <Chip
-              label="Community Prayer Wall"
+              label="Public Prayer Wall"
               selected={activeTab === 'wall'}
               onPress={() => setActiveTab('wall')}
-              count={prayerList.length}
+              count={publicPrayerList.length}
             />
             <Chip
               label="Submit Petition"
@@ -110,19 +119,23 @@ export default function PrayerScreen() {
           </View>
 
           {activeTab === 'submit' ? (
-            /* Submit Petition Form */
             <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
               {submittedSuccess ? (
                 <View style={styles.successBlock}>
                   <Icon name="checkmark-circle" size={44} color={colors.success} />
                   <Text style={[styles.successTitle, { color: colors.text }]}>Prayer Request Received</Text>
-                  <Text style={[styles.successSubtitle, { color: colors.textSecondary }]}>
-                    Our pastoral team and intercessors are standing in agreement with you.
-                  </Text>
+                  <Text style={[styles.successSubtitle, { color: colors.textSecondary }]}>Your petition has been received successfully.</Text>
                 </View>
               ) : (
                 <>
-                  <Text style={[styles.cardKicker, { color: colors.prayer }]}>CONFIDENTIAL PASTORAL SUBMISSION</Text>
+                  {submitError ? (
+                    <View style={[styles.errorBanner, { backgroundColor: colors.liveSoft }]}>
+                      <Icon name="alert-circle" size={17} color={colors.live} />
+                      <Text style={[styles.errorText, { color: colors.live }]}>{submitError}</Text>
+                    </View>
+                  ) : null}
+
+                  <Text style={[styles.cardKicker, { color: colors.prayer }]}>PRAYER PETITION</Text>
 
                   <InputField
                     label="Prayer Title / Need"
@@ -140,17 +153,16 @@ export default function PrayerScreen() {
                     placeholder="Share what you are believing God for..."
                   />
 
-                  {/* Privacy Level Selector */}
                   <Text style={[styles.label, { color: colors.textSecondary }]}>PRIVACY & SHARING SCOPE</Text>
                   <View style={styles.privacyOptions}>
                     {[
                       ['pastoral_only', 'Pastoral Staff Only (Confidential)'],
-                      ['prayer_team', 'Sanctuary Intercessory Team'],
-                      ['public_approved', 'Public Church Prayer Wall'],
+                      ['prayer_team', 'Prayer Team'],
+                      ['public_approved', 'Public Prayer Wall'],
                     ].map(([priv, label]) => (
                       <Pressable
                         key={priv}
-                        onPress={() => setPrivacy(priv as any)}
+                        onPress={() => setPrivacy(priv as typeof privacy)}
                         style={[
                           styles.privacyOption,
                           {
@@ -169,6 +181,15 @@ export default function PrayerScreen() {
                     ))}
                   </View>
 
+                  {mode === 'authenticated' ? (
+                    <Pressable onPress={() => setIsAnonymous((value) => !value)} style={styles.anonymousRow}>
+                      <Icon name={isAnonymous ? 'checkbox' : 'square-outline'} size={18} color={colors.interactive} />
+                      <Text style={[styles.privacyText, { color: colors.textSecondary }]}>Hide my identity from the public-facing petition</Text>
+                    </Pressable>
+                  ) : (
+                    <Text style={[styles.guestHelp, { color: colors.textMuted }]}>Visitors can submit without signing in. Visitor submissions are stored anonymously.</Text>
+                  )}
+
                   <Button
                     label="Submit Prayer Request"
                     onPress={handleSubmitPrayer}
@@ -182,25 +203,18 @@ export default function PrayerScreen() {
               )}
             </View>
           ) : (
-            /* Prayer Wall List */
             <View style={styles.wallSection}>
-              <SectionHeader title="Active Prayer Petitions" badge={prayerList.length} />
-              {prayers.loading ? (
+              <SectionHeader title="Public Prayer Wall" badge={publicPrayerList.length} />
+              {prayers.loading && !prayers.data ? (
                 <Skeleton height={140} count={3} />
               ) : prayers.error && !prayers.data ? (
                 <ResourceError message={prayers.error} retry={prayers.refresh} />
-              ) : prayerList.length > 0 ? (
-                prayerList.map((p) => (
-                  <PrayerCard
-                    key={p.id}
-                    prayer={p}
-                    onPray={() => {}}
-                  />
-                ))
+              ) : publicPrayerList.length > 0 ? (
+                publicPrayerList.map((p) => <PrayerCard key={p.id} prayer={p} onPray={() => {}} />)
               ) : (
                 <EmptyState
                   title="No Public Prayers Yet"
-                  message="Submit a petition above to stand together with your church fellowship in prayer."
+                  message="Public petitions will appear here when someone chooses the Public Prayer Wall scope."
                   iconName="heart-outline"
                 />
               )}
@@ -213,67 +227,22 @@ export default function PrayerScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  content: {
-    flexGrow: 1,
-  },
-  body: {
-    paddingHorizontal: spacing.lg,
-    gap: spacing.lg,
-  },
-  tabRow: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-  },
-  card: {
-    padding: spacing.lg,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    gap: spacing.md,
-  },
-  cardKicker: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  label: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  privacyOptions: {
-    gap: spacing.xs,
-  },
-  privacyOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    gap: spacing.sm,
-  },
-  privacyText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  wallSection: {
-    gap: spacing.xs,
-  },
-  successBlock: {
-    alignItems: 'center',
-    padding: spacing.md,
-    gap: spacing.xs,
-  },
-  successTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  successSubtitle: {
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 18,
-    maxWidth: 300,
-  },
+  screen: { flex: 1 },
+  content: { flexGrow: 1 },
+  body: { paddingHorizontal: spacing.lg, gap: spacing.lg },
+  tabRow: { flexDirection: 'row', gap: spacing.xs },
+  card: { padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, gap: spacing.md },
+  cardKicker: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  label: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  privacyOptions: { gap: spacing.xs },
+  privacyOption: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.md, borderWidth: 1, gap: spacing.sm },
+  privacyText: { fontSize: 13, fontWeight: '500' },
+  anonymousRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  guestHelp: { fontSize: 11, lineHeight: 16 },
+  wallSection: { gap: spacing.xs },
+  successBlock: { alignItems: 'center', padding: spacing.md, gap: spacing.xs },
+  successTitle: { fontSize: 18, fontWeight: '800' },
+  successSubtitle: { fontSize: 13, textAlign: 'center', lineHeight: 18, maxWidth: 300 },
+  errorBanner: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center', borderRadius: radius.md, padding: spacing.sm },
+  errorText: { flex: 1, fontSize: 12, fontWeight: '600' },
 });
