@@ -19,28 +19,19 @@ Deno.serve(createHandler(
       let query = client
         .from("reels")
         .select(`
-          id,
-          organization_id,
-          media_asset_id,
-          caption,
-          audio_title,
-          audio_artist,
-          views_count,
-          likes_count,
-          comments_count,
-          shares_count,
-          created_at,
+          id, organization_id, media_asset_id, caption, audio_title, audio_artist,
+          views_count, likes_count, comments_count, shares_count, created_at,
           content_items!inner(id, organization_id, expression_id, visibility, status, published_at),
-          media_assets(id, media_type, duration_seconds, aspect_ratio, media_renditions(id, rendition_kind, container, codec, width, height, storage_path, provider_playback_id), media_thumbnails(storage_path, is_primary))
+          media_assets(id, media_type, duration_seconds, aspect_ratio,
+            media_renditions(id, rendition_kind, container, codec, width, height, storage_path, provider_playback_id),
+            media_thumbnails(storage_path, is_primary))
         `)
         .eq("content_items.visibility", "public")
         .eq("content_items.status", "published")
         .order("created_at", { ascending: false })
         .limit(30);
-
       if (organizationId) query = query.eq("organization_id", organizationId);
       if (expressionId) query = query.eq("content_items.expression_id", expressionId);
-
       const { data, error } = await query;
       if (error) throw new ApiError("PUBLIC_REELS_FAILED", "Unable to retrieve public reels", 500, undefined, false);
       return { data: data ?? [] };
@@ -50,32 +41,19 @@ Deno.serve(createHandler(
       let query = client
         .from("videos")
         .select(`
-          id,
-          organization_id,
-          media_asset_id,
-          series_id,
-          title,
-          slug,
-          description,
-          category,
-          chapters,
-          transcript,
-          views_count,
-          likes_count,
-          comments_count,
-          shares_count,
-          created_at,
+          id, organization_id, media_asset_id, series_id, title, slug, description, category,
+          chapters, transcript, views_count, likes_count, comments_count, shares_count, created_at,
           content_items!inner(id, organization_id, expression_id, visibility, status, published_at),
-          media_assets(id, media_type, duration_seconds, aspect_ratio, media_renditions(id, rendition_kind, container, codec, width, height, storage_path, provider_playback_id), media_thumbnails(storage_path, is_primary))
+          media_assets(id, media_type, duration_seconds, aspect_ratio,
+            media_renditions(id, rendition_kind, container, codec, width, height, storage_path, provider_playback_id),
+            media_thumbnails(storage_path, is_primary))
         `)
         .eq("content_items.visibility", "public")
         .eq("content_items.status", "published")
         .order("created_at", { ascending: false })
         .limit(30);
-
       if (organizationId) query = query.eq("organization_id", organizationId);
       if (expressionId) query = query.eq("content_items.expression_id", expressionId);
-
       const { data, error } = await query;
       if (error) throw new ApiError("PUBLIC_VIDEOS_FAILED", "Unable to retrieve public videos", 500, undefined, false);
       return { data: data ?? [] };
@@ -84,40 +62,13 @@ Deno.serve(createHandler(
     if (type === "sermons") {
       let query = client
         .from("sermons")
-        .select(`
-          id,
-          organization_id,
-          expression_id,
-          series_id,
-          title,
-          slug,
-          preacher,
-          sermon_date,
-          scripture_references,
-          topics,
-          description,
-          transcript,
-          audio_url,
-          video_url,
-          thumbnail_url,
-          audio_asset_id,
-          video_asset_id,
-          chapters,
-          duration_seconds,
-          status,
-          visibility,
-          is_featured,
-          play_count,
-          published_at
-        `)
+        .select("id,organization_id,expression_id,series_id,title,slug,preacher,sermon_date,scripture_references,topics,description,transcript,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,chapters,duration_seconds,status,visibility,is_featured,play_count,published_at")
         .eq("visibility", "public")
         .eq("status", "published")
         .order("sermon_date", { ascending: false })
         .limit(50);
-
       if (organizationId) query = query.eq("organization_id", organizationId);
       if (expressionId) query = query.eq("expression_id", expressionId);
-
       const { data, error } = await query;
       if (error) throw new ApiError("PUBLIC_SERMONS_FAILED", "Unable to retrieve public sermons", 500, undefined, false);
       return { data: data ?? [] };
@@ -130,49 +81,109 @@ Deno.serve(createHandler(
         .order("is_featured", { ascending: false })
         .order("starts_at", { ascending: false, nullsFirst: false })
         .limit(50);
-
       if (organizationId) query = query.eq("organization_id", organizationId);
       if (expressionId) query = query.eq("expression_id", expressionId);
-
       const { data, error } = await query;
       if (error) throw new ApiError("PUBLIC_SERIES_FAILED", "Unable to retrieve public sermon series", 500, undefined, false);
       return { data: data ?? [] };
     }
 
     if (type === "leaders") {
+      // General Community leadership is curated centrally. Expression leadership is
+      // a separate, membership-scoped experience and is never leaked through this endpoint.
       let query = client
-        .from("leaders")
-        .select("id, organization_id, expression_id, name, role_title, biography, avatar_url, is_founder, is_historic, display_order")
+        .from("leadership_profiles")
+        .select("id,organization_id,profile_id,display_name,portrait_url,role_title,short_bio,full_bio,ministry,display_order,tenure_start,tenure_end,is_founder,is_featured_public,social_links")
+        .is("expression_id", null)
+        .eq("is_active", true)
+        .eq("is_featured_public", true)
         .order("display_order", { ascending: true })
-        .limit(50);
-
+        .limit(100);
       if (organizationId) query = query.eq("organization_id", organizationId);
-      if (expressionId) query = query.eq("expression_id", expressionId);
-
       const { data, error } = await query;
-      if (error) throw new ApiError("PUBLIC_LEADERS_FAILED", "Unable to retrieve leaders", 500, undefined, false);
-      return { data: data ?? [] };
+      if (error) throw new ApiError("PUBLIC_LEADERS_FAILED", "Unable to retrieve public church leadership", 500, undefined, false);
+      return {
+        data: (data ?? []).map((leader) => ({
+          id: leader.id,
+          organization_id: leader.organization_id,
+          expression_id: null,
+          profile_id: leader.profile_id,
+          name: leader.display_name,
+          role_title: leader.role_title,
+          biography: leader.full_bio || leader.short_bio || "",
+          short_bio: leader.short_bio,
+          avatar_url: leader.portrait_url,
+          ministry: leader.ministry,
+          is_founder: leader.is_founder,
+          display_order: leader.display_order,
+          social_links: leader.social_links,
+        })),
+      };
     }
 
     if (type === "search") {
       const q = url.searchParams.get("q")?.trim() ?? "";
       if (!q) return { data: { sermons: [], videos: [], reels: [], expressions: [], leaders: [] } };
 
+      let sermonsQuery = client
+        .from("sermons")
+        .select("id,organization_id,title,preacher,sermon_date,thumbnail_url,duration_seconds")
+        .eq("visibility", "public")
+        .eq("status", "published")
+        .ilike("title", `%${q}%`)
+        .limit(10);
+      let videosQuery = client
+        .from("videos")
+        .select("id,organization_id,title,slug,category,views_count,created_at,content_items!inner(visibility,status)")
+        .eq("content_items.visibility", "public")
+        .eq("content_items.status", "published")
+        .ilike("title", `%${q}%`)
+        .limit(10);
+      let reelsQuery = client
+        .from("reels")
+        .select("id,organization_id,caption,audio_title,views_count,created_at,content_items!inner(visibility,status)")
+        .eq("content_items.visibility", "public")
+        .eq("content_items.status", "published")
+        .ilike("caption", `%${q}%`)
+        .limit(10);
+      let expressionsQuery = client
+        .from("branches")
+        .select("id,organization_id,name,city,state,country,is_primary")
+        .eq("is_active", true)
+        .ilike("name", `%${q}%`)
+        .limit(10);
+      let leadersQuery = client
+        .from("leadership_profiles")
+        .select("id,organization_id,display_name,role_title,portrait_url,is_founder")
+        .is("expression_id", null)
+        .eq("is_active", true)
+        .eq("is_featured_public", true)
+        .ilike("display_name", `%${q}%`)
+        .limit(10);
+      if (organizationId) {
+        sermonsQuery = sermonsQuery.eq("organization_id", organizationId);
+        videosQuery = videosQuery.eq("organization_id", organizationId);
+        reelsQuery = reelsQuery.eq("organization_id", organizationId);
+        expressionsQuery = expressionsQuery.eq("organization_id", organizationId);
+        leadersQuery = leadersQuery.eq("organization_id", organizationId);
+      }
       const [sermonsRes, videosRes, reelsRes, expressionsRes, leadersRes] = await Promise.all([
-        client.from("sermons").select("id, title, preacher, sermon_date, thumbnail_url, duration_seconds").eq("visibility", "public").eq("status", "published").ilike("title", `%${q}%`).limit(10),
-        client.from("videos").select("id, title, slug, category, views_count, created_at").ilike("title", `%${q}%`).limit(10),
-        client.from("reels").select("id, caption, audio_title, views_count, created_at").ilike("caption", `%${q}%`).limit(10),
-        client.from("branches").select("id, organization_id, name, city, state, country, is_primary").ilike("name", `%${q}%`).limit(10),
-        client.from("leaders").select("id, organization_id, name, role_title, avatar_url, is_founder").ilike("name", `%${q}%`).limit(10),
+        sermonsQuery, videosQuery, reelsQuery, expressionsQuery, leadersQuery,
       ]);
-
       return {
         data: {
           sermons: sermonsRes.data ?? [],
           videos: videosRes.data ?? [],
           reels: reelsRes.data ?? [],
           expressions: expressionsRes.data ?? [],
-          leaders: leadersRes.data ?? [],
+          leaders: (leadersRes.data ?? []).map((leader) => ({
+            id: leader.id,
+            organization_id: leader.organization_id,
+            name: leader.display_name,
+            role_title: leader.role_title,
+            avatar_url: leader.portrait_url,
+            is_founder: leader.is_founder,
+          })),
         },
       };
     }
@@ -188,13 +199,7 @@ Deno.serve(createHandler(
       if (organizationId) query = query.eq("organization_id", organizationId);
       const { data, error } = await query;
       if (error) throw new ApiError("PUBLIC_STREAMS_FAILED", "Unable to retrieve public streams", 500, undefined, false);
-      return {
-        data: (data ?? []).map((stream) => ({
-          ...stream,
-          playback_url: stream.playback_token_required ? null : stream.playback_url,
-          recording_url: stream.playback_token_required ? null : stream.recording_url,
-        })),
-      };
+      return { data: (data ?? []).map((stream) => ({ ...stream, playback_url: stream.playback_token_required ? null : stream.playback_url, recording_url: stream.playback_token_required ? null : stream.recording_url })) };
     }
 
     if (type === "events") {
@@ -211,9 +216,12 @@ Deno.serve(createHandler(
     }
 
     if (type === "giving") {
+      // Legacy compatibility only. The canonical giving endpoint is public-giving.
+      // General Community giving must never mix Expression destinations into this response.
       let campaignQuery = client
         .from("giving_campaigns")
         .select("id,organization_id,branch_id,name,description,currency,goal_amount_minor,status,starts_at,ends_at")
+        .is("branch_id", null)
         .in("status", ["active", "completed"])
         .order("created_at", { ascending: false })
         .limit(50);
@@ -222,20 +230,18 @@ Deno.serve(createHandler(
       let bankQuery = client
         .from("organization_bank_accounts")
         .select("id,organization_id,branch_id,bank_name,account_name,account_number,routing_number,currency,transfer_instructions,reference_prefix")
+        .is("branch_id", null)
         .eq("is_public", true)
-        .limit(20);
+        .limit(50);
       if (organizationId) bankQuery = bankQuery.eq("organization_id", organizationId);
 
       const [campaignsRes, bankRes] = await Promise.all([campaignQuery, bankQuery]);
-      if (campaignsRes.error) {
-        throw new ApiError("PUBLIC_GIVING_FAILED", "Unable to retrieve giving campaigns", 500, undefined, false);
-      }
-
+      if (campaignsRes.error || bankRes.error) throw new ApiError("PUBLIC_GIVING_FAILED", "Unable to retrieve giving information", 500, undefined, false);
       return {
         data: {
           campaigns: campaignsRes.data ?? [],
           bankAccounts: bankRes.data ?? [],
-          supportedMethods: ["manual_bank_transfer", "online_payment"],
+          supportedMethods: ["manual_bank_transfer"],
         },
       };
     }
@@ -251,7 +257,6 @@ Deno.serve(createHandler(
       return { data: data ?? [] };
     }
 
-    // Default: public social posts feed
     let feedQuery = client
       .from("social_posts")
       .select("id,organization_id,body,media,published_at,visibility")
@@ -263,5 +268,5 @@ Deno.serve(createHandler(
     const { data, error } = await feedQuery;
     if (error) throw new ApiError("PUBLIC_FEED_FAILED", "Unable to retrieve public feed", 500, undefined, false);
     return { data: data ?? [] };
-  }
+  },
 ));
