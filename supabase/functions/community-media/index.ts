@@ -22,6 +22,19 @@ const MIME_TYPES: Record<string, { kind: "image" | "video" | "audio"; ext: strin
   "audio/wav": { kind: "audio", ext: "wav" },
 };
 
+function positiveSize(value: unknown) {
+  const size = Number(value);
+  if (!Number.isSafeInteger(size) || size <= 0 || size > MAX_BYTES) {
+    throw new ApiError("PAYLOAD_TOO_LARGE", "Community media must be 50 MB or smaller", 413);
+  }
+  return size;
+}
+
+function fileLabel(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) return null;
+  return value.trim().slice(0, 255);
+}
+
 Deno.serve(createHandler(
   { methods: ["POST", "DELETE"], authentication: "required", organization: "required" },
   async ({ request, auth }) => {
@@ -37,9 +50,9 @@ Deno.serve(createHandler(
     }
 
     const admin = adminClient();
+    const body = assertObject(await jsonBody(request));
 
     if (request.method === "DELETE") {
-      const body = assertObject(await jsonBody(request));
       assertNoUnknownFields(body, ["uploadId"]);
       const uploadId = uuid(requiredString(body.uploadId, "uploadId", 36), "uploadId", true)!;
       const { data: upload, error: lookupError } = await admin
@@ -52,77 +65,114 @@ Deno.serve(createHandler(
       if (lookupError || !upload) throw new ApiError("UPLOAD_NOT_FOUND", "Media upload not found", 404);
       if (upload.status === "attached") throw new ApiError("UPLOAD_ALREADY_ATTACHED", "Media already belongs to a published post", 409);
       if (upload.status !== "deleted") {
-        const { error: removeError } = await admin.storage.from(BUCKET).remove([upload.storage_path]);
-        if (removeError) throw new ApiError("MEDIA_DELETE_FAILED", "Unable to remove media", 500, undefined, false);
+        await admin.storage.from(BUCKET).remove([upload.storage_path]);
         const { error: updateError } = await admin.from("social_media_uploads").update({
           status: "deleted",
           deleted_at: new Date().toISOString(),
         }).eq("id", upload.id);
-        if (updateError) throw new ApiError("MEDIA_DELETE_FAILED", "Media removed but upload state could not be updated", 500, undefined, false);
+        if (updateError) throw new ApiError("MEDIA_DELETE_FAILED", "Unable to remove media", 500, undefined, false);
       }
       return { data: { uploadId, deleted: true } };
     }
 
-    const contentType = request.headers.get("content-type") ?? "";
-    if (!contentType.toLowerCase().includes("multipart/form-data")) {
-      throw new ApiError("UNSUPPORTED_MEDIA_TYPE", "Community media upload must use multipart form data", 415);
+    const action = requiredString(body.action, "action", 32);
+    if (action === "create_upload") {
+      assertNoUnknownFields(body, ["action", "mimeType", "fileName", "sizeBytes", "branchId"]);
+      const mimeType = requiredString(body.mimeType, "mimeType", 120).toLowerCase();
+      const type = MIME_TYPES[mimeType];
+      if (!type) throw new ApiError("UNSUPPORTED_MEDIA_TYPE", "This image, video, or audio format is not supported", 415);
+      const sizeBytes = positiveSize(body.sizeBytes);
+      const branchId = body.branchId ? uuid(String(body.branchId), "branchId", true)! : null;
+      if (branchId && branchId !== auth.branchId) {
+        throw new ApiError("EXPRESSION_SCOPE_DENIED", "Media can only be uploaded for your selected Expression", 403);
+      }
+
+      const uploadId = crypto.randomUUID();
+      const storagePath = `orgs/${auth.organizationId}/social/${auth.user.id}/${uploadId}.${type.ext}`;
+      const { data: publicData } = admin.storage.from(BUCKET).getPublicUrl(storagePath);
+      const { error: recordError } = await admin.from("social_media_uploads").insert({
+        id: uploadId,
+        organization_id: auth.organizationId,
+        branch_id: branchId,
+        uploader_profile_id: auth.user.id,
+        media_kind: type.kind,
+        mime_type: mimeType,
+        storage_path: storagePath,
+        public_url: publicData.publicUrl,
+        original_filename: fileLabel(body.fileName),
+        size_bytes: sizeBytes,
+        status: "pending",
+      });
+      if (recordError) throw new ApiError("MEDIA_UPLOAD_INTENT_FAILED", "Unable to prepare media upload", 500, undefined, false);
+
+      const { data: signed, error: signedError } = await admin.storage.from(BUCKET).createSignedUploadUrl(storagePath, { upsert: false });
+      if (signedError || !signed) {
+        await admin.from("social_media_uploads").delete().eq("id", uploadId);
+        throw new ApiError("MEDIA_UPLOAD_INTENT_FAILED", "Unable to create secure media upload URL", 500, undefined, false);
+      }
+
+      return {
+        data: {
+          uploadId,
+          type: type.kind,
+          mimeType,
+          sizeBytes,
+          signedUploadUrl: signed.signedUrl,
+          uploadToken: signed.token,
+          storagePath: signed.path,
+        },
+        status: 201,
+      };
     }
 
-    const form = await request.formData();
-    const file = form.get("file");
-    if (!(file instanceof File)) throw new ApiError("VALIDATION_FAILED", "Choose an image, video, or audio file", 422);
-    const type = MIME_TYPES[file.type];
-    if (!type) throw new ApiError("UNSUPPORTED_MEDIA_TYPE", "This image, video, or audio format is not supported", 415);
-    if (file.size <= 0 || file.size > MAX_BYTES) throw new ApiError("PAYLOAD_TOO_LARGE", "Community media must be 50 MB or smaller", 413);
+    if (action === "complete_upload") {
+      assertNoUnknownFields(body, ["action", "uploadId"]);
+      const uploadId = uuid(requiredString(body.uploadId, "uploadId", 36), "uploadId", true)!;
+      const { data: upload, error: lookupError } = await admin
+        .from("social_media_uploads")
+        .select("id,media_kind,mime_type,storage_path,public_url,original_filename,size_bytes,status")
+        .eq("id", uploadId)
+        .eq("organization_id", auth.organizationId)
+        .eq("uploader_profile_id", auth.user.id)
+        .maybeSingle();
+      if (lookupError || !upload) throw new ApiError("UPLOAD_NOT_FOUND", "Media upload not found", 404);
+      if (upload.status === "attached" || upload.status === "uploaded") {
+        return { data: { uploadId: upload.id, type: upload.media_kind, mimeType: upload.mime_type, url: upload.public_url, fileName: upload.original_filename, sizeBytes: Number(upload.size_bytes) } };
+      }
+      if (upload.status !== "pending") throw new ApiError("UPLOAD_UNAVAILABLE", "This media upload is no longer available", 409);
 
-    const rawBranchId = form.get("branchId");
-    const branchId = typeof rawBranchId === "string" && rawBranchId.trim()
-      ? uuid(rawBranchId.trim(), "branchId", true)!
-      : null;
-    if (branchId && branchId !== auth.branchId) {
-      throw new ApiError("EXPRESSION_SCOPE_DENIED", "Media can only be uploaded for your selected Expression", 403);
+      const segments = upload.storage_path.split("/");
+      const objectName = segments.pop()!;
+      const directory = segments.join("/");
+      const { data: objects, error: listError } = await admin.storage.from(BUCKET).list(directory, { limit: 20, search: objectName });
+      if (listError) throw new ApiError("MEDIA_VERIFY_FAILED", "Unable to verify uploaded media", 500, undefined, false);
+      const object = (objects ?? []).find((item) => item.name === objectName);
+      if (!object) throw new ApiError("MEDIA_UPLOAD_INCOMPLETE", "The media file has not finished uploading", 409);
+      const actualSize = Number((object as any).metadata?.size ?? upload.size_bytes);
+      if (!Number.isFinite(actualSize) || actualSize <= 0 || actualSize > MAX_BYTES) {
+        await admin.storage.from(BUCKET).remove([upload.storage_path]);
+        await admin.from("social_media_uploads").update({ status: "deleted", deleted_at: new Date().toISOString() }).eq("id", upload.id);
+        throw new ApiError("PAYLOAD_TOO_LARGE", "Uploaded media exceeds the 50 MB limit", 413);
+      }
+
+      const { data: completed, error: completeError } = await admin.from("social_media_uploads").update({
+        status: "uploaded",
+        size_bytes: Math.round(actualSize),
+      }).eq("id", upload.id).eq("status", "pending").select("id,media_kind,mime_type,public_url,original_filename,size_bytes").single();
+      if (completeError || !completed) throw new ApiError("MEDIA_VERIFY_FAILED", "Unable to finalize uploaded media", 500, undefined, false);
+
+      return {
+        data: {
+          uploadId: completed.id,
+          type: completed.media_kind,
+          mimeType: completed.mime_type,
+          url: completed.public_url,
+          fileName: completed.original_filename,
+          sizeBytes: Number(completed.size_bytes),
+        },
+      };
     }
 
-    const uploadId = crypto.randomUUID();
-    const storagePath = `orgs/${auth.organizationId}/social/${auth.user.id}/${uploadId}.${type.ext}`;
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const { error: uploadError } = await admin.storage.from(BUCKET).upload(storagePath, bytes, {
-      contentType: file.type,
-      upsert: false,
-      cacheControl: "31536000",
-    });
-    if (uploadError) throw new ApiError("MEDIA_UPLOAD_FAILED", "Unable to upload community media", 500, undefined, false);
-
-    const { data: publicData } = admin.storage.from(BUCKET).getPublicUrl(storagePath);
-    const publicUrl = publicData.publicUrl;
-    const { data: record, error: recordError } = await admin.from("social_media_uploads").insert({
-      id: uploadId,
-      organization_id: auth.organizationId,
-      branch_id: branchId,
-      uploader_profile_id: auth.user.id,
-      media_kind: type.kind,
-      mime_type: file.type,
-      storage_path: storagePath,
-      public_url: publicUrl,
-      original_filename: file.name?.slice(0, 255) || null,
-      size_bytes: file.size,
-    }).select("id,media_kind,mime_type,public_url,original_filename,size_bytes,status").single();
-
-    if (recordError || !record) {
-      await admin.storage.from(BUCKET).remove([storagePath]);
-      throw new ApiError("MEDIA_UPLOAD_FAILED", "Media uploaded but could not be registered", 500, undefined, false);
-    }
-
-    return {
-      data: {
-        uploadId: record.id,
-        type: record.media_kind,
-        mimeType: record.mime_type,
-        url: record.public_url,
-        fileName: record.original_filename,
-        sizeBytes: Number(record.size_bytes),
-      },
-      status: 201,
-    };
+    throw new ApiError("VALIDATION_FAILED", "Unsupported community media action", 422);
   },
 ));
