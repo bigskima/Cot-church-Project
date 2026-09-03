@@ -19,7 +19,9 @@ function normalizedUsername(value: unknown) {
 function normalizedBirthday(value: unknown) {
   if (value === undefined) return undefined;
   if (value === null || value === "") return null;
-  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new ApiError("VALIDATION_FAILED", "Birthday must use YYYY-MM-DD", 422);
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new ApiError("VALIDATION_FAILED", "Birthday must use YYYY-MM-DD", 422);
+  }
   const parsed = new Date(`${value}T00:00:00Z`);
   if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value || parsed > new Date() || parsed < new Date("1900-01-01T00:00:00Z")) {
     throw new ApiError("VALIDATION_FAILED", "Birthday is invalid", 422);
@@ -34,12 +36,15 @@ Deno.serve(createHandler(
 
     if (request.method === "PATCH") {
       const body = assertObject(await jsonBody(request));
-      assertNoUnknownFields(body, ["displayName", "username", "birthday", "bio", "phoneNumber"]);
+      assertNoUnknownFields(body, ["displayName", "username", "birthday", "birthdayExpressionVisible", "bio", "phoneNumber"]);
       const displayName = optionalString(body.displayName, "displayName", 120);
       const username = normalizedUsername(body.username);
       const birthday = normalizedBirthday(body.birthday);
       const bio = body.bio === null ? null : optionalString(body.bio, "bio", 500);
       const phoneNumber = body.phoneNumber === null ? null : optionalString(body.phoneNumber, "phoneNumber", 32);
+      if (body.birthdayExpressionVisible !== undefined && typeof body.birthdayExpressionVisible !== "boolean") {
+        throw new ApiError("VALIDATION_FAILED", "birthdayExpressionVisible must be boolean", 422);
+      }
 
       const updates: Record<string, unknown> = {};
       if (displayName !== undefined) {
@@ -48,6 +53,7 @@ Deno.serve(createHandler(
       }
       if (username !== undefined) updates.username = username;
       if (birthday !== undefined) updates.birthday = birthday;
+      if (body.birthdayExpressionVisible !== undefined) updates.birthday_expression_visible = body.birthdayExpressionVisible;
       if (bio !== undefined) updates.bio = bio?.trim() || null;
       if (phoneNumber !== undefined) updates.phone_number = phoneNumber?.trim() || null;
       if (!Object.keys(updates).length) throw new ApiError("VALIDATION_FAILED", "At least one profile field is required", 422);
@@ -59,7 +65,7 @@ Deno.serve(createHandler(
 
     const { data: profile, error } = await auth.client
       .from("profiles")
-      .select("id,display_name,username,birthday,bio,phone_number,avatar_url,created_at,updated_at")
+      .select("id,display_name,username,birthday,birthday_expression_visible,bio,phone_number,avatar_url,created_at,updated_at")
       .eq("id", auth.user.id)
       .single();
     if (error || !profile) throw new ApiError("PROFILE_NOT_FOUND", "Profile was not found", 404);
