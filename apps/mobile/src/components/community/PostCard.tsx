@@ -21,6 +21,7 @@ export interface PostCardProps {
   authorHandle?: string;
   authorAvatar?: string | null;
   expressionName?: string;
+  canEngage?: boolean;
   onPress?: () => void;
   onPressAuthor?: () => void;
   onLike?: () => void;
@@ -39,6 +40,7 @@ export function PostCard({
   authorHandle,
   authorAvatar,
   expressionName,
+  canEngage = true,
   onPress,
   onPressAuthor,
   onLike,
@@ -65,7 +67,7 @@ export function PostCard({
   const [hasSaved, setHasSaved] = useState(false);
 
   const handleLike = () => {
-    if (hasLiked) return;
+    if (!canEngage || hasLiked) return;
     setHasLiked(true);
     setLikeCount((count: number) => count + 1);
     onReact?.('like');
@@ -73,6 +75,7 @@ export function PostCard({
   };
 
   const handleSave = () => {
+    if (!canEngage) return;
     setHasSaved(!hasSaved);
     onBookmark?.();
   };
@@ -98,10 +101,7 @@ export function PostCard({
   const mediaItem = post.media?.[0];
 
   return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.container, { backgroundColor: colors.bg, borderBottomColor: colors.borderSubtle }, style]}
-    >
+    <Pressable onPress={onPress} style={[styles.container, { backgroundColor: colors.bg, borderBottomColor: colors.borderSubtle }, style]}>
       <Pressable onPress={onPressAuthor || onPress} style={styles.avatarColumn}>
         <Avatar name={displayName} url={avatarUrl} size="md" />
       </Pressable>
@@ -136,20 +136,23 @@ export function PostCard({
         ) : null}
 
         <View style={styles.actionRail}>
-          <Pressable onPress={onComment || onReply} hitSlop={6} style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Reply to post">
-            <Icon name="chatbubble-outline" size={17} color={colors.textMuted} />
-            <Text style={[styles.actionCount, { color: colors.textMuted }]}>{postAsAny.comments_count || 0}</Text>
-          </Pressable>
-
-          <Pressable onPress={handleLike} hitSlop={6} style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Like post">
-            <Icon name={hasLiked ? 'heart' : 'heart-outline'} size={17} color={hasLiked ? colors.live : colors.textMuted} />
-            <Text style={[styles.actionCount, { color: hasLiked ? colors.live : colors.textMuted }]}>{likeCount > 0 ? likeCount : ''}</Text>
-          </Pressable>
-
-          <Pressable onPress={handleSave} hitSlop={6} style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Bookmark post">
-            <Icon name={hasSaved ? 'bookmark' : 'bookmark-outline'} size={17} color={hasSaved ? colors.interactive : colors.textMuted} />
-          </Pressable>
-
+          {canEngage ? (
+            <>
+              <Pressable onPress={onComment || onReply} hitSlop={6} style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Reply to post">
+                <Icon name="chatbubble-outline" size={17} color={colors.textMuted} />
+                <Text style={[styles.actionCount, { color: colors.textMuted }]}>{postAsAny.comments_count || 0}</Text>
+              </Pressable>
+              <Pressable onPress={handleLike} hitSlop={6} style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Like post">
+                <Icon name={hasLiked ? 'heart' : 'heart-outline'} size={17} color={hasLiked ? colors.live : colors.textMuted} />
+                <Text style={[styles.actionCount, { color: hasLiked ? colors.live : colors.textMuted }]}>{likeCount > 0 ? likeCount : ''}</Text>
+              </Pressable>
+              <Pressable onPress={handleSave} hitSlop={6} style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Bookmark post">
+                <Icon name={hasSaved ? 'bookmark' : 'bookmark-outline'} size={17} color={hasSaved ? colors.interactive : colors.textMuted} />
+              </Pressable>
+            </>
+          ) : (
+            <Text style={[styles.guestMeta, { color: colors.textMuted }]}>Sign in to join the conversation</Text>
+          )}
           <Pressable onPress={handleNativeShare} hitSlop={6} style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Share post">
             <Icon name="share-social-outline" size={17} color={colors.textMuted} />
           </Pressable>
@@ -176,7 +179,8 @@ const styles = StyleSheet.create({
   bodyText: { fontSize: 15, lineHeight: 21, marginTop: 2 },
   mediaFrame: { width: '100%', aspectRatio: 16 / 9, borderRadius: radius.md, overflow: 'hidden', marginTop: spacing.sm },
   mediaImage: { width: '100%', height: '100%' },
-  actionRail: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm, paddingRight: spacing.xxl },
+  actionRail: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm, paddingRight: spacing.xl },
   actionButton: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: 6 },
   actionCount: { fontSize: 12, fontWeight: '500' },
+  guestMeta: { fontSize: 11, fontWeight: '600' },
 });
