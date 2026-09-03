@@ -1,14 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,23 +9,8 @@ import { Button, Chip, Icon, InputField, ScreenHeader, VideoPlayer } from '@/com
 import { radius, spacing } from '@/design-system/tokens';
 
 type ReelScope = 'public' | 'branch';
-type SelectedVideo = {
-  uri: string;
-  fileName: string;
-  mimeType: string;
-  sizeBytes: number;
-  durationSeconds?: number;
-  body: Blob;
-};
-type UploadIntent = {
-  asset: { id: string };
-  uploadSession: {
-    assetId: string;
-    signedUploadUrl: string;
-    storagePath: string;
-  };
-};
-
+type SelectedVideo = { uri: string; fileName: string; mimeType: string; sizeBytes: number; durationSeconds?: number; body: Blob };
+type UploadIntent = { asset: { id: string }; uploadSession: { assetId: string; signedUploadUrl: string; storagePath: string } };
 const MAX_BYTES = 200 * 1024 * 1024;
 
 function inferVideoMime(asset: ImagePicker.ImagePickerAsset) {
@@ -50,7 +26,6 @@ export default function ReelCreatorScreen() {
   const { api, context, mode, hasCapability } = useSession();
   const { colors } = useTheme();
   const expression = context?.expression;
-
   const [scope, setScope] = useState<ReelScope>('public');
   const [video, setVideo] = useState<SelectedVideo | null>(null);
   const [caption, setCaption] = useState('');
@@ -59,15 +34,8 @@ export default function ReelCreatorScreen() {
   const [working, setWorking] = useState(false);
   const [stage, setStage] = useState('');
 
-  const allowed = mode === 'authenticated'
-    && Boolean(expression?.id)
-    && hasCapability('media.upload')
-    && hasCapability('reels.publish');
-
-  const canPublish = useMemo(
-    () => allowed && Boolean(video) && Boolean(caption.trim()) && !working,
-    [allowed, video, caption, working],
-  );
+  const allowed = mode === 'authenticated' && Boolean(expression?.id) && hasCapability('media.upload') && hasCapability('reels.publish');
+  const canPublish = useMemo(() => allowed && Boolean(video) && Boolean(caption.trim()) && !working, [allowed, video, caption, working]);
 
   const chooseVideo = async () => {
     if (!allowed || working) return;
@@ -77,18 +45,18 @@ export default function ReelCreatorScreen() {
         Alert.alert('Media access required', 'Allow photo-library access to choose a Reel video.');
         return;
       }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['videos'],
-        allowsMultipleSelection: false,
-        quality: 1,
-      });
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['videos'], allowsMultipleSelection: false, quality: 1 });
       if (result.canceled || !result.assets?.[0]) return;
       const asset = result.assets[0];
       const webFile = (asset as any).file as Blob | undefined;
-      const body = webFile ?? await fetch(asset.uri).then(async (response) => {
+      let body: Blob;
+      if (webFile) {
+        body = webFile;
+      } else {
+        const response = await fetch(asset.uri);
         if (!response.ok) throw new Error('Unable to read the selected video.');
-        return response.blob();
-      });
+        body = await response.blob();
+      }
       const sizeBytes = Number(body.size || asset.fileSize || 0);
       if (!sizeBytes || sizeBytes > MAX_BYTES) {
         Alert.alert('Video too large', 'Choose a Reel video that is 200 MB or smaller.');
@@ -108,10 +76,7 @@ export default function ReelCreatorScreen() {
   };
 
   const cancelAsset = async (assetId: string) => {
-    await api.request('content-media', {
-      method: 'POST',
-      body: JSON.stringify({ action: 'cancel_upload', assetId }),
-    }).catch(() => undefined);
+    await api.request('content-media', { method: 'POST', body: JSON.stringify({ action: 'cancel_upload', assetId }) }).catch(() => undefined);
   };
 
   const publishReel = async () => {
@@ -123,46 +88,25 @@ export default function ReelCreatorScreen() {
       const intent = await api.request<UploadIntent>('content-media', {
         method: 'POST',
         body: JSON.stringify({
-          action: 'create_upload_intent',
-          mediaType: 'video',
-          mimeType: video.mimeType,
-          expressionId: expression.id,
-          durationSeconds: video.durationSeconds,
-          aspectRatio: '9:16',
-          fileSizeBytes: video.sizeBytes,
-          fileName: video.fileName,
+          action: 'create_upload_intent', mediaType: 'video', mimeType: video.mimeType,
+          expressionId: expression.id, durationSeconds: video.durationSeconds, aspectRatio: '9:16',
+          fileSizeBytes: video.sizeBytes, fileName: video.fileName,
         }),
       });
       assetId = intent.uploadSession.assetId;
-
       setStage('Uploading video…');
-      const uploaded = await fetch(intent.uploadSession.signedUploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': video.mimeType },
-        body: video.body,
-      });
+      const uploaded = await fetch(intent.uploadSession.signedUploadUrl, { method: 'PUT', headers: { 'Content-Type': video.mimeType }, body: video.body });
       if (!uploaded.ok) throw new Error(`Video upload failed (${uploaded.status}).`);
-
       setStage('Verifying upload…');
-      await api.request('content-media', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'complete_upload', assetId }),
-      });
-
+      await api.request('content-media', { method: 'POST', body: JSON.stringify({ action: 'complete_upload', assetId }) });
       setStage('Publishing Reel…');
       await api.request('creator-studio', {
         method: 'POST',
         body: JSON.stringify({
-          action: 'publish_reel',
-          expressionId: expression.id,
-          visibility: scope,
-          mediaAssetId: assetId,
-          caption: caption.trim(),
-          audioTitle: audioTitle.trim() || undefined,
-          audioArtist: audioArtist.trim() || undefined,
+          action: 'publish_reel', expressionId: expression.id, visibility: scope, mediaAssetId: assetId,
+          caption: caption.trim(), audioTitle: audioTitle.trim() || undefined, audioArtist: audioArtist.trim() || undefined,
         }),
       });
-
       assetId = null;
       setStage('Published');
       router.replace('/reels');
@@ -177,16 +121,8 @@ export default function ReelCreatorScreen() {
 
   return (
     <KeyboardAvoidingView style={[styles.screen, { backgroundColor: colors.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 80 }]}
-      >
-        <ScreenHeader
-          title="Create Reel"
-          subtitle="Publish short vertical video through your Expression's media permissions."
-          showBack
-        />
-
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 80 }]}>
+        <ScreenHeader title="Create Reel" subtitle="Publish short vertical video through your Expression's media permissions." showBack />
         <View style={styles.body}>
           {!allowed ? (
             <View style={[styles.notice, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
@@ -204,9 +140,7 @@ export default function ReelCreatorScreen() {
                   <Chip label="Public Reels" selected={scope === 'public'} onPress={() => setScope('public')} />
                   <Chip label={expression?.name || 'Expression'} selected={scope === 'branch'} onPress={() => setScope('branch')} />
                 </View>
-                <Text style={[styles.helper, { color: colors.textMuted }]}>
-                  Public Reels can appear in platform discovery. Expression Reels remain available only to members of {expression?.name || 'the selected Expression'}.
-                </Text>
+                <Text style={[styles.helper, { color: colors.textMuted }]}>Public Reels can appear in public discovery. Expression Reels remain inside {expression?.name || 'the selected Expression'}.</Text>
               </View>
 
               {video ? (
@@ -217,9 +151,7 @@ export default function ReelCreatorScreen() {
                       <Text style={[styles.videoName, { color: colors.text }]} numberOfLines={1}>{video.fileName}</Text>
                       <Text style={[styles.helper, { color: colors.textMuted }]}>{(video.sizeBytes / (1024 * 1024)).toFixed(1)} MB</Text>
                     </View>
-                    <Pressable onPress={() => !working && setVideo(null)} hitSlop={8}>
-                      <Icon name="trash-outline" size={20} color={colors.live} />
-                    </Pressable>
+                    <Pressable onPress={() => !working && setVideo(null)} hitSlop={8}><Icon name="trash-outline" size={20} color={colors.live} /></Pressable>
                   </View>
                 </View>
               ) : (
@@ -230,42 +162,11 @@ export default function ReelCreatorScreen() {
                 </Pressable>
               )}
 
-              <InputField
-                label="Caption"
-                value={caption}
-                onChangeText={setCaption}
-                multiline
-                numberOfLines={4}
-                placeholder="Write the Reel caption…"
-              />
-              <InputField
-                label="Audio / Track title (optional)"
-                value={audioTitle}
-                onChangeText={setAudioTitle}
-                placeholder="Original audio, song or track name"
-              />
-              <InputField
-                label="Audio artist / source (optional)"
-                value={audioArtist}
-                onChangeText={setAudioArtist}
-                placeholder="Artist or source"
-              />
-
-              {stage ? (
-                <View style={[styles.progressNotice, { backgroundColor: colors.primarySoft }]}>
-                  <Icon name="cloud-upload-outline" size={18} color={colors.interactive} />
-                  <Text style={[styles.progressText, { color: colors.textSecondary }]}>{stage}</Text>
-                </View>
-              ) : null}
-
-              <Button
-                label="Publish Reel"
-                onPress={publishReel}
-                loading={working}
-                disabled={!canPublish}
-                variant="primary"
-                size="lg"
-              />
+              <InputField label="Caption" value={caption} onChangeText={setCaption} multiline numberOfLines={4} placeholder="Write the Reel caption…" />
+              <InputField label="Audio / Track title (optional)" value={audioTitle} onChangeText={setAudioTitle} placeholder="Original audio, song or track name" />
+              <InputField label="Audio artist / source (optional)" value={audioArtist} onChangeText={setAudioArtist} placeholder="Artist or source" />
+              {stage ? <View style={[styles.progressNotice, { backgroundColor: colors.primarySoft }]}><Icon name="cloud-upload-outline" size={18} color={colors.interactive} /><Text style={[styles.progressText, { color: colors.textSecondary }]}>{stage}</Text></View> : null}
+              <Button label="Publish Reel" onPress={publishReel} loading={working} disabled={!canPublish} variant="primary" size="lg" />
             </>
           )}
         </View>
@@ -275,23 +176,13 @@ export default function ReelCreatorScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 },
-  content: { flexGrow: 1 },
-  body: { paddingHorizontal: spacing.lg, gap: spacing.lg },
-  label: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
-  scopeBlock: { gap: spacing.xs },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  helper: { fontSize: 11, lineHeight: 16 },
+  screen: { flex: 1 }, content: { flexGrow: 1 }, body: { paddingHorizontal: spacing.lg, gap: spacing.lg },
+  label: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 }, scopeBlock: { gap: spacing.xs },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }, helper: { fontSize: 11, lineHeight: 16 },
   notice: { flexDirection: 'row', gap: spacing.md, padding: spacing.lg, borderWidth: 1, borderRadius: radius.lg },
-  noticeCopy: { flex: 1, gap: 4 },
-  noticeTitle: { fontSize: 15, fontWeight: '800' },
-  noticeText: { fontSize: 12, lineHeight: 18 },
+  noticeCopy: { flex: 1, gap: 4 }, noticeTitle: { fontSize: 15, fontWeight: '800' }, noticeText: { fontSize: 12, lineHeight: 18 },
   videoPicker: { minHeight: 190, borderWidth: 1, borderStyle: 'dashed', borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', gap: spacing.xs, padding: spacing.lg },
-  pickerTitle: { fontSize: 16, fontWeight: '800' },
-  videoCard: { overflow: 'hidden', borderWidth: 1, borderRadius: radius.lg },
-  videoMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md },
-  videoMetaCopy: { flex: 1 },
-  videoName: { fontSize: 13, fontWeight: '700' },
-  progressNotice: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderRadius: radius.md, padding: spacing.md },
-  progressText: { fontSize: 12, fontWeight: '700' },
+  pickerTitle: { fontSize: 16, fontWeight: '800' }, videoCard: { overflow: 'hidden', borderWidth: 1, borderRadius: radius.lg },
+  videoMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md }, videoMetaCopy: { flex: 1 }, videoName: { fontSize: 13, fontWeight: '700' },
+  progressNotice: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderRadius: radius.md, padding: spacing.md }, progressText: { fontSize: 12, fontWeight: '700' },
 });
