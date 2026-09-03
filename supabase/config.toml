@@ -49,6 +49,9 @@ verify_jwt = false
 [functions.public-social-feed]
 verify_jwt = false
 
+[functions.public-birthdays]
+verify_jwt = false
+
 [functions.public-giving]
 verify_jwt = false
 
