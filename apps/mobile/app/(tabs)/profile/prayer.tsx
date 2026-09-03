@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,7 +12,6 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import {
-  Badge,
   Button,
   Chip,
   EmptyState,
@@ -25,15 +23,21 @@ import {
   SectionHeader,
   Skeleton,
 } from '@/components';
-import { radius, shadows, spacing, typography } from '@/design-system/tokens';
+import { radius, shadows, spacing } from '@/design-system/tokens';
 import type { PrayerRequest } from '@/types/content';
 
 export default function PrayerScreen() {
   const insets = useSafeAreaInsets();
-  const { api, mode } = useSession();
+  const { api, mode, context } = useSession();
   const { colors } = useTheme();
 
-  const [activeTab, setActiveTab] = useState<'my_prayers' | 'wall'>('wall');
+  const organizationId =
+    context?.organization?.id ??
+    context?.organizations?.[0]?.id ??
+    process.env.EXPO_PUBLIC_ORGANIZATION_ID ??
+    '';
+  const prayerPath = `prayer-requests${organizationId ? `?organizationId=${encodeURIComponent(organizationId)}` : ''}`;
+
   const [title, setTitle] = useState('');
   const [request, setRequest] = useState('');
   const [privacy, setPrivacy] = useState<'pastoral_only' | 'prayer_team' | 'public_approved'>('pastoral_only');
@@ -41,8 +45,8 @@ export default function PrayerScreen() {
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  const prayerFeed = useResource<PrayerRequest[]>('prayer:feed', (signal) =>
-    api.request<PrayerRequest[]>('prayer-requests', { signal }).catch(() => [])
+  const prayerFeed = useResource<PrayerRequest[]>(`prayer:feed:${organizationId || 'public'}`, (signal) =>
+    api.request<PrayerRequest[]>(prayerPath, { signal })
   );
 
   const handleSubmitPrayer = async () => {
@@ -57,14 +61,20 @@ export default function PrayerScreen() {
       await api.request('prayer-requests', {
         method: 'POST',
         body: JSON.stringify({
+          organizationId: organizationId || undefined,
           title: title.trim(),
           request: request.trim(),
           privacy,
+          isAnonymous: mode === 'visitor' ? true : undefined,
         }),
       });
       setTitle('');
       setRequest('');
-      setSuccessMsg('Your prayer petition has been confidentially submitted.');
+      setSuccessMsg(
+        privacy === 'public_approved'
+          ? 'Your prayer petition has been submitted to the Public Prayer Wall.'
+          : 'Your prayer petition has been confidentially submitted.'
+      );
       prayerFeed.refresh();
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Unable to submit prayer request.');
@@ -74,7 +84,9 @@ export default function PrayerScreen() {
   };
 
   const prayers = prayerFeed.data ?? [];
-  const publicPrayers = prayers.filter((p) => p.privacy !== 'pastoral_only');
+  // Only explicitly public petitions belong on the public wall. Prayer-team and
+  // pastoral-only petitions may be returned to their owner but must never render here.
+  const publicPrayers = prayers.filter((p) => p.privacy === 'public_approved');
 
   return (
     <KeyboardAvoidingView
@@ -95,7 +107,6 @@ export default function PrayerScreen() {
         />
 
         <View style={styles.body}>
-          {/* Notification Messages */}
           {successMsg ? (
             <View style={[styles.banner, { backgroundColor: 'rgba(22, 163, 106, 0.12)', borderColor: 'rgba(22, 163, 106, 0.3)' }]}>
               <Icon name="checkmark-circle" size={18} color="#16A36A" style={{ marginRight: 8 }} />
@@ -110,7 +121,6 @@ export default function PrayerScreen() {
             </View>
           ) : null}
 
-          {/* Submit Prayer Request Form Card */}
           <View
             style={[
               styles.card,
@@ -139,11 +149,8 @@ export default function PrayerScreen() {
               placeholder="Share what is on your heart..."
             />
 
-            {/* Privacy Scope Selector */}
             <View style={styles.privacySection}>
-              <Text style={[styles.privacyLabel, { color: colors.textSecondary }]}>
-                Confidentiality Scope
-              </Text>
+              <Text style={[styles.privacyLabel, { color: colors.textSecondary }]}>Confidentiality Scope</Text>
               <View style={styles.privacyChips}>
                 <Chip
                   label="Pastoral Care Only"
@@ -162,6 +169,9 @@ export default function PrayerScreen() {
                   onPress={() => setPrivacy('public_approved')}
                 />
               </View>
+              {mode === 'visitor' ? (
+                <Text style={[styles.helper, { color: colors.textMuted }]}>You can submit without signing in. Visitor petitions are recorded anonymously.</Text>
+              ) : null}
             </View>
 
             <Button
@@ -174,22 +184,18 @@ export default function PrayerScreen() {
             />
           </View>
 
-          {/* Prayer Wall Feed */}
           <View style={styles.wallSection}>
-            <SectionHeader title="Community Prayer Wall" badge={publicPrayers.length} />
-            {prayerFeed.loading ? (
+            <SectionHeader title="Public Prayer Wall" badge={publicPrayers.length} />
+            {prayerFeed.loading && !prayerFeed.data ? (
               <Skeleton height={120} count={2} />
+            ) : prayerFeed.error && !prayerFeed.data ? (
+              <ResourceError message={prayerFeed.error} retry={prayerFeed.refresh} />
             ) : publicPrayers.length > 0 ? (
-              publicPrayers.map((p) => (
-                <PrayerCard
-                  key={p.id}
-                  prayer={p}
-                />
-              ))
+              publicPrayers.map((p) => <PrayerCard key={p.id} prayer={p} />)
             ) : (
               <EmptyState
                 title="No Public Prayers Yet"
-                message="Be the first to share an encouragement or prayer request with the church."
+                message="Public prayer petitions will appear here when people choose to share them with the community."
                 iconName="heart-outline"
               />
             )}
@@ -201,58 +207,17 @@ export default function PrayerScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  content: {
-    flexGrow: 1,
-  },
-  body: {
-    paddingHorizontal: spacing.lg,
-    gap: spacing.lg,
-  },
-  banner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-  },
-  bannerText: {
-    fontSize: 13,
-    fontWeight: '600',
-    flex: 1,
-  },
-  card: {
-    padding: spacing.lg,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    gap: spacing.md,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  privacySection: {
-    gap: spacing.xs,
-  },
-  privacyLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-    textTransform: 'uppercase',
-  },
-  privacyChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-  },
-  wallSection: {
-    gap: spacing.xs,
-  },
+  screen: { flex: 1 },
+  content: { flexGrow: 1 },
+  body: { paddingHorizontal: spacing.lg, gap: spacing.lg },
+  banner: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.md, borderWidth: 1 },
+  bannerText: { fontSize: 13, fontWeight: '600', flex: 1 },
+  card: { padding: spacing.lg, borderRadius: radius.xl, borderWidth: 1, gap: spacing.md },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  cardTitle: { fontSize: 16, fontWeight: '700' },
+  privacySection: { gap: spacing.xs },
+  privacyLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3, textTransform: 'uppercase' },
+  privacyChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  helper: { fontSize: 11, lineHeight: 16 },
+  wallSection: { gap: spacing.xs },
 });
