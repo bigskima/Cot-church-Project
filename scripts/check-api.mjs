@@ -57,6 +57,17 @@ const requiredFiles = [
   'supabase/functions/sermons/index.ts',
   'supabase/functions/branding/index.ts',
   'supabase/functions/church-story/index.ts',
+  'supabase/functions/platform-context/index.ts',
+  'supabase/functions/platform-overview/index.ts',
+  'supabase/functions/platform-organizations/index.ts',
+  'supabase/functions/platform-expressions/index.ts',
+  'supabase/functions/platform-users/index.ts',
+  'supabase/functions/platform-audit/index.ts',
+  'supabase/functions/platform-streaming/index.ts',
+  'supabase/functions/platform-ai/index.ts',
+  'supabase/functions/platform-features/index.ts',
+  'supabase/functions/platform-integrations/index.ts',
+  'supabase/functions/platform-payments/index.ts',
 ];
 
 await Promise.all(requiredFiles.map((file) => access(file)));
@@ -76,6 +87,11 @@ const publicContent = await readFile('supabase/functions/public-content/index.ts
 const sermons = await readFile('supabase/functions/sermons/index.ts', 'utf8');
 const branding = await readFile('supabase/functions/branding/index.ts', 'utf8');
 const churchStory = await readFile('supabase/functions/church-story/index.ts', 'utf8');
+const platformPayments = await readFile('supabase/functions/platform-payments/index.ts', 'utf8');
+const platformStreaming = await readFile('supabase/functions/platform-streaming/index.ts', 'utf8');
+const platformAi = await readFile('supabase/functions/platform-ai/index.ts', 'utf8');
+const platformFeatures = await readFile('supabase/functions/platform-features/index.ts', 'utf8');
+const platformIntegrations = await readFile('supabase/functions/platform-integrations/index.ts', 'utf8');
 const gatewayConfig = await readFile('supabase/config.toml', 'utf8');
 
 const invariants = [
@@ -99,6 +115,15 @@ const invariants = [
   [sermons, /sermons\.create/, 'sermon authorization'],
   [branding, /platform\.branding\.manage/, 'branding authorization'],
   [churchStory, /leadership_profiles/, 'leadership profile management'],
+  [platformPayments, /authorizePlatform\(auth, "platform\.payments\.read"\)/, 'Level-1 payment read authorization'],
+  [platformPayments, /authorizePlatform\(auth, "platform\.payments\.manage"\)/, 'Level-1 payment manage authorization'],
+  [platformPayments, /payment_provider_configs/, 'database-driven payment provider configuration'],
+  [platformPayments, /platform_audit_log/, 'payment governance audit trail'],
+  [platformPayments, /Deno\.env\.get\(config\.secret_reference\)/, 'runtime secret-reference validation before provider activation'],
+  [platformStreaming, /platform\.streaming\./, 'Level-1 streaming authority'],
+  [platformAi, /platform\.ai\./, 'Level-1 AI authority'],
+  [platformFeatures, /platform\.features\./, 'Level-1 feature authority'],
+  [platformIntegrations, /platform\.integrations\./, 'Level-1 integrations authority'],
 ];
 
 const missing = invariants.filter(([source, pattern]) => !pattern.test(source));
