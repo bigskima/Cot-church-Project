@@ -40,6 +40,7 @@ const requiredFiles = [
   'supabase/functions/membership-invitations/index.ts',
   'supabase/functions/_shared/rate-limit.ts',
   'supabase/functions/giving/index.ts',
+  'supabase/functions/public-giving/index.ts',
   'supabase/functions/finance/index.ts',
   'supabase/functions/payment-events/index.ts',
   'supabase/functions/live-streams/index.ts',
@@ -68,6 +69,7 @@ const requiredFiles = [
   'supabase/functions/platform-features/index.ts',
   'supabase/functions/platform-integrations/index.ts',
   'supabase/functions/platform-payments/index.ts',
+  'supabase/functions/platform-giving/index.ts',
 ];
 
 await Promise.all(requiredFiles.map((file) => access(file)));
@@ -87,6 +89,9 @@ const publicContent = await readFile('supabase/functions/public-content/index.ts
 const sermons = await readFile('supabase/functions/sermons/index.ts', 'utf8');
 const branding = await readFile('supabase/functions/branding/index.ts', 'utf8');
 const churchStory = await readFile('supabase/functions/church-story/index.ts', 'utf8');
+const giving = await readFile('supabase/functions/giving/index.ts', 'utf8');
+const publicGiving = await readFile('supabase/functions/public-giving/index.ts', 'utf8');
+const platformGiving = await readFile('supabase/functions/platform-giving/index.ts', 'utf8');
 const platformPayments = await readFile('supabase/functions/platform-payments/index.ts', 'utf8');
 const platformStreaming = await readFile('supabase/functions/platform-streaming/index.ts', 'utf8');
 const platformAi = await readFile('supabase/functions/platform-ai/index.ts', 'utf8');
@@ -115,6 +120,15 @@ const invariants = [
   [sermons, /sermons\.create/, 'sermon authorization'],
   [branding, /platform\.branding\.manage/, 'branding authorization'],
   [churchStory, /leadership_profiles/, 'leadership profile management'],
+  [giving, /requireExpression\(auth\.branchId\)/, 'expression giving management requires expression context'],
+  [giving, /online_payment_enabled:\s*false/, 'expression online giving remains unavailable'],
+  [publicGiving, /ORGANIZATION_REQUIRED/, 'public giving requires explicit church scope'],
+  [publicGiving, /expressionId/, 'public giving supports explicit expression scope'],
+  [publicGiving, /manualBankTransfer/, 'manual transfer is exposed as a server-driven giving method'],
+  [platformGiving, /authorizePlatform\(auth, "platform\.giving\.read"\)/, 'Level-1 church-wide giving read authorization'],
+  [platformGiving, /authorizePlatform\(auth, "platform\.giving\.manage"\)/, 'Level-1 church-wide giving manage authorization'],
+  [platformGiving, /ONLINE_GIVING_NOT_READY/, 'online giving cannot be enabled before real provider integration'],
+  [platformGiving, /currency.*3-letter ISO/s, 'currency-neutral giving account validation'],
   [platformPayments, /authorizePlatform\(auth, "platform\.payments\.read"\)/, 'Level-1 payment read authorization'],
   [platformPayments, /authorizePlatform\(auth, "platform\.payments\.manage"\)/, 'Level-1 payment manage authorization'],
   [platformPayments, /payment_provider_configs/, 'database-driven payment provider configuration'],
