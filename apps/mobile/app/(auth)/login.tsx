@@ -11,12 +11,39 @@ import {
 } from 'react-native';
 import { Link, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ApiError } from '@/api';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { BrandMark } from '@/components/primitives/BrandMark';
 import { Icon } from '@/components/primitives/Icon';
 import { Button } from '@/components/Button';
 import { radius, spacing, typography } from '@/design-system/tokens';
+
+function loginErrorMessage(error: unknown) {
+  if (!(error instanceof ApiError)) {
+    return 'We couldn’t sign you in. Please try again.';
+  }
+
+  switch (error.code) {
+    case 'INVALID_CREDENTIALS':
+      return 'The email, phone number, or password you entered is incorrect.';
+    case 'RATE_LIMITED':
+      return 'Too many sign-in attempts. Please wait a little and try again.';
+    case 'REQUEST_TIMEOUT':
+    case 'NETWORK_ERROR':
+      return 'We couldn’t reach the server. Check your connection and try again.';
+    case 'API_NOT_CONFIGURED':
+      return 'Sign in is temporarily unavailable on this app build.';
+    case 'ORIGIN_NOT_ALLOWED':
+    case 'REQUEST_FAILED':
+    case 'INVALID_RESPONSE':
+      return 'Sign in is temporarily unavailable. Please try again shortly.';
+    default:
+      return error.status >= 500
+        ? 'Sign in is temporarily unavailable. Please try again shortly.'
+        : error.message || 'We couldn’t sign you in. Please try again.';
+  }
+}
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -27,9 +54,11 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [guestLoading, setGuestLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   const handleLogin = async () => {
+    if (loading || guestLoading) return;
     setErrorMsg('');
     if (!identifier.trim()) {
       setErrorMsg('Please enter your email or phone number.');
@@ -44,17 +73,28 @@ export default function LoginScreen() {
     try {
       await login(identifier.trim(), password);
       router.replace('/(tabs)/home');
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Invalid credentials. Please check your details.');
+    } catch (error) {
+      setErrorMsg(loginErrorMessage(error));
     } finally {
       setLoading(false);
     }
   };
 
   const handleGuestEntry = async () => {
-    await enterAsVisitor();
-    router.replace('/(tabs)/home');
+    if (loading || guestLoading) return;
+    setErrorMsg('');
+    setGuestLoading(true);
+    try {
+      await enterAsVisitor();
+      router.replace('/(tabs)/home');
+    } catch {
+      setErrorMsg('We couldn’t open guest access. Please try again.');
+    } finally {
+      setGuestLoading(false);
+    }
   };
+
+  const identifierKeyboard = identifier.trim().startsWith('+') ? 'phone-pad' : 'email-address';
 
   return (
     <KeyboardAvoidingView
@@ -69,7 +109,6 @@ export default function LoginScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Platform Brand Mark */}
         <View style={styles.brandMarkContainer}>
           <BrandMark variant="auth" size={72} />
         </View>
@@ -77,12 +116,15 @@ export default function LoginScreen() {
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.text }]}>Welcome Back</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Sign in to access sermons, giving, prayer wall, and your campus fellowship.
+            Sign in to access sermons, live services, giving, prayer, and your church community.
           </Text>
         </View>
 
         {errorMsg ? (
-          <View style={[styles.errorBanner, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
+          <View
+            style={[styles.errorBanner, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}
+            accessibilityRole="alert"
+          >
             <Icon name="alert-circle" size={18} color="#EF4444" style={{ marginRight: 8 }} />
             <Text style={[styles.errorText, { color: '#EF4444' }]}>{errorMsg}</Text>
           </View>
@@ -93,11 +135,17 @@ export default function LoginScreen() {
             <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>EMAIL OR PHONE NUMBER</Text>
             <TextInput
               value={identifier}
-              onChangeText={setIdentifier}
-              placeholder="name@example.com or +15550000000"
+              onChangeText={(value) => {
+                setIdentifier(value);
+                if (errorMsg) setErrorMsg('');
+              }}
+              placeholder="name@example.com or +country code"
               placeholderTextColor={colors.textMuted}
               autoCapitalize="none"
-              keyboardType="email-address"
+              autoCorrect={false}
+              keyboardType={identifierKeyboard}
+              editable={!loading && !guestLoading}
+              returnKeyType="next"
               style={[
                 styles.input,
                 {
@@ -114,10 +162,16 @@ export default function LoginScreen() {
             <View style={styles.passwordContainer}>
               <TextInput
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(value) => {
+                  setPassword(value);
+                  if (errorMsg) setErrorMsg('');
+                }}
                 placeholder="Enter your password"
                 placeholderTextColor={colors.textMuted}
                 secureTextEntry={!showPassword}
+                editable={!loading && !guestLoading}
+                returnKeyType="done"
+                onSubmitEditing={() => void handleLogin()}
                 style={[
                   styles.input,
                   {
@@ -132,6 +186,8 @@ export default function LoginScreen() {
                 onPress={() => setShowPassword(!showPassword)}
                 style={styles.eyeBtn}
                 hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
               >
                 <Icon
                   name={showPassword ? 'eye-off-outline' : 'eye-outline'}
@@ -146,6 +202,7 @@ export default function LoginScreen() {
             label="Sign In"
             onPress={handleLogin}
             loading={loading}
+            disabled={guestLoading}
             variant="primary"
             size="lg"
             style={{ marginTop: spacing.sm }}
@@ -154,17 +211,17 @@ export default function LoginScreen() {
           <Button
             label="Continue as Guest"
             onPress={handleGuestEntry}
+            loading={guestLoading}
+            disabled={loading}
             variant="outline"
             size="lg"
           />
         </View>
 
         <View style={styles.footer}>
-          <Text style={[styles.footerText, { color: colors.textSecondary }]}>
-            Don't have an account?{' '}
-          </Text>
+          <Text style={[styles.footerText, { color: colors.textSecondary }]}>Don't have an account? </Text>
           <Link href="/(auth)/signup" asChild>
-            <Pressable>
+            <Pressable accessibilityRole="link">
               <Text style={[styles.footerLink, { color: colors.interactive }]}>Sign up</Text>
             </Pressable>
           </Link>
