@@ -191,7 +191,7 @@ export function GivingScreen() {
           {giving.loading ? (
             <Skeleton height={150} count={3} />
           ) : giving.error ? (
-            <ResourceError message={giving.error.message} onRetry={giving.refresh} />
+            <ResourceError message={giving.error} retry={giving.refresh} />
           ) : !details?.settings || !details.settings.isEnabled ? (
             <EmptyState
               title="Giving details are not available"
