@@ -12,6 +12,7 @@ import { GivingConfiguration } from '../pages/GivingConfiguration';
 import { StreamingInfrastructure } from '../pages/StreamingInfrastructure';
 import { AiInfrastructure } from '../pages/AiInfrastructure';
 import { PaymentInfrastructure } from '../pages/PaymentInfrastructure';
+import { ProviderCredentials } from '../pages/ProviderCredentials';
 import { FeatureFlags } from '../pages/FeatureFlags';
 import { IntegrationsJobs } from '../pages/IntegrationsJobs';
 import { AuditSecurity } from '../pages/AuditSecurity';
@@ -37,6 +38,7 @@ const allNavSections: NavSection[] = [
   {
     group: 'Provider Infrastructure',
     items: [
+      { key: 'credentials', label: 'Provider Credentials', icon: '🔐' },
       { key: 'streaming', label: 'Video Broadcast Adapter', icon: '📡' },
       { key: 'ai', label: 'AI Gateway & Models', icon: '✦' },
       { key: 'payments', label: 'Payment Gateways', icon: '💳' },
@@ -98,6 +100,7 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
       case 'expression-creators': return isSuperAdmin ? <ExpressionCreators api={api} /> : <PlatformOverview api={api} onNavigate={setPage} />;
       case 'branding': return <BrandingAppearance api={api} />;
       case 'giving': return <GivingConfiguration api={api} />;
+      case 'credentials': return <ProviderCredentials api={api} />;
       case 'streaming': return <StreamingInfrastructure api={api} />;
       case 'ai': return <AiInfrastructure api={api} />;
       case 'payments': return <PaymentInfrastructure api={api} />;
