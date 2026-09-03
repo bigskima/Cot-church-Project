@@ -1,6 +1,7 @@
-import { access, readFile } from 'node:fs/promises';
+import { access, readFile, readdir } from 'node:fs/promises';
 
 const requiredFiles = [
+  'supabase/config.toml',
   'supabase/functions/_shared/config.ts',
   'supabase/functions/_shared/context.ts',
   'supabase/functions/_shared/cors.ts',
@@ -12,9 +13,11 @@ const requiredFiles = [
   'supabase/functions/_shared/supabase.ts',
   'supabase/functions/_shared/validation.ts',
   'supabase/functions/login/index.ts',
+  'supabase/functions/signup/index.ts',
   'supabase/functions/password-recovery/index.ts',
   'supabase/functions/profile/index.ts',
   'supabase/functions/verify-otp/index.ts',
+  'supabase/functions/organization-context/index.ts',
   'supabase/functions/organizations/index.ts',
   'supabase/functions/branches/index.ts',
   'supabase/functions/memberships/index.ts',
@@ -73,6 +76,7 @@ const publicContent = await readFile('supabase/functions/public-content/index.ts
 const sermons = await readFile('supabase/functions/sermons/index.ts', 'utf8');
 const branding = await readFile('supabase/functions/branding/index.ts', 'utf8');
 const churchStory = await readFile('supabase/functions/church-story/index.ts', 'utf8');
+const gatewayConfig = await readFile('supabase/config.toml', 'utf8');
 
 const invariants = [
   [handler, /request\.method === "OPTIONS"/, 'CORS preflight handling'],
@@ -98,9 +102,39 @@ const invariants = [
 ];
 
 const missing = invariants.filter(([source, pattern]) => !pattern.test(source));
-if (missing.length) {
-  console.error(`API check failed: ${missing.map(([, , label]) => label).join(', ')}`);
+
+const functionEntries = await readdir('supabase/functions', { withFileTypes: true });
+const publicHandlerFunctions = [];
+for (const entry of functionEntries) {
+  if (!entry.isDirectory() || entry.name.startsWith('_')) continue;
+  const path = `supabase/functions/${entry.name}/index.ts`;
+  try {
+    const source = await readFile(path, 'utf8');
+    if (/authentication\s*:\s*["']none["']/.test(source)) publicHandlerFunctions.push(entry.name);
+  } catch {
+    // Directories without an index.ts are not Edge Function entrypoints.
+  }
+}
+
+const gatewayMismatches = publicHandlerFunctions.filter((functionName) => {
+  const header = `[functions.${functionName}]`;
+  const sectionStart = gatewayConfig.indexOf(header);
+  if (sectionStart < 0) return true;
+  const remainder = gatewayConfig.slice(sectionStart + header.length);
+  const nextSection = remainder.search(/\n\s*\[/);
+  const section = nextSection >= 0 ? remainder.slice(0, nextSection) : remainder;
+  return !/verify_jwt\s*=\s*false/.test(section);
+});
+
+if (missing.length || gatewayMismatches.length) {
+  const failures = [
+    ...missing.map(([, , label]) => label),
+    ...gatewayMismatches.map((name) => `gateway verify_jwt=false for ${name}`),
+  ];
+  console.error(`API check failed: ${failures.join(', ')}`);
   process.exitCode = 1;
 } else {
-  console.log(`API check passed (${requiredFiles.length} shared modules, ${invariants.length} invariants).`);
+  console.log(
+    `API check passed (${requiredFiles.length} shared modules, ${invariants.length} invariants, ${publicHandlerFunctions.length} public/secret-verified gateway contracts).`,
+  );
 }
