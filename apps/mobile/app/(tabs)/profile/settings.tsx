@@ -13,6 +13,7 @@ type ProfilePayload = {
   username: string | null;
   birthday: string | null;
   birthday_expression_visible: boolean;
+  birthday_public_visible: boolean;
   bio: string | null;
   phone_number: string | null;
   avatar_url: string | null;
@@ -39,6 +40,7 @@ export default function AccountSettingsScreen() {
   const [username, setUsername] = useState('');
   const [birthday, setBirthday] = useState('');
   const [birthdayExpressionVisible, setBirthdayExpressionVisible] = useState(true);
+  const [birthdayPublicVisible, setBirthdayPublicVisible] = useState(false);
   const [bio, setBio] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(true);
@@ -57,6 +59,7 @@ export default function AccountSettingsScreen() {
       setUsername(data.username ?? '');
       setBirthday(data.birthday ?? '');
       setBirthdayExpressionVisible(data.birthday_expression_visible !== false);
+      setBirthdayPublicVisible(data.birthday_public_visible === true);
       setBio(data.bio ?? '');
       setPhoneNumber(data.phone_number ?? '');
     } catch (value) {
@@ -90,12 +93,14 @@ export default function AccountSettingsScreen() {
           username: username.trim(),
           birthday: birthday.trim() || null,
           birthdayExpressionVisible,
+          birthdayPublicVisible,
           bio: bio.trim() || null,
           phoneNumber: phoneNumber.trim() || null,
         }),
       });
       setProfile(updated);
       setBirthdayExpressionVisible(updated.birthday_expression_visible !== false);
+      setBirthdayPublicVisible(updated.birthday_public_visible === true);
       setSuccess('Profile settings saved.');
       await refreshSessionContext();
     } catch (value) {
@@ -203,11 +208,18 @@ export default function AccountSettingsScreen() {
               <Field label="USERNAME" value={username} onChangeText={setUsername} placeholder="your.username" colors={colors} autoCapitalize="none" />
               <Text style={[styles.helper, { color: colors.textMuted }]}>Username uses 3–30 lowercase letters, numbers, dots or underscores.</Text>
               <Field label="BIRTHDAY" value={birthday} onChangeText={setBirthday} placeholder="YYYY-MM-DD" colors={colors} keyboardType="numbers-and-punctuation" />
-              <Text style={[styles.helper, { color: colors.textMuted }]}>Your full birth date is private. If enabled below, members of your own Expression see only your birthday month/day and receive birthday reminders.</Text>
+              <Text style={[styles.helper, { color: colors.textMuted }]}>Your full birth date is always private. The controls below decide whether only month/day may appear in the General Community and/or your own Expression.</Text>
+
+              <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>GENERAL COMMUNITY BIRTHDAY VISIBILITY</Text>
+              <View style={styles.chips}>
+                <Chip label="Show my month/day publicly" selected={birthdayPublicVisible} onPress={() => setBirthdayPublicVisible(true)} />
+                <Chip label="Keep it out of General Community" selected={!birthdayPublicVisible} onPress={() => setBirthdayPublicVisible(false)} />
+              </View>
+
               <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>EXPRESSION BIRTHDAY VISIBILITY</Text>
               <View style={styles.chips}>
                 <Chip label="Share month/day with my Expression" selected={birthdayExpressionVisible} onPress={() => setBirthdayExpressionVisible(true)} />
-                <Chip label="Keep birthday hidden" selected={!birthdayExpressionVisible} onPress={() => setBirthdayExpressionVisible(false)} />
+                <Chip label="Keep it hidden in my Expression" selected={!birthdayExpressionVisible} onPress={() => setBirthdayExpressionVisible(false)} />
               </View>
               <Field label="BIO" value={bio} onChangeText={setBio} placeholder="A short introduction" colors={colors} multiline maxLength={500} />
             </View>
