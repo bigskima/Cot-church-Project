@@ -1,88 +1,162 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { ApiClient } from '../api';
-import { Badge, Button, Card, SearchBar, Table, Toggle } from '../components/ui';
+import { Badge, Button, Card, InputField, Modal, SearchBar, Table, Toggle } from '../components/ui';
 
 interface FeatureFlag {
   key: string;
   name: string;
-  category: 'core' | 'media' | 'intelligence' | 'finance' | 'social';
+  category: string;
   description: string;
   global_enabled: boolean;
   rollout_percentage: number;
+  configuration: Record<string, unknown>;
+  updated_at?: string;
+  organization_override?: unknown;
+  effective_enabled: boolean;
+  effective_rollout_percentage: number;
 }
 
-const defaultFlags: FeatureFlag[] = [
-  {
-    key: 'livestream_realtime_chat',
-    name: 'Livestream Real-Time Chat & Emojis',
-    category: 'media',
-    description: 'Enable interactive member chat and floating reactions during live broadcasts.',
-    global_enabled: true,
-    rollout_percentage: 100,
-  },
-  {
-    key: 'ai_sermon_intelligence',
-    name: 'AI Sermon Intelligence & Study Notes',
-    category: 'intelligence',
-    description: 'Automatic transcription, scripture extraction, and lesson summaries.',
-    global_enabled: true,
-    rollout_percentage: 100,
-  },
-  {
-    key: 'giving_reconciliation_engine',
-    name: 'Multi-Currency Giving & Instant Receipts',
-    category: 'finance',
-    description: 'Automated settlement fee tracking and multi-gateway matching.',
-    global_enabled: true,
-    rollout_percentage: 100,
-  },
-  {
-    key: 'social_community_feed',
-    name: 'Sanctuary Community Social Feed',
-    category: 'social',
-    description: 'Scoped posts, testimonies, and prayer agreement reactions for church members.',
-    global_enabled: true,
-    rollout_percentage: 100,
-  },
-  {
-    key: 'pastoral_triage_altar_calls',
-    name: 'Pastoral Triage & Altar Responses',
-    category: 'core',
-    description: 'Confidential prayer queue, altar calls, and ministerial assignments.',
-    global_enabled: true,
-    rollout_percentage: 100,
-  },
-];
+interface FeaturePayload {
+  organizationId: string | null;
+  items: FeatureFlag[];
+}
 
 export function FeatureFlags({ api }: { api: ApiClient }) {
-  const [flags, setFlags] = useState<FeatureFlag[]>(defaultFlags);
+  const [flags, setFlags] = useState<FeatureFlag[]>([]);
   const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [editing, setEditing] = useState<FeatureFlag | null>(null);
+  const [rolloutPercentage, setRolloutPercentage] = useState('100');
+  const [disableReason, setDisableReason] = useState('');
 
-  const toggleFlag = (key: string) => {
-    setFlags((list) =>
-      list.map((f) => (f.key === key ? { ...f, global_enabled: !f.global_enabled } : f))
-    );
+  const load = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await api.request<FeaturePayload>('platform-features');
+      setFlags(data.items ?? []);
+    } catch (value) {
+      setError(value instanceof Error ? value.message : 'Unable to load feature flags.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const filtered = flags.filter(
-    (f) =>
-      f.name.toLowerCase().includes(search.toLowerCase()) ||
-      f.key.toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => {
+    void load();
+  }, [api]);
+
+  const filtered = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    if (!needle) return flags;
+    return flags.filter(
+      (flag) =>
+        flag.name.toLowerCase().includes(needle) ||
+        flag.key.toLowerCase().includes(needle) ||
+        flag.category.toLowerCase().includes(needle)
+    );
+  }, [flags, search]);
+
+  const setGlobal = async (
+    flag: FeatureFlag,
+    enabled: boolean,
+    percentage = flag.rollout_percentage,
+    reason?: string
+  ) => {
+    setBusyKey(flag.key);
+    setError('');
+    try {
+      const updated = await api.request<FeatureFlag>('platform-features', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          action: 'set_global',
+          key: flag.key,
+          enabled,
+          rolloutPercentage: percentage,
+          configuration: flag.configuration ?? {},
+          reason: enabled ? undefined : reason,
+        }),
+      });
+      setFlags((items) =>
+        items.map((item) =>
+          item.key === updated.key
+            ? {
+                ...item,
+                ...updated,
+                effective_enabled: updated.global_enabled,
+                effective_rollout_percentage: updated.rollout_percentage,
+              }
+            : item
+        )
+      );
+    } catch (value) {
+      setError(value instanceof Error ? value.message : 'Unable to update feature state.');
+      throw value;
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const requestToggle = async (flag: FeatureFlag) => {
+    if (flag.global_enabled) {
+      setEditing(flag);
+      setRolloutPercentage(String(flag.rollout_percentage));
+      setDisableReason('');
+      return;
+    }
+    try {
+      await setGlobal(flag, true);
+    } catch {
+      // Error already surfaced by setGlobal.
+    }
+  };
+
+  const saveSettings = async () => {
+    if (!editing) return;
+    const percentage = Number(rolloutPercentage);
+    if (!Number.isInteger(percentage) || percentage < 0 || percentage > 100) {
+      setError('Rollout percentage must be an integer from 0 to 100.');
+      return;
+    }
+    if (!disableReason.trim()) {
+      setError('A governance reason is required before globally disabling a feature.');
+      return;
+    }
+    try {
+      await setGlobal(editing, false, percentage, disableReason.trim());
+      setEditing(null);
+      setDisableReason('');
+    } catch {
+      // Error already surfaced by setGlobal.
+    }
+  };
 
   return (
     <div>
       <Card
         title="Platform Feature Capabilities & Rollouts"
-        subtitle="Dynamically control platform modules globally or per organisation without redeploying code"
+        subtitle="Database-driven global defaults. Organization overrides are layered by the backend without redeploying clients."
         headerAction={
-          <SearchBar
-            value={search}
-            onChange={setSearch}
-            placeholder="Search capability flags..."
-          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <SearchBar
+              value={search}
+              onChange={setSearch}
+              placeholder="Search capability flags..."
+            />
+            <Button variant="outline" size="sm" onClick={() => void load()} loading={loading}>
+              Refresh
+            </Button>
+          </div>
         }
       >
+        {error ? (
+          <div className="admin-form-error" role="alert" style={{ marginBottom: 16 }}>
+            {error}
+          </div>
+        ) : null}
+
         <Table
           columns={[
             {
@@ -90,7 +164,7 @@ export function FeatureFlags({ api }: { api: ApiClient }) {
               accessor: (item) => (
                 <div>
                   <div style={{ fontWeight: 800 }}>{item.name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.55 }}>
                     <code style={{ color: 'var(--gold)' }}>{item.key}</code> · {item.description}
                   </div>
                 </div>
@@ -101,8 +175,8 @@ export function FeatureFlags({ api }: { api: ApiClient }) {
               accessor: (item) => <Badge label={item.category.toUpperCase()} variant="neutral" />,
             },
             {
-              header: 'ROLLOUT',
-              accessor: (item) => <strong>{item.rollout_percentage}% Global</strong>,
+              header: 'GLOBAL ROLLOUT',
+              accessor: (item) => <strong>{item.rollout_percentage}%</strong>,
             },
             {
               header: 'STATE',
@@ -115,21 +189,93 @@ export function FeatureFlags({ api }: { api: ApiClient }) {
               ),
             },
             {
-              header: 'TOGGLE',
+              header: 'CONTROL',
               accessor: (item) => (
-                <Toggle
-                  label=""
-                  checked={item.global_enabled}
-                  onChange={() => toggleFlag(item.key)}
-                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Toggle
+                    label=""
+                    checked={item.global_enabled}
+                    disabled={busyKey === item.key}
+                    onChange={() => void requestToggle(item)}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={busyKey === item.key}
+                    onClick={() => {
+                      setEditing(item);
+                      setRolloutPercentage(String(item.rollout_percentage));
+                      setDisableReason('');
+                    }}
+                  >
+                    Policy
+                  </Button>
+                </div>
               ),
             },
           ]}
           data={filtered}
           keyExtractor={(item) => item.key}
+          loading={loading}
           emptyMessage="No feature flags match your search query."
         />
       </Card>
+
+      <Modal
+        isOpen={!!editing}
+        onClose={() => {
+          if (!busyKey) setEditing(null);
+        }}
+        title={editing ? `Feature policy · ${editing.name}` : 'Feature policy'}
+        subtitle={editing?.key}
+        footer={
+          <div style={{ display: 'flex', gap: 12 }}>
+            <Button variant="outline" disabled={!!busyKey} onClick={() => setEditing(null)}>
+              Cancel
+            </Button>
+            {editing?.global_enabled ? (
+              <Button variant="danger" loading={busyKey === editing.key} onClick={() => void saveSettings()}>
+                Save & disable globally
+              </Button>
+            ) : (
+              <Button
+                variant="gold"
+                loading={busyKey === editing?.key}
+                onClick={() => {
+                  if (!editing) return;
+                  const percentage = Number(rolloutPercentage);
+                  if (!Number.isInteger(percentage) || percentage < 0 || percentage > 100) {
+                    setError('Rollout percentage must be an integer from 0 to 100.');
+                    return;
+                  }
+                  void setGlobal(editing, true, percentage).then(() => setEditing(null)).catch(() => undefined);
+                }}
+              >
+                Save & enable
+              </Button>
+            )}
+          </div>
+        }
+      >
+        <InputField
+          label="Global rollout percentage"
+          type="number"
+          min={0}
+          max={100}
+          value={rolloutPercentage}
+          onChange={(event) => setRolloutPercentage(event.target.value)}
+          helperText="This is the platform default. Organization overrides can narrow or expand effective availability separately."
+        />
+        {editing?.global_enabled ? (
+          <InputField
+            label="Governance reason for disabling"
+            value={disableReason}
+            onChange={(event) => setDisableReason(event.target.value)}
+            placeholder="Operational incident, staged retirement, safety restriction..."
+            helperText="The reason is written to the Level-1 append-only audit trail."
+          />
+        ) : null}
+      </Modal>
     </div>
   );
 }
