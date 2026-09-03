@@ -226,7 +226,15 @@ export const elevation = {
   },
 } as const;
 
-export type SemanticTokens = typeof semanticTokens.light;
+// Both themes intentionally share the same semantic keys but not the same
+// literal values. A type derived from only `light` incorrectly rejects every
+// dark-mode color at compile time. Preserve the key contract while allowing
+// the value for each key from either supported theme.
+export type SemanticTokens = {
+  [Key in keyof typeof semanticTokens.light]:
+    | (typeof semanticTokens.light)[Key]
+    | (typeof semanticTokens.dark)[Key];
+};
 export type TypographyToken = typeof typography[keyof typeof typography];
 export type SpacingToken = typeof spacing[keyof typeof spacing];
 export type RadiusToken = typeof radius[keyof typeof radius];
