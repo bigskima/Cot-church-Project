@@ -26,6 +26,12 @@ type RoutedPrayer = PrayerRequest & {
   public_approved_at?: string | null;
   is_publicly_visible?: boolean;
 };
+type CareFollowUp = LiveFollowUp & {
+  branch_id?: string | null;
+  stream_title?: string | null;
+  user_phone?: string | null;
+  user_avatar?: string | null;
+};
 
 export default function PastoralTriageScreen() {
   const insets = useSafeAreaInsets();
@@ -35,29 +41,34 @@ export default function PastoralTriageScreen() {
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
 
   const [activeQueue, setActiveQueue] = useState<'prayer' | 'care'>('prayer');
-  const [prayerScope, setPrayerScope] = useState<PrayerScope>(expression?.id ? 'expression' : 'general');
+  const [ministryScope, setMinistryScope] = useState<PrayerScope>(expression?.id ? 'expression' : 'general');
   const [workingId, setWorkingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!expression?.id && prayerScope === 'expression') setPrayerScope('general');
-  }, [expression?.id, prayerScope]);
+    if (!expression?.id && ministryScope === 'expression') setMinistryScope('general');
+  }, [expression?.id, ministryScope]);
 
   const prayerPath = (() => {
-    const query = new URLSearchParams({ view: 'moderation', scope: prayerScope });
+    const query = new URLSearchParams({ view: 'moderation', scope: ministryScope });
     if (organizationId) query.set('organizationId', organizationId);
-    if (prayerScope === 'expression' && expression?.id) query.set('branchId', expression.id);
+    if (ministryScope === 'expression' && expression?.id) query.set('branchId', expression.id);
     return `prayer-requests?${query.toString()}`;
   })();
 
+  const followupPath = (() => {
+    const query = new URLSearchParams({ scope: ministryScope });
+    if (ministryScope === 'expression' && expression?.id) query.set('branchId', expression.id);
+    return `pastoral-followups?${query.toString()}`;
+  })();
+
   const prayers = useResource<RoutedPrayer[]>(
-    `pastoral:prayers:${prayerScope}:${organizationId || 'auto'}:${expression?.id || 'none'}`,
+    `pastoral:prayers:${ministryScope}:${organizationId || 'auto'}:${expression?.id || 'none'}`,
     (signal) => api.request<RoutedPrayer[]>(prayerPath, { signal })
   );
 
-  // This queue is retained while the broader pastoral follow-up endpoint is audited.
-  // Prayer routing itself no longer depends on this legacy feed request.
-  const followups = useResource<LiveFollowUp[]>('pastoral:followups', (signal) =>
-    api.request<LiveFollowUp[]>('social-feed?type=followups', { signal }).catch(() => [])
+  const followups = useResource<CareFollowUp[]>(
+    `pastoral:followups:${ministryScope}:${organizationId || 'none'}:${expression?.id || 'none'}`,
+    (signal) => api.request<CareFollowUp[]>(followupPath, { signal })
   );
 
   const updatePrayer = async (
@@ -78,11 +89,33 @@ export default function PastoralTriageScreen() {
     }
   };
 
+  const updateFollowup = async (id: string, status: 'contacted' | 'resolved' | 'closed') => {
+    setWorkingId(id);
+    try {
+      await api.request('pastoral-followups', {
+        method: 'PATCH',
+        body: JSON.stringify({ id, status }),
+      });
+      followups.refresh();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Unable to update this pastoral follow-up.');
+    } finally {
+      setWorkingId(null);
+    }
+  };
+
   const prayerList = prayers.data ?? [];
   const careList = followups.data ?? [];
-  const scopeTitle = prayerScope === 'expression' && expression?.name
+  const scopeTitle = ministryScope === 'expression' && expression?.name
     ? `${expression.name} Prayer Queue`
     : 'General Prayer Ministry Queue';
+
+  const scopeTabs = expression?.id ? (
+    <View style={styles.scopeTabs}>
+      <Chip label="General" selected={ministryScope === 'general'} onPress={() => setMinistryScope('general')} />
+      <Chip label={expression.name} selected={ministryScope === 'expression'} onPress={() => setMinistryScope('expression')} />
+    </View>
+  ) : null;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -95,35 +128,19 @@ export default function PastoralTriageScreen() {
       >
         <ScreenHeader
           title="Pastoral Triage & Care"
-          subtitle="Prayer access follows your assigned ministry role and exact church or Expression scope."
+          subtitle="Prayer and live-service follow-up access follows your assigned pastoral role and exact church or Expression scope."
           showBack
         />
 
         <View style={styles.tabRow}>
-          <Chip
-            label="Prayer Requests"
-            selected={activeQueue === 'prayer'}
-            onPress={() => setActiveQueue('prayer')}
-            count={prayerList.length}
-          />
-          <Chip
-            label="Altar & Care Responses"
-            selected={activeQueue === 'care'}
-            onPress={() => setActiveQueue('care')}
-            count={careList.length}
-          />
+          <Chip label="Prayer Requests" selected={activeQueue === 'prayer'} onPress={() => setActiveQueue('prayer')} count={prayerList.length} />
+          <Chip label="Altar & Care Responses" selected={activeQueue === 'care'} onPress={() => setActiveQueue('care')} count={careList.length} />
         </View>
 
         <View style={styles.body}>
           {activeQueue === 'prayer' ? (
             <View style={styles.queueSection}>
-              {expression?.id ? (
-                <View style={styles.scopeTabs}>
-                  <Chip label="General" selected={prayerScope === 'general'} onPress={() => setPrayerScope('general')} />
-                  <Chip label={expression.name} selected={prayerScope === 'expression'} onPress={() => setPrayerScope('expression')} />
-                </View>
-              ) : null}
-
+              {scopeTabs}
               <SectionHeader title={scopeTitle} badge={prayerList.length} />
               {prayers.loading && !prayers.data ? (
                 <Skeleton height={140} count={2} />
@@ -143,101 +160,68 @@ export default function PastoralTriageScreen() {
                         : 'WALL APPROVAL PENDING';
 
                   return (
-                    <View
-                      key={p.id}
-                      style={[styles.triageCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}
-                    >
+                    <View key={p.id} style={[styles.triageCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
                       <View style={styles.cardHeader}>
-                        <Badge
-                          label={badgeLabel}
-                          variant={p.privacy === 'pastoral_only' ? 'prayer' : 'primary'}
-                        />
-                        <Text style={[styles.dateText, { color: colors.textMuted }]}> 
-                          {new Date(p.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                        </Text>
+                        <Badge label={badgeLabel} variant={p.privacy === 'pastoral_only' ? 'prayer' : 'primary'} />
+                        <Text style={[styles.dateText, { color: colors.textMuted }]}>{new Date(p.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Text>
                       </View>
-
                       <Text style={[styles.title, { color: colors.text }]}>{p.title}</Text>
-                      {p.request || p.description ? (
-                        <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
-                          {p.request || p.description}
-                        </Text>
-                      ) : null}
+                      {p.request || p.description ? <Text style={[styles.bodyText, { color: colors.textSecondary }]}>{p.request || p.description}</Text> : null}
 
                       {wallIntent ? (
-                        <View style={[styles.wallNotice, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}> 
-                          <Text style={[styles.wallNoticeText, { color: colors.textSecondary }]}> 
-                            The submitter allowed this petition to appear on the {prayerScope === 'expression' ? 'Expression' : 'public'} prayer wall. It remains private to the assigned ministry until you approve it.
-                          </Text>
-                          <Button
-                            label={approved ? 'Remove from Wall' : 'Approve for Wall'}
-                            onPress={() => updatePrayer(p.id, { approvePublic: !approved })}
-                            variant={approved ? 'outline' : 'primary'}
-                            size="sm"
-                            loading={busy}
-                          />
+                        <View style={[styles.wallNotice, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+                          <Text style={[styles.wallNoticeText, { color: colors.textSecondary }]}>The submitter allowed this petition to appear on the {ministryScope === 'expression' ? 'Expression' : 'public'} prayer wall. It remains private to the assigned ministry until you approve it.</Text>
+                          <Button label={approved ? 'Remove from Wall' : 'Approve for Wall'} onPress={() => updatePrayer(p.id, { approvePublic: !approved })} variant={approved ? 'outline' : 'primary'} size="sm" loading={busy} />
                         </View>
                       ) : null}
 
-                      <View style={[styles.actionBar, { borderTopColor: colors.borderSubtle }]}> 
-                        <Text style={[styles.statusLabel, { color: colors.textMuted }]}> 
-                          Status: <Text style={{ color: colors.interactive, fontWeight: '700' }}>{p.status || 'submitted'}</Text>
-                        </Text>
-
+                      <View style={[styles.actionBar, { borderTopColor: colors.borderSubtle }]}>
+                        <Text style={[styles.statusLabel, { color: colors.textMuted }]}>Status: <Text style={{ color: colors.interactive, fontWeight: '700' }}>{p.status || 'submitted'}</Text></Text>
                         <View style={styles.btnRow}>
-                          <Button
-                            label="Mark Praying"
-                            onPress={() => updatePrayer(p.id, { status: 'praying' })}
-                            variant="outline"
-                            size="sm"
-                            loading={busy}
-                          />
-                          <Button
-                            label="Answered"
-                            onPress={() => updatePrayer(p.id, { status: 'answered' })}
-                            variant="primary"
-                            size="sm"
-                            loading={busy}
-                          />
+                          <Button label="Mark Praying" onPress={() => updatePrayer(p.id, { status: 'praying' })} variant="outline" size="sm" loading={busy} />
+                          <Button label="Answered" onPress={() => updatePrayer(p.id, { status: 'answered' })} variant="primary" size="sm" loading={busy} />
                         </View>
                       </View>
                     </View>
                   );
                 })
               ) : (
-                <EmptyState
-                  title="No Prayer Requests in This Queue"
-                  message="New petitions routed to your exact prayer or pastoral scope will appear here."
-                  iconName="shield-checkmark-outline"
-                />
+                <EmptyState title="No Prayer Requests in This Queue" message="New petitions routed to your exact prayer or pastoral scope will appear here." iconName="shield-checkmark-outline" />
               )}
             </View>
           ) : (
             <View style={styles.queueSection}>
-              <SectionHeader title="Altar Call & Counselling Log" badge={careList.length} />
-              {careList.length > 0 ? (
-                careList.map((f) => (
-                  <View
-                    key={f.id}
-                    style={[styles.triageCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}
-                  >
-                    <View style={styles.cardHeader}>
-                      <Badge label={f.type.toUpperCase()} variant="primary" />
-                      <Text style={[styles.dateText, { color: colors.textMuted }]}> 
-                        {new Date(f.created_at).toLocaleDateString()}
-                      </Text>
+              {scopeTabs}
+              <SectionHeader title={ministryScope === 'expression' && expression?.name ? `${expression.name} Altar & Care Queue` : 'General Altar & Care Queue'} badge={careList.length} />
+              {followups.loading && !followups.data ? (
+                <Skeleton height={130} count={2} />
+              ) : followups.error && !followups.data ? (
+                <ResourceError message={followups.error} retry={followups.refresh} />
+              ) : careList.length > 0 ? (
+                careList.map((f) => {
+                  const busy = workingId === f.id;
+                  return (
+                    <View key={f.id} style={[styles.triageCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+                      <View style={styles.cardHeader}>
+                        <Badge label={f.type.replaceAll('_', ' ').toUpperCase()} variant="primary" />
+                        <Text style={[styles.dateText, { color: colors.textMuted }]}>{new Date(f.created_at).toLocaleDateString()}</Text>
+                      </View>
+                      <Text style={[styles.title, { color: colors.text }]}>{f.user_name || 'Church Participant'}</Text>
+                      {f.stream_title ? <Text style={[styles.bodyText, { color: colors.textSecondary }]}>From: {f.stream_title}</Text> : null}
+                      {f.user_phone ? <Text style={[styles.bodyText, { color: colors.interactive }]}>{f.user_phone}</Text> : null}
+                      {f.private_note ? <Text style={[styles.bodyText, { color: colors.textSecondary }]}>{f.private_note}</Text> : null}
+                      <View style={[styles.actionBar, { borderTopColor: colors.borderSubtle }]}>
+                        <Text style={[styles.statusLabel, { color: colors.textMuted }]}>Status: <Text style={{ color: colors.interactive, fontWeight: '700' }}>{f.status}</Text></Text>
+                        <View style={styles.btnRow}>
+                          <Button label="Contacted" onPress={() => updateFollowup(f.id, 'contacted')} variant="outline" size="sm" loading={busy} />
+                          <Button label="Resolved" onPress={() => updateFollowup(f.id, 'resolved')} variant="primary" size="sm" loading={busy} />
+                        </View>
+                      </View>
                     </View>
-                    <Text style={[styles.title, { color: colors.text }]}>{f.user_name || 'Anonymous Visitor'}</Text>
-                    {f.user_email ? <Text style={[styles.bodyText, { color: colors.interactive }]}>{f.user_email}</Text> : null}
-                    {f.private_note ? <Text style={[styles.bodyText, { color: colors.textSecondary }]}>{f.private_note}</Text> : null}
-                  </View>
-                ))
+                  );
+                })
               ) : (
-                <EmptyState
-                  title="No Follow-Up Requests"
-                  message="Incoming live-service follow-up requests will appear here once that pastoral queue is available."
-                  iconName="heart-outline"
-                />
+                <EmptyState title="No Follow-Up Requests" message="Altar responses, counselling requests and other live-service follow-ups routed to this exact scope will appear here." iconName="heart-outline" />
               )}
             </View>
           )}
