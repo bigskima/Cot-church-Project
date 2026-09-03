@@ -123,6 +123,22 @@ Deno.serve(createHandler(
       return { data: data ?? [] };
     }
 
+    if (type === "series") {
+      let query = client
+        .from("sermon_series")
+        .select("id,organization_id,expression_id,title,slug,description,artwork_url,starts_at,ends_at,is_featured,created_at,updated_at")
+        .order("is_featured", { ascending: false })
+        .order("starts_at", { ascending: false, nullsFirst: false })
+        .limit(50);
+
+      if (organizationId) query = query.eq("organization_id", organizationId);
+      if (expressionId) query = query.eq("expression_id", expressionId);
+
+      const { data, error } = await query;
+      if (error) throw new ApiError("PUBLIC_SERIES_FAILED", "Unable to retrieve public sermon series", 500, undefined, false);
+      return { data: data ?? [] };
+    }
+
     if (type === "leaders") {
       let query = client
         .from("leaders")
