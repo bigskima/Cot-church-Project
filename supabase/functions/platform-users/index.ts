@@ -29,24 +29,31 @@ Deno.serve(
           page_offset: offset,
         });
         if (error) throw new ApiError("PLATFORM_USERS_FAILED", "Unable to retrieve platform identities", 500, undefined, false);
+
         const rows = (data ?? []) as Array<Record<string, unknown>>;
         const profileIds = rows.map((row) => String(row.id)).filter(Boolean);
-        const { data: postingControls, error: postingError } = profileIds.length
-          ? await admin.from("profile_posting_controls").select("profile_id,posting_allowed,reason,restricted_until,updated_at").in("profile_id", profileIds)
+        const { data: restrictions, error: restrictionError } = profileIds.length
+          ? await admin
+              .from("platform_user_restrictions")
+              .select("profile_id,is_active,reason,expires_at,updated_at")
+              .eq("restriction_code", "posting")
+              .in("profile_id", profileIds)
           : { data: [], error: null };
-        if (postingError) throw new ApiError("PLATFORM_USERS_FAILED", "Unable to retrieve posting governance state", 500, undefined, false);
-        const postingMap = new Map((postingControls ?? []).map((control: any) => [control.profile_id, control]));
+        if (restrictionError) throw new ApiError("PLATFORM_USERS_FAILED", "Unable to retrieve posting governance state", 500, undefined, false);
 
+        const restrictionMap = new Map((restrictions ?? []).map((control: any) => [control.profile_id, control]));
         return {
           data: {
             items: rows.map(({ total_count: _total, ...item }) => {
-              const control = postingMap.get(String(item.id)) as any;
-              const restrictionExpired = Boolean(control?.restricted_until && new Date(control.restricted_until).getTime() <= Date.now());
+              const control = restrictionMap.get(String(item.id)) as any;
+              const stillRestricted = Boolean(
+                control?.is_active && (!control.expires_at || new Date(control.expires_at).getTime() > Date.now()),
+              );
               return {
                 ...item,
-                posting_allowed: control ? Boolean(control.posting_allowed || restrictionExpired) : true,
-                posting_restriction_reason: control?.reason ?? null,
-                posting_restricted_until: control?.restricted_until ?? null,
+                posting_allowed: !stillRestricted,
+                posting_restriction_reason: stillRestricted ? control?.reason ?? null : null,
+                posting_restricted_until: stillRestricted ? control?.expires_at ?? null : null,
               };
             }),
             page,
@@ -58,7 +65,7 @@ Deno.serve(
 
       await authorizePlatform(auth, "platform.users.manage");
       const body = assertObject(await jsonBody(request));
-      assertNoUnknownFields(body, ["profileId", "action", "reason"]);
+      assertNoUnknownFields(body, ["profileId", "action", "reason", "expiresAt"]);
       const profileId = uuid(requiredString(body.profileId, "profileId", 64), "profileId", true)!;
       const action = requiredString(body.action, "action", 32);
       const reason = optionalString(body.reason, "reason", 1000) ?? null;
@@ -69,40 +76,44 @@ Deno.serve(
       if (profileId === auth.user.id && action === "ban") throw new ApiError("SELF_LOCKOUT_DENIED", "You cannot ban your own platform account", 409);
 
       if (action === "restrict_posting" || action === "restore_posting") {
-        const postingAllowed = action === "restore_posting";
-        const { data: control, error: postingError } = await admin.from("profile_posting_controls").upsert({
-          profile_id: profileId,
-          posting_allowed: postingAllowed,
-          reason: postingAllowed ? "" : reason!,
-          restricted_until: null,
-          updated_by: auth.user.id,
-        }, { onConflict: "profile_id" }).select("profile_id,posting_allowed,reason,restricted_until,updated_at").single();
-        if (postingError || !control) throw new ApiError("POSTING_GOVERNANCE_FAILED", "Unable to update posting access", 500, undefined, false);
-        const { error: auditError } = await admin.from("platform_audit_log").insert({
-          actor_profile_id: auth.user.id,
-          action: postingAllowed ? "identity.posting_restored" : "identity.posting_restricted",
-          target_type: "identity",
-          target_id: profileId,
-          request_id: requestId,
-          metadata: { reason },
-        });
-        if (auditError) throw new ApiError("PLATFORM_AUDIT_FAILED", "Posting access changed but the governance audit could not be recorded", 500, undefined, false);
+        const expiresAt = body.expiresAt === undefined || body.expiresAt === null || body.expiresAt === ""
+          ? null
+          : new Date(String(body.expiresAt));
+        if (expiresAt && Number.isNaN(expiresAt.getTime())) throw new ApiError("VALIDATION_FAILED", "expiresAt must be a valid date/time", 422);
+
+        const { data: control, error: postingError } = await auth.client.rpc("set_platform_user_restriction", {
+          target_profile_id: profileId,
+          target_restriction: "posting",
+          enable_restriction: action === "restrict_posting",
+          restriction_reason: action === "restrict_posting" ? reason : "Posting access restored",
+          restriction_expires_at: expiresAt?.toISOString() ?? null,
+        }).single();
+        if (postingError?.code === "P0002") throw new ApiError("PROFILE_NOT_FOUND", "Profile not found", 404);
+        if (postingError?.code === "22023") throw new ApiError("VALIDATION_FAILED", postingError.message, 422);
+        if (postingError) throw new ApiError("POSTING_GOVERNANCE_FAILED", "Unable to update posting access", 500, undefined, false);
         return {
           data: {
             id: profileId,
-            postingAllowed: control.posting_allowed,
-            postingRestrictionReason: control.reason || null,
-            postingRestrictedUntil: control.restricted_until,
+            postingAllowed: !control.is_active,
+            postingRestrictionReason: control.is_active ? control.reason : null,
+            postingRestrictedUntil: control.is_active ? control.expires_at : null,
           },
         };
       }
 
       if (action === "ban") {
-        const { count: targetSuperAdminCount } = await admin.from("platform_role_assignments").select("id", { count: "exact", head: true })
-          .eq("profile_id", profileId).eq("role_code", "super_admin").or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
+        const { count: targetSuperAdminCount } = await admin
+          .from("platform_role_assignments")
+          .select("id", { count: "exact", head: true })
+          .eq("profile_id", profileId)
+          .eq("role_code", "super_admin")
+          .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
         if ((targetSuperAdminCount ?? 0) > 0) {
-          const { count: allSuperAdmins } = await admin.from("platform_role_assignments").select("id", { count: "exact", head: true })
-            .eq("role_code", "super_admin").or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
+          const { count: allSuperAdmins } = await admin
+            .from("platform_role_assignments")
+            .select("id", { count: "exact", head: true })
+            .eq("role_code", "super_admin")
+            .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
           if ((allSuperAdmins ?? 0) <= 1) throw new ApiError("LAST_SUPER_ADMIN", "The final active Platform Super Admin cannot be banned", 409);
         }
       }
@@ -110,6 +121,7 @@ Deno.serve(
       const banDuration = action === "ban" ? "876000h" : "none";
       const { data: updatedUser, error: userError } = await admin.auth.admin.updateUserById(profileId, { ban_duration: banDuration });
       if (userError || !updatedUser.user) throw new ApiError("PLATFORM_USER_UPDATE_FAILED", "Unable to update platform account", 500, undefined, false);
+
       const { error: auditError } = await admin.from("platform_audit_log").insert({
         actor_profile_id: auth.user.id,
         action: action === "ban" ? "identity.banned" : "identity.restored",
