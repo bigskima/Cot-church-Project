@@ -49,6 +49,12 @@ verify_jwt = false
 [functions.public-social-feed]
 verify_jwt = false
 
+# Home is a single optional-auth aggregation contract. Visitors receive public
+# content; signed-in Expression members receive public/general plus their exact
+# Expression scope after membership validation inside the function.
+[functions.home-feed]
+verify_jwt = false
+
 [functions.public-birthdays]
 verify_jwt = false
 
