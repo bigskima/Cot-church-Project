@@ -8,7 +8,7 @@ type MembershipRow = {
   joined_at: string | null;
   branch_id: string | null;
   organization: { id: string; name: string; slug: string; status: string; timezone: string } | null;
-  branch: { id: string; name: string; code: string; timezone: string } | null;
+  branch: { id: string; name: string; code: string; timezone: string; is_active: boolean } | null;
 };
 
 Deno.serve(createHandler(
@@ -19,7 +19,7 @@ Deno.serve(createHandler(
     const [membershipsResult, profileResult] = await Promise.all([
       auth.client
         .from("memberships")
-        .select("id, status, joined_at, branch_id, organization:organizations(id, name, slug, status, timezone), branch:branches(id, name, code, timezone)")
+        .select("id, status, joined_at, branch_id, organization:organizations(id, name, slug, status, timezone), branch:branches(id, name, code, timezone, is_active)")
         .eq("profile_id", auth.user.id)
         .eq("status", "active")
         .order("created_at", { ascending: true }),
@@ -77,10 +77,12 @@ Deno.serve(createHandler(
         timezone: membership.organization.timezone,
         memberships: [],
       };
+      // Keep organisation membership available for General Community, but never
+      // advertise a disabled Expression as selectable/current context.
       current.memberships.push({
         id: membership.id,
         status: membership.status,
-        branch_id: membership.branch_id,
+        branch_id: membership.branch?.is_active ? membership.branch_id : null,
       });
       organizationMap.set(current.id, current);
     }
@@ -93,16 +95,17 @@ Deno.serve(createHandler(
     const selectedOrganization = selectedMembership?.organization?.status === "active"
       ? selectedMembership.organization
       : null;
-    const selectedExpression =
-      (auth.branchId
-        ? memberships.find((membership) => membership.branch?.id === auth.branchId)?.branch
-        : selectedMembership?.branch) ?? null;
+
+    const requestedExpression = auth.branchId
+      ? memberships.find((membership) => membership.branch?.id === auth.branchId)?.branch ?? null
+      : selectedMembership?.branch ?? null;
+    const selectedExpression = requestedExpression?.is_active ? requestedExpression : null;
 
     return {
       data: {
         userId: auth.user.id,
-        selectedOrganizationId: auth.organizationId,
-        selectedBranchId: auth.branchId,
+        selectedOrganizationId: selectedOrganization?.id ?? null,
+        selectedBranchId: selectedExpression?.id ?? null,
         profile: {
           id: profileResult.data?.id ?? auth.user.id,
           display_name: profileResult.data?.display_name ?? auth.user.email?.split("@")[0] ?? "Member",
