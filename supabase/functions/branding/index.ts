@@ -66,14 +66,14 @@ Deno.serve(
 
       const updates: Record<string, unknown> = { updated_by: auth.user.id };
       if (body.platformName !== undefined) updates.platform_name = requiredString(body.platformName, "platformName", 120);
-      if (body.primaryLogoUrl !== undefined) updates.primary_logo_url = optionalString(body.primaryLogoUrl, "primaryLogoUrl", 2000);
-      if (body.compactLogoUrl !== undefined) updates.compact_logo_url = optionalString(body.compactLogoUrl, "compactLogoUrl", 2000);
-      if (body.darkLogoUrl !== undefined) updates.dark_logo_url = optionalString(body.darkLogoUrl, "darkLogoUrl", 2000);
-      if (body.publicHeaderLogoUrl !== undefined) updates.public_header_logo_url = optionalString(body.publicHeaderLogoUrl, "publicHeaderLogoUrl", 2000);
-      if (body.launchLogoUrl !== undefined) updates.launch_logo_url = optionalString(body.launchLogoUrl, "launchLogoUrl", 2000);
-      if (body.launchBackgroundUrl !== undefined) updates.launch_background_url = optionalString(body.launchBackgroundUrl, "launchBackgroundUrl", 2000);
-      if (body.defaultPlaceholderLogoUrl !== undefined) updates.default_placeholder_logo_url = optionalString(body.defaultPlaceholderLogoUrl, "defaultPlaceholderLogoUrl", 2000);
-      if (body.defaultLeaderPlaceholderUrl !== undefined) updates.default_leader_placeholder_url = optionalString(body.defaultLeaderPlaceholderUrl, "defaultLeaderPlaceholderUrl", 2000);
+      if (body.primaryLogoUrl !== undefined) updates.primary_logo_url = body.primaryLogoUrl === null ? null : optionalString(body.primaryLogoUrl, "primaryLogoUrl", 2000);
+      if (body.compactLogoUrl !== undefined) updates.compact_logo_url = body.compactLogoUrl === null ? null : optionalString(body.compactLogoUrl, "compactLogoUrl", 2000);
+      if (body.darkLogoUrl !== undefined) updates.dark_logo_url = body.darkLogoUrl === null ? null : optionalString(body.darkLogoUrl, "darkLogoUrl", 2000);
+      if (body.publicHeaderLogoUrl !== undefined) updates.public_header_logo_url = body.publicHeaderLogoUrl === null ? null : optionalString(body.publicHeaderLogoUrl, "publicHeaderLogoUrl", 2000);
+      if (body.launchLogoUrl !== undefined) updates.launch_logo_url = body.launchLogoUrl === null ? null : optionalString(body.launchLogoUrl, "launchLogoUrl", 2000);
+      if (body.launchBackgroundUrl !== undefined) updates.launch_background_url = body.launchBackgroundUrl === null ? null : optionalString(body.launchBackgroundUrl, "launchBackgroundUrl", 2000);
+      if (body.defaultPlaceholderLogoUrl !== undefined) updates.default_placeholder_logo_url = body.defaultPlaceholderLogoUrl === null ? null : optionalString(body.defaultPlaceholderLogoUrl, "defaultPlaceholderLogoUrl", 2000);
+      if (body.defaultLeaderPlaceholderUrl !== undefined) updates.default_leader_placeholder_url = body.defaultLeaderPlaceholderUrl === null ? null : optionalString(body.defaultLeaderPlaceholderUrl, "defaultLeaderPlaceholderUrl", 2000);
       if (body.themeTokens !== undefined) {
         if (!body.themeTokens || typeof body.themeTokens !== "object" || Array.isArray(body.themeTokens)) {
           throw new ApiError("VALIDATION_FAILED", "themeTokens must be an object", 422);
