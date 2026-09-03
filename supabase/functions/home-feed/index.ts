@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { ApiError } from "../_shared/errors.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { enrichSocialPosts } from "../_shared/public-identity.ts";
-import { adminClient, publicClient } from "../_shared/supabase.ts";
+import { adminClient, publicClient, userClient } from "../_shared/supabase.ts";
 import { uuid } from "../_shared/validation.ts";
 
 function nestedItem(value: any) {
@@ -23,17 +23,38 @@ function resultData<T>(result: { data: T | null; error: any }, name: string, deg
   return (result.data ?? []) as T;
 }
 
+function optionalBearer(request: Request) {
+  const authorization = request.headers.get("authorization");
+  if (!authorization) return null;
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  if (!match) throw new ApiError("INVALID_SESSION", "Session is invalid or expired", 401);
+  return match[1];
+}
+
 Deno.serve(createHandler(
-  { methods: ["GET"], authentication: "optional", organization: "optional" },
-  async ({ request, auth }) => {
+  // Home deliberately owns optional identity resolution instead of using the generic
+  // auth helper. General Community is public and must remain available to a signed-in
+  // account that has not joined an Expression yet. Expression mode is validated below.
+  { methods: ["GET"], authentication: "none", organization: "none" },
+  async ({ request }) => {
     const url = new URL(request.url);
     const requestedOrganizationId = url.searchParams.get("organizationId");
     const requestedExpressionId = url.searchParams.get("expressionId");
     const admin = adminClient();
 
+    const token = optionalBearer(request);
+    let authenticatedClient: ReturnType<typeof userClient> | null = null;
+    let userId: string | null = null;
+    if (token) {
+      authenticatedClient = userClient(token);
+      const { data: userData, error: userError } = await authenticatedClient.auth.getUser(token);
+      if (userError || !userData.user) throw new ApiError("INVALID_SESSION", "Session is invalid or expired", 401);
+      userId = userData.user.id;
+    }
+
     let organizationId = requestedOrganizationId
       ? uuid(requestedOrganizationId, "organizationId", true)!
-      : auth?.organizationId ?? null;
+      : null;
 
     if (!organizationId) {
       const { data, error } = await admin
@@ -57,17 +78,19 @@ Deno.serve(createHandler(
 
     const selectedExpressionId = requestedExpressionId
       ? uuid(requestedExpressionId, "expressionId", true)!
-      : auth?.branchId ?? null;
+      : null;
 
     let selectedExpression: { id: string; name: string } | null = null;
     if (selectedExpressionId) {
-      if (!auth?.user || !auth.client) throw new ApiError("EXPRESSION_ACCESS_DENIED", "Sign in and join this Expression to view its member feed", 403);
+      if (!userId || !authenticatedClient) {
+        throw new ApiError("EXPRESSION_ACCESS_DENIED", "Sign in and join this Expression to view its member feed", 403);
+      }
 
       const { data: exactMembership, error: membershipError } = await admin
         .from("memberships")
         .select("id")
         .eq("organization_id", organizationId)
-        .eq("profile_id", auth.user.id)
+        .eq("profile_id", userId)
         .eq("branch_id", selectedExpressionId)
         .eq("status", "active")
         .maybeSingle();
@@ -86,9 +109,10 @@ Deno.serve(createHandler(
       selectedExpression = { id: branch.id, name: branch.name };
     }
 
-    // RLS remains authoritative for content visibility. The extra scope filter below
-    // only prevents a member's Home from mixing in public posts from other Expressions.
-    const client = auth?.client ?? publicClient();
+    // General mode deliberately uses the anonymous client even when a valid session is
+    // present, so it can never leak member-only rows. Expression mode uses the caller's
+    // JWT, with the exact membership check above and RLS remaining authoritative.
+    const client = selectedExpressionId ? authenticatedClient! : publicClient();
     const degraded: string[] = [];
     const recentEventCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
