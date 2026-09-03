@@ -1,27 +1,48 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { ApiClient } from '../api';
 import { Badge, Button, Card, StatWidget, Table } from '../components/ui';
 
-interface PlatformMetrics {
-  organizationsCount: number;
-  activeExpressionsCount: number;
-  totalMembers: number;
-  activeStreamsCount: number;
-  aiRunsToday: number;
-  systemHealth: {
-    edgeApi: 'healthy' | 'degraded' | 'live';
-    database: 'healthy' | 'degraded' | 'live';
-    streamingIngest: 'healthy' | 'degraded' | 'live';
-    aiGateway: 'healthy' | 'degraded' | 'live';
-    workers: 'healthy' | 'degraded' | 'live';
+interface PlatformOverviewPayload {
+  generatedAt: string;
+  state: 'operational' | 'attention';
+  organizations: { total: number; active: number; suspended: number; archived: number };
+  expressions: { total: number; active: number; inactive: number };
+  identities: { total: number; activeMemberships: number };
+  streaming: {
+    live: number;
+    scheduled: number;
+    processing: number;
+    failed: number;
+    activeProviders: number;
+    activeConfigurations: number;
+    configured: boolean;
   };
-  recentAuditEvents: Array<{
-    id: string;
+  ai: {
+    runs24h: number;
+    failed24h: number;
+    requiresReview: number;
+    activeProviders: number;
+    activeModels: number;
+    configured: boolean;
+  };
+  jobs: {
+    workflows: { queued: number; running: number; failed: number; deadLetter: number };
+    integrations: { queued: number; running: number; failed: number; deadLetter: number };
+  };
+  recentAudit: Array<{
+    id: number | string;
+    actor_profile_id?: string | null;
     action: string;
-    actor_email?: string;
-    created_at: string;
     target_type: string;
+    target_id?: string | null;
+    metadata?: Record<string, unknown> | null;
+    occurred_at: string;
   }>;
+}
+
+function statusLabel(ok: boolean, attention = false) {
+  if (attention) return 'attention';
+  return ok ? 'healthy' : 'not configured';
 }
 
 export function PlatformOverview({
@@ -31,115 +52,99 @@ export function PlatformOverview({
   api: ApiClient;
   onNavigate: (page: string) => void;
 }) {
-  const [metrics, setMetrics] = useState<PlatformMetrics | null>(null);
+  const [metrics, setMetrics] = useState<PlatformOverviewPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
+  const load = () => {
     setLoading(true);
-    Promise.all([
-      api.request<any>('reports').catch(() => null),
-      api.request<any>('health').catch(() => null),
-      api.request<any[]>('organizations').catch(() => []),
-    ])
-      .then(([reportData, healthData, orgs]) => {
-        setMetrics({
-          organizationsCount: orgs?.length ?? 1,
-          activeExpressionsCount: reportData?.expressions ?? 2,
-          totalMembers: reportData?.members ?? 142,
-          activeStreamsCount: reportData?.activeStreams ?? 1,
-          aiRunsToday: reportData?.aiRuns ?? 38,
-          systemHealth: {
-            edgeApi: healthData?.status === 'ok' ? 'healthy' : 'healthy',
-            database: 'healthy',
-            streamingIngest: 'healthy',
-            aiGateway: 'healthy',
-            workers: 'healthy',
-          },
-          recentAuditEvents: [
-            {
-              id: 'evt-1',
-              action: 'streaming.provider_provisioned',
-              actor_email: 'platform.admin@sanctuary.org',
-              target_type: 'LiveStream',
-              created_at: new Date().toISOString(),
-            },
-            {
-              id: 'evt-2',
-              action: 'ai.route_updated',
-              actor_email: 'platform.admin@sanctuary.org',
-              target_type: 'AiGateway',
-              created_at: new Date(Date.now() - 3600000).toISOString(),
-            },
-          ],
-        });
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : 'Unable to load overview'))
+    setError('');
+    api
+      .request<PlatformOverviewPayload>('platform-overview')
+      .then(setMetrics)
+      .catch((value) => setError(value instanceof Error ? value.message : 'Unable to load platform telemetry.'))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    load();
   }, [api]);
+
+  const queueAttention = useMemo(() => {
+    if (!metrics) return false;
+    const workflow = metrics.jobs.workflows;
+    const integrations = metrics.jobs.integrations;
+    return workflow.failed + workflow.deadLetter + integrations.failed + integrations.deadLetter > 0;
+  }, [metrics]);
+
+  if (error && !metrics) {
+    return (
+      <Card title="Platform telemetry unavailable" subtitle="The control plane stayed rendered and isolated the failed data request.">
+        <div className="admin-inline-error" role="alert" style={{ marginBottom: 16 }}>{error}</div>
+        <Button variant="primary" onClick={load}>Retry telemetry</Button>
+      </Card>
+    );
+  }
 
   return (
     <div>
-      {/* Ecosystem KPI Grid */}
       <div className="admin-stats-grid">
         <StatWidget
-          title="Active Organisations"
-          value={metrics?.organizationsCount ?? 1}
-          subtitle="Global church jurisdictions"
-          trend={{ value: '100% active', isPositive: true }}
+          title="Church Organisations"
+          value={metrics?.organizations.total ?? 0}
+          subtitle={`${metrics?.organizations.active ?? 0} active · ${metrics?.organizations.suspended ?? 0} suspended`}
+          trend={{ value: metrics?.organizations.archived ? `${metrics.organizations.archived} archived` : 'Lifecycle controlled', isPositive: (metrics?.organizations.suspended ?? 0) === 0 }}
           icon="🏛"
           variant="gold"
         />
         <StatWidget
-          title="Church Expressions"
-          value={metrics?.activeExpressionsCount ?? 2}
-          subtitle="Local campuses & branches"
-          trend={{ value: '+2 new', isPositive: true }}
+          title="Expressions"
+          value={metrics?.expressions.total ?? 0}
+          subtitle={`${metrics?.expressions.active ?? 0} active local expressions`}
+          trend={{ value: `${metrics?.expressions.inactive ?? 0} inactive`, isPositive: (metrics?.expressions.inactive ?? 0) === 0 }}
           icon="🌐"
         />
         <StatWidget
-          title="Global Members"
-          value={metrics?.totalMembers ?? 142}
-          subtitle="Registered spiritual accounts"
-          trend={{ value: '+14% growth', isPositive: true }}
+          title="Global Identities"
+          value={metrics?.identities.total ?? 0}
+          subtitle={`${metrics?.identities.activeMemberships ?? 0} active memberships`}
+          trend={{ value: 'Database source of truth', isPositive: true }}
           icon="👥"
           variant="success"
         />
         <StatWidget
-          title="Live Ingest Streams"
-          value={metrics?.activeStreamsCount ?? 1}
-          subtitle="Real-time broadcasting sanctuary"
-          trend={{ value: 'ONLINE', isPositive: true }}
+          title="Live Broadcasts"
+          value={metrics?.streaming.live ?? 0}
+          subtitle={`${metrics?.streaming.scheduled ?? 0} scheduled · ${metrics?.streaming.processing ?? 0} processing`}
+          trend={{ value: (metrics?.streaming.failed ?? 0) > 0 ? `${metrics?.streaming.failed} failed` : 'No stream failures', isPositive: (metrics?.streaming.failed ?? 0) === 0 }}
           icon="📡"
           variant="live"
         />
       </div>
 
-      {/* Infrastructure Telemetry & Health Matrix */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24, marginBottom: 24 }}>
+      {metrics?.state === 'attention' ? (
+        <div className="admin-inline-error" role="status" style={{ marginBottom: 24 }}>
+          Platform telemetry detected one or more failed jobs, stream failures, or AI failures. Review the infrastructure sections below before treating the platform as fully healthy.
+        </div>
+      ) : null}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(260px, 1fr)', gap: 24, marginBottom: 24 }}>
         <Card
           title="Ecosystem Infrastructure Health"
-          subtitle="Real-time status across edge microservices and global provider gateways"
-          headerAction={
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onNavigate('integrations')}
-            >
-              Inspect Jobs ➔
-            </Button>
-          }
+          subtitle={metrics?.generatedAt ? `Live database telemetry · updated ${new Date(metrics.generatedAt).toLocaleString()}` : 'Loading live telemetry'}
+          headerAction={<Button variant="outline" size="sm" onClick={load}>Refresh</Button>}
         >
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
             {[
-              ['Edge Functions API', metrics?.systemHealth.edgeApi ?? 'healthy', 'Supabase Deno Runtime'],
-              ['PostgreSQL Database', metrics?.systemHealth.database ?? 'healthy', 'Pooled & RLS Enforced'],
-              ['Live Stream Ingest (Mux)', metrics?.systemHealth.streamingIngest ?? 'healthy', 'Global CDN Transcoder'],
-              ['AI Inference Gateway', metrics?.systemHealth.aiGateway ?? 'healthy', 'Multi-Provider Failover'],
-              ['Outbox Worker Queue', metrics?.systemHealth.workers ?? 'healthy', 'Cron & Webhook Engine'],
-            ].map(([service, status, desc], idx) => (
+              ['Platform API', statusLabel(Boolean(metrics)), 'Authenticated Level-1 control plane'],
+              ['Streaming Providers', statusLabel(Boolean(metrics?.streaming.configured), (metrics?.streaming.failed ?? 0) > 0), `${metrics?.streaming.activeProviders ?? 0} provider(s) · ${metrics?.streaming.activeConfigurations ?? 0} active config(s)`],
+              ['AI Gateway', statusLabel(Boolean(metrics?.ai.configured), (metrics?.ai.failed24h ?? 0) > 0), `${metrics?.ai.activeProviders ?? 0} provider(s) · ${metrics?.ai.activeModels ?? 0} model(s)`],
+              ['Workflow Queue', statusLabel(true, queueAttention), `${metrics?.jobs.workflows.queued ?? 0} queued · ${metrics?.jobs.workflows.running ?? 0} running`],
+              ['Integration Delivery', statusLabel(true, queueAttention), `${metrics?.jobs.integrations.queued ?? 0} queued · ${metrics?.jobs.integrations.running ?? 0} running`],
+              ['AI Review Queue', (metrics?.ai.requiresReview ?? 0) > 0 ? 'attention' : 'healthy', `${metrics?.ai.requiresReview ?? 0} item(s) require ministry review`],
+            ].map(([service, status, desc]) => (
               <div
-                key={idx}
+                key={service}
                 style={{
                   backgroundColor: 'var(--bg-elevated)',
                   padding: 16,
@@ -147,9 +152,13 @@ export function PlatformOverview({
                   border: '1px solid var(--border-subtle)',
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                   <span style={{ fontSize: 13, fontWeight: 800 }}>{service}</span>
-                  <Badge label={status.toUpperCase()} variant={status as any} pulse={status === 'healthy'} />
+                  <Badge
+                    label={status.toUpperCase()}
+                    variant={status === 'healthy' ? 'success' : status === 'attention' ? 'warning' : 'neutral'}
+                    pulse={status === 'healthy'}
+                  />
                 </div>
                 <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>{desc}</p>
               </div>
@@ -157,77 +166,60 @@ export function PlatformOverview({
           </div>
         </Card>
 
-        <Card
-          title="Quick Governance Actions"
-          subtitle="Platform control shortcuts"
-        >
+        <Card title="Quick Governance Actions" subtitle="Level-1 platform control shortcuts">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <Button
-              variant="primary"
-              size="md"
-              onClick={() => onNavigate('organizations')}
-              icon="🏛"
-            >
+            <Button variant="primary" size="md" onClick={() => onNavigate('organizations')} icon="🏛">
               Manage Organisations
             </Button>
-            <Button
-              variant="gold"
-              size="md"
-              onClick={() => onNavigate('streaming')}
-              icon="📡"
-            >
+            <Button variant="gold" size="md" onClick={() => onNavigate('streaming')} icon="📡">
               Streaming Infrastructure
             </Button>
-            <Button
-              variant="secondary"
-              size="md"
-              onClick={() => onNavigate('ai')}
-              icon="✦"
-            >
+            <Button variant="secondary" size="md" onClick={() => onNavigate('ai')} icon="✦">
               Configure AI Gateway
             </Button>
-            <Button
-              variant="outline"
-              size="md"
-              onClick={() => onNavigate('audit')}
-              icon="🛡"
-            >
-              View Immutable Audit Log
+            <Button variant="outline" size="md" onClick={() => onNavigate('integrations')} icon="⚡">
+              Inspect Queues
+            </Button>
+            <Button variant="outline" size="md" onClick={() => onNavigate('audit')} icon="🛡">
+              View Platform Audit
             </Button>
           </div>
         </Card>
       </div>
 
-      {/* Recent Privileged Audit Trail */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 24 }}>
+        <Card title="AI activity (24h)">
+          <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+            <div><strong style={{ fontSize: 24 }}>{metrics?.ai.runs24h ?? 0}</strong><p style={{ color: 'var(--text-muted)', fontSize: 12 }}>runs</p></div>
+            <div><strong style={{ fontSize: 24 }}>{metrics?.ai.failed24h ?? 0}</strong><p style={{ color: 'var(--text-muted)', fontSize: 12 }}>failed</p></div>
+            <div><strong style={{ fontSize: 24 }}>{metrics?.ai.requiresReview ?? 0}</strong><p style={{ color: 'var(--text-muted)', fontSize: 12 }}>awaiting review</p></div>
+          </div>
+        </Card>
+        <Card title="Workflow runtime">
+          <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+            <div><strong style={{ fontSize: 24 }}>{metrics?.jobs.workflows.queued ?? 0}</strong><p style={{ color: 'var(--text-muted)', fontSize: 12 }}>queued</p></div>
+            <div><strong style={{ fontSize: 24 }}>{metrics?.jobs.workflows.running ?? 0}</strong><p style={{ color: 'var(--text-muted)', fontSize: 12 }}>running</p></div>
+            <div><strong style={{ fontSize: 24 }}>{(metrics?.jobs.workflows.failed ?? 0) + (metrics?.jobs.workflows.deadLetter ?? 0)}</strong><p style={{ color: 'var(--text-muted)', fontSize: 12 }}>failed/dead</p></div>
+          </div>
+        </Card>
+      </div>
+
       <Card
         title="Recent Privileged System Events"
-        subtitle="Immutable security log of platform-level administrative interventions"
-        headerAction={
-          <Button variant="ghost" size="sm" onClick={() => onNavigate('audit')}>
-            Full Security Log ➔
-          </Button>
-        }
+        subtitle="Immutable Level-1 platform governance activity"
+        headerAction={<Button variant="ghost" size="sm" onClick={() => onNavigate('audit')}>Full Security Log ➔</Button>}
       >
         <Table
           columns={[
-            {
-              header: 'EVENT ACTION',
-              accessor: (item) => <Badge label={item.action} variant="gold" />,
-            },
+            { header: 'EVENT ACTION', accessor: (item) => <Badge label={item.action} variant="gold" /> },
             { header: 'TARGET DOMAIN', accessor: 'target_type' },
-            {
-              header: 'ACTOR',
-              accessor: (item) => item.actor_email ?? 'Platform Super Admin',
-            },
-            {
-              header: 'TIMESTAMP',
-              accessor: (item) => new Date(item.created_at).toLocaleString(),
-            },
+            { header: 'ACTOR PROFILE', accessor: (item) => item.actor_profile_id ?? 'system' },
+            { header: 'TIMESTAMP', accessor: (item) => new Date(item.occurred_at).toLocaleString() },
           ]}
-          data={metrics?.recentAuditEvents ?? []}
-          keyExtractor={(item) => item.id}
+          data={metrics?.recentAudit ?? []}
+          keyExtractor={(item) => String(item.id)}
           loading={loading}
-          emptyMessage="No privileged actions recorded in the last 24 hours."
+          emptyMessage="No privileged platform actions have been recorded yet."
         />
       </Card>
     </div>
