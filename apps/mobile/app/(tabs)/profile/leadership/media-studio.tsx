@@ -103,7 +103,7 @@ export default function MediaStudioScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: 70 }]}>
-        <ScreenHeader title="Live Media Studio" subtitle={`Real provider-backed broadcasts for ${expression?.name ?? 'the selected Expression'}.`} showBack />
+        <ScreenHeader title="Live Media Studio" subtitle={`Create and manage live broadcasts for ${expression?.name ?? 'the selected Expression'}.`} showBack />
 
         <View style={styles.body}>
           {actionMsg ? <View style={[styles.banner, { backgroundColor: colors.successSoft, borderColor: colors.success }]}><Icon name="checkmark-circle" size={18} color={colors.success} /><Text style={[styles.bannerText, { color: colors.success }]}>{actionMsg}</Text></View> : null}
@@ -168,7 +168,7 @@ export default function MediaStudioScreen() {
                   {!['ended', 'cancelled'].includes(stream.status) ? <Button label="End Broadcast" onPress={() => void operateStream(stream.id, 'stop')} disabled={busyId === stream.id} variant="destructive" size="sm" /> : null}
                 </View>
               </View>
-            )) : <EmptyState title="No Expression Streams" message={providerReady ? 'Create the first provider-backed broadcast above.' : 'Streams will appear here once Platform Authority enables the streaming provider.'} iconName="radio-outline" />}
+            )) : <EmptyState title="No Expression Streams" message={providerReady ? 'Create the first live broadcast above.' : 'Live broadcasting is temporarily unavailable. Please try again later.'} iconName="radio-outline" />}
           </View>
         </View>
       </ScrollView>
