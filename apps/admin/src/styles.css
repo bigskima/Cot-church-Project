@@ -1,28 +1,30 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap');
 
 :root {
-  --bg-main: #140C07;
-  --bg-sidebar: #1C1009;
-  --bg-card: #22140C;
-  --bg-card-hover: #2E1C11;
-  --bg-elevated: #362215;
-  --bg-input: #1C1009;
+  --bg-main: #061426;
+  --bg-sidebar: #07111F;
+  --bg-card: #0C1929;
+  --bg-card-hover: #112238;
+  --bg-elevated: #152A43;
+  --bg-input: #0C1929;
   
-  --border-subtle: #452A1A;
-  --border-strong: #613C25;
-  --border-glow: #F59E0B55;
+  --border-subtle: #21344B;
+  --border-strong: #304762;
+  --border-glow: #2F6FED55;
 
-  --text-primary: #FFFDF9;
-  --text-secondary: #E6CCB2;
-  --text-muted: #A68A75;
+  --text-primary: #F8FAFC;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
 
-  --gold: #F59E0B;
-  --gold-light: #FDE047;
-  --gold-dark: #B45309;
-  --gold-glow: 0 0 20px rgba(245, 158, 11, 0.35);
+  /* Legacy variable names remain temporarily for component compatibility.
+     They now resolve to the approved blue interaction palette, not gold. */
+  --gold: #5C8FF5;
+  --gold-light: #82B0FF;
+  --gold-dark: #2F6FED;
+  --gold-glow: 0 0 18px rgba(47, 111, 237, 0.24);
 
-  --blue: #3B82F6;
-  --blue-glow: 0 0 20px rgba(59, 130, 246, 0.35);
+  --blue: #2F6FED;
+  --blue-glow: 0 0 18px rgba(47, 111, 237, 0.24);
   --live: #EF4444;
   --live-glow: 0 0 20px rgba(239, 68, 68, 0.45);
   --success: #10B981;
@@ -40,24 +42,24 @@
 }
 
 [data-theme="light"] {
-  --bg-main: #F8EDE2;
-  --bg-sidebar: #F1E3D3;
-  --bg-card: #FFFDF9;
-  --bg-card-hover: #F8EDE2;
+  --bg-main: #F7F9FC;
+  --bg-sidebar: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #F1F5F9;
   --bg-elevated: #FFFFFF;
   --bg-input: #FFFFFF;
   
-  --border-subtle: #E8D5C4;
-  --border-strong: #D4BEAB;
-  --border-glow: #F59E0B40;
+  --border-subtle: #E4E7EC;
+  --border-strong: #D0D5DD;
+  --border-glow: #2F6FED33;
 
-  --text-primary: #26140A;
-  --text-secondary: #5C3D28;
-  --text-muted: #8C6549;
+  --text-primary: #0B1628;
+  --text-secondary: #475467;
+  --text-muted: #667085;
 
-  --gold: #D97706;
-  --gold-light: #F59E0B;
-  --gold-dark: #92400E;
+  --gold: #18528B;
+  --gold-light: #2F6FED;
+  --gold-dark: #0D294B;
 }
 
 * {
@@ -81,7 +83,7 @@ body {
 .admin-shell {
   display: flex;
   min-height: 100vh;
-  background: radial-gradient(circle at 10% 0%, #2A170C 0%, var(--bg-main) 60%);
+  background: radial-gradient(circle at 10% 0%, #0D294B 0%, var(--bg-main) 62%);
 }
 
 .admin-sidebar {
