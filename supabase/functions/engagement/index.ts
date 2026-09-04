@@ -17,6 +17,16 @@ Deno.serve(createHandler(
       if (!contentId) throw new ApiError("VALIDATION_FAILED", "contentId is required", 400);
 
       const client = auth?.client ?? (await import("../_shared/supabase.ts")).publicClient();
+      if (url.searchParams.get("view") === "state") {
+        if (!auth?.user) return { data: { reaction: null, bookmarked: false, progress: null } };
+        const [reaction, bookmark, progress] = await Promise.all([
+          auth.client.from("content_reactions").select("reaction").eq("content_item_id", contentId).eq("profile_id", auth.user.id).maybeSingle(),
+          auth.client.from("content_bookmarks").select("content_item_id").eq("content_item_id", contentId).eq("profile_id", auth.user.id).maybeSingle(),
+          auth.client.from("content_playback_progress").select("progress_seconds,duration_seconds,completed,last_played_at").eq("content_item_id", contentId).eq("profile_id", auth.user.id).maybeSingle(),
+        ]);
+        if (reaction.error || bookmark.error || progress.error) throw new ApiError("ENGAGEMENT_STATE_FAILED", "Unable to retrieve your content activity", 500, undefined, false);
+        return { data: { reaction: reaction.data?.reaction ?? null, bookmarked: Boolean(bookmark.data), progress: progress.data ?? null } };
+      }
       const { data, error } = await client
         .from("content_comments")
         .select(`
@@ -69,6 +79,14 @@ Deno.serve(createHandler(
       return { data };
     }
 
+    if (body.action === "unreact") {
+      assertNoUnknownFields(body, ["action", "contentId"]);
+      const contentId = uuid(requiredString(body.contentId, "contentId", 36), "contentId", true)!;
+      const { error } = await auth.client.from("content_reactions").delete().eq("content_item_id", contentId).eq("profile_id", auth.user.id);
+      if (error) throw new ApiError("REACTION_FAILED", "Unable to remove reaction", 500, undefined, false);
+      return { data: { reacted: false } };
+    }
+
     // 2. Comment / Reply
     if (body.action === "comment") {
       assertNoUnknownFields(body, ["action", "contentId", "body", "parentCommentId"]);
@@ -112,11 +130,12 @@ Deno.serve(createHandler(
         .maybeSingle();
 
       if (existing) {
-        await auth.client
+        const { error } = await auth.client
           .from("content_bookmarks")
           .delete()
           .eq("content_item_id", contentId)
           .eq("profile_id", auth.user.id);
+        if (error) throw new ApiError("BOOKMARK_FAILED", "Unable to remove bookmark", 500, undefined, false);
         return { data: { bookmarked: false } };
       }
 

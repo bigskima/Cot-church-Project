@@ -33,7 +33,7 @@ export function createHandler(options: HandlerOptions, callback: (context: Reque
     const startedAt = performance.now();
     let cors: HeadersInit = {};
     try {
-      cors = corsHeaders(request);
+      cors = corsHeaders(request) as HeadersInit;
       if (request.method === "OPTIONS") return preflight(cors);
       if (!methods.includes(request.method)) {
         throw new ApiError("METHOD_NOT_ALLOWED", "Method not allowed", 405, undefined, true, { Allow: methods.join(", ") });

@@ -21,9 +21,9 @@ export interface ReelPlayerProps {
   isFollowing?: boolean;
   isActive?: boolean;
   onFollow?: () => void;
-  onLike?: () => void;
+  onLike?: () => boolean | Promise<boolean>;
   onOpenComments?: () => void;
-  onSave?: () => void;
+  onSave?: () => boolean | Promise<boolean>;
   onShare?: () => void;
   containerHeight?: number;
 }
@@ -93,14 +93,12 @@ export function ReelPlayer({
     }
   };
 
-  const toggleLike = () => {
-    setIsLiked(!isLiked);
-    onLike?.();
+  const toggleLike = async () => {
+    if (!onLike || await onLike()) setIsLiked((value) => !value);
   };
 
-  const toggleSave = () => {
-    setIsSaved(!isSaved);
-    onSave?.();
+  const toggleSave = async () => {
+    if (!onSave || await onSave()) setIsSaved((value) => !value);
   };
 
   const handleShare = async () => {

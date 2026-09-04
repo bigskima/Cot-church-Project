@@ -22,7 +22,7 @@ async function enrichMembershipAuthors<T extends MembershipAuthoredRow>(rows: T[
   const membershipMap = new Map(activeMemberships.map((membership) => [membership.id, membership]));
   const profileIds = [...new Set(activeMemberships.map((membership) => membership.profile_id))];
   const organizationIds = [...new Set(activeMemberships.map((membership) => membership.organization_id))];
-  const branchIds = [...new Set(activeMemberships.map((membership) => membership.branch_id).filter(Boolean))] as string[];
+  const branchIds = [...new Set(rows.map((row) => row.branch_id).filter(Boolean))] as string[];
 
   const [profilesResult, defaultsResult, assignmentsResult, branchesResult] = await Promise.all([
     profileIds.length
@@ -64,9 +64,9 @@ async function enrichMembershipAuthors<T extends MembershipAuthoredRow>(rows: T[
     const profile = profileMap.get(membership.profile_id);
     const badges: PublicBadge[] = [];
     const membershipDefault = defaultByOrg.get(membership.organization_id);
-    if (membership.branch_id && membershipDefault) badges.push(toBadge(membershipDefault));
+    if (row.branch_id && membershipDefault) badges.push(toBadge(membershipDefault));
     for (const assignment of assignedByProfile.get(membership.profile_id) ?? []) {
-      if (assignment.branch_id !== membership.branch_id) continue;
+      if (assignment.branch_id !== row.branch_id) continue;
       const definition = Array.isArray(assignment.identity_badge_definitions) ? assignment.identity_badge_definitions[0] : assignment.identity_badge_definitions;
       if (definition) badges.push(toBadge(definition));
     }
@@ -82,7 +82,7 @@ async function enrichMembershipAuthors<T extends MembershipAuthoredRow>(rows: T[
         bio: profile.bio,
         badges,
       } : null,
-      expression: membership.branch_id ? branchMap.get(membership.branch_id) ?? null : null,
+      expression: row.branch_id ? branchMap.get(row.branch_id) ?? null : null,
     };
   });
 }

@@ -122,7 +122,7 @@ export default function CommunityScreen() {
   const feedKey = `mobile:community:${activeTab}:${organizationId || 'auto'}:${expression?.id ?? 'none'}`;
   const resource = useResource<CommunityPost[]>(feedKey, (signal) => {
     if (activeTab === 'general') {
-      const query = new URLSearchParams({ scope: 'church' });
+      const query = new URLSearchParams({ scope: 'all' });
       if (organizationId) query.set('organizationId', organizationId);
       return api.request<CommunityPost[]>(`public-social-feed?${query.toString()}`, { signal });
     }
@@ -132,7 +132,7 @@ export default function CommunityScreen() {
   const hasChurchMembership = Boolean(
     context?.organizations?.some((organization) => organization.memberships?.some((membership) => membership.status === 'active')),
   );
-  const canPost = mode === 'authenticated' && Boolean(expression?.id) && hasChurchMembership;
+  const canPost = mode === 'authenticated' && hasChurchMembership;
   const canEngage = mode === 'authenticated' && hasChurchMembership;
 
   const cleanupAttachments = async (items = attachments) => {
@@ -373,9 +373,11 @@ export default function CommunityScreen() {
             <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>Public fellowship and Expression conversations</Text>
           </View>
         </View>
-        <Pressable onPress={() => router.push('/(tabs)/community/leadership')} hitSlop={8} style={[styles.headerIconBtn, { backgroundColor: colors.bgSecondary }]}>
-          <Icon name="people-outline" size={18} color={colors.text} />
-        </Pressable>
+        {expression?.id ? (
+          <Pressable onPress={() => router.push('/(tabs)/community/leadership')} hitSlop={8} style={[styles.headerIconBtn, { backgroundColor: colors.bgSecondary }]} accessibilityRole="button" accessibilityLabel={`${expression.name} leadership`}>
+            <Icon name="people-outline" size={18} color={colors.text} />
+          </Pressable>
+        ) : null}
       </View>
 
       <View style={[styles.tabBar, { borderBottomColor: colors.borderSubtle }]}>

@@ -2,6 +2,7 @@ import { AppState } from 'react-native';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
 import { ApiClient, ApiError, apiUrl, loadAuth, saveAuth, type StoredAuth } from '../api';
 import type { MembershipContext } from '../types/content';
+import { invalidate } from '../services/query-cache';
 
 type Mode = 'restoring' | 'visitor' | 'authenticated';
 type Value = {
@@ -17,6 +18,8 @@ type Value = {
   continueAsVisitor: () => void;
   enterAsVisitor: () => Promise<void>;
   selectContext: (organizationId: string, branchId?: string) => Promise<void>;
+  enterExpression: (organizationId: string, expressionId: string) => Promise<void>;
+  leaveExpression: () => Promise<void>;
   switchOrganization: (organizationId: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -32,6 +35,12 @@ type RefreshSessionPayload = {
 
 const SessionContext = createContext<Value | null>(null);
 const REFRESH_SKEW_SECONDS = 120;
+
+function clearContextResources() {
+  for (const prefix of ['expression:', 'mobile:home-feed:', 'mobile:community:', 'live:discovery:', 'watch:catalogue:', 'reels:immersive:']) {
+    invalidate(prefix);
+  }
+}
 
 function sessionNeedsRefresh(value: StoredAuth) {
   const expiresAt = value.session.expiresAt;
@@ -237,17 +246,16 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
         if (!auth.organizationId && value.organizations[0]) {
           const firstOrganization = value.organizations[0];
-          const activeBranchId = firstOrganization.memberships?.find((membership) => membership.branch_id)?.branch_id;
           await persist({
             ...auth,
             organizationId: firstOrganization.id,
-            branchId: activeBranchId || undefined,
+            branchId: undefined,
           });
         }
       } catch (error) {
         if (cancelled) return;
         if (error instanceof ApiError) {
-          if (auth.branchId && ['EXPRESSION_UNAVAILABLE', 'BRANCH_ACCESS_DENIED'].includes(error.code)) {
+          if (auth.branchId && ['EXPRESSION_UNAVAILABLE', 'EXPRESSION_MEMBERSHIP_REQUIRED', 'BRANCH_ACCESS_DENIED'].includes(error.code)) {
             setContext(null);
             await persist({ ...auth, branchId: undefined });
             return;
@@ -279,7 +287,30 @@ export function SessionProvider({ children }: PropsWithChildren) {
   );
 
   const selectContext = async (organizationId: string, branchId?: string) => {
-    if (auth) await persist({ ...auth, organizationId, branchId });
+    if (auth) {
+      clearContextResources();
+      setContext(null);
+      await persist({ ...auth, organizationId, branchId });
+    }
+  };
+
+  const enterExpression = async (organizationId: string, expressionId: string) => {
+    if (!auth) throw new ApiError('AUTHENTICATION_REQUIRED', 'Please sign in to continue.', 401);
+    const available = context?.expressions?.some(
+      (expression) => expression.organizationId === organizationId && expression.id === expressionId && expression.status === 'active',
+    );
+    if (!available) throw new ApiError('EXPRESSION_MEMBERSHIP_REQUIRED', 'Join this Expression before entering it.', 403);
+    // Clear the old Expression-derived context before changing the request scope.
+    clearContextResources();
+    setContext(null);
+    await persist({ ...auth, organizationId, branchId: expressionId });
+  };
+
+  const leaveExpression = async () => {
+    if (!auth) return;
+    clearContextResources();
+    setContext(null);
+    await persist({ ...auth, branchId: undefined });
   };
 
   const switchOrganization = async (organizationId: string) => {
@@ -287,6 +318,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
   };
 
   const signOut = async () => {
+    clearContextResources();
     setContext(null);
     await persist(null);
   };
@@ -308,6 +340,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
           setMode('visitor');
         },
         selectContext,
+        enterExpression,
+        leaveExpression,
         switchOrganization,
         signOut,
       }}

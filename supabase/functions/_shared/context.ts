@@ -32,11 +32,6 @@ export async function authenticate(request: Request, requireOrganization: boolea
       .eq("profile_id", data.user.id)
       .eq("status", "active");
 
-    // Expression-scoped requests must bind to the membership for that exact
-    // Expression. Organisation-only requests intentionally resolve one active
-    // membership so users can belong to multiple Expressions without maybeSingle()
-    // failing on more than one row.
-    if (branchId) membershipQuery = membershipQuery.eq("branch_id", branchId);
     const { data: membership, error: membershipError } = await membershipQuery
       .order("created_at", { ascending: true })
       .limit(1)
@@ -58,15 +53,16 @@ export async function authenticate(request: Request, requireOrganization: boolea
     }
 
     if (branchId) {
-      const { data: branch, error: branchError } = await client
-        .from("branches")
-        .select("id,is_active")
-        .eq("id", branchId)
-        .eq("organization_id", organizationId)
-        .maybeSingle();
+      const [{ data: branch, error: branchError }, { data: expressionMembership, error: expressionMembershipError }] = await Promise.all([
+        client.from("branches").select("id,is_active").eq("id", branchId).eq("organization_id", organizationId).maybeSingle(),
+        client.from("expression_memberships").select("id,status").eq("organization_id", organizationId).eq("branch_id", branchId).eq("profile_id", data.user.id).eq("status", "active").maybeSingle(),
+      ]);
       if (branchError || !branch) throw new ApiError("BRANCH_ACCESS_DENIED", "Expression does not belong to the selected organization", 403);
       if (!branch.is_active) {
         throw new ApiError("EXPRESSION_UNAVAILABLE", "This expression is currently unavailable on the platform", 403);
+      }
+      if (expressionMembershipError || !expressionMembership) {
+        throw new ApiError("EXPRESSION_MEMBERSHIP_REQUIRED", "Active membership in this Expression is required", 403);
       }
     }
     membershipId = membership.id;

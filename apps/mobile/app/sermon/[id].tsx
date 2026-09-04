@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -31,38 +31,43 @@ type SermonPlayback = {
 const publicOrganizationId = process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
 
 export default function SermonDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, context: requestedContext } = useLocalSearchParams<{ id: string; context?: string }>();
   const insets = useSafeAreaInsets();
-  const { api, mode } = useSession();
+  const { api, context, mode } = useSession();
   const { colors } = useTheme();
   const [mediaFormat, setMediaFormat] = useState<'video' | 'audio'>('video');
+  const lastSyncedSecond = useRef(0);
+  const expressionMode = requestedContext === 'expression';
 
-  const resource = useResource<Sermon>(`sermon:detail:${mode}:${id}`, (signal) => {
-    if (mode === 'visitor') {
-      if (!publicOrganizationId) return Promise.reject(new Error('Church configuration is unavailable.'));
+  const activeOrganizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? publicOrganizationId;
+  const activeExpressionId = context?.expression?.id;
+  const resource = useResource<Sermon>(`sermon:detail:${expressionMode ? `expression:${activeExpressionId ?? 'none'}` : 'public'}:${id}`, (signal) => {
+    if (!expressionMode) {
+      if (!activeOrganizationId) return Promise.reject(new Error('Choose a church to view this sermon.'));
       return api
-        .request<Sermon[]>(`public-content?type=sermons&organizationId=${encodeURIComponent(publicOrganizationId)}`, { signal })
-        .then((list) => {
-          const found = list.find((sermon) => sermon.id === id);
-          if (!found) throw new Error('Sermon not found.');
-          return found;
-        });
+        .request<Sermon>(`public-content?type=sermon&id=${encodeURIComponent(id)}&organizationId=${encodeURIComponent(activeOrganizationId)}`, { signal, context: 'public' });
     }
+    if (!activeExpressionId) return Promise.reject(new Error('Enter this Expression to view its internal sermon.'));
     return api.request<Sermon>(`sermons?id=${id}`, { signal });
   });
 
-  const playback = useResource<SermonPlayback>(`sermon:playback:${mode}:${id}`, (signal) => {
-    if (mode === 'visitor') {
-      if (!publicOrganizationId) return Promise.reject(new Error('Church configuration is unavailable.'));
+  const playback = useResource<SermonPlayback>(`sermon:playback:${expressionMode ? `expression:${activeExpressionId ?? 'none'}` : 'public'}:${id}`, (signal) => {
+    if (!expressionMode) {
+      if (!activeOrganizationId) return Promise.reject(new Error('Choose a church to play this sermon.'));
       return api.request<SermonPlayback>(
-        `sermon-playback?id=${id}&organizationId=${encodeURIComponent(publicOrganizationId)}`,
-        { signal },
+        `sermon-playback?id=${id}&organizationId=${encodeURIComponent(activeOrganizationId)}`,
+        { signal, context: 'public' },
       );
     }
+    if (!activeExpressionId) return Promise.reject(new Error('Enter this Expression to play its internal sermon.'));
     return api.request<SermonPlayback>(`sermon-playback?id=${id}`, { signal });
   });
 
   const sermon = resource.data;
+  const contentId = sermon?.content_item_id;
+  const engagement = useResource<{ progress: { progress_seconds: number; completed: boolean } | null }>(`sermon:engagement:${mode}:${contentId ?? id}`, (signal) => mode === 'authenticated' && contentId
+    ? api.request(`engagement?contentId=${contentId}&view=state`, { signal, context: expressionMode ? 'current' : 'public' })
+    : Promise.resolve({ progress: null }));
   const directVideoUrl =
     sermon?.video_url ||
     sermon?.media_assets?.renditions?.find((rendition) => rendition.rendition_kind === 'video_stream')?.storage_path ||
@@ -85,6 +90,13 @@ export default function SermonDetailScreen() {
   }, [hasVideo, hasAudio]);
 
   const mediaPending = sermon?.recording_id && playback.data && !playback.data.ready;
+  const syncProgress = useCallback((seconds: number, duration: number) => {
+    if (mode !== 'authenticated' || !contentId || duration <= 0) return;
+    const wholeSecond = Math.floor(seconds);
+    if (wholeSecond - lastSyncedSecond.current < 15 && seconds < duration * 0.9) return;
+    lastSyncedSecond.current = wholeSecond;
+    void api.request('engagement', { method: 'POST', context: expressionMode ? 'current' : 'public', body: JSON.stringify({ action: 'sync_playback', contentId, progressSeconds: wholeSecond, durationSeconds: Math.floor(duration) }) }).catch(() => {});
+  }, [api, contentId, expressionMode, mode]);
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -139,6 +151,9 @@ export default function SermonDetailScreen() {
                 sourceUrl={videoUrl}
                 posterUrl={posterUrl}
                 durationSeconds={durationSeconds}
+                chapters={sermon.chapters}
+                initialPositionSeconds={engagement.data?.progress?.completed ? 0 : engagement.data?.progress?.progress_seconds ?? 0}
+                onProgress={syncProgress}
               />
             ) : mediaFormat === 'audio' && hasAudio ? (
               <AudioPlayer
@@ -146,6 +161,8 @@ export default function SermonDetailScreen() {
                 speaker={sermon.preacher}
                 sourceUrl={audioUrl}
                 durationSeconds={durationSeconds}
+                initialPositionSeconds={engagement.data?.progress?.completed ? 0 : engagement.data?.progress?.progress_seconds ?? 0}
+                onProgress={syncProgress}
               />
             ) : (
               <View style={[styles.mediaState, { backgroundColor: colors.card, borderColor: colors.border }]}>

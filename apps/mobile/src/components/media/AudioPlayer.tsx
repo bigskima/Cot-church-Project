@@ -13,6 +13,8 @@ export interface AudioPlayerProps {
   durationSeconds?: number | null;
   scriptureReferences?: string[];
   onSeek?: (seconds: number) => void;
+  onProgress?: (seconds: number, durationSeconds: number) => void;
+  initialPositionSeconds?: number;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -24,6 +26,8 @@ export function AudioPlayer({
   durationSeconds = 0,
   scriptureReferences,
   onSeek,
+  onProgress,
+  initialPositionSeconds = 0,
   style,
 }: AudioPlayerProps) {
   const { colors } = useTheme();
@@ -31,6 +35,7 @@ export function AudioPlayer({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(durationSeconds || 0);
   const [speed, setSpeed] = useState<number>(1.0);
+  const [restoredPosition, setRestoredPosition] = useState(false);
 
   const displaySpeaker = speaker || preacherOrArtist;
 
@@ -46,14 +51,19 @@ export function AudioPlayer({
       setIsPlaying(status.isPlaying);
     });
 
-    const statusSub = player.addListener('statusChange', () => {
+    const statusSub = player.addListener('statusChange', (status) => {
       if (player.duration && player.duration > 0) {
         setDuration(player.duration);
+      }
+      if (status.status === 'readyToPlay' && !restoredPosition && initialPositionSeconds > 0) {
+        player.currentTime = Math.min(initialPositionSeconds, Math.max(0, player.duration - 1));
+        setRestoredPosition(true);
       }
     });
 
     const timeSub = player.addListener('timeUpdate', (event) => {
       setCurrentTime(event.currentTime);
+      onProgress?.(event.currentTime, player.duration || durationSeconds || 0);
       if (player.duration && player.duration > 0) {
         setDuration(player.duration);
       }
@@ -64,7 +74,7 @@ export function AudioPlayer({
       statusSub.remove();
       timeSub.remove();
     };
-  }, [player]);
+  }, [player, restoredPosition, initialPositionSeconds, onProgress, durationSeconds]);
 
   const togglePlay = () => {
     if (!player) return;

@@ -39,6 +39,7 @@ const requiredFiles = [
   'supabase/functions/notifications/index.ts',
   'supabase/functions/notification-dispatch/index.ts',
   'supabase/functions/membership-invitations/index.ts',
+  'supabase/functions/expression-memberships/index.ts',
   'supabase/functions/_shared/rate-limit.ts',
   'supabase/functions/giving/index.ts',
   'supabase/functions/public-giving/index.ts',
@@ -47,6 +48,8 @@ const requiredFiles = [
   'supabase/functions/live-streams/index.ts',
   'supabase/functions/social-feed/index.ts',
   'supabase/functions/public-content/index.ts',
+  'supabase/functions/engagement/index.ts',
+  'supabase/functions/_shared/feed-ranking.ts',
   'supabase/functions/reports/index.ts',
   'supabase/functions/integrations/index.ts',
   'supabase/functions/workflow-dispatch/index.ts',
@@ -83,11 +86,16 @@ const login = await readFile('supabase/functions/login/index.ts', 'utf8');
 const refreshSession = await readFile('supabase/functions/refresh-session/index.ts', 'utf8');
 const organizations = await readFile('supabase/functions/organizations/index.ts', 'utf8');
 const memberships = await readFile('supabase/functions/memberships/index.ts', 'utf8');
+const expressionMemberships = await readFile('supabase/functions/expression-memberships/index.ts', 'utf8');
 const roles = await readFile('supabase/functions/roles/index.ts', 'utf8');
 const events = await readFile('supabase/functions/events/index.ts', 'utf8');
 const signupRateLimited = await readFile('supabase/functions/signup/index.ts', 'utf8');
 const paymentEvents = await readFile('supabase/functions/payment-events/index.ts', 'utf8');
 const publicContent = await readFile('supabase/functions/public-content/index.ts', 'utf8');
+const engagement = await readFile('supabase/functions/engagement/index.ts', 'utf8');
+const homeFeed = await readFile('supabase/functions/home-feed/index.ts', 'utf8');
+const feedRanking = await readFile('supabase/functions/_shared/feed-ranking.ts', 'utf8');
+const eventRegistrations = await readFile('supabase/functions/event-registrations/index.ts', 'utf8');
 const sermons = await readFile('supabase/functions/sermons/index.ts', 'utf8');
 const branding = await readFile('supabase/functions/branding/index.ts', 'utf8');
 const churchStory = await readFile('supabase/functions/church-story/index.ts', 'utf8');
@@ -111,6 +119,32 @@ const invariants = [
   [signup, /client\.auth\.signUp/, 'Supabase Auth signup'],
   [signup, /assertNoUnknownFields/, 'strict signup validation'],
   [organizationContext, /effectivePermissions/, 'effective permission resolution'],
+  [organizationContext, /expressionMemberships/, 'multiple Expression membership resolution'],
+  [organizationContext, /requestedExpressionMembership/, 'deliberate exact Expression context resolution'],
+  [expressionMemberships, /expression-invite-preview/, 'Expression invite preview rate limiting'],
+  [expressionMemberships, /expression-invite-redeem/, 'Expression invite redemption rate limiting'],
+  [expressionMemberships, /generate_expression_invite_code/, 'server-generated Expression invite codes'],
+  [expressionMemberships, /revoke_expression_invite_code/, 'Expression invite revocation'],
+  [publicContent, /type === "expression"/, 'public Expression profile contract'],
+  [publicContent, /type === "event"/, 'exact public event detail contract'],
+  [publicContent, /type === "video"/, 'exact public video detail contract'],
+  [publicContent, /type === "sermon"/, 'exact public sermon detail contract'],
+  [publicContent, /Search must be between 2 and 100 characters/, 'bounded public search input'],
+  [publicContent, /type === "series-detail"/, 'exact public sermon series contract'],
+  [publicContent, /PUBLIC_SERIES_SERMONS_FAILED/, 'series partial-failure handling'],
+  [publicContent, /replace\(\/\[\\\\%_\]/, 'public search wildcard escaping'],
+  [eventRegistrations, /cancel_event_registration/, 'event registration cancellation'],
+  [eventRegistrations, /REGISTRATION_ACCESS_DENIED/, 'event eligibility error mapping'],
+  [homeFeed, /rankFeedCandidates/, 'public feed personalization pipeline'],
+  [homeFeed, /followedExpressionIds/, 'follow-driven public recommendations'],
+  [homeFeed, /inProgressContentIds/, 'continue-watching recommendation signal'],
+  [homeFeed, /value === selectedExpressionId/, 'exact Expression home isolation'],
+  [feedRanking, /completedPenalty/, 'completed-content recommendation suppression'],
+  [feedRanking, /diversifyFeed/, 'mixed-format feed diversification'],
+  [engagement, /view.*state/, 'engagement viewer-state retrieval'],
+  [engagement, /body\.action === "unreact"/, 'reaction removal contract'],
+  [publicContent, /content_items\.visibility.*public/s, 'public media visibility boundary'],
+  [churchStory, /EXPRESSION_MEMBERSHIP_REQUIRED/, 'internal Expression leadership boundary'],
   [login, /signInWithPassword/, 'password login workflow'],
   [refreshSession, /auth\.refreshSession/, 'refresh-token session rotation'],
   [refreshSession, /enforceRateLimit/, 'refresh session rate limiting'],
@@ -145,6 +179,10 @@ const invariants = [
 ];
 
 const missing = invariants.filter(([source, pattern]) => !pattern.test(source));
+const forbidden = [
+  [churchStory, /Foundation & First Gathering|Multi-Expression Expansion|Global Digital Ministry/, 'fabricated church story fallback'],
+];
+const presentForbidden = forbidden.filter(([source, pattern]) => pattern.test(source));
 
 const functionEntries = await readdir('supabase/functions', { withFileTypes: true });
 const publicHandlerFunctions = [];
@@ -169,10 +207,11 @@ const gatewayMismatches = publicHandlerFunctions.filter((functionName) => {
   return !/verify_jwt\s*=\s*false/.test(section);
 });
 
-if (missing.length || gatewayMismatches.length) {
+if (missing.length || gatewayMismatches.length || presentForbidden.length) {
   const failures = [
     ...missing.map(([, , label]) => label),
     ...gatewayMismatches.map((name) => `gateway verify_jwt=false for ${name}`),
+    ...presentForbidden.map(([, , label]) => `remove ${label}`),
   ];
   console.error(`API check failed: ${failures.join(', ')}`);
   process.exitCode = 1;

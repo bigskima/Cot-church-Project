@@ -4,6 +4,7 @@ import { createHandler } from "../_shared/handler.ts";
 import { enrichSocialPosts } from "../_shared/public-identity.ts";
 import { adminClient, publicClient, userClient } from "../_shared/supabase.ts";
 import { uuid } from "../_shared/validation.ts";
+import { diversifyFeed, rankFeedCandidates, type FeedSignals } from "../_shared/feed-ranking.ts";
 
 function nestedItem(value: any) {
   return Array.isArray(value) ? value[0] ?? null : value ?? null;
@@ -12,7 +13,14 @@ function nestedItem(value: any) {
 function inSelectedExperience(row: any, selectedExpressionId: string | null, key: string) {
   if (!selectedExpressionId) return true;
   const value = key === "content_items" ? nestedItem(row.content_items)?.expression_id : row[key];
-  return value == null || value === selectedExpressionId;
+  return value === selectedExpressionId;
+}
+
+function emptySignals(): FeedSignals {
+  return {
+    followedOrganizationIds: new Set(), followedExpressionIds: new Set(), followedLeaderProfileIds: new Set(),
+    reactedContentIds: new Set(), bookmarkedContentIds: new Set(), completedContentIds: new Set(), inProgressContentIds: new Set(),
+  };
 }
 
 function resultData<T>(result: { data: T | null; error: any }, name: string, degraded: string[]) {
@@ -87,7 +95,7 @@ Deno.serve(createHandler(
       }
 
       const { data: exactMembership, error: membershipError } = await admin
-        .from("memberships")
+        .from("expression_memberships")
         .select("id")
         .eq("organization_id", organizationId)
         .eq("profile_id", userId)
@@ -126,21 +134,21 @@ Deno.serve(createHandler(
         .limit(30),
       client
         .from("reels")
-        .select("id,organization_id,media_asset_id,caption,audio_title,audio_artist,views_count,likes_count,comments_count,shares_count,created_at,content_items!inner(id,organization_id,expression_id,visibility,status,published_at),media_assets(id,media_type,processing_state,duration_seconds,aspect_ratio,media_renditions(id,rendition_kind,container,codec,width,height,storage_path,provider_playback_id),media_thumbnails(storage_path,is_primary))")
+        .select("id,organization_id,media_asset_id,caption,audio_title,audio_artist,views_count,likes_count,comments_count,shares_count,created_at,content_items!inner(id,organization_id,expression_id,author_profile_id,visibility,status,published_at),media_assets(id,media_type,processing_state,duration_seconds,aspect_ratio,media_renditions(id,rendition_kind,container,codec,width,height,storage_path,provider_playback_id),media_thumbnails(storage_path,is_primary))")
         .eq("organization_id", organizationId)
         .eq("content_items.status", "published")
         .order("created_at", { ascending: false })
         .limit(40),
       client
         .from("videos")
-        .select("id,organization_id,media_asset_id,series_id,title,slug,description,category,chapters,transcript,views_count,likes_count,comments_count,shares_count,created_at,content_items!inner(id,organization_id,expression_id,visibility,status,published_at),media_assets(id,media_type,processing_state,duration_seconds,aspect_ratio,media_renditions(id,rendition_kind,container,codec,width,height,storage_path,provider_playback_id),media_thumbnails(storage_path,is_primary))")
+        .select("id,organization_id,media_asset_id,series_id,title,slug,description,category,chapters,transcript,views_count,likes_count,comments_count,shares_count,created_at,content_items!inner(id,organization_id,expression_id,author_profile_id,visibility,status,published_at),media_assets(id,media_type,processing_state,duration_seconds,aspect_ratio,media_renditions(id,rendition_kind,container,codec,width,height,storage_path,provider_playback_id),media_thumbnails(storage_path,is_primary))")
         .eq("organization_id", organizationId)
         .eq("content_items.status", "published")
         .order("created_at", { ascending: false })
         .limit(40),
       client
         .from("sermons")
-        .select("id,organization_id,expression_id,series_id,title,slug,preacher,sermon_date,scripture_references,topics,description,transcript,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,chapters,duration_seconds,status,visibility,is_featured,play_count,published_at,created_at")
+        .select("id,organization_id,expression_id,content_item_id,series_id,title,slug,preacher,sermon_date,scripture_references,topics,description,transcript,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,chapters,duration_seconds,status,visibility,is_featured,play_count,published_at,created_at")
         .eq("organization_id", organizationId)
         .eq("status", "published")
         .order("published_at", { ascending: false, nullsFirst: false })
@@ -178,9 +186,52 @@ Deno.serve(createHandler(
       .filter((row) => inSelectedExperience(row, selectedExpressionId, "branch_id"));
     const rawPosts = resultData<any[]>(postsResult as any, "community", degraded)
       .filter((row) => inSelectedExperience(row, selectedExpressionId, "branch_id"));
-    const posts = await enrichSocialPosts(rawPosts);
+    let posts = await enrichSocialPosts(rawPosts);
 
-    if (degraded.length === 6) {
+    let rankingMode: "personalized" | "recent" | "expression" = selectedExpressionId ? "expression" : "recent";
+    if (!selectedExpressionId && userId) {
+      const signals = emptySignals();
+      const [followsResult, reactionsResult, bookmarksResult, progressResult] = await Promise.all([
+        admin.from("follows").select("organization_id,expression_id,leader:leaders(profile_id)").eq("profile_id", userId),
+        admin.from("content_reactions").select("content_item_id").eq("profile_id", userId).limit(500),
+        admin.from("content_bookmarks").select("content_item_id").eq("profile_id", userId).limit(500),
+        admin.from("content_playback_progress").select("content_item_id,completed,progress_seconds").eq("profile_id", userId).limit(500),
+      ]);
+      if (!followsResult.error && !reactionsResult.error && !bookmarksResult.error && !progressResult.error) {
+        for (const follow of followsResult.data ?? []) {
+          if (follow.organization_id) signals.followedOrganizationIds.add(follow.organization_id);
+          if (follow.expression_id) signals.followedExpressionIds.add(follow.expression_id);
+          const leader = nestedItem(follow.leader);
+          if (leader?.profile_id) signals.followedLeaderProfileIds.add(leader.profile_id);
+        }
+        for (const row of reactionsResult.data ?? []) signals.reactedContentIds.add(row.content_item_id);
+        for (const row of bookmarksResult.data ?? []) signals.bookmarkedContentIds.add(row.content_item_id);
+        for (const row of progressResult.data ?? []) {
+          if (row.completed) signals.completedContentIds.add(row.content_item_id);
+          else if (row.progress_seconds > 0) signals.inProgressContentIds.add(row.content_item_id);
+        }
+
+        const candidates = [
+          ...posts.map((row: any) => ({ key: `post:${row.id}`, kind: "post" as const, publishedAt: row.published_at ?? row.created_at, expressionId: row.branch_id, authorProfileId: row.author?.id, engagementCount: row.social_reactions?.length ?? 0 })),
+          ...reels.map((row: any) => { const item = nestedItem(row.content_items); return { key: `reel:${row.id}`, kind: "reel" as const, publishedAt: item?.published_at ?? row.created_at, expressionId: item?.expression_id, authorProfileId: item?.author_profile_id, contentItemId: item?.id, engagementCount: row.likes_count + row.comments_count + row.shares_count }; }),
+          ...videos.map((row: any) => { const item = nestedItem(row.content_items); return { key: `video:${row.id}`, kind: "video" as const, publishedAt: item?.published_at ?? row.created_at, expressionId: item?.expression_id, authorProfileId: item?.author_profile_id, contentItemId: item?.id, engagementCount: row.likes_count + row.comments_count + row.shares_count }; }),
+          ...sermons.map((row: any) => ({ key: `sermon:${row.id}`, kind: "sermon" as const, publishedAt: row.published_at ?? row.sermon_date, expressionId: row.expression_id, contentItemId: row.content_item_id, engagementCount: row.play_count })),
+          ...events.map((row: any) => ({ key: `event:${row.id}`, kind: "event" as const, publishedAt: row.created_at ?? row.starts_at, expressionId: row.branch_id })),
+        ];
+        const ranked = diversifyFeed(rankFeedCandidates(candidates, organization.id, signals));
+        const ranking = new Map(ranked.map((item, index) => [item.key, { feed_rank: ranked.length - index, feed_reason: item.reason }]));
+        posts = posts.map((row: any) => ({ ...row, ...ranking.get(`post:${row.id}`) }));
+        reels.forEach((row: any) => Object.assign(row, ranking.get(`reel:${row.id}`)));
+        videos.forEach((row: any) => Object.assign(row, ranking.get(`video:${row.id}`)));
+        sermons.forEach((row: any) => Object.assign(row, ranking.get(`sermon:${row.id}`)));
+        events.forEach((row: any) => Object.assign(row, ranking.get(`event:${row.id}`)));
+        rankingMode = "personalized";
+      } else {
+        degraded.push("personalization");
+      }
+    }
+
+    if (["live", "reels", "videos", "sermons", "events", "community"].every((section) => degraded.includes(section))) {
       throw new ApiError("HOME_FEED_FAILED", "Home content is temporarily unavailable", 503, undefined, true);
     }
 
@@ -195,6 +246,7 @@ Deno.serve(createHandler(
         sermons,
         events,
         posts,
+        rankingMode,
         degradedSections: degraded,
       },
     };

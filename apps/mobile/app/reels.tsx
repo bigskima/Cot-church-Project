@@ -9,8 +9,6 @@ import { CommentSheet, Icon, ReelPlayer, ResourceError, Skeleton } from '@/compo
 import type { ContentComment, Reel } from '@/types/content';
 
 const { height: windowHeight } = Dimensions.get('window');
-const organization = process.env.EXPO_PUBLIC_ORGANIZATION_ID;
-
 type PlaybackInfo = {
   available: boolean;
   renditions?: { kind?: string; playbackUrl?: string; storagePath?: string }[];
@@ -24,9 +22,13 @@ export default function FullScreenReelsScreen() {
   const [activeReelForComments, setActiveReelForComments] = useState<Reel | null>(null);
   const [comments, setComments] = useState<ContentComment[]>([]);
   const [commentLoading, setCommentLoading] = useState(false);
+  const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
+  const expressionId = context?.expression?.id;
 
-  const reelsResource = useResource<Reel[]>('reels:immersive', async (signal) => {
-    const reels = await api.request<Reel[]>(`public-content?type=reels${organization ? `&organizationId=${organization}` : ''}`, { signal });
+  const reelsResource = useResource<Reel[]>(`reels:immersive:${expressionId ? `expression:${expressionId}` : `public:${organizationId || 'auto'}`}`, async (signal) => {
+    const reels = expressionId
+      ? (await api.request<{ reels: Reel[] }>(`home-feed?organizationId=${encodeURIComponent(organizationId)}&expressionId=${encodeURIComponent(expressionId)}`, { signal })).reels
+      : await api.request<Reel[]>(`public-content?type=reels${organizationId ? `&organizationId=${encodeURIComponent(organizationId)}` : ''}`, { signal });
     return Promise.all(reels.map(async (reel) => {
       try {
         const playback = await api.request<PlaybackInfo>(`content-media?action=playback&contentId=${encodeURIComponent(reel.id)}`, { signal });
@@ -56,10 +58,14 @@ export default function FullScreenReelsScreen() {
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 70 }).current;
 
   const handleOpenComments = async (reel: Reel) => {
+    if (mode === 'visitor') {
+      router.push('/(auth)/login');
+      return;
+    }
     setActiveReelForComments(reel);
     setCommentLoading(true);
     try {
-      const res = await api.request<ContentComment[]>(`engagement?contentId=${reel.id}`);
+      const res = await api.request<ContentComment[]>(`engagement?contentId=${reel.id}`, { context: expressionId ? 'current' : 'public' });
       setComments(res ?? []);
     } catch {
       setComments([]);
@@ -73,6 +79,7 @@ export default function FullScreenReelsScreen() {
     try {
       const res = await api.request<ContentComment>('engagement', {
         method: 'POST',
+        context: expressionId ? 'current' : 'public',
         body: JSON.stringify({ action: 'comment', contentId: activeReelForComments.id, body, parentCommentId }),
       });
       if (res) setComments((prev) => [...prev, res]);
@@ -82,24 +89,32 @@ export default function FullScreenReelsScreen() {
   };
 
   const handleLikeReel = async (reelId: string) => {
-    if (mode === 'visitor') return;
+    if (mode === 'visitor') {
+      router.push('/(auth)/login');
+      return false;
+    }
     try {
-      await api.request('engagement', { method: 'POST', body: JSON.stringify({ action: 'react', contentId: reelId, reaction: 'amen' }) });
+      await api.request('engagement', { method: 'POST', context: expressionId ? 'current' : 'public', body: JSON.stringify({ action: 'react', contentId: reelId, reaction: 'amen' }) });
+      return true;
     } catch {
-      // Optimistic state is handled by ReelPlayer.
+      return false;
     }
   };
 
   const handleSaveReel = async (reelId: string) => {
-    if (mode === 'visitor') return;
+    if (mode === 'visitor') {
+      router.push('/(auth)/login');
+      return false;
+    }
     try {
-      await api.request('engagement', { method: 'POST', body: JSON.stringify({ action: 'bookmark', contentId: reelId }) });
+      await api.request('engagement', { method: 'POST', context: expressionId ? 'current' : 'public', body: JSON.stringify({ action: 'bookmark', contentId: reelId }) });
+      return true;
     } catch {
-      // Optimistic state is handled by ReelPlayer.
+      return false;
     }
   };
 
-  const expressionName = context?.expression?.name || context?.organizations?.[0]?.name;
+  const expressionName = context?.expression?.name;
 
   return (
     <View style={styles.screen}>

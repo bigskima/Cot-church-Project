@@ -17,19 +17,41 @@ export interface StoredAuth {
   branchId?: string;
 }
 
+function isStoredAuth(value: unknown): value is StoredAuth {
+  if (!value || typeof value !== 'object') return false;
+  const session = (value as Partial<StoredAuth>).session;
+  return Boolean(
+    session
+      && typeof session.accessToken === 'string'
+      && session.accessToken.trim()
+      && typeof session.refreshToken === 'string'
+      && session.refreshToken.trim(),
+  );
+}
+
+function parseStoredAuth(value: string | null): StoredAuth | null {
+  if (!value) return null;
+  const parsed: unknown = JSON.parse(value);
+  return isStoredAuth(parsed) ? parsed : null;
+}
+
 export async function loadAuth(): Promise<StoredAuth | null> {
   try {
     if (Platform.OS === 'web') {
       if (typeof window !== 'undefined' && window.localStorage) {
         const value = window.localStorage.getItem(SESSION_KEY);
-        return value ? (JSON.parse(value) as StoredAuth) : null;
+        const parsed = parseStoredAuth(value);
+        if (value && !parsed) window.localStorage.removeItem(SESSION_KEY);
+        return parsed;
       }
       return null;
     }
     const isAvailable = await SecureStore.isAvailableAsync().catch(() => false);
     if (!isAvailable) return null;
     const value = await SecureStore.getItemAsync(SESSION_KEY);
-    return value ? (JSON.parse(value) as StoredAuth) : null;
+    const parsed = parseStoredAuth(value);
+    if (value && !parsed) await SecureStore.deleteItemAsync(SESSION_KEY);
+    return parsed;
   } catch (err) {
     console.warn('loadAuth failed gracefully:', err);
     return null;
@@ -62,6 +84,7 @@ export async function saveAuth(value: StoredAuth | null): Promise<void> {
 export class ApiError extends Error {
   constructor(public code: string, message: string, public status: number) {
     super(message);
+    this.name = 'ApiError';
   }
 }
 
@@ -79,6 +102,15 @@ function userFacingApiMessage(code: string, status: number, serverMessage?: stri
     REFRESH_TOKEN_MISSING: 'Your session has expired. Please sign in again.',
     PERMISSION_DENIED: 'You don’t have access to this action.',
     PLATFORM_PERMISSION_DENIED: 'You don’t have access to this action.',
+    EXPRESSION_REQUIRED: 'Enter an Expression to continue.',
+    EXPRESSION_MEMBERSHIP_REQUIRED: 'Join this Expression before accessing its private space.',
+    EXPRESSION_ACCESS_DENIED: 'You don’t have access to this Expression.',
+    EXPRESSION_INVITE_INVALID: 'That invite code is invalid or no longer available.',
+    EXPRESSION_INVITE_UNAVAILABLE: 'That invite code has expired or reached its usage limit.',
+    REGISTRATION_ACCESS_DENIED: 'You are not eligible to register for this event.',
+    REGISTRATION_UNAVAILABLE: 'Registration is not available for this event.',
+    REGISTRATION_NOT_FOUND: 'No active registration was found.',
+    REGISTRATION_CANCEL_FAILED: 'We couldn’t cancel your registration. Please try again.',
     ONLINE_GIVING_UNAVAILABLE: 'Online giving is not available for this giving destination yet.',
     ONLINE_GIVING_NOT_READY: 'Online giving is not available for this giving destination yet.',
     AI_ASSISTANT_NOT_READY: 'The church assistant is temporarily unavailable. Please try again later.',
@@ -102,13 +134,14 @@ function userFacingApiMessage(code: string, status: number, serverMessage?: stri
 export class ApiClient {
   constructor(private baseUrl: string, private getAuth: () => StoredAuth | null) {}
 
-  async request<T>(path: string, init: RequestInit = {}) {
+  async request<T>(path: string, init: RequestInit & { context?: 'current' | 'public' } = {}) {
     const cleanBase = this.baseUrl.trim().replace(/\/+$/, '');
     if (!cleanBase) {
       throw new ApiError('API_NOT_CONFIGURED', userFacingApiMessage('API_NOT_CONFIGURED', 0), 0);
     }
 
     const auth = this.getAuth();
+    const { context: requestContext = 'current', ...fetchInit } = init;
     const cleanPath = path.replace(/^\/+/, '');
     const controller = new AbortController();
     let timedOut = false;
@@ -117,7 +150,7 @@ export class ApiClient {
       controller.abort();
     }, DEFAULT_REQUEST_TIMEOUT_MS);
 
-    const callerSignal = init.signal;
+    const callerSignal = fetchInit.signal;
     const abortFromCaller = () => controller.abort();
     if (callerSignal) {
       if (callerSignal.aborted) controller.abort();
@@ -125,18 +158,18 @@ export class ApiClient {
     }
 
     try {
-      const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData;
+      const isFormData = typeof FormData !== 'undefined' && fetchInit.body instanceof FormData;
       const response = await fetch(`${cleanBase}/${cleanPath}`, {
-        ...init,
+        ...fetchInit,
         signal: controller.signal,
         headers: {
           Accept: 'application/json',
           // Never set multipart Content-Type manually: fetch must add the boundary.
-          ...(init.body && !isFormData ? { 'Content-Type': 'application/json' } : {}),
+          ...(fetchInit.body && !isFormData ? { 'Content-Type': 'application/json' } : {}),
           ...(auth?.session?.accessToken ? { Authorization: `Bearer ${auth.session.accessToken}` } : {}),
-          ...(auth?.organizationId ? { 'X-Organization-Id': auth.organizationId } : {}),
-          ...(auth?.branchId ? { 'X-Branch-Id': auth.branchId } : {}),
-          ...init.headers,
+          ...(requestContext === 'current' && auth?.organizationId ? { 'X-Organization-Id': auth.organizationId } : {}),
+          ...(requestContext === 'current' && auth?.branchId ? { 'X-Branch-Id': auth.branchId } : {}),
+          ...fetchInit.headers,
         },
       });
 

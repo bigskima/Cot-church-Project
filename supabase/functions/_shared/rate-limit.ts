@@ -18,6 +18,7 @@ export async function enforceRateLimit(request: Request, bucket: string, subject
     window_seconds: windowSeconds,
   }).single();
   if (error || !data) throw new ApiError("RATE_LIMIT_UNAVAILABLE", "Request protection is temporarily unavailable", 503);
-  if (!data.allowed) throw new ApiError("RATE_LIMITED", "Too many requests", 429, { resetsAt: data.resets_at });
-  return { remaining: data.remaining as number, resetsAt: data.resets_at as string };
+  const result = data as unknown as { allowed: boolean; remaining: number; resets_at: string };
+  if (!result.allowed) throw new ApiError("RATE_LIMITED", "Too many requests", 429, { resetsAt: result.resets_at });
+  return { remaining: result.remaining, resetsAt: result.resets_at };
 }

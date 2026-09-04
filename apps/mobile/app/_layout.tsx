@@ -40,12 +40,14 @@ function AppContent() {
         <Stack.Screen name="watch/index" options={{ headerShown: false }} />
         <Stack.Screen name="watch/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="sermon/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="series/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="event/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="church-story" options={{ headerShown: false }} />
         <Stack.Screen name="giving/index" options={{ headerShown: false }} />
         <Stack.Screen name="prayer/index" options={{ headerShown: false }} />
         <Stack.Screen name="settings/index" options={{ headerShown: false }} />
         <Stack.Screen name="expression/[id]/index" options={{ headerShown: false }} />
+        <Stack.Screen name="expressions/index" options={{ headerShown: false }} />
         <Stack.Screen name="assistant" options={{ headerShown: false }} />
         <Stack.Screen name="studio/index" options={{ headerShown: false }} />
         <Stack.Screen name="leadership/index" options={{ headerShown: false }} />
@@ -56,6 +58,7 @@ function AppContent() {
         <Stack.Screen name="leadership/giving" options={{ headerShown: false }} />
         <Stack.Screen name="leadership/expressions" options={{ headerShown: false }} />
         <Stack.Screen name="leadership/directory" options={{ headerShown: false }} />
+        <Stack.Screen name="leadership/invite-codes" options={{ headerShown: false }} />
       </Stack>
     </>
   );

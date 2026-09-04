@@ -13,7 +13,8 @@ Deno.serve(createHandler({ methods: ["GET", "POST", "PATCH"], authentication: "r
   if (!auth?.organizationId) throw new ApiError("ORGANIZATION_REQUIRED", "Organization context is required", 400);
   if (request.method === "GET") {
     const url = new URL(request.url); const eventId = uuid(url.searchParams.get("id"), "id");
-    let query = auth.client.from("events").select("id, branch_id, title, description, status, visibility, location, timezone, starts_at, ends_at, registration_opens_at, registration_closes_at, capacity, recurrence_rule, created_at, updated_at").eq("organization_id", auth.organizationId).order("starts_at");
+    let query = auth.client.from("events").select("id, organization_id, branch_id, title, description, status, visibility, location, timezone, starts_at, ends_at, registration_opens_at, registration_closes_at, capacity, recurrence_rule, created_at, updated_at").eq("organization_id", auth.organizationId).order("starts_at");
+    query = auth.branchId ? query.eq("branch_id", auth.branchId) : query.is("branch_id", null);
     if (eventId) query = query.eq("id", eventId); else query = query.gte("ends_at", url.searchParams.get("from") ?? new Date().toISOString()).limit(100);
     const { data, error } = await query; if (error) throw new ApiError("EVENT_LIST_FAILED", "Unable to retrieve events", 500, undefined, false);
     return { data: eventId ? data?.[0] ?? null : data ?? [] };
@@ -24,7 +25,9 @@ Deno.serve(createHandler({ methods: ["GET", "POST", "PATCH"], authentication: "r
     assertNoUnknownFields(body, ["branchId", "title", "description", "visibility", "location", "timezone", "startsAt", "endsAt", "registrationOpensAt", "registrationClosesAt", "capacity", "recurrenceRule"]);
     const visibility = optionalString(body.visibility, "visibility", 20) ?? "members"; if (!visibilities.has(visibility)) throw new ApiError("VALIDATION_FAILED", "Invalid visibility", 422);
     const capacity = body.capacity == null ? null : Number(body.capacity); if (capacity !== null && (!Number.isInteger(capacity) || capacity < 1)) throw new ApiError("VALIDATION_FAILED", "capacity must be a positive integer", 422);
-    const record = { organization_id: auth.organizationId, branch_id: body.branchId ? uuid(String(body.branchId), "branchId", true) : null, title: requiredString(body.title, "title", 180), description: optionalString(body.description, "description", 10000) ?? "", visibility, location: body.location ?? {}, timezone: optionalString(body.timezone, "timezone", 64) ?? "UTC", starts_at: timestamp(body.startsAt, "startsAt"), ends_at: timestamp(body.endsAt, "endsAt"), registration_opens_at: body.registrationOpensAt ? timestamp(body.registrationOpensAt, "registrationOpensAt") : null, registration_closes_at: body.registrationClosesAt ? timestamp(body.registrationClosesAt, "registrationClosesAt") : null, capacity, recurrence_rule: body.recurrenceRule ?? null, created_by: auth.user.id };
+    const requestedBranchId = body.branchId ? uuid(String(body.branchId), "branchId", true) : null;
+    if (requestedBranchId && requestedBranchId !== auth.branchId) throw new ApiError("EXPRESSION_CONTEXT_MISMATCH", "Enter the target Expression before creating its event", 403);
+    const record = { organization_id: auth.organizationId, branch_id: requestedBranchId ?? auth.branchId ?? null, title: requiredString(body.title, "title", 180), description: optionalString(body.description, "description", 10000) ?? "", visibility, location: body.location ?? {}, timezone: optionalString(body.timezone, "timezone", 64) ?? "UTC", starts_at: timestamp(body.startsAt, "startsAt"), ends_at: timestamp(body.endsAt, "endsAt"), registration_opens_at: body.registrationOpensAt ? timestamp(body.registrationOpensAt, "registrationOpensAt") : null, registration_closes_at: body.registrationClosesAt ? timestamp(body.registrationClosesAt, "registrationClosesAt") : null, capacity, recurrence_rule: body.recurrenceRule ?? null, created_by: auth.user.id };
     const { data, error } = await auth.client.from("events").insert(record).select().single(); if (error) throw new ApiError("EVENT_CREATE_FAILED", "Unable to create event", 500, undefined, false); return { data, status: 201 };
   }
   await authorize(auth, "events.update"); assertNoUnknownFields(body, ["id", "title", "description", "status", "visibility", "startsAt", "endsAt", "capacity"]);
@@ -35,5 +38,7 @@ Deno.serve(createHandler({ methods: ["GET", "POST", "PATCH"], authentication: "r
   if (body.startsAt !== undefined) updates.starts_at = timestamp(body.startsAt, "startsAt"); if (body.endsAt !== undefined) updates.ends_at = timestamp(body.endsAt, "endsAt");
   if (body.capacity !== undefined) { const capacity = body.capacity === null ? null : Number(body.capacity); if (capacity !== null && (!Number.isInteger(capacity) || capacity < 1)) throw new ApiError("VALIDATION_FAILED", "Invalid capacity", 422); updates.capacity = capacity; }
   if (!Object.keys(updates).length) throw new ApiError("VALIDATION_FAILED", "At least one field is required", 422);
-  const { data, error } = await auth.client.from("events").update(updates).eq("id", id).eq("organization_id", auth.organizationId).select().single(); if (error) throw new ApiError("EVENT_UPDATE_FAILED", "Unable to update event", 500, undefined, false); return { data };
+  let updateQuery = auth.client.from("events").update(updates).eq("id", id).eq("organization_id", auth.organizationId);
+  updateQuery = auth.branchId ? updateQuery.eq("branch_id", auth.branchId) : updateQuery.is("branch_id", null);
+  const { data, error } = await updateQuery.select().single(); if (error?.code === "PGRST116") throw new ApiError("EVENT_NOT_FOUND", "This event is not available in the active context", 404); if (error) throw new ApiError("EVENT_UPDATE_FAILED", "Unable to update event", 500, undefined, false); return { data };
 }));

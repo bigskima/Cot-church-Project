@@ -11,18 +11,33 @@ type MembershipRow = {
   branch: { id: string; name: string; code: string; timezone: string; is_active: boolean } | null;
 };
 
+type ExpressionMembershipRow = {
+  id: string;
+  organization_id: string;
+  branch_id: string;
+  status: string;
+  joined_at: string | null;
+  branch: { id: string; name: string; code: string; timezone: string; is_active: boolean } | null;
+};
+
 Deno.serve(createHandler(
   { methods: ["GET"], authentication: "required", organization: "optional" },
   async ({ auth }) => {
     if (!auth) throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication required", 401);
 
-    const [membershipsResult, profileResult] = await Promise.all([
+    const [membershipsResult, expressionMembershipsResult, profileResult] = await Promise.all([
       auth.client
         .from("memberships")
         .select("id, status, joined_at, branch_id, organization:organizations(id, name, slug, status, timezone), branch:branches(id, name, code, timezone, is_active)")
         .eq("profile_id", auth.user.id)
         .eq("status", "active")
         .order("created_at", { ascending: true }),
+      auth.client
+        .from("expression_memberships")
+        .select("id,organization_id,branch_id,status,joined_at,branch:branches(id,name,code,timezone,is_active)")
+        .eq("profile_id", auth.user.id)
+        .eq("status", "active")
+        .order("joined_at", { ascending: true }),
       auth.client
         .from("profiles")
         .select("id, display_name, avatar_url")
@@ -33,11 +48,15 @@ Deno.serve(createHandler(
     if (membershipsResult.error) {
       throw new ApiError("CONTEXT_LOOKUP_FAILED", "Unable to resolve organization context", 500, undefined, false);
     }
+    if (expressionMembershipsResult.error) {
+      throw new ApiError("CONTEXT_LOOKUP_FAILED", "Unable to resolve Expression memberships", 500, undefined, false);
+    }
     if (profileResult.error) {
       throw new ApiError("CONTEXT_LOOKUP_FAILED", "Unable to resolve member profile", 500, undefined, false);
     }
 
     const memberships = (membershipsResult.data ?? []) as unknown as MembershipRow[];
+    const expressionMemberships = (expressionMembershipsResult.data ?? []) as unknown as ExpressionMembershipRow[];
 
     let effectivePermissions: string[] = [];
     if (auth.organizationId && auth.membershipId) {
@@ -96,10 +115,24 @@ Deno.serve(createHandler(
       ? selectedMembership.organization
       : null;
 
-    const requestedExpression = auth.branchId
-      ? memberships.find((membership) => membership.branch?.id === auth.branchId)?.branch ?? null
-      : selectedMembership?.branch ?? null;
+    const requestedExpressionMembership = auth.branchId
+      ? expressionMemberships.find((membership) => membership.branch_id === auth.branchId && membership.organization_id === auth.organizationId)
+      : null;
+    const requestedExpression = requestedExpressionMembership?.branch ?? null;
     const selectedExpression = requestedExpression?.is_active ? requestedExpression : null;
+
+    const expressions = expressionMemberships
+      .filter((membership) => membership.branch?.is_active)
+      .map((membership) => ({
+        membershipId: membership.id,
+        organizationId: membership.organization_id,
+        id: membership.branch_id,
+        name: membership.branch!.name,
+        code: membership.branch!.code,
+        timezone: membership.branch!.timezone,
+        status: membership.status,
+        joinedAt: membership.joined_at,
+      }));
 
     return {
       data: {
@@ -127,6 +160,7 @@ Deno.serve(createHandler(
           : undefined,
         organizations,
         memberships,
+        expressions,
         effectivePermissions,
       },
     };

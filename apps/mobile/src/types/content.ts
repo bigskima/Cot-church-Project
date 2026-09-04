@@ -238,12 +238,17 @@ export type Event = {
   id: string;
   organization_id?: string;
   expression_id?: string | null;
+  branch_id?: string | null;
   title: string;
   description: string;
   starts_at: string;
   ends_at: string;
   location?: { name?: string; is_online?: boolean };
   visibility: string;
+  status?: string;
+  timezone?: string;
+  registration_opens_at?: string | null;
+  registration_closes_at?: string | null;
   capacity?: number | null;
 };
 
@@ -258,6 +263,7 @@ export type SermonSeries = {
 
 export type Sermon = {
   id: string;
+  content_item_id?: string | null;
   organization_id: string;
   expression_id?: string | null;
   series_id?: string | null;
@@ -402,6 +408,16 @@ export type MembershipContext = {
   effectivePermissions?: string[];
   organization?: { id: string; name: string; slug: string };
   expression?: { id: string; name: string };
+  expressions?: {
+    membershipId: string;
+    organizationId: string;
+    id: string;
+    name: string;
+    code?: string;
+    timezone?: string;
+    status: string;
+    joinedAt?: string | null;
+  }[];
   organizations: {
     id: string;
     name: string;

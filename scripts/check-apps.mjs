@@ -9,11 +9,23 @@ const files = [
   'apps/mobile/app/(tabs)/discover/index.tsx',
   'apps/mobile/app/(tabs)/live/index.tsx',
   'apps/mobile/app/(tabs)/live/[id].tsx',
+  'apps/mobile/app/watch/[id].tsx',
+  'apps/mobile/src/components/media/VideoPlayer.tsx',
+  'apps/mobile/src/components/media/AudioPlayer.tsx',
+  'apps/mobile/app/sermon/[id].tsx',
+  'apps/mobile/app/series/[id].tsx',
   'apps/mobile/app/(tabs)/community/index.tsx',
   'apps/mobile/app/(tabs)/profile/index.tsx',
+  'apps/mobile/app/expressions/index.tsx',
+  'apps/mobile/app/leadership/invite-codes.tsx',
+  'apps/mobile/app/reels.tsx',
+  'apps/mobile/app/expression/[id]/index.tsx',
+  'apps/mobile/app/event/[id].tsx',
   'apps/mobile/src/features/giving/GivingScreen.tsx',
   'apps/mobile/app/(tabs)/profile/leadership/giving-manage.tsx',
   'apps/admin/src/pages/GivingConfiguration.tsx',
+  'apps/admin/src/pages/IntegrationsJobs.tsx',
+  'apps/admin/src/api.ts',
   'supabase/functions/stream-access/index.ts',
   'supabase/functions/stream-presence/index.ts',
   'supabase/functions/live-interactions/index.ts',
@@ -29,6 +41,7 @@ const givingUi = [
   sources.get('apps/mobile/app/(tabs)/profile/leadership/giving-manage.tsx') ?? '',
   sources.get('apps/admin/src/pages/GivingConfiguration.tsx') ?? '',
 ].join('\n');
+const integrationsUi = sources.get('apps/admin/src/pages/IntegrationsJobs.tsx') ?? '';
 
 const checks = [
   [/expo-secure-store/, 'secure session persistence'],
@@ -46,6 +59,46 @@ const checks = [
   [/Church-wide/, 'church-wide giving scope'],
   [/Expression Giving Settings/, 'expression-owned giving settings'],
   [/Currency is (?:configuration|data), not (?:code|application code)/, 'currency-neutral giving configuration'],
+  [/platform-integrations/, 'real platform integration telemetry'],
+  [/retry_job/, 'failed integration job retry'],
+  [/set_connection_status/, 'integration connection governance'],
+  [/Notification delivery/, 'notification queue telemetry'],
+  [/Workflow execution/, 'workflow queue telemetry'],
+  [/Integration delivery/, 'delivery queue telemetry'],
+  [/signature_valid/, 'streaming webhook verification visibility'],
+  [/signature_verified/, 'payment webhook verification visibility'],
+  [/isStoredAuth/, 'validated mobile stored session'],
+  [/isAuthState/, 'validated admin stored session'],
+  [/Join an Expression/, 'public Expression join entry point'],
+  [/enterExpression/, 'deliberate Expression entry'],
+  [/leaveExpression/, 'deliberate Expression exit'],
+  [/action: 'preview'/, 'invite-code preview flow'],
+  [/action: 'redeem'/, 'invite-code redemption flow'],
+  [/action: 'generate'/, 'invite-code generation flow'],
+  [/codeId/, 'invite-code revocation flow'],
+  [/context: 'public'/, 'public interaction request scope'],
+  [/clearContextResources/, 'Expression cache invalidation'],
+  [/public-content\?type=event&id=/, 'exact public event detail request'],
+  [/Cancel Registration/, 'event registration cancellation action'],
+  [/Registration Not Open/, 'event registration opening state'],
+  [/Registration Closed/, 'event registration closing state'],
+  [/public-content\?type=video&id=/, 'exact public video detail request'],
+  [/view=state/, 'server-backed video engagement state'],
+  [/action: isLiked \? 'unreact' : 'react'/, 'confirmed like and unlike flow'],
+  [/action: 'sync_playback'/, 'cross-device playback progress sync'],
+  [/initialPositionSeconds/, 'playback position restoration'],
+  [/content-media\?action=playback/, 'signed video playback resolution'],
+  [/comments\.refresh\(\)/, 'comment refresh after posting'],
+  [/router\.push\('\/\(auth\)\/login'\)/, 'protected interaction sign-in gating'],
+  [/public-content\?type=sermon&id=/, 'exact public sermon detail request'],
+  [/Enter this Expression to play its internal sermon/, 'Expression sermon playback guard'],
+  [/onProgress=\{syncProgress\}/, 'sermon audio and video continuity'],
+  [/useDeferredValue/, 'non-blocking public discovery search'],
+  [/type: 'search'/, 'server-backed public discovery search'],
+  [/PUBLIC EXPRESSION PROFILE/, 'public Expression search result boundary'],
+  [/public-content\?type=series-detail&id=/, 'exact sermon series detail request'],
+  [/No published messages/, 'empty sermon series state'],
+  [/EXPRESSION_MEMBERSHIP_REQUIRED/, 'not-a-member state mapping'],
 ];
 
 const forbiddenGivingPatterns = [
@@ -57,18 +110,25 @@ const forbiddenGivingPatterns = [
   [/\$\{?amount|\$20|\$50|\$100|\$250|\$500/, 'hardcoded dollar giving presentation'],
 ];
 
+const forbiddenIntegrationPatterns = [
+  [/Just now|15m ago/, 'fabricated integration activity time'],
+  [/< 85ms|4 Active|HEALTHY|OPTIMAL/, 'fabricated integration health metric'],
+];
+
 const missing = checks.filter(([pattern]) => !pattern.test(joined));
 const forbidden = forbiddenGivingPatterns.filter(([pattern]) => pattern.test(givingUi));
+const forbiddenIntegrations = forbiddenIntegrationPatterns.filter(([pattern]) => pattern.test(integrationsUi));
 
-if (missing.length || forbidden.length) {
+if (missing.length || forbidden.length || forbiddenIntegrations.length) {
   const failures = [
     ...missing.map(([, name]) => name),
     ...forbidden.map(([, name]) => `remove ${name}`),
+    ...forbiddenIntegrations.map(([, name]) => `remove ${name}`),
   ];
   console.error(`Application check failed: ${failures.join(', ')}`);
   process.exit(1);
 }
 
 console.log(
-  `Application check passed (${files.length} files, ${checks.length} production invariants, ${forbiddenGivingPatterns.length} giving anti-hardcode checks).`,
+  `Application check passed (${files.length} files, ${checks.length} production invariants, ${forbiddenGivingPatterns.length + forbiddenIntegrationPatterns.length} anti-hardcode checks).`,
 );

@@ -57,7 +57,8 @@ Deno.serve(createHandler(
           .eq("organization_id", organizationId)
           .order("starts_at", { ascending: false })
           .limit(50);
-        if (auth?.branchId) seriesQuery = seriesQuery.or(`expression_id.is.null,expression_id.eq.${auth.branchId}`);
+        if (auth?.branchId) seriesQuery = seriesQuery.or(`visibility.eq.public,and(visibility.eq.branch,expression_id.eq.${auth.branchId})`);
+        else seriesQuery = seriesQuery.eq("visibility", "public");
         const { data, error } = await seriesQuery;
         if (error) throw new ApiError("SERIES_LIST_FAILED", "Unable to retrieve sermon series", 500, undefined, false);
         return { data: data ?? [] };
@@ -71,11 +72,13 @@ Deno.serve(createHandler(
       if (sermonId) {
         query = query.eq("id", sermonId);
       } else {
-        if (!auth?.user) query = query.eq("status", "published").eq("visibility", "public");
         if (seriesId) query = query.eq("series_id", seriesId);
         if (queryTerm) query = query.ilike("title", `%${queryTerm.replace(/[%_]/g, "\\$&")}%`);
         query = query.order("sermon_date", { ascending: false }).limit(100);
       }
+      query = query.eq("status", "published");
+      if (auth?.branchId) query = query.or(`visibility.eq.public,and(visibility.eq.branch,expression_id.eq.${auth.branchId})`);
+      else query = query.eq("visibility", "public");
 
       const { data, error } = await query;
       if (error) throw new ApiError("SERMONS_LIST_FAILED", "Unable to retrieve sermons", 500, undefined, false);

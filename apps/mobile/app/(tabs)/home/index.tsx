@@ -40,14 +40,16 @@ interface HomePayload {
   events: Event[];
   posts: SocialPost[];
   degradedSections?: string[];
+  rankingMode?: 'personalized' | 'recent' | 'expression';
 }
 
+type Ranked = { feed_rank?: number; feed_reason?: 'following' | 'continue' | 'popular' | 'recent' };
 type HomeFeedUnit =
-  | { key: string; kind: 'post'; timestamp: number; post: SocialPost }
-  | { key: string; kind: 'reel'; timestamp: number; reel: Reel }
-  | { key: string; kind: 'video'; timestamp: number; video: Video }
-  | { key: string; kind: 'sermon'; timestamp: number; sermon: Sermon }
-  | { key: string; kind: 'event'; timestamp: number; event: Event };
+  | { key: string; kind: 'post'; timestamp: number; rank: number; post: SocialPost & Ranked }
+  | { key: string; kind: 'reel'; timestamp: number; rank: number; reel: Reel & Ranked }
+  | { key: string; kind: 'video'; timestamp: number; rank: number; video: Video & Ranked }
+  | { key: string; kind: 'sermon'; timestamp: number; rank: number; sermon: Sermon & Ranked }
+  | { key: string; kind: 'event'; timestamp: number; rank: number; event: Event & Ranked };
 
 function timeValue(value?: string | null) {
   if (!value) return 0;
@@ -61,14 +63,15 @@ export default function HomeScreen() {
   const { api, context, mode, hasCapability } = useSession();
   const { colors } = useTheme();
 
-  const hasAnyLeadershipCapability =
+  const hasAnyLeadershipCapability = Boolean(context?.expression?.id) && (
     hasCapability('posts.create') ||
     hasCapability('reels.create') ||
     hasCapability('videos.create') ||
     hasCapability('streams.broadcast') ||
     hasCapability('sermons.create') ||
     hasCapability('studio.access') ||
-    hasCapability('*');
+    hasCapability('*')
+  );
 
   const contextOrganization = context?.organization ?? context?.organizations?.[0];
   const contextExpression = context?.expression;
@@ -94,6 +97,7 @@ export default function HomeScreen() {
   const posts = resource.data?.posts ?? [];
   const events = resource.data?.events ?? [];
   const degradedSections = resource.data?.degradedSections ?? [];
+  const rankingMode = resource.data?.rankingMode ?? (expression?.id ? 'expression' : 'recent');
 
   const activeStream = useMemo(
     () => streams.find((stream) => stream.status === 'live') ?? streams.find((stream) => stream.status === 'scheduled'),
@@ -106,34 +110,39 @@ export default function HomeScreen() {
         key: `post:${post.id}`,
         kind: 'post' as const,
         timestamp: timeValue(post.published_at || (post as any).created_at),
+        rank: (post as SocialPost & Ranked).feed_rank ?? 0,
         post,
       })),
       ...reels.map((reel) => ({
         key: `reel:${reel.id}`,
         kind: 'reel' as const,
         timestamp: timeValue((reel.content_items as any)?.published_at || reel.created_at),
+        rank: (reel as Reel & Ranked).feed_rank ?? 0,
         reel,
       })),
       ...videos.map((video) => ({
         key: `video:${video.id}`,
         kind: 'video' as const,
         timestamp: timeValue((video.content_items as any)?.published_at || video.created_at),
+        rank: (video as Video & Ranked).feed_rank ?? 0,
         video,
       })),
       ...sermons.map((sermon) => ({
         key: `sermon:${sermon.id}`,
         kind: 'sermon' as const,
         timestamp: timeValue(sermon.published_at || sermon.sermon_date),
+        rank: (sermon as Sermon & Ranked).feed_rank ?? 0,
         sermon,
       })),
       ...events.map((event) => ({
         key: `event:${event.id}`,
         kind: 'event' as const,
         timestamp: timeValue((event as any).created_at || event.starts_at),
+        rank: (event as Event & Ranked).feed_rank ?? 0,
         event,
       })),
     ];
-    return units.sort((a, b) => b.timestamp - a.timestamp);
+    return units.sort((a, b) => b.rank - a.rank || b.timestamp - a.timestamp);
   }, [posts, reels, videos, sermons, events]);
 
   const stories = useMemo(() => {
@@ -152,18 +161,18 @@ export default function HomeScreen() {
         title: activeStream.status === 'live' ? 'LIVE NOW' : 'Upcoming',
         imageUrl: activeStream.thumbnail_url,
         isLive: activeStream.status === 'live',
-        hasUnseen: true,
+        hasUnseen: false,
         onPress: () => router.push(`/(tabs)/live/${activeStream.id}` as any),
       });
     }
 
-    reels.slice(0, 6).forEach((reel, index) => {
+    reels.slice(0, 6).forEach((reel) => {
       list.push({
         id: `reel:${reel.id}`,
-        title: reel.caption ? reel.caption.slice(0, 12) : `Reel ${index + 1}`,
+        title: reel.caption ? reel.caption.slice(0, 12) : 'Reel',
         imageUrl: reel.media_assets?.thumbnailUrl,
         isLive: false,
-        hasUnseen: index < 3,
+        hasUnseen: false,
         onPress: () => router.push('/reels'),
       });
     });
@@ -181,7 +190,24 @@ export default function HomeScreen() {
           <View style={styles.noticeCopy}>
             <Text style={[styles.publicNoticeTitle, { color: colors.text }]}>General Community</Text>
             <Text style={[styles.publicNoticeText, { color: colors.textSecondary }]}>Public sermons, videos, Reels, teachings, events and community posts remain available even before you join an Expression.</Text>
+            <Pressable onPress={() => router.push('/expressions')} accessibilityRole="button" style={[styles.expressionAction, { borderColor: colors.interactive }]}>
+              <Text style={[styles.expressionActionText, { color: colors.interactive }]}>Join or enter an Expression</Text>
+              <Icon name="arrow-forward" size={14} color={colors.interactive} />
+            </Pressable>
           </View>
+        </View>
+      ) : null}
+
+      {mode === 'authenticated' && expression?.id ? (
+        <View style={[styles.expressionNotice, { backgroundColor: colors.primarySoft, borderBottomColor: colors.borderSubtle }]}>
+          <Icon name="people" size={17} color={colors.interactive} />
+          <View style={styles.noticeCopy}>
+            <Text style={[styles.publicNoticeTitle, { color: colors.text }]}>Expression Space · {expression.name}</Text>
+            <Text style={[styles.publicNoticeText, { color: colors.textSecondary }]}>Only resources belonging to this Expression appear here. Leave this space to return to the public platform.</Text>
+          </View>
+          <Pressable onPress={() => router.push('/expressions')} accessibilityRole="button" accessibilityLabel="Change or leave Expression" hitSlop={8}>
+            <Icon name="swap-horizontal" size={20} color={colors.interactive} />
+          </Pressable>
         </View>
       ) : null}
 
@@ -202,7 +228,7 @@ export default function HomeScreen() {
 
       {feed.length ? (
         <View style={styles.timelineHeading}>
-          <Text style={[styles.timelineTitle, { color: colors.text }]}>{expression?.name ? `${expression.name} + Community` : 'Latest'}</Text>
+          <Text style={[styles.timelineTitle, { color: colors.text }]}>{expression?.name ? `${expression.name} Home` : rankingMode === 'personalized' ? 'For You' : 'Latest Public Content'}</Text>
           <Text style={[styles.timelineSubtitle, { color: colors.textMuted }]}>Reels, sermons, audio, long video, teachings, events and conversations in one feed.</Text>
         </View>
       ) : null}
@@ -282,7 +308,7 @@ export default function HomeScreen() {
               return (
                 <View style={styles.feedCardWrap}>
                   <View style={styles.itemLabelRow}><Icon name="play-circle-outline" size={16} color={colors.interactive} /><Text style={[styles.itemLabel, { color: colors.textSecondary }]}>WATCH</Text></View>
-                  <VideoCard video={item.video} expressionName={expression?.name} onPress={() => router.push(`/watch/${item.video.id}` as any)} />
+                  <VideoCard video={item.video} expressionName={expression?.name} onPress={() => router.push(`/watch/${item.video.id}${expression?.id ? '?context=expression' : ''}` as any)} />
                 </View>
               );
             }
@@ -292,14 +318,14 @@ export default function HomeScreen() {
               return (
                 <View style={styles.feedCardWrap}>
                   <View style={styles.itemLabelRow}><Icon name={hasAudio && !hasVideo ? 'headset-outline' : 'book-outline'} size={16} color={colors.interactive} /><Text style={[styles.itemLabel, { color: colors.textSecondary }]}>{hasAudio && !hasVideo ? 'AUDIO TEACHING' : 'SERMON / TEACHING'}</Text></View>
-                  <SermonCard sermon={item.sermon} onPress={() => router.push(`/(tabs)/discover/sermon/${item.sermon.id}` as any)} />
+                  <SermonCard sermon={item.sermon} onPress={() => router.push(`/sermon/${item.sermon.id}${expression?.id ? '?context=expression' : ''}` as any)} />
                 </View>
               );
             }
             return (
               <View style={styles.feedCardWrap}>
                 <View style={styles.itemLabelRow}><Icon name="calendar-outline" size={16} color={colors.interactive} /><Text style={[styles.itemLabel, { color: colors.textSecondary }]}>UPCOMING</Text></View>
-                <EventCard event={item.event} onPress={() => router.push('/(tabs)/discover')} />
+                <EventCard event={item.event} onPress={() => router.push(`/event/${item.event.id}${expression?.id ? '?context=expression' : ''}` as any)} />
               </View>
             );
           }}
@@ -319,9 +345,12 @@ const styles = StyleSheet.create({
   topBarRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   iconButton: { width: 36, height: 36, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   publicNotice: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start', paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1 },
+  expressionNotice: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start', paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1 },
   noticeCopy: { flex: 1 },
   publicNoticeTitle: { fontSize: 13, fontWeight: '800', marginBottom: 2 },
   publicNoticeText: { fontSize: 11, lineHeight: 16 },
+  expressionAction: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 4, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 6, marginTop: spacing.sm },
+  expressionActionText: { fontSize: 12, fontWeight: '700' },
   degradedBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, margin: spacing.lg, marginBottom: 0, padding: spacing.md, borderWidth: 1, borderRadius: radius.md },
   degradedText: { flex: 1, fontSize: 11, lineHeight: 16 },
   heroSection: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },

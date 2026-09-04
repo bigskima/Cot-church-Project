@@ -27,6 +27,7 @@ export interface OrganizationContextResponse {
   selectedOrganizationId: string | null;
   selectedBranchId: string | null;
   memberships: OrganizationMembershipContext[];
+  expressions: import("./memberships").ExpressionMembershipContext[];
   effectivePermissions: string[];
 }
 

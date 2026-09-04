@@ -22,7 +22,7 @@ Deno.serve(
         let leadershipData = null;
 
         if (view === "all" || view === "story") {
-          let query = client
+          let query = publicClient()
             .from("church_story")
             .select("id, organization_id, title, subtitle, mission, vision, founding_story, founding_year, history_milestones, values, banner_image_url, is_published, created_at, updated_at")
             .eq("is_published", true);
@@ -30,29 +30,15 @@ Deno.serve(
           if (organizationId) {
             query = query.eq("organization_id", organizationId);
           }
-          const { data } = await query.limit(1).single();
-          storyData = data ?? {
-            title: "Our Story & Heritage",
-            subtitle: "A community of faith, hope, and love.",
-            mission: "To proclaim the Gospel and build Christ-centered communities worldwide.",
-            vision: "A vibrant church transforming lives, families, and cities for the glory of God.",
-            founding_story: "Founded with a vision to bring biblical teaching, authentic community, and spirit-led worship to every expression.",
-            founding_year: 2010,
-            history_milestones: [
-              { year: 2010, title: "Foundation & First Gathering", description: "First prayer meeting and official church launch." },
-              { year: 2015, title: "Multi-Expression Expansion", description: "Planting regional expressions and community hubs." },
-              { year: 2020, title: "Global Digital Ministry", description: "Launching livestream broadcasts and online discipleship." },
-              { year: 2026, title: "Integrated Church Operating Platform", description: "Deploying unified digital ministry and pastoral care." },
-            ],
-            values: [
-              { title: "Christ Centered", description: "Jesus is the author, finisher, and center of all we do." },
-              { title: "Kingdom Community", description: "Loving relationships, authentic fellowship, and mutual care." },
-              { title: "Generous Living", description: "Radical generosity in service, time, and stewardship." },
-            ],
-          };
+          const { data, error } = await query.limit(1).maybeSingle();
+          if (error) throw new ApiError("STORY_FETCH_FAILED", "Unable to retrieve the church story", 500, undefined, false);
+          storyData = data ?? null;
         }
 
         if (view === "all" || view === "leadership") {
+          if (expressionId && (!auth?.user || auth.branchId !== expressionId)) {
+            throw new ApiError("EXPRESSION_MEMBERSHIP_REQUIRED", "Enter this Expression to view its internal leadership directory", 403);
+          }
           let query = client
             .from("leadership_profiles")
             .select("id, organization_id, expression_id, profile_id, display_name, portrait_url, role_title, short_bio, full_bio, ministry, display_order, tenure_start, tenure_end, is_founder, is_featured_public, is_active, social_links, created_at, updated_at")

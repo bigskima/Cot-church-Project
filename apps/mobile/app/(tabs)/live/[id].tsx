@@ -51,6 +51,7 @@ export default function LivePlayerScreen() {
   const [supportName, setSupportName] = useState('');
   const [supportContact, setSupportContact] = useState('');
   const [supportSent, setSupportSent] = useState(false);
+  const [interactionError, setInteractionError] = useState('');
 
   useEffect(() => {
     let isMounted = true;
@@ -61,20 +62,21 @@ export default function LivePlayerScreen() {
       try {
         if (mode === 'visitor') {
           const res = await api.request<LiveStream[]>(`public-content?type=streams`);
-          const match = res.find((s) => s.id === id) ?? res[0];
+          const match = res.find((s) => s.id === id);
           if (!match) throw new Error('Live broadcast not found.');
           if (isMounted) {
             setAccess({
               stream: match,
               playbackUrl: match.playback_url ?? null,
-              viewerSessionId: `guest_${Date.now()}`,
-              canChat: true,
+              viewerSessionId: null,
+              canChat: false,
               givingEnabled: true,
             });
           }
         } else {
           const data = await api.request<StreamAccess>('stream-access', {
             method: 'POST',
+            context: context?.expression?.id ? 'current' : 'public',
             body: JSON.stringify({ streamId: id }),
           });
           if (isMounted) setAccess(data);
@@ -92,7 +94,7 @@ export default function LivePlayerScreen() {
     return () => {
       isMounted = false;
     };
-  }, [id, mode]);
+  }, [api, context?.expression?.id, id, mode]);
 
   const player = useVideoPlayer(access?.playbackUrl ?? '', (p) => {
     p.loop = false;
@@ -101,23 +103,44 @@ export default function LivePlayerScreen() {
 
   const isLive = access?.stream.status === 'live';
 
-  const handleSendChat = () => {
+  const handleSendChat = async () => {
     if (!chatMessage.trim()) return;
-    const newMsg = {
-      id: String(Date.now()),
-      user: context?.profile?.display_name || 'Member',
-      text: chatMessage.trim(),
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
-    setChatLog((prev) => [...prev, newMsg]);
-    setChatMessage('');
+    if (mode === 'visitor' || !access?.canChat) {
+      router.push('/(auth)/login');
+      return;
+    }
+    const text = chatMessage.trim();
+    setInteractionError('');
+    try {
+      const result = await api.request<{ id?: string; created_at?: string }>('live-interactions', {
+        method: 'POST',
+        context: context?.expression?.id ? 'current' : 'public',
+        body: JSON.stringify({ action: 'chat', streamId: id, message: text }),
+      });
+      setChatLog((prev) => [...prev, {
+        id: result.id ?? `${id}:${result.created_at ?? Date.now()}`,
+        user: context?.profile?.display_name || 'Member',
+        text,
+        time: new Date(result.created_at ?? Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      }]);
+      setChatMessage('');
+    } catch (value) {
+      setInteractionError(value instanceof Error ? value.message : 'Unable to send this message.');
+    }
   };
 
   const submitSupport = async () => {
     if (!supportName.trim()) return;
+    if (mode === 'visitor') {
+      setShowSupportSheet(false);
+      router.push('/(auth)/login');
+      return;
+    }
+    setInteractionError('');
     try {
       await api.request('live-interactions', {
         method: 'POST',
+        context: context?.expression?.id ? 'current' : 'public',
         body: JSON.stringify({
           action: 'follow_up',
           streamId: id,
@@ -125,8 +148,9 @@ export default function LivePlayerScreen() {
           contact: supportContact.trim(),
         }),
       });
-    } catch {
-      // Ignored for offline/guest
+    } catch (value) {
+      setInteractionError(value instanceof Error ? value.message : 'Unable to submit this prayer request.');
+      return;
     }
     setSupportSent(true);
     setTimeout(() => {
@@ -227,7 +251,7 @@ export default function LivePlayerScreen() {
             </Pressable>
           )}
           <Pressable
-            onPress={() => setShowSupportSheet(true)}
+            onPress={() => mode === 'visitor' ? router.push('/(auth)/login') : setShowSupportSheet(true)}
             style={[styles.prayerPill, { backgroundColor: colors.bgSecondary }]}
           >
             <Icon name="heart-outline" size={14} color={colors.textSecondary} />
@@ -238,6 +262,7 @@ export default function LivePlayerScreen() {
 
       {/* Live Fellowship Chat Feed */}
       <View style={styles.chatSection}>
+        {interactionError ? <Text style={[styles.interactionError, { color: colors.live }]} accessibilityRole="alert">{interactionError}</Text> : null}
         <FlatList
           data={chatLog}
           keyExtractor={(item) => item.id}
@@ -254,14 +279,14 @@ export default function LivePlayerScreen() {
           ListEmptyComponent={() => (
             <View style={styles.chatEmpty}>
               <Text style={[styles.chatEmptyText, { color: colors.textMuted }]}>
-                Welcome to the live service. Say hello or share your prayer request below.
+                {access.canChat ? 'No confirmed chat messages are loaded yet.' : 'Sign in to participate in live fellowship chat.'}
               </Text>
             </View>
           )}
         />
 
         {/* Chat Input Box */}
-        <View style={[styles.chatInputBar, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, spacing.xs) }]}>
+        {access.canChat ? <View style={[styles.chatInputBar, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, spacing.xs) }]}>
           <TextInput
             value={chatMessage}
             onChangeText={setChatMessage}
@@ -285,7 +310,12 @@ export default function LivePlayerScreen() {
           >
             <Icon name="arrow-up" size={18} color={chatMessage.trim() ? '#FFFFFF' : colors.textMuted} />
           </Pressable>
-        </View>
+        </View> : (
+          <Pressable onPress={() => router.push('/(auth)/login')} accessibilityRole="button" style={[styles.signInChat, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
+            <Icon name="log-in-outline" size={17} color={colors.interactive} />
+            <Text style={[styles.signInChatText, { color: colors.interactive }]}>Sign in to join live chat</Text>
+          </Pressable>
+        )}
       </View>
 
       {/* Pastoral Prayer Request Bottom Sheet */}
@@ -426,6 +456,12 @@ const styles = StyleSheet.create({
   chatSection: {
     flex: 1,
   },
+  interactionError: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    fontSize: 12,
+    fontWeight: '600',
+  },
   chatList: {
     padding: spacing.md,
     gap: spacing.xs,
@@ -472,6 +508,19 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  signInChat: {
+    minHeight: 52,
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingTop: spacing.sm,
+  },
+  signInChatText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   backBtn: {
     flexDirection: 'row',

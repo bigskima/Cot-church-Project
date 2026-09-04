@@ -17,6 +17,9 @@ const migrationPaths = [
   'supabase/migrations/20260826110000_ai_gateway.sql',
   'supabase/migrations/20260827100000_sermons_media.sql',
   'supabase/migrations/20260828100000_leadership_and_church_story.sql',
+  'supabase/migrations/20260904130000_public_expression_context_and_invite_codes.sql',
+  'supabase/migrations/20260904140000_event_access_and_registration_lifecycle.sql',
+  'supabase/migrations/20260904150000_media_playback_scope_hardening.sql',
 ];
 
 const requiredPatterns = [
@@ -54,6 +57,18 @@ const requiredPatterns = [
   /create function public\.convert_recording_to_sermon/i,
   /create table public\.platform_branding/i,
   /create table public\.leadership_profiles/i,
+  /create table public\.expression_memberships/i,
+  /create table public\.expression_invite_codes/i,
+  /create function public\.preview_expression_invite_code/i,
+  /create function public\.redeem_expression_invite_code/i,
+  /create function public\.generate_expression_invite_code/i,
+  /create function public\.revoke_expression_invite_code/i,
+  /public\.is_expression_member\(target_organization_id,target_branch_id\)/i,
+  /create function public\.cancel_event_registration/i,
+  /create policy events_public_read/i,
+  /events_member_read[\s\S]*public\.is_expression_member/i,
+  /get_media_playback_info[\s\S]*can_read_social_scope/i,
+  /sync_content_playback[\s\S]*Invalid playback progress/i,
 ];
 
 const source = (await Promise.all(migrationPaths.map((path) => readFile(path, 'utf8')))).join('\n');

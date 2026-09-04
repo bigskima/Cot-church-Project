@@ -15,10 +15,19 @@ export default function ExpressionLeadershipScreen() {
   const branchId = context?.expression?.id;
 
   const leadersResource = useResource<LeadershipProfile[]>(`expression:leadership:${branchId}`, (signal) =>
-    api.request(`church-story?view=leadership${branchId ? `&expressionId=${branchId}` : ''}`, { signal })
+    branchId ? api.request(`church-story?view=leadership&expressionId=${branchId}`, { signal }) : Promise.resolve([])
   );
 
   const leaders = leadersResource.data ?? [];
+
+  if (!branchId) {
+    return (
+      <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top + spacing.sm }]}>
+        <ScreenHeader title="Expression Leadership" showBack />
+        <View style={styles.body}><EmptyState title="Enter an Expression first" message="Internal leadership directories are available only inside an active Expression context." iconName="lock-closed-outline" /></View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>

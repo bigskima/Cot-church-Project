@@ -31,36 +31,30 @@ export default function WatchScreen() {
   const { colors } = useTheme();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
-  const orgParam =
-    mode === 'visitor'
-      ? `?organizationId=${process.env.EXPO_PUBLIC_ORGANIZATION_ID || ''}`
-      : context?.expression?.id
-      ? `?expressionId=${context.expression.id}`
-      : '';
+  const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
+  const expressionId = context?.expression?.id;
+  type WatchPayload = { videos: Video[]; reels: Reel[]; sermons: Sermon[] };
+  const catalogue = useResource<WatchPayload>(
+    `watch:catalogue:${expressionId ? `expression:${expressionId}` : `public:${organizationId || 'auto'}`}:${mode}`,
+    async (signal) => {
+      if (expressionId) {
+        const params = new URLSearchParams({ expressionId });
+        if (organizationId) params.set('organizationId', organizationId);
+        return api.request<WatchPayload>(`home-feed?${params.toString()}`, { signal });
+      }
+      const suffix = organizationId ? `&organizationId=${encodeURIComponent(organizationId)}` : '';
+      const [videos, reels, sermons] = await Promise.all([
+        api.request<Video[]>(`public-content?type=videos${suffix}`, { signal }),
+        api.request<Reel[]>(`public-content?type=reels${suffix}`, { signal }),
+        api.request<Sermon[]>(`public-content?type=sermons${suffix}`, { signal }),
+      ]);
+      return { videos, reels, sermons };
+    },
+  );
 
-  const videosResource = useResource<Video[]>('watch:catalogue', (signal) => {
-    return api.request<Video[]>(`public-content?type=videos${orgParam ? `&${orgParam.slice(1)}` : ''}`, { signal });
-  });
-
-  const reelsResource = useResource<Reel[]>('watch:reels', (signal) => {
-    return api.request<Reel[]>(
-      `public-content?type=reels${orgParam ? `&${orgParam.slice(1)}` : ''}`,
-      { signal }
-    );
-  });
-
-  const sermResource = useResource<Sermon[]>('watch:sermons', (signal) => {
-    return api.request<Sermon[]>(
-      mode === 'authenticated'
-        ? 'sermons'
-        : `public-content${orgParam ? `?type=sermons&${orgParam.slice(1)}` : '?type=sermons'}`,
-      { signal }
-    );
-  });
-
-  const videos = videosResource.data ?? [];
-  const reels = reelsResource.data ?? [];
-  const sermons = sermResource.data ?? [];
+  const videos = catalogue.data?.videos ?? [];
+  const reels = catalogue.data?.reels ?? [];
+  const sermons = catalogue.data?.sermons ?? [];
 
   const filteredVideos =
     selectedCategory === 'all'
@@ -128,8 +122,8 @@ export default function WatchScreen() {
         contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 48 }]}
         refreshControl={
           <RefreshControl
-            refreshing={videosResource.loading}
-            onRefresh={videosResource.refresh}
+            refreshing={catalogue.refreshing}
+            onRefresh={catalogue.refresh}
             tintColor={colors.interactive}
           />
         }
@@ -139,10 +133,10 @@ export default function WatchScreen() {
           ) : null
         }
         ListEmptyComponent={
-          videosResource.loading && !videosResource.data ? (
+          catalogue.loading && !catalogue.data ? (
             <WatchSkeleton />
-          ) : videosResource.error && !videosResource.data ? (
-            <ResourceError message={videosResource.error} retry={videosResource.refresh} />
+          ) : catalogue.error && !catalogue.data ? (
+            <ResourceError message={catalogue.error} retry={catalogue.refresh} />
           ) : (
             <EmptyState
               title="No Videos in this Category"
@@ -154,7 +148,7 @@ export default function WatchScreen() {
         renderItem={({ item }) => (
           <VideoCard
             video={item}
-            onPress={() => router.push(`/watch/${item.id}` as any)}
+            onPress={() => router.push(`/watch/${item.id}${expressionId ? '?context=expression' : ''}` as any)}
           />
         )}
         ListFooterComponent={
@@ -168,7 +162,7 @@ export default function WatchScreen() {
                   key={sermon.id}
                   sermon={sermon}
                   variant="row"
-                  onPress={() => router.push(`/(tabs)/discover/sermon/${sermon.id}` as any)}
+                  onPress={() => router.push(`/sermon/${sermon.id}${expressionId ? '?context=expression' : ''}` as any)}
                 />
               ))}
             </View>

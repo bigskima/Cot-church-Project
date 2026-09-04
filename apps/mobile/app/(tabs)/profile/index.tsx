@@ -38,10 +38,11 @@ export default function ProfileScreen() {
       ? 'Checking availability…'
       : 'Temporarily unavailable. Please try again later.';
 
-  const hasLeadershipAccess =
+  const hasLeadershipAccess = Boolean(expression?.id) && (
     hasCapability('content.create') || hasCapability('streams.broadcast') || hasCapability('sermons.create') ||
     hasCapability('events.manage') || hasCapability('finance.manage') || hasCapability('pastoral.manage') ||
-    hasCapability('members.manage') || hasCapability('*');
+    hasCapability('members.manage') || hasCapability('*')
+  );
 
   const serviceTile = (route: string, icon: string, title: string, subtitle: string, disabled = false) => (
     <Pressable
@@ -88,8 +89,10 @@ export default function ProfileScreen() {
           <View style={styles.linksList}>
             {mode === 'authenticated' ? serviceTile('/(tabs)/profile/settings', 'person-circle-outline', 'Account Settings', 'Edit your name, username, birthday, bio, phone, and profile photo') : null}
             {mode === 'authenticated' ? serviceTile('/(tabs)/profile/notifications', 'notifications-outline', 'Notifications & Invitations', 'Accept or decline role invitations and view church updates') : null}
+            {mode === 'authenticated' ? serviceTile('/expressions', 'business-outline', 'My Expressions', expression?.name ? `Inside ${expression.name} · change or leave this space` : 'Join with an invite code or enter one of your Expressions') : null}
             {mode === 'authenticated' && expression?.id ? serviceTile('/(tabs)/community/groups', 'people-outline', 'Expression Groups', `Discover and join groups inside ${expression.name}`) : null}
             {mode === 'authenticated' && expression?.id ? serviceTile('/(tabs)/community/birthdays', 'gift-outline', 'Expression Birthdays', 'Private upcoming birthday calendar with month/day only') : null}
+            {mode === 'authenticated' && expression?.id && (hasCapability('members.invite') || hasCapability('*')) ? serviceTile('/leadership/invite-codes', 'key-outline', 'Expression Invite Codes', `Invite and manage membership access for ${expression.name}`) : null}
             {serviceTile('/(tabs)/profile/prayer', 'heart-outline', 'Prayer Petitions & Wall', 'Submit private pastoral requests or view community prayer items')}
             {serviceTile('/(tabs)/profile/giving', 'gift-outline', 'Giving & Statements', 'View the configured church or Expression giving destinations and receipts')}
             {mode === 'authenticated' ? serviceTile('/assistant', 'sparkles', 'AI Spiritual Assistant', aiSubtitle, !aiReady) : null}

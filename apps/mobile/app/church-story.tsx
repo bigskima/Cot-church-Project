@@ -16,24 +16,20 @@ import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 import type { ChurchStory, LeadershipProfile } from '@church/types';
 
 interface StoryResponse {
-  story: ChurchStory;
+  story: ChurchStory | null;
   leadership: LeadershipProfile[];
 }
 
 export default function ChurchStoryScreen() {
   const insets = useSafeAreaInsets();
-  const { api, mode, context } = useSession();
+  const { api, context } = useSession();
   const { colors } = useTheme();
   const [activeTab, setActiveTab] = useState<'story' | 'leadership'>('story');
 
-  const orgParam =
-    mode === 'visitor'
-      ? `?organizationId=${process.env.EXPO_PUBLIC_ORGANIZATION_ID || ''}`
-      : context?.expression?.id
-      ? `?expressionId=${context.expression.id}`
-      : '';
+  const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
+  const orgParam = organizationId ? `?organizationId=${encodeURIComponent(organizationId)}` : '';
 
-  const resource = useResource<StoryResponse>('church:story:public', (signal) =>
+  const resource = useResource<StoryResponse>(`church:story:public:${organizationId || 'auto'}`, (signal) =>
     api.request<StoryResponse>(`church-story${orgParam}`, { signal })
   );
 

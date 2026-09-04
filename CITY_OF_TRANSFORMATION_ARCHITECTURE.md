@@ -2,7 +2,7 @@
 ## Full Production Architecture & Engineering Handoff Document
 ### (Verified against `Cot-church-Project`, branch `main`, as of 2026-09-04)
 
-> **How this document was produced:** This is not a rewrite from a blank page. Every claim below was checked against the actual repository — migrations in `supabase/migrations/` (59 files), Edge Functions in `supabase/functions/` (83 functions), the `apps/mobile` route tree, the `apps/admin` page tree, `packages/types`, and the existing internal docs (`README.md`, `backend/architecture.md`, `backend/api.md`, `backend/roadmap.md`, `docs/FULLARCTECT.MD`, `docs/DEV_HANDOVER/00–06`, `docs/WHITE_SCREEN_FINDINGS.md`, `docs/BUILD_IN_PROGRESS.md`). Where this document states something is **implemented**, it means the code exists in the repo. It does not by itself mean it is deployed, has real provider credentials attached, or has been end-to-end tested against a live environment — that distinction matters and is called out explicitly in Section 23.
+> **How this document was produced:** This is not a rewrite from a blank page. Every claim below was checked against the actual repository — migrations in `supabase/migrations/` (60 files), Edge Functions in `supabase/functions/` (83 functions), the `apps/mobile` route tree, the `apps/admin` page tree, `packages/types`, and the existing internal docs (`README.md`, `backend/architecture.md`, `backend/api.md`, `backend/roadmap.md`, `docs/FULLARCTECT.MD`, `docs/DEV_HANDOVER/00–06`, `docs/WHITE_SCREEN_FINDINGS.md`, `docs/BUILD_IN_PROGRESS.md`). Where this document states something is **implemented**, it means the code exists in the repo. It does not by itself mean it is deployed, has real provider credentials attached, or has been end-to-end tested against a live environment — that distinction matters and is called out explicitly in Section 23.
 >
 > **Relationship to existing repo docs:** This document does not replace `docs/DEV_HANDOVER/00_READ_ME_FIRST.md` — it consolidates it, `docs/FULLARCTECT.MD`, and the backend docs into the structure you asked for. Your dev should still read the handover pack in the repo; treat that pack and this document as describing the same system from two angles.
 
@@ -51,7 +51,7 @@ A church website is a one-way publishing surface for one church. This platform i
 
 | Layer | Verified fact |
 | :--- | :--- |
-| Database migrations | 59 SQL migration files, `supabase/migrations/`, spanning 2026-08-24 → 2026-09-04 (i.e. changes were still landing the same day this document was produced) |
+| Database migrations | 60 SQL migration files, `supabase/migrations/`, spanning 2026-08-24 → 2026-09-04 (i.e. changes were still landing the same day this document was produced) |
 | Edge Functions | 83 deployed-as-code functions in `supabase/functions/` (excluding `_shared` and `tests`), covering identity, tenancy, RBAC, church operations, finance, streaming, AI, and platform governance |
 | Shared types | `packages/types/src/` — 14 domain type modules shared between `apps/mobile` and `apps/admin` |
 | Mobile app | `apps/mobile` — Expo Router app with a 5-tab primary navigation, an `(auth)` group, a `leadership/` module, and a `studio/` (Creator Studio) module already routed |
@@ -93,7 +93,7 @@ A completed screen is not a completed feature. The repo's own `docs/DEV_HANDOVER
 
 ### Backend — Supabase
 
-- PostgreSQL as the single source of truth, with 59 forward-only migrations
+- PostgreSQL as the single source of truth, with 60 forward-only migrations
 - Edge Functions (Deno) as the API layer — clients never talk to Postgres directly
 - Storage — buckets for avatars, church/branding assets, and content/community media, referenced via `packages/types/src/media.ts` and the `_shared/media` adapters
 - Realtime — used for live-presence/stream-state style features (`stream-presence`, `live-interactions` functions exist)
@@ -133,7 +133,7 @@ This is the concrete mechanism behind every "provider-neutral" claim elsewhere i
                                           │
                     ┌─────────────────────┴─────────────────────┐
                     │                Supabase Platform            │
-                    │  PostgreSQL (59 migrations, RLS-enforced)   │
+                    │  PostgreSQL (60 migrations, RLS-enforced)   │
                     │  Auth (email + E.164 phone)                 │
                     │  Storage (avatars, branding, media)         │
                     │  Realtime (stream presence / live)          │
@@ -169,7 +169,7 @@ Platform permission codes are namespaced and verified in the migration to includ
 
 **Owns:** platform security, moderation/abuse prevention, global configuration, provider management (streaming/AI/payments infrastructure), feature availability, audit, tenant lifecycle (suspend/restore/archive an organisation or expression).
 
-**Does not own — verified by the most recent migration in the repo (`20260904102944_restore_church_owned_giving.sql`, dated the same day as this document):** giving/finance operations. That migration explicitly deactivates `platform.giving.read`/`platform.giving.manage` and rewrites the RLS policies on `giving_campaigns`, `giving_settings`, `giving_purposes`, and `organization_bank_accounts` to require the **church-scoped** `giving.campaigns.manage` capability instead. This is a concrete, dated example of the boundary in Section 6 of your pasted doc ("Does not own: churches, sermons, expressions, livestream content, church giving, ministries") being actively enforced and corrected in the schema, not just asserted in prose. Platform Authority retains ownership of **payment infrastructure** (provider credentials, rails, reconciliation tooling) via `platform.payments.*` — the distinction is infrastructure vs. operation, exactly as your draft states, and it's now the enforced state, not merely the intended one.
+**Does not own — verified by the giving-boundary migration (`20260904102944_restore_church_owned_giving.sql`, dated the same day as this document):** giving/finance operations. That migration explicitly deactivates `platform.giving.read`/`platform.giving.manage` and rewrites the RLS policies on `giving_campaigns`, `giving_settings`, `giving_purposes`, and `organization_bank_accounts` to require the **church-scoped** `giving.campaigns.manage` capability instead. This is a concrete, dated example of the boundary in Section 6 of your pasted doc ("Does not own: churches, sermons, expressions, livestream content, church giving, ministries") being actively enforced and corrected in the schema, not just asserted in prose. Platform Authority retains ownership of **payment infrastructure** (provider credentials, rails, reconciliation tooling) via `platform.payments.*` — the distinction is infrastructure vs. operation, exactly as your draft states, and it's now the enforced state, not merely the intended one.
 
 ### Layer 2 — Organisation Authority (verified)
 
@@ -214,6 +214,148 @@ This is called from RLS policies and from Edge Function authorization checks wit
 ---
 
 ## 6. Identity Architecture
+
+### Public Platform and Expression Spaces — authoritative context model
+
+The application has two deliberately separate user contexts. They share identity and
+the content model, but they do not share navigation or implicit data access.
+
+#### Public context
+
+Public context is the general City of Transformation platform. It is the default context
+at launch, after authentication, and whenever a user leaves an Expression. Its Home,
+Discover, Reels, Watch, audio, sermons, livestreams, events, profiles, church information,
+and social feed contain only records explicitly classified for public visibility. Public
+queries must not become broader merely because the caller is authenticated or belongs to
+an Expression. Where practical, public Edge Functions use the anonymous database client
+for reads even when a bearer token is present, so RLS proves that the returned rows are
+genuinely public.
+
+Unauthenticated users may read public records and public playback that does not require a
+member grant. Authentication is required for identity-bearing mutations such as reacting,
+commenting, following, saving, joining, posting, or managing content. Authentication does
+not itself confer organisation membership, Expression membership, or leadership power.
+Clients route a visitor to sign-in before a protected interaction; APIs and RLS still
+reject the same interaction when called directly without a valid identity.
+
+#### Expression context
+
+An Expression is a contained community space backed by the existing `branches` table and
+`branch_id`/`X-Branch-Id` compatibility contract. It is not a public-feed category. The
+canonical context transition is:
+
+```
+Public Platform → My Expressions → Enter Expression → Expression Home
+Expression Home → Leave Expression → Public Platform
+```
+
+Entering is an explicit client action that persists an `active_expression_id` equivalent
+(`branchId` in the current client auth state) only after the backend has returned that
+Expression among the user's active memberships. Leaving clears `branchId` immediately,
+clears Expression-derived context and permissions, invalidates Expression query keys, and
+returns to public navigation. Changing Expression performs the same clear-before-enter
+transition so data from Expression A cannot remain visible while Expression B loads.
+
+Expression navigation exists only while an active Expression has been resolved by the
+backend. It may expose Expression Home, feed, announcements, members, groups,
+departments/units, events, livestreams, Reels, videos, audio, sermons, notifications,
+leadership, and permitted administration. On exit, these routes and controls disappear.
+Deep-linking directly to an internal route without the exact active membership must result
+in a not-a-member/unauthorized state, never an implicit context switch.
+
+#### Membership model and multiple Expressions
+
+Organisation membership and Expression membership are different facts:
+
+- `memberships` represents the authenticated person's relationship to an organisation.
+- `expression_memberships` represents membership in one `branches` row and has its own
+  active/invited/suspended/left lifecycle.
+- one active organisation membership may have zero, one, or many Expression memberships;
+  no single-Expression assumption is permitted;
+- `role_assignments.branch_id` scopes roles to an Expression. A role assignment never
+  substitutes for the underlying active Expression membership;
+- authenticated, organisation member, Expression member, and Expression leader/admin are
+  four distinct authorization states.
+
+Legacy `memberships.branch_id` remains readable during compatibility migration but is not
+the long-term cardinality authority. New membership and access logic uses
+`expression_memberships`. Existing branch-anchored membership rows are backfilled into the
+new relation before clients depend on it.
+
+#### Invite-code joining and management
+
+Expression joining is invite-code only. The public UI provides **Join an Expression**, not
+an unrestricted Expression directory with a Join button. The flow is two-stage:
+
+1. an authenticated caller submits a code to the server for validation;
+2. the server returns only safe preview information (Expression name and organisation
+   name), never internal UUIDs or member data;
+3. the caller confirms;
+4. the server revalidates the code in a locked transaction, verifies active organisation
+   and Expression state, expiry and usage limits, creates/reactivates organisation and
+   Expression memberships, increments usage, and writes audit records;
+5. the client refreshes membership context and offers **Enter Expression**.
+
+`expression_invite_codes` stores Expression ownership, creator, a SHA-256 hash of a
+cryptographically random code, a non-secret display hint, status, optional expiry,
+optional usage limit, usage count, created/revoked timestamps, and revoker. Raw codes are
+returned only once when generated and are never stored. Codes disclose no database UUID.
+Authorized leaders manage codes through capability checks (`members.invite` at the exact
+Expression scope), not role-name comparisons. They can generate, list safe metadata, copy
+or externally share the one-time returned code, revoke, and generate replacements. Code
+validation and redemption are rate-limited server operations and all generate/revoke/use
+events are audited.
+
+#### Content scope is explicit, not inferred from creator
+
+Creator ownership and audience visibility are independent. An Expression may create both
+public and internal content. `visibility = 'public'` makes an authorized, published record
+eligible for public surfaces even when `expression_id`/`branch_id` identifies its creator.
+`visibility = 'branch'` confines it to the exact active Expression. Existing additional
+classes retain their meanings: `organization` is organisation-member scope, `group` is an
+exact Expression group scope, and `private` is actor/permission-specific.
+
+This rule applies uniformly to posts, Reels, long video, audio, sermons, events, and
+livestreams. A public livestream may be created by an Expression and appear publicly; an
+Expression livestream uses signed/member playback and stays inside that Expression. The
+presence of `branch_id` must never by itself include or exclude a record from a public
+surface—the explicit visibility value is authoritative.
+
+#### Query, API, and navigation boundaries
+
+Public routes never send `X-Branch-Id` and call public endpoints or explicit `scope=public`
+contracts. Expression routes require an active backend-resolved Expression and send both
+`X-Organization-Id` and `X-Branch-Id`; collection queries additionally bind their filters
+to that exact branch. Query/resource keys include `public` or the active Expression ID.
+Entering, leaving, membership changes, and sign-out invalidate the old scoped resources.
+Realtime channels and storage/playback grants follow the same scope and are unsubscribed
+before context changes.
+
+An Expression profile visible publicly is descriptive only: public identity and explicitly
+public content. It is not the internal Expression environment and must not expose members,
+groups, departments, announcements, internal events, permissions, or management actions.
+
+#### Backend and RLS boundary
+
+Every Expression-scoped request is authorized independently of client filtering. The
+shared request context validates the bearer identity, active organisation membership,
+active `expression_memberships` row for the exact organisation/Expression pair, active
+organisation, and active Expression before resolving `membershipId` and `branchId`.
+Privileged mutations additionally call `has_permission(organization_id, capability,
+branch_id)`. RLS read policies use the same exact active Expression membership predicate;
+group/department access additionally requires membership or the relevant scoped
+capability. A malicious request that substitutes another `X-Branch-Id`, URL ID, body ID,
+realtime channel, or storage path must be denied.
+
+Public RLS policies require published/active state plus explicit public visibility. Public
+APIs must not use service-role reads without reproducing those predicates. Expression APIs
+reject absent context as `EXPRESSION_REQUIRED`, non-members as
+`EXPRESSION_MEMBERSHIP_REQUIRED`, inactive spaces as `EXPRESSION_UNAVAILABLE`, and
+insufficient capabilities as `PERMISSION_DENIED`; clients map these separately to sign-in,
+not-a-member, unavailable, and unauthorized states rather than a generic network failure.
+
+These boundaries must hold at all five layers—UI, navigation, query, API, and database/RLS.
+Hiding a control is never accepted as the security implementation.
 
 Verified flow, matching `backend/architecture.md` and the `memberships`/`role_assignments` schema:
 
@@ -582,7 +724,7 @@ The prescribed fix direction (per that same doc) is the standing production rule
 
 Before adding a feature, the repo's own handover pack already asks nearly this exact checklist (`docs/DEV_HANDOVER/00` and `02`). Answer all six before writing code, and prefer discovering an existing answer over inventing a new one:
 
-1. **What database supports this?** — search `supabase/migrations/` and `packages/types/src/` first; 59 migrations already exist across every domain in Section 8.
+1. **What database supports this?** — search `supabase/migrations/` and `packages/types/src/` first; 60 migrations already exist across every domain in Section 8.
 2. **What permission controls this?** — search `public.permissions` seed inserts across migrations for an existing code before inventing a new one; the catalogue in Section 7 is not exhaustive.
 3. **What API handles this?** — search the 83 functions in `supabase/functions/` (list in Section 3's provider table plus `backend/api.md`'s endpoint tables) before creating a new function; extend an existing one where the domain already exists.
 4. **What happens if it fails?** — must map to the `{error:{code,message,requestId}}` envelope (Section 20) and a calm, non-leaking client message.
@@ -610,7 +752,7 @@ npm run db:verify          # requires local Docker + Supabase CLI: reset, lint, 
 **Important, and explicitly called out in the repo's own docs:** *"A passing structural/type check does not by itself prove deployed production readiness."* `services:check`, for example, statically greps for the presence of `interface StreamingProvider`, a real Mux RTMPS URL, webhook signature verification, etc. — it proves the code exists and is shaped correctly, not that a live Mux account with real secrets is attached and working end-to-end.
 
 ### Backend
-- ✓ Migrations present and structurally checked locally — **verify separately** that all 59 are actually applied to the linked remote Supabase project (`supabase db push` / `supabase migration list`), since local presence and remote application are different facts.
+- ✓ Migrations present and structurally checked locally — **verify separately** that all 60 are actually applied to the linked remote Supabase project (`supabase db push` / `supabase migration list`), since local presence and remote application are different facts.
 - ✓ Permissions tested — verify with distinct test users per role (ordinary member, media, finance, pastoral, expression admin, org admin, platform admin) proving both UI visibility *and* direct backend denial for out-of-scope actions.
 - ✓ APIs stable — confirm the required secrets in Section 17/21 (`SUPABASE_SERVICE_ROLE_KEY`, `ALLOWED_ORIGINS`, `RATE_LIMIT_PEPPER`, `PASSWORD_RECOVERY_REDIRECT_URL`, `NOTIFICATION_WORKER_SECRET`, `PAYMENT_WEBHOOK_SECRET`, `WORKFLOW_WORKER_SECRET`, plus provider secrets `STREAMING_MUX_*`, `AI_OPENAI_PRIMARY`, `AI_GEMINI_PRIMARY`, `AI_ANTHROPIC_PRIMARY`) are actually set in the deployed environment, not just documented.
 

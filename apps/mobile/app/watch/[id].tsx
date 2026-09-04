@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -27,9 +27,13 @@ import {
 } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import type { Video } from '@/types/content';
+import type { ContentComment } from '@/types/content';
+
+type EngagementState = { reaction: string | null; bookmarked: boolean; progress: { progress_seconds: number; duration_seconds: number; completed: boolean } | null };
+type PlaybackInfo = { available: boolean; renditions?: { kind?: string; playbackUrl?: string; storagePath?: string }[] };
 
 export default function WatchDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, context: requestedContext } = useLocalSearchParams<{ id: string; context?: string }>();
   const insets = useSafeAreaInsets();
   const { api, mode, context } = useSession();
   const { colors } = useTheme();
@@ -37,68 +41,79 @@ export default function WatchDetailScreen() {
   const [isLiked, setIsLiked] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [actionError, setActionError] = useState('');
+  const lastSyncedSecond = useRef(0);
+  const expressionMode = requestedContext === 'expression';
+  const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
 
-  const resource = useResource<Video>(`watch:detail:${id}`, (signal) => {
-    if (mode === 'visitor') {
-      return api
-        .request<Video[]>(`public-content?type=videos`, { signal })
-        .then((list) => {
-          const match = list.find((v) => v.id === id);
-          if (!match) throw new Error('Video not found.');
-          return match;
-        });
-    }
-    return api.request<Video[]>(`public-content?type=videos`, { signal }).then((list) => {
-      const match = list.find((v) => v.id === id);
-      if (!match) throw new Error('Video not found.');
+  const resource = useResource<Video>(`watch:detail:${expressionMode ? context?.expression?.id ?? 'none' : 'public'}:${id}`, async (signal) => {
+    if (expressionMode) {
+      if (mode === 'visitor' || !context?.expression?.id) throw new Error('Enter this Expression to view its internal video.');
+      const payload = await api.request<{ videos: Video[] }>(`home-feed?organizationId=${encodeURIComponent(organizationId)}&expressionId=${encodeURIComponent(context.expression.id)}`, { signal });
+      const match = payload.videos.find((video) => video.id === id);
+      if (!match) throw new Error('This video is not available in the active Expression.');
       return match;
-    });
+    }
+    const suffix = organizationId ? `&organizationId=${encodeURIComponent(organizationId)}` : '';
+    return api.request<Video>(`public-content?type=video&id=${encodeURIComponent(id)}${suffix}`, { signal, context: 'public' });
   });
 
-  const relatedResource = useResource<Video[]>('watch:related', (signal) => {
-    return api.request<Video[]>('public-content?type=videos', { signal });
+  const relatedResource = useResource<Video[]>(`watch:related:${expressionMode ? context?.expression?.id ?? 'none' : `public:${organizationId}`}`, async (signal) => {
+    if (expressionMode && context?.expression?.id) return (await api.request<{ videos: Video[] }>(`home-feed?organizationId=${encodeURIComponent(organizationId)}&expressionId=${encodeURIComponent(context.expression.id)}`, { signal })).videos;
+    return api.request<Video[]>(`public-content?type=videos${organizationId ? `&organizationId=${encodeURIComponent(organizationId)}` : ''}`, { signal, context: 'public' });
   });
+
+  const engagement = useResource<EngagementState>(`watch:engagement:${mode}:${id}`, (signal) => mode === 'authenticated'
+    ? api.request<EngagementState>(`engagement?contentId=${id}&view=state`, { signal, context: expressionMode ? 'current' : 'public' })
+    : Promise.resolve({ reaction: null, bookmarked: false, progress: null }));
+  const comments = useResource<ContentComment[]>(`watch:comments:${id}`, (signal) => api.request<ContentComment[]>(`engagement?contentId=${id}`, { signal, context: expressionMode ? 'current' : 'public' }));
+  const playback = useResource<PlaybackInfo>(`watch:playback:${expressionMode ? context?.expression?.id ?? 'none' : 'public'}:${id}`, (signal) =>
+    api.request<PlaybackInfo>(`content-media?action=playback&contentId=${encodeURIComponent(id)}`, { signal, context: expressionMode ? 'current' : 'public' }));
 
   const video = resource.data;
   const relatedVideos = (relatedResource.data ?? []).filter((v) => v.id !== id);
 
-  const videoUrl =
-    video?.media_assets?.renditions?.find((r) => r.rendition_kind === 'video_stream')?.storage_path ||
-    video?.media_assets?.url;
+  const videoUrl = playback.data?.renditions?.find((rendition) => rendition.kind === 'video_stream')?.playbackUrl;
   const posterUrl = video?.media_assets?.thumbnailUrl || video?.media_assets?.url;
+  const contentId = video?.content_items?.id ?? id;
+  const identity = (video?.content_items as any)?.expression?.name || (video?.content_items as any)?.organization?.name || context?.organization?.name || 'Church Community';
 
   const handleLike = async () => {
-    if (mode === 'visitor') return;
-    setIsLiked(!isLiked);
+    if (mode === 'visitor') { router.push('/(auth)/login'); return; }
+    setActionError('');
     try {
       await api.request('engagement', {
         method: 'POST',
+        context: expressionMode ? 'current' : 'public',
         body: JSON.stringify({
-          action: 'react',
-          targetId: id,
-          targetType: 'video',
-          reaction: 'like',
+          action: isLiked ? 'unreact' : 'react',
+          contentId,
+          ...(isLiked ? {} : { reaction: 'like' }),
         }),
       });
-    } catch {
-      // Ignored
+      setIsLiked(!isLiked);
+      engagement.refresh();
+    } catch (value) {
+      setActionError(value instanceof Error ? value.message : 'Unable to update your reaction.');
     }
   };
 
   const handleSave = async () => {
-    if (mode === 'visitor') return;
-    setIsSaved(!isSaved);
+    if (mode === 'visitor') { router.push('/(auth)/login'); return; }
+    setActionError('');
     try {
-      await api.request('engagement', {
+      const result = await api.request<{ bookmarked: boolean }>('engagement', {
         method: 'POST',
+        context: expressionMode ? 'current' : 'public',
         body: JSON.stringify({
           action: 'bookmark',
-          targetId: id,
-          targetType: 'video',
+          contentId,
         }),
       });
-    } catch {
-      // Ignored
+      setIsSaved(result.bookmarked);
+      engagement.refresh();
+    } catch (value) {
+      setActionError(value instanceof Error ? value.message : 'Unable to update your saved videos.');
     }
   };
 
@@ -106,12 +121,25 @@ export default function WatchDetailScreen() {
     if (!video) return;
     try {
       await Share.share({
-        message: `Watch "${video.title}" on Church of the Truth.`,
+        message: `Watch "${video.title}" on ${identity}.`,
       });
     } catch {
       // Ignored
     }
   };
+
+  const syncProgress = useCallback((seconds: number, duration: number) => {
+    if (mode !== 'authenticated' || !contentId || duration <= 0) return;
+    const wholeSecond = Math.floor(seconds);
+    if (wholeSecond - lastSyncedSecond.current < 15 && seconds < duration * 0.9) return;
+    lastSyncedSecond.current = wholeSecond;
+    void api.request('engagement', { method: 'POST', context: expressionMode ? 'current' : 'public', body: JSON.stringify({ action: 'sync_playback', contentId, progressSeconds: wholeSecond, durationSeconds: Math.floor(duration) }) }).catch(() => {});
+  }, [api, contentId, expressionMode, mode]);
+
+  React.useEffect(() => {
+    setIsLiked(Boolean(engagement.data?.reaction));
+    setIsSaved(Boolean(engagement.data?.bookmarked));
+  }, [engagement.data]);
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -127,28 +155,32 @@ export default function WatchDetailScreen() {
           contentContainerStyle={{ paddingBottom: insets.bottom + 60 }}
         >
           {/* Dominant 16:9 Video Canvas */}
-          <VideoPlayer
+          {playback.error ? <ResourceError message={playback.error} retry={playback.refresh} /> : <VideoPlayer
             title={video.title}
             sourceUrl={videoUrl}
             posterUrl={posterUrl}
             durationSeconds={video.media_assets?.duration_seconds}
-          />
+            chapters={video.chapters}
+            initialPositionSeconds={engagement.data?.progress?.completed ? 0 : engagement.data?.progress?.progress_seconds ?? 0}
+            onProgress={syncProgress}
+          />}
 
           {/* Video Metadata & Title */}
           <View style={styles.metadataSection}>
             <Text style={[styles.title, { color: colors.text }]}>{video.title}</Text>
 
             <View style={styles.authorRow}>
-              <Avatar name={context?.expression?.name || 'Church'} size="sm" />
+              <Avatar name={identity} size="sm" />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.authorName, { color: colors.text }]} numberOfLines={1}>
-                  {context?.expression?.name || 'Church of the Truth'}
+                  {identity}
                 </Text>
                 <Text style={[styles.authorSub, { color: colors.textSecondary }]}>
                   {video.category || 'Ministry Teaching'}
                 </Text>
               </View>
             </View>
+            {actionError ? <Text style={[styles.actionError, { color: colors.live }]} accessibilityRole="alert">{actionError}</Text> : null}
 
             {/* YouTube-Style Action Rail (Like, Save, Share, Comments) */}
             <View style={[styles.actionsBar, { borderTopColor: colors.borderSubtle, borderBottomColor: colors.borderSubtle }]}>
@@ -185,7 +217,7 @@ export default function WatchDetailScreen() {
                 <Text style={[styles.actionBtnText, { color: colors.text }]}>Share</Text>
               </Pressable>
 
-              <Pressable onPress={() => setCommentsOpen(true)} style={styles.actionBtn}>
+              <Pressable onPress={() => mode === 'visitor' ? router.push('/(auth)/login') : setCommentsOpen(true)} style={styles.actionBtn}>
                 <Icon name="chatbubble-ellipses-outline" size={20} color={colors.text} />
                 <Text style={[styles.actionBtnText, { color: colors.text }]}>Comments</Text>
               </Pressable>
@@ -221,21 +253,22 @@ export default function WatchDetailScreen() {
       <CommentSheet
         visible={commentsOpen}
         onClose={() => setCommentsOpen(false)}
-        comments={[]}
-        onSubmitComment={async (body) => {
+        comments={comments.data ?? []}
+        loading={comments.loading}
+        onSubmitComment={async (body, parentCommentId) => {
           try {
             await api.request('engagement', {
               method: 'POST',
               body: JSON.stringify({
                 action: 'comment',
-                targetId: id,
-                targetType: 'video',
+                contentId,
                 body,
+                parentCommentId,
               }),
             });
-            setCommentsOpen(false);
+            comments.refresh();
           } catch (err) {
-            alert(err instanceof Error ? err.message : 'Unable to post comment');
+            setActionError(err instanceof Error ? err.message : 'Unable to post comment');
           }
         }}
       />
@@ -296,6 +329,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
   },
+  actionError: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
   relatedSection: {
     marginTop: spacing.md,
     gap: spacing.sm,

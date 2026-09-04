@@ -16,29 +16,51 @@ import {
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import type { Event } from '@/types/content';
 
+type EventRegistration = {
+  id: string;
+  event_id: string;
+  occurrence_id?: string | null;
+  status: 'registered' | 'waitlisted' | 'cancelled' | 'attended';
+  registered_at: string;
+};
+
 export default function EventDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, context: requestedContext } = useLocalSearchParams<{ id: string; context?: string }>();
   const insets = useSafeAreaInsets();
-  const { api, mode } = useSession();
+  const { api, mode, context } = useSession();
   const { colors } = useTheme();
 
-  const [registered, setRegistered] = useState(false);
   const [registering, setRegistering] = useState(false);
+  const [actionError, setActionError] = useState('');
+  const [actionMessage, setActionMessage] = useState('');
+  const expressionMode = requestedContext === 'expression';
 
-  const resource = useResource<Event>(`event:detail:${id}`, (signal) => {
-    if (mode === 'visitor') {
-      return api
-        .request<Event[]>(`public-content?type=events`, { signal })
-        .then((list) => {
-          const match = list.find((e) => e.id === id);
-          if (!match) throw new Error('Event not found.');
-          return match;
-        });
+  const resource = useResource<Event>(`event:detail:${expressionMode ? context?.expression?.id ?? 'none' : 'public'}:${id}`, (signal) => {
+    if (expressionMode) {
+      if (mode === 'visitor' || !context?.expression?.id) {
+        return Promise.reject(new Error('Enter this Expression to view its internal event.'));
+      }
+      return api.request<Event>(`events?id=${id}`, { signal });
     }
-    return api.request<Event>(`events?id=${id}`, { signal });
+    return api.request<Event>(`public-content?type=event&id=${id}`, { signal, context: 'public' });
   });
 
   const event = resource.data;
+  const registrations = useResource<EventRegistration[]>(`event:registration:${mode}:${id}`, (signal) =>
+    mode === 'authenticated'
+      ? api.request<EventRegistration[]>(`event-registrations?eventId=${id}`, { signal })
+      : Promise.resolve([]),
+  );
+  const registration = registrations.data?.find((item) => item.status !== 'cancelled');
+
+  const registrationAvailability = (() => {
+    if (!event) return { allowed: false, label: 'RSVP / Register' };
+    const now = Date.now();
+    if (event.ends_at && Date.parse(event.ends_at) <= now) return { allowed: false, label: 'Event Ended' };
+    if (event.registration_opens_at && Date.parse(event.registration_opens_at) > now) return { allowed: false, label: 'Registration Not Open' };
+    if (event.registration_closes_at && Date.parse(event.registration_closes_at) < now) return { allowed: false, label: 'Registration Closed' };
+    return { allowed: true, label: 'RSVP / Register' };
+  })();
 
   const handleRegister = async () => {
     if (mode === 'visitor') {
@@ -46,14 +68,32 @@ export default function EventDetailScreen() {
       return;
     }
     setRegistering(true);
+    setActionError('');
+    setActionMessage('');
     try {
-      await api.request('event-registrations', {
+      const result = await api.request<EventRegistration>('event-registrations', {
         method: 'POST',
         body: JSON.stringify({ eventId: id }),
       });
-      setRegistered(true);
-    } catch {
-      alert('Unable to complete event registration.');
+      setActionMessage(result.status === 'waitlisted' ? 'You joined the waitlist.' : 'Your registration is confirmed.');
+      registrations.refresh();
+    } catch (value) {
+      setActionError(value instanceof Error ? value.message : 'Unable to complete event registration.');
+    } finally {
+      setRegistering(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    setRegistering(true);
+    setActionError('');
+    setActionMessage('');
+    try {
+      await api.request('event-registrations', { method: 'DELETE', body: JSON.stringify({ eventId: id }) });
+      setActionMessage('Your registration has been cancelled.');
+      registrations.refresh();
+    } catch (value) {
+      setActionError(value instanceof Error ? value.message : 'Unable to cancel registration.');
     } finally {
       setRegistering(false);
     }
@@ -77,8 +117,8 @@ export default function EventDetailScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 60 }]}
       >
         <ScreenHeader
-          title={event?.title ?? 'Church Gathering'}
-          subtitle={event?.location?.name ?? 'Worship service & fellowship'}
+          title={event?.title ?? 'Event'}
+          subtitle={event?.location?.name ?? undefined}
           showBack
         />
 
@@ -114,7 +154,7 @@ export default function EventDetailScreen() {
                 <View style={styles.cardInfo}>
                   <Text style={[styles.cardLabel, { color: colors.textMuted }]}>VENUE LOCATION</Text>
                   <Text style={[styles.cardValue, { color: colors.text }]}>
-                    {event.location?.name || 'Sanctuary Campus'}
+                    {event.location?.name || 'Location to be announced'}
                   </Text>
                   {event.location?.is_online && (
                     <Badge label="HYBRID & ONLINE STREAM" variant="primary" style={{ marginTop: 4, alignSelf: 'flex-start' }} />
@@ -132,15 +172,29 @@ export default function EventDetailScreen() {
             ) : null}
 
             {/* Actions Bar */}
+            {registrations.loading && mode === 'authenticated' ? <Skeleton height={48} borderRadius={radius.md} /> : null}
+            {registrations.error && mode === 'authenticated' ? <ResourceError message={registrations.error} retry={registrations.refresh} /> : null}
+            {registration ? (
+              <View style={[styles.registrationState, { backgroundColor: colors.primarySoft, borderColor: colors.interactive }]}>
+                <Icon name="checkmark-circle" size={20} color={colors.interactive} />
+                <View style={styles.cardInfo}>
+                  <Text style={[styles.cardValue, { color: colors.text }]}>{registration.status === 'waitlisted' ? 'You are on the waitlist' : registration.status === 'attended' ? 'Attendance recorded' : 'You are registered'}</Text>
+                  <Text style={[styles.registrationHint, { color: colors.textSecondary }]}>{registration.status === 'waitlisted' ? 'Your place may be confirmed if capacity becomes available.' : 'Your registration is saved to your account.'}</Text>
+                </View>
+              </View>
+            ) : null}
+            {actionError ? <Text style={[styles.statusMessage, { color: colors.live }]} accessibilityRole="alert">{actionError}</Text> : null}
+            {actionMessage ? <Text style={[styles.statusMessage, { color: colors.success }]} accessibilityRole="alert">{actionMessage}</Text> : null}
             <View style={styles.actionRow}>
               <Button
-                label={registered ? 'Registered for Gathering' : 'RSVP / Register'}
-                onPress={handleRegister}
+                label={registration && registration.status !== 'attended' ? 'Cancel Registration' : registration?.status === 'attended' ? 'Attendance Recorded' : registrationAvailability.label}
+                onPress={registration && registration.status !== 'attended' ? handleCancel : handleRegister}
                 loading={registering}
-                variant={registered ? 'outline' : 'primary'}
+                disabled={registration?.status === 'attended' || (!registration && !registrationAvailability.allowed)}
+                variant={registration ? 'outline' : 'primary'}
                 size="lg"
                 style={{ flex: 1 }}
-                icon={<Icon name={registered ? 'checkmark-circle' : 'ticket-outline'} size={18} color={registered ? colors.interactive : colors.textInverse} />}
+                icon={<Icon name={registration ? 'checkmark-circle' : 'ticket-outline'} size={18} color={registration ? colors.interactive : colors.textInverse} />}
               />
               <Button
                 label="Share"
@@ -216,4 +270,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
   },
+  statusMessage: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
+  registrationState: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.md, padding: spacing.md },
+  registrationHint: { fontSize: 12, lineHeight: 17 },
 });

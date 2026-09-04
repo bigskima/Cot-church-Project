@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useDeferredValue, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,7 +18,9 @@ import {
   Skeleton,
 } from '@/components';
 import { radius, spacing, typography } from '@/design-system/tokens';
-import type { ChurchOrganization, Event, Sermon, SermonSeries } from '@/types/content';
+import type { CampusBranch, ChurchOrganization, Event, Leader, Reel, Sermon, SermonSeries, Video } from '@/types/content';
+
+type SearchResults = { sermons: Sermon[]; videos: Video[]; reels: Reel[]; expressions: CampusBranch[]; leaders: Leader[] };
 
 export default function DiscoverScreen() {
   const insets = useSafeAreaInsets();
@@ -27,6 +29,7 @@ export default function DiscoverScreen() {
   const [selectedChurch, setSelectedChurch] = useState<ChurchOrganization | null>(null);
   const [showChurchPicker, setShowChurchPicker] = useState(false);
   const [query, setQuery] = useState('');
+  const deferredQuery = useDeferredValue(query.trim());
   const [activeFilter, setActiveFilter] = useState<'all' | 'sermons' | 'series' | 'events'>('all');
 
   const contextualOrganization = context?.organization ?? context?.organizations?.[0];
@@ -55,6 +58,12 @@ export default function DiscoverScreen() {
   const events = useResource<Event[]>(`discover:events:${activeOrgId ?? 'all'}`, (signal) =>
     api.request<Event[]>(publicEndpoint('events'), { signal })
   );
+  const search = useResource<SearchResults>(`discover:search:${activeOrgId ?? 'all'}:${deferredQuery.toLowerCase()}`, (signal) => {
+    if (deferredQuery.length < 2) return Promise.resolve({ sermons: [], videos: [], reels: [], expressions: [], leaders: [] });
+    const params = new URLSearchParams({ type: 'search', q: deferredQuery });
+    if (activeOrgId) params.set('organizationId', activeOrgId);
+    return api.request<SearchResults>(`public-content?${params.toString()}`, { signal, context: 'public' });
+  });
 
   const filteredSermons = sermons.data?.filter((s) => {
     if (!query.trim()) return true;
@@ -137,11 +146,25 @@ export default function DiscoverScreen() {
           </View>
         ) : (
           <View style={styles.body}>
+            {deferredQuery.length >= 2 ? (
+              <View style={styles.sectionWrap}>
+                <SectionHeader title="Search across public content" />
+                {search.loading && !search.data ? <Skeleton height={58} count={3} /> : search.error ? <ResourceError message={search.error} retry={search.refresh} /> : (
+                  <>
+                    {(search.data?.videos ?? []).map((video) => <Pressable key={`video-${video.id}`} accessibilityRole="button" onPress={() => router.push(`/watch/${video.id}` as any)} style={[styles.searchRow, { backgroundColor: colors.card, borderColor: colors.border }]}><Icon name="play-circle-outline" size={20} color={colors.interactive} /><View style={styles.searchCopy}><Text style={[styles.searchTitle, { color: colors.text }]}>{video.title}</Text><Text style={[styles.searchMeta, { color: colors.textMuted }]}>VIDEO · {video.category}</Text></View><Icon name="chevron-forward" size={17} color={colors.textMuted} /></Pressable>)}
+                    {(search.data?.reels ?? []).map((reel) => <Pressable key={`reel-${reel.id}`} accessibilityRole="button" onPress={() => router.push('/reels')} style={[styles.searchRow, { backgroundColor: colors.card, borderColor: colors.border }]}><Icon name="flash-outline" size={20} color={colors.interactive} /><View style={styles.searchCopy}><Text numberOfLines={2} style={[styles.searchTitle, { color: colors.text }]}>{reel.caption}</Text><Text style={[styles.searchMeta, { color: colors.textMuted }]}>REEL</Text></View><Icon name="chevron-forward" size={17} color={colors.textMuted} /></Pressable>)}
+                    {(search.data?.expressions ?? []).map((expression) => <Pressable key={`expression-${expression.id}`} accessibilityRole="button" onPress={() => router.push(`/expression/${expression.id}` as any)} style={[styles.searchRow, { backgroundColor: colors.card, borderColor: colors.border }]}><Icon name="business-outline" size={20} color={colors.interactive} /><View style={styles.searchCopy}><Text style={[styles.searchTitle, { color: colors.text }]}>{expression.name}</Text><Text style={[styles.searchMeta, { color: colors.textMuted }]}>PUBLIC EXPRESSION PROFILE</Text></View><Icon name="chevron-forward" size={17} color={colors.textMuted} /></Pressable>)}
+                    {(search.data?.leaders ?? []).map((leader) => <View key={`leader-${leader.id}`} style={[styles.searchRow, { backgroundColor: colors.card, borderColor: colors.border }]}><Icon name="person-outline" size={20} color={colors.interactive} /><View style={styles.searchCopy}><Text style={[styles.searchTitle, { color: colors.text }]}>{leader.name ?? (leader as any).display_name}</Text><Text style={[styles.searchMeta, { color: colors.textMuted }]}>{leader.role_title || 'PUBLIC LEADER'}</Text></View></View>)}
+                    {!(search.data?.videos.length || search.data?.reels.length || search.data?.expressions.length || search.data?.leaders.length) ? <Text style={[styles.noExtraResults, { color: colors.textMuted }]}>No additional public videos, Reels, Expressions, or leaders match this search.</Text> : null}
+                  </>
+                )}
+              </View>
+            ) : null}
             {(activeFilter === 'all' || activeFilter === 'sermons') && (
               <View style={styles.sectionWrap}>
                 <SectionHeader title="Sermons" badge={filteredSermons.length} />
                 {filteredSermons.length > 0 ? filteredSermons.map((sermon) => (
-                  <SermonCard key={sermon.id} sermon={sermon} onPress={() => router.push(`/(tabs)/discover/sermon/${sermon.id}` as any)} />
+                  <SermonCard key={sermon.id} sermon={sermon} onPress={() => router.push(`/sermon/${sermon.id}` as any)} />
                 )) : (
                   <EmptyState
                     title="No Sermons Found"
@@ -156,7 +179,7 @@ export default function DiscoverScreen() {
               <View style={styles.sectionWrap}>
                 <SectionHeader title="Series" badge={filteredSeries.length} />
                 {filteredSeries.map((item) => (
-                  <Pressable key={item.id} style={[styles.seriesRow, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                  <Pressable key={item.id} accessibilityRole="button" onPress={() => router.push(`/series/${item.id}` as any)} style={[styles.seriesRow, { borderColor: colors.border, backgroundColor: colors.card }]}>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.seriesTitle, { color: colors.text }]}>{item.title}</Text>
                       {item.description ? <Text style={[styles.seriesDescription, { color: colors.textSecondary }]} numberOfLines={2}>{item.description}</Text> : null}
@@ -171,7 +194,7 @@ export default function DiscoverScreen() {
               <View style={styles.sectionWrap}>
                 <SectionHeader title="Upcoming Gatherings" badge={filteredEvents.length} />
                 {filteredEvents.length > 0 ? filteredEvents.map((event) => (
-                  <EventCard key={event.id} event={event} onPress={() => router.push('/(tabs)/discover')} />
+                  <EventCard key={event.id} event={event} onPress={() => router.push(`/event/${event.id}` as any)} />
                 )) : (
                   <EmptyState
                     title="No Upcoming Events"
@@ -210,5 +233,8 @@ const styles = StyleSheet.create({
   seriesRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.xs },
   seriesTitle: { fontSize: 15, fontWeight: '700' },
   seriesDescription: { fontSize: 12, lineHeight: 17, marginTop: 3 },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.xs },
+  searchCopy: { flex: 1, gap: 2 }, searchTitle: { fontSize: 14, fontWeight: '700' }, searchMeta: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+  noExtraResults: { fontSize: 13, lineHeight: 18, paddingVertical: spacing.sm },
   pressed: { opacity: 0.8 },
 });

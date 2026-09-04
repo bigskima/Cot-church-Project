@@ -11,6 +11,8 @@ export interface VideoPlayerProps {
   posterUrl?: string | null;
   durationSeconds?: number | null;
   onSeek?: (seconds: number) => void;
+  onProgress?: (seconds: number, durationSeconds: number) => void;
+  initialPositionSeconds?: number;
   chapters?: { title: string; timestamp_seconds: number }[];
   style?: StyleProp<ViewStyle>;
 }
@@ -21,6 +23,8 @@ export function VideoPlayer({
   posterUrl,
   durationSeconds = 0,
   onSeek,
+  onProgress,
+  initialPositionSeconds = 0,
   chapters = [],
   style,
 }: VideoPlayerProps) {
@@ -29,6 +33,7 @@ export function VideoPlayer({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(durationSeconds || 0);
   const [isBuffering, setIsBuffering] = useState(false);
+  const [restoredPosition, setRestoredPosition] = useState(false);
 
   const player = useVideoPlayer(sourceUrl || '', (p) => {
     p.loop = false;
@@ -47,10 +52,15 @@ export function VideoPlayer({
       if (player.duration) {
         setDuration(player.duration);
       }
+      if (status.status === 'readyToPlay' && !restoredPosition && initialPositionSeconds > 0) {
+        player.currentTime = Math.min(initialPositionSeconds, Math.max(0, player.duration - 1));
+        setRestoredPosition(true);
+      }
     });
 
     const timeSub = player.addListener('timeUpdate', (event) => {
       setCurrentTime(event.currentTime);
+      onProgress?.(event.currentTime, player.duration || durationSeconds || 0);
       if (player.duration && player.duration > 0) {
         setDuration(player.duration);
       }
@@ -61,7 +71,7 @@ export function VideoPlayer({
       statusSub.remove();
       timeSub.remove();
     };
-  }, [player]);
+  }, [player, restoredPosition, initialPositionSeconds, onProgress, durationSeconds]);
 
   const togglePlay = () => {
     if (!player) return;

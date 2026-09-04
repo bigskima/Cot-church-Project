@@ -16,6 +16,7 @@
     "@expo/metro-runtime": "latest",
     "@expo/vector-icons": "^15.1.1",
     "expo": "latest",
+    "expo-clipboard": "^57.0.1",
     "expo-constants": "^57.0.16",
     "expo-document-picker": "~57.0.1",
     "expo-image-picker": "~57.0.15",
