@@ -17,33 +17,33 @@ import { FeatureFlags } from '../pages/FeatureFlags';
 import { IntegrationsJobs } from '../pages/IntegrationsJobs';
 import { AuditSecurity } from '../pages/AuditSecurity';
 
-type NavItem = { key: string; label: string; icon: string; superAdminOnly?: boolean };
+type NavItem = { key: string; label: string; superAdminOnly?: boolean };
 type NavSection = { group: string; items: NavItem[] };
 
 const allNavSections: NavSection[] = [
   {
-    group: 'Platform Ecosystem',
+    group: 'Platform',
     items: [
-      { key: 'overview', label: 'Platform Telemetry', icon: '📊' },
-      { key: 'organizations', label: 'Church Organizations', icon: '🏛' },
-      { key: 'expressions', label: 'Expressions', icon: '🌿' },
-      { key: 'users', label: 'Global Identities', icon: '👥' },
-      { key: 'admin-invitations', label: 'Admin Invitations', icon: '✉️', superAdminOnly: true },
-      { key: 'expression-creators', label: 'Authorize Expression Creators', icon: '🔑', superAdminOnly: true },
-      { key: 'branding', label: 'Branding & Identity', icon: '🎨' },
-      { key: 'public-directory', label: 'General Community Directory', icon: '📖' },
-      { key: 'features', label: 'Tenant Feature Flags', icon: '⚑' },
+      { key: 'overview', label: 'Overview' },
+      { key: 'organizations', label: 'Church Organisations' },
+      { key: 'expressions', label: 'Expressions' },
+      { key: 'users', label: 'Accounts & Access' },
+      { key: 'admin-invitations', label: 'Administrator Access', superAdminOnly: true },
+      { key: 'expression-creators', label: 'Expression Creation Access', superAdminOnly: true },
+      { key: 'branding', label: 'Branding & Identity' },
+      { key: 'public-directory', label: 'Community Directory' },
+      { key: 'features', label: 'Feature Availability' },
     ],
   },
   {
-    group: 'Provider Infrastructure',
+    group: 'Services & Operations',
     items: [
-      { key: 'credentials', label: 'Provider Credentials', icon: '🔐' },
-      { key: 'streaming', label: 'Video Broadcast Adapter', icon: '📡' },
-      { key: 'ai', label: 'AI Gateway & Models', icon: '✦' },
-      { key: 'payments', label: 'Payment Gateways', icon: '💳' },
-      { key: 'integrations', label: 'Jobs & Webhooks', icon: '⚡' },
-      { key: 'audit', label: 'Audit & Security', icon: '🛡' },
+      { key: 'credentials', label: 'Secure Credentials' },
+      { key: 'streaming', label: 'Streaming Services' },
+      { key: 'ai', label: 'AI Services' },
+      { key: 'payments', label: 'Payment Services' },
+      { key: 'integrations', label: 'System Activity' },
+      { key: 'audit', label: 'Audit & Security' },
     ],
   },
 ];
@@ -54,7 +54,7 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
   const [page, setPage] = useState<string>('overview');
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
-  const [authority, setAuthority] = useState<PlatformAuthority>({ displayName: 'Platform Authority', roleName: 'Platform Administrator', roleCode: '' });
+  const [authority, setAuthority] = useState<PlatformAuthority>({ displayName: 'Administrator', roleName: 'Platform Administrator', roleCode: '' });
 
   const isSuperAdmin = authority.roleCode === 'super_admin';
   const navSections = useMemo(
@@ -75,7 +75,7 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
         const sortedRoles = [...(data.roles ?? [])].sort((a, b) => (a.role_code === 'super_admin' ? -1 : b.role_code === 'super_admin' ? 1 : 0));
         const firstRole = sortedRoles[0];
         setAuthority({
-          displayName: data.profile?.display_name?.trim() || 'Platform Authority',
+          displayName: data.profile?.display_name?.trim() || 'Administrator',
           roleName: firstRole?.platform_roles?.name?.trim() || firstRole?.role_code?.replaceAll('_', ' ') || 'Platform Administrator',
           roleCode: firstRole?.role_code ?? '',
         });
@@ -116,13 +116,13 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
       const match = section.items.find((item) => item.key === page);
       if (match) return match.label;
     }
-    return 'Platform Governance';
+    return 'Platform Administration';
   };
 
   return (
     <div className="admin-shell">
       <aside className="admin-sidebar">
-        <div className="admin-brand"><div className="admin-brand-icon">COT</div><div className="admin-brand-text"><h1>City of Transformation</h1><p>Platform Control Plane</p></div></div>
+        <div className="admin-brand"><div className="admin-brand-icon">COT</div><div className="admin-brand-text"><h1>City of Transformation</h1><p>Platform Administration</p></div></div>
         <nav className="admin-nav">
           {navSections.map((section) => (
             <div key={section.group} className="admin-nav-group">
@@ -130,25 +130,24 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
               {section.items.map((item) => {
                 const isActive = page === item.key;
                 return <button key={item.key} type="button" onClick={() => setPage(item.key)} className={`admin-nav-item ${isActive ? 'active' : ''}`}>
-                  <span className="admin-nav-item-icon">{item.icon}</span><span>{item.label}</span>
+                  <span>{item.label}</span>
                 </button>;
               })}
             </div>
           ))}
         </nav>
-        <div className="admin-sidebar-footer"><div className="admin-user-pill"><div className="admin-user-info"><span className="admin-user-name">{authority.displayName}</span><span className="admin-user-role">{authority.roleName}</span></div><button type="button" onClick={() => updateAuth(null)} className="admin-btn-ghost admin-btn-sm" title="Sign out of control plane">Sign out</button></div></div>
+        <div className="admin-sidebar-footer"><div className="admin-user-pill"><div className="admin-user-info"><span className="admin-user-name">{authority.displayName}</span><span className="admin-user-role">{authority.roleName}</span></div><button type="button" onClick={() => updateAuth(null)} className="admin-btn-ghost admin-btn-sm" title="Sign out of Platform Administration">Sign out</button></div></div>
       </aside>
 
       <div className="admin-main-stage">
         <header className="admin-topbar">
-          <div className="admin-topbar-left"><h2 className="admin-topbar-title">{getPageTitle()}</h2><Badge label="LEVEL 1 AUTHORITY" variant="gold" /></div>
+          <div className="admin-topbar-left"><h2 className="admin-topbar-title">{getPageTitle()}</h2><Badge label="PLATFORM ADMIN" variant="primary" /></div>
           <div className="admin-topbar-right">
             <button type="button" onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))} className="admin-btn-secondary admin-btn-sm" style={{ display: 'flex', alignItems: 'center', gap: 6 }} title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}><span>{theme === 'dark' ? 'Light' : 'Dark'}</span></button>
-            <div className="admin-system-health-pill"><span className="pulse-live-dot" /><span>Platform connected</span></div>
           </div>
         </header>
         <main className="admin-content-viewport">
-          {loading ? <div className="admin-table-loading" style={{ padding: 120 }}><span className="admin-spinner" /><p>Validating Platform Authority session...</p></div> : renderContent()}
+          {loading ? <div className="admin-table-loading" style={{ padding: 120 }}><span className="admin-spinner" /><p>Loading Platform Administration…</p></div> : renderContent()}
         </main>
       </div>
     </div>
