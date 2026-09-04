@@ -42,6 +42,22 @@ function requireExpression(branchId: string | null) {
   return branchId;
 }
 
+async function canManageGivingScope(auth: any, organizationId: string, branchId: string | null) {
+  const { data, error } = await auth.client.rpc("has_permission", {
+    target_organization_id: organizationId,
+    requested_permission: "giving.campaigns.manage",
+    target_branch_id: branchId,
+  });
+  if (error) throw new ApiError("GIVING_PERMISSION_CHECK_FAILED", "Unable to verify giving access", 500, undefined, false);
+  return data === true;
+}
+
+async function requireGivingScope(auth: any, organizationId: string, branchId: string | null) {
+  if (!(await canManageGivingScope(auth, organizationId, branchId))) {
+    throw new ApiError("PERMISSION_DENIED", "You do not have permission to manage this giving destination", 403);
+  }
+}
+
 Deno.serve(
   createHandler(
     { methods: ["GET", "POST", "PATCH"], authentication: "required", organization: "required" },
@@ -52,8 +68,22 @@ Deno.serve(
 
       if (request.method === "GET") {
         const view = url.searchParams.get("view") ?? "campaigns";
-        if (!new Set(["configuration", "campaigns", "donations", "receipts"]).has(view)) {
+        if (!new Set(["management-scopes", "configuration", "campaigns", "donations", "receipts"]).has(view)) {
           throw new ApiError("VALIDATION_FAILED", "Invalid giving view", 422);
+        }
+
+        if (view === "management-scopes") {
+          const [organizationScope, expressionScope] = await Promise.all([
+            canManageGivingScope(auth, organizationId, null),
+            auth.branchId ? canManageGivingScope(auth, organizationId, auth.branchId) : Promise.resolve(false),
+          ]);
+          return {
+            data: {
+              organization: organizationScope,
+              expression: expressionScope,
+              expressionId: auth.branchId ?? null,
+            },
+          };
         }
 
         if (view === "donations") {
@@ -80,48 +110,46 @@ Deno.serve(
           return { data: data ?? [] };
         }
 
-        const expressionId = requireExpression(auth.branchId);
+        const requestedScope = url.searchParams.get("scope") === "organization" ? "organization" : "expression";
+        const targetBranchId = requestedScope === "organization" ? null : requireExpression(auth.branchId);
+
         if (view === "campaigns") {
-          const { data, error } = await auth.client
+          let campaignQuery = auth.client
             .from("giving_campaigns")
             .select("*")
             .eq("organization_id", organizationId)
-            .eq("branch_id", expressionId)
             .order("created_at", { ascending: false })
             .limit(100);
-          if (error) throw new ApiError("GIVING_LIST_FAILED", "Unable to retrieve expression campaigns", 500, undefined, false);
+          campaignQuery = targetBranchId ? campaignQuery.eq("branch_id", targetBranchId) : campaignQuery.is("branch_id", null);
+          const { data, error } = await campaignQuery;
+          if (error) throw new ApiError("GIVING_LIST_FAILED", "Unable to retrieve giving campaigns", 500, undefined, false);
           return { data: data ?? [] };
         }
 
-        await authorize(auth, "giving.campaigns.manage");
+        await requireGivingScope(auth, organizationId, targetBranchId);
+        let settingsQuery = auth.client.from("giving_settings").select("*").eq("organization_id", organizationId);
+        let purposesQuery = auth.client.from("giving_purposes").select("*").eq("organization_id", organizationId).order("display_order", { ascending: true });
+        let accountsQuery = auth.client.from("organization_bank_accounts").select("*").eq("organization_id", organizationId).order("display_order", { ascending: true });
+        let campaignsQuery = auth.client.from("giving_campaigns").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false });
+        if (targetBranchId) {
+          settingsQuery = settingsQuery.eq("branch_id", targetBranchId);
+          purposesQuery = purposesQuery.eq("branch_id", targetBranchId);
+          accountsQuery = accountsQuery.eq("branch_id", targetBranchId);
+          campaignsQuery = campaignsQuery.eq("branch_id", targetBranchId);
+        } else {
+          settingsQuery = settingsQuery.is("branch_id", null);
+          purposesQuery = purposesQuery.is("branch_id", null);
+          accountsQuery = accountsQuery.is("branch_id", null);
+          campaignsQuery = campaignsQuery.is("branch_id", null);
+        }
         const [settings, purposes, accounts, campaigns] = await Promise.all([
-          auth.client
-            .from("giving_settings")
-            .select("*")
-            .eq("organization_id", organizationId)
-            .eq("branch_id", expressionId)
-            .maybeSingle(),
-          auth.client
-            .from("giving_purposes")
-            .select("*")
-            .eq("organization_id", organizationId)
-            .eq("branch_id", expressionId)
-            .order("display_order", { ascending: true }),
-          auth.client
-            .from("organization_bank_accounts")
-            .select("*")
-            .eq("organization_id", organizationId)
-            .eq("branch_id", expressionId)
-            .order("display_order", { ascending: true }),
-          auth.client
-            .from("giving_campaigns")
-            .select("*")
-            .eq("organization_id", organizationId)
-            .eq("branch_id", expressionId)
-            .order("created_at", { ascending: false }),
+          settingsQuery.maybeSingle(),
+          purposesQuery,
+          accountsQuery,
+          campaignsQuery,
         ]);
         for (const result of [settings, purposes, accounts, campaigns]) {
-          if (result.error) throw new ApiError("GIVING_CONFIGURATION_FAILED", "Unable to retrieve expression giving configuration", 500, undefined, false);
+          if (result.error) throw new ApiError("GIVING_CONFIGURATION_FAILED", "Unable to retrieve giving configuration", 500, undefined, false);
         }
         return {
           data: {
@@ -161,8 +189,9 @@ Deno.serve(
         return { data, status: 201 };
       }
 
-      const expressionId = requireExpression(auth.branchId);
-      await authorize(auth, "giving.campaigns.manage");
+      const requestedScope = url.searchParams.get("scope") === "organization" ? "organization" : "expression";
+      const expressionId = requestedScope === "organization" ? null : requireExpression(auth.branchId);
+      await requireGivingScope(auth, organizationId, expressionId);
 
       if (action === "upsert_settings") {
         assertNoUnknownFields(body, [
@@ -172,7 +201,7 @@ Deno.serve(
         if (body.onlinePaymentEnabled === true) {
           throw new ApiError(
             "ONLINE_GIVING_NOT_READY",
-            "Online giving remains unavailable until the platform activates a real payment provider",
+            "Online giving is not available for this giving destination yet",
             409,
           );
         }
@@ -187,16 +216,16 @@ Deno.serve(
           online_unavailable_message: optionalString(body.onlineUnavailableMessage, "onlineUnavailableMessage", 500) ?? "",
           updated_by: auth.user.id,
         };
-        const { data: existing } = await auth.client
+        let existingQuery = auth.client
           .from("giving_settings")
           .select("id")
-          .eq("organization_id", organizationId)
-          .eq("branch_id", expressionId)
-          .maybeSingle();
+          .eq("organization_id", organizationId);
+        existingQuery = expressionId ? existingQuery.eq("branch_id", expressionId) : existingQuery.is("branch_id", null);
+        const { data: existing } = await existingQuery.maybeSingle();
         const result = existing
           ? await auth.client.from("giving_settings").update(record).eq("id", existing.id).select().single()
           : await auth.client.from("giving_settings").insert({ ...record, created_by: auth.user.id }).select().single();
-        if (result.error) throw new ApiError("GIVING_SETTINGS_SAVE_FAILED", "Unable to save expression giving settings", 500, undefined, false);
+        if (result.error) throw new ApiError("GIVING_SETTINGS_SAVE_FAILED", "Unable to save giving settings", 500, undefined, false);
         return { data: result.data };
       }
 
@@ -226,9 +255,9 @@ Deno.serve(
         };
         const id = body.id ? uuid(requiredString(body.id, "id", 64), "id", true)! : null;
         const result = id
-          ? await auth.client.from("giving_purposes").update(record).eq("id", id).eq("organization_id", organizationId).eq("branch_id", expressionId).select().single()
+          ? await auth.client.from("giving_purposes").update(record).eq("id", id).eq("organization_id", organizationId).select().single()
           : await auth.client.from("giving_purposes").insert({ ...record, created_by: auth.user.id }).select().single();
-        if (result.error) throw new ApiError("GIVING_PURPOSE_SAVE_FAILED", "Unable to save expression giving purpose", 500, undefined, false);
+        if (result.error) throw new ApiError("GIVING_PURPOSE_SAVE_FAILED", "Unable to save giving purpose", 500, undefined, false);
         return { data: result.data };
       }
 
@@ -258,9 +287,9 @@ Deno.serve(
         };
         const id = body.id ? uuid(requiredString(body.id, "id", 64), "id", true)! : null;
         const result = id
-          ? await auth.client.from("organization_bank_accounts").update(record).eq("id", id).eq("organization_id", organizationId).eq("branch_id", expressionId).select().single()
+          ? await auth.client.from("organization_bank_accounts").update(record).eq("id", id).eq("organization_id", organizationId).select().single()
           : await auth.client.from("organization_bank_accounts").insert({ ...record, created_by: auth.user.id }).select().single();
-        if (result.error) throw new ApiError("BANK_ACCOUNT_SAVE_FAILED", "Unable to save expression transfer account", 500, undefined, false);
+        if (result.error) throw new ApiError("BANK_ACCOUNT_SAVE_FAILED", "Unable to save transfer account", 500, undefined, false);
         return { data: result.data };
       }
 
@@ -284,7 +313,7 @@ Deno.serve(
         if (request.method === "POST" && !body.id) {
           Object.assign(record, { created_by: auth.user.id });
           const { data, error } = await auth.client.from("giving_campaigns").insert(record).select().single();
-          if (error) throw new ApiError("CAMPAIGN_CREATE_FAILED", "Unable to create expression campaign", 500, undefined, false);
+          if (error) throw new ApiError("CAMPAIGN_CREATE_FAILED", "Unable to create giving campaign", 500, undefined, false);
           return { data, status: 201 };
         }
         const id = uuid(requiredString(body.id, "id", 36), "id", true)!;
@@ -293,10 +322,9 @@ Deno.serve(
           .update(record)
           .eq("id", id)
           .eq("organization_id", organizationId)
-          .eq("branch_id", expressionId)
           .select()
           .single();
-        if (error) throw new ApiError("CAMPAIGN_UPDATE_FAILED", "Unable to update expression campaign", 500, undefined, false);
+        if (error) throw new ApiError("CAMPAIGN_UPDATE_FAILED", "Unable to update giving campaign", 500, undefined, false);
         return { data };
       }
 
