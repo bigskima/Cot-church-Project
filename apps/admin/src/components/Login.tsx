@@ -20,18 +20,23 @@ export function Login({
     setBusy(true);
     setError('');
     try {
-      const data = await api.request<{ session: { accessToken: string } }>('login', {
+      const data = await api.request<{ session: { accessToken: string; refreshToken?: string; expiresAt?: number; tokenType?: string } }>('login', {
         method: 'POST',
         body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
       });
-      const provisional: AuthState = { accessToken: data.session.accessToken };
+      const provisional: AuthState = {
+        accessToken: data.session.accessToken,
+        refreshToken: data.session.refreshToken,
+        expiresAt: data.session.expiresAt,
+        tokenType: data.session.tokenType ?? 'bearer',
+      };
       const platformApi = new ApiClient(() => provisional);
       await platformApi.request('platform-context');
       onAuthenticated(provisional);
     } catch (value) {
       const maybeApiError = value as ApiError;
       if (maybeApiError?.code === 'PLATFORM_PERMISSION_DENIED') {
-        setError('This account does not have Platform Administration access. Church roles belong in the church application.');
+        setError('This account does not have access to Platform Administration.');
       } else {
         setError(value instanceof Error ? value.message : 'Unable to sign in to Platform Administration.');
       }
@@ -52,7 +57,7 @@ export function Login({
         </div>
 
         <p className="platform-login-copy">
-          Sign in with an account that has Level-1 platform authority. Organisation and expression leaders manage their churches inside the church application, not here.
+          Sign in with an account that has access to Platform Administration.
         </p>
 
         <Card>
@@ -85,7 +90,7 @@ export function Login({
         </Card>
 
         <p className="platform-login-footnote">
-          Platform actions are permission checked and auditable.
+          Administrative actions are protected by account permissions and recorded for security.
         </p>
       </section>
     </main>

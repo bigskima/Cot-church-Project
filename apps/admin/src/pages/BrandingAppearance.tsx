@@ -31,7 +31,7 @@ export function BrandingAppearance({ api }: { api: ApiClient }) {
       .then((data) => {
         if (data) setBranding(data);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : 'Unable to load branding'))
+      .catch((err) => setError(err instanceof Error ? err.message : 'Unable to load branding.'))
       .finally(() => setLoading(false));
   }
 
@@ -55,9 +55,9 @@ export function BrandingAppearance({ api }: { api: ApiClient }) {
           defaultLeaderPlaceholderUrl: branding.default_leader_placeholder_url || null,
         }),
       });
-      setMsg('Platform branding configuration saved successfully!');
+      setMsg('Branding changes saved.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save branding');
+      setError(err instanceof Error ? err.message : 'Unable to save branding.');
     } finally {
       setSaving(false);
     }
@@ -68,10 +68,10 @@ export function BrandingAppearance({ api }: { api: ApiClient }) {
       <section className="panel">
         <div className="panel-title">
           <div>
-            <span className="eyebrow">CONTROL PLANE APPEARANCE</span>
-            <h2>Platform Branding & Visual Identity</h2>
+            <span className="eyebrow">BRANDING</span>
+            <h2>Branding & Identity</h2>
             <p>
-              Centrally configure platform name, logos, splash/launch graphics, and default asset placeholders.
+              Manage the platform name, logos, launch artwork and default images shown across the experience.
             </p>
           </div>
           <button onClick={loadBranding} disabled={loading}>
@@ -80,7 +80,7 @@ export function BrandingAppearance({ api }: { api: ApiClient }) {
         </div>
 
         <div className="alert-notice">
-          <strong>Two-Layer Architecture:</strong> Native Splash (Layer A) is compiled in the binary for zero-latency startup. Dynamic Launch Branding (Layer B) and In-App logos update automatically from these database settings without requiring a binary release.
+          <strong>Launch branding:</strong> The installed app always keeps a built-in startup image for reliable opening. In-app logos and launch artwork can be updated here without changing everyday app content.
         </div>
 
         {error && <div className="error">{error}</div>}
@@ -130,7 +130,7 @@ export function BrandingAppearance({ api }: { api: ApiClient }) {
 
             <div className="grid">
               <label>
-                <strong>In-App Dynamic Launch Logo URL</strong>
+                <strong>Launch Logo URL</strong>
                 <input
                   type="url"
                   className="search"
@@ -156,7 +156,7 @@ export function BrandingAppearance({ api }: { api: ApiClient }) {
 
             <div className="grid">
               <label>
-                <strong>Default Organization Placeholder URL</strong>
+                <strong>Default Church Logo URL</strong>
                 <input
                   type="url"
                   className="search"
@@ -168,7 +168,7 @@ export function BrandingAppearance({ api }: { api: ApiClient }) {
               </label>
 
               <label>
-                <strong>Default Leader Portrait Placeholder URL</strong>
+                <strong>Default Leader Image URL</strong>
                 <input
                   type="url"
                   className="search"
@@ -195,7 +195,7 @@ export function BrandingAppearance({ api }: { api: ApiClient }) {
                 width: '240px',
               }}
             >
-              {saving ? 'Saving changes…' : 'Save Branding Config'}
+              {saving ? 'Saving changes…' : 'Save Branding'}
             </button>
           </form>
         )}

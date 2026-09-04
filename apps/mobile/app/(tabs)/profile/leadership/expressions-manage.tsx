@@ -50,7 +50,7 @@ export default function ExpressionsManageScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: 60 }]}>
-        <ScreenHeader title="Expressions" subtitle="View church Expressions and create a new one only when Platform Authority has authorized you." showBack />
+        <ScreenHeader title="Expressions" subtitle="View church Expressions and create a new one when your account has permission to do so." showBack />
         <View style={styles.body}>
           {successMsg ? <View style={[styles.banner, { backgroundColor: colors.successSoft, borderColor: colors.success }]}><Icon name="checkmark-circle" size={18} color={colors.success} /><Text style={[styles.bannerText, { color: colors.success }]}>{successMsg}</Text></View> : null}
           {errorMsg ? <View style={[styles.banner, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}><Icon name="alert-circle" size={18} color={colors.live} /><Text style={[styles.bannerText, { color: colors.live }]}>{errorMsg}</Text></View> : null}
@@ -58,7 +58,7 @@ export default function ExpressionsManageScreen() {
           {creatorState.loading ? <Skeleton height={120} /> : canCreateExpression ? (
             <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
               <View style={styles.cardHeader}><Icon name="add-circle-outline" size={18} color={colors.interactive} /><Text style={[styles.cardTitle, { color: colors.text }]}>Create an Expression</Text></View>
-              <Text style={[styles.helper, { color: colors.textSecondary }]}>Platform Authority has authorized your account to create Expressions. The Expression you create will be owned by you and you will receive Expression Admin authority for that Expression only.</Text>
+              <Text style={[styles.helper, { color: colors.textSecondary }]}>Your account is approved to create Expressions for this church. You will become the owner and administrator of the Expression you create.</Text>
               <InputField label="Expression Name" value={name} onChangeText={(val) => { setName(val); if (!code) setCode(val.replace(/[^a-zA-Z0-9]/g, '').slice(0, 10).toUpperCase()); }} placeholder="e.g. Awka Expression" />
               <InputField label="Expression Code" value={code} onChangeText={(val) => setCode(val.toUpperCase())} placeholder="e.g. AWKA-01" />
               <InputField label="Timezone" value={timezone} onChangeText={setTimezone} placeholder="e.g. Africa/Lagos" />

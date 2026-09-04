@@ -65,13 +65,47 @@ export class ApiError extends Error {
   }
 }
 
+const INTERNAL_COPY_PATTERN = /\b(api|webhook|runtime|secret|provider|adapter|configuration|configured|backend|platform authority|control plane|rls|jwt|supabase)\b/i;
+
+function userFacingApiMessage(code: string, status: number, serverMessage?: string) {
+  const known: Record<string, string> = {
+    API_NOT_CONFIGURED: 'This feature is temporarily unavailable. Please try again later.',
+    NETWORK_ERROR: 'We couldn’t connect. Check your internet connection and try again.',
+    REQUEST_TIMEOUT: 'This is taking longer than expected. Please try again.',
+    INVALID_RESPONSE: 'We couldn’t load this right now. Please try again.',
+    AUTHENTICATION_REQUIRED: 'Please sign in to continue.',
+    INVALID_ACCESS_TOKEN: 'Your session has expired. Please sign in again.',
+    INVALID_REFRESH_SESSION: 'Your session has expired. Please sign in again.',
+    REFRESH_TOKEN_MISSING: 'Your session has expired. Please sign in again.',
+    PERMISSION_DENIED: 'You don’t have access to this action.',
+    PLATFORM_PERMISSION_DENIED: 'You don’t have access to this action.',
+    ONLINE_GIVING_UNAVAILABLE: 'Online giving is not available for this giving destination yet.',
+    ONLINE_GIVING_NOT_READY: 'Online giving is not available for this giving destination yet.',
+    AI_ASSISTANT_NOT_READY: 'The church assistant is temporarily unavailable. Please try again later.',
+    STREAMING_CONFIGURATION_MISSING: 'Live broadcasting is temporarily unavailable. Please try again later.',
+    STREAM_PROVIDER_NOT_CONFIGURED: 'Live broadcasting is temporarily unavailable. Please try again later.',
+  };
+
+  if (known[code]) return known[code];
+  if (status >= 500) return 'Something went wrong while loading this. Please try again.';
+  if (status === 404) return serverMessage && !INTERNAL_COPY_PATTERN.test(serverMessage)
+    ? serverMessage
+    : 'The requested item could not be found.';
+  if (status === 403) return serverMessage && !INTERNAL_COPY_PATTERN.test(serverMessage)
+    ? serverMessage
+    : 'You don’t have access to this action.';
+  if (status === 401) return 'Please sign in again to continue.';
+  if (serverMessage && !INTERNAL_COPY_PATTERN.test(serverMessage)) return serverMessage;
+  return 'We couldn’t complete this request. Please try again.';
+}
+
 export class ApiClient {
   constructor(private baseUrl: string, private getAuth: () => StoredAuth | null) {}
 
   async request<T>(path: string, init: RequestInit = {}) {
     const cleanBase = this.baseUrl.trim().replace(/\/+$/, '');
     if (!cleanBase) {
-      throw new ApiError('API_NOT_CONFIGURED', 'This application build is missing EXPO_PUBLIC_API_URL.', 0);
+      throw new ApiError('API_NOT_CONFIGURED', userFacingApiMessage('API_NOT_CONFIGURED', 0), 0);
     }
 
     const auth = this.getAuth();
@@ -110,20 +144,21 @@ export class ApiClient {
       try {
         payload = await response.json();
       } catch {
-        throw new ApiError('INVALID_RESPONSE', `Server returned invalid response (${response.status})`, response.status);
+        throw new ApiError('INVALID_RESPONSE', userFacingApiMessage('INVALID_RESPONSE', response.status), response.status);
       }
 
       if (!response.ok) {
-        throw new ApiError(payload.error?.code ?? 'REQUEST_FAILED', payload.error?.message ?? 'Request failed', response.status);
+        const code = payload.error?.code ?? 'REQUEST_FAILED';
+        throw new ApiError(code, userFacingApiMessage(code, response.status, payload.error?.message), response.status);
       }
       return payload.data as T;
     } catch (error) {
       if (error instanceof ApiError) throw error;
       if (error instanceof Error && error.name === 'AbortError') {
-        if (timedOut) throw new ApiError('REQUEST_TIMEOUT', 'The server took too long to respond. Please try again.', 0);
+        if (timedOut) throw new ApiError('REQUEST_TIMEOUT', userFacingApiMessage('REQUEST_TIMEOUT', 0), 0);
         throw new ApiError('REQUEST_CANCELLED', 'The request was cancelled.', 0);
       }
-      throw new ApiError('NETWORK_ERROR', error instanceof Error ? error.message : 'Unable to reach the server.', 0);
+      throw new ApiError('NETWORK_ERROR', userFacingApiMessage('NETWORK_ERROR', 0), 0);
     } finally {
       clearTimeout(timeoutId);
       callerSignal?.removeEventListener('abort', abortFromCaller);

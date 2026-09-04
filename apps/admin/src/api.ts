@@ -1,11 +1,15 @@
 export interface AuthState {
   accessToken: string;
+  refreshToken?: string;
+  expiresAt?: number;
+  tokenType?: string;
   organizationId?: string;
   branchId?: string;
 }
 
 const key = 'church-admin-auth';
 const REQUEST_TIMEOUT_MS = 15_000;
+const REFRESH_SKEW_SECONDS = 120;
 
 export function loadAuth(): AuthState | null {
   try {
@@ -35,20 +39,80 @@ function configuredApiUrl() {
   return String(import.meta.env.VITE_API_URL ?? '').trim().replace(/\/+$/, '');
 }
 
+function sessionNeedsRefresh(auth: AuthState | null) {
+  if (!auth?.refreshToken) return false;
+  if (!auth.expiresAt) return true;
+  return auth.expiresAt <= Math.floor(Date.now() / 1000) + REFRESH_SKEW_SECONDS;
+}
+
+function adminMessage(code: string, status: number, message?: string) {
+  if (code === 'API_NOT_CONFIGURED') return 'Platform Administration is temporarily unavailable. Please try again later.';
+  if (code === 'NETWORK_ERROR') return 'We couldn’t connect to Platform Administration. Check your connection and try again.';
+  if (code === 'REQUEST_TIMEOUT') return 'This request is taking longer than expected. Please try again.';
+  if (code === 'INVALID_REFRESH_SESSION' || code === 'INVALID_ACCESS_TOKEN' || status === 401) return 'Your session has expired. Please sign in again.';
+  if (status >= 500) return 'Something went wrong while loading this page. Please try again.';
+  return message || 'We couldn’t complete this request. Please try again.';
+}
+
 export class ApiClient {
-  constructor(private getAuth: () => AuthState | null) {}
+  private refreshPromise: Promise<AuthState | null> | null = null;
+
+  constructor(
+    private getAuth: () => AuthState | null,
+    private updateAuth?: (value: AuthState | null) => void,
+  ) {}
+
+  private async refreshAuth(baseUrl: string, current: AuthState) {
+    if (!current.refreshToken) return current;
+    if (this.refreshPromise) return this.refreshPromise;
+
+    this.refreshPromise = (async () => {
+      try {
+        const response = await fetch(`${baseUrl}/refresh-session`, {
+          method: 'POST',
+          headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken: current.refreshToken }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload?.data?.session?.accessToken) {
+          if (response.status === 401) this.updateAuth?.(null);
+          throw new ApiError(
+            payload?.error?.code ?? 'INVALID_REFRESH_SESSION',
+            adminMessage(payload?.error?.code ?? 'INVALID_REFRESH_SESSION', response.status, payload?.error?.message),
+            response.status,
+          );
+        }
+
+        const session = payload.data.session;
+        const refreshed: AuthState = {
+          ...current,
+          accessToken: session.accessToken,
+          refreshToken: session.refreshToken ?? current.refreshToken,
+          expiresAt: session.expiresAt,
+          tokenType: session.tokenType ?? 'bearer',
+        };
+        this.updateAuth?.(refreshed);
+        return refreshed;
+      } catch (error) {
+        if (error instanceof ApiError) throw error;
+        throw new ApiError('NETWORK_ERROR', adminMessage('NETWORK_ERROR', 0), 0);
+      } finally {
+        this.refreshPromise = null;
+      }
+    })();
+
+    return this.refreshPromise;
+  }
 
   async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const baseUrl = configuredApiUrl();
     if (!baseUrl) {
-      throw new ApiError(
-        'API_NOT_CONFIGURED',
-        'The Platform Admin deployment is missing VITE_API_URL.',
-        0,
-      );
+      throw new ApiError('API_NOT_CONFIGURED', adminMessage('API_NOT_CONFIGURED', 0), 0);
     }
 
-    const auth = this.getAuth();
+    let auth = this.getAuth();
+    if (auth && sessionNeedsRefresh(auth)) auth = await this.refreshAuth(baseUrl, auth);
+
     const cleanPath = path.replace(/^\/+/, '');
     const controller = new AbortController();
     let timedOut = false;
@@ -82,34 +146,22 @@ export class ApiClient {
       try {
         payload = await response.json();
       } catch {
-        throw new ApiError(
-          'INVALID_RESPONSE',
-          `Server returned invalid response (${response.status})`,
-          response.status,
-        );
+        throw new ApiError('INVALID_RESPONSE', adminMessage('INVALID_RESPONSE', response.status), response.status);
       }
 
       if (!response.ok) {
-        throw new ApiError(
-          payload.error?.code ?? 'REQUEST_FAILED',
-          payload.error?.message ?? payload.message ?? 'Request failed',
-          response.status,
-        );
+        const code = payload.error?.code ?? 'REQUEST_FAILED';
+        if (response.status === 401) this.updateAuth?.(null);
+        throw new ApiError(code, adminMessage(code, response.status, payload.error?.message ?? payload.message), response.status);
       }
       return payload.data as T;
     } catch (error) {
       if (error instanceof ApiError) throw error;
       if (error instanceof Error && error.name === 'AbortError') {
-        if (timedOut) {
-          throw new ApiError('REQUEST_TIMEOUT', 'The server took too long to respond. Please try again.', 0);
-        }
+        if (timedOut) throw new ApiError('REQUEST_TIMEOUT', adminMessage('REQUEST_TIMEOUT', 0), 0);
         throw new ApiError('REQUEST_CANCELLED', 'The request was cancelled.', 0);
       }
-      throw new ApiError(
-        'NETWORK_ERROR',
-        error instanceof Error ? error.message : 'Unable to reach the platform API.',
-        0,
-      );
+      throw new ApiError('NETWORK_ERROR', adminMessage('NETWORK_ERROR', 0), 0);
     } finally {
       window.clearTimeout(timer);
       callerSignal?.removeEventListener('abort', cancelFromCaller);

@@ -68,11 +68,11 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="watch"
+        name="reels"
         options={{
-          title: 'Watch',
-          tabBarAccessibilityLabel: 'Watch',
-          tabBarIcon: renderIcon('play-circle', 'play-circle-outline'),
+          title: 'Reels',
+          tabBarAccessibilityLabel: 'Reels',
+          tabBarIcon: renderIcon('flash', 'flash-outline'),
         }}
       />
       <Tabs.Screen
@@ -95,6 +95,7 @@ export default function TabLayout() {
           tab children and never surface as bottom-tab items. The `live` group
           is a direct child and is kept routable but hidden from the tab bar. */}
       <Tabs.Screen name="live" options={{ href: null }} />
+      <Tabs.Screen name="watch" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -33,10 +33,10 @@ export default function ProfileScreen() {
   });
   const aiReady = aiReadiness.data?.ready === true;
   const aiSubtitle = aiReady
-    ? `Available now${aiReadiness.data?.providerName ? ` via ${aiReadiness.data.providerName}` : ''}${aiReadiness.data?.modelName ? ` · ${aiReadiness.data.modelName}` : ''}`
+    ? 'Available now'
     : aiReadiness.loading
-      ? 'Checking configured AI provider readiness…'
-      : 'Not enabled yet. Platform Authority must configure an active provider, model, route, and runtime secret.';
+      ? 'Checking availability…'
+      : 'Temporarily unavailable. Please try again later.';
 
   const hasLeadershipAccess =
     hasCapability('content.create') || hasCapability('streams.broadcast') || hasCapability('sermons.create') ||

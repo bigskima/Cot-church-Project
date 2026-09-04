@@ -20,6 +20,8 @@ import { radius, shadows, spacing } from '@/design-system/tokens';
 import type { BankAccount, ExpressionGivingConfiguration, GivingPurpose } from '@/types/giving';
 
 type Tab = 'settings' | 'purposes' | 'accounts';
+type GivingScope = 'organization' | 'expression';
+type ManagementScopes = { organization: boolean; expression: boolean; expressionId?: string | null };
 
 function ToggleRow({
   label,
@@ -71,16 +73,31 @@ export default function ExpressionGivingManageScreen() {
   const insets = useSafeAreaInsets();
   const { api, context } = useSession();
   const { colors } = useTheme();
+  const organization = context?.organization ?? context?.organizations?.[0];
   const expression = context?.expression;
 
   const [tab, setTab] = useState<Tab>('settings');
+  const [givingScope, setGivingScope] = useState<GivingScope>(expression ? 'expression' : 'organization');
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
+  const scopeAccess = useResource<ManagementScopes>(
+    `giving-management-scopes:${organization?.id ?? 'none'}:${expression?.id ?? 'none'}`,
+    (signal) => organization
+      ? api.request<ManagementScopes>('giving?view=management-scopes', { signal })
+      : Promise.resolve({ organization: false, expression: false, expressionId: null }),
+  );
+
+  const activeScope: GivingScope = givingScope === 'expression' && expression ? 'expression' : 'organization';
+  const givingPath = `giving?scope=${activeScope}`;
   const configuration = useResource<ExpressionGivingConfiguration>(
-    `expression-giving:${expression?.id ?? 'none'}`,
-    (signal) => api.request<ExpressionGivingConfiguration>('giving?view=configuration', { signal }),
+    `giving-configuration:${organization?.id ?? 'none'}:${expression?.id ?? 'none'}:${activeScope}`,
+    (signal) => {
+      if (!organization) return Promise.resolve({ settings: null, purposes: [], bankAccounts: [], campaigns: [] } as ExpressionGivingConfiguration);
+      if (activeScope === 'expression' && !expression) return Promise.resolve({ settings: null, purposes: [], bankAccounts: [], campaigns: [] } as ExpressionGivingConfiguration);
+      return api.request<ExpressionGivingConfiguration>(`giving?view=configuration&scope=${activeScope}`, { signal });
+    },
   );
 
   const [displayTitle, setDisplayTitle] = useState('Giving');
@@ -103,6 +120,15 @@ export default function ExpressionGivingManageScreen() {
   const [transferInstructions, setTransferInstructions] = useState('');
   const [additionalInstructions, setAdditionalInstructions] = useState('');
   const [referencePrefix, setReferencePrefix] = useState('');
+
+  useEffect(() => {
+    if (scopeAccess.loading || !scopeAccess.data) return;
+    if (givingScope === 'organization' && !scopeAccess.data.organization && scopeAccess.data.expression && expression) {
+      setGivingScope('expression');
+    } else if (givingScope === 'expression' && (!expression || !scopeAccess.data.expression) && scopeAccess.data.organization) {
+      setGivingScope('organization');
+    }
+  }, [scopeAccess.loading, scopeAccess.data?.organization, scopeAccess.data?.expression, expression?.id, givingScope]);
 
   useEffect(() => {
     const settings = configuration.data?.settings;
@@ -131,7 +157,7 @@ export default function ExpressionGivingManageScreen() {
   const saveSettings = () =>
     run(
       () =>
-        api.request('giving', {
+        api.request(givingPath, {
           method: 'PATCH',
           body: JSON.stringify({
             action: 'upsert_settings',
@@ -143,7 +169,7 @@ export default function ExpressionGivingManageScreen() {
             onlineUnavailableMessage: 'Online giving is not available yet.',
           }),
         }),
-      'Expression giving settings saved.',
+      activeScope === 'organization' ? 'Church-wide giving settings saved.' : 'Expression giving settings saved.',
     );
 
   const addPurpose = async () => {
@@ -153,7 +179,7 @@ export default function ExpressionGivingManageScreen() {
     }
     await run(
       () =>
-        api.request('giving', {
+        api.request(givingPath, {
           method: 'POST',
           body: JSON.stringify({
             action: 'upsert_purpose',
@@ -173,7 +199,7 @@ export default function ExpressionGivingManageScreen() {
   const updatePurpose = (purpose: GivingPurpose, patch: { status?: string; isDefault?: boolean }) =>
     run(
       () =>
-        api.request('giving', {
+        api.request(givingPath, {
           method: 'PATCH',
           body: JSON.stringify({
             action: 'upsert_purpose',
@@ -200,7 +226,7 @@ export default function ExpressionGivingManageScreen() {
     }
     await run(
       () =>
-        api.request('giving', {
+        api.request(givingPath, {
           method: 'POST',
           body: JSON.stringify({
             action: 'upsert_bank_account',
@@ -219,7 +245,7 @@ export default function ExpressionGivingManageScreen() {
             isActive: true,
           }),
         }),
-      `${code} transfer account published for this expression.`,
+      activeScope === 'organization' ? `${code} transfer account published for the church.` : `${code} transfer account published for this expression.`,
     );
     setAccountLabel('');
     setCurrency('');
@@ -237,7 +263,7 @@ export default function ExpressionGivingManageScreen() {
   const updateAccountVisibility = (account: BankAccount, isActive: boolean) =>
     run(
       () =>
-        api.request('giving', {
+        api.request(givingPath, {
           method: 'PATCH',
           body: JSON.stringify({
             action: 'upsert_bank_account',
@@ -261,13 +287,25 @@ export default function ExpressionGivingManageScreen() {
       isActive ? 'Transfer account published.' : 'Transfer account hidden.',
     );
 
-  if (!expression) {
+  if (!organization) {
     return (
       <View style={[styles.screen, styles.center, { backgroundColor: colors.bg }]}>
         <EmptyState
-          title="Select an expression"
-          message="Expression giving can only be configured while an expression is selected."
-          iconName="location-outline"
+          title="Choose a church"
+          message="Choose a church before managing giving."
+          iconName="business-outline"
+        />
+      </View>
+    );
+  }
+
+  if (!scopeAccess.loading && scopeAccess.data && !scopeAccess.data.organization && !scopeAccess.data.expression) {
+    return (
+      <View style={[styles.screen, styles.center, { backgroundColor: colors.bg }]}>
+        <EmptyState
+          title="Giving access unavailable"
+          message="Your current role does not include permission to manage giving."
+          iconName="lock-closed-outline"
         />
       </View>
     );
@@ -283,17 +321,26 @@ export default function ExpressionGivingManageScreen() {
         contentContainerStyle={{ paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 80 }}
       >
         <ScreenHeader
-          title="Expression Giving Settings"
-          subtitle={`Manage giving shown only for ${expression.name}. Church-wide giving is managed by Platform Administration.`}
+          title={activeScope === 'organization' ? 'Church Giving Settings' : 'Expression Giving Settings'}
+          subtitle={activeScope === 'organization'
+            ? `Manage the giving information shared across ${organization.name}.`
+            : `Manage giving for ${expression?.name ?? 'the selected Expression'}.`}
           showBack
         />
 
         <View style={styles.body}>
+          {scopeAccess.loading ? <Skeleton height={44} /> : scopeAccess.data?.organization && scopeAccess.data?.expression && expression ? (
+            <View style={styles.scopeTabs}>
+              <Chip label="Church-wide" selected={activeScope === 'organization'} onPress={() => setGivingScope('organization')} />
+              <Chip label={expression.name} selected={activeScope === 'expression'} onPress={() => setGivingScope('expression')} />
+            </View>
+          ) : null}
+
           <View style={[styles.scopeCard, { backgroundColor: colors.primarySoft, borderColor: colors.border }]}>
-            <Icon name="location" size={18} color={colors.interactive} />
+            <Icon name={activeScope === 'organization' ? 'business-outline' : 'location-outline'} size={18} color={colors.interactive} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.scopeTitle, { color: colors.text }]}>{expression.name}</Text>
-              <Text style={[styles.scopeCopy, { color: colors.textSecondary }]}>Changes here cannot modify the church-wide giving destination.</Text>
+              <Text style={[styles.scopeTitle, { color: colors.text }]}>{activeScope === 'organization' ? organization.name : expression?.name}</Text>
+              <Text style={[styles.scopeCopy, { color: colors.textSecondary }]}>{activeScope === 'organization' ? 'These settings apply to the church-wide giving destination.' : 'These settings apply only to this Expression.'}</Text>
             </View>
           </View>
 
@@ -326,30 +373,30 @@ export default function ExpressionGivingManageScreen() {
                 label="Description"
                 value={displaySubtitle}
                 onChangeText={setDisplaySubtitle}
-                placeholder="Optional message shown above this expression's giving details"
+                placeholder={activeScope === 'organization' ? 'Optional message shown above church giving details' : "Optional message shown above this Expression's giving details"}
                 multiline
                 numberOfLines={3}
               />
               <ToggleRow
-                label="Publish expression giving"
-                description="When off, this expression's giving destination is unavailable to members."
+                label={activeScope === 'organization' ? 'Publish church-wide giving' : 'Publish expression giving'}
+                description={activeScope === 'organization' ? 'When off, the church-wide giving destination is unavailable.' : "When off, this Expression's giving destination is unavailable to members."}
                 value={isEnabled}
                 onPress={() => setIsEnabled((value) => !value)}
               />
               <ToggleRow
                 label="Manual bank transfer"
-                description="Show the expression's published transfer accounts."
+                description={activeScope === 'organization' ? 'Show the church-wide transfer accounts.' : "Show this Expression's published transfer accounts."}
                 value={manualEnabled}
                 onPress={() => setManualEnabled((value) => !value)}
               />
               <ToggleRow
                 label="Online payment"
-                description="Not available yet. Platform payment-provider infrastructure must be activated first."
+                description="Online payments are not available for this giving destination yet."
                 value={false}
                 onPress={() => undefined}
                 disabled
               />
-              <Button label="Save Expression Giving" onPress={saveSettings} loading={busy} size="lg" />
+              <Button label={activeScope === 'organization' ? 'Save Church Giving' : 'Save Expression Giving'} onPress={saveSettings} loading={busy} size="lg" />
             </View>
           ) : tab === 'purposes' ? (
             <>
@@ -359,7 +406,7 @@ export default function ExpressionGivingManageScreen() {
                   label="Name"
                   value={purposeName}
                   onChangeText={setPurposeName}
-                  placeholder="Configured by your expression"
+                  placeholder={activeScope === 'organization' ? 'e.g. General Offering' : 'e.g. Expression Offering'}
                 />
                 <InputField
                   label="Description"
@@ -371,7 +418,7 @@ export default function ExpressionGivingManageScreen() {
                 />
                 <ToggleRow
                   label="Default purpose"
-                  description="Preselect this purpose when members open expression giving."
+                  description={activeScope === 'organization' ? 'Preselect this purpose when someone opens church giving.' : 'Preselect this purpose when members open Expression giving.'}
                   value={purposeDefault}
                   onPress={() => setPurposeDefault((value) => !value)}
                 />
@@ -402,7 +449,7 @@ export default function ExpressionGivingManageScreen() {
                     </View>
                   </View>
                 )) : (
-                  <EmptyState title="No purposes yet" message="Add the giving purposes your expression wants members to see." iconName="gift-outline" />
+                  <EmptyState title="No purposes yet" message={activeScope === 'organization' ? 'Add the giving purposes your church wants people to see.' : 'Add the giving purposes your Expression wants members to see.'} iconName="gift-outline" />
                 )}
               </View>
             </>
@@ -410,7 +457,7 @@ export default function ExpressionGivingManageScreen() {
             <>
               <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
                 <SectionHeader title="Add transfer account" />
-                <Text style={[styles.helper, { color: colors.textSecondary }]}>Currency is configuration, not code. Enter any valid 3-letter account currency when the church opens a new account.</Text>
+                <Text style={[styles.helper, { color: colors.textSecondary }]}>Enter the 3-letter currency code for this account, for example NGN, USD or GBP.</Text>
                 <InputField label="Display label" value={accountLabel} onChangeText={setAccountLabel} placeholder="e.g. NGN Giving Account" />
                 <InputField label="Currency code" value={currency} onChangeText={(value) => setCurrency(value.toUpperCase())} autoCapitalize="characters" maxLength={3} placeholder="NGN" />
                 <InputField label="Bank name" value={bankName} onChangeText={setBankName} placeholder="Bank name" />
@@ -440,7 +487,7 @@ export default function ExpressionGivingManageScreen() {
               </View>
 
               <View style={styles.list}>
-                <SectionHeader title="Expression transfer accounts" badge={accounts.length} />
+                <SectionHeader title={activeScope === 'organization' ? 'Church transfer accounts' : 'Expression transfer accounts'} badge={accounts.length} />
                 {accounts.length ? accounts.map((account) => (
                   <View key={account.id} style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                     <View style={{ flex: 1 }}>
@@ -459,7 +506,7 @@ export default function ExpressionGivingManageScreen() {
                     />
                   </View>
                 )) : (
-                  <EmptyState title="No transfer accounts" message="Add the first account for this expression. No currency is assumed by the app." iconName="business-outline" />
+                  <EmptyState title="No transfer accounts" message={activeScope === 'organization' ? 'Add the first church-wide transfer account.' : 'Add the first transfer account for this Expression.'} iconName="business-outline" />
                 )}
               </View>
             </>
@@ -479,6 +526,7 @@ const styles = StyleSheet.create({
   scopeCopy: { fontSize: 12, lineHeight: 18, marginTop: 2 },
   banner: { borderWidth: 1, borderRadius: radius.md, padding: spacing.md },
   bannerText: { fontSize: 13, fontWeight: '700' },
+  scopeTabs: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   card: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md },
   helper: { fontSize: 12, lineHeight: 18 },

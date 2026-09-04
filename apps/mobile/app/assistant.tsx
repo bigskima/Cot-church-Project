@@ -137,7 +137,7 @@ export default function AssistantScreen() {
   if (checkingReadiness) {
     return (
       <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top + spacing.xs }]}>
-        <ScreenHeader title="Spiritual Assistant" subtitle="Checking live AI readiness…" showBack />
+        <ScreenHeader title="Spiritual Assistant" subtitle="Getting things ready…" showBack />
         <View style={styles.stateWrap}><Skeleton height={80} count={3} /></View>
       </View>
     );
@@ -146,13 +146,13 @@ export default function AssistantScreen() {
   if (!readiness?.ready) {
     return (
       <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top + spacing.xs }]}>
-        <ScreenHeader title="Spiritual Assistant" subtitle="Provider-aware church intelligence." showBack />
+        <ScreenHeader title="Spiritual Assistant" subtitle="Helpful answers based on available church information." showBack />
         <View style={styles.stateWrap}>
           <View style={[styles.stateIcon, { backgroundColor: colors.bgSecondary }]}><Icon name="sparkles-outline" size={30} color={colors.textMuted} /></View>
-          <Badge label="NOT ENABLED" variant="neutral" />
-          <Text style={[styles.stateTitle, { color: colors.text }]}>The church assistant is not available yet</Text>
-          <Text style={[styles.stateBody, { color: colors.textSecondary }]}>Platform Authority must configure an active AI provider, model, route, and runtime secret before this feature becomes available. The app will enable it automatically once that configuration is complete.</Text>
-          {readinessError ? <Text style={[styles.readinessError, { color: colors.live }]}>{readinessError}</Text> : null}
+          <Badge label="UNAVAILABLE" variant="neutral" />
+          <Text style={[styles.stateTitle, { color: colors.text }]}>The church assistant is temporarily unavailable</Text>
+          <Text style={[styles.stateBody, { color: colors.textSecondary }]}>Please try again later. You can continue using sermons, events, prayer and the rest of the app while this feature is unavailable.</Text>
+          {readinessError ? <Text style={[styles.readinessError, { color: colors.textMuted }]}>We couldn’t confirm availability right now.</Text> : null}
           <Button label="Check Again" onPress={() => void loadReadiness()} variant="outline" size="md" />
         </View>
       </View>
@@ -164,8 +164,8 @@ export default function AssistantScreen() {
       <View style={{ paddingTop: insets.top + spacing.xs }}>
         <ScreenHeader title="Spiritual Assistant" subtitle="Verified scriptures, sermons, schedules, and church guidance." showBack />
         <View style={styles.providerRow}>
-          <Badge label="READY" variant="active" />
-          <Text style={[styles.providerText, { color: colors.textMuted }]}>{[readiness.providerName, readiness.modelName].filter(Boolean).join(' · ')}</Text>
+          <Badge label="AVAILABLE" variant="active" />
+          <Text style={[styles.providerText, { color: colors.textMuted }]}>Ready to help</Text>
         </View>
       </View>
 

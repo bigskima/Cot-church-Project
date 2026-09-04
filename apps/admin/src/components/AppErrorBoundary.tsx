@@ -11,7 +11,7 @@ export class AppErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('Platform Admin render failure', error, info.componentStack);
+    console.error('Platform Administration render failure', error, info.componentStack);
   }
 
   render() {
@@ -23,8 +23,8 @@ export class AppErrorBoundary extends Component<Props, State> {
           minHeight: '100vh',
           display: 'grid',
           placeItems: 'center',
-          background: '#140C07',
-          color: '#FFFDF9',
+          background: '#061426',
+          color: '#F8FAFC',
           padding: 24,
           fontFamily: 'system-ui, sans-serif',
         }}
@@ -32,37 +32,31 @@ export class AppErrorBoundary extends Component<Props, State> {
         <section
           style={{
             width: 'min(560px, 100%)',
-            border: '1px solid #613C25',
-            borderRadius: 18,
-            background: '#22140C',
+            border: '1px solid #21344B',
+            borderRadius: 16,
+            background: '#0C1929',
             padding: 28,
           }}
         >
-          <p style={{ color: '#F59E0B', fontWeight: 800, marginBottom: 8 }}>Platform Administration</p>
-          <h1 style={{ fontSize: 24, marginBottom: 10 }}>This screen could not be rendered.</h1>
-          <p style={{ color: '#E6CCB2', lineHeight: 1.6, marginBottom: 18 }}>
-            The application recovered instead of showing a blank page. Reload the control plane. If the problem repeats, the browser console will contain the render failure for diagnosis.
+          <p style={{ color: '#6EA8FF', fontWeight: 700, marginBottom: 8 }}>Platform Administration</p>
+          <h1 style={{ fontSize: 24, marginBottom: 10 }}>This page could not be opened.</h1>
+          <p style={{ color: '#CBD5E1', lineHeight: 1.6, marginBottom: 18 }}>
+            Reload the page to try again. If the problem continues, contact the platform support team.
           </p>
-          <details style={{ color: '#A68A75', marginBottom: 18 }}>
-            <summary>Technical detail</summary>
-            <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginTop: 10 }}>
-              {this.state.error.message}
-            </pre>
-          </details>
           <button
             type="button"
             onClick={() => window.location.reload()}
             style={{
               border: 0,
               borderRadius: 10,
-              background: '#F59E0B',
-              color: '#26140A',
+              background: '#2F6FED',
+              color: '#FFFFFF',
               fontWeight: 800,
               padding: '12px 18px',
               cursor: 'pointer',
             }}
           >
-            Reload Platform Administration
+            Reload page
           </button>
         </section>
       </main>

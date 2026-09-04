@@ -180,9 +180,9 @@ export function OrganizationsGovernance({ api }: { api: ApiClient }) {
               <Metric label="MEMBERSHIPS" value={String(selectedOrg.memberships?.[0]?.count ?? 0)} />
               <Metric label="TIMEZONE" value={selectedOrg.timezone || 'UTC'} />
             </div>
-            <Card title="Lifecycle boundary" subtitle="Level-1 governance changes are audited and enforced by backend policy.">
+            <Card title="Organisation status" subtitle="Status changes are protected and recorded.">
               <p style={{ color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1.65 }}>
-                Suspending an organisation blocks active tenant operation while preserving its records for governance and restoration. This control plane does not invent quotas or compliance statuses that are not stored in the backend.
+                Suspending an organisation temporarily blocks its platform access while preserving its records so access can be restored later.
               </p>
             </Card>
           </div>

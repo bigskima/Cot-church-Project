@@ -38,7 +38,7 @@ export function FeatureFlags({ api }: { api: ApiClient }) {
       const data = await api.request<FeaturePayload>('platform-features');
       setFlags(data.items ?? []);
     } catch (value) {
-      setError(value instanceof Error ? value.message : 'Unable to load feature flags.');
+      setError(value instanceof Error ? value.message : 'Unable to load feature availability.');
     } finally {
       setLoading(false);
     }
@@ -136,14 +136,14 @@ export function FeatureFlags({ api }: { api: ApiClient }) {
   return (
     <div>
       <Card
-        title="Platform Feature Capabilities & Rollouts"
-        subtitle="Database-driven global defaults. Organization overrides are layered by the backend without redeploying clients."
+        title="Feature Availability"
+        subtitle="Control which platform features are available globally. Church-specific availability can be adjusted separately where supported."
         headerAction={
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <SearchBar
               value={search}
               onChange={setSearch}
-              placeholder="Search capability flags..."
+              placeholder="Search features..."
             />
             <Button variant="outline" size="sm" onClick={() => void load()} loading={loading}>
               Refresh
@@ -160,7 +160,7 @@ export function FeatureFlags({ api }: { api: ApiClient }) {
         <Table
           columns={[
             {
-              header: 'FEATURE / CAPABILITY',
+              header: 'FEATURE',
               accessor: (item) => (
                 <div>
                   <div style={{ fontWeight: 800 }}>{item.name}</div>
@@ -175,7 +175,7 @@ export function FeatureFlags({ api }: { api: ApiClient }) {
               accessor: (item) => <Badge label={item.category.toUpperCase()} variant="neutral" />,
             },
             {
-              header: 'GLOBAL ROLLOUT',
+              header: 'AVAILABILITY',
               accessor: (item) => <strong>{item.rollout_percentage}%</strong>,
             },
             {
@@ -217,7 +217,7 @@ export function FeatureFlags({ api }: { api: ApiClient }) {
           data={filtered}
           keyExtractor={(item) => item.key}
           loading={loading}
-          emptyMessage="No feature flags match your search query."
+          emptyMessage="No features match your search."
         />
       </Card>
 
@@ -258,21 +258,21 @@ export function FeatureFlags({ api }: { api: ApiClient }) {
         }
       >
         <InputField
-          label="Global rollout percentage"
+          label="Availability percentage"
           type="number"
           min={0}
           max={100}
           value={rolloutPercentage}
           onChange={(event) => setRolloutPercentage(event.target.value)}
-          helperText="This is the platform default. Organization overrides can narrow or expand effective availability separately."
+          helperText="This is the default availability across the platform. Church-specific settings may further limit access."
         />
         {editing?.global_enabled ? (
           <InputField
-            label="Governance reason for disabling"
+            label="Reason for disabling"
             value={disableReason}
             onChange={(event) => setDisableReason(event.target.value)}
             placeholder="Operational incident, staged retirement, safety restriction..."
-            helperText="The reason is written to the Level-1 append-only audit trail."
+            helperText="This reason will be recorded in the audit log."
           />
         ) : null}
       </Modal>

@@ -62,7 +62,7 @@ export function PlatformOverview({
     api
       .request<PlatformOverviewPayload>('platform-overview')
       .then(setMetrics)
-      .catch((value) => setError(value instanceof Error ? value.message : 'Unable to load platform telemetry.'))
+      .catch((value) => setError(value instanceof Error ? value.message : 'Unable to load the platform overview.'))
       .finally(() => setLoading(false));
   };
 
@@ -79,9 +79,9 @@ export function PlatformOverview({
 
   if (error && !metrics) {
     return (
-      <Card title="Platform telemetry unavailable" subtitle="The control plane stayed rendered and isolated the failed data request.">
+      <Card title="Platform overview unavailable" subtitle="The page is still available, but the latest platform information could not be loaded.">
         <div className="admin-inline-error" role="alert" style={{ marginBottom: 16 }}>{error}</div>
-        <Button variant="primary" onClick={load}>Retry telemetry</Button>
+        <Button variant="primary" onClick={load}>Try again</Button>
       </Card>
     );
   }
@@ -105,10 +105,10 @@ export function PlatformOverview({
           icon="🌐"
         />
         <StatWidget
-          title="Global Identities"
+          title="Accounts"
           value={metrics?.identities.total ?? 0}
           subtitle={`${metrics?.identities.activeMemberships ?? 0} active memberships`}
-          trend={{ value: 'Database source of truth', isPositive: true }}
+          trend={{ value: 'Live account data', isPositive: true }}
           icon="👥"
           variant="success"
         />
@@ -124,24 +124,24 @@ export function PlatformOverview({
 
       {metrics?.state === 'attention' ? (
         <div className="admin-inline-error" role="status" style={{ marginBottom: 24 }}>
-          Platform telemetry detected one or more failed jobs, stream failures, or AI failures. Review the infrastructure sections below before treating the platform as fully healthy.
+          One or more platform services need attention. Review the affected services below.
         </div>
       ) : null}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(260px, 1fr)', gap: 24, marginBottom: 24 }}>
         <Card
-          title="Ecosystem Infrastructure Health"
-          subtitle={metrics?.generatedAt ? `Live database telemetry · updated ${new Date(metrics.generatedAt).toLocaleString()}` : 'Loading live telemetry'}
+          title="Platform Service Health"
+          subtitle={metrics?.generatedAt ? `Last updated ${new Date(metrics.generatedAt).toLocaleString()}` : 'Loading current status'}
           headerAction={<Button variant="outline" size="sm" onClick={load}>Refresh</Button>}
         >
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
             {[
-              ['Platform API', statusLabel(Boolean(metrics)), 'Authenticated Level-1 control plane'],
-              ['Streaming Providers', statusLabel(Boolean(metrics?.streaming.configured), (metrics?.streaming.failed ?? 0) > 0), `${metrics?.streaming.activeProviders ?? 0} provider(s) · ${metrics?.streaming.activeConfigurations ?? 0} active config(s)`],
-              ['AI Gateway', statusLabel(Boolean(metrics?.ai.configured), (metrics?.ai.failed24h ?? 0) > 0), `${metrics?.ai.activeProviders ?? 0} provider(s) · ${metrics?.ai.activeModels ?? 0} model(s)`],
-              ['Workflow Queue', statusLabel(true, queueAttention), `${metrics?.jobs.workflows.queued ?? 0} queued · ${metrics?.jobs.workflows.running ?? 0} running`],
-              ['Integration Delivery', statusLabel(true, queueAttention), `${metrics?.jobs.integrations.queued ?? 0} queued · ${metrics?.jobs.integrations.running ?? 0} running`],
-              ['AI Review Queue', (metrics?.ai.requiresReview ?? 0) > 0 ? 'attention' : 'healthy', `${metrics?.ai.requiresReview ?? 0} item(s) require ministry review`],
+              ['Platform services', statusLabel(Boolean(metrics)), 'Administration service availability'],
+              ['Streaming service', statusLabel(Boolean(metrics?.streaming.configured), (metrics?.streaming.failed ?? 0) > 0), `${metrics?.streaming.activeProviders ?? 0} provider(s) · ${metrics?.streaming.activeConfigurations ?? 0} active config(s)`],
+              ['AI service', statusLabel(Boolean(metrics?.ai.configured), (metrics?.ai.failed24h ?? 0) > 0), `${metrics?.ai.activeProviders ?? 0} provider(s) · ${metrics?.ai.activeModels ?? 0} model(s)`],
+              ['Background tasks', statusLabel(true, queueAttention), `${metrics?.jobs.workflows.queued ?? 0} queued · ${metrics?.jobs.workflows.running ?? 0} running`],
+              ['Connected services', statusLabel(true, queueAttention), `${metrics?.jobs.integrations.queued ?? 0} queued · ${metrics?.jobs.integrations.running ?? 0} running`],
+              ['AI review', (metrics?.ai.requiresReview ?? 0) > 0 ? 'attention' : 'healthy', `${metrics?.ai.requiresReview ?? 0} item(s) require ministry review`],
             ].map(([service, status, desc]) => (
               <div
                 key={service}
@@ -166,22 +166,22 @@ export function PlatformOverview({
           </div>
         </Card>
 
-        <Card title="Quick Governance Actions" subtitle="Level-1 platform control shortcuts">
+        <Card title="Quick Actions" subtitle="Common Platform Administration tasks">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <Button variant="primary" size="md" onClick={() => onNavigate('organizations')} icon="🏛">
               Manage Organisations
             </Button>
             <Button variant="gold" size="md" onClick={() => onNavigate('streaming')} icon="📡">
-              Streaming Infrastructure
+              Streaming Services
             </Button>
             <Button variant="secondary" size="md" onClick={() => onNavigate('ai')} icon="✦">
-              Configure AI Gateway
+              AI Services
             </Button>
             <Button variant="outline" size="md" onClick={() => onNavigate('integrations')} icon="⚡">
-              Inspect Queues
+              System Activity
             </Button>
             <Button variant="outline" size="md" onClick={() => onNavigate('audit')} icon="🛡">
-              View Platform Audit
+              View Audit Log
             </Button>
           </div>
         </Card>
@@ -195,7 +195,7 @@ export function PlatformOverview({
             <div><strong style={{ fontSize: 24 }}>{metrics?.ai.requiresReview ?? 0}</strong><p style={{ color: 'var(--text-muted)', fontSize: 12 }}>awaiting review</p></div>
           </div>
         </Card>
-        <Card title="Workflow runtime">
+        <Card title="Background tasks">
           <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
             <div><strong style={{ fontSize: 24 }}>{metrics?.jobs.workflows.queued ?? 0}</strong><p style={{ color: 'var(--text-muted)', fontSize: 12 }}>queued</p></div>
             <div><strong style={{ fontSize: 24 }}>{metrics?.jobs.workflows.running ?? 0}</strong><p style={{ color: 'var(--text-muted)', fontSize: 12 }}>running</p></div>
@@ -205,9 +205,9 @@ export function PlatformOverview({
       </div>
 
       <Card
-        title="Recent Privileged System Events"
-        subtitle="Immutable Level-1 platform governance activity"
-        headerAction={<Button variant="ghost" size="sm" onClick={() => onNavigate('audit')}>Full Security Log ➔</Button>}
+        title="Recent Administrative Activity"
+        subtitle="Recent security-sensitive administrative actions"
+        headerAction={<Button variant="ghost" size="sm" onClick={() => onNavigate('audit')}>View Audit Log</Button>}
       >
         <Table
           columns={[
@@ -219,7 +219,7 @@ export function PlatformOverview({
           data={metrics?.recentAudit ?? []}
           keyExtractor={(item) => String(item.id)}
           loading={loading}
-          emptyMessage="No privileged platform actions have been recorded yet."
+          emptyMessage="No administrative activity has been recorded yet."
         />
       </Card>
     </div>

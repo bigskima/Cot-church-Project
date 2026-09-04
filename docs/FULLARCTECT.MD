@@ -259,19 +259,15 @@ The AI Gateway connects to the content pipeline to accelerate ministry workflows
 
 ## 12. Mobile UX & Design System Foundation
 
-The user interface implements a luxury, content-driven experience:
-* **Palette:** Sanctuary Warm Brown & Gold (`palette.brown900 = #140C07`, `palette.brown800 = #2E1C11`, `palette.gold = #F59E0B`, `palette.yellow = #FDE68A`, `palette.surfaceDark = #0D0805`).
-* **Theme Modes:** Seamless dynamic support for **Dark**, **Light**, and **System** themes.
-* **Navigation Architecture:**
-  1. **Home (`(tabs)/home`):** Live gather banner, content feed, reels carousel, continue watching progress, latest sermons, watch highlights, upcoming events, and expression discovery.
-  2. **Discover (`(tabs)/discover`):** Server-side universal search across All, Sermons, Videos, Reels, Expressions, Leaders, and Events; sermon series collections; leader directory.
-  3. **Reels (`(tabs)/reels`):** Immersive vertical swipe feed with action rail, creator attribution, and threaded comments.
-  4. **Live (`(tabs)/live`):** Current and scheduled live sanctuary broadcasts with low-latency chat and digital altar calls.
-  5. **Watch Catalog (`/watch` & `/watch/[id]`):** Dedicated long-form watch library with categories, playlists, chapters, and progress sync.
-  6. **Sermon Teaching (`(tabs)/discover/sermon/[id]`):** Adaptive audio/video player, transcript excerpts, approved AI synthesis, and scripture cards.
-  7. **Expression Profile (`/expression/[id]`):** Public identity, follow action, watch videos, reels, sermons, leadership, and private Member Space.
-  8. **Creator Studio (`/studio`):** Capability-authorized publishing and media queue management.
-  9. **Profile (`(tabs)/profile`):** Digital member pass, following list, saved bookmarks, giving receipts, prayer requests, and appearance settings.
+The mobile product uses the current production design direction defined in `docs/DEV_HANDOVER/05_MOBILE_UI_UX_BRAND_AND_PRODUCT_RULES.md`.
+
+* **Palette:** Dark navy / dark blue + white, with restrained interactive blue and semantic status colors. The former Brown/Gold palette is retired.
+* **Theme Modes:** Production support for **Dark**, **Light**, and **System** themes through semantic tokens.
+* **Primary Navigation:** At most five member-facing tabs: **Home, Discover, Reels, Community, Profile**. Live remains contextually prominent from Home/Discover/notifications, while Watch remains a dedicated long-form media destination without crowding the primary tab bar.
+* **Presentation:** Content-first, media-aware, calm, accessible and responsive. Avoid dashboard-card clutter, emoji as primary UI icons, theatrical internal terminology, and raw infrastructure language.
+* **Real Data:** Church identity, expressions, leaders, schedules, media, counts, giving, permissions and status are never fabricated in the client. Missing data uses honest empty/error states.
+* **Role-aware Operations:** Creator Studio and Leadership tools are shown only when database-backed capabilities and scope allow them; Platform Administration remains separate from church operations.
+* **Customer-facing Copy:** Member screens never expose provider names, API keys, runtime secrets, webhook/configuration details, RLS/JWT terms, or other implementation language. Operational technical detail belongs only in appropriately privileged administration surfaces when genuinely necessary.
 
 ---
 

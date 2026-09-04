@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { ApiError } from "../_shared/errors.ts";
 import { createHandler } from "../_shared/handler.ts";
-import { publicClient } from "../_shared/supabase.ts";
+import { adminClient, publicClient } from "../_shared/supabase.ts";
 import { uuid } from "../_shared/validation.ts";
 
 Deno.serve(createHandler(
@@ -191,7 +191,7 @@ Deno.serve(createHandler(
     if (type === "streams") {
       let query = client
         .from("live_streams")
-        .select("id,organization_id,title,description,status,playback_url,playback_token_required,scheduled_start,started_at,ended_at,recording_url,thumbnail_url,viewer_count")
+        .select("id,organization_id,branch_id,title,description,status,playback_url,playback_token_required,scheduled_start,started_at,ended_at,recording_url,thumbnail_url")
         .eq("visibility", "public")
         .in("status", ["scheduled", "live", "ended"])
         .order("scheduled_start", { ascending: false })
@@ -199,7 +199,38 @@ Deno.serve(createHandler(
       if (organizationId) query = query.eq("organization_id", organizationId);
       const { data, error } = await query;
       if (error) throw new ApiError("PUBLIC_STREAMS_FAILED", "Unable to retrieve public streams", 500, undefined, false);
-      return { data: (data ?? []).map((stream) => ({ ...stream, playback_url: stream.playback_token_required ? null : stream.playback_url, recording_url: stream.playback_token_required ? null : stream.recording_url })) };
+
+      const streams = data ?? [];
+      const activeViewerCounts = new Map<string, number>();
+      let viewerCountsAvailable = true;
+      if (streams.some((stream) => stream.status === "live")) {
+        const liveIds = streams.filter((stream) => stream.status === "live").map((stream) => stream.id);
+        const heartbeatCutoff = new Date(Date.now() - 90_000).toISOString();
+        const { data: viewers, error: viewerError } = await adminClient()
+          .from("stream_viewer_sessions")
+          .select("stream_id")
+          .in("stream_id", liveIds)
+          .is("left_at", null)
+          .gte("last_heartbeat_at", heartbeatCutoff);
+        if (viewerError) {
+          viewerCountsAvailable = false;
+        } else {
+          for (const viewer of viewers ?? []) {
+            activeViewerCounts.set(viewer.stream_id, (activeViewerCounts.get(viewer.stream_id) ?? 0) + 1);
+          }
+        }
+      }
+
+      return {
+        data: streams.map((stream) => ({
+          ...stream,
+          playback_url: stream.playback_token_required ? null : stream.playback_url,
+          recording_url: stream.playback_token_required ? null : stream.recording_url,
+          ...(stream.status === "live" && viewerCountsAvailable
+            ? { viewer_count: activeViewerCounts.get(stream.id) ?? 0 }
+            : {}),
+        })),
+      };
     }
 
     if (type === "events") {
