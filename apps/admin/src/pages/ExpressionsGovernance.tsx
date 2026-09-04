@@ -87,8 +87,8 @@ export function ExpressionsGovernance({ api }: { api: ApiClient }) {
   return (
     <div>
       <Card
-        title="Church Expressions Global Directory"
-        subtitle={`${total} expression${total === 1 ? '' : 's'} across the platform. Expressions remain governed by their parent church while Level-1 can enforce lifecycle restrictions.`}
+        title="Expressions"
+        subtitle={`${total} expression${total === 1 ? '' : 's'} across the platform. Each church manages its own operations; Platform Administration can apply safety or lifecycle restrictions when necessary.`}
         headerAction={
           <div style={{ display: 'flex', gap: 12 }}>
             <SearchBar value={search} onChange={setSearch} placeholder="Search expression name or code..." />
@@ -173,9 +173,9 @@ export function ExpressionsGovernance({ api }: { api: ApiClient }) {
               <Metric label="PARENT CHURCH" value={selectedExp.organizations?.name ?? selectedExp.organization_id} />
               <Metric label="TIMEZONE" value={selectedExp.timezone || 'UTC'} />
             </div>
-            <Card title="Governance boundary" subtitle="Operational capabilities remain tenant-controlled and database-driven.">
+            <Card title="Responsibility" subtitle="Church operations remain under the owning church.">
               <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.65 }}>
-                Level-1 administration can inspect and disable an expression when platform safety or governance requires it. Church-specific ministries, roles, content, giving, departments and local settings remain under the parent organisation's delegated authority.
+                Platform Administration may restrict an Expression for safety, policy or security reasons. Ministries, roles, content, giving, departments and local settings remain under the owning church.
               </p>
             </Card>
           </div>
