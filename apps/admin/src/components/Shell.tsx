@@ -9,7 +9,6 @@ import { AdminInvitations } from '../pages/AdminInvitations';
 import { ExpressionCreators } from '../pages/ExpressionCreators';
 import { BrandingAppearance } from '../pages/BrandingAppearance';
 import { PublicDirectory } from '../pages/PublicDirectory';
-import { GivingConfiguration } from '../pages/GivingConfiguration';
 import { StreamingInfrastructure } from '../pages/StreamingInfrastructure';
 import { AiInfrastructure } from '../pages/AiInfrastructure';
 import { PaymentInfrastructure } from '../pages/PaymentInfrastructure';
@@ -33,7 +32,6 @@ const allNavSections: NavSection[] = [
       { key: 'expression-creators', label: 'Authorize Expression Creators', icon: '🔑', superAdminOnly: true },
       { key: 'branding', label: 'Branding & Identity', icon: '🎨' },
       { key: 'public-directory', label: 'General Community Directory', icon: '📖' },
-      { key: 'giving', label: 'General Giving', icon: '🎁' },
       { key: 'features', label: 'Tenant Feature Flags', icon: '⚑' },
     ],
   },
@@ -102,7 +100,6 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
       case 'expression-creators': return isSuperAdmin ? <ExpressionCreators api={api} /> : <PlatformOverview api={api} onNavigate={setPage} />;
       case 'branding': return <BrandingAppearance api={api} />;
       case 'public-directory': return <PublicDirectory api={api} />;
-      case 'giving': return <GivingConfiguration api={api} />;
       case 'credentials': return <ProviderCredentials api={api} />;
       case 'streaming': return <StreamingInfrastructure api={api} />;
       case 'ai': return <AiInfrastructure api={api} />;
