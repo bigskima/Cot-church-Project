@@ -396,7 +396,7 @@ export default function ExpressionGivingManageScreen() {
                 onPress={() => undefined}
                 disabled
               />
-              <Button label="Save Expression Giving" onPress={saveSettings} loading={busy} size="lg" />
+              <Button label={activeScope === 'organization' ? 'Save Church Giving' : 'Save Expression Giving'} onPress={saveSettings} loading={busy} size="lg" />
             </View>
           ) : tab === 'purposes' ? (
             <>
