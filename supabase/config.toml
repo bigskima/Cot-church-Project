@@ -40,6 +40,21 @@ verify_jwt = false
 [functions.password-recovery]
 verify_jwt = false
 
+# Session refresh accepts an expired access-token state by design. The handler
+# validates the refresh token with Supabase Auth server-side and rate-limits
+# attempts before returning a rotated session.
+[functions.refresh-session]
+verify_jwt = false
+
+# Profile endpoints authenticate inside the shared handler so browser clients
+# receive consistent CORS/error envelopes even when an access token is expired
+# or rejected before the request reaches application code.
+[functions.profile]
+verify_jwt = false
+
+[functions.profile-avatar]
+verify_jwt = false
+
 [functions.health]
 verify_jwt = false
 
