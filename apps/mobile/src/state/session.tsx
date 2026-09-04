@@ -1,3 +1,4 @@
+import { AppState } from 'react-native';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
 import { ApiClient, ApiError, apiUrl, loadAuth, saveAuth, type StoredAuth } from '../api';
 import type { MembershipContext } from '../types/content';
@@ -19,7 +20,49 @@ type Value = {
   switchOrganization: (organizationId: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
+
+type RefreshSessionPayload = {
+  session: {
+    accessToken: string;
+    refreshToken: string;
+    expiresAt?: number;
+    tokenType?: string;
+  };
+};
+
 const SessionContext = createContext<Value | null>(null);
+const REFRESH_SKEW_SECONDS = 120;
+
+function sessionNeedsRefresh(value: StoredAuth) {
+  const expiresAt = value.session.expiresAt;
+  if (!expiresAt) return true;
+  return expiresAt <= Math.floor(Date.now() / 1000) + REFRESH_SKEW_SECONDS;
+}
+
+async function refreshStoredSession(value: StoredAuth): Promise<StoredAuth> {
+  if (!value.session.refreshToken) {
+    throw new ApiError('REFRESH_TOKEN_MISSING', 'Your session has expired. Please sign in again.', 401);
+  }
+
+  // Refresh is intentionally performed through a dedicated public Edge Function.
+  // The refresh token is validated by Supabase Auth server-side and is never
+  // exposed as a public client key or embedded Supabase credential.
+  const refreshApi = new ApiClient(apiUrl, () => null);
+  const result = await refreshApi.request<RefreshSessionPayload>('refresh-session', {
+    method: 'POST',
+    body: JSON.stringify({ refreshToken: value.session.refreshToken }),
+  });
+
+  return {
+    ...value,
+    session: {
+      accessToken: result.session.accessToken,
+      refreshToken: result.session.refreshToken,
+      expiresAt: result.session.expiresAt,
+      tokenType: result.session.tokenType || 'bearer',
+    },
+  };
+}
 
 export function SessionProvider({ children }: PropsWithChildren) {
   const [auth, setAuth] = useState<StoredAuth | null>(null);
@@ -27,16 +70,56 @@ export function SessionProvider({ children }: PropsWithChildren) {
   const [context, setContext] = useState<MembershipContext | null>(null);
 
   useEffect(() => {
-    loadAuth()
-      .then((value) => {
-        setAuth(value);
-        setMode(value ? 'authenticated' : 'visitor');
-      })
-      .catch((err) => {
+    let cancelled = false;
+
+    const restore = async () => {
+      try {
+        const stored = await loadAuth();
+        if (!stored) {
+          if (!cancelled) {
+            setAuth(null);
+            setMode('visitor');
+          }
+          return;
+        }
+
+        let next = stored;
+        if (sessionNeedsRefresh(stored)) {
+          try {
+            next = await refreshStoredSession(stored);
+            await saveAuth(next);
+          } catch (error) {
+            // A rejected refresh token means the stored login can no longer be
+            // trusted. Network failures are treated differently so a temporary
+            // outage does not destroy the user's refresh token.
+            if (error instanceof ApiError && error.status === 401) {
+              await saveAuth(null);
+              if (!cancelled) {
+                setAuth(null);
+                setMode('visitor');
+              }
+              return;
+            }
+          }
+        }
+
+        if (!cancelled) {
+          setAuth(next);
+          setMode('authenticated');
+        }
+      } catch (err) {
         console.warn('Failed to load session:', err);
-        setAuth(null);
-        setMode('visitor');
-      });
+        if (!cancelled) {
+          setAuth(null);
+          setMode('visitor');
+        }
+      }
+    };
+
+    void restore();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const persist = useCallback(async (value: StoredAuth | null) => {
@@ -46,6 +129,43 @@ export function SessionProvider({ children }: PropsWithChildren) {
   }, []);
 
   const api = useMemo(() => new ApiClient(apiUrl, () => auth), [auth]);
+
+  const refreshCurrentSession = useCallback(async () => {
+    if (!auth || !sessionNeedsRefresh(auth)) return auth;
+    try {
+      const refreshed = await refreshStoredSession(auth);
+      await persist(refreshed);
+      return refreshed;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setContext(null);
+        await persist(null);
+        return null;
+      }
+      // Keep the refresh token for transient connectivity failures and retry
+      // when the app becomes active or at the next interval.
+      return auth;
+    }
+  }, [auth, persist]);
+
+  useEffect(() => {
+    if (mode !== 'authenticated' || !auth) return;
+
+    const tryRefresh = () => {
+      if (sessionNeedsRefresh(auth)) void refreshCurrentSession();
+    };
+
+    // Covers long-running browser tabs and native sessions.
+    const interval = setInterval(tryRefresh, 60_000);
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') tryRefresh();
+    });
+
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
+  }, [mode, auth, refreshCurrentSession]);
 
   const login = async (identifier: string, password: string) => {
     const isEmail = identifier.includes('@');

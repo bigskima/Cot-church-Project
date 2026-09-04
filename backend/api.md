@@ -18,9 +18,10 @@ Authenticated endpoints require `Authorization: Bearer <access-token>`. Tenant e
 | --- | --- | --- | --- |
 | `signup` | POST | Public | Register with email or E.164 phone number. |
 | `login` | POST | Public | Exchange email/phone credentials for a session. |
+| `refresh-session` | POST | Public refresh-token exchange | Rotate an existing refresh token into a fresh Supabase session; rate-limited and server-validated. |
 | `verify-otp` | POST | Public | Verify an email or phone authentication code. |
 | `password-recovery` | POST | Public | Initiate an enumeration-resistant recovery flow. |
-| `profile` | GET, PATCH | Required | Read or update the authenticated profile. |
+| `profile` | GET, PATCH | Required (validated inside shared handler) | Read or update the authenticated profile. Gateway JWT verification is disabled so expired-token/CORS failures return the normal API envelope instead of a browser network error. |
 
 ## Tenancy
 

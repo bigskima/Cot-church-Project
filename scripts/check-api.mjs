@@ -13,6 +13,7 @@ const requiredFiles = [
   'supabase/functions/_shared/supabase.ts',
   'supabase/functions/_shared/validation.ts',
   'supabase/functions/login/index.ts',
+  'supabase/functions/refresh-session/index.ts',
   'supabase/functions/signup/index.ts',
   'supabase/functions/password-recovery/index.ts',
   'supabase/functions/profile/index.ts',
@@ -79,6 +80,7 @@ const response = await readFile('supabase/functions/_shared/response.ts', 'utf8'
 const signup = await readFile('supabase/functions/signup/index.ts', 'utf8');
 const organizationContext = await readFile('supabase/functions/organization-context/index.ts', 'utf8');
 const login = await readFile('supabase/functions/login/index.ts', 'utf8');
+const refreshSession = await readFile('supabase/functions/refresh-session/index.ts', 'utf8');
 const organizations = await readFile('supabase/functions/organizations/index.ts', 'utf8');
 const memberships = await readFile('supabase/functions/memberships/index.ts', 'utf8');
 const roles = await readFile('supabase/functions/roles/index.ts', 'utf8');
@@ -110,6 +112,8 @@ const invariants = [
   [signup, /assertNoUnknownFields/, 'strict signup validation'],
   [organizationContext, /effectivePermissions/, 'effective permission resolution'],
   [login, /signInWithPassword/, 'password login workflow'],
+  [refreshSession, /auth\.refreshSession/, 'refresh-token session rotation'],
+  [refreshSession, /enforceRateLimit/, 'refresh session rate limiting'],
   [organizations, /create_organization/, 'transactional organization provisioning'],
   [memberships, /update_membership_status/, 'protected membership lifecycle'],
   [roles, /create_custom_role/, 'custom role administration'],
