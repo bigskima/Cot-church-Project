@@ -41,7 +41,7 @@ export default function MediaStudioScreen() {
 
   const handleCreateBroadcast = async () => {
     if (!readiness.data?.ready) {
-      setErrorMsg('Live streaming is not configured by Platform Authority yet.');
+      setErrorMsg('Live broadcasting is temporarily unavailable. Please try again later.');
       return;
     }
     if (!expression?.id) {
@@ -88,7 +88,7 @@ export default function MediaStudioScreen() {
         method: 'PATCH',
         body: JSON.stringify({ id, action }),
       });
-      setActionMsg(action === 'stop' ? 'Broadcast stopped at the streaming provider.' : `Provider status refreshed: ${result.status}.`);
+      setActionMsg(action === 'stop' ? 'Broadcast ended.' : `Broadcast status updated: ${result.status}.`);
       streams.refresh();
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Unable to operate broadcast.');
@@ -113,12 +113,12 @@ export default function MediaStudioScreen() {
             <View style={styles.readinessHeader}>
               <View style={[styles.providerIcon, { backgroundColor: providerReady ? colors.successSoft : colors.bgSecondary }]}><Icon name="radio-outline" size={20} color={providerReady ? colors.success : colors.textMuted} /></View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.cardTitle, { color: colors.text }]}>Streaming Provider</Text>
-                <Text style={[styles.helper, { color: colors.textSecondary }]}>{providerReady ? `${readiness.data?.providerCode ?? 'Provider'} is configured with runtime credentials and webhook verification.` : 'No production-ready streaming provider configuration is active yet.'}</Text>
+                <Text style={[styles.cardTitle, { color: colors.text }]}>Broadcast Service</Text>
+                <Text style={[styles.helper, { color: colors.textSecondary }]}>{providerReady ? 'Live broadcasting is ready to use.' : 'Live broadcasting is temporarily unavailable.'}</Text>
               </View>
               <Badge label={providerReady ? 'READY' : 'OFFLINE'} variant={providerReady ? 'active' : 'neutral'} />
             </View>
-            {!providerReady ? <Text style={[styles.helper, { color: colors.textMuted }]}>Platform Authority must activate a provider configuration and its runtime secrets. This screen will enable automatically afterward.</Text> : null}
+            {!providerReady ? <Text style={[styles.helper, { color: colors.textMuted }]}>Please try again later. Your existing drafts and recordings remain available.</Text> : null}
           </View>
 
           {createdIngest ? (
@@ -127,7 +127,7 @@ export default function MediaStudioScreen() {
               <View style={styles.ingestField}><Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>SERVER URL / RTMP</Text><Text selectable style={[styles.fieldCode, { backgroundColor: colors.bgSecondary, color: colors.text }]}>{createdIngest.rtmpUrl}</Text></View>
               <View style={styles.ingestField}><Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>STREAM KEY</Text><Text selectable={showKey} style={[styles.fieldCode, { backgroundColor: colors.bgSecondary, color: colors.text }]}>{showKey ? createdIngest.streamKey : '••••••••••••••••••••••••'}</Text></View>
               <Button label={showKey ? 'Hide Stream Key' : 'Reveal Stream Key'} onPress={() => setShowKey(!showKey)} variant="outline" size="sm" />
-              <Text style={[styles.helper, { color: colors.textMuted }]}>Treat the stream key as a secret. It is shown from the provider response and is not a reusable app credential.</Text>
+              <Text style={[styles.helper, { color: colors.textMuted }]}>Keep this stream key private. Only share it with the trusted person or device used to broadcast this service.</Text>
             </View>
           ) : null}
 
