@@ -141,7 +141,7 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
 
       <div className="admin-main-stage">
         <header className="admin-topbar">
-          <div className="admin-topbar-left"><h2 className="admin-topbar-title">{getPageTitle()}</h2><Badge label="PLATFORM ADMIN" variant="primary" /></div>
+          <div className="admin-topbar-left"><h2 className="admin-topbar-title">{getPageTitle()}</h2><Badge label="PLATFORM ADMIN" variant="gold" /></div>
           <div className="admin-topbar-right">
             <button type="button" onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))} className="admin-btn-secondary admin-btn-sm" style={{ display: 'flex', alignItems: 'center', gap: 6 }} title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}><span>{theme === 'dark' ? 'Light' : 'Dark'}</span></button>
           </div>
