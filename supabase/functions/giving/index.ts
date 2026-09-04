@@ -235,12 +235,13 @@ Deno.serve(
         if (!purposeStatuses.has(status)) throw new ApiError("VALIDATION_FAILED", "Invalid purpose status", 422);
         const isDefault = bool(body.isDefault, "isDefault", false);
         if (isDefault) {
-          const { error } = await auth.client
+          let defaultQuery = auth.client
             .from("giving_purposes")
             .update({ is_default: false, updated_by: auth.user.id })
             .eq("organization_id", organizationId)
-            .eq("branch_id", expressionId)
             .eq("is_default", true);
+          defaultQuery = expressionId ? defaultQuery.eq("branch_id", expressionId) : defaultQuery.is("branch_id", null);
+          const { error } = await defaultQuery;
           if (error) throw new ApiError("GIVING_PURPOSE_SAVE_FAILED", "Unable to update default purpose", 500, undefined, false);
         }
         const record = {
@@ -328,7 +329,7 @@ Deno.serve(
         return { data };
       }
 
-      throw new ApiError("VALIDATION_FAILED", "Unsupported expression giving action", 422);
+      throw new ApiError("VALIDATION_FAILED", "Unsupported giving action", 422);
     },
   ),
 );
