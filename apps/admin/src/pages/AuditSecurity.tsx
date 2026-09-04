@@ -62,8 +62,8 @@ export function AuditSecurity({ api }: { api: ApiClient }) {
   return (
     <div>
       <Card
-        title="Platform Audit Trail & Security Ledger"
-        subtitle={`${total} Level-1 governance event${total === 1 ? '' : 's'} · database-enforced append-only history`}
+        title="Audit & Security"
+        subtitle={`${total} administrative event${total === 1 ? '' : 's'} · protected activity history`}
         headerAction={
           <div style={{ display: 'flex', gap: 12 }}>
             <SearchBar
