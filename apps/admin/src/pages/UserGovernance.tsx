@@ -49,7 +49,7 @@ export function UserGovernance({ api }: { api: ApiClient }) {
       setUsers(data.items ?? []);
       setTotal(data.total ?? 0);
     } catch (value) {
-      setError(value instanceof Error ? value.message : 'Unable to load platform identities.');
+      setError(value instanceof Error ? value.message : 'Unable to load accounts.');
     } finally {
       setLoading(false);
     }
@@ -74,7 +74,7 @@ export function UserGovernance({ api }: { api: ApiClient }) {
       : moderationUser.account_status === 'banned' ? 'restore' : 'ban';
     const restricting = action === 'ban' || action === 'restrict_posting';
     if (restricting && !moderationReason.trim()) {
-      setError('A governance reason is required before applying this restriction.');
+      setError('Please enter a reason before applying this restriction.');
       return;
     }
 
@@ -124,7 +124,7 @@ export function UserGovernance({ api }: { api: ApiClient }) {
       setModerationUser(null);
       setModerationReason('');
     } catch (value) {
-      setError(value instanceof Error ? value.message : 'Unable to update platform governance state.');
+      setError(value instanceof Error ? value.message : 'Unable to update this account.');
     } finally {
       setActionBusy(false);
     }
@@ -139,8 +139,8 @@ export function UserGovernance({ api }: { api: ApiClient }) {
   return (
     <div>
       <Card
-        title="Platform Identities & Account Governance"
-        subtitle={`${total} global identit${total === 1 ? 'y' : 'ies'} · Level-1 safety controls without exposing church-private records`}
+        title="Accounts & Access"
+        subtitle={`${total} account${total === 1 ? 'y' : 'ies'} · platform-level safety and access controls`}
         headerAction={
           <div style={{ display: 'flex', gap: 12 }}>
             <SearchBar value={search} onChange={setSearch} placeholder="Search name, email, or phone..." />
@@ -197,15 +197,15 @@ export function UserGovernance({ api }: { api: ApiClient }) {
           data={users}
           keyExtractor={(item) => item.id}
           loading={loading}
-          emptyMessage="No identities match the current search."
+          emptyMessage="No accounts match the current search."
         />
       </Card>
 
       <Modal
         isOpen={!!selectedUser}
         onClose={() => setSelectedUser(null)}
-        title={selectedUser?.display_name || selectedUser?.email || 'Platform Identity'}
-        subtitle={selectedUser ? `Canonical profile ID: ${selectedUser.id}` : undefined}
+        title={selectedUser?.display_name || selectedUser?.email || 'Platform Account'}
+        subtitle={selectedUser ? `Account ID: ${selectedUser.id}` : undefined}
         footer={<Button variant="primary" size="md" onClick={() => setSelectedUser(null)}>Close</Button>}
       >
         {selectedUser ? (
@@ -226,9 +226,9 @@ export function UserGovernance({ api }: { api: ApiClient }) {
                 </p>
               </Card>
             ) : null}
-            <Card title="Privacy boundary" subtitle="The Level-1 directory intentionally excludes pastoral and tenant-private records.">
+            <Card title="Privacy" subtitle="Private church and pastoral records are not shown here.">
               <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.65 }}>
-                This screen is for platform identity governance, security response and abuse controls. Membership notes, prayer records, counselling information and other church-private data are not surfaced here.
+                Use this page for account safety, access and abuse controls. Membership notes, prayer records, counselling information and other private church data remain protected.
               </p>
             </Card>
           </div>
