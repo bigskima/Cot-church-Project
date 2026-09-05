@@ -121,7 +121,7 @@ function statusVariant(status: string): 'active' | 'success' | 'warning' | 'degr
   return 'neutral';
 }
 
-export function IntegrationsJobs({ api }: { api: ApiClient }) {
+export function IntegrationsJobs({ api, canManage = false }: { api: ApiClient; canManage?: boolean }) {
   const [telemetry, setTelemetry] = useState<IntegrationTelemetry | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -152,6 +152,7 @@ export function IntegrationsJobs({ api }: { api: ApiClient }) {
   }, [load]);
 
   const runAction = useCallback(async (key: string, payload: Record<string, unknown>) => {
+    if (!canManage) return false;
     setBusyKey(key);
     setActionError('');
     try {
@@ -164,15 +165,17 @@ export function IntegrationsJobs({ api }: { api: ApiClient }) {
     } finally {
       setBusyKey('');
     }
-  }, [api, load]);
+  }, [api, load, canManage]);
 
   const retryJob = useCallback((queue: 'notification' | 'workflow' | 'integration', id: number | string) => {
+    if (!canManage) return;
     setActionReason('');
     setActionError('');
     setActionTarget({ kind: 'retry', queue, id });
-  }, []);
+  }, [canManage]);
 
   const setConnectionStatus = useCallback((connection: IntegrationConnection) => {
+    if (!canManage) return;
     setActionReason('');
     setActionError('');
     setActionTarget({
@@ -180,10 +183,10 @@ export function IntegrationsJobs({ api }: { api: ApiClient }) {
       connection,
       nextStatus: connection.status === 'active' ? 'disabled' : 'active',
     });
-  }, []);
+  }, [canManage]);
 
   const applyGovernanceAction = async () => {
-    if (!actionTarget) return;
+    if (!canManage || !actionTarget) return;
     if (actionTarget.kind === 'retry') {
       if (!actionReason.trim()) {
         setActionError('Enter an audit reason before retrying a failed job.');
@@ -240,16 +243,17 @@ export function IntegrationsJobs({ api }: { api: ApiClient }) {
     );
   }
 
-  const actionButton = (queue: 'notification' | 'workflow' | 'integration', id: number | string, status: string) => retryable(status) ? (
-    <Button
-      variant="outline"
-      size="sm"
-      loading={busyKey === `retry:${queue}:${id}`}
-      onClick={() => retryJob(queue, id)}
-    >
-      Retry
-    </Button>
-  ) : <span style={{ color: 'var(--text-muted)' }}>—</span>;
+  const actionButton = (queue: 'notification' | 'workflow' | 'integration', id: number | string, status: string) =>
+    canManage && retryable(status) ? (
+      <Button
+        variant="outline"
+        size="sm"
+        loading={busyKey === `retry:${queue}:${id}`}
+        onClick={() => retryJob(queue, id)}
+      >
+        Retry
+      </Button>
+    ) : <span style={{ color: 'var(--text-muted)' }}>—</span>;
 
   return (
     <div className="admin-page-stack">
@@ -324,7 +328,7 @@ export function IntegrationsJobs({ api }: { api: ApiClient }) {
           { header: 'STATUS', accessor: (item) => <Badge label={item.status.toUpperCase()} variant={statusVariant(item.status)} /> },
           { header: 'LAST SUCCESS', accessor: (item) => formatDate(item.last_success_at) },
           { header: 'LAST ERROR', accessor: (item) => errorSummary(item.last_error) },
-          { header: 'ACTION', accessor: (item) => <Button variant={item.status === 'active' ? 'danger' : 'outline'} size="sm" loading={busyKey === `connection:${item.id}`} onClick={() => setConnectionStatus(item)}>{item.status === 'active' ? 'Disable' : 'Enable'}</Button> },
+          { header: 'ACTION', accessor: (item) => canManage ? <Button variant={item.status === 'active' ? 'danger' : 'outline'} size="sm" loading={busyKey === `connection:${item.id}`} onClick={() => setConnectionStatus(item)}>{item.status === 'active' ? 'Disable' : 'Enable'}</Button> : <span style={{ color: 'var(--text-muted)' }}>Read only</span> },
         ]} data={telemetry?.connections ?? []} keyExtractor={(item) => item.id} emptyMessage="No integration connections are configured." /> : null}
 
         {activeTab === 'webhooks' ? (
@@ -349,7 +353,7 @@ export function IntegrationsJobs({ api }: { api: ApiClient }) {
       </Card>
 
       <Modal
-        isOpen={!!actionTarget}
+        isOpen={canManage && !!actionTarget}
         onClose={() => {
           if (!busyKey) {
             setActionTarget(null);
