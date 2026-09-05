@@ -103,7 +103,7 @@ function money(amountMinor: number, currency: string) {
   }
 }
 
-export function PaymentInfrastructure({ api }: { api: ApiClient }) {
+export function PaymentInfrastructure({ api, canManage = false, canManageSecrets = false }: { api: ApiClient; canManage?: boolean; canManageSecrets?: boolean }) {
   const [data, setData] = useState<PaymentPayload>(emptyPayload);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -138,6 +138,7 @@ export function PaymentInfrastructure({ api }: { api: ApiClient }) {
   );
 
   const openConfiguration = (item: PaymentProvider) => {
+    if (!canManage) return;
     const existing = item.configurations.find((config) => config.organization_id === null && config.environment === 'production')
       ?? item.configurations.find((config) => config.organization_id === null);
     const defaults = defaultReferences[item.code] ?? {
@@ -157,6 +158,7 @@ export function PaymentInfrastructure({ api }: { api: ApiClient }) {
 
   const storeSecret = async (reference: string, value: string, description: string) => {
     if (!value.trim()) return;
+    if (!canManageSecrets) throw new Error('Your role cannot store or rotate platform secrets.');
     await api.request('platform-secrets', {
       method: 'POST',
       body: JSON.stringify({
@@ -171,7 +173,11 @@ export function PaymentInfrastructure({ api }: { api: ApiClient }) {
   };
 
   const savePreparation = async () => {
-    if (!provider || !secretReference.trim() || !webhookReference.trim()) return;
+    if (!canManage || !provider || !secretReference.trim() || !webhookReference.trim()) return;
+    if ((secretValue.trim() || webhookValue.trim()) && !canManageSecrets) {
+      setError('Your role can prepare payment configuration but cannot store or rotate platform secrets.');
+      return;
+    }
     setBusy(true);
     setError('');
     setMessage('');
@@ -247,7 +253,7 @@ export function PaymentInfrastructure({ api }: { api: ApiClient }) {
                 <div className="admin-capability-tags">
                   {(item.capabilities ?? []).map((capability) => <span key={capability} className="active">{capability}</span>)}
                 </div>
-                <Button variant="outline" size="sm" onClick={() => openConfiguration(item)}>Prepare credentials</Button>
+                {canManage ? <Button variant="outline" size="sm" onClick={() => openConfiguration(item)}>{canManageSecrets ? 'Prepare credentials' : 'Prepare configuration'}</Button> : <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Read only</div>}
               </div>
             );
           })}
@@ -290,7 +296,7 @@ export function PaymentInfrastructure({ api }: { api: ApiClient }) {
       </Card>
 
       <Modal
-        isOpen={!!provider}
+        isOpen={canManage && !!provider}
         onClose={() => { if (!busy) setProvider(null); }}
         title={provider ? `Prepare ${provider.name}` : 'Prepare payment provider'}
         subtitle="Credentials are written to Supabase Vault over the authenticated Platform Admin API. The provider remains inactive after saving."
@@ -305,10 +311,10 @@ export function PaymentInfrastructure({ api }: { api: ApiClient }) {
             </select>
           </label>
           <InputField label="Provider secret reference" value={secretReference} onChange={(event) => setSecretReference(event.target.value.toUpperCase())} helperText="Stable reference only; the raw key is stored in Vault." />
-          <InputField label="Provider API secret / key" type={showSecrets ? 'text' : 'password'} value={secretValue} onChange={(event) => setSecretValue(event.target.value)} placeholder="Leave blank to keep the existing secret" autoComplete="new-password" />
+          {canManageSecrets ? <InputField label="Provider API secret / key" type={showSecrets ? 'text' : 'password'} value={secretValue} onChange={(event) => setSecretValue(event.target.value)} placeholder="Leave blank to keep the existing secret" autoComplete="new-password" /> : null}
           <InputField label="Webhook secret reference" value={webhookReference} onChange={(event) => setWebhookReference(event.target.value.toUpperCase())} />
-          <InputField label="Webhook verification secret" type={showSecrets ? 'text' : 'password'} value={webhookValue} onChange={(event) => setWebhookValue(event.target.value)} placeholder="Leave blank to keep the existing secret" autoComplete="new-password" />
-          <label className="admin-inline-check"><input type="checkbox" checked={showSecrets} onChange={(event) => setShowSecrets(event.target.checked)} /><span>Show values while entering them on this device</span></label>
+          {canManageSecrets ? <InputField label="Webhook verification secret" type={showSecrets ? 'text' : 'password'} value={webhookValue} onChange={(event) => setWebhookValue(event.target.value)} placeholder="Leave blank to keep the existing secret" autoComplete="new-password" /> : <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Your role may reuse stored secret references but cannot add or rotate payment credentials.</p>}
+          {canManageSecrets ? <label className="admin-inline-check"><input type="checkbox" checked={showSecrets} onChange={(event) => setShowSecrets(event.target.checked)} /><span>Show values while entering them on this device</span></label> : null}
           <div className="admin-warning-callout">
             Saving here does <strong>not</strong> enable online payment. Manual transfer remains the production giving method until a future provider rollout is explicitly released.
           </div>
