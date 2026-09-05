@@ -85,12 +85,12 @@ export function ExpressionsGovernance({ api }: { api: ApiClient }) {
   };
 
   return (
-    <div>
+    <div className="admin-page-stack">
       <Card
         title="Expressions"
         subtitle={`${total} expression${total === 1 ? '' : 's'} across the platform. Each church manages its own operations; Platform Administration can apply safety or lifecycle restrictions when necessary.`}
         headerAction={
-          <div style={{ display: 'flex', gap: 12 }}>
+          <div className="admin-header-actions">
             <SearchBar value={search} onChange={setSearch} placeholder="Search expression name or code..." />
             <Button variant="outline" size="md" onClick={() => void loadExpressions()} loading={loading}>
               Refresh
@@ -223,9 +223,9 @@ export function ExpressionsGovernance({ api }: { api: ApiClient }) {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ backgroundColor: 'var(--bg-elevated)', padding: 14, borderRadius: 14 }}>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 800 }}>{label}</div>
-      <div style={{ fontSize: 15, fontWeight: 800, marginTop: 4, overflowWrap: 'anywhere' }}>{value}</div>
+    <div className="admin-metric-tile">
+      <div className="admin-metric-label">{label}</div>
+      <div className="admin-metric-value">{value}</div>
     </div>
   );
 }
