@@ -87,7 +87,7 @@ export default function FullScreenReelsScreen() {
 
   const handleOpenComments = async (reel: Reel) => {
     if (mode === 'visitor') {
-      router.push('/(auth)/login');
+      router.push({ pathname: '/(auth)/login', params: { returnTo: '/reels' } } as any);
       return;
     }
     setActiveReelForComments(reel);
@@ -121,7 +121,7 @@ export default function FullScreenReelsScreen() {
 
   const handleLikeReel = async (reel: ReelWithViewerState, currentlyLiked: boolean) => {
     if (mode === 'visitor') {
-      router.push('/(auth)/login');
+      router.push({ pathname: '/(auth)/login', params: { returnTo: '/reels' } } as any);
       return currentlyLiked;
     }
     const contentId = reel.content_items?.id;
@@ -146,7 +146,7 @@ export default function FullScreenReelsScreen() {
 
   const handleSaveReel = async (reel: ReelWithViewerState, currentlySaved: boolean) => {
     if (mode === 'visitor') {
-      router.push('/(auth)/login');
+      router.push({ pathname: '/(auth)/login', params: { returnTo: '/reels' } } as any);
       return currentlySaved;
     }
     const contentId = reel.content_items?.id;
