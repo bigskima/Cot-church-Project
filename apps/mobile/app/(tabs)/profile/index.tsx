@@ -62,7 +62,7 @@ export default function ProfileScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: 100 }]}>
-        <ScreenHeader title="My Profile" subtitle="Account settings, notifications, giving, and church tools." />
+        <ScreenHeader title="You" subtitle="Your identity, community and church tools." kicker="PROFILE" />
 
         {mode === 'visitor' ? (
           <View style={[styles.visitorCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
@@ -72,23 +72,38 @@ export default function ProfileScreen() {
             <Button label="Sign In or Create Account" onPress={() => router.replace('/(auth)/login')} variant="primary" size="lg" style={{ width: '100%', marginTop: spacing.sm }} />
           </View>
         ) : (
-          <View style={[styles.memberCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+          <View style={[styles.memberCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
             <View style={styles.memberHeader}>
-              <Avatar url={profile?.avatar_url} name={profile?.display_name} size="lg" />
+              <View style={[styles.avatarHalo, { backgroundColor: colors.primarySoft }]}>
+                <Avatar url={profile?.avatar_url} name={profile?.display_name} size="lg" />
+              </View>
               <View style={styles.memberInfo}>
                 <Text style={[styles.memberName, { color: colors.text }]}>{profile?.display_name ?? 'Church Member'}</Text>
-                {profile?.email ? <Text style={[styles.memberEmail, { color: colors.textSecondary }]}>{profile.email}</Text> : null}
-                {organization?.name ? <Text style={[styles.memberOrg, { color: colors.interactive }]}>{organization.name} {expression?.name ? `· ${expression.name}` : ''}</Text> : null}
+                {profile?.email ? <Text style={[styles.memberEmail, { color: colors.textSecondary }]} numberOfLines={1}>{profile.email}</Text> : null}
+                {organization?.name ? (
+                  <View style={styles.memberContextRow}>
+                    <Icon name={expression?.id ? "people-outline" : "business-outline"} size={13} color={colors.interactive} />
+                    <Text style={[styles.memberOrg, { color: colors.interactive }]} numberOfLines={1}>{organization.name}{expression?.name ? ` · ${expression.name}` : ''}</Text>
+                  </View>
+                ) : null}
               </View>
+            </View>
+            <View style={styles.profileQuickActions}>
+              <Pressable onPress={() => router.push('/(tabs)/profile/settings')} style={({ pressed }) => [styles.profileQuickAction, { backgroundColor: colors.bgSecondary }, pressed && styles.pressed]}>
+                <Icon name="create-outline" size={16} color={colors.text} />
+                <Text style={[styles.profileQuickActionText, { color: colors.text }]}>Edit profile</Text>
+              </Pressable>
+              <Pressable onPress={() => router.push('/(tabs)/profile/notifications')} style={({ pressed }) => [styles.profileQuickAction, { backgroundColor: colors.bgSecondary }, pressed && styles.pressed]}>
+                <Icon name="notifications-outline" size={16} color={colors.text} />
+                <Text style={[styles.profileQuickActionText, { color: colors.text }]}>Notifications</Text>
+              </Pressable>
             </View>
           </View>
         )}
 
         <View style={styles.sectionWrap}>
-          <SectionHeader title="Account & Community" />
+          <SectionHeader title="Your church" subtitle="Community, Expressions and personal services" />
           <View style={styles.linksList}>
-            {mode === 'authenticated' ? serviceTile('/(tabs)/profile/settings', 'person-circle-outline', 'Account Settings', 'Edit your name, username, birthday, bio, phone, and profile photo') : null}
-            {mode === 'authenticated' ? serviceTile('/(tabs)/profile/notifications', 'notifications-outline', 'Notifications & Invitations', 'Accept or decline role invitations and view church updates') : null}
             {mode === 'authenticated' ? serviceTile('/expressions', 'business-outline', 'My Expressions', expression?.name ? `Inside ${expression.name} · change or leave this space` : 'Join with an invite code or enter one of your Expressions') : null}
             {mode === 'authenticated' && expression?.id ? serviceTile('/(tabs)/community/groups', 'people-outline', 'Expression Groups', `Discover and join groups inside ${expression.name}`) : null}
             {mode === 'authenticated' && expression?.id ? serviceTile('/(tabs)/community/birthdays', 'gift-outline', 'Expression Birthdays', 'Private upcoming birthday calendar with month/day only') : null}
@@ -101,7 +116,7 @@ export default function ProfileScreen() {
 
         {hasLeadershipAccess && (
           <View style={styles.sectionWrap}>
-            <SectionHeader title="Leadership & Ministry Tools" />
+            <SectionHeader title="Ministry tools" subtitle="Only capabilities assigned to your role appear here" />
             <Pressable onPress={() => router.push('/studio')} style={({ pressed }) => [styles.leadershipBanner, { backgroundColor: colors.card, borderColor: colors.interactive }, shadows.sm, pressed && styles.pressed]}>
               <View style={[styles.leadershipIconWrap, { backgroundColor: colors.primarySoft }]}><Icon name="construct-outline" size={22} color={colors.interactive} /></View>
               <View style={styles.leadershipContent}>
@@ -114,7 +129,7 @@ export default function ProfileScreen() {
         )}
 
         <View style={styles.sectionWrap}>
-          <SectionHeader title="Appearance & Theme" />
+          <SectionHeader title="Appearance" subtitle="Choose how COT looks on this device" />
           <View style={[styles.themeCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
             <View style={styles.themeChipsRow}>
               <Chip label="System Auto" selected={preference === 'system'} onPress={() => setPreference('system')} icon={<Icon name="phone-portrait-outline" size={14} color={preference === 'system' ? colors.interactive : colors.textSecondary} />} />
@@ -131,11 +146,11 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 }, content: { flexGrow: 1, paddingHorizontal: spacing.lg, gap: spacing.lg },
+  screen: { flex: 1 }, content: { flexGrow: 1, paddingHorizontal: spacing.md, gap: spacing.xl },
   visitorCard: { padding: spacing.xl, borderRadius: radius.xl, borderWidth: 1, alignItems: 'center', gap: spacing.xs }, visitorIconWrap: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xs },
   visitorTitle: { ...typography.h2, textAlign: 'center' }, visitorSubtitle: { ...typography.bodySmall, textAlign: 'center', lineHeight: 18 },
-  memberCard: { padding: spacing.lg, borderRadius: radius.xl, borderWidth: 1 }, memberHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md }, memberInfo: { flex: 1, gap: 2 }, memberName: { fontSize: 17, fontWeight: '700' }, memberEmail: { fontSize: 13 }, memberOrg: { fontSize: 12, fontWeight: '600', marginTop: 2 },
-  sectionWrap: { gap: spacing.xs }, linksList: { gap: spacing.xs }, linkTile: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, gap: spacing.md },
+  memberCard: { padding: spacing.lg, borderRadius: radius.xxl, borderWidth: 1, gap: spacing.md }, memberHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md }, avatarHalo: { padding: 4, borderRadius: radius.pill }, memberInfo: { flex: 1, minWidth: 0, gap: 2 }, memberName: { fontSize: 20, fontWeight: '800', letterSpacing: -0.4 }, memberEmail: { fontSize: 13 }, memberContextRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }, memberOrg: { fontSize: 12, fontWeight: '700', flexShrink: 1 }, profileQuickActions: { flexDirection: 'row', gap: spacing.sm }, profileQuickAction: { flex: 1, minHeight: 42, borderRadius: radius.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: spacing.sm }, profileQuickActionText: { fontSize: 12, fontWeight: '700' },
+  sectionWrap: { gap: spacing.sm }, linksList: { gap: spacing.sm }, linkTile: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.xl, borderWidth: 1, gap: spacing.md },
   tileIcon: { width: 42, height: 42, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' }, tileContent: { flex: 1, gap: 2 }, tileTitle: { fontSize: 15, fontWeight: '600' }, tileSub: { fontSize: 12, lineHeight: 16 },
   leadershipBanner: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, gap: spacing.md }, leadershipIconWrap: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' }, leadershipContent: { flex: 1, gap: 2 },
   leadershipTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, leadershipTitle: { fontSize: 15, fontWeight: '700' }, leadershipSub: { fontSize: 12, lineHeight: 16 },
