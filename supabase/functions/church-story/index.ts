@@ -21,6 +21,23 @@ Deno.serve(
         let storyData = null;
         let leadershipData = null;
 
+        if (view === "leadership-manage") {
+          if (!auth?.user || !auth.organizationId) {
+            throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication and organization context required", 401);
+          }
+          await authorize(auth, "organization.leadership.manage");
+          const { data, error } = await auth.client
+            .from("leadership_profiles")
+            .select("id, organization_id, expression_id, profile_id, display_name, portrait_url, role_title, short_bio, full_bio, ministry, display_order, tenure_start, tenure_end, is_founder, is_featured_public, is_active, social_links, created_at, updated_at")
+            .eq("organization_id", auth.organizationId)
+            .is("expression_id", null)
+            .order("is_founder", { ascending: false })
+            .order("display_order", { ascending: true })
+            .limit(100);
+          if (error) throw new ApiError("LEADERSHIP_FETCH_FAILED", "Unable to retrieve church leadership profiles", 500, undefined, false);
+          return { data: data ?? [] };
+        }
+
         if (view === "all" || view === "story") {
           let query = publicClient()
             .from("church_story")
