@@ -238,6 +238,32 @@ not itself confer organisation membership, Expression membership, or leadership 
 Clients route a visitor to sign-in before a protected interaction; APIs and RLS still
 reject the same interaction when called directly without a valid identity.
 
+#### General Community member publishing policy
+
+General Community is public to read, but ordinary public publishing is not an unrestricted
+account capability. An authenticated user may publish ordinary General Community social
+posts only when they belong to at least one active Expression in that church. This grants
+a **member-social lane**, not ministry publishing authority.
+
+For an ordinary Expression member, a General Community post may contain text, images and
+short social video only. The validated community-media pipeline currently limits this lane
+to four attachments per post, 50 MB per attachment, and videos of at most three minutes.
+Standalone audio is excluded from this ordinary public lane so sermon/audio-ministry
+material cannot be smuggled into General as a normal member post.
+
+This member-social capability does **not** grant canonical Sermon, Watch/long-video, Reel
+publication, livestream broadcasting, or any other ministry-authoritative content type.
+Those continue to require their exact capabilities and dedicated publish contracts
+(`sermons.*`, `videos.publish`, `reels.publish`, `streams.broadcast`, etc.). A user
+with explicit `feed.post` authority is treated as an elevated publisher for social-feed
+governance, but long-form/ministry content should still use its canonical content system.
+
+The raw `publish_social_post` RPC is not executable by authenticated app clients. Mobile
+publishing goes through `social-feed` → `publish_social_post_with_uploads`, which validates
+membership, posting restrictions, media ownership, scope, count, type and duration before
+attaching media and publishing the post. General Community queries use the church scope
+(`branch_id is null`) so Expression-feed posts are not duplicated into the General feed.
+
 #### Expression context
 
 An Expression is a contained community space backed by the existing `branches` table and
