@@ -157,8 +157,10 @@ export function IntegrationsJobs({ api }: { api: ApiClient }) {
     try {
       await api.request('platform-integrations', { method: 'PATCH', body: JSON.stringify(payload) });
       await load(true);
+      return true;
     } catch (value) {
       setActionError(value instanceof Error ? value.message : 'Unable to complete this action.');
+      return false;
     } finally {
       setBusyKey('');
     }
@@ -187,12 +189,14 @@ export function IntegrationsJobs({ api }: { api: ApiClient }) {
         setActionError('Enter an audit reason before retrying a failed job.');
         return;
       }
-      await runAction(
+      const succeeded = await runAction(
         `retry:${actionTarget.queue}:${actionTarget.id}`,
         { action: 'retry_job', queue: actionTarget.queue, id: actionTarget.id, reason: actionReason.trim() },
       );
-      setActionTarget(null);
-      setActionReason('');
+      if (succeeded) {
+        setActionTarget(null);
+        setActionReason('');
+      }
       return;
     }
 
@@ -201,7 +205,7 @@ export function IntegrationsJobs({ api }: { api: ApiClient }) {
       setActionError('Enter a governance reason before disabling this connection.');
       return;
     }
-    await runAction(
+    const succeeded = await runAction(
       `connection:${actionTarget.connection.id}`,
       {
         action: 'set_connection_status',
@@ -210,8 +214,10 @@ export function IntegrationsJobs({ api }: { api: ApiClient }) {
         ...(disabling ? { reason: actionReason.trim() } : {}),
       },
     );
-    setActionTarget(null);
-    setActionReason('');
+    if (succeeded) {
+      setActionTarget(null);
+      setActionReason('');
+    }
   };
 
   const stats = telemetry?.stats ?? EMPTY_STATS;
@@ -255,7 +261,7 @@ export function IntegrationsJobs({ api }: { api: ApiClient }) {
       </div>
 
       {error ? <div className="admin-inline-error" role="alert" style={{ marginBottom: 16 }}>{error}</div> : null}
-      {actionError ? <div className="admin-inline-error" role="alert" style={{ marginBottom: 16 }}>{actionError}</div> : null}
+      {actionError && !actionTarget ? <div className="admin-inline-error" role="alert">{actionError}</div> : null}
 
       <Card
         title="Background queues & integrations"
