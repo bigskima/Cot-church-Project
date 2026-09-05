@@ -102,10 +102,11 @@ export default function SermonDetailScreen() {
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 60 }]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 120 }]}
       >
         <ScreenHeader
           title={sermon?.title ?? 'Sermon'}
+          kicker="SERMON"
           subtitle={sermon?.preacher ? `By ${sermon.preacher}` : sermon?.sermon_date ? new Date(sermon.sermon_date).toLocaleDateString() : undefined}
           showBack
         />
@@ -117,7 +118,7 @@ export default function SermonDetailScreen() {
         ) : sermon ? (
           <View style={styles.body}>
             {hasVideo && hasAudio ? (
-              <View style={styles.formatRow}>
+              <View style={[styles.formatRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
                 <Chip
                   label="Watch"
                   selected={mediaFormat === 'video'}
@@ -134,11 +135,11 @@ export default function SermonDetailScreen() {
             ) : null}
 
             {playback.loading && !hasVideo && !hasAudio ? (
-              <View style={[styles.mediaState, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.mediaState, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
                 <Text style={[styles.mediaStateTitle, { color: colors.text }]}>Preparing sermon media…</Text>
               </View>
             ) : mediaPending ? (
-              <View style={[styles.mediaState, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.mediaState, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
                 <Icon name="time-outline" size={20} color={colors.interactive} />
                 <Text style={[styles.mediaStateTitle, { color: colors.text }]}>Recording is still processing</Text>
                 <Text style={[styles.mediaStateText, { color: colors.textSecondary }]}>Playback will become available automatically when the recording is ready.</Text>
@@ -165,14 +166,14 @@ export default function SermonDetailScreen() {
                 onProgress={syncProgress}
               />
             ) : (
-              <View style={[styles.mediaState, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.mediaState, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
                 <Text style={[styles.mediaStateTitle, { color: colors.text }]}>Media is not available yet</Text>
                 <Text style={[styles.mediaStateText, { color: colors.textSecondary }]}>This sermon can still be read below while its media is being prepared.</Text>
               </View>
             )}
 
             {sermon.scripture_references?.length ? (
-              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
                 <Text style={[styles.cardKicker, { color: colors.interactive }]}>SCRIPTURE PASSAGES</Text>
                 <View style={styles.scripturePills}>
                   {sermon.scripture_references.map((reference, index) => (
@@ -186,7 +187,7 @@ export default function SermonDetailScreen() {
             ) : null}
 
             {sermon.description ? (
-              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
                 <Text style={[styles.cardKicker, { color: colors.interactive }]}>SERMON NOTES</Text>
                 <Text style={[styles.descriptionText, { color: colors.text }]}>{sermon.description}</Text>
               </View>
@@ -201,13 +202,13 @@ export default function SermonDetailScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: { flexGrow: 1 },
-  body: { paddingHorizontal: spacing.lg, gap: spacing.lg },
-  formatRow: { flexDirection: 'row', gap: spacing.xs },
-  mediaState: { padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, gap: spacing.xs, alignItems: 'flex-start' },
+  body: { paddingHorizontal: spacing.md, gap: spacing.lg },
+  formatRow: { flexDirection: 'row', gap: spacing.xs, padding: 5, borderWidth: 1, borderRadius: radius.xl, alignSelf: 'flex-start' },
+  mediaState: { padding: spacing.lg, borderRadius: radius.xl, borderWidth: 1, gap: spacing.xs, alignItems: 'flex-start' },
   mediaStateTitle: { fontSize: 15, fontWeight: '700' },
   mediaStateText: { fontSize: 13, lineHeight: 19 },
-  card: { padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, gap: spacing.sm },
-  cardKicker: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  card: { padding: spacing.lg, borderRadius: radius.xl, borderWidth: 1, gap: spacing.sm },
+  cardKicker: { fontSize: 11, fontWeight: '800', letterSpacing: 0.7 },
   scripturePills: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   scripturePill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill },
   scriptureText: { fontSize: 13, fontWeight: '600' },
