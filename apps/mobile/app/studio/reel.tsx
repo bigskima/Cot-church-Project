@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -33,6 +33,7 @@ export default function ReelCreatorScreen() {
   const [audioArtist, setAudioArtist] = useState('');
   const [working, setWorking] = useState(false);
   const [stage, setStage] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
   const allowed = mode === 'authenticated' && hasCapability('media.upload') && hasCapability('reels.publish');
   const selectedExpressionId = scope === 'branch' ? expression?.id ?? null : null;
@@ -48,9 +49,10 @@ export default function ReelCreatorScreen() {
   const chooseVideo = async () => {
     if (!allowed || working) return;
     try {
+      setErrorMsg('');
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('Media access required', 'Allow photo-library access to choose a Reel video.');
+        setErrorMsg('Photo-library access is required to choose a Reel video. Allow access in your device settings and try again.');
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['videos'], allowsMultipleSelection: false, quality: 1 });
@@ -67,7 +69,7 @@ export default function ReelCreatorScreen() {
       }
       const sizeBytes = Number(body.size || asset.fileSize || 0);
       if (!sizeBytes || sizeBytes > MAX_BYTES) {
-        Alert.alert('Video too large', 'Choose a Reel video that is 200 MB or smaller.');
+        setErrorMsg('Choose a Reel video that is 200 MB or smaller.');
         return;
       }
       setVideo({
@@ -79,7 +81,7 @@ export default function ReelCreatorScreen() {
         body,
       });
     } catch (error) {
-      Alert.alert('Video unavailable', error instanceof Error ? error.message : 'Unable to choose this video.');
+      setErrorMsg(error instanceof Error ? error.message : 'Unable to choose this video.');
     }
   };
 
@@ -90,6 +92,7 @@ export default function ReelCreatorScreen() {
   const publishReel = async () => {
     if (!canPublish || !video) return;
     setWorking(true);
+    setErrorMsg('');
     let assetId: string | null = null;
     try {
       setStage('Preparing secure upload…');
@@ -121,7 +124,7 @@ export default function ReelCreatorScreen() {
     } catch (error) {
       if (assetId) await cancelAsset(assetId);
       setStage('');
-      Alert.alert('Reel not published', error instanceof Error ? error.message : 'Unable to publish this Reel.');
+      setErrorMsg(error instanceof Error ? error.message : 'Unable to publish this Reel.');
     } finally {
       setWorking(false);
     }
@@ -134,6 +137,18 @@ export default function ReelCreatorScreen() {
           <ScreenHeader title="Create Reel" kicker="MEDIA STUDIO" subtitle="Upload a vertical video and choose exactly where it should appear." showBack />
         </View>
         <View style={styles.body}>
+          {errorMsg ? (
+            <Pressable
+              onPress={() => setErrorMsg('')}
+              style={[styles.errorBanner, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss Reel error"
+            >
+              <Icon name="alert-circle-outline" size={17} color={colors.live} />
+              <Text style={[styles.errorText, { color: colors.live }]}>{errorMsg}</Text>
+              <Icon name="close" size={14} color={colors.live} />
+            </Pressable>
+          ) : null}
           {!allowed ? (
             <View style={[styles.notice, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
               <Icon name="shield-outline" size={22} color={colors.textMuted} />
@@ -198,5 +213,7 @@ const styles = StyleSheet.create({
   videoPicker: { minHeight: 190, borderWidth: 1, borderStyle: 'dashed', borderRadius: radius.xl, alignItems: 'center', justifyContent: 'center', gap: spacing.xs, padding: spacing.lg },
   pickerTitle: { fontSize: 16, fontWeight: '800' }, videoCard: { overflow: 'hidden', borderWidth: 1, borderRadius: radius.xl },
   videoMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md }, videoMetaCopy: { flex: 1 }, videoName: { fontSize: 13, fontWeight: '700' },
+  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md },
+  errorText: { flex: 1, fontSize: 12, lineHeight: 17, fontWeight: '700' },
   progressNotice: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderRadius: radius.lg, padding: spacing.md }, progressText: { fontSize: 12, fontWeight: '700' },
 });
