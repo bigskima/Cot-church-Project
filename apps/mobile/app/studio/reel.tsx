@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { Button, Chip, Icon, InputField, ScreenHeader, VideoPlayer } from '@/components';
-import { radius, spacing } from '@/design-system/tokens';
+import { radius, shadows, spacing } from '@/design-system/tokens';
 
 type ReelScope = 'public' | 'branch';
 type SelectedVideo = { uri: string; fileName: string; mimeType: string; sizeBytes: number; durationSeconds?: number; body: Blob };
@@ -26,7 +26,7 @@ export default function ReelCreatorScreen() {
   const { api, context, mode, hasCapability } = useSession();
   const { colors } = useTheme();
   const expression = context?.expression;
-  const [scope, setScope] = useState<ReelScope>('public');
+  const [scope, setScope] = useState<ReelScope>(expression?.id ? 'branch' : 'public');
   const [video, setVideo] = useState<SelectedVideo | null>(null);
   const [caption, setCaption] = useState('');
   const [audioTitle, setAudioTitle] = useState('');
@@ -34,8 +34,16 @@ export default function ReelCreatorScreen() {
   const [working, setWorking] = useState(false);
   const [stage, setStage] = useState('');
 
-  const allowed = mode === 'authenticated' && Boolean(expression?.id) && hasCapability('media.upload') && hasCapability('reels.publish');
-  const canPublish = useMemo(() => allowed && Boolean(video) && Boolean(caption.trim()) && !working, [allowed, video, caption, working]);
+  const allowed = mode === 'authenticated' && hasCapability('media.upload') && hasCapability('reels.publish');
+  const selectedExpressionId = scope === 'branch' ? expression?.id ?? null : null;
+  const canPublish = useMemo(
+    () => allowed && (scope !== 'branch' || Boolean(expression?.id)) && Boolean(video) && Boolean(caption.trim()) && !working,
+    [allowed, scope, expression?.id, video, caption, working],
+  );
+
+  useEffect(() => {
+    if (!expression?.id && scope === 'branch') setScope('public');
+  }, [expression?.id, scope]);
 
   const chooseVideo = async () => {
     if (!allowed || working) return;
@@ -80,7 +88,7 @@ export default function ReelCreatorScreen() {
   };
 
   const publishReel = async () => {
-    if (!canPublish || !video || !expression?.id) return;
+    if (!canPublish || !video) return;
     setWorking(true);
     let assetId: string | null = null;
     try {
@@ -89,7 +97,7 @@ export default function ReelCreatorScreen() {
         method: 'POST',
         body: JSON.stringify({
           action: 'create_upload_intent', mediaType: 'video', mimeType: video.mimeType,
-          expressionId: expression.id, durationSeconds: video.durationSeconds, aspectRatio: '9:16',
+          expressionId: selectedExpressionId, durationSeconds: video.durationSeconds, aspectRatio: '9:16',
           fileSizeBytes: video.sizeBytes, fileName: video.fileName,
         }),
       });
@@ -103,7 +111,7 @@ export default function ReelCreatorScreen() {
       await api.request('creator-studio', {
         method: 'POST',
         body: JSON.stringify({
-          action: 'publish_reel', expressionId: expression.id, visibility: scope, mediaAssetId: assetId,
+          action: 'publish_reel', expressionId: selectedExpressionId, visibility: scope, mediaAssetId: assetId,
           caption: caption.trim(), audioTitle: audioTitle.trim() || undefined, audioArtist: audioArtist.trim() || undefined,
         }),
       });
@@ -121,15 +129,17 @@ export default function ReelCreatorScreen() {
 
   return (
     <KeyboardAvoidingView style={[styles.screen, { backgroundColor: colors.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 80 }]}>
-        <ScreenHeader title="Create Reel" subtitle="Publish short vertical video through your Expression's media permissions." showBack />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 130 }]}>
+        <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+          <ScreenHeader title="Create Reel" kicker="MEDIA STUDIO" subtitle="Upload a vertical video and choose exactly where it should appear." showBack />
+        </View>
         <View style={styles.body}>
           {!allowed ? (
-            <View style={[styles.notice, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
+            <View style={[styles.notice, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
               <Icon name="shield-outline" size={22} color={colors.textMuted} />
               <View style={styles.noticeCopy}>
                 <Text style={[styles.noticeTitle, { color: colors.text }]}>Reel publishing is role-scoped</Text>
-                <Text style={[styles.noticeText, { color: colors.textSecondary }]}>Your selected Expression must grant both media upload and Reel publishing capabilities.</Text>
+                <Text style={[styles.noticeText, { color: colors.textSecondary }]}>Your role must grant both media upload and Reel publishing capabilities in the current church scope.</Text>
               </View>
             </View>
           ) : (
@@ -138,13 +148,17 @@ export default function ReelCreatorScreen() {
                 <Text style={[styles.label, { color: colors.textSecondary }]}>PUBLISHING SCOPE</Text>
                 <View style={styles.chipRow}>
                   <Chip label="Public Reels" selected={scope === 'public'} onPress={() => setScope('public')} />
-                  <Chip label={expression?.name || 'Expression'} selected={scope === 'branch'} onPress={() => setScope('branch')} />
+                  {expression?.id ? <Chip label={expression.name} selected={scope === 'branch'} onPress={() => setScope('branch')} /> : null}
                 </View>
-                <Text style={[styles.helper, { color: colors.textMuted }]}>Public Reels can appear in public discovery. Expression Reels remain inside {expression?.name || 'the selected Expression'}.</Text>
+                <Text style={[styles.helper, { color: colors.textMuted }]}>
+                  {scope === 'public'
+                    ? 'This Reel can appear in public discovery.'
+                    : `This Reel stays inside ${expression?.name || 'the selected Expression'}.`}
+                </Text>
               </View>
 
               {video ? (
-                <View style={[styles.videoCard, { borderColor: colors.border }]}>
+                <View style={[styles.videoCard, { borderColor: colors.borderSubtle }, shadows.md]}>
                   <VideoPlayer title={video.fileName} sourceUrl={video.uri} durationSeconds={video.durationSeconds} />
                   <View style={styles.videoMeta}>
                     <View style={styles.videoMetaCopy}>
@@ -155,7 +169,7 @@ export default function ReelCreatorScreen() {
                   </View>
                 </View>
               ) : (
-                <Pressable onPress={() => void chooseVideo()} style={[styles.videoPicker, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
+                <Pressable onPress={() => void chooseVideo()} style={[styles.videoPicker, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
                   <Icon name="videocam-outline" size={32} color={colors.interactive} />
                   <Text style={[styles.pickerTitle, { color: colors.text }]}>Choose Reel Video</Text>
                   <Text style={[styles.helper, { color: colors.textMuted }]}>Vertical video recommended · up to 200 MB</Text>
@@ -176,13 +190,13 @@ export default function ReelCreatorScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 }, content: { flexGrow: 1 }, body: { paddingHorizontal: spacing.lg, gap: spacing.lg },
+  screen: { flex: 1 }, content: { flexGrow: 1 }, headerCard: { marginHorizontal: spacing.md, borderWidth: 1, borderRadius: radius.xxl, overflow: 'hidden' }, body: { paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: spacing.lg },
   label: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 }, scopeBlock: { gap: spacing.xs },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }, helper: { fontSize: 11, lineHeight: 16 },
-  notice: { flexDirection: 'row', gap: spacing.md, padding: spacing.lg, borderWidth: 1, borderRadius: radius.lg },
+  notice: { flexDirection: 'row', gap: spacing.md, padding: spacing.lg, borderWidth: 1, borderRadius: radius.xl },
   noticeCopy: { flex: 1, gap: 4 }, noticeTitle: { fontSize: 15, fontWeight: '800' }, noticeText: { fontSize: 12, lineHeight: 18 },
-  videoPicker: { minHeight: 190, borderWidth: 1, borderStyle: 'dashed', borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', gap: spacing.xs, padding: spacing.lg },
-  pickerTitle: { fontSize: 16, fontWeight: '800' }, videoCard: { overflow: 'hidden', borderWidth: 1, borderRadius: radius.lg },
+  videoPicker: { minHeight: 190, borderWidth: 1, borderStyle: 'dashed', borderRadius: radius.xl, alignItems: 'center', justifyContent: 'center', gap: spacing.xs, padding: spacing.lg },
+  pickerTitle: { fontSize: 16, fontWeight: '800' }, videoCard: { overflow: 'hidden', borderWidth: 1, borderRadius: radius.xl },
   videoMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md }, videoMetaCopy: { flex: 1 }, videoName: { fontSize: 13, fontWeight: '700' },
-  progressNotice: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderRadius: radius.md, padding: spacing.md }, progressText: { fontSize: 12, fontWeight: '700' },
+  progressNotice: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderRadius: radius.lg, padding: spacing.md }, progressText: { fontSize: 12, fontWeight: '700' },
 });
