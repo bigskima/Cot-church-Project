@@ -53,10 +53,15 @@ export default function ProfileScreen() {
       ? 'Checking availability…'
       : 'Temporarily unavailable. Please try again later.';
 
+  const hasPastoralLeadershipAccess =
+    ((hasCapability('prayer.moderate') &&
+      (hasCapability('prayer.pastoral.receive') || hasCapability('prayer.team.receive'))) ||
+      hasCapability('pastoral.followups.receive'));
+
   const hasExpressionLeadershipAccess = Boolean(expression?.id) && (
     hasCapability('content.create') || hasCapability('streams.broadcast') ||
     hasCapability('sermons.create') || hasCapability('sermons.manage') || hasCapability('events.create') ||
-    hasCapability('events.update') || hasCapability('prayer.manage') || hasCapability('members.invite') ||
+    hasCapability('events.update') || hasPastoralLeadershipAccess || hasCapability('members.invite') ||
     hasCapability('roles.assign') || hasCapability('expression.leadership.manage')
   );
   const hasOrganizationLeadershipAccess =
