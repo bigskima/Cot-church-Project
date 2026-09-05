@@ -63,6 +63,8 @@ export function StreamingInfrastructure({ api }: { api: ApiClient }) {
   const [actionBusy, setActionBusy] = useState(false);
   const [selectedStreamToKill, setSelectedStreamToKill] = useState<ActiveStream | null>(null);
   const [terminationReason, setTerminationReason] = useState('');
+  const [providerStateTarget, setProviderStateTarget] = useState<StreamingProvider | null>(null);
+  const [providerStateReason, setProviderStateReason] = useState('');
   const [configProvider, setConfigProvider] = useState<StreamingProvider | null>(null);
   const [secretReference, setSecretReference] = useState('');
   const [webhookSecretReference, setWebhookSecretReference] = useState('');
@@ -185,17 +187,34 @@ export function StreamingInfrastructure({ api }: { api: ApiClient }) {
     }
   };
 
-  const toggleProvider = async (provider: StreamingProvider) => {
-    const nextActive = !provider.is_active;
-    const reason = nextActive ? undefined : window.prompt('Governance reason for disabling this provider:')?.trim();
-    if (!nextActive && !reason) return;
+  const requestProviderStateChange = (provider: StreamingProvider) => {
+    setProviderStateTarget(provider);
+    setProviderStateReason('');
+    setError('');
+  };
+
+  const applyProviderStateChange = async () => {
+    if (!providerStateTarget) return;
+    const nextActive = !providerStateTarget.is_active;
+    if (!nextActive && !providerStateReason.trim()) {
+      setError('A governance reason is required before disabling a streaming provider.');
+      return;
+    }
+
     setActionBusy(true);
     setError('');
     try {
       await api.request('platform-streaming', {
         method: 'PATCH',
-        body: JSON.stringify({ action: 'set_provider_active', providerId: provider.id, isActive: nextActive, reason }),
+        body: JSON.stringify({
+          action: 'set_provider_active',
+          providerId: providerStateTarget.id,
+          isActive: nextActive,
+          reason: nextActive ? undefined : providerStateReason.trim(),
+        }),
       });
+      setProviderStateTarget(null);
+      setProviderStateReason('');
       await load();
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to change provider state.');
@@ -228,32 +247,32 @@ export function StreamingInfrastructure({ api }: { api: ApiClient }) {
   };
 
   return (
-    <div>
+    <div className="admin-page-stack">
       <div className="admin-stats-grid">
-        <StatWidget title="Active Live Broadcasts" value={liveCount} subtitle={`${data.streams.length} active/scheduled control-plane records`} trend={{ value: liveCount > 0 ? 'LIVE NOW' : 'No live feeds', isPositive: true }} icon="📡" variant="live" />
-        <StatWidget title="Primary Video Provider" value={primaryConfig?.streaming_providers?.name ?? 'Not configured'} subtitle={primaryConfig ? `Credential ref: ${primaryConfig.secret_reference}` : 'Set a global default provider'} trend={{ value: primaryConfig ? 'ACTIVE' : 'ACTION REQUIRED', isPositive: Boolean(primaryConfig) }} icon="⚡" variant="gold" />
-        <StatWidget title="Recent Webhook Health" value={webhookIssues === 0 ? 'Healthy' : `${webhookIssues} issue(s)`} subtitle={`${data.recentWebhooks.length} recent delivery events inspected`} trend={{ value: webhookIssues === 0 ? 'NO RECENT ERRORS' : 'REVIEW EVENTS', isPositive: webhookIssues === 0 }} icon="🛡" variant="success" />
+        <StatWidget title="Active Live Broadcasts" value={liveCount} subtitle={`${data.streams.length} active/scheduled control-plane records`} trend={{ value: liveCount > 0 ? 'LIVE NOW' : 'No live feeds', isPositive: true }} icon="LIVE" variant="live" />
+        <StatWidget title="Primary Video Provider" value={primaryConfig?.streaming_providers?.name ?? 'Not configured'} subtitle={primaryConfig ? `Credential ref: ${primaryConfig.secret_reference}` : 'Set a global default provider'} trend={{ value: primaryConfig ? 'ACTIVE' : 'ACTION REQUIRED', isPositive: Boolean(primaryConfig) }} icon="VIDEO" variant="gold" />
+        <StatWidget title="Recent Webhook Health" value={webhookIssues === 0 ? 'Healthy' : `${webhookIssues} issue(s)`} subtitle={`${data.recentWebhooks.length} recent delivery events inspected`} trend={{ value: webhookIssues === 0 ? 'NO RECENT ERRORS' : 'REVIEW EVENTS', isPositive: webhookIssues === 0 }} icon="HOOKS" variant="success" />
       </div>
 
-      {error ? <div className="admin-form-error" role="alert" style={{ marginBottom: 20 }}>{error}</div> : null}
-      {success ? <div style={{ marginBottom: 20, padding: 12, borderRadius: 10, border: '1px solid var(--success)', color: 'var(--success)' }}>{success}</div> : null}
+      {error && !providerStateTarget ? <div className="admin-inline-error" role="alert">{error}</div> : null}
+      {success ? <div className="admin-status-message admin-status-success">{success}</div> : null}
 
-      <Card title="Live Stream Provider Registry" subtitle="Configure provider adapters and, when needed, paste credentials directly into the encrypted Platform Vault." headerAction={<Button variant="outline" size="sm" onClick={() => void load()} loading={loading}>Refresh</Button>}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+      <Card title="Streaming provider registry" subtitle="Configure provider adapters and, when needed, paste credentials directly into the encrypted Platform Vault." headerAction={<Button variant="outline" size="sm" onClick={() => void load()} loading={loading}>Refresh</Button>}>
+        <div className="admin-provider-grid">
           {data.providers.map((provider) => {
             const config = configByProvider.get(provider.id);
             return (
-              <div key={provider.id} style={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', padding: 20 }}>
+              <div key={provider.id} className="admin-provider-card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                   <div><h4 style={{ fontSize: 16, fontWeight: 900 }}>{provider.name}</h4><p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>{provider.code} · adapter {provider.adapter_version}</p></div>
                   <Badge label={provider.is_active ? 'ENABLED' : 'DISABLED'} variant={provider.is_active ? 'active' : 'suspended'} pulse={provider.is_active} />
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>Global config: <strong style={{ color: config?.is_active ? 'var(--gold)' : 'var(--text-muted)' }}>{config?.is_active ? 'ACTIVE' : 'NOT CONFIGURED'}</strong>{config?.is_default ? ' · DEFAULT' : ''}</div>
                 {config ? <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 12, lineHeight: 1.6 }}>Credential ref: <code>{config.secret_reference}</code><br />Webhook ref: <code>{config.webhook_secret_reference}</code>{config.signing_key_reference ? <><br />Signing ref: <code>{config.signing_key_reference}</code></> : null}</div> : null}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>{provider.capabilities.map((capability) => <span key={capability} style={{ fontSize: 10, fontWeight: 800, backgroundColor: 'var(--bg-card)', padding: '3px 8px', borderRadius: 'var(--radius-pill)', color: 'var(--text-secondary)' }}>{capability}</span>)}</div>
+                <div className="admin-capability-tags">{provider.capabilities.map((capability) => <span key={capability} className="active">{capability}</span>)}</div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 12, borderTop: '1px solid var(--border-subtle)' }}>
                   <Button variant="outline" size="sm" onClick={() => openConfig(provider)}>Configure</Button>
-                  <Button variant={provider.is_active ? 'danger' : 'gold'} size="sm" disabled={actionBusy} onClick={() => void toggleProvider(provider)}>{provider.is_active ? 'Disable provider' : 'Enable provider'}</Button>
+                  <Button variant={provider.is_active ? 'danger' : 'gold'} size="sm" disabled={actionBusy} onClick={() => requestProviderStateChange(provider)}>{provider.is_active ? 'Disable provider' : 'Enable provider'}</Button>
                 </div>
               </div>
             );
@@ -261,7 +280,7 @@ export function StreamingInfrastructure({ api }: { api: ApiClient }) {
         </div>
       </Card>
 
-      <Card title="Live Broadcast Monitor & Emergency Controls" subtitle="Platform-wide active, scheduled, provisioning and failed streams across church organisations" headerAction={<Button variant="outline" size="md" onClick={() => void load()} loading={loading}>Refresh Streams</Button>}>
+      <Card title="Live broadcast monitor" subtitle="Platform-wide active, scheduled, provisioning and failed streams across church organisations" headerAction={<Button variant="outline" size="md" onClick={() => void load()} loading={loading}>Refresh</Button>}>
         <Table
           columns={[
             { header: 'STREAM', accessor: (item) => <div><div style={{ fontWeight: 800 }}>{item.title}</div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{item.organizations?.name ?? item.organization_id}</div></div> },
@@ -298,7 +317,7 @@ export function StreamingInfrastructure({ api }: { api: ApiClient }) {
             <InputField label="Mux Playback Signing Key ID (optional)" type="password" value={muxSigningKeyId} onChange={(event) => setMuxSigningKeyId(event.target.value)} autoComplete="new-password" placeholder="Paste key ID" />
             <div className="admin-form-group">
               <label className="admin-form-label">Mux Playback Private Key PEM (optional)</label>
-              <textarea className="admin-form-input" rows={6} value={muxSigningPrivateKey} onChange={(event) => setMuxSigningPrivateKey(event.target.value)} placeholder="-----BEGIN PRIVATE KEY-----" autoComplete="off" spellCheck={false} style={{ resize: 'vertical', fontFamily: 'var(--font-mono)' }} />
+              <textarea className="admin-form-input admin-form-textarea" rows={6} value={muxSigningPrivateKey} onChange={(event) => setMuxSigningPrivateKey(event.target.value)} placeholder="-----BEGIN PRIVATE KEY-----" autoComplete="off" spellCheck={false} style={{ resize: 'vertical', fontFamily: 'var(--font-mono)' }} />
               <span className="admin-form-helper">Required only for signed/private playback. Stored encrypted with the key ID.</span>
             </div>
           </div>
@@ -306,7 +325,41 @@ export function StreamingInfrastructure({ api }: { api: ApiClient }) {
           <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 12 }}>Use Provider Credentials to store credentials for this adapter, then reference them here.</p>
         )}
 
-        <label style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 13, color: 'var(--text-secondary)', marginTop: 12 }}><input type="checkbox" checked={makeDefault} onChange={(event) => setMakeDefault(event.target.checked)} />Use this provider as the global default for organisations without an override.</label>
+        <label className="admin-inline-check"><input type="checkbox" checked={makeDefault} onChange={(event) => setMakeDefault(event.target.checked)} /><span>Use this provider as the global default for organisations without an override.</span></label>
+      </Modal>
+
+      <Modal
+        isOpen={!!providerStateTarget}
+        onClose={() => { if (!actionBusy) { setProviderStateTarget(null); setProviderStateReason(''); } }}
+        title={providerStateTarget?.is_active ? 'Disable streaming provider' : 'Enable streaming provider'}
+        subtitle={providerStateTarget?.name}
+        maxWidth="sm"
+        footer={
+          <>
+            <Button variant="outline" size="md" disabled={actionBusy} onClick={() => setProviderStateTarget(null)}>Cancel</Button>
+            <Button
+              variant={providerStateTarget?.is_active ? 'danger' : 'gold'}
+              size="md"
+              loading={actionBusy}
+              onClick={() => void applyProviderStateChange()}
+            >
+              {providerStateTarget?.is_active ? 'Disable provider' : 'Enable provider'}
+            </Button>
+          </>
+        }
+      >
+        {error ? <div className="admin-inline-error" role="alert">{error}</div> : null}
+        {providerStateTarget?.is_active ? (
+          <InputField
+            label="Governance reason"
+            value={providerStateReason}
+            onChange={(event) => setProviderStateReason(event.target.value)}
+            placeholder="Provider incident, security issue, service restriction…"
+            helperText="The provider-state change and reason are written to the platform audit trail."
+          />
+        ) : (
+          <div className="admin-info-callout">Enabling this provider makes the adapter available again. Active configuration still determines whether it can carry production broadcasts.</div>
+        )}
       </Modal>
 
       <Modal
