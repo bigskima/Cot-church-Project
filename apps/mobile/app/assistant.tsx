@@ -128,7 +128,12 @@ export default function AssistantScreen() {
           <View style={[styles.stateIcon, { backgroundColor: colors.primarySoft }]}><Icon name="sparkles" size={30} color={colors.interactive} /></View>
           <Text style={[styles.stateTitle, { color: colors.text }]}>Sign in to use the church assistant</Text>
           <Text style={[styles.stateBody, { color: colors.textSecondary }]}>The assistant uses your active church context so it can answer only from information you are allowed to access.</Text>
-          <Button label="Sign in" onPress={() => router.replace('/(auth)/login')} variant="primary" size="lg" />
+          <Button
+            label="Sign in"
+            onPress={() => router.push({ pathname: '/(auth)/login', params: { returnTo: '/assistant' } } as any)}
+            variant="primary"
+            size="lg"
+          />
         </View>
       </View>
     );
