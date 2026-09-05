@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ApiClient } from '../api';
-import { Badge, Button, Card, StatWidget, Table, Tabs } from '../components/ui';
+import { Badge, Button, Card, InputField, Modal, StatWidget, Table, Tabs } from '../components/ui';
 
 type OrganizationRef = { id: string; name: string; slug?: string } | null;
 type JobStatus = 'pending' | 'processing' | 'queued' | 'running' | 'failed' | 'dead_letter' | 'delivered' | 'completed' | string;
@@ -128,6 +128,12 @@ export function IntegrationsJobs({ api }: { api: ApiClient }) {
   const [actionError, setActionError] = useState('');
   const [busyKey, setBusyKey] = useState('');
   const [activeTab, setActiveTab] = useState('queues');
+  const [actionTarget, setActionTarget] = useState<
+    | { kind: 'retry'; queue: 'notification' | 'workflow' | 'integration'; id: number | string }
+    | { kind: 'connection'; connection: IntegrationConnection; nextStatus: 'active' | 'disabled' }
+    | null
+  >(null);
+  const [actionReason, setActionReason] = useState('');
 
   const load = useCallback(async (background = false) => {
     if (!background) setLoading(true);
@@ -159,25 +165,54 @@ export function IntegrationsJobs({ api }: { api: ApiClient }) {
   }, [api, load]);
 
   const retryJob = useCallback((queue: 'notification' | 'workflow' | 'integration', id: number | string) => {
-    const reason = window.prompt('Give an audit reason for retrying this failed job:')?.trim();
-    if (!reason) return;
-    void runAction(`retry:${queue}:${id}`, { action: 'retry_job', queue, id, reason });
-  }, [runAction]);
+    setActionReason('');
+    setActionError('');
+    setActionTarget({ kind: 'retry', queue, id });
+  }, []);
 
   const setConnectionStatus = useCallback((connection: IntegrationConnection) => {
-    const nextStatus = connection.status === 'active' ? 'disabled' : 'active';
-    const reason = nextStatus === 'disabled'
-      ? window.prompt(`Why should ${connection.name} be disabled?`)?.trim()
-      : undefined;
-    if (nextStatus === 'disabled' && !reason) return;
-    if (nextStatus === 'active' && !window.confirm(`Enable ${connection.name}?`)) return;
-    void runAction(`connection:${connection.id}`, {
-      action: 'set_connection_status',
-      connectionId: connection.id,
-      status: nextStatus,
-      ...(reason ? { reason } : {}),
+    setActionReason('');
+    setActionError('');
+    setActionTarget({
+      kind: 'connection',
+      connection,
+      nextStatus: connection.status === 'active' ? 'disabled' : 'active',
     });
-  }, [runAction]);
+  }, []);
+
+  const applyGovernanceAction = async () => {
+    if (!actionTarget) return;
+    if (actionTarget.kind === 'retry') {
+      if (!actionReason.trim()) {
+        setActionError('Enter an audit reason before retrying a failed job.');
+        return;
+      }
+      await runAction(
+        `retry:${actionTarget.queue}:${actionTarget.id}`,
+        { action: 'retry_job', queue: actionTarget.queue, id: actionTarget.id, reason: actionReason.trim() },
+      );
+      setActionTarget(null);
+      setActionReason('');
+      return;
+    }
+
+    const disabling = actionTarget.nextStatus === 'disabled';
+    if (disabling && !actionReason.trim()) {
+      setActionError('Enter a governance reason before disabling this connection.');
+      return;
+    }
+    await runAction(
+      `connection:${actionTarget.connection.id}`,
+      {
+        action: 'set_connection_status',
+        connectionId: actionTarget.connection.id,
+        status: actionTarget.nextStatus,
+        ...(disabling ? { reason: actionReason.trim() } : {}),
+      },
+    );
+    setActionTarget(null);
+    setActionReason('');
+  };
 
   const stats = telemetry?.stats ?? EMPTY_STATS;
   const pendingTotal = stats.notificationPending + stats.workflowQueued + stats.integrationQueued;
@@ -211,19 +246,19 @@ export function IntegrationsJobs({ api }: { api: ApiClient }) {
   ) : <span style={{ color: 'var(--text-muted)' }}>—</span>;
 
   return (
-    <div>
+    <div className="admin-page-stack">
       <div className="admin-stats-grid" aria-busy={loading}>
-        <StatWidget title="Queued / Running" value={loading && !telemetry ? '—' : pendingTotal} subtitle="Current work across monitored queues" trend={{ value: pendingTotal > 0 ? 'WORK PENDING' : 'CLEAR', isPositive: pendingTotal === 0 }} />
-        <StatWidget title="Failed / Dead Letter" value={loading && !telemetry ? '—' : failedTotal} subtitle="Jobs requiring operator attention" trend={{ value: failedTotal > 0 ? 'ATTENTION' : 'CLEAR', isPositive: failedTotal === 0 }} variant={failedTotal > 0 ? 'live' : 'success'} />
+        <StatWidget title="Queued / running" value={loading && !telemetry ? '—' : pendingTotal} subtitle="Current work across monitored queues" trend={{ value: pendingTotal > 0 ? 'WORK PENDING' : 'CLEAR', isPositive: pendingTotal === 0 }} />
+        <StatWidget title="Failed / dead letter" value={loading && !telemetry ? '—' : failedTotal} subtitle="Jobs requiring operator attention" trend={{ value: failedTotal > 0 ? 'ATTENTION' : 'CLEAR', isPositive: failedTotal === 0 }} variant={failedTotal > 0 ? 'live' : 'success'} />
         <StatWidget title="Connections" value={loading && !telemetry ? '—' : telemetry?.connections.length ?? 0} subtitle="Configured integration connections" trend={{ value: `${telemetry?.connections.filter((item) => item.status === 'active').length ?? 0} ACTIVE`, isPositive: true }} />
-        <StatWidget title="Recent Webhook Events" value={loading && !telemetry ? '—' : webhookTotal} subtitle="Latest streaming and payment events" trend={{ value: 'LATEST 30 PER SOURCE', isPositive: true }} />
+        <StatWidget title="Recent webhook events" value={loading && !telemetry ? '—' : webhookTotal} subtitle="Latest streaming and payment events" trend={{ value: 'LATEST 30 PER SOURCE', isPositive: true }} />
       </div>
 
       {error ? <div className="admin-inline-error" role="alert" style={{ marginBottom: 16 }}>{error}</div> : null}
       {actionError ? <div className="admin-inline-error" role="alert" style={{ marginBottom: 16 }}>{actionError}</div> : null}
 
       <Card
-        title="Background Queues & Integration Pipelines"
+        title="Background queues & integrations"
         subtitle="Live platform telemetry; no health status is inferred by the client"
         headerAction={<Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>{loading ? 'Refreshing…' : 'Refresh'}</Button>}
       >
@@ -306,6 +341,61 @@ export function IntegrationsJobs({ api }: { api: ApiClient }) {
           </div>
         ) : null}
       </Card>
+
+      <Modal
+        isOpen={!!actionTarget}
+        onClose={() => {
+          if (!busyKey) {
+            setActionTarget(null);
+            setActionReason('');
+            setActionError('');
+          }
+        }}
+        title={
+          actionTarget?.kind === 'retry'
+            ? 'Retry failed job'
+            : actionTarget?.nextStatus === 'disabled'
+              ? 'Disable integration connection'
+              : 'Enable integration connection'
+        }
+        subtitle={
+          actionTarget?.kind === 'connection'
+            ? actionTarget.connection.name
+            : actionTarget?.kind === 'retry'
+              ? `${actionTarget.queue} queue · ${String(actionTarget.id)}`
+              : undefined
+        }
+        maxWidth="sm"
+        footer={
+          <>
+            <Button variant="outline" disabled={!!busyKey} onClick={() => setActionTarget(null)}>Cancel</Button>
+            <Button
+              variant={actionTarget?.kind === 'connection' && actionTarget.nextStatus === 'disabled' ? 'danger' : 'gold'}
+              loading={!!busyKey}
+              onClick={() => void applyGovernanceAction()}
+            >
+              {actionTarget?.kind === 'retry'
+                ? 'Retry job'
+                : actionTarget?.nextStatus === 'disabled'
+                  ? 'Disable connection'
+                  : 'Enable connection'}
+            </Button>
+          </>
+        }
+      >
+        {actionError ? <div className="admin-inline-error" role="alert">{actionError}</div> : null}
+        {actionTarget?.kind === 'retry' || actionTarget?.nextStatus === 'disabled' ? (
+          <InputField
+            label={actionTarget?.kind === 'retry' ? 'Audit reason' : 'Governance reason'}
+            value={actionReason}
+            onChange={(event) => setActionReason(event.target.value)}
+            placeholder={actionTarget?.kind === 'retry' ? 'Why should this failed job be retried?' : 'Why should this connection be disabled?'}
+            helperText="This reason is recorded with the operator action."
+          />
+        ) : (
+          <div className="admin-info-callout">Enabling the connection allows delivery attempts to resume. Existing credentials and routing remain unchanged.</div>
+        )}
+      </Modal>
     </div>
   );
 }
