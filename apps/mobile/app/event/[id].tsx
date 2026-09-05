@@ -103,7 +103,7 @@ export default function EventDetailScreen() {
   };
 
   const handleShare = async () => {
-    if (!event) return;
+    if (!event || expressionMode) return;
     try {
       await Share.share({
         message: `Join us for ${event.title}! ${event.location?.name ? `At ${event.location.name}` : ''}`,
