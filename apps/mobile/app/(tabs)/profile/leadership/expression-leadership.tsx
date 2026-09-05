@@ -5,8 +5,9 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import {
-  Badge,
+  BottomSheet,
   Button,
+  Chip,
   EmptyState,
   Icon,
   InputField,
@@ -16,32 +17,65 @@ import {
   SectionHeader,
   Skeleton,
 } from '@/components';
-import { radius, shadows, spacing, typography } from '@/design-system/tokens';
+import { radius, shadows, spacing } from '@/design-system/tokens';
 import type { LeadershipProfile } from '@church/types';
 
 export default function ExpressionLeadershipManage() {
   const insets = useSafeAreaInsets();
   const { api, context } = useSession();
   const { colors } = useTheme();
-  const branchId = context?.expression?.id;
+  const expression = context?.expression;
+  const branchId = expression?.id;
 
+  const [createOpen, setCreateOpen] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [roleTitle, setRoleTitle] = useState('');
   const [ministry, setMinistry] = useState('');
   const [shortBio, setShortBio] = useState('');
+  const [featurePublicly, setFeaturePublicly] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  const leaders = useResource<LeadershipProfile[]>('leadership:expression:manage', (signal) =>
-    api.request<LeadershipProfile[]>(`church-story?view=leadership${branchId ? `&expressionId=${branchId}` : ''}`, { signal }).catch(() => [])
+  const leaders = useResource<LeadershipProfile[]>(
+    `leadership:expression:manage:${branchId ?? 'none'}`,
+    (signal) =>
+      branchId
+        ? api.request<LeadershipProfile[]>(`church-story?view=leadership&expressionId=${branchId}`, { signal })
+        : Promise.resolve([]),
   );
+
+  if (!branchId) {
+    return (
+      <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top + spacing.sm }]}>
+        <ScreenHeader title="Expression leadership" kicker="LEADERSHIP" showBack />
+        <View style={styles.emptyPad}>
+          <EmptyState title="Enter an Expression first" message="Leadership profiles belong to the active Expression." iconName="people-outline" />
+        </View>
+      </View>
+    );
+  }
+
+  const resetForm = () => {
+    setDisplayName('');
+    setRoleTitle('');
+    setMinistry('');
+    setShortBio('');
+    setFeaturePublicly(false);
+    setErrorMsg('');
+  };
+
+  const openCreate = () => {
+    resetForm();
+    setCreateOpen(true);
+  };
 
   async function handleAddLeader() {
     if (!displayName.trim() || !roleTitle.trim()) {
-      setErrorMsg('Please provide the leader name and role title.');
+      setErrorMsg('Provide the leader name and role title.');
       return;
     }
+
     setSaving(true);
     setErrorMsg('');
     setSuccessMsg('');
@@ -49,20 +83,22 @@ export default function ExpressionLeadershipManage() {
       await api.request('church-story', {
         method: 'POST',
         body: JSON.stringify({
-          expressionId: branchId ?? null,
+          expressionId: branchId,
           displayName: displayName.trim(),
           roleTitle: roleTitle.trim(),
           ministry: ministry.trim() || null,
           shortBio: shortBio.trim() || '',
-          isFeaturedPublic: true,
+          isFeaturedPublic: featurePublicly,
         }),
       });
-      setDisplayName('');
-      setRoleTitle('');
-      setMinistry('');
-      setShortBio('');
-      setSuccessMsg('Leader profile added successfully.');
-      leaders.refresh();
+      setSuccessMsg(
+        featurePublicly
+          ? 'Leader added to the Expression directory and marked for public leadership presentation.'
+          : 'Leader added to the Expression directory.',
+      );
+      setCreateOpen(false);
+      resetForm();
+      await leaders.refresh();
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Failed to create leader profile.');
     } finally {
@@ -78,144 +114,107 @@ export default function ExpressionLeadershipManage() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + spacing.sm, paddingBottom: 60 },
+          { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 120 },
         ]}
       >
-        <ScreenHeader
-          title="Campus Leadership Directory"
-          subtitle="Configure pastoral staff, ministry directors, and coordinators."
-          showBack
-        />
+        <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+          <ScreenHeader
+            title="Expression leadership"
+            kicker="LEADERSHIP"
+            subtitle={`Pastors and ministry leaders serving ${expression.name}.`}
+            showBack
+            rightAction={<Button label="Add leader" onPress={openCreate} size="sm" />}
+          />
+        </View>
 
         <View style={styles.body}>
-          {/* Notification Messages */}
           {successMsg ? (
-            <View style={[styles.banner, { backgroundColor: 'rgba(22, 163, 106, 0.12)', borderColor: 'rgba(22, 163, 106, 0.3)' }]}>
-              <Icon name="checkmark-circle" size={18} color="#16A36A" style={{ marginRight: 8 }} />
-              <Text style={[styles.bannerText, { color: '#16A36A' }]}>{successMsg}</Text>
+            <View style={[styles.banner, { backgroundColor: colors.successSoft, borderColor: colors.success }]}>
+              <Icon name="checkmark-circle" size={18} color={colors.success} />
+              <Text style={[styles.bannerText, { color: colors.success }]}>{successMsg}</Text>
+            </View>
+          ) : null}
+          {errorMsg && !createOpen ? (
+            <View style={[styles.banner, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}>
+              <Icon name="alert-circle" size={18} color={colors.live} />
+              <Text style={[styles.bannerText, { color: colors.live }]}>{errorMsg}</Text>
             </View>
           ) : null}
 
-          {errorMsg ? (
-            <View style={[styles.banner, { backgroundColor: 'rgba(229, 72, 77, 0.12)', borderColor: 'rgba(229, 72, 77, 0.3)' }]}>
-              <Icon name="alert-circle" size={18} color="#E5484D" style={{ marginRight: 8 }} />
-              <Text style={[styles.bannerText, { color: '#E5484D' }]}>{errorMsg}</Text>
-            </View>
-          ) : null}
-
-          {/* Add Leader Card */}
-          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
-            <View style={styles.cardHeader}>
-              <Icon name="person-add-outline" size={18} color={colors.interactive} />
-              <Text style={[styles.cardTitle, { color: colors.text }]}>Add Leader to Directory</Text>
-            </View>
-
-            <InputField
-              label="Full Name"
-              value={displayName}
-              onChangeText={setDisplayName}
-              placeholder="e.g. Pastor David Alexander"
-            />
-
-            <InputField
-              label="Role Title"
-              value={roleTitle}
-              onChangeText={setRoleTitle}
-              placeholder="e.g. Lead Pastor, Worship Director"
-            />
-
-            <InputField
-              label="Ministry Department (Optional)"
-              value={ministry}
-              onChangeText={setMinistry}
-              placeholder="e.g. Pastoral Care, Youth & Families"
-            />
-
-            <InputField
-              label="Short Biography"
-              value={shortBio}
-              onChangeText={setShortBio}
-              multiline
-              numberOfLines={3}
-              placeholder="Summary of ministerial calling and role..."
-            />
-
-            <Button
-              label="Save Leader Profile"
-              onPress={handleAddLeader}
-              loading={saving}
-              variant="primary"
-              size="md"
-              style={{ marginTop: spacing.xs }}
-            />
-          </View>
-
-          {/* Leaders List */}
           <View style={styles.listSection}>
-            <SectionHeader title="Configured Leaders" badge={leaderList.length} />
+            <SectionHeader
+              title="Leadership directory"
+              badge={leaderList.length}
+              subtitle="Expression leadership remains private to this scope unless explicitly featured publicly"
+              actionLabel="Add"
+              onAction={openCreate}
+            />
             {leaders.loading ? (
-              <Skeleton height={80} count={2} />
-            ) : leaderList.length > 0 ? (
-              leaderList.map((leader) => (
-                <LeaderCard
-                  key={leader.id}
-                  leader={leader}
-                  variant="standard"
-                />
-              ))
+              <Skeleton height={92} count={2} />
+            ) : leaders.error && !leaders.data ? (
+              <ResourceError message={leaders.error} retry={leaders.refresh} />
+            ) : leaderList.length ? (
+              leaderList.map((leader) => <LeaderCard key={leader.id} leader={leader} variant="standard" />)
             ) : (
               <EmptyState
-                title="No Leaders Configured"
-                message="Add your pastoral team using the form above."
+                title="No leaders configured"
+                message="Add the pastoral and ministry team serving this Expression."
                 iconName="people-outline"
+                actionLabel="Add leader"
+                onAction={openCreate}
               />
             )}
           </View>
         </View>
       </ScrollView>
+
+      <BottomSheet
+        visible={createOpen}
+        onClose={() => !saving && setCreateOpen(false)}
+        title="Add Expression leader"
+        subtitle={`Inside ${expression.name}`}
+        maxHeightPercent={92}
+      >
+        <View style={styles.form}>
+          {errorMsg ? (
+            <View style={[styles.banner, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}>
+              <Icon name="alert-circle" size={18} color={colors.live} />
+              <Text style={[styles.bannerText, { color: colors.live }]}>{errorMsg}</Text>
+            </View>
+          ) : null}
+
+          <InputField label="Full name" value={displayName} onChangeText={setDisplayName} placeholder="Pastor / leader name" />
+          <InputField label="Role title" value={roleTitle} onChangeText={setRoleTitle} placeholder="Lead Pastor, Worship Director…" />
+          <InputField label="Ministry (optional)" value={ministry} onChangeText={setMinistry} placeholder="Pastoral Care, Youth, Worship…" />
+          <InputField label="Short biography" value={shortBio} onChangeText={setShortBio} multiline numberOfLines={4} placeholder="A short ministry introduction…" />
+
+          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>PUBLIC VISIBILITY</Text>
+          <View style={styles.chips}>
+            <Chip label="Expression directory only" selected={!featurePublicly} onPress={() => setFeaturePublicly(false)} />
+            <Chip label="Also feature publicly" selected={featurePublicly} onPress={() => setFeaturePublicly(true)} />
+          </View>
+          <Text style={[styles.helper, { color: colors.textMuted }]}>
+            Public featuring is optional. Expression leaders are not automatically added to the church-wide public leadership presentation.
+          </Text>
+
+          <Button label="Save leader" onPress={() => void handleAddLeader()} loading={saving} size="lg" fullWidth />
+        </View>
+      </BottomSheet>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  content: {
-    flexGrow: 1,
-  },
-  body: {
-    paddingHorizontal: spacing.lg,
-    gap: spacing.lg,
-  },
-  banner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-  },
-  bannerText: {
-    fontSize: 13,
-    fontWeight: '600',
-    flex: 1,
-  },
-  card: {
-    padding: spacing.lg,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    gap: spacing.sm,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  listSection: {
-    gap: spacing.xs,
-  },
+  screen: { flex: 1 },
+  content: { flexGrow: 1 },
+  headerCard: { marginHorizontal: spacing.md, borderWidth: 1, borderRadius: radius.xxl, overflow: 'hidden' },
+  body: { paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: spacing.xl },
+  emptyPad: { paddingHorizontal: spacing.md },
+  banner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1 },
+  bannerText: { fontSize: 13, fontWeight: '600', flex: 1 },
+  listSection: { gap: spacing.sm },
+  form: { gap: spacing.md },
+  fieldLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.65 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  helper: { fontSize: 11, lineHeight: 16 },
 });
