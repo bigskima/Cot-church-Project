@@ -32,6 +32,7 @@ export default function MediaStudioScreen() {
   const { api, context } = useSession();
   const { colors } = useTheme();
   const expression = context?.expression;
+  const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
 
   const [createOpen, setCreateOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -45,7 +46,7 @@ export default function MediaStudioScreen() {
   const [actionMsg, setActionMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  const readiness = useResource<StreamingReadiness>('leadership:streaming-readiness', (signal) =>
+  const readiness = useResource<StreamingReadiness>(`leadership:streaming-readiness:${organizationId || 'none'}:${expression?.id ?? 'general'}`, (signal) =>
     api.request<StreamingReadiness>('streaming-broadcasts', { signal }),
   );
   const streams = useResource<LiveStream[]>(`leadership:streams:${expression?.id ?? 'none'}`, (signal) =>
