@@ -37,12 +37,7 @@ export default function TabLayout() {
 
   const renderIcon = (filled: string, outline: string) =>
     ({ color, focused }: { color: ColorValue; focused: boolean }) => (
-      <View
-        style={[
-          styles.iconShell,
-          focused && { backgroundColor: colors.primarySoft },
-        ]}
-      >
+      <View style={[styles.iconShell, focused && { backgroundColor: colors.primarySoft }]}>
         <Icon name={focused ? filled : outline} size={TAB_ICON_SIZE} color={color as string} />
       </View>
     );
@@ -138,12 +133,12 @@ const styles = StyleSheet.create({
     ...shadows.floating,
   },
   tabBar: {
-    position: Platform.OS === 'web' ? 'absolute' : 'absolute',
-    left: Platform.OS === 'web' ? '50%' : 10,
-    right: Platform.OS === 'web' ? undefined : 10,
-    bottom: Platform.OS === 'web' ? 10 : 8,
-    width: Platform.OS === 'web' ? 'min(720px, calc(100% - 24px))' as any : undefined,
-    transform: Platform.OS === 'web' ? [{ translateX: '-50%' as any }] : undefined,
+    position: 'absolute',
+    left: 10,
+    right: 10,
+    bottom: 8,
+    maxWidth: 720,
+    alignSelf: 'center',
     borderTopWidth: 0,
     borderWidth: 1,
     borderRadius: radius.xxl,
