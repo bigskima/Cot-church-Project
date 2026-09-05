@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Dimensions, FlatList, Pressable, RefreshControl, StyleSheet, View, ViewToken } from 'react-native';
+import { Dimensions, FlatList, Pressable, RefreshControl, StyleSheet, Text, View, ViewToken } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
@@ -30,6 +30,7 @@ export default function FullScreenReelsScreen() {
   const [activeReelForComments, setActiveReelForComments] = useState<Reel | null>(null);
   const [comments, setComments] = useState<ContentComment[]>([]);
   const [commentLoading, setCommentLoading] = useState(false);
+  const [actionError, setActionError] = useState('');
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
   const expressionId = context?.expression?.id;
 
@@ -91,13 +92,15 @@ export default function FullScreenReelsScreen() {
     }
     setActiveReelForComments(reel);
     setCommentLoading(true);
+    setActionError('');
     try {
       const contentId = reel.content_items?.id;
       if (!contentId) throw new Error('This Reel is missing its engagement identity.');
       const res = await api.request<ContentComment[]>(`engagement?contentId=${contentId}`, { context: expressionId ? 'current' : 'public' });
       setComments(res ?? []);
-    } catch {
+    } catch (value) {
       setComments([]);
+      setActionError(value instanceof Error ? value.message : 'Unable to load comments for this Reel.');
     } finally {
       setCommentLoading(false);
     }
@@ -107,6 +110,7 @@ export default function FullScreenReelsScreen() {
     if (!activeReelForComments) return;
     const contentId = activeReelForComments.content_items?.id;
     if (!contentId) throw new Error('This Reel is missing its engagement identity.');
+    setActionError('');
     const res = await api.request<ContentComment>('engagement', {
       method: 'POST',
       context: expressionId ? 'current' : 'public',
@@ -123,6 +127,7 @@ export default function FullScreenReelsScreen() {
     const contentId = reel.content_items?.id;
     if (!contentId) return currentlyLiked;
     try {
+      setActionError('');
       await api.request('engagement', {
         method: 'POST',
         context: expressionId ? 'current' : 'public',
@@ -133,7 +138,8 @@ export default function FullScreenReelsScreen() {
         ),
       });
       return !currentlyLiked;
-    } catch {
+    } catch (value) {
+      setActionError(value instanceof Error ? value.message : 'Unable to update your reaction.');
       return currentlyLiked;
     }
   };
@@ -146,13 +152,15 @@ export default function FullScreenReelsScreen() {
     const contentId = reel.content_items?.id;
     if (!contentId) return currentlySaved;
     try {
+      setActionError('');
       const result = await api.request<{ bookmarked: boolean }>('engagement', {
         method: 'POST',
         context: expressionId ? 'current' : 'public',
         body: JSON.stringify({ action: 'bookmark', contentId }),
       });
       return result.bookmarked;
-    } catch {
+    } catch (value) {
+      setActionError(value instanceof Error ? value.message : 'Unable to update this bookmark.');
       return currentlySaved;
     }
   };
@@ -166,6 +174,19 @@ export default function FullScreenReelsScreen() {
           <Icon name="close" size={22} color="#FFFFFF" />
         </Pressable>
       </View>
+
+      {actionError ? (
+        <Pressable
+          onPress={() => setActionError('')}
+          style={[styles.errorToast, { top: insets.top + 58 }]}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss Reel error"
+        >
+          <Icon name="alert-circle-outline" size={15} color="#FFFFFF" />
+          <Text style={styles.errorToastText} numberOfLines={2}>{actionError}</Text>
+          <Icon name="close" size={14} color="rgba(255,255,255,0.86)" />
+        </Pressable>
+      ) : null}
 
       {reelsResource.loading && !reels.length ? (
         <Skeleton height={windowHeight} />
@@ -215,5 +236,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#000000' },
   closeButton: { position: 'absolute', right: 16, zIndex: 10 },
   closeBtnInner: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.48)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
+  errorToast: { position: 'absolute', left: 16, right: 68, zIndex: 20, minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 16, backgroundColor: 'rgba(180,35,24,0.92)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
+  errorToastText: { flex: 1, color: '#FFFFFF', fontSize: 12, lineHeight: 17, fontWeight: '700' },
   centerWrapper: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
 });
