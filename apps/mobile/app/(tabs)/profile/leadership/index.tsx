@@ -33,7 +33,7 @@ export default function LeadershipHubScreen() {
   const canManageMedia = hasCapability('streams.broadcast') || hasCapability('*');
   const canPastoralTriage = hasCapability('prayer.manage') || hasCapability('prayer.moderate') || hasCapability('prayer.pastoral_notes.manage') || hasCapability('*');
   const canManageSermons = hasCapability('sermons.create') || hasCapability('sermons.manage') || hasCapability('sermons.publish') || hasCapability('*');
-  const canManageEvents = hasCapability('events.create') || hasCapability('events.update') || hasCapability('events.manage') || hasCapability('*');
+  const canManageEvents = hasCapability('events.create') || hasCapability('events.update') || hasCapability('*');
   const canManageGiving = hasCapability('giving.campaigns.manage') || hasCapability('giving.finance.read') || hasCapability('*');
   const canManageLeadership = hasCapability('expression.leadership.manage') || hasCapability('organization.leadership.manage') || hasCapability('*');
   const canManageExpressionAccess =
