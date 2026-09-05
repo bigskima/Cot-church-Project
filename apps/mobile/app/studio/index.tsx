@@ -152,6 +152,14 @@ export default function CreatorStudioScreen() {
       enabled: hasCapability('branches.create') || hasCapability('*'),
     },
     {
+      title: 'Church Leadership',
+      description: 'Manage church-wide leaders and public leadership presentation.',
+      iconName: 'business-outline',
+      badge: 'CHURCH',
+      route: '/(tabs)/profile/leadership/church-leadership',
+      enabled: hasCapability('organization.leadership.manage') || hasCapability('*'),
+    },
+    {
       title: 'Expression Leadership',
       description: 'Manage leaders and ministry roles in the active Expression.',
       iconName: 'people-circle-outline',
