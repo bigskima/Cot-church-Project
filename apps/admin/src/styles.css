@@ -2177,3 +2177,58 @@ body {
   font-size: 12px;
   line-height: 1.65;
 }
+
+
+/* -------------------------------------------------------------
+   PROVIDER & SERVICE CONTROL SURFACES
+   ------------------------------------------------------------- */
+.admin-provider-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 12px;
+}
+
+.admin-provider-card {
+  padding: 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 18px;
+  background:
+    linear-gradient(145deg, var(--bg-elevated), color-mix(in srgb, var(--bg-card) 88%, transparent));
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08);
+}
+
+.admin-provider-card h4 {
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: -0.25px;
+}
+
+.admin-capability-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 14px;
+}
+
+.admin-capability-tags span {
+  padding: 4px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.admin-capability-tags span.active {
+  color: var(--text-primary);
+  border-color: rgba(92, 143, 245, 0.26);
+  background: rgba(47, 111, 237, 0.08);
+}
+
+@media (max-width: 620px) {
+  .admin-provider-grid {
+    grid-template-columns: 1fr;
+  }
+}
