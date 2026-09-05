@@ -13,7 +13,7 @@ export default function LeadershipHubScreen() {
   const { hasCapability, context, api, mode } = useSession();
   const { colors } = useTheme();
 
-  const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
+  const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? context?.creatorOrganizations?.[0]?.id ?? '';
   const expressionCreatorState = useResource<{ organizationId: string; authorized: boolean }>(
     `leadership:expression-creator:${organizationId || 'none'}`,
     (signal) => {
