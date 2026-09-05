@@ -37,7 +37,7 @@ export default function ExpressionsScreen() {
     return (
       <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
         <ScreenHeader title="My Expressions" showBack />
-        <EmptyState title="Sign in to join an Expression" message="Public content remains available without an account. Expression membership and entry require authentication." iconName="lock-closed-outline" actionLabel="Sign In" onAction={() => router.push('/(auth)/login')} />
+        <EmptyState title="Sign in to join an Expression" message="Public content remains available without an account. Expression membership and entry require authentication." iconName="lock-closed-outline" actionLabel="Sign In" onAction={() => router.push({ pathname: '/(auth)/login', params: { returnTo: '/expressions' } } as any)} />
       </View>
     );
   }
