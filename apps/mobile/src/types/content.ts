@@ -396,6 +396,7 @@ export type PrayerRequest = {
   is_anonymous?: boolean;
   status: 'submitted' | 'praying' | 'answered' | 'archived';
   prayer_count?: number;
+  viewer_has_prayed?: boolean;
   created_at: string;
 };
 
