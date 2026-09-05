@@ -43,6 +43,7 @@ export default function PastoralTriageScreen() {
   const [activeQueue, setActiveQueue] = useState<'prayer' | 'care'>('prayer');
   const [ministryScope, setMinistryScope] = useState<PrayerScope>(expression?.id ? 'expression' : 'general');
   const [workingId, setWorkingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState('');
 
   useEffect(() => {
     if (!expression?.id && ministryScope === 'expression') setMinistryScope('general');
@@ -76,6 +77,7 @@ export default function PastoralTriageScreen() {
     patch: { status?: 'praying' | 'answered' | 'archived'; approvePublic?: boolean }
   ) => {
     setWorkingId(id);
+    setActionError('');
     try {
       await api.request('prayer-requests', {
         method: 'PATCH',
@@ -83,7 +85,7 @@ export default function PastoralTriageScreen() {
       });
       prayers.refresh();
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'Unable to update this prayer request.');
+      setActionError(error instanceof Error ? error.message : 'Unable to update this prayer request.');
     } finally {
       setWorkingId(null);
     }
@@ -91,6 +93,7 @@ export default function PastoralTriageScreen() {
 
   const updateFollowup = async (id: string, status: 'contacted' | 'resolved' | 'closed') => {
     setWorkingId(id);
+    setActionError('');
     try {
       await api.request('pastoral-followups', {
         method: 'PATCH',
@@ -98,7 +101,7 @@ export default function PastoralTriageScreen() {
       });
       followups.refresh();
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'Unable to update this pastoral follow-up.');
+      setActionError(error instanceof Error ? error.message : 'Unable to update this pastoral follow-up.');
     } finally {
       setWorkingId(null);
     }
@@ -123,21 +126,29 @@ export default function PastoralTriageScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 60 },
+          { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 120 },
         ]}
       >
-        <ScreenHeader
-          title="Pastoral Triage & Care"
-          subtitle="Prayer and live-service follow-up access follows your assigned pastoral role and exact church or Expression scope."
-          showBack
-        />
+        <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+          <ScreenHeader
+            title="Pastoral Care"
+            kicker="LEADERSHIP"
+            subtitle="Prayer and live-service follow-up stay inside your assigned church or Expression scope."
+            showBack
+          />
+        </View>
 
-        <View style={styles.tabRow}>
+        <View style={[styles.tabRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
           <Chip label="Prayer Requests" selected={activeQueue === 'prayer'} onPress={() => setActiveQueue('prayer')} count={prayerList.length} />
           <Chip label="Altar & Care Responses" selected={activeQueue === 'care'} onPress={() => setActiveQueue('care')} count={careList.length} />
         </View>
 
         <View style={styles.body}>
+          {actionError ? (
+            <View style={[styles.errorBanner, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}>
+              <Text style={[styles.errorText, { color: colors.live }]}>{actionError}</Text>
+            </View>
+          ) : null}
           {activeQueue === 'prayer' ? (
             <View style={styles.queueSection}>
               {scopeTabs}
@@ -160,7 +171,7 @@ export default function PastoralTriageScreen() {
                         : 'WALL APPROVAL PENDING';
 
                   return (
-                    <View key={p.id} style={[styles.triageCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+                    <View key={p.id} style={[styles.triageCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
                       <View style={styles.cardHeader}>
                         <Badge label={badgeLabel} variant={p.privacy === 'pastoral_only' ? 'prayer' : 'primary'} />
                         <Text style={[styles.dateText, { color: colors.textMuted }]}>{new Date(p.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Text>
@@ -201,7 +212,7 @@ export default function PastoralTriageScreen() {
                 careList.map((f) => {
                   const busy = workingId === f.id;
                   return (
-                    <View key={f.id} style={[styles.triageCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+                    <View key={f.id} style={[styles.triageCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
                       <View style={styles.cardHeader}>
                         <Badge label={f.type.replaceAll('_', ' ').toUpperCase()} variant="primary" />
                         <Text style={[styles.dateText, { color: colors.textMuted }]}>{new Date(f.created_at).toLocaleDateString()}</Text>
@@ -234,16 +245,19 @@ export default function PastoralTriageScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: { flexGrow: 1 },
-  tabRow: { flexDirection: 'row', paddingHorizontal: spacing.lg, gap: spacing.xs, marginBottom: spacing.md },
-  body: { paddingHorizontal: spacing.lg, gap: spacing.lg },
-  queueSection: { gap: spacing.xs },
-  scopeTabs: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.xs },
-  triageCard: { padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, marginBottom: spacing.xs, gap: spacing.xs },
+  headerCard: { marginHorizontal: spacing.md, borderWidth: 1, borderRadius: radius.xxl, overflow: 'hidden' },
+  tabRow: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: spacing.md, marginTop: spacing.md, padding: 5, gap: spacing.xs, borderWidth: 1, borderRadius: radius.xl, alignSelf: 'flex-start' },
+  body: { paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: spacing.lg },
+  errorBanner: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md },
+  errorText: { fontSize: 12, lineHeight: 17, fontWeight: '600' },
+  queueSection: { gap: spacing.sm },
+  scopeTabs: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.xs },
+  triageCard: { padding: spacing.md, borderRadius: radius.xl, borderWidth: 1, marginBottom: spacing.sm, gap: spacing.sm },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   dateText: { fontSize: 11 },
-  title: { fontSize: 15, fontWeight: '700' },
+  title: { fontSize: 15, fontWeight: '800', letterSpacing: -0.15 },
   bodyText: { fontSize: 13, lineHeight: 18 },
-  wallNotice: { borderWidth: 1, borderRadius: radius.md, padding: spacing.sm, gap: spacing.sm, marginTop: spacing.xs },
+  wallNotice: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm, marginTop: spacing.xs },
   wallNoticeText: { fontSize: 11, lineHeight: 16 },
   actionBar: { gap: spacing.sm, paddingTop: spacing.xs + 4, borderTopWidth: 1, marginTop: spacing.xs },
   statusLabel: { fontSize: 12 },
