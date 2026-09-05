@@ -128,7 +128,7 @@ export default function AssistantScreen() {
           <View style={[styles.stateIcon, { backgroundColor: colors.primarySoft }]}><Icon name="sparkles" size={30} color={colors.interactive} /></View>
           <Text style={[styles.stateTitle, { color: colors.text }]}>Sign in to use the church assistant</Text>
           <Text style={[styles.stateBody, { color: colors.textSecondary }]}>The assistant uses your active church context so it can answer only from information you are allowed to access.</Text>
-          <Button label="Sign In" onPress={() => router.replace('/(auth)/login')} variant="primary" size="lg" />
+          <Button label="Sign in" onPress={() => router.replace('/(auth)/login')} variant="primary" size="lg" />
         </View>
       </View>
     );
@@ -153,7 +153,7 @@ export default function AssistantScreen() {
           <Text style={[styles.stateTitle, { color: colors.text }]}>The church assistant is temporarily unavailable</Text>
           <Text style={[styles.stateBody, { color: colors.textSecondary }]}>Please try again later. You can continue using sermons, events, prayer and the rest of the app while this feature is unavailable.</Text>
           {readinessError ? <Text style={[styles.readinessError, { color: colors.textMuted }]}>We couldn’t confirm availability right now.</Text> : null}
-          <Button label="Check Again" onPress={() => void loadReadiness()} variant="outline" size="md" />
+          <Button label="Check again" onPress={() => void loadReadiness()} variant="outline" size="md" />
         </View>
       </View>
     );
@@ -176,7 +176,7 @@ export default function AssistantScreen() {
         showsVerticalScrollIndicator={false}
         ListFooterComponent={() => messages.length <= 2 ? (
           <View style={styles.suggestionsWrap}>
-            <Text style={[styles.suggestionsLabel, { color: colors.textMuted }]}>Suggested Questions</Text>
+            <Text style={[styles.suggestionsLabel, { color: colors.textMuted }]}>Try asking</Text>
             <View style={styles.chipsWrap}>{suggestedPrompts.map((prompt) => <Chip key={prompt} label={prompt} onPress={() => void handleSend(prompt)} />)}</View>
           </View>
         ) : null}
@@ -221,13 +221,13 @@ export default function AssistantScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  stateWrap: { flex: 1, paddingHorizontal: spacing.xxl, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
+  stateWrap: { flex: 1, paddingHorizontal: spacing.lg, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
   stateIcon: { width: 68, height: 68, borderRadius: 34, alignItems: 'center', justifyContent: 'center' },
   stateTitle: { fontSize: 20, fontWeight: '800', textAlign: 'center' },
   stateBody: { fontSize: 13, lineHeight: 20, textAlign: 'center', maxWidth: 460 },
   readinessError: { fontSize: 12, textAlign: 'center' },
   assistantHeader: { marginHorizontal: spacing.md, marginTop: spacing.xs, borderWidth: 1, borderRadius: radius.xxl, overflow: 'hidden' },
-  providerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
+  providerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, paddingBottom: spacing.md },
   providerText: { fontSize: 11, fontWeight: '600' },
   chatList: { paddingHorizontal: spacing.md, paddingVertical: spacing.lg, gap: spacing.md },
   bubbleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs },
@@ -237,9 +237,9 @@ const styles = StyleSheet.create({
   bubble: { maxWidth: '84%', paddingHorizontal: 14, paddingVertical: 11, borderRadius: radius.xl },
   bubbleText: { fontSize: 14, lineHeight: 20 },
   suggestionsWrap: { marginTop: spacing.lg, gap: spacing.xs },
-  suggestionsLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3, textTransform: 'uppercase' },
+  suggestionsLabel: { fontSize: 12, fontWeight: '800', letterSpacing: 0.1 },
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  errorBar: { paddingHorizontal: spacing.lg, paddingVertical: 6 },
+  errorBar: { marginHorizontal: spacing.md, marginBottom: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: 8, borderRadius: radius.lg },
   errorText: { fontSize: 12, textAlign: 'center' },
   composer: { flexDirection: 'row', alignItems: 'flex-end', marginHorizontal: spacing.md, padding: spacing.sm, borderWidth: 1, borderRadius: radius.xxl, gap: spacing.sm },
   input: { flex: 1, borderRadius: radius.lg, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, maxHeight: 110 },
