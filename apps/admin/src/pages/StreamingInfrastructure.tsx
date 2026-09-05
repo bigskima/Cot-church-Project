@@ -278,8 +278,12 @@ export function StreamingInfrastructure({ api, canManage = false, canManageSecre
                 {config ? <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 12, lineHeight: 1.6 }}>Credential ref: <code>{config.secret_reference}</code><br />Webhook ref: <code>{config.webhook_secret_reference}</code>{config.signing_key_reference ? <><br />Signing ref: <code>{config.signing_key_reference}</code></> : null}</div> : null}
                 <div className="admin-capability-tags">{provider.capabilities.map((capability) => <span key={capability} className="active">{capability}</span>)}</div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 12, borderTop: '1px solid var(--border-subtle)' }}>
-                  <Button variant="outline" size="sm" onClick={() => openConfig(provider)}>Configure</Button>
-                  <Button variant={provider.is_active ? 'danger' : 'gold'} size="sm" disabled={actionBusy} onClick={() => requestProviderStateChange(provider)}>{provider.is_active ? 'Disable provider' : 'Enable provider'}</Button>
+                  {canManage ? (
+                    <>
+                      <Button variant="outline" size="sm" onClick={() => openConfig(provider)}>{canManageSecrets ? 'Configure & credentials' : 'Configure'}</Button>
+                      <Button variant={provider.is_active ? 'danger' : 'gold'} size="sm" disabled={actionBusy} onClick={() => requestProviderStateChange(provider)}>{provider.is_active ? 'Disable provider' : 'Enable provider'}</Button>
+                    </>
+                  ) : <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Read only</span>}
                 </div>
               </div>
             );
