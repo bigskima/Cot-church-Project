@@ -28,6 +28,7 @@ export interface OrganizationContextResponse {
   selectedBranchId: string | null;
   memberships: OrganizationMembershipContext[];
   expressions: import("./memberships").ExpressionMembershipContext[];
+  creatorOrganizations?: Array<Pick<OrganizationSummary, "id" | "name" | "slug" | "timezone">>;
   effectivePermissions: string[];
 }
 
