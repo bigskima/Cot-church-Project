@@ -34,7 +34,8 @@ export default function LeadershipHubScreen() {
   const canPastoralTriage = hasCapability('prayer.manage') || hasCapability('prayer.moderate') || hasCapability('prayer.pastoral_notes.manage') || hasCapability('*');
   const canManageSermons = hasCapability('sermons.create') || hasCapability('sermons.manage') || hasCapability('*');
   const canManageEvents = hasCapability('events.create') || hasCapability('events.update') || hasCapability('*');
-  const canManageGiving = hasCapability('giving.campaigns.manage') || hasCapability('giving.finance.read') || hasCapability('*');
+  const canManageGiving = hasCapability('giving.campaigns.manage') || hasCapability('*');
+  const canReadGivingFinance = hasCapability('giving.finance.read') || hasCapability('*');
   const canManageLeadership = hasCapability('expression.leadership.manage') || hasCapability('organization.leadership.manage') || hasCapability('*');
   const canManageExpressionAccess =
     isCurrentExpressionOwner ||
@@ -47,7 +48,8 @@ export default function LeadershipHubScreen() {
     { title: 'Pastoral Triage & Care Queue', description: 'Manage confidential prayer petitions, decisions, and assigned follow-ups.', iconName: 'heart-outline', badge: 'CARE', route: '/(tabs)/profile/leadership/pastoral-triage', enabled: canPastoralTriage },
     { title: 'Expression Leadership Directory', description: 'Manage pastoral and ministry leadership profiles for the selected Expression. Public featuring remains explicit.', iconName: 'people-outline', badge: 'DIRECTORY', route: '/(tabs)/profile/leadership/expression-leadership', enabled: canManageLeadership },
     { title: 'Expression Access & Ownership', description: 'Manage role invitations when authorized, and transfer accountable ownership when you are the current owner.', iconName: 'key-outline', badge: 'ACCESS', route: '/(tabs)/profile/leadership/expression-governance', enabled: canManageExpressionAccess },
-    { title: 'Giving', description: 'Manage the giving destinations available to your church or selected Expression, according to your access.', iconName: 'gift-outline', badge: 'GIVING', route: '/(tabs)/profile/leadership/giving-manage', enabled: canManageGiving },
+    { title: 'Giving Configuration', description: 'Manage giving destinations, purposes and transfer accounts for the current church scope.', iconName: 'gift-outline', badge: 'GIVING', route: '/(tabs)/profile/leadership/giving-manage', enabled: canManageGiving },
+    { title: 'Giving Finance', description: 'Review read-only giving totals, refunds and net amounts by currency.', iconName: 'analytics-outline', badge: 'FINANCE', route: '/(tabs)/profile/leadership/giving-finance', enabled: canReadGivingFinance },
     { title: 'Sermons & Media Publishing', description: 'Review recorded message drafts, assign scripture topics, and publish sermons to members.', iconName: 'book-outline', badge: 'MEDIA', route: '/(tabs)/profile/leadership/sermons-manage', enabled: canManageSermons },
     { title: 'Events & Gatherings', description: 'Schedule worship gatherings, configure attendance, and manage event schedules.', iconName: 'calendar-outline', badge: 'SCHEDULE', route: '/(tabs)/profile/leadership/events-manage', enabled: canManageEvents },
     { title: 'Expressions', description: 'View church Expressions and create a new one when your account has been approved to do so.', iconName: 'business-outline', badge: 'EXPRESSIONS', route: '/(tabs)/profile/leadership/expressions-manage', enabled: canManageExpressions },
