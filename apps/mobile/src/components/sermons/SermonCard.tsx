@@ -94,9 +94,9 @@ export function SermonCard({
         styles.cardContainer,
         {
           backgroundColor: colors.card,
-          borderColor: colors.border,
+          borderColor: colors.borderSubtle,
         },
-        shadows.sm,
+        shadows.md,
         pressed && styles.pressed,
         style,
       ]}
@@ -123,6 +123,9 @@ export function SermonCard({
       </View>
 
       <View style={styles.cardContent}>
+        <View style={[styles.playAffordance, { backgroundColor: colors.primarySoft }]}>
+          <Icon name={hasVideo ? 'play' : 'headset'} size={14} color={colors.interactive} />
+        </View>
         {sermon.series?.title ? (
           <Text numberOfLines={1} style={[styles.seriesTag, { color: colors.interactive }]}>
             {sermon.series.title}
@@ -160,14 +163,14 @@ export function SermonCard({
 
 const styles = StyleSheet.create({
   cardContainer: {
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     borderWidth: 1,
     overflow: 'hidden',
     marginBottom: spacing.md,
   },
   cardThumbnailWrap: {
     width: '100%',
-    height: 160,
+    aspectRatio: 16 / 9,
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
@@ -188,6 +191,17 @@ const styles = StyleSheet.create({
   cardContent: {
     padding: spacing.md,
     gap: 4,
+    position: 'relative',
+  },
+  playAffordance: {
+    position: 'absolute',
+    right: spacing.md,
+    top: spacing.md,
+    width: 34,
+    height: 34,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   seriesTag: {
     fontSize: 11,
@@ -260,6 +274,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   pressed: {
-    opacity: 0.8,
+    opacity: 0.9,
+    transform: [{ scale: 0.992 }],
   },
 });
