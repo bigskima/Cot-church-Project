@@ -101,7 +101,10 @@ export default function WatchDetailScreen() {
   const identity = (video?.content_items as any)?.expression?.name || (video?.content_items as any)?.organization?.name || context?.organization?.name || 'Church Community';
 
   const handleLike = async () => {
-    if (mode === 'visitor') { router.push('/(auth)/login'); return; }
+    if (mode === 'visitor') { router.push({
+      pathname: '/(auth)/login',
+      params: { returnTo: `/watch/${id}${expressionMode ? '?context=expression' : ''}` },
+    } as any); return; }
     if (!contentId) { setActionError('This video is missing its engagement identity.'); return; }
     setActionError('');
     try {
@@ -122,7 +125,10 @@ export default function WatchDetailScreen() {
   };
 
   const handleSave = async () => {
-    if (mode === 'visitor') { router.push('/(auth)/login'); return; }
+    if (mode === 'visitor') { router.push({
+      pathname: '/(auth)/login',
+      params: { returnTo: `/watch/${id}${expressionMode ? '?context=expression' : ''}` },
+    } as any); return; }
     if (!contentId) { setActionError('This video is missing its engagement identity.'); return; }
     setActionError('');
     try {
@@ -247,7 +253,10 @@ export default function WatchDetailScreen() {
                 <Text style={[styles.actionBtnText, { color: colors.text }]}>Share</Text>
               </Pressable>
 
-              <Pressable onPress={() => mode === 'visitor' ? router.push('/(auth)/login') : setCommentsOpen(true)} style={styles.actionBtn}>
+              <Pressable onPress={() => mode === 'visitor' ? router.push({
+      pathname: '/(auth)/login',
+      params: { returnTo: `/watch/${id}${expressionMode ? '?context=expression' : ''}` },
+    } as any) : setCommentsOpen(true)} style={styles.actionBtn}>
                 <Icon name="chatbubble-ellipses-outline" size={20} color={colors.text} />
                 <Text style={[styles.actionBtnText, { color: colors.text }]}>Comments</Text>
               </Pressable>
