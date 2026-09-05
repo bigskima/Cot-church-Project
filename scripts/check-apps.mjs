@@ -89,7 +89,7 @@ const checks = [
   [/initialPositionSeconds/, 'playback position restoration'],
   [/content-media\?action=playback/, 'signed video playback resolution'],
   [/comments\.refresh\(\)/, 'comment refresh after posting'],
-  [/router\.push\('\/\(auth\)\/login'\)/, 'protected interaction sign-in gating'],
+  [/pathname:\s*['"]\/\(auth\)\/login['"]/, 'protected interaction sign-in gating'],
   [/public-content\?type=sermon&id=/, 'exact public sermon detail request'],
   [/Enter this Expression to play its internal sermon/, 'Expression sermon playback guard'],
   [/onProgress=\{syncProgress\}/, 'sermon audio and video continuity'],
