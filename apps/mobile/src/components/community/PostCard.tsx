@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View, StyleProp, ViewStyle, Share } from 'react-native';
 import { useTheme } from '@/state/theme';
-import { radius, spacing } from '@/design-system/tokens';
+import { radius, shadows, spacing } from '@/design-system/tokens';
 import { Avatar } from '../primitives/Avatar';
 import { Icon } from '../primitives/Icon';
 import { AudioPlayer } from '../media/AudioPlayer';
@@ -101,7 +101,7 @@ export function PostCard({
       await Share.share({ message });
       onShare?.();
     } catch {
-      // The native share sheet can be dismissed without changing post state.
+      // Dismissing the native share sheet does not alter post state.
     }
   };
 
@@ -117,121 +117,151 @@ export function PostCard({
   const media = Array.isArray(post.media) ? post.media.filter((item) => Boolean(item?.url)) : [];
 
   return (
-    <Pressable onPress={onPress} style={[styles.container, { backgroundColor: colors.bg, borderBottomColor: colors.borderSubtle }, style]}>
-      <Pressable onPress={onPressAuthor || onPress} style={styles.avatarColumn}>
-        <Avatar name={displayName} url={avatarUrl} size="md" />
-      </Pressable>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.container,
+        { backgroundColor: colors.card, borderColor: colors.borderSubtle },
+        pressed && onPress ? { backgroundColor: colors.pressed } : null,
+        style,
+      ]}
+    >
+      <View style={styles.headerRow}>
+        <Pressable onPress={onPressAuthor || onPress} hitSlop={4}>
+          <Avatar name={displayName} url={avatarUrl} size="md" />
+        </Pressable>
 
-      <View style={styles.contentColumn}>
-        <View style={styles.authorRow}>
-          <Pressable onPress={onPressAuthor || onPress} style={styles.nameGroup}>
-            <Text style={[styles.displayName, { color: colors.text }]} numberOfLines={1}>{displayName}</Text>
-            {isVerified ? <Icon name="checkmark-circle" size={14} color={colors.interactive} style={styles.verifiedIcon} /> : null}
+        <View style={styles.identityColumn}>
+          <View style={styles.authorLine}>
+            <Pressable onPress={onPressAuthor || onPress} style={styles.nameGroup}>
+              <Text style={[styles.displayName, { color: colors.text }]} numberOfLines={1}>{displayName}</Text>
+              {isVerified ? <Icon name="checkmark-circle" size={15} color={colors.interactive} /> : null}
+            </Pressable>
+            <Text style={[styles.timestamp, { color: colors.textMuted }]}>{formatTime()}</Text>
+          </View>
+          <View style={styles.metaLine}>
             {handle ? <Text style={[styles.handleText, { color: colors.textMuted }]} numberOfLines={1}>@{handle}</Text> : null}
-          </Pressable>
-          <Text style={[styles.timestamp, { color: colors.textMuted }]}>· {formatTime()}</Text>
+            {expressionLabel ? (
+              <>
+                {handle ? <Text style={[styles.metaDot, { color: colors.textMuted }]}>•</Text> : null}
+                <Text style={[styles.expressionText, { color: colors.textSecondary }]} numberOfLines={1}>{expressionLabel}</Text>
+              </>
+            ) : null}
+          </View>
         </View>
 
-        {badges.length || expressionLabel ? (
-          <View style={styles.identityMetaRow}>
-            {badges.map((badge, index) => (
-              <View key={badge.id || badge.code || `${badge.label}-${index}`} style={[styles.identityBadge, { backgroundColor: badge.backgroundColor }]}>
-                <Text style={[styles.identityBadgeText, { color: badge.textColor }]}>{badge.label}</Text>
-              </View>
-            ))}
-            {expressionLabel ? <Text style={[styles.expressionText, { color: colors.textMuted }]} numberOfLines={1}>{expressionLabel}</Text> : null}
-          </View>
-        ) : null}
+        <Pressable hitSlop={8} style={styles.moreButton} accessibilityRole="button" accessibilityLabel="More post actions">
+          <Icon name="ellipsis-horizontal" size={19} color={colors.textMuted} />
+        </Pressable>
+      </View>
 
-        {post.body?.trim() ? <Text style={[styles.bodyText, { color: colors.text }]}>{post.body}</Text> : null}
+      {badges.length ? (
+        <View style={styles.identityMetaRow}>
+          {badges.map((badge, index) => (
+            <View key={badge.id || badge.code || `${badge.label}-${index}`} style={[styles.identityBadge, { backgroundColor: badge.backgroundColor }]}>
+              <Text style={[styles.identityBadgeText, { color: badge.textColor }]}>{badge.label}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
 
-        {media.length ? (
-          <View style={styles.mediaList}>
-            {media.map((item, index) => {
-              const kind = mediaKind(item);
-              const key = item.id || (item as any).uploadId || `${kind || 'media'}-${index}-${item.url}`;
-              if (kind === 'video') {
-                return (
-                  <View key={key} style={[styles.richMediaFrame, { borderColor: colors.borderSubtle }]}>
-                    <VideoPlayer
-                      title={mediaTitle(item, 'Community video')}
-                      sourceUrl={item.url}
-                      posterUrl={item.thumbnailUrl}
-                      durationSeconds={item.duration_seconds}
-                    />
-                  </View>
-                );
-              }
-              if (kind === 'audio') {
-                return (
-                  <AudioPlayer
-                    key={key}
-                    title={mediaTitle(item, 'Community audio')}
-                    speaker={displayName}
-                    sourceUrl={item.url}
-                    durationSeconds={item.duration_seconds}
-                    style={styles.audioPlayer}
-                  />
-                );
-              }
+      {post.body?.trim() ? <Text style={[styles.bodyText, { color: colors.text }]}>{post.body}</Text> : null}
+
+      {media.length ? (
+        <View style={styles.mediaList}>
+          {media.map((item, index) => {
+            const kind = mediaKind(item);
+            const key = item.id || (item as any).uploadId || `${kind || 'media'}-${index}-${item.url}`;
+            if (kind === 'video') {
               return (
-                <View key={key} style={[styles.mediaFrame, { backgroundColor: colors.bgSecondary }]}>
-                  <Image source={{ uri: item.url! }} style={styles.mediaImage} resizeMode="cover" accessibilityLabel={item.alt || 'Community post image'} />
+                <View key={key} style={[styles.richMediaFrame, { borderColor: colors.borderSubtle }]}>
+                  <VideoPlayer
+                    title={mediaTitle(item, 'Community video')}
+                    sourceUrl={item.url}
+                    posterUrl={item.thumbnailUrl}
+                    durationSeconds={item.duration_seconds}
+                  />
                 </View>
               );
-            })}
-          </View>
-        ) : null}
-
-        <View style={styles.actionRail}>
-          {canEngage ? (
-            <>
-              <Pressable onPress={onComment || onReply} hitSlop={6} style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Reply to post">
-                <Icon name="chatbubble-outline" size={17} color={colors.textMuted} />
-                <Text style={[styles.actionCount, { color: colors.textMuted }]}>{postAsAny.comments_count || 0}</Text>
-              </Pressable>
-              <Pressable onPress={handleLike} hitSlop={6} style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Like post">
-                <Icon name={hasLiked ? 'heart' : 'heart-outline'} size={17} color={hasLiked ? colors.live : colors.textMuted} />
-                <Text style={[styles.actionCount, { color: hasLiked ? colors.live : colors.textMuted }]}>{likeCount > 0 ? likeCount : ''}</Text>
-              </Pressable>
-              <Pressable onPress={handleSave} hitSlop={6} style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Bookmark post">
-                <Icon name={hasSaved ? 'bookmark' : 'bookmark-outline'} size={17} color={hasSaved ? colors.interactive : colors.textMuted} />
-              </Pressable>
-            </>
-          ) : (
-            <Text style={[styles.guestMeta, { color: colors.textMuted }]}>Sign in to join the conversation</Text>
-          )}
-          <Pressable onPress={handleNativeShare} hitSlop={6} style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Share post">
-            <Icon name="share-social-outline" size={17} color={colors.textMuted} />
-          </Pressable>
+            }
+            if (kind === 'audio') {
+              return (
+                <AudioPlayer
+                  key={key}
+                  title={mediaTitle(item, 'Community audio')}
+                  speaker={displayName}
+                  sourceUrl={item.url}
+                  durationSeconds={item.duration_seconds}
+                  style={styles.audioPlayer}
+                />
+              );
+            }
+            return (
+              <View key={key} style={[styles.mediaFrame, { backgroundColor: colors.bgSecondary }]}>
+                <Image source={{ uri: item.url! }} style={styles.mediaImage} resizeMode="cover" accessibilityLabel={item.alt || 'Community post image'} />
+              </View>
+            );
+          })}
         </View>
+      ) : null}
+
+      <View style={[styles.actionRail, { borderTopColor: colors.borderSubtle }]}>
+        {canEngage ? (
+          <>
+            <Pressable onPress={onComment || onReply} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed && { backgroundColor: colors.bgSecondary }]} accessibilityRole="button" accessibilityLabel="Reply to post">
+              <Icon name="chatbubble-outline" size={19} color={colors.textSecondary} />
+              <Text style={[styles.actionCount, { color: colors.textSecondary }]}>{postAsAny.comments_count || ''}</Text>
+            </Pressable>
+            <Pressable onPress={handleLike} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed && { backgroundColor: colors.liveSoft }]} accessibilityRole="button" accessibilityLabel="Like post">
+              <Icon name={hasLiked ? 'heart' : 'heart-outline'} size={19} color={hasLiked ? colors.live : colors.textSecondary} />
+              <Text style={[styles.actionCount, { color: hasLiked ? colors.live : colors.textSecondary }]}>{likeCount > 0 ? likeCount : ''}</Text>
+            </Pressable>
+            <Pressable onPress={handleSave} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed && { backgroundColor: colors.primarySoft }]} accessibilityRole="button" accessibilityLabel="Bookmark post">
+              <Icon name={hasSaved ? 'bookmark' : 'bookmark-outline'} size={19} color={hasSaved ? colors.interactive : colors.textSecondary} />
+            </Pressable>
+          </>
+        ) : (
+          <Text style={[styles.guestMeta, { color: colors.textMuted }]}>Sign in to join the conversation</Text>
+        )}
+        <Pressable onPress={handleNativeShare} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed && { backgroundColor: colors.bgSecondary }]} accessibilityRole="button" accessibilityLabel="Share post">
+          <Icon name="share-social-outline" size={19} color={colors.textSecondary} />
+        </Pressable>
       </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flexDirection: 'row', paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1 },
-  avatarColumn: { marginRight: spacing.md },
-  contentColumn: { flex: 1, gap: 4 },
-  authorRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  nameGroup: { flexDirection: 'row', alignItems: 'center', flexShrink: 1, gap: 3 },
-  displayName: { fontSize: 15, fontWeight: '700', flexShrink: 1 },
-  verifiedIcon: { marginLeft: 1 },
-  handleText: { fontSize: 13, flexShrink: 1 },
-  timestamp: { fontSize: 13, marginLeft: 4 },
-  identityMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, marginTop: 1 },
-  identityBadge: { borderRadius: radius.pill, paddingHorizontal: 7, paddingVertical: 2 },
+  container: {
+    marginHorizontal: spacing.md,
+    marginVertical: spacing.sm,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderRadius: radius.card,
+    ...shadows.sm,
+  },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  identityColumn: { flex: 1, minWidth: 0 },
+  authorLine: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  nameGroup: { flexDirection: 'row', alignItems: 'center', flexShrink: 1, gap: 4 },
+  displayName: { fontSize: 15, fontWeight: '800', flexShrink: 1, letterSpacing: -0.2 },
+  timestamp: { fontSize: 12, fontWeight: '500' },
+  metaLine: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 1, minWidth: 0 },
+  handleText: { fontSize: 12, flexShrink: 1 },
+  metaDot: { fontSize: 10 },
+  expressionText: { fontSize: 12, fontWeight: '600', flexShrink: 1 },
+  moreButton: { width: 32, height: 32, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  identityMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, marginTop: spacing.md },
+  identityBadge: { borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3 },
   identityBadgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.2 },
-  expressionText: { fontSize: 11, fontWeight: '600', maxWidth: 160 },
-  bodyText: { fontSize: 15, lineHeight: 21, marginTop: 2 },
-  mediaList: { gap: spacing.sm, marginTop: spacing.sm },
-  mediaFrame: { width: '100%', aspectRatio: 16 / 9, borderRadius: radius.md, overflow: 'hidden' },
+  bodyText: { fontSize: 15, lineHeight: 22, marginTop: spacing.md, letterSpacing: -0.08 },
+  mediaList: { gap: spacing.sm, marginTop: spacing.md },
+  mediaFrame: { width: '100%', aspectRatio: 16 / 10, borderRadius: radius.lg, overflow: 'hidden' },
   mediaImage: { width: '100%', height: '100%' },
-  richMediaFrame: { width: '100%', overflow: 'hidden', borderRadius: radius.md, borderWidth: 1 },
+  richMediaFrame: { width: '100%', overflow: 'hidden', borderRadius: radius.lg, borderWidth: 1 },
   audioPlayer: { width: '100%' },
-  actionRail: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm, paddingRight: spacing.xl },
-  actionButton: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: 6 },
-  actionCount: { fontSize: 12, fontWeight: '500' },
+  actionRail: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth },
+  actionButton: { minWidth: 42, height: 36, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 8 },
+  actionCount: { fontSize: 12, fontWeight: '600' },
   guestMeta: { fontSize: 11, fontWeight: '600' },
 });
