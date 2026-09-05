@@ -101,6 +101,7 @@ const eventRegistrations = await readFile('supabase/functions/event-registration
 const sermons = await readFile('supabase/functions/sermons/index.ts', 'utf8');
 const branding = await readFile('supabase/functions/branding/index.ts', 'utf8');
 const churchStory = await readFile('supabase/functions/church-story/index.ts', 'utf8');
+const prayerRequests = await readFile('supabase/functions/prayer-requests/index.ts', 'utf8');
 const giving = await readFile('supabase/functions/giving/index.ts', 'utf8');
 const publicGiving = await readFile('supabase/functions/public-giving/index.ts', 'utf8');
 const platformGiving = await readFile('supabase/functions/platform-giving/index.ts', 'utf8');
@@ -162,6 +163,11 @@ const invariants = [
   [sermons, /sermons\.create/, 'sermon authorization'],
   [branding, /platform\.branding\.manage/, 'branding authorization'],
   [churchStory, /leadership_profiles/, 'leadership profile management'],
+  [prayerRequests, /action === "pray"/, 'prayer-wall support action'],
+  [prayerRequests, /prayer_supports/, 'server-backed prayer support persistence'],
+  [prayerRequests, /viewer_has_prayed/, 'per-viewer prayer support state'],
+  [prayerRequests, /ignoreDuplicates:\s*true/, 'idempotent prayer support'],
+  [prayerRequests, /prayer_count/, 'server-backed prayer support count'],
   [giving, /requireExpression\(auth\.branchId\)/, 'expression giving management requires expression context'],
   [giving, /online_payment_enabled:\s*false/, 'expression online giving remains unavailable'],
   [publicGiving, /ORGANIZATION_REQUIRED/, 'public giving requires explicit church scope'],
