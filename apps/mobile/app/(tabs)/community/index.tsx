@@ -52,12 +52,14 @@ type MediaAttachment = {
   url: string;
   fileName?: string | null;
   sizeBytes: number;
+  durationSeconds?: number | null;
 };
 type UploadIntent = {
   uploadId: string;
   type: 'image' | 'video' | 'audio';
   mimeType: string;
   sizeBytes: number;
+  durationSeconds?: number | null;
   signedUploadUrl: string;
 };
 type UploadableMedia = {
@@ -65,10 +67,13 @@ type UploadableMedia = {
   fileName?: string | null;
   mimeType: string;
   reportedSize?: number | null;
+  durationSeconds?: number | null;
   webFile?: Blob | null;
 };
 
 const MAX_MEDIA_BYTES = 50 * 1024 * 1024;
+const MAX_MEMBER_PUBLIC_ATTACHMENTS = 4;
+const MAX_MEMBER_PUBLIC_VIDEO_SECONDS = 180;
 
 function inferImagePickerMime(asset: ImagePicker.ImagePickerAsset) {
   if (asset.mimeType) return asset.mimeType.toLowerCase();
@@ -133,19 +138,22 @@ export default function CommunityScreen() {
     return api.request<CommunityPost[]>('social-feed?scope=expression', { signal });
   });
 
-  // General Community is public to read and available to any authenticated
-  // account for interaction. Expression-only posting remains scoped by the
-  // selected Expression below and is still enforced by the API.
-  const hasChurchMembership = Boolean(
-    context?.organizations?.some((organization) =>
-      organization.memberships?.some((membership) => membership.status === 'active'),
-    ),
+  // General Community is public to read. Ordinary publishing is a separate
+  // member-social lane unlocked by active Expression membership. Ministry
+  // publishers use explicit feed / Reel / Watch / Sermon / Live capabilities.
+  const hasActiveExpressionMembership = Boolean(
+    context?.expressions?.some((item) => item.status === 'active'),
   );
-
-  // Signed-in users may interact with public community content. Publishing is
-  // still membership-scoped because the server-side post RPC enforces active
-  // organization membership.
-  const canPost = mode === 'authenticated' && hasChurchMembership;
+  const elevatedFeedPublisher = hasCapability('feed.post') || hasCapability('*');
+  const canPostGeneral =
+    mode === 'authenticated' && (hasActiveExpressionMembership || elevatedFeedPublisher);
+  const canPostExpression =
+    mode === 'authenticated' && Boolean(expression?.id) && elevatedFeedPublisher;
+  const canPostCurrent = activeTab === 'general' ? canPostGeneral : canPostExpression;
+  const canPostDestination = postDestination === 'general' ? canPostGeneral : canPostExpression;
+  const ordinaryGeneralMemberLane = postDestination === 'general' && !elevatedFeedPublisher;
+  const attachmentLimit = ordinaryGeneralMemberLane ? MAX_MEMBER_PUBLIC_ATTACHMENTS : 10;
+  const canAttachAudio = !ordinaryGeneralMemberLane;
   const canEngage = mode === 'authenticated';
   const canCreateReel = mode === 'authenticated' && hasCapability('media.upload') && hasCapability('reels.publish');
 
@@ -158,7 +166,7 @@ export default function CommunityScreen() {
   };
 
   const openComposer = () => {
-    if (!canPost) return;
+    if (!canPostCurrent) return;
     setPostError('');
     setPostDestination(activeTab === 'expression' ? 'expression' : 'general');
     setComposerOpen(true);
@@ -176,6 +184,8 @@ export default function CommunityScreen() {
 
   const changeDestination = (destination: FeedScope) => {
     if (destination === postDestination) return;
+    if (destination === 'general' && !canPostGeneral) return;
+    if (destination === 'expression' && !canPostExpression) return;
     const pending = attachments;
     setAttachments([]);
     setPostDestination(destination);
@@ -187,6 +197,17 @@ export default function CommunityScreen() {
     const sizeBytes = Number(binary.size || media.reportedSize || 0);
     if (!sizeBytes || sizeBytes > MAX_MEDIA_BYTES) throw new Error('Each attachment must be 50 MB or smaller.');
 
+    if (ordinaryGeneralMemberLane && media.mimeType.startsWith('audio/')) {
+      throw new Error('General Community member posts support text, photos and short videos. Audio ministry content requires publishing access.');
+    }
+    if (
+      ordinaryGeneralMemberLane &&
+      media.mimeType.startsWith('video/') &&
+      (!media.durationSeconds || media.durationSeconds > MAX_MEMBER_PUBLIC_VIDEO_SECONDS)
+    ) {
+      throw new Error('General Community videos must be 3 minutes or shorter.');
+    }
+
     const branchId = postDestination === 'expression' ? expression?.id : undefined;
     const intent = await api.request<UploadIntent>('community-media', {
       method: 'POST',
@@ -196,6 +217,7 @@ export default function CommunityScreen() {
         fileName: media.fileName ?? undefined,
         sizeBytes,
         branchId,
+        durationSeconds: media.durationSeconds ?? undefined,
       }),
     });
 
@@ -224,10 +246,10 @@ export default function CommunityScreen() {
     setMediaUploading(true);
     const uploaded: MediaAttachment[] = [];
     try {
-      for (const media of selected.slice(0, Math.max(0, 10 - attachments.length))) {
+      for (const media of selected.slice(0, Math.max(0, attachmentLimit - attachments.length))) {
         uploaded.push(await uploadMedia(media));
       }
-      setAttachments((current) => [...current, ...uploaded].slice(0, 10));
+      setAttachments((current) => [...current, ...uploaded].slice(0, attachmentLimit));
     } catch (error) {
       if (uploaded.length) await cleanupAttachments(uploaded);
       setPostError(error instanceof Error ? error.message : 'Unable to upload selected media.');
@@ -237,7 +259,7 @@ export default function CommunityScreen() {
   };
 
   const choosePhotoOrVideo = async () => {
-    if (!canPost || mediaUploading || attachments.length >= 10) return;
+    if (!canPostDestination || mediaUploading || attachments.length >= attachmentLimit) return;
     setPostError('');
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -248,7 +270,7 @@ export default function CommunityScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images', 'videos'],
         allowsMultipleSelection: true,
-        selectionLimit: Math.max(1, 10 - attachments.length),
+        selectionLimit: Math.max(1, attachmentLimit - attachments.length),
         quality: 1,
       });
       if (result.canceled || !result.assets?.length) return;
@@ -257,6 +279,7 @@ export default function CommunityScreen() {
         fileName: asset.fileName,
         mimeType: inferImagePickerMime(asset),
         reportedSize: asset.fileSize,
+        durationSeconds: asset.type === 'video' && asset.duration ? Math.max(1, Math.round(asset.duration / 1000)) : null,
         webFile: ((asset as any).file as Blob | undefined) ?? null,
       })));
     } catch (error) {
@@ -266,7 +289,7 @@ export default function CommunityScreen() {
   };
 
   const chooseAudio = async () => {
-    if (!canPost || mediaUploading || attachments.length >= 10) return;
+    if (!canPostDestination || !canAttachAudio || mediaUploading || attachments.length >= attachmentLimit) return;
     setPostError('');
     try {
       const result = await DocumentPicker.getDocumentAsync({
@@ -301,7 +324,7 @@ export default function CommunityScreen() {
   };
 
   const handleCreatePost = async () => {
-    if ((!postText.trim() && !attachments.length) || !canPost || mediaUploading) return;
+    if ((!postText.trim() && !attachments.length) || !canPostDestination || mediaUploading) return;
     if (postDestination === 'expression' && !expression?.id) {
       setPostError('Select or join an Expression before posting to an Expression feed.');
       return;
@@ -415,7 +438,11 @@ export default function CommunityScreen() {
   };
 
   const posts = resource.data ?? [];
-  const canPublishCurrent = Boolean(postText.trim() || attachments.length) && !posting && !mediaUploading;
+  const canPublishCurrent =
+    canPostDestination &&
+    Boolean(postText.trim() || attachments.length) &&
+    !posting &&
+    !mediaUploading;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -458,12 +485,14 @@ export default function CommunityScreen() {
         </Pressable>
       ) : null}
 
-      {canPost ? (
+      {canPostCurrent ? (
         <Pressable onPress={openComposer} style={({ pressed }) => [styles.composerStrip, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, pressed && styles.composerPressed]}>
           <Avatar url={context?.profile?.avatar_url} name={context?.profile?.display_name || 'Me'} size="sm" />
           <View style={styles.composerCopy}>
             <Text style={[styles.composerPrompt, { color: colors.text }]}>Share with the community</Text>
-            <Text style={[styles.composerPlaceholder, { color: colors.textMuted }]}>Text, photos, video or audio</Text>
+            <Text style={[styles.composerPlaceholder, { color: colors.textMuted }]}>
+              {activeTab === 'general' && !elevatedFeedPublisher ? 'Text, photos or short video' : 'Text, photos, video or audio'}
+            </Text>
           </View>
           <Icon name="create-outline" size={20} color={colors.interactive} />
         </Pressable>
@@ -494,7 +523,7 @@ export default function CommunityScreen() {
       ) : (
         <EmptyState
           title={activeTab === 'expression' ? 'No Expression Posts Yet' : 'No General Community Posts Yet'}
-          message={canPost ? 'Share the first encouraging word or media post in this feed.' : 'Published community posts will appear here.'}
+          message={canPostCurrent ? 'Share the first encouraging word or media post in this feed.' : 'Published community posts will appear here.'}
           iconName="chatbubbles-outline"
         />
       )}
@@ -504,6 +533,7 @@ export default function CommunityScreen() {
           <View style={styles.destinationBlock}>
             <Text style={[styles.destinationLabel, { color: colors.textSecondary }]}>POST TO</Text>
             <View style={styles.destinationRow}>
+              {canPostGeneral ? (
               <Pressable
                 onPress={() => changeDestination('general')}
                 style={[styles.destinationPill, { borderColor: postDestination === 'general' ? colors.interactive : colors.border, backgroundColor: postDestination === 'general' ? colors.primarySoft : colors.bgSecondary }]}
@@ -511,7 +541,8 @@ export default function CommunityScreen() {
                 <Icon name="globe-outline" size={15} color={postDestination === 'general' ? colors.interactive : colors.textSecondary} />
                 <Text style={[styles.destinationText, { color: postDestination === 'general' ? colors.interactive : colors.textSecondary }]}>General Community</Text>
               </Pressable>
-              {expression?.id ? (
+              ) : null}
+              {expression?.id && canPostExpression ? (
                 <Pressable
                   onPress={() => changeDestination('expression')}
                   style={[styles.destinationPill, { borderColor: postDestination === 'expression' ? colors.interactive : colors.border, backgroundColor: postDestination === 'expression' ? colors.primarySoft : colors.bgSecondary }]}
@@ -521,7 +552,11 @@ export default function CommunityScreen() {
                 </Pressable>
               ) : null}
             </View>
-            <Text style={[styles.destinationHelp, { color: colors.textMuted }]}>General Community posts are public. Expression posts remain inside your selected Expression.</Text>
+            <Text style={[styles.destinationHelp, { color: colors.textMuted }]}>
+              {ordinaryGeneralMemberLane
+                ? 'General Community posts are public. Member posts are lightweight social content: text, photos and short videos only. Sermons, long-form Watch, canonical Reels and Live require publishing authority.'
+                : 'General Community posts are public. Expression posts remain inside your selected Expression.'}
+            </Text>
           </View>
 
           {postError ? <View style={[styles.errorBanner, { backgroundColor: colors.liveSoft }]}><Icon name="alert-circle" size={17} color={colors.live} /><Text style={[styles.errorText, { color: colors.live }]}>{postError}</Text></View> : null}
@@ -541,14 +576,16 @@ export default function CommunityScreen() {
           </View>
 
           <View style={styles.mediaToolbar}>
-            <Pressable onPress={() => void choosePhotoOrVideo()} disabled={mediaUploading || attachments.length >= 10} style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+            <Pressable onPress={() => void choosePhotoOrVideo()} disabled={mediaUploading || attachments.length >= attachmentLimit} style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
               <Icon name="images-outline" size={18} color={colors.interactive} />
-              <Text style={[styles.mediaButtonText, { color: colors.text }]}>Photo / Video</Text>
+              <Text style={[styles.mediaButtonText, { color: colors.text }]}>{ordinaryGeneralMemberLane ? 'Photo / Short video' : 'Photo / Video'}</Text>
             </Pressable>
-            <Pressable onPress={() => void chooseAudio()} disabled={mediaUploading || attachments.length >= 10} style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
-              <Icon name="musical-notes-outline" size={18} color={colors.interactive} />
-              <Text style={[styles.mediaButtonText, { color: colors.text }]}>Audio</Text>
-            </Pressable>
+            {canAttachAudio ? (
+              <Pressable onPress={() => void chooseAudio()} disabled={mediaUploading || attachments.length >= attachmentLimit} style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
+                <Icon name="musical-notes-outline" size={18} color={colors.interactive} />
+                <Text style={[styles.mediaButtonText, { color: colors.text }]}>Audio</Text>
+              </Pressable>
+            ) : null}
             {canCreateReel ? (
               <Pressable onPress={() => { closeComposer(); router.push('/studio/reel' as any); }} style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
                 <Icon name="flash-outline" size={18} color={colors.interactive} />
@@ -556,7 +593,11 @@ export default function CommunityScreen() {
               </Pressable>
             ) : null}
           </View>
-          <Text style={[styles.mediaHelp, { color: colors.textMuted }]}>Up to 10 attachments · 50 MB each · images, videos and audio upload through the same validated Storage pipeline.</Text>
+          <Text style={[styles.mediaHelp, { color: colors.textMuted }]}>
+            {ordinaryGeneralMemberLane
+              ? 'General member post · up to 4 attachments · 50 MB each · videos must be 3 minutes or shorter.'
+              : `Up to ${attachmentLimit} attachments · 50 MB each · validated media upload pipeline.`}
+          </Text>
 
           {mediaUploading ? (
             <View style={[styles.uploadingRow, { backgroundColor: colors.primarySoft }]}>
@@ -589,7 +630,7 @@ export default function CommunityScreen() {
           ) : null}
 
           <View style={[styles.composerFooter, { borderTopColor: colors.borderSubtle }]}>
-            <Text style={[styles.characterCount, { color: colors.textMuted }]}>{postText.length.toLocaleString()} / 10,000 · {attachments.length}/10 media</Text>
+            <Text style={[styles.characterCount, { color: colors.textMuted }]}>{postText.length.toLocaleString()} / 10,000 · {attachments.length}/{attachmentLimit} media</Text>
             <Pressable
               onPress={handleCreatePost}
               disabled={!canPublishCurrent}
