@@ -75,6 +75,7 @@ const requiredFiles = [
   'supabase/functions/platform-integrations/index.ts',
   'supabase/functions/platform-payments/index.ts',
   'supabase/functions/platform-giving/index.ts',
+  'supabase/functions/search/index.ts',
 ];
 
 await Promise.all(requiredFiles.map((file) => access(file)));
@@ -105,6 +106,7 @@ const prayerRequests = await readFile('supabase/functions/prayer-requests/index.
 const giving = await readFile('supabase/functions/giving/index.ts', 'utf8');
 const publicGiving = await readFile('supabase/functions/public-giving/index.ts', 'utf8');
 const platformGiving = await readFile('supabase/functions/platform-giving/index.ts', 'utf8');
+const retiredSearch = await readFile('supabase/functions/search/index.ts', 'utf8');
 const platformPayments = await readFile('supabase/functions/platform-payments/index.ts', 'utf8');
 const platformStreaming = await readFile('supabase/functions/platform-streaming/index.ts', 'utf8');
 const platformAi = await readFile('supabase/functions/platform-ai/index.ts', 'utf8');
@@ -175,6 +177,8 @@ const invariants = [
   [publicGiving, /manualBankTransfer/, 'manual transfer is exposed as a server-driven giving method'],
   [platformGiving, /PLATFORM_GIVING_RETIRED/, 'retired Platform Giving endpoint boundary'],
   [platformGiving, /does not own church giving/i, 'church-owned giving retirement message'],
+  [retiredSearch, /SEARCH_ENDPOINT_RETIRED/, 'retired duplicate search endpoint'],
+  [retiredSearch, /public-content/, 'canonical public discovery search destination'],
   [platformPayments, /authorizePlatform\(auth, "platform\.payments\.read"\)/, 'Level-1 payment read authorization'],
   [platformPayments, /authorizePlatform\(auth, "platform\.payments\.manage"\)/, 'Level-1 payment manage authorization'],
   [platformPayments, /payment_provider_configs/, 'database-driven payment provider configuration'],
