@@ -129,9 +129,6 @@ export default function CommunityScreen() {
     return api.request<CommunityPost[]>('social-feed?scope=expression', { signal });
   });
 
-  const hasChurchMembership = Boolean(
-    context?.organizations?.some((organization) => organization.memberships?.some((membership) => membership.status === 'active')),
-  );
   // General Community is public to read and available to any authenticated
   // account for interaction. Expression-only posting remains scoped by the
   // selected Expression below and is still enforced by the API.
