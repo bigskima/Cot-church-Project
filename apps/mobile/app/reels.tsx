@@ -13,6 +13,14 @@ type PlaybackInfo = {
   available: boolean;
   renditions?: { kind?: string; playbackUrl?: string; storagePath?: string }[];
 };
+type ReelEngagementState = {
+  reaction: string | null;
+  bookmarked: boolean;
+};
+type ReelWithViewerState = Reel & {
+  viewerReaction?: string | null;
+  viewerBookmarked?: boolean;
+};
 
 export default function FullScreenReelsScreen() {
   const insets = useSafeAreaInsets();
@@ -25,29 +33,48 @@ export default function FullScreenReelsScreen() {
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
   const expressionId = context?.expression?.id;
 
-  const reelsResource = useResource<Reel[]>(`reels:immersive:${expressionId ? `expression:${expressionId}` : `public:${organizationId || 'auto'}`}`, async (signal) => {
+  const reelsResource = useResource<ReelWithViewerState[]>(`reels:immersive:${expressionId ? `expression:${expressionId}` : `public:${organizationId || 'auto'}`}:${mode}`, async (signal) => {
     const reels = expressionId
       ? (await api.request<{ reels: Reel[] }>(`home-feed?organizationId=${encodeURIComponent(organizationId)}&expressionId=${encodeURIComponent(expressionId)}`, { signal })).reels
       : await api.request<Reel[]>(`public-content?type=reels${organizationId ? `&organizationId=${encodeURIComponent(organizationId)}` : ''}`, { signal });
     return Promise.all(reels.map(async (reel) => {
-      try {
-        const playback = await api.request<PlaybackInfo>(`content-media?action=playback&contentId=${encodeURIComponent(reel.id)}`, { signal });
-        const playbackUrl = playback.renditions?.find((rendition) => rendition.kind === 'video_stream')?.playbackUrl;
-        if (!playbackUrl) return reel;
-        const currentRenditions = reel.media_assets?.renditions ?? [];
-        return {
-          ...reel,
-          media_assets: {
-            ...(reel.media_assets ?? {}),
-            url: playbackUrl,
-            renditions: currentRenditions.map((rendition) => rendition.rendition_kind === 'video_stream'
-              ? { ...rendition, storage_path: playbackUrl }
-              : rendition),
-          },
-        } as Reel;
-      } catch {
-        return reel;
-      }
+      const contentId = reel.content_items?.id;
+      if (!contentId) return reel as ReelWithViewerState;
+
+      const [playbackResult, engagementResult] = await Promise.allSettled([
+        api.request<PlaybackInfo>(
+          `content-media?action=playback&contentId=${encodeURIComponent(contentId)}`,
+          { signal, context: expressionId ? 'current' : 'public' },
+        ),
+        mode === 'authenticated'
+          ? api.request<ReelEngagementState>(
+              `engagement?contentId=${encodeURIComponent(contentId)}&view=state`,
+              { signal, context: expressionId ? 'current' : 'public' },
+            )
+          : Promise.resolve({ reaction: null, bookmarked: false }),
+      ]);
+
+      const playback = playbackResult.status === 'fulfilled' ? playbackResult.value : null;
+      const engagement = engagementResult.status === 'fulfilled' ? engagementResult.value : null;
+      const playbackUrl = playback?.renditions?.find((rendition) => rendition.kind === 'video_stream')?.playbackUrl;
+      const currentRenditions = reel.media_assets?.renditions ?? [];
+
+      return {
+        ...reel,
+        viewerReaction: engagement?.reaction ?? null,
+        viewerBookmarked: engagement?.bookmarked ?? false,
+        media_assets: playbackUrl
+          ? {
+              ...(reel.media_assets ?? {}),
+              url: playbackUrl,
+              renditions: currentRenditions.map((rendition) =>
+                rendition.rendition_kind === 'video_stream'
+                  ? { ...rendition, storage_path: playbackUrl }
+                  : rendition,
+              ),
+            }
+          : reel.media_assets,
+      } as ReelWithViewerState;
     }));
   });
 
@@ -65,7 +92,9 @@ export default function FullScreenReelsScreen() {
     setActiveReelForComments(reel);
     setCommentLoading(true);
     try {
-      const res = await api.request<ContentComment[]>(`engagement?contentId=${reel.id}`, { context: expressionId ? 'current' : 'public' });
+      const contentId = reel.content_items?.id;
+      if (!contentId) throw new Error('This Reel is missing its engagement identity.');
+      const res = await api.request<ContentComment[]>(`engagement?contentId=${contentId}`, { context: expressionId ? 'current' : 'public' });
       setComments(res ?? []);
     } catch {
       setComments([]);
@@ -76,41 +105,55 @@ export default function FullScreenReelsScreen() {
 
   const handleSendComment = async (body: string, parentCommentId?: string | null) => {
     if (!activeReelForComments) return;
+    const contentId = activeReelForComments.content_items?.id;
+    if (!contentId) throw new Error('This Reel is missing its engagement identity.');
+    const res = await api.request<ContentComment>('engagement', {
+      method: 'POST',
+      context: expressionId ? 'current' : 'public',
+      body: JSON.stringify({ action: 'comment', contentId, body, parentCommentId }),
+    });
+    if (res) setComments((prev) => [...prev, res]);
+  };
+
+  const handleLikeReel = async (reel: ReelWithViewerState, currentlyLiked: boolean) => {
+    if (mode === 'visitor') {
+      router.push('/(auth)/login');
+      return currentlyLiked;
+    }
+    const contentId = reel.content_items?.id;
+    if (!contentId) return currentlyLiked;
     try {
-      const res = await api.request<ContentComment>('engagement', {
+      await api.request('engagement', {
         method: 'POST',
         context: expressionId ? 'current' : 'public',
-        body: JSON.stringify({ action: 'comment', contentId: activeReelForComments.id, body, parentCommentId }),
+        body: JSON.stringify(
+          currentlyLiked
+            ? { action: 'unreact', contentId }
+            : { action: 'react', contentId, reaction: 'amen' },
+        ),
       });
-      if (res) setComments((prev) => [...prev, res]);
+      return !currentlyLiked;
     } catch {
-      // Comment errors remain local to the comment sheet.
+      return currentlyLiked;
     }
   };
 
-  const handleLikeReel = async (reelId: string) => {
+  const handleSaveReel = async (reel: ReelWithViewerState, currentlySaved: boolean) => {
     if (mode === 'visitor') {
       router.push('/(auth)/login');
-      return false;
+      return currentlySaved;
     }
+    const contentId = reel.content_items?.id;
+    if (!contentId) return currentlySaved;
     try {
-      await api.request('engagement', { method: 'POST', context: expressionId ? 'current' : 'public', body: JSON.stringify({ action: 'react', contentId: reelId, reaction: 'amen' }) });
-      return true;
+      const result = await api.request<{ bookmarked: boolean }>('engagement', {
+        method: 'POST',
+        context: expressionId ? 'current' : 'public',
+        body: JSON.stringify({ action: 'bookmark', contentId }),
+      });
+      return result.bookmarked;
     } catch {
-      return false;
-    }
-  };
-
-  const handleSaveReel = async (reelId: string) => {
-    if (mode === 'visitor') {
-      router.push('/(auth)/login');
-      return false;
-    }
-    try {
-      await api.request('engagement', { method: 'POST', context: expressionId ? 'current' : 'public', body: JSON.stringify({ action: 'bookmark', contentId: reelId }) });
-      return true;
-    } catch {
-      return false;
+      return currentlySaved;
     }
   };
 
@@ -147,8 +190,10 @@ export default function FullScreenReelsScreen() {
               reel={item}
               expressionName={expressionName}
               isActive={index === activeIndex}
-              onLike={() => handleLikeReel(item.id)}
-              onSave={() => handleSaveReel(item.id)}
+              initialLiked={Boolean(item.viewerReaction)}
+              initialSaved={item.viewerBookmarked === true}
+              onLike={(currentlyLiked) => handleLikeReel(item, currentlyLiked)}
+              onSave={(currentlySaved) => handleSaveReel(item, currentlySaved)}
               onOpenComments={() => handleOpenComments(item)}
             />
           )}
