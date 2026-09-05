@@ -38,7 +38,7 @@ export default function LeadershipHubScreen() {
   const canManageEvents = hasCapability('events.create') || hasCapability('events.update') || hasCapability('*');
   const canManageGiving = hasCapability('giving.campaigns.manage') || hasCapability('*');
   const canReadGivingFinance = hasCapability('giving.finance.read') || hasCapability('*');
-  const canManageLeadership = hasCapability('expression.leadership.manage') || hasCapability('organization.leadership.manage') || hasCapability('*');
+  const canManageLeadership = hasCapability('expression.leadership.manage') || hasCapability('*');
   const canManageExpressionAccess =
     isCurrentExpressionOwner ||
     (hasCapability('members.invite') && hasCapability('roles.assign')) ||
