@@ -110,23 +110,25 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
     setSidebarOpen(false);
   };
 
+  const can = (permission: string) => isSuperAdmin || effectivePermissions.includes(permission);
+
   const renderContent = () => {
     if (!allowedPageKeys.has(page)) return <PlatformOverview api={api} onNavigate={navigate} allowedPages={allowedPageKeys} />;
     switch (page) {
       case 'overview': return <PlatformOverview api={api} onNavigate={navigate} allowedPages={allowedPageKeys} />;
-      case 'organizations': return <OrganizationsGovernance api={api} />;
-      case 'expressions': return <ExpressionsGovernance api={api} />;
-      case 'users': return <UserGovernance api={api} />;
+      case 'organizations': return <OrganizationsGovernance api={api} canManage={can('platform.organizations.manage')} />;
+      case 'expressions': return <ExpressionsGovernance api={api} canManage={can('platform.expressions.manage')} />;
+      case 'users': return <UserGovernance api={api} canManage={can('platform.users.manage')} />;
       case 'admin-invitations': return isSuperAdmin ? <AdminInvitations api={api} /> : <PlatformOverview api={api} onNavigate={navigate} allowedPages={allowedPageKeys} />;
       case 'expression-creators': return isSuperAdmin ? <ExpressionCreators api={api} /> : <PlatformOverview api={api} onNavigate={navigate} allowedPages={allowedPageKeys} />;
       case 'branding': return <BrandingAppearance api={api} />;
       case 'public-directory': return <PublicDirectory api={api} />;
       case 'credentials': return <ProviderCredentials api={api} />;
-      case 'streaming': return <StreamingInfrastructure api={api} />;
-      case 'ai': return <AiInfrastructure api={api} />;
-      case 'payments': return <PaymentInfrastructure api={api} />;
-      case 'features': return <FeatureFlags api={api} />;
-      case 'integrations': return <IntegrationsJobs api={api} />;
+      case 'streaming': return <StreamingInfrastructure api={api} canManage={can('platform.streaming.manage')} canManageSecrets={can('platform.secrets.manage')} />;
+      case 'ai': return <AiInfrastructure api={api} canManage={can('platform.ai.manage')} canManageSecrets={can('platform.secrets.manage')} />;
+      case 'payments': return <PaymentInfrastructure api={api} canManage={can('platform.payments.manage')} canManageSecrets={can('platform.secrets.manage')} />;
+      case 'features': return <FeatureFlags api={api} canManage={can('platform.features.manage')} />;
+      case 'integrations': return <IntegrationsJobs api={api} canManage={can('platform.integrations.manage')} />;
       case 'audit': return <AuditSecurity api={api} />;
       default: return <PlatformOverview api={api} onNavigate={navigate} allowedPages={allowedPageKeys} />;
     }
