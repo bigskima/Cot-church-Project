@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "npm:@supabase/supabase-js@2.57.4";
 import { adminClient } from "./supabase.ts";
 
 type MembershipAuthoredRow = Record<string, any> & { author_membership_id?: string | null; branch_id?: string | null; organization_id?: string | null };
@@ -89,3 +90,74 @@ async function enrichMembershipAuthors<T extends MembershipAuthoredRow>(rows: T[
 
 export const enrichSocialPosts = enrichMembershipAuthors;
 export const enrichSocialComments = enrichMembershipAuthors;
+
+
+export async function enrichContentEngagement<T extends { id: string }>(
+  rows: T[],
+  client: SupabaseClient,
+  viewerProfileId?: string | null,
+): Promise<Array<T & {
+  likes_count: number;
+  comments_count: number;
+  viewer_reaction: string | null;
+  viewer_bookmarked: boolean;
+  social_reactions: Array<{ reaction: string }>;
+}>> {
+  if (!rows.length) return [];
+  const contentIds = [...new Set(rows.map((row) => row.id).filter(Boolean))];
+
+  const [reactionsResult, commentsResult, bookmarksResult] = await Promise.all([
+    client
+      .from("content_reactions")
+      .select("content_item_id,profile_id,reaction")
+      .in("content_item_id", contentIds),
+    client
+      .from("content_comments")
+      .select("id,content_item_id")
+      .in("content_item_id", contentIds)
+      .eq("is_hidden", false),
+    viewerProfileId
+      ? client
+          .from("content_bookmarks")
+          .select("content_item_id")
+          .eq("profile_id", viewerProfileId)
+          .in("content_item_id", contentIds)
+      : Promise.resolve({ data: [] as Array<{ content_item_id: string }>, error: null }),
+  ]);
+
+  const reactionsByContent = new Map<string, Array<{ profile_id: string; reaction: string }>>();
+  if (!reactionsResult.error) {
+    for (const row of reactionsResult.data ?? []) {
+      const current = reactionsByContent.get(row.content_item_id) ?? [];
+      current.push({ profile_id: row.profile_id, reaction: row.reaction });
+      reactionsByContent.set(row.content_item_id, current);
+    }
+  }
+
+  const commentsByContent = new Map<string, number>();
+  if (!commentsResult.error) {
+    for (const row of commentsResult.data ?? []) {
+      commentsByContent.set(row.content_item_id, (commentsByContent.get(row.content_item_id) ?? 0) + 1);
+    }
+  }
+
+  const bookmarked = new Set(
+    bookmarksResult.error ? [] : (bookmarksResult.data ?? []).map((row) => row.content_item_id),
+  );
+
+  return rows.map((row) => {
+    const reactions = reactionsByContent.get(row.id) ?? [];
+    const viewerReaction = viewerProfileId
+      ? reactions.find((reaction) => reaction.profile_id === viewerProfileId)?.reaction ?? null
+      : null;
+
+    return {
+      ...row,
+      likes_count: reactions.length,
+      comments_count: commentsByContent.get(row.id) ?? 0,
+      viewer_reaction: viewerReaction,
+      viewer_bookmarked: bookmarked.has(row.id),
+      social_reactions: reactions.map(({ reaction }) => ({ reaction })),
+    };
+  });
+}
