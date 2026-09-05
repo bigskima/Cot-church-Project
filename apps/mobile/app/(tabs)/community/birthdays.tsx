@@ -39,7 +39,7 @@ export default function ExpressionBirthdaysScreen() {
   if (mode !== 'authenticated' || !expression?.id) {
     return (
       <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top + spacing.sm }]}>
-        <ScreenHeader title="Birthdays" subtitle="Expression birthday calendar." showBack />
+        <ScreenHeader title="Birthdays" kicker="EXPRESSION" subtitle="A private birthday calendar for your community." showBack />
         <View style={styles.body}>
           <EmptyState title="Join an Expression first" message="Birthday reminders are private to members of the same Expression." iconName="gift-outline" />
         </View>
@@ -52,7 +52,7 @@ export default function ExpressionBirthdaysScreen() {
   const upcoming = entries.filter((entry) => entry.days_until > 0);
 
   const birthdayCard = (entry: BirthdayEntry) => (
-    <View key={entry.profile_id} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+    <View key={entry.profile_id} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
       <Avatar url={entry.avatar_url} name={entry.display_name} size="md" />
       <View style={styles.cardBody}>
         <View style={styles.nameRow}>
@@ -106,7 +106,7 @@ export default function ExpressionBirthdaysScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  body: { paddingHorizontal: spacing.lg, gap: spacing.lg },
+  body: { paddingHorizontal: spacing.md, gap: spacing.lg },
   privacyCard: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, borderWidth: 1, borderRadius: radius.md, padding: spacing.md },
   privacyText: { flex: 1, fontSize: 12, lineHeight: 18 },
   section: { gap: spacing.sm },
