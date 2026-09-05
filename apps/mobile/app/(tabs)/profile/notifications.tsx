@@ -58,12 +58,19 @@ export default function NotificationsScreen() {
       await invitations.refresh();
 
       if (decision === 'accept') {
-        // Reload the membership/permission context immediately. Preserve the
-        // current church/Expression when possible; only select the invited
-        // church when this account did not previously have a church context.
-        const organizationId = auth?.organizationId ?? invitation.organization_id ?? undefined;
+        // An accepted Expression role belongs to the invitation's church.
+        // Switch/reload that church immediately so the new membership,
+        // Expression and permissions are visible without an app restart.
+        const organizationId = invitation.kind === 'expression_role'
+          ? invitation.organization_id ?? auth?.organizationId ?? undefined
+          : auth?.organizationId ?? invitation.organization_id ?? undefined;
         if (organizationId) {
-          await selectContext(organizationId, auth?.organizationId === organizationId ? auth.branchId : undefined);
+          const preserveBranch =
+            invitation.kind !== 'expression_role' &&
+            auth?.organizationId === organizationId
+              ? auth.branchId
+              : undefined;
+          await selectContext(organizationId, preserveBranch);
         }
       }
     } catch (error) {
