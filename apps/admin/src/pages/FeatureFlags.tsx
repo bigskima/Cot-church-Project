@@ -21,7 +21,7 @@ interface FeaturePayload {
   items: FeatureFlag[];
 }
 
-export function FeatureFlags({ api }: { api: ApiClient }) {
+export function FeatureFlags({ api, canManage = false }: { api: ApiClient; canManage?: boolean }) {
   const [flags, setFlags] = useState<FeatureFlag[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -65,6 +65,7 @@ export function FeatureFlags({ api }: { api: ApiClient }) {
     percentage = flag.rollout_percentage,
     reason?: string
   ) => {
+    if (!canManage) return;
     setBusyKey(flag.key);
     setError('');
     try {
@@ -190,24 +191,28 @@ export function FeatureFlags({ api }: { api: ApiClient }) {
               header: 'CONTROL',
               accessor: (item) => (
                 <div className="admin-table-actions">
-                  <Toggle
-                    label=""
-                    checked={item.global_enabled}
-                    disabled={busyKey === item.key}
-                    onChange={() => void requestToggle(item)}
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={busyKey === item.key}
-                    onClick={() => {
-                      setEditing(item);
-                      setRolloutPercentage(String(item.rollout_percentage));
-                      setDisableReason('');
-                    }}
-                  >
-                    Policy
-                  </Button>
+                  {canManage ? (
+                    <>
+                      <Toggle
+                        label=""
+                        checked={item.global_enabled}
+                        disabled={busyKey === item.key}
+                        onChange={() => void requestToggle(item)}
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={busyKey === item.key}
+                        onClick={() => {
+                          setEditing(item);
+                          setRolloutPercentage(String(item.rollout_percentage));
+                          setDisableReason('');
+                        }}
+                      >
+                        Policy
+                      </Button>
+                    </>
+                  ) : <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Read only</span>}
                 </div>
               ),
             },
@@ -220,7 +225,7 @@ export function FeatureFlags({ api }: { api: ApiClient }) {
       </Card>
 
       <Modal
-        isOpen={!!editing}
+        isOpen={canManage && !!editing}
         onClose={() => {
           if (!busyKey) setEditing(null);
         }}
