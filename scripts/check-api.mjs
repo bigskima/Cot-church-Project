@@ -113,6 +113,7 @@ const platformAi = await readFile('supabase/functions/platform-ai/index.ts', 'ut
 const platformFeatures = await readFile('supabase/functions/platform-features/index.ts', 'utf8');
 const platformIntegrations = await readFile('supabase/functions/platform-integrations/index.ts', 'utf8');
 const gatewayConfig = await readFile('supabase/config.toml', 'utf8');
+const privilegedRpcGrantHardening = await readFile('supabase/migrations/20260905121228_harden_remaining_privileged_rpc_execute_grants.sql', 'utf8');
 
 const invariants = [
   [handler, /request\.method === "OPTIONS"/, 'CORS preflight handling'],
@@ -189,6 +190,11 @@ const invariants = [
   [platformAi, /platform\.ai\./, 'Level-1 AI authority'],
   [platformFeatures, /platform\.features\./, 'Level-1 feature authority'],
   [platformIntegrations, /platform\.integrations\./, 'Level-1 integrations authority'],
+  [privilegedRpcGrantHardening, /platform_store_secret\(text,text,text,text,text\).*from public, anon/s, 'secret-store anonymous execute revocation'],
+  [privilegedRpcGrantHardening, /resolve_runtime_secret\(text\).*from public, anon, authenticated/s, 'runtime-secret service-only execute boundary'],
+  [privilegedRpcGrantHardening, /process_payment_result\(text,text,text,uuid,text,payment_attempt_status,jsonb,text\).*from public, anon, authenticated/s, 'payment-result service-only execute boundary'],
+  [privilegedRpcGrantHardening, /generate_expression_invite_code\(uuid,uuid,integer,integer\).*from public, anon/s, 'Expression invite anonymous execute revocation'],
+  [privilegedRpcGrantHardening, /update_membership_status\(uuid,uuid,membership_status,uuid\).*from public, anon/s, 'membership mutation anonymous execute revocation'],
 ];
 
 const missing = invariants.filter(([source, pattern]) => !pattern.test(source));
