@@ -35,12 +35,17 @@ type CareFollowUp = LiveFollowUp & {
 
 export default function PastoralTriageScreen() {
   const insets = useSafeAreaInsets();
-  const { api, context } = useSession();
+  const { api, context, hasCapability } = useSession();
   const { colors } = useTheme();
   const expression = context?.expression;
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
+  const canModeratePrayer =
+    (hasCapability('prayer.moderate') &&
+      (hasCapability('prayer.pastoral.receive') || hasCapability('prayer.team.receive'))) ||
+    hasCapability('*');
+  const canReceiveFollowups = hasCapability('pastoral.followups.receive') || hasCapability('*');
 
-  const [activeQueue, setActiveQueue] = useState<'prayer' | 'care'>('prayer');
+  const [activeQueue, setActiveQueue] = useState<'prayer' | 'care'>(canModeratePrayer ? 'prayer' : 'care');
   const [ministryScope, setMinistryScope] = useState<PrayerScope>(expression?.id ? 'expression' : 'general');
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
@@ -48,6 +53,11 @@ export default function PastoralTriageScreen() {
   useEffect(() => {
     if (!expression?.id && ministryScope === 'expression') setMinistryScope('general');
   }, [expression?.id, ministryScope]);
+
+  useEffect(() => {
+    if (activeQueue === 'prayer' && !canModeratePrayer && canReceiveFollowups) setActiveQueue('care');
+    if (activeQueue === 'care' && !canReceiveFollowups && canModeratePrayer) setActiveQueue('prayer');
+  }, [activeQueue, canModeratePrayer, canReceiveFollowups]);
 
   const prayerPath = (() => {
     const query = new URLSearchParams({ view: 'moderation', scope: ministryScope });
@@ -64,12 +74,12 @@ export default function PastoralTriageScreen() {
 
   const prayers = useResource<RoutedPrayer[]>(
     `pastoral:prayers:${ministryScope}:${organizationId || 'auto'}:${expression?.id || 'none'}`,
-    (signal) => api.request<RoutedPrayer[]>(prayerPath, { signal })
+    (signal) => canModeratePrayer ? api.request<RoutedPrayer[]>(prayerPath, { signal }) : Promise.resolve([])
   );
 
   const followups = useResource<CareFollowUp[]>(
     `pastoral:followups:${ministryScope}:${organizationId || 'none'}:${expression?.id || 'none'}`,
-    (signal) => api.request<CareFollowUp[]>(followupPath, { signal })
+    (signal) => canReceiveFollowups ? api.request<CareFollowUp[]>(followupPath, { signal }) : Promise.resolve([])
   );
 
   const updatePrayer = async (
@@ -138,18 +148,31 @@ export default function PastoralTriageScreen() {
           />
         </View>
 
-        <View style={[styles.tabRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
-          <Chip label="Prayer Requests" selected={activeQueue === 'prayer'} onPress={() => setActiveQueue('prayer')} count={prayerList.length} />
-          <Chip label="Altar & Care Responses" selected={activeQueue === 'care'} onPress={() => setActiveQueue('care')} count={careList.length} />
-        </View>
+        {canModeratePrayer || canReceiveFollowups ? (
+          <View style={[styles.tabRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+            {canModeratePrayer ? (
+              <Chip label="Prayer Requests" selected={activeQueue === 'prayer'} onPress={() => setActiveQueue('prayer')} count={prayerList.length} />
+            ) : null}
+            {canReceiveFollowups ? (
+              <Chip label="Altar & Care Responses" selected={activeQueue === 'care'} onPress={() => setActiveQueue('care')} count={careList.length} />
+            ) : null}
+          </View>
+        ) : null}
 
         <View style={styles.body}>
+          {!canModeratePrayer && !canReceiveFollowups ? (
+            <EmptyState
+              title="Pastoral access unavailable"
+              message="Your current role is not assigned to prayer moderation or pastoral follow-up in this scope."
+              iconName="lock-closed-outline"
+            />
+          ) : null}
           {actionError ? (
             <View style={[styles.errorBanner, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}>
               <Text style={[styles.errorText, { color: colors.live }]}>{actionError}</Text>
             </View>
           ) : null}
-          {activeQueue === 'prayer' ? (
+          {canModeratePrayer && activeQueue === 'prayer' ? (
             <View style={styles.queueSection}>
               {scopeTabs}
               <SectionHeader title={scopeTitle} badge={prayerList.length} />
@@ -200,7 +223,7 @@ export default function PastoralTriageScreen() {
                 <EmptyState title="No Prayer Requests in This Queue" message="New petitions routed to your exact prayer or pastoral scope will appear here." iconName="shield-checkmark-outline" />
               )}
             </View>
-          ) : (
+          ) : canReceiveFollowups ? (
             <View style={styles.queueSection}>
               {scopeTabs}
               <SectionHeader title={ministryScope === 'expression' && expression?.name ? `${expression.name} Altar & Care Queue` : 'General Altar & Care Queue'} badge={careList.length} />
@@ -235,7 +258,7 @@ export default function PastoralTriageScreen() {
                 <EmptyState title="No Follow-Up Requests" message="Altar responses, counselling requests and other live-service follow-ups routed to this exact scope will appear here." iconName="heart-outline" />
               )}
             </View>
-          )}
+          ) : null}
         </View>
       </ScrollView>
     </View>
