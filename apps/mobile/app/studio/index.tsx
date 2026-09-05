@@ -9,7 +9,6 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
-import { useResource } from '@/hooks/use-resource';
 import {
   BottomSheet,
   Button,
@@ -20,12 +19,6 @@ import {
   SectionHeader,
 } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
-
-interface StudioOverview {
-  drafts?: { id: string; content_type: string; status: string; created_at: string }[];
-  mediaQueue?: { id: string; media_type: string; processing_state: string; created_at: string }[];
-  totalPublished?: number;
-}
 
 export default function CreatorStudioScreen() {
   const insets = useSafeAreaInsets();
@@ -39,10 +32,6 @@ export default function CreatorStudioScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [publishNotice, setPublishNotice] = useState('');
   const [publishError, setPublishError] = useState('');
-
-  const studioResource = useResource<StudioOverview>('studio:overview', (signal) =>
-    api.request<StudioOverview>('creator-studio', { signal })
-  );
 
   const handlePublishPost = async () => {
     if (!postBody.trim()) return;
@@ -66,7 +55,6 @@ export default function CreatorStudioScreen() {
           ? `Your announcement is live inside ${expression.name}.`
           : 'Your announcement is live in the General Community.',
       );
-      await studioResource.refresh();
     } catch (err: unknown) {
       setPublishError(err instanceof Error ? err.message : 'Unable to publish this announcement.');
     } finally {
