@@ -95,8 +95,8 @@ export default function FullScreenReelsScreen() {
           (item) => item.status === 'active' && item.organizationId === organizationId,
         ),
       ) ||
-      hasCapability('feed.post') ||
-      hasCapability('*')
+      context?.organizationPermissions?.includes('feed.post') === true ||
+      context?.organizationPermissions?.includes('*') === true
     );
 
   useEffect(() => {
