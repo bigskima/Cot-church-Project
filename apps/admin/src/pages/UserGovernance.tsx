@@ -28,7 +28,7 @@ interface UserListResponse {
   total: number;
 }
 
-export function UserGovernance({ api }: { api: ApiClient }) {
+export function UserGovernance({ api, canManage = false }: { api: ApiClient; canManage?: boolean }) {
   const [users, setUsers] = useState<UserAccount[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -61,13 +61,14 @@ export function UserGovernance({ api }: { api: ApiClient }) {
   }, [api, search]);
 
   const openGovernance = (user: UserAccount, type: GovernanceAction) => {
+    if (!canManage) return;
     setModerationUser(user);
     setModerationType(type);
     setModerationReason('');
   };
 
   const applyGovernance = async () => {
-    if (!moderationUser) return;
+    if (!canManage || !moderationUser) return;
     const isPosting = moderationType === 'posting';
     const action = isPosting
       ? moderationUser.posting_allowed === false ? 'restore_posting' : 'restrict_posting'
@@ -182,12 +183,16 @@ export function UserGovernance({ api }: { api: ApiClient }) {
               accessor: (item) => (
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <Button variant="outline" size="sm" onClick={() => setSelectedUser(item)}>Inspect</Button>
-                  <Button variant="outline" size="sm" onClick={() => openGovernance(item, 'posting')}>
-                    {item.posting_allowed === false ? 'Restore posting' : 'Restrict posting'}
-                  </Button>
-                  <Button variant={item.account_status === 'banned' ? 'gold' : 'danger'} size="sm" onClick={() => openGovernance(item, 'account')}>
-                    {item.account_status === 'banned' ? 'Restore' : 'Ban'}
-                  </Button>
+                  {canManage ? (
+                    <>
+                      <Button variant="outline" size="sm" onClick={() => openGovernance(item, 'posting')}>
+                        {item.posting_allowed === false ? 'Restore posting' : 'Restrict posting'}
+                      </Button>
+                      <Button variant={item.account_status === 'banned' ? 'gold' : 'danger'} size="sm" onClick={() => openGovernance(item, 'account')}>
+                        {item.account_status === 'banned' ? 'Restore' : 'Ban'}
+                      </Button>
+                    </>
+                  ) : null}
                 </div>
               ),
             },
@@ -234,7 +239,7 @@ export function UserGovernance({ api }: { api: ApiClient }) {
       </Modal>
 
       <Modal
-        isOpen={!!moderationUser}
+        isOpen={canManage && !!moderationUser}
         onClose={() => { if (!actionBusy) setModerationUser(null); }}
         title={moderationType === 'posting'
           ? actionIsRestore ? 'Restore posting access' : 'Restrict posting access'
