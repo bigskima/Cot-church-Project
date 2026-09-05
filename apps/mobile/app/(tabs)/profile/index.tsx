@@ -92,7 +92,7 @@ export default function ProfileScreen() {
             <View style={[styles.visitorIconWrap, { backgroundColor: colors.primarySoft }]}><Icon name="person-add" size={28} color={colors.interactive} /></View>
             <Text style={[styles.visitorTitle, { color: colors.text }]}>Your COT account</Text>
             <Text style={[styles.visitorSubtitle, { color: colors.textSecondary }]}>Public COT stays open to browse. Sign in when you want to interact, join an Expression, receive invitations, or use member-only features.</Text>
-            <Button label="Sign in or create account" onPress={() => router.replace('/(auth)/login')} variant="primary" size="lg" style={{ width: '100%', marginTop: spacing.sm }} />
+            <Button label="Sign in or create account" onPress={() => router.push({ pathname: '/(auth)/login', params: { returnTo: '/(tabs)/profile' } } as any)} variant="primary" size="lg" style={{ width: '100%', marginTop: spacing.sm }} />
           </View>
         ) : (
           <View style={[styles.memberCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
