@@ -132,7 +132,16 @@ export default function CommunityScreen() {
   // General Community is public to read and available to any authenticated
   // account for interaction. Expression-only posting remains scoped by the
   // selected Expression below and is still enforced by the API.
-  const canPost = mode === 'authenticated';
+  const hasChurchMembership = Boolean(
+    context?.organizations?.some((organization) =>
+      organization.memberships?.some((membership) => membership.status === 'active'),
+    ),
+  );
+
+  // Signed-in users may interact with public community content. Publishing is
+  // still membership-scoped because the server-side post RPC enforces active
+  // organization membership.
+  const canPost = mode === 'authenticated' && hasChurchMembership;
   const canEngage = mode === 'authenticated';
 
   const cleanupAttachments = async (items = attachments) => {
