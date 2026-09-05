@@ -107,6 +107,27 @@ Deno.serve(createHandler(
       if (error) throw new ApiError("COMMENT_CREATE_FAILED", "Unable to comment", 500, undefined, false);
       return { data, status: 201 };
     }
+    if (body.action === "share_reel") {
+      assertNoUnknownFields(body, ["action", "reelId", "body"]);
+      const reelId = uuid(requiredString(body.reelId, "reelId", 36), "reelId", true)!;
+      const shareBody = body.body === undefined || body.body === null ? "" : requiredString(body.body, "body", 10000).trim();
+      const { data, error } = await auth.client.rpc("publish_social_reel_share", {
+        target_organization_id: auth.organizationId,
+        target_reel_id: reelId,
+        post_body: shareBody,
+      }).single();
+      if (error?.code === "P0002") throw new ApiError("REEL_NOT_FOUND", "This Reel is no longer available", 404);
+      if (error?.code === "42501") {
+        const message = String(error.message ?? "");
+        if (message.includes("Posting is currently restricted")) throw new ApiError("POSTING_RESTRICTED", "Your posting access is currently restricted", 403);
+        if (message.includes("Active Expression membership required")) throw new ApiError("GENERAL_POSTING_MEMBERSHIP_REQUIRED", "Join an active Expression before sharing to General Community", 403);
+        if (message.includes("Only published public Reels")) throw new ApiError("REEL_SHARE_UNAVAILABLE", "Only public Reels can be shared to General Community", 403);
+        throw new ApiError("PERMISSION_DENIED", "You do not have permission to share this Reel to General Community", 403);
+      }
+      if (error) throw new ApiError("REEL_SHARE_FAILED", "Unable to share this Reel to General Community", 500, undefined, false);
+      return { data, status: 201 };
+    }
+
     if (body.action === "react") {
       assertNoUnknownFields(body, ["action", "postId", "reaction"]);
       const contentId = uuid(requiredString(body.postId, "postId", 36), "postId", true)!;
