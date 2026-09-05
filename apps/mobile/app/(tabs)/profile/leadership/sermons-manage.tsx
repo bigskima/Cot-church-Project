@@ -27,6 +27,7 @@ export default function SermonsManageScreen() {
   const { api, context, hasCapability } = useSession();
   const { colors } = useTheme();
   const expression = context?.expression;
+  const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
 
   const [composerOpen, setComposerOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -39,7 +40,7 @@ export default function SermonsManageScreen() {
   const [successMsg, setSuccessMsg] = useState('');
 
   const canPublish = hasCapability('sermons.publish') || hasCapability('*');
-  const sermons = useResource<Sermon[]>('leadership:sermons', (signal) =>
+  const sermons = useResource<Sermon[]>(`leadership:sermons:${organizationId || 'none'}:${expression?.id ?? 'general'}`, (signal) =>
     api.request<Sermon[]>('sermons', { signal })
   );
 
