@@ -33,6 +33,7 @@ export interface PostCardProps {
   onReact?: (reaction: string | null) => void | boolean | Promise<boolean>;
   onBookmark?: (currentlySaved: boolean) => void | boolean | Promise<boolean>;
   onShare?: () => void;
+  allowExternalShare?: boolean;
   onMore?: () => void;
   style?: StyleProp<ViewStyle>;
   dark?: boolean;
@@ -62,6 +63,7 @@ export function PostCard({
   onReact,
   onBookmark,
   onShare,
+  allowExternalShare = true,
   onMore,
   style,
 }: PostCardProps) {
@@ -278,9 +280,11 @@ export function PostCard({
         ) : (
           <Text style={[styles.guestMeta, { color: colors.textMuted }]}>Sign in to join the conversation</Text>
         )}
-        <Pressable onPress={handleNativeShare} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed && { backgroundColor: colors.bgSecondary }]} accessibilityRole="button" accessibilityLabel="Share post">
-          <Icon name="share-social-outline" size={19} color={colors.textSecondary} />
-        </Pressable>
+        {allowExternalShare ? (
+          <Pressable onPress={handleNativeShare} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed && { backgroundColor: colors.bgSecondary }]} accessibilityRole="button" accessibilityLabel="Share post">
+            <Icon name="share-social-outline" size={19} color={colors.textSecondary} />
+          </Pressable>
+        ) : null}
       </View>
     </Pressable>
   );
