@@ -25,6 +25,16 @@ export default function ProfileScreen() {
   const expression = context?.expression;
   const hasOrganization = Boolean(context?.organization?.id ?? organization?.id);
 
+  const expressionCreatorState = useResource<{ organizationId: string; authorized: boolean }>(
+    `profile:expression-creator:${context?.organization?.id ?? organization?.id ?? 'none'}`,
+    (signal) => {
+      const organizationId = context?.organization?.id ?? organization?.id;
+      if (mode !== 'authenticated' || !organizationId) return Promise.resolve({ organizationId: '', authorized: false });
+      return api.request(`expression-creators?mode=self&organizationId=${organizationId}`, { signal });
+    },
+  );
+  const isAuthorizedExpressionCreator = expressionCreatorState.data?.authorized === true;
+
   const aiReadiness = useResource<AiReadiness>('profile:assistant-readiness', (signal) => {
     if (mode !== 'authenticated' || !hasOrganization) {
       return Promise.resolve({ capability: 'assistant.answer', ready: false, reason: 'active_membership_required' });
@@ -50,7 +60,8 @@ export default function ProfileScreen() {
     hasCapability('branches.create') ||
     hasCapability('expression.create') ||
     hasCapability('giving.campaigns.manage') ||
-    hasCapability('giving.finance.read');
+    hasCapability('giving.finance.read') ||
+    isAuthorizedExpressionCreator;
 
   const hasLeadershipAccess = mode === 'authenticated' && (
     hasCapability('*') || hasOrganizationLeadershipAccess || hasExpressionLeadershipAccess
