@@ -57,6 +57,15 @@ export function Table<T>({
             <tr
               key={keyExtractor(item)}
               onClick={() => onRowClick?.(item)}
+              onKeyDown={(event) => {
+                if (!onRowClick) return;
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onRowClick(item);
+                }
+              }}
+              tabIndex={onRowClick ? 0 : undefined}
+              role={onRowClick ? 'button' : undefined}
               className={onRowClick ? 'admin-table-row-clickable' : ''}
             >
               {columns.map((col, idx) => {
