@@ -26,6 +26,65 @@ To apply all database tables, policies, and permissions:
 supabase db push
 ```
 
+#### If `db push` says remote migration versions are missing locally
+
+Do **not** delete database objects, reset the production database, or create empty
+SQL files with the missing version numbers. This message means the remote
+`supabase_migrations.schema_migrations` history contains entries that are not in
+this repository. The schema changes may still be present in the remote database.
+
+First, update your checkout and confirm that you are on `main`:
+
+```powershell
+git switch main
+git pull --ff-only origin main
+git status --short --branch
+```
+
+If the error still lists exactly these five remote-only versions, remove their
+stale history entries:
+
+```powershell
+supabase migration repair --status reverted 20260905182821 20260905183329 20260905183803 20260905184356 20260905185101
+supabase migration list
+```
+
+The CLI may then report that these five canonical local migrations are missing
+from remote history. If, and only if, it lists exactly the versions below, mark
+them as applied before pulling:
+
+```powershell
+supabase migration repair --status applied 20260905184500
+supabase migration repair --status applied 20260905191000
+supabase migration repair --status applied 20260905194500
+supabase migration repair --status applied 20260905201500
+supabase migration repair --status applied 20260905203500
+supabase migration list
+supabase db pull
+```
+
+These are existing, reviewed migrations in this repository; marking them applied
+aligns history with the canonical filenames without running the same schema
+changes a second time. Do not substitute other version numbers.
+
+If `db pull` generates a new SQL file under `supabase/migrations/`, review it
+before doing anything else. It is a real recovery artifact and **must be committed
+and pushed** so every future checkout has the same migration history:
+
+```powershell
+git add supabase/migrations
+git commit -m "Reconcile remote Supabase migration history"
+git push
+supabase db push
+```
+
+Only use these repair commands when Supabase reports these exact versions for the
+project reference shown above. If it reports different versions, stop and compare
+`supabase migration list` with the filenames in `supabase/migrations/` rather than
+copying these commands blindly. Migration repair changes history metadata; it does
+not apply or undo schema objects. The final `db pull` checks the actual remote
+schema and records any remaining difference in source control.
+
 ### 3. Deploy All Edge Functions
 ```bash
 supabase functions deploy --no-verify-jwt
