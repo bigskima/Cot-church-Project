@@ -196,6 +196,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
     });
 
     if (res.session) {
+      clearContextResources();
+      setContext(null);
       await persist({
         session: {
           accessToken: res.session.accessToken,
@@ -209,6 +211,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
   const setSession = async (session: any) => {
     if (session) {
+      clearContextResources();
+      setContext(null);
       await persist({
         session: {
           accessToken: session.accessToken,
