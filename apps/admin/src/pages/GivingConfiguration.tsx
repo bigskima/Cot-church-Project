@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ApiClient } from '../api';
-import { Badge, Button, Card, InputField, SelectField, Toggle } from '../components/ui';
+import { Badge, Button, Card, InputField, Modal, SelectField, Tabs, Toggle } from '../components/ui';
 
 type Organization = { id: string; name: string; slug: string; status: string };
 type Settings = {
@@ -60,6 +60,8 @@ export function GivingConfiguration({ api }: { api: ApiClient }) {
   });
   const [organizationId, setOrganizationId] = useState('');
   const [tab, setTab] = useState<Tab>('settings');
+  const [purposeOpen, setPurposeOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -197,6 +199,7 @@ export function GivingConfiguration({ api }: { api: ApiClient }) {
       setPurposeName('');
       setPurposeDescription('');
       setPurposeDefault(false);
+      setPurposeOpen(false);
     }
   };
 
@@ -255,6 +258,7 @@ export function GivingConfiguration({ api }: { api: ApiClient }) {
       setTransferInstructions('');
       setAdditionalInstructions('');
       setReferencePrefix('');
+      setAccountOpen(false);
     }
   };
 
@@ -287,20 +291,16 @@ export function GivingConfiguration({ api }: { api: ApiClient }) {
   }));
 
   return (
-    <div>
-      <Card
-        title="Church-wide Giving"
-        subtitle="Configure the general church giving destination shown to guests and authenticated users. Expression giving remains controlled inside each expression."
-        headerAction={
-          <Button variant="outline" size="sm" onClick={() => void load()} loading={loading}>
-            Refresh
-          </Button>
-        }
-      >
-        {error ? <div className="admin-form-error" role="alert" style={{ marginBottom: 16 }}>{error}</div> : null}
-        {notice ? <div style={{ marginBottom: 16, color: 'var(--success)', fontWeight: 700 }}>{notice}</div> : null}
+    <div className="admin-page-stack">
+      {error && !purposeOpen && !accountOpen ? <div className="admin-inline-error" role="alert">{error}</div> : null}
+      {notice ? <div className="admin-status-message admin-status-success">{notice}</div> : null}
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 1fr) minmax(280px, 2fr)', gap: 16, alignItems: 'end' }}>
+      <Card
+        title="Church-wide giving"
+        subtitle="Configure the general church giving destination shown to guests and authenticated users. Expression giving remains controlled inside each Expression."
+        headerAction={<Button variant="outline" size="sm" onClick={() => void load()} loading={loading}>Refresh</Button>}
+      >
+        <div className="admin-filter-bar">
           <SelectField
             label="Church organization"
             value={organizationId}
@@ -312,37 +312,41 @@ export function GivingConfiguration({ api }: { api: ApiClient }) {
             value={reason}
             onChange={(event) => setReason(event.target.value)}
             placeholder="Why is this church-wide giving configuration being changed?"
+            helperText="Every write on this page is permission checked and audited."
           />
         </div>
 
         {selectedOrganization ? (
-          <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className="admin-scope-banner">
             <Badge label={selectedOrganization.status.toUpperCase()} variant={selectedOrganization.status === 'active' ? 'active' : 'suspended'} />
-            <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
-              Root scope only · no expression account is editable from this page
-            </span>
+            <div>
+              <strong>{selectedOrganization.name}</strong>
+              <span>Church-wide root scope only · no Expression account is editable from this page</span>
+            </div>
           </div>
         ) : null}
       </Card>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        {(['settings', 'purposes', 'accounts'] as Tab[]).map((item) => (
-          <Button key={item} variant={tab === item ? 'primary' : 'outline'} size="sm" onClick={() => setTab(item)}>
-            {item === 'settings' ? 'Availability & Copy' : item === 'purposes' ? 'Purposes & Funds' : 'Transfer Accounts'}
-          </Button>
-        ))}
-      </div>
+      <Tabs
+        tabs={[
+          { key: 'settings', label: 'Availability & copy' },
+          { key: 'purposes', label: 'Purposes & funds', count: purposes.length },
+          { key: 'accounts', label: 'Transfer accounts', count: accounts.length },
+        ]}
+        activeKey={tab}
+        onChange={(key) => setTab(key as Tab)}
+      />
 
       {tab === 'settings' ? (
         <Card
-          title="Giving Availability & Presentation"
-          subtitle="Manual transfer is the active production rail. Online provider payments remain structurally present but unavailable until real provider APIs and adapters are installed."
+          title="Giving availability & presentation"
+          subtitle="Manual transfer is the active production rail. Online provider payments remain unavailable until an explicitly released production provider rollout."
         >
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+          <div className="admin-form-grid-two">
             <InputField label="Giving title" value={displayTitle} onChange={(event) => setDisplayTitle(event.target.value)} placeholder="Giving" />
             <InputField label="Giving description" value={displaySubtitle} onChange={(event) => setDisplaySubtitle(event.target.value)} placeholder="Optional message shown to givers" />
           </div>
-          <div style={{ display: 'grid', gap: 16, marginTop: 18 }}>
+          <div className="admin-settings-list">
             <Toggle
               label="Publish church-wide giving"
               description="Makes configured church-wide giving information available to guests and authenticated users."
@@ -357,115 +361,134 @@ export function GivingConfiguration({ api }: { api: ApiClient }) {
             />
             <Toggle
               label="Online payment"
-              description="Unavailable by design until a real provider API and verified production adapter are installed."
+              description="Unavailable by design until a verified production payment provider rollout is released."
               checked={false}
               onChange={() => undefined}
               disabled
             />
           </div>
-          <div style={{ marginTop: 18 }}>
-            <Button onClick={() => void saveSettings()} loading={busy} disabled={!organizationId}>
-              Save Church-wide Giving
-            </Button>
+          <div className="admin-card-footer-action">
+            <Button onClick={() => void saveSettings()} loading={busy} disabled={!organizationId}>Save church-wide giving</Button>
           </div>
         </Card>
       ) : null}
 
       {tab === 'purposes' ? (
-        <>
-          <Card title="Add Giving Purpose / Fund" subtitle="Nothing here is hardcoded into the app. Add, hide, reorder, or replace church-wide giving purposes as ministry needs change.">
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
-              <InputField label="Purpose or fund name" value={purposeName} onChange={(event) => setPurposeName(event.target.value)} placeholder="Configured by Platform Administration" />
-              <InputField label="Description" value={purposeDescription} onChange={(event) => setPurposeDescription(event.target.value)} placeholder="Optional explanation" />
-            </div>
-            <div style={{ marginTop: 14 }}>
-              <Toggle label="Default purpose" description="Preselect this purpose when someone opens church-wide giving." checked={purposeDefault} onChange={setPurposeDefault} />
-            </div>
-            <div style={{ marginTop: 16 }}><Button onClick={() => void addPurpose()} loading={busy}>Publish Purpose</Button></div>
-          </Card>
-
-          <Card title="Configured Church-wide Purposes" subtitle={`${purposes.length} purpose${purposes.length === 1 ? '' : 's'} configured for this church.`}>
-            {purposes.length ? (
-              <div style={{ display: 'grid', gap: 10 }}>
-                {purposes.map((purpose) => (
-                  <div key={purpose.id} style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', padding: 16, display: 'flex', gap: 16, alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <strong>{purpose.name}</strong>
-                        {purpose.is_default ? <Badge label="DEFAULT" variant="gold" /> : null}
-                        <Badge label={purpose.status.toUpperCase()} variant={purpose.status === 'active' ? 'active' : 'neutral'} />
-                      </div>
-                      {purpose.description ? <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 5 }}>{purpose.description}</div> : null}
+        <Card
+          title="Configured church-wide purposes"
+          subtitle={`${purposes.length} purpose${purposes.length === 1 ? '' : 's'} configured for this church. Purposes are data-driven and can be changed without redeploying the app.`}
+          headerAction={<Button variant="gold" size="sm" onClick={() => { setError(''); setPurposeOpen(true); }}>New purpose</Button>}
+        >
+          {purposes.length ? (
+            <div className="admin-record-grid">
+              {purposes.map((purpose) => (
+                <div key={purpose.id} className="admin-record-card">
+                  <div className="admin-record-main">
+                    <div className="admin-record-title-row">
+                      <strong>{purpose.name}</strong>
+                      {purpose.is_default ? <Badge label="DEFAULT" variant="gold" /> : null}
+                      <Badge label={purpose.status.toUpperCase()} variant={purpose.status === 'active' ? 'active' : 'neutral'} />
                     </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      {!purpose.is_default && purpose.status === 'active' ? (
-                        <Button variant="outline" size="sm" onClick={() => void updatePurpose(purpose, { is_default: true })} disabled={busy}>Set default</Button>
-                      ) : null}
-                      <Button variant="ghost" size="sm" onClick={() => void updatePurpose(purpose, { status: purpose.status === 'active' ? 'inactive' : 'active' })} disabled={busy}>
-                        {purpose.status === 'active' ? 'Hide' : 'Publish'}
-                      </Button>
-                    </div>
+                    {purpose.description ? <div className="admin-row-meta">{purpose.description}</div> : null}
                   </div>
-                ))}
-              </div>
-            ) : <div className="admin-table-empty"><p>No church-wide giving purposes are configured.</p></div>}
-          </Card>
-        </>
+                  <div className="admin-table-actions">
+                    {!purpose.is_default && purpose.status === 'active' ? (
+                      <Button variant="outline" size="sm" onClick={() => void updatePurpose(purpose, { is_default: true })} disabled={busy}>Set default</Button>
+                    ) : null}
+                    <Button variant="ghost" size="sm" onClick={() => void updatePurpose(purpose, { status: purpose.status === 'active' ? 'inactive' : 'active' })} disabled={busy}>
+                      {purpose.status === 'active' ? 'Hide' : 'Publish'}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : <div className="admin-table-empty"><p>No church-wide giving purposes are configured.</p></div>}
+        </Card>
       ) : null}
 
       {tab === 'accounts' ? (
-        <>
-          <Card
-            title="Add Manual Transfer Account"
-            subtitle="Currency is data, not application code. Add any valid currency account without redeploying the mobile or web applications. Multiple accounts may use the same currency."
-          >
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
-              <InputField label="Display label" value={accountLabel} onChange={(event) => setAccountLabel(event.target.value)} placeholder="e.g. NGN General Giving" />
-              <InputField label="Currency code" value={currency} onChange={(event) => setCurrency(event.target.value.toUpperCase())} maxLength={3} placeholder="NGN" />
-              <InputField label="Bank name" value={bankName} onChange={(event) => setBankName(event.target.value)} placeholder="Bank name" />
-              <InputField label="Account name" value={accountName} onChange={(event) => setAccountName(event.target.value)} placeholder="Beneficiary name" />
-              <InputField label="Account number" value={accountNumber} onChange={(event) => setAccountNumber(event.target.value)} placeholder="Account number" />
-              <InputField label="Routing / sort code" value={routingNumber} onChange={(event) => setRoutingNumber(event.target.value)} placeholder="Optional" />
-              <InputField label="SWIFT / BIC" value={swiftCode} onChange={(event) => setSwiftCode(event.target.value)} placeholder="Optional" />
-              <InputField label="IBAN" value={iban} onChange={(event) => setIban(event.target.value)} placeholder="Optional" />
-              <InputField label="Reference prefix" value={referencePrefix} onChange={(event) => setReferencePrefix(event.target.value)} placeholder="Optional, e.g. GIVE-" />
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14, marginTop: 14 }}>
-              <InputField label="Transfer instructions" value={transferInstructions} onChange={(event) => setTransferInstructions(event.target.value)} placeholder="Instructions shown to the giver" />
-              <InputField label="Additional instructions" value={additionalInstructions} onChange={(event) => setAdditionalInstructions(event.target.value)} placeholder="Optional currency or bank-specific information" />
-            </div>
-            <div style={{ marginTop: 16 }}><Button onClick={() => void addAccount()} loading={busy}>Publish Transfer Account</Button></div>
-          </Card>
-
-          <Card title="Published Transfer Destinations" subtitle={`${accounts.length} manual transfer account${accounts.length === 1 ? '' : 's'} configured.`}>
-            {accounts.length ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))', gap: 14 }}>
-                {accounts.map((account) => (
-                  <div key={account.id} style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', padding: 16 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <Card
+          title="Published transfer destinations"
+          subtitle={`${accounts.length} manual transfer account${accounts.length === 1 ? '' : 's'} configured. Currency remains data, not application code.`}
+          headerAction={<Button variant="gold" size="sm" onClick={() => { setError(''); setAccountOpen(true); }}>New transfer account</Button>}
+        >
+          {accounts.length ? (
+            <div className="admin-record-grid admin-record-grid-wide">
+              {accounts.map((account) => (
+                <div key={account.id} className="admin-record-card">
+                  <div className="admin-record-main">
+                    <div className="admin-record-title-row">
                       <strong>{account.label}</strong>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <Badge label={account.currency} variant="gold" />
-                        <Badge label={account.is_active ? 'PUBLISHED' : 'HIDDEN'} variant={account.is_active ? 'active' : 'neutral'} />
-                      </div>
+                      <Badge label={account.currency} variant="gold" />
+                      <Badge label={account.is_active ? 'PUBLISHED' : 'HIDDEN'} variant={account.is_active ? 'active' : 'neutral'} />
                     </div>
-                    <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.65 }}>
-                      <div>{account.bank_name}</div>
-                      <div style={{ color: 'var(--text-muted)' }}>{account.account_name}</div>
-                      <code style={{ color: 'var(--blue)' }}>{account.account_number}</code>
-                    </div>
-                    <div style={{ marginTop: 14 }}>
-                      <Button variant="outline" size="sm" onClick={() => void setAccountActive(account, !account.is_active)} disabled={busy}>
-                        {account.is_active ? 'Hide Account' : 'Publish Account'}
-                      </Button>
-                    </div>
+                    <div className="admin-record-detail">{account.bank_name}</div>
+                    <div className="admin-row-meta">{account.account_name}</div>
+                    <code className="admin-account-number">{account.account_number}</code>
                   </div>
-                ))}
-              </div>
-            ) : <div className="admin-table-empty"><p>No manual transfer accounts are configured yet.</p></div>}
-          </Card>
-        </>
+                  <Button variant="outline" size="sm" onClick={() => void setAccountActive(account, !account.is_active)} disabled={busy}>
+                    {account.is_active ? 'Hide account' : 'Publish account'}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : <div className="admin-table-empty"><p>No manual transfer accounts are configured yet.</p></div>}
+        </Card>
       ) : null}
+
+      <Modal
+        isOpen={purposeOpen}
+        onClose={() => { if (!busy) setPurposeOpen(false); }}
+        title="New giving purpose"
+        subtitle={selectedOrganization?.name}
+        maxWidth="md"
+        footer={
+          <>
+            <Button variant="outline" disabled={busy} onClick={() => setPurposeOpen(false)}>Cancel</Button>
+            <Button variant="gold" loading={busy} onClick={() => void addPurpose()}>Publish purpose</Button>
+          </>
+        }
+      >
+        <div className="admin-modal-form">
+          {error ? <div className="admin-inline-error" role="alert">{error}</div> : null}
+          <InputField label="Purpose or fund name" value={purposeName} onChange={(event) => setPurposeName(event.target.value)} placeholder="General offering, missions, building fund…" />
+          <InputField label="Description" value={purposeDescription} onChange={(event) => setPurposeDescription(event.target.value)} placeholder="Optional explanation" />
+          <Toggle label="Default purpose" description="Preselect this purpose when someone opens church-wide giving." checked={purposeDefault} onChange={setPurposeDefault} />
+          <div className="admin-info-callout">The governance reason entered at the top of this page will be attached to this audited change.</div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={accountOpen}
+        onClose={() => { if (!busy) setAccountOpen(false); }}
+        title="New transfer account"
+        subtitle={selectedOrganization?.name}
+        maxWidth="xl"
+        footer={
+          <>
+            <Button variant="outline" disabled={busy} onClick={() => setAccountOpen(false)}>Cancel</Button>
+            <Button variant="gold" loading={busy} onClick={() => void addAccount()}>Publish transfer account</Button>
+          </>
+        }
+      >
+        <div className="admin-modal-form">
+          {error ? <div className="admin-inline-error" role="alert">{error}</div> : null}
+          <div className="admin-form-grid-two">
+            <InputField label="Display label" value={accountLabel} onChange={(event) => setAccountLabel(event.target.value)} placeholder="NGN General Giving" />
+            <InputField label="Currency code" value={currency} onChange={(event) => setCurrency(event.target.value.toUpperCase())} maxLength={3} placeholder="NGN" />
+            <InputField label="Bank name" value={bankName} onChange={(event) => setBankName(event.target.value)} placeholder="Bank name" />
+            <InputField label="Account name" value={accountName} onChange={(event) => setAccountName(event.target.value)} placeholder="Beneficiary name" />
+            <InputField label="Account number" value={accountNumber} onChange={(event) => setAccountNumber(event.target.value)} placeholder="Account number" />
+            <InputField label="Routing / sort code" value={routingNumber} onChange={(event) => setRoutingNumber(event.target.value)} placeholder="Optional" />
+            <InputField label="SWIFT / BIC" value={swiftCode} onChange={(event) => setSwiftCode(event.target.value)} placeholder="Optional" />
+            <InputField label="IBAN" value={iban} onChange={(event) => setIban(event.target.value)} placeholder="Optional" />
+            <InputField label="Reference prefix" value={referencePrefix} onChange={(event) => setReferencePrefix(event.target.value)} placeholder="Optional, e.g. GIVE-" />
+            <InputField label="Transfer instructions" value={transferInstructions} onChange={(event) => setTransferInstructions(event.target.value)} placeholder="Instructions shown to the giver" />
+            <InputField label="Additional instructions" value={additionalInstructions} onChange={(event) => setAdditionalInstructions(event.target.value)} placeholder="Optional currency or bank-specific information" />
+          </div>
+          <div className="admin-info-callout">The governance reason entered at the top of this page will be attached to this audited change.</div>
+        </div>
+      </Modal>
     </div>
   );
 }
