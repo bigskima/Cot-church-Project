@@ -2522,3 +2522,46 @@ body {
     grid-column: 1 / -1;
   }
 }
+
+
+.admin-search-icon {
+  width: 13px;
+  height: 13px;
+  left: 14px;
+  border: 1.8px solid currentColor;
+  border-radius: 999px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.admin-search-icon::after {
+  content: "";
+  position: absolute;
+  width: 5px;
+  height: 1.8px;
+  right: -4px;
+  bottom: -2px;
+  border-radius: 99px;
+  background: currentColor;
+  transform: rotate(45deg);
+  transform-origin: left center;
+}
+
+.admin-search-clear {
+  width: 26px;
+  height: 26px;
+  right: 8px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.admin-search-clear:hover {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
