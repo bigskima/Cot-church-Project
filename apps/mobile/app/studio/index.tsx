@@ -117,7 +117,7 @@ export default function CreatorStudioScreen() {
       iconName: 'people-outline',
       badge: 'COMMUNITY',
       route: '/leadership/expressions',
-      enabled: hasCapability('branches.create') || hasCapability('organizations.manage') || hasCapability('expression.create') || hasCapability('*'),
+      enabled: hasCapability('branches.create') || hasCapability('*'),
     },
     {
       title: 'Expression Leadership',
