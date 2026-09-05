@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Link, router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiError } from '@/api';
 import { useSession } from '@/state/session';
@@ -18,6 +18,13 @@ import { BrandMark } from '@/components/primitives/BrandMark';
 import { Icon } from '@/components/primitives/Icon';
 import { Button } from '@/components/Button';
 import { radius, shadows, spacing, typography } from '@/design-system/tokens';
+
+function safeReturnTo(value?: string) {
+  if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('://') || value.startsWith('/(auth)')) {
+    return '/(tabs)/home';
+  }
+  return value;
+}
 
 function loginErrorMessage(error: unknown) {
   if (!(error instanceof ApiError)) {
@@ -47,6 +54,8 @@ function loginErrorMessage(error: unknown) {
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
+  const { returnTo: requestedReturnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const returnTo = safeReturnTo(requestedReturnTo);
   const { login, enterAsVisitor } = useSession();
   const { colors } = useTheme();
 
@@ -72,7 +81,7 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await login(identifier.trim(), password);
-      router.replace('/(tabs)/home');
+      router.replace(returnTo as any);
     } catch (error) {
       setErrorMsg(loginErrorMessage(error));
     } finally {
@@ -177,7 +186,7 @@ export default function LoginScreen() {
                   styles.input,
                   {
                     backgroundColor: colors.bgSecondary,
-                    borderColor: colors.border,
+                    borderColor: colors.borderSubtle,
                     color: colors.text,
                     paddingRight: 44,
                   },
@@ -232,11 +241,12 @@ export default function LoginScreen() {
 
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: colors.textSecondary }]}>Don't have an account? </Text>
-          <Link href="/(auth)/signup" asChild>
-            <Pressable accessibilityRole="link">
-              <Text style={[styles.footerLink, { color: colors.interactive }]}>Sign up</Text>
-            </Pressable>
-          </Link>
+          <Pressable
+            accessibilityRole="link"
+            onPress={() => router.push({ pathname: '/(auth)/signup', params: { returnTo } } as any)}
+          >
+            <Text style={[styles.footerLink, { color: colors.interactive }]}>Sign up</Text>
+          </Pressable>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
