@@ -142,7 +142,10 @@ export default function CommunityScreen() {
   // member-social lane unlocked by active Expression membership. Ministry
   // publishers use explicit feed / Reel / Watch / Sermon / Live capabilities.
   const hasActiveExpressionMembership = Boolean(
-    context?.expressions?.some((item) => item.status === 'active'),
+    organizationId &&
+    context?.expressions?.some(
+      (item) => item.status === 'active' && item.organizationId === organizationId,
+    ),
   );
   const elevatedFeedPublisher = hasCapability('feed.post') || hasCapability('*');
   const canPostGeneral =
