@@ -39,6 +39,7 @@ export default function LeadershipHubScreen() {
   const canManageGiving = hasCapability('giving.campaigns.manage') || hasCapability('*');
   const canReadGivingFinance = hasCapability('giving.finance.read') || hasCapability('*');
   const canManageLeadership = hasCapability('expression.leadership.manage') || hasCapability('*');
+  const canManageChurchLeadership = hasCapability('organization.leadership.manage') || hasCapability('*');
   const canManageExpressionAccess =
     isCurrentExpressionOwner ||
     (hasCapability('members.invite') && hasCapability('roles.assign')) ||
@@ -48,6 +49,7 @@ export default function LeadershipHubScreen() {
   const tools = [
     { title: 'Live Media Studio', description: 'Create live broadcasts, retrieve ingest details, and monitor stream health.', iconName: 'radio-outline', badge: 'LIVE OPS', route: '/(tabs)/profile/leadership/media-studio', enabled: canManageMedia },
     { title: 'Pastoral Triage & Care Queue', description: 'Manage confidential prayer petitions, decisions, and assigned follow-ups.', iconName: 'heart-outline', badge: 'CARE', route: '/(tabs)/profile/leadership/pastoral-triage', enabled: canPastoralTriage },
+    { title: 'Church Leadership Directory', description: 'Manage church-wide leaders and choose who appears in the public Church Story.', iconName: 'business-outline', badge: 'CHURCH', route: '/(tabs)/profile/leadership/church-leadership', enabled: canManageChurchLeadership },
     { title: 'Expression Leadership Directory', description: 'Manage pastoral and ministry leadership profiles for the selected Expression. Public featuring remains explicit.', iconName: 'people-outline', badge: 'DIRECTORY', route: '/(tabs)/profile/leadership/expression-leadership', enabled: canManageLeadership },
     { title: 'Expression Access & Ownership', description: 'Manage role invitations when authorized, and transfer accountable ownership when you are the current owner.', iconName: 'key-outline', badge: 'ACCESS', route: '/(tabs)/profile/leadership/expression-governance', enabled: canManageExpressionAccess },
     { title: 'Giving Configuration', description: 'Manage giving destinations, purposes and transfer accounts for the current church scope.', iconName: 'gift-outline', badge: 'GIVING', route: '/(tabs)/profile/leadership/giving-manage', enabled: canManageGiving },
