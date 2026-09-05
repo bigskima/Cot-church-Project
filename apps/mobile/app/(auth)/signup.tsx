@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Link, router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -11,8 +11,17 @@ import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 
 type SignupStep = 'identity' | 'security';
 
+function safeReturnTo(value?: string) {
+  if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('://') || value.startsWith('/(auth)')) {
+    return '/(tabs)/home';
+  }
+  return value;
+}
+
 export default function SignupScreen() {
   const insets = useSafeAreaInsets();
+  const { returnTo: requestedReturnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const returnTo = safeReturnTo(requestedReturnTo);
   const { api, setSession } = useSession();
   const { colors } = useTheme();
 
@@ -87,7 +96,7 @@ export default function SignupScreen() {
         setVerificationPending(true);
       } else {
         await setSession(res.session);
-        router.replace('/(tabs)/home');
+        router.replace(returnTo as any);
       }
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Unable to complete registration.');
@@ -110,9 +119,9 @@ export default function SignupScreen() {
       });
       if (res.session) {
         await setSession(res.session);
-        router.replace('/(tabs)/home');
+        router.replace(returnTo as any);
       } else {
-        router.replace('/(auth)/login');
+        router.replace({ pathname: '/(auth)/login', params: { returnTo } } as any);
       }
     } catch (err) {
       setVerifyError(err instanceof Error ? err.message : 'Invalid or expired verification code.');
@@ -264,9 +273,9 @@ export default function SignupScreen() {
 
             <View style={styles.footer}>
               <Text style={[styles.footerText, { color: colors.textSecondary }]}>Already have an account? </Text>
-              <Link href="/(auth)/login" asChild>
-                <Pressable><Text style={[styles.footerLink, { color: colors.interactive }]}>Sign in</Text></Pressable>
-              </Link>
+              <Pressable onPress={() => router.push({ pathname: '/(auth)/login', params: { returnTo } } as any)}>
+                <Text style={[styles.footerLink, { color: colors.interactive }]}>Sign in</Text>
+              </Pressable>
             </View>
           </>
         )}
