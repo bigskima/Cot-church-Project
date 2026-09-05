@@ -54,6 +54,7 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
   const [page, setPage] = useState<string>('overview');
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [authority, setAuthority] = useState<PlatformAuthority>({ displayName: 'Administrator', roleName: 'Platform Administrator', roleCode: '' });
 
   const isSuperAdmin = authority.roleCode === 'super_admin';
@@ -90,14 +91,19 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
     if (requested?.superAdminOnly && !isSuperAdmin && !loading) setPage('overview');
   }, [page, isSuperAdmin, loading]);
 
+  const navigate = (nextPage: string) => {
+    setPage(nextPage);
+    setSidebarOpen(false);
+  };
+
   const renderContent = () => {
     switch (page) {
-      case 'overview': return <PlatformOverview api={api} onNavigate={setPage} />;
+      case 'overview': return <PlatformOverview api={api} onNavigate={navigate} />;
       case 'organizations': return <OrganizationsGovernance api={api} />;
       case 'expressions': return <ExpressionsGovernance api={api} />;
       case 'users': return <UserGovernance api={api} />;
-      case 'admin-invitations': return isSuperAdmin ? <AdminInvitations api={api} /> : <PlatformOverview api={api} onNavigate={setPage} />;
-      case 'expression-creators': return isSuperAdmin ? <ExpressionCreators api={api} /> : <PlatformOverview api={api} onNavigate={setPage} />;
+      case 'admin-invitations': return isSuperAdmin ? <AdminInvitations api={api} /> : <PlatformOverview api={api} onNavigate={navigate} />;
+      case 'expression-creators': return isSuperAdmin ? <ExpressionCreators api={api} /> : <PlatformOverview api={api} onNavigate={navigate} />;
       case 'branding': return <BrandingAppearance api={api} />;
       case 'public-directory': return <PublicDirectory api={api} />;
       case 'credentials': return <ProviderCredentials api={api} />;
@@ -107,7 +113,7 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
       case 'features': return <FeatureFlags api={api} />;
       case 'integrations': return <IntegrationsJobs api={api} />;
       case 'audit': return <AuditSecurity api={api} />;
-      default: return <PlatformOverview api={api} onNavigate={setPage} />;
+      default: return <PlatformOverview api={api} onNavigate={navigate} />;
     }
   };
 
@@ -121,7 +127,13 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
 
   return (
     <div className="admin-shell">
-      <aside className="admin-sidebar">
+      <button
+        type="button"
+        className={`admin-sidebar-backdrop ${sidebarOpen ? 'visible' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+        aria-label="Close navigation"
+      />
+      <aside className={`admin-sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="admin-brand"><div className="admin-brand-icon">COT</div><div className="admin-brand-text"><h1>City of Transformation</h1><p>Platform Administration</p></div></div>
         <nav className="admin-nav">
           {navSections.map((section) => (
@@ -129,7 +141,8 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
               <div className="admin-nav-group-title">{section.group}</div>
               {section.items.map((item) => {
                 const isActive = page === item.key;
-                return <button key={item.key} type="button" onClick={() => setPage(item.key)} className={`admin-nav-item ${isActive ? 'active' : ''}`}>
+                return <button key={item.key} type="button" onClick={() => navigate(item.key)} className={`admin-nav-item ${isActive ? 'active' : ''}`}>
+                  <span className="admin-nav-indicator" aria-hidden="true" />
                   <span>{item.label}</span>
                 </button>;
               })}
@@ -141,9 +154,34 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
 
       <div className="admin-main-stage">
         <header className="admin-topbar">
-          <div className="admin-topbar-left"><h2 className="admin-topbar-title">{getPageTitle()}</h2><Badge label="PLATFORM ADMIN" variant="gold" /></div>
+          <div className="admin-topbar-left">
+            <button
+              type="button"
+              className="admin-mobile-menu"
+              onClick={() => setSidebarOpen((open) => !open)}
+              aria-label={sidebarOpen ? 'Close navigation' : 'Open navigation'}
+              aria-expanded={sidebarOpen}
+            >
+              <span />
+              <span />
+              <span />
+            </button>
+            <div className="admin-page-heading">
+              <span className="admin-topbar-kicker">Platform control</span>
+              <h2 className="admin-topbar-title">{getPageTitle()}</h2>
+            </div>
+            <Badge label="ADMIN" variant="gold" />
+          </div>
           <div className="admin-topbar-right">
-            <button type="button" onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))} className="admin-btn-secondary admin-btn-sm" style={{ display: 'flex', alignItems: 'center', gap: 6 }} title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}><span>{theme === 'dark' ? 'Light' : 'Dark'}</span></button>
+            <button
+              type="button"
+              onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+              className="admin-theme-toggle"
+              title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}
+            >
+              <span className={`admin-theme-dot ${theme}`} aria-hidden="true" />
+              <span>{theme === 'dark' ? 'Dark' : 'Light'}</span>
+            </button>
           </div>
         </header>
         <main className="admin-content-viewport">
