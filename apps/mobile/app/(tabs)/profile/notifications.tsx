@@ -9,6 +9,8 @@ import { radius, shadows, spacing } from '@/design-system/tokens';
 
 type GovernanceInvitation = {
   id: string;
+  organization_id?: string | null;
+  branch_id?: string | null;
   kind: 'platform_role' | 'expression_role';
   message: string;
   status: 'pending' | 'accepted' | 'declined' | 'revoked' | 'expired';
@@ -27,7 +29,7 @@ type NotificationItem = {
 
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
-  const { api, mode, context } = useSession();
+  const { api, mode, context, auth, selectContext } = useSession();
   const { colors } = useTheme();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
@@ -43,13 +45,26 @@ export default function NotificationsScreen() {
   const pending = useMemo(() => (invitations.data ?? []).filter((item) => item.status === 'pending'), [invitations.data]);
   const history = useMemo(() => (invitations.data ?? []).filter((item) => item.status !== 'pending'), [invitations.data]);
 
-  const respond = async (invitationId: string, decision: 'accept' | 'decline') => {
-    setBusyId(invitationId);
+  const respond = async (invitation: GovernanceInvitation, decision: 'accept' | 'decline') => {
+    setBusyId(invitation.id);
     setMessage('');
     try {
-      await api.request('governance-invitations', { method: 'POST', body: JSON.stringify({ invitationId, decision }) });
-      setMessage(decision === 'accept' ? 'Invitation accepted.' : 'Invitation declined.');
-      invitations.refresh();
+      await api.request('governance-invitations', {
+        method: 'POST',
+        body: JSON.stringify({ invitationId: invitation.id, decision }),
+      });
+      setMessage(decision === 'accept' ? 'Invitation accepted. Your access has been refreshed.' : 'Invitation declined.');
+      await invitations.refresh();
+
+      if (decision === 'accept') {
+        // Reload the membership/permission context immediately. Preserve the
+        // current church/Expression when possible; only select the invited
+        // church when this account did not previously have a church context.
+        const organizationId = auth?.organizationId ?? invitation.organization_id ?? undefined;
+        if (organizationId) {
+          await selectContext(organizationId, auth?.organizationId === organizationId ? auth.branchId : undefined);
+        }
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to respond to invitation.');
     } finally {
@@ -62,7 +77,7 @@ export default function NotificationsScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 130 }}>
         <ScreenHeader title="Notifications" kicker="INBOX" subtitle="Invitations, updates and actions that need your attention." showBack />
         <View style={styles.body}>
-          {message ? <View style={[styles.message, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}><Text style={[styles.messageText, { color: colors.text }]}>{message}</Text></View> : null}
+          {message ? <View style={[styles.message, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}><Text style={[styles.messageText, { color: colors.text }]}>{message}</Text></View> : null}
           <View style={styles.section}>
             <SectionHeader title="Invitations" badge={pending.length} />
             {invitations.loading ? <Skeleton height={132} count={2} /> : invitations.error && !invitations.data ? (
@@ -80,8 +95,8 @@ export default function NotificationsScreen() {
                 {invite.message ? <Text style={[styles.bodyText, { color: colors.textSecondary }]}>{invite.message}</Text> : null}
                 <Text style={[styles.meta, { color: colors.textMuted }]}>Expires {new Date(invite.expires_at).toLocaleString()}</Text>
                 <View style={styles.actions}>
-                  <Button label="Decline" variant="outline" size="sm" disabled={busyId === invite.id} onPress={() => void respond(invite.id, 'decline')} />
-                  <Button label="Accept" variant="primary" size="sm" loading={busyId === invite.id} onPress={() => void respond(invite.id, 'accept')} />
+                  <Button label="Decline" variant="outline" size="sm" disabled={busyId === invite.id} onPress={() => void respond(invite, 'decline')} />
+                  <Button label="Accept" variant="primary" size="sm" loading={busyId === invite.id} onPress={() => void respond(invite, 'accept')} />
                 </View>
               </View>
             )) : <EmptyState title="No invitations waiting" message="Role and administration invitations that need your decision will appear here." iconName="mail-open-outline" />}
@@ -105,7 +120,7 @@ export default function NotificationsScreen() {
 
           {history.length ? <View style={styles.section}>
             <SectionHeader title="Invitation history" badge={history.length} />
-            {history.map((invite) => <View key={invite.id} style={[styles.historyRow, { borderBottomColor: colors.border }]}>
+            {history.map((invite) => <View key={invite.id} style={[styles.historyRow, { borderBottomColor: colors.borderSubtle }]}>
               <View style={{ flex: 1 }}><Text style={[styles.title, { color: colors.text }]}>{invite.role?.name ?? 'Invitation'}</Text><Text style={[styles.meta, { color: colors.textMuted }]}>{invite.expression?.name ?? 'Platform'}</Text></View>
               <Badge label={invite.status.toUpperCase()} variant={invite.status === 'accepted' ? 'success' : 'neutral'} />
             </View>)}
@@ -118,7 +133,7 @@ export default function NotificationsScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 }, body: { paddingHorizontal: spacing.md, gap: spacing.xl }, section: { gap: spacing.sm },
-  message: { borderWidth: 1, borderRadius: radius.md, padding: spacing.md }, messageText: { fontSize: 13, fontWeight: '600' },
+  message: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md }, messageText: { fontSize: 13, fontWeight: '600' },
   card: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.lg, gap: spacing.sm }, cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   iconWrap: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }, cardHeaderText: { flex: 1 },
   title: { fontSize: 14, fontWeight: '800' }, bodyText: { fontSize: 13, lineHeight: 19 }, meta: { fontSize: 11, marginTop: 2 },
