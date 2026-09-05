@@ -59,16 +59,14 @@ export default function ProfileScreen() {
       hasCapability('pastoral.followups.receive'));
 
   const hasExpressionLeadershipAccess = Boolean(expression?.id) && (
-    hasCapability('content.create') || hasCapability('streams.broadcast') ||
+    hasCapability('posts.create') || hasCapability('reels.create') || hasCapability('videos.create') || hasCapability('media.upload') || hasCapability('studio.access') || hasCapability('streams.broadcast') ||
     hasCapability('sermons.create') || hasCapability('sermons.manage') || hasCapability('events.create') ||
     hasCapability('events.update') || hasPastoralLeadershipAccess || hasCapability('members.invite') ||
     hasCapability('roles.assign') || hasCapability('expression.leadership.manage')
   );
   const hasOrganizationLeadershipAccess =
-    hasCapability('organizations.manage') ||
     hasCapability('organization.leadership.manage') ||
     hasCapability('branches.create') ||
-    hasCapability('expression.create') ||
     hasCapability('giving.campaigns.manage') ||
     hasCapability('giving.finance.read') ||
     isAuthorizedExpressionCreator;
