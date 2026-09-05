@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { router } from 'expo-router';
 import { Image, Pressable, StyleSheet, Text, View, StyleProp, ViewStyle, Share } from 'react-native';
 import { useTheme } from '@/state/theme';
 import { radius, shadows, spacing } from '@/design-system/tokens';
@@ -136,7 +137,7 @@ export function PostCard({
     return `${Math.floor(diff / 86400)}d`;
   };
 
-  const media = Array.isArray(post.media) ? post.media.filter((item) => Boolean(item?.url)) : [];
+  const media = Array.isArray(post.media) ? post.media.filter((item) => Boolean(item?.url) || mediaKind(item) === 'reel_reference') : [];
 
   return (
     <Pressable
@@ -196,6 +197,34 @@ export function PostCard({
           {media.map((item, index) => {
             const kind = mediaKind(item);
             const key = item.id || (item as any).uploadId || `${kind || 'media'}-${index}-${item.url}`;
+            if (kind === 'reel_reference') {
+              const reference = item as MediaAsset & { reelId?: string; caption?: string | null };
+              return (
+                <Pressable
+                  key={key}
+                  onPress={() => reference.reelId && router.push({ pathname: '/reels', params: { reelId: reference.reelId } } as any)}
+                  style={({ pressed }) => [
+                    styles.reelReference,
+                    { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle },
+                    pressed && { opacity: 0.88 },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open shared Reel"
+                >
+                  <View style={[styles.reelReferenceIcon, { backgroundColor: colors.primarySoft }]}>
+                    <Icon name="flash-outline" size={22} color={colors.interactive} />
+                  </View>
+                  <View style={styles.reelReferenceCopy}>
+                    <Text style={[styles.reelReferenceKicker, { color: colors.interactive }]}>SHARED REEL</Text>
+                    <Text style={[styles.reelReferenceTitle, { color: colors.text }]} numberOfLines={2}>
+                      {reference.caption?.trim() || 'Open this Reel'}
+                    </Text>
+                    <Text style={[styles.reelReferenceMeta, { color: colors.textMuted }]}>Tap to watch the original Reel</Text>
+                  </View>
+                  <Icon name="chevron-forward" size={18} color={colors.textMuted} />
+                </Pressable>
+              );
+            }
             if (kind === 'video') {
               return (
                 <View key={key} style={[styles.richMediaFrame, { borderColor: colors.borderSubtle }]}>
@@ -285,6 +314,12 @@ const styles = StyleSheet.create({
   mediaFrame: { width: '100%', aspectRatio: 16 / 10, borderRadius: radius.lg, overflow: 'hidden' },
   mediaImage: { width: '100%', height: '100%' },
   richMediaFrame: { width: '100%', overflow: 'hidden', borderRadius: radius.lg, borderWidth: 1 },
+  reelReference: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md },
+  reelReferenceIcon: { width: 44, height: 44, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
+  reelReferenceCopy: { flex: 1, minWidth: 0 },
+  reelReferenceKicker: { fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
+  reelReferenceTitle: { fontSize: 14, lineHeight: 19, fontWeight: '800', marginTop: 2 },
+  reelReferenceMeta: { fontSize: 10, marginTop: 3 },
   audioPlayer: { width: '100%' },
   actionRail: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth },
   actionButton: { minWidth: 42, height: 36, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 8 },
