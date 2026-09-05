@@ -105,12 +105,12 @@ export function HomeFeedSkeleton() {
       </View>
 
       {/* Hero Live Video Placeholder */}
-      <View style={{ paddingHorizontal: spacing.lg }}>
-        <Skeleton height={200} borderRadius={radius.lg} />
+      <View style={{ paddingHorizontal: spacing.md }}>
+        <Skeleton height={200} borderRadius={radius.xl} />
       </View>
 
       {/* YouTube-Style Video Card Placeholder */}
-      <View style={{ paddingHorizontal: spacing.lg, gap: spacing.sm }}>
+      <View style={{ paddingHorizontal: spacing.md, gap: spacing.sm }}>
         <Skeleton height={180} borderRadius={radius.md} />
         <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }}>
           <Skeleton height={36} width={36} borderRadius={18} />
@@ -152,14 +152,14 @@ export function CommunityPostSkeleton() {
 
 export function DiscoverSkeleton() {
   return (
-    <View style={{ paddingHorizontal: spacing.lg, gap: spacing.md }}>
+    <View style={{ paddingHorizontal: spacing.md, gap: spacing.md }}>
       <Skeleton height={44} borderRadius={radius.pill} />
       <View style={{ flexDirection: 'row', gap: spacing.xs }}>
         <Skeleton height={32} width={60} borderRadius={radius.pill} />
         <Skeleton height={32} width={80} borderRadius={radius.pill} />
         <Skeleton height={32} width={70} borderRadius={radius.pill} />
       </View>
-      <Skeleton height={120} count={3} borderRadius={radius.lg} />
+      <Skeleton height={120} count={3} borderRadius={radius.xl} />
     </View>
   );
 }
@@ -168,7 +168,7 @@ export function WatchSkeleton() {
   return (
     <View style={{ gap: spacing.lg }}>
       <Skeleton height={220} width="100%" borderRadius={0} />
-      <View style={{ paddingHorizontal: spacing.lg, gap: spacing.sm }}>
+      <View style={{ paddingHorizontal: spacing.md, gap: spacing.sm }}>
         <Skeleton height={20} width="85%" />
         <Skeleton height={14} width="40%" />
         <Skeleton height={40} borderRadius={radius.md} style={{ marginTop: spacing.sm }} />
@@ -179,8 +179,8 @@ export function WatchSkeleton() {
 
 export function SermonSkeleton() {
   return (
-    <View style={{ gap: spacing.md, paddingHorizontal: spacing.lg }}>
-      <Skeleton height={220} borderRadius={radius.lg} />
+    <View style={{ gap: spacing.md, paddingHorizontal: spacing.md }}>
+      <Skeleton height={220} borderRadius={radius.xl} />
       <Skeleton height={22} width="80%" />
       <Skeleton height={14} width="50%" />
       <Skeleton height={80} borderRadius={radius.md} />
@@ -190,7 +190,7 @@ export function SermonSkeleton() {
 
 export function ProfileSkeleton() {
   return (
-    <View style={{ paddingHorizontal: spacing.lg, gap: spacing.lg }}>
+    <View style={{ paddingHorizontal: spacing.md, gap: spacing.lg }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
         <Skeleton height={68} width={68} borderRadius={34} />
         <View style={{ flex: 1, gap: 6 }}>
@@ -198,7 +198,7 @@ export function ProfileSkeleton() {
           <Skeleton height={14} width="40%" />
         </View>
       </View>
-      <Skeleton height={50} count={4} borderRadius={radius.lg} />
+      <Skeleton height={50} count={4} borderRadius={radius.xl} />
     </View>
   );
 }
@@ -207,13 +207,13 @@ export function ExpressionSkeleton() {
   return (
     <View style={{ gap: spacing.md }}>
       <Skeleton height={160} width="100%" borderRadius={0} />
-      <View style={{ paddingHorizontal: spacing.lg, gap: spacing.sm }}>
+      <View style={{ paddingHorizontal: spacing.md, gap: spacing.sm }}>
         <Skeleton height={24} width="70%" />
         <Skeleton height={14} width="45%" />
         <Skeleton height={36} borderRadius={radius.pill} style={{ marginTop: spacing.xs }} />
       </View>
-      <View style={{ paddingHorizontal: spacing.lg, gap: spacing.md, marginTop: spacing.md }}>
-        <Skeleton height={100} count={3} borderRadius={radius.lg} />
+      <View style={{ paddingHorizontal: spacing.md, gap: spacing.md, marginTop: spacing.md }}>
+        <Skeleton height={100} count={3} borderRadius={radius.xl} />
       </View>
     </View>
   );
@@ -280,7 +280,7 @@ export function EmptyState({
         styles.emptyContainer,
         {
           backgroundColor: colors.card,
-          borderColor: colors.border,
+          borderColor: colors.borderSubtle,
         },
         style,
       ]}
@@ -294,7 +294,7 @@ export function EmptyState({
         <Button
           label={actionLabel}
           onPress={onAction}
-          variant="outline"
+          variant="secondary"
           size="sm"
           style={{ marginTop: spacing.md }}
         />
@@ -344,7 +344,7 @@ export function ResourceError({
       </Text>
       {retry ? (
         <Button
-          label="Try Again"
+          label="Try again"
           onPress={retry}
           variant="primary"
           size="sm"
@@ -385,7 +385,7 @@ const styles = StyleSheet.create({
   storiesTraySkeleton: {
     flexDirection: 'row',
     gap: spacing.md,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
   storyBubbleSkeleton: {
@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
   postSkeletonRow: {
     flexDirection: 'row',
     gap: spacing.md,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
   },
@@ -407,28 +407,28 @@ const styles = StyleSheet.create({
   reelSkeletonOverlay: {
     ...StyleSheet.absoluteFill as any,
     flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
   },
   emptyContainer: {
-    padding: spacing.xxl,
-    borderRadius: radius.lg,
+    padding: spacing.xl,
+    borderRadius: radius.xxl,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
     marginVertical: spacing.md,
   },
   errorContainer: {
-    padding: spacing.xxl,
-    borderRadius: radius.lg,
+    padding: spacing.xl,
+    borderRadius: radius.xxl,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
     marginVertical: spacing.md,
   },
   iconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
