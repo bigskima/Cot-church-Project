@@ -2147,3 +2147,33 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+
+.admin-preset-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 14px;
+}
+
+.admin-secret-reference {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: -0.15px;
+}
+
+.admin-table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-warning-callout {
+  padding: 13px;
+  border-radius: 14px;
+  border: 1px solid rgba(245, 158, 11, 0.24);
+  background: rgba(245, 158, 11, 0.08);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.65;
+}
