@@ -26,7 +26,7 @@ export interface ReelPlayerProps {
   onLike?: (currentlyLiked: boolean) => boolean | Promise<boolean>;
   onOpenComments?: () => void;
   onSave?: (currentlySaved: boolean) => boolean | Promise<boolean>;
-  onShare?: () => void;
+  onShare?: () => void | Promise<void>;
   containerHeight?: number;
 }
 
@@ -128,13 +128,16 @@ export function ReelPlayer({
   };
 
   const handleShare = async () => {
+    if (onShare) {
+      await onShare();
+      return;
+    }
     try {
       await Share.share({
         message: `Watch this Reel on City of Transformation: ${reel.caption || 'Church video'}`,
       });
-      onShare?.();
     } catch {
-      // Ignored
+      // Dismissing the native share sheet does not change Reel state.
     }
   };
 
