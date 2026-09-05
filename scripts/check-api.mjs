@@ -116,6 +116,7 @@ const gatewayConfig = await readFile('supabase/config.toml', 'utf8');
 const privilegedRpcGrantHardening = await readFile('supabase/migrations/20260905121228_harden_remaining_privileged_rpc_execute_grants.sql', 'utf8');
 const streamGrantHardening = await readFile('supabase/migrations/20260905121401_restore_stream_and_idempotency_execute_boundaries.sql', 'utf8');
 const triggerGrantHardening = await readFile('supabase/migrations/20260905121523_remove_api_execute_from_security_definer_triggers.sql', 'utf8');
+const profileStateRpcHardening = await readFile('supabase/migrations/20260905122057_harden_ai_usage_and_profile_state_rpc_access.sql', 'utf8');
 
 const invariants = [
   [handler, /request\.method === "OPTIONS"/, 'CORS preflight handling'],
@@ -200,6 +201,8 @@ const invariants = [
   [streamGrantHardening, /can_access_stream\(uuid\).*from public, anon/s, 'stream-access anonymous execute revocation'],
   [streamGrantHardening, /reserve_api_idempotency\(uuid,text,text,text\).*from public, anon/s, 'idempotency anonymous execute revocation'],
   [triggerGrantHardening, /p\.prorettype = 'trigger'::regtype/, 'security-definer trigger execute hardening'],
+  [profileStateRpcHardening, /ai_usage_totals\(uuid,text,timestamptz\).*from public, anon, authenticated/s, 'AI usage totals service-only boundary'],
+  [profileStateRpcHardening, /target_profile_id <> auth\.uid\(\)/, 'profile-state self-only direct RPC boundary'],
 ];
 
 const missing = invariants.filter(([source, pattern]) => !pattern.test(source));
