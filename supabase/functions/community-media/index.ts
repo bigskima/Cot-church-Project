@@ -7,6 +7,7 @@ import { assertNoUnknownFields, assertObject, requiredString, uuid } from "../_s
 
 const BUCKET = "community-public-media";
 const MAX_BYTES = 50 * 1024 * 1024;
+const MAX_MEMBER_PUBLIC_VIDEO_SECONDS = 180;
 const MIME_TYPES: Record<string, { kind: "image" | "video" | "audio"; ext: string }> = {
   "image/jpeg": { kind: "image", ext: "jpg" },
   "image/png": { kind: "image", ext: "png" },
@@ -33,6 +34,15 @@ function positiveSize(value: unknown) {
 function fileLabel(value: unknown) {
   if (typeof value !== "string" || !value.trim()) return null;
   return value.trim().slice(0, 255);
+}
+
+function durationSeconds(value: unknown) {
+  if (value === undefined || value === null || value === "") return null;
+  const duration = Number(value);
+  if (!Number.isFinite(duration) || duration < 0 || duration > 86400) {
+    throw new ApiError("VALIDATION_FAILED", "Video duration is invalid", 422);
+  }
+  return Math.round(duration);
 }
 
 Deno.serve(createHandler(
@@ -77,14 +87,59 @@ Deno.serve(createHandler(
 
     const action = requiredString(body.action, "action", 32);
     if (action === "create_upload") {
-      assertNoUnknownFields(body, ["action", "mimeType", "fileName", "sizeBytes", "branchId"]);
+      assertNoUnknownFields(body, ["action", "mimeType", "fileName", "sizeBytes", "branchId", "durationSeconds"]);
       const mimeType = requiredString(body.mimeType, "mimeType", 120).toLowerCase();
       const type = MIME_TYPES[mimeType];
       if (!type) throw new ApiError("UNSUPPORTED_MEDIA_TYPE", "This image, video, or audio format is not supported", 415);
       const sizeBytes = positiveSize(body.sizeBytes);
       const branchId = body.branchId ? uuid(String(body.branchId), "branchId", true)! : null;
+      const declaredDurationSeconds = type.kind === "video" ? durationSeconds(body.durationSeconds) : null;
+
       if (branchId && branchId !== auth.branchId) {
         throw new ApiError("EXPRESSION_SCOPE_DENIED", "Media can only be uploaded for your selected Expression", 403);
+      }
+
+      const { data: elevatedPublisher, error: permissionError } = await auth.client.rpc("has_permission", {
+        target_organization_id: auth.organizationId,
+        requested_permission: "feed.post",
+        target_branch_id: branchId,
+      });
+      if (permissionError) {
+        throw new ApiError("PERMISSION_CHECK_FAILED", "Unable to validate community publishing access", 500, undefined, false);
+      }
+
+      if (!branchId && elevatedPublisher !== true) {
+        const { data: memberships, error: membershipError } = await admin
+          .from("expression_memberships")
+          .select("id,branch:branches!inner(is_active)")
+          .eq("organization_id", auth.organizationId)
+          .eq("profile_id", auth.user.id)
+          .eq("status", "active")
+          .eq("branch.is_active", true)
+          .limit(1);
+        if (membershipError) {
+          throw new ApiError("MEMBERSHIP_LOOKUP_FAILED", "Unable to validate Expression membership", 500, undefined, false);
+        }
+        if (!(memberships ?? []).length) {
+          throw new ApiError("EXPRESSION_MEMBERSHIP_REQUIRED", "Join an active Expression before posting in General Community", 403);
+        }
+        if (type.kind === "audio") {
+          throw new ApiError(
+            "GENERAL_MEDIA_RESTRICTED",
+            "General Community member posts support text, images and short videos. Audio ministry content requires an authorized publishing workflow.",
+            403,
+          );
+        }
+        if (
+          type.kind === "video" &&
+          (!declaredDurationSeconds || declaredDurationSeconds > MAX_MEMBER_PUBLIC_VIDEO_SECONDS)
+        ) {
+          throw new ApiError(
+            "GENERAL_VIDEO_TOO_LONG",
+            "General Community member videos must be 3 minutes or shorter",
+            422,
+          );
+        }
       }
 
       const uploadId = crypto.randomUUID();
@@ -101,6 +156,7 @@ Deno.serve(createHandler(
         public_url: publicData.publicUrl,
         original_filename: fileLabel(body.fileName),
         size_bytes: sizeBytes,
+        duration_seconds: declaredDurationSeconds,
         status: "pending",
       });
       if (recordError) throw new ApiError("MEDIA_UPLOAD_INTENT_FAILED", "Unable to prepare media upload", 500, undefined, false);
@@ -117,6 +173,7 @@ Deno.serve(createHandler(
           type: type.kind,
           mimeType,
           sizeBytes,
+          durationSeconds: declaredDurationSeconds,
           signedUploadUrl: signed.signedUrl,
           uploadToken: signed.token,
           storagePath: signed.path,
@@ -130,14 +187,24 @@ Deno.serve(createHandler(
       const uploadId = uuid(requiredString(body.uploadId, "uploadId", 36), "uploadId", true)!;
       const { data: upload, error: lookupError } = await admin
         .from("social_media_uploads")
-        .select("id,media_kind,mime_type,storage_path,public_url,original_filename,size_bytes,status")
+        .select("id,media_kind,mime_type,storage_path,public_url,original_filename,size_bytes,duration_seconds,status")
         .eq("id", uploadId)
         .eq("organization_id", auth.organizationId)
         .eq("uploader_profile_id", auth.user.id)
         .maybeSingle();
       if (lookupError || !upload) throw new ApiError("UPLOAD_NOT_FOUND", "Media upload not found", 404);
       if (upload.status === "attached" || upload.status === "uploaded") {
-        return { data: { uploadId: upload.id, type: upload.media_kind, mimeType: upload.mime_type, url: upload.public_url, fileName: upload.original_filename, sizeBytes: Number(upload.size_bytes) } };
+        return {
+          data: {
+            uploadId: upload.id,
+            type: upload.media_kind,
+            mimeType: upload.mime_type,
+            url: upload.public_url,
+            fileName: upload.original_filename,
+            sizeBytes: Number(upload.size_bytes),
+            durationSeconds: upload.duration_seconds == null ? null : Number(upload.duration_seconds),
+          },
+        };
       }
       if (upload.status !== "pending") throw new ApiError("UPLOAD_UNAVAILABLE", "This media upload is no longer available", 409);
 
@@ -158,7 +225,9 @@ Deno.serve(createHandler(
       const { data: completed, error: completeError } = await admin.from("social_media_uploads").update({
         status: "uploaded",
         size_bytes: Math.round(actualSize),
-      }).eq("id", upload.id).eq("status", "pending").select("id,media_kind,mime_type,public_url,original_filename,size_bytes").single();
+      }).eq("id", upload.id).eq("status", "pending")
+        .select("id,media_kind,mime_type,public_url,original_filename,size_bytes,duration_seconds")
+        .single();
       if (completeError || !completed) throw new ApiError("MEDIA_VERIFY_FAILED", "Unable to finalize uploaded media", 500, undefined, false);
 
       return {
@@ -169,6 +238,7 @@ Deno.serve(createHandler(
           url: completed.public_url,
           fileName: completed.original_filename,
           sizeBytes: Number(completed.size_bytes),
+          durationSeconds: completed.duration_seconds == null ? null : Number(completed.duration_seconds),
         },
       };
     }
