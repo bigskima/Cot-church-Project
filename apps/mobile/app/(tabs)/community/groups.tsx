@@ -179,16 +179,16 @@ export default function ExpressionGroupsScreen() {
       <ScrollView
         refreshControl={<RefreshControl refreshing={resource.refreshing} onRefresh={resource.refresh} tintColor={colors.interactive} />}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 90 }}
+        contentContainerStyle={{ paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 130 }}
       >
-        <ScreenHeader title="Expression Groups" subtitle={`Groups and fellowship communities inside ${expression.name}.`} showBack />
+        <ScreenHeader title="Groups" kicker={expression.name.toUpperCase()} subtitle="Smaller communities inside this Expression." showBack />
         <View style={styles.body}>
           {feedback ? <View style={[styles.banner, { backgroundColor: colors.successSoft, borderColor: colors.success }]}><Icon name="checkmark-circle" size={18} color={colors.success} /><Text style={[styles.bannerText, { color: colors.success }]}>{feedback}</Text></View> : null}
           {actionError ? <View style={[styles.banner, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}><Icon name="alert-circle" size={18} color={colors.live} /><Text style={[styles.bannerText, { color: colors.live }]}>{actionError}</Text></View> : null}
 
           <View style={styles.sectionHeaderRow}>
-            <SectionHeader title="Your Expression Groups" badge={groups.length} />
-            {canManageGroups ? <Button label="Create Group" onPress={() => setCreateOpen(true)} variant="outline" size="sm" /> : null}
+            <SectionHeader title="Your groups" badge={groups.length} subtitle="Join conversations and fellowship spaces" />
+            {canManageGroups ? <Button label="New group" onPress={() => setCreateOpen(true)} variant="primary" size="sm" /> : null}
           </View>
 
           {resource.loading && !resource.data ? (
@@ -200,7 +200,7 @@ export default function ExpressionGroupsScreen() {
             const meetingSummary = typeof group.meeting_schedule?.summary === 'string' ? group.meeting_schedule.summary : null;
             const requests = pendingByGroup.get(group.id) ?? [];
             return (
-              <View key={group.id} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+              <View key={group.id} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
                 <View style={styles.cardTop}>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.groupName, { color: colors.text }]}>{group.name}</Text>
@@ -247,7 +247,7 @@ export default function ExpressionGroupsScreen() {
         </View>
       </ScrollView>
 
-      <BottomSheet visible={createOpen} onClose={() => !saving && setCreateOpen(false)} title={`Create Group · ${expression.name}`}>
+      <BottomSheet visible={createOpen} onClose={() => !saving && setCreateOpen(false)} title="Create group" subtitle={`Inside ${expression.name}`}>
         <View style={styles.form}>
           <Text style={[styles.helper, { color: colors.textSecondary }]}>This group will be permanently scoped to the currently selected Expression.</Text>
           <InputField label="Group Name" value={name} onChangeText={setName} placeholder="e.g. Young Adults Fellowship" />
@@ -265,11 +265,11 @@ export default function ExpressionGroupsScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  body: { paddingHorizontal: spacing.lg, gap: spacing.md },
+  body: { paddingHorizontal: spacing.md, gap: spacing.md },
   banner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.md, padding: spacing.md },
   bannerText: { flex: 1, fontSize: 12, fontWeight: '600' },
   sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  card: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.sm },
+  card: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.lg, gap: spacing.sm },
   cardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   groupName: { fontSize: 16, fontWeight: '800' },
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 5 },
