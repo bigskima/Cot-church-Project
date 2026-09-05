@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Alert,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,7 +11,6 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import {
-  Badge,
   BottomSheet,
   Button,
   Icon,
@@ -21,9 +18,8 @@ import {
   LeadershipModuleCard,
   ScreenHeader,
   SectionHeader,
-  Skeleton,
 } from '@/components';
-import { radius, shadows, spacing, typography } from '@/design-system/tokens';
+import { radius, shadows, spacing } from '@/design-system/tokens';
 
 interface StudioOverview {
   drafts?: { id: string; content_type: string; status: string; created_at: string }[];
@@ -41,6 +37,8 @@ export default function CreatorStudioScreen() {
   const [activeModal, setActiveModal] = useState<'post' | null>(null);
   const [postBody, setPostBody] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [publishNotice, setPublishNotice] = useState('');
+  const [publishError, setPublishError] = useState('');
 
   const studioResource = useResource<StudioOverview>('studio:overview', (signal) =>
     api.request<StudioOverview>('creator-studio', { signal })
@@ -49,6 +47,8 @@ export default function CreatorStudioScreen() {
   const handlePublishPost = async () => {
     if (!postBody.trim()) return;
     setSubmitting(true);
+    setPublishError('');
+    setPublishNotice('');
     try {
       await api.request('creator-studio', {
         method: 'POST',
@@ -61,13 +61,14 @@ export default function CreatorStudioScreen() {
       });
       setPostBody('');
       setActiveModal(null);
-      Alert.alert(
-        'Post Published',
-        expression?.name ? `Your message is now live inside ${expression.name}.` : 'Your message is now live in the General Community.',
+      setPublishNotice(
+        expression?.name
+          ? `Your announcement is live inside ${expression.name}.`
+          : 'Your announcement is live in the General Community.',
       );
-      studioResource.refresh();
-    } catch (err: any) {
-      Alert.alert('Publish Failed', err.message ?? 'Unable to publish post');
+      await studioResource.refresh();
+    } catch (err: unknown) {
+      setPublishError(err instanceof Error ? err.message : 'Unable to publish this announcement.');
     } finally {
       setSubmitting(false);
     }
@@ -149,6 +150,12 @@ export default function CreatorStudioScreen() {
         />
 
         <View style={styles.body}>
+          {publishNotice ? (
+            <View style={[styles.banner, { backgroundColor: colors.successSoft, borderColor: colors.success }]}>
+              <Icon name="checkmark-circle" size={17} color={colors.success} />
+              <Text style={[styles.bannerText, { color: colors.success }]}>{publishNotice}</Text>
+            </View>
+          ) : null}
           {canPublishPosts ? (
           <View style={[styles.quickPostCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
             <View style={styles.quickPostHeader}>
@@ -189,10 +196,21 @@ export default function CreatorStudioScreen() {
 
       <BottomSheet
         visible={activeModal === 'post'}
-        onClose={() => setActiveModal(null)}
+        onClose={() => {
+          if (!submitting) {
+            setActiveModal(null);
+            setPublishError('');
+          }
+        }}
         title="Publish announcement"
         subtitle={expression?.name ? `Share inside ${expression.name}.` : 'Share with the General Community.'}
       >
+        {publishError ? (
+          <View style={[styles.banner, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}>
+            <Icon name="alert-circle" size={17} color={colors.live} />
+            <Text style={[styles.bannerText, { color: colors.live }]}>{publishError}</Text>
+          </View>
+        ) : null}
         <InputField
           label="Announcement"
           value={postBody}
@@ -202,7 +220,7 @@ export default function CreatorStudioScreen() {
           placeholder="Write your pastoral announcement or encouragement..."
         />
         <View style={styles.modalActions}>
-          <Button label="Cancel" onPress={() => setActiveModal(null)} variant="outline" size="md" />
+          <Button label="Cancel" onPress={() => { setActiveModal(null); setPublishError(''); }} variant="outline" size="md" disabled={submitting} />
           <Button label="Publish" onPress={handlePublishPost} loading={submitting} variant="primary" size="md" />
         </View>
       </BottomSheet>
@@ -220,6 +238,20 @@ const styles = StyleSheet.create({
   body: {
     paddingHorizontal: spacing.md,
     gap: spacing.lg,
+  },
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+  },
+  bannerText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
   },
   quickPostCard: {
     padding: spacing.lg,
