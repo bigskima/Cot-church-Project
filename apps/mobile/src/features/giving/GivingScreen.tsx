@@ -33,7 +33,7 @@ function formatMoney(amountMinor: number, currency: string) {
 function AccountCard({ account, selectedPurpose }: { account: BankAccount; selectedPurpose: GivingPurpose | null }) {
   const { colors } = useTheme();
   return (
-    <View style={[styles.accountCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+    <View style={[styles.accountCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
       <View style={styles.accountHeader}>
         <View style={[styles.accountIcon, { backgroundColor: colors.primarySoft }]}>
           <Icon name="business-outline" size={18} color={colors.interactive} />
@@ -81,7 +81,7 @@ function AccountCard({ account, selectedPurpose }: { account: BankAccount; selec
       ) : null}
 
       {account.transfer_instructions ? (
-        <Text style={[styles.instructions, { color: colors.textSecondary, borderTopColor: colors.border }]}>
+        <Text style={[styles.instructions, { color: colors.textSecondary, borderTopColor: colors.borderSubtle }]}>
           {account.transfer_instructions}
         </Text>
       ) : null}
@@ -162,23 +162,25 @@ export function GivingScreen() {
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 80 }}
+        contentContainerStyle={{ paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 130 }}
       >
-        <ScreenHeader title={title} subtitle={subtitle} showBack />
+        <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+          <ScreenHeader title={title} kicker="GIVING" subtitle={subtitle || 'Church and Expression giving details.'} showBack />
+        </View>
 
         <View style={styles.body}>
           {mode === 'authenticated' && expressionId ? (
-            <View style={[styles.scopeSelector, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
+            <View style={[styles.scopeSelector, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
               <Pressable
                 onPress={() => setScope('church')}
-                style={[styles.scopeOption, scope === 'church' && { backgroundColor: colors.card }]}
+                style={[styles.scopeOption, scope === 'church' && { backgroundColor: colors.primarySoft }]}
               >
                 <Icon name="globe-outline" size={16} color={scope === 'church' ? colors.interactive : colors.textMuted} />
                 <Text style={[styles.scopeText, { color: scope === 'church' ? colors.text : colors.textMuted }]}>Church-wide</Text>
               </Pressable>
               <Pressable
                 onPress={() => setScope('expression')}
-                style={[styles.scopeOption, scope === 'expression' && { backgroundColor: colors.card }]}
+                style={[styles.scopeOption, scope === 'expression' && { backgroundColor: colors.primarySoft }]}
               >
                 <Icon name="location-outline" size={16} color={scope === 'expression' ? colors.interactive : colors.textMuted} />
                 <Text numberOfLines={1} style={[styles.scopeText, { color: scope === 'expression' ? colors.text : colors.textMuted }]}>
@@ -256,7 +258,7 @@ export function GivingScreen() {
               )}
 
               {!details.methods.onlinePayment && details.settings.onlinePaymentEnabled ? (
-                <View style={[styles.infoCard, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
+                <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
                   <Icon name="card-outline" size={18} color={colors.textMuted} />
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.infoTitle, { color: colors.text }]}>Online giving unavailable</Text>
@@ -276,7 +278,7 @@ export function GivingScreen() {
                 <Skeleton height={72} count={2} />
               ) : receipts.data?.length ? (
                 receipts.data.map((receipt) => (
-                  <View key={receipt.id} style={[styles.receipt, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View key={receipt.id} style={[styles.receipt, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.receiptAmount, { color: colors.text }]}>{formatMoney(receipt.amount_minor, receipt.currency)}</Text>
                       {receipt.category ? <Text style={[styles.receiptCategory, { color: colors.textSecondary }]}>{receipt.category}</Text> : null}
@@ -297,16 +299,17 @@ export function GivingScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  body: { paddingHorizontal: spacing.lg, gap: spacing.lg },
-  scopeSelector: { flexDirection: 'row', padding: 4, borderRadius: radius.lg, borderWidth: 1, gap: 4 },
-  scopeOption: { flex: 1, minHeight: 44, paddingHorizontal: spacing.sm, borderRadius: radius.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  headerCard: { marginHorizontal: spacing.md, borderWidth: 1, borderRadius: radius.xxl, overflow: 'hidden' },
+  body: { paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: spacing.xl },
+  scopeSelector: { flexDirection: 'row', padding: 5, borderRadius: radius.xl, borderWidth: 1, gap: 4 },
+  scopeOption: { flex: 1, minHeight: 44, paddingHorizontal: spacing.sm, borderRadius: radius.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   scopeText: { fontSize: 13, fontWeight: '700', flexShrink: 1 },
   section: { gap: spacing.sm },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   purposeDescription: { fontSize: 13, lineHeight: 19 },
   currencyLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   currencyLabel: { fontSize: 12, fontWeight: '600' },
-  accountCard: { borderRadius: radius.lg, borderWidth: 1, padding: spacing.lg, gap: spacing.sm },
+  accountCard: { borderRadius: radius.xl, borderWidth: 1, padding: spacing.lg, gap: spacing.sm },
   accountHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: 2 },
   accountIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   accountHeaderText: { flex: 1 },
@@ -318,10 +321,10 @@ const styles = StyleSheet.create({
   accountNumber: { fontSize: 18, fontWeight: '800', letterSpacing: 0.5 },
   instructions: { borderTopWidth: 1, paddingTop: spacing.sm, fontSize: 13, lineHeight: 19 },
   additionalInstructions: { fontSize: 12, lineHeight: 18 },
-  infoCard: { borderRadius: radius.lg, borderWidth: 1, padding: spacing.md, flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },
+  infoCard: { borderRadius: radius.xl, borderWidth: 1, padding: spacing.md, flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },
   infoTitle: { fontSize: 14, fontWeight: '800' },
   infoText: { fontSize: 12, lineHeight: 18, marginTop: 2 },
-  receipt: { minHeight: 66, borderRadius: radius.md, borderWidth: 1, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  receipt: { minHeight: 70, borderRadius: radius.xl, borderWidth: 1, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   receiptAmount: { fontSize: 15, fontWeight: '800' },
   receiptCategory: { fontSize: 12, marginTop: 2 },
   noReceipts: { fontSize: 13 },
