@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View, StyleProp, ViewStyle, ActivityIndicator } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useTheme } from '@/state/theme';
-import { radius, spacing } from '@/design-system/tokens';
+import { radius, shadows, spacing } from '@/design-system/tokens';
 import { Icon } from '../primitives/Icon';
 
 export interface VideoPlayerProps {
@@ -96,7 +96,7 @@ export function VideoPlayer({
   const progressPercent = duration > 0 ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0;
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md, style]}>
       {/* 16:9 Video Canvas Frame */}
       <View style={[styles.videoFrame, { backgroundColor: '#000000' }]}>
         {sourceUrl && player ? (
@@ -168,12 +168,12 @@ export function VideoPlayer({
               <Pressable
                 key={idx}
                 onPress={() => {
-                  player?.currentTime && (player.currentTime = ch.timestamp_seconds);
+                  if (player) player.currentTime = ch.timestamp_seconds;
                   onSeek?.(ch.timestamp_seconds);
                 }}
                 style={[
                   styles.chapterPill,
-                  { backgroundColor: colors.bgSecondary, borderColor: colors.border },
+                  { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle },
                 ]}
               >
                 <Text style={[styles.chapterPillText, { color: colors.text }]}>
@@ -191,6 +191,9 @@ export function VideoPlayer({
 const styles = StyleSheet.create({
   container: {
     width: '100%',
+    borderWidth: 1,
+    borderRadius: radius.xl,
+    overflow: 'hidden',
   },
   videoFrame: {
     width: '100%',
@@ -228,7 +231,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
   timeGroup: {
@@ -249,9 +252,9 @@ const styles = StyleSheet.create({
     padding: 6,
   },
   playBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -271,12 +274,12 @@ const styles = StyleSheet.create({
   },
   chapterPill: {
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 6,
     borderRadius: radius.pill,
     borderWidth: 1,
   },
   chapterPillText: {
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '600',
   },
 });
