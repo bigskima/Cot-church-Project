@@ -434,6 +434,12 @@ export type MembershipContext = {
     status: string;
     joinedAt?: string | null;
   }[];
+  creatorOrganizations?: {
+    id: string;
+    name: string;
+    slug?: string;
+    timezone?: string;
+  }[];
   organizations: {
     id: string;
     name: string;
