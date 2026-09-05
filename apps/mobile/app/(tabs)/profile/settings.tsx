@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
@@ -117,7 +117,7 @@ export default function AccountSettingsScreen() {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('Photo access required', 'Allow photo-library access to choose a profile picture.');
+        setError('Photo access is required to choose a profile picture. Allow photo-library access in your device settings and try again.');
         return;
       }
 
@@ -267,16 +267,16 @@ function Field({ label, value, onChangeText, placeholder, colors, autoCapitalize
   return (
     <View style={styles.fieldGroup}>
       <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{label}</Text>
-      <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={colors.textMuted} autoCapitalize={autoCapitalize} keyboardType={keyboardType} multiline={multiline} maxLength={maxLength} style={[styles.input, multiline && styles.multiline, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]} />
+      <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={colors.textMuted} autoCapitalize={autoCapitalize} keyboardType={keyboardType} multiline={multiline} maxLength={maxLength} style={[styles.input, multiline && styles.multiline, { backgroundColor: colors.inputBg, borderColor: colors.borderSubtle, color: colors.text }]} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 }, content: { flexGrow: 1 }, body: { paddingHorizontal: spacing.md, gap: spacing.lg },
-  banner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.md, padding: spacing.md }, bannerText: { flex: 1, fontSize: 13, fontWeight: '600' },
+  banner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md }, bannerText: { flex: 1, fontSize: 13, fontWeight: '600' },
   card: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.lg, gap: spacing.md }, cardTitle: { fontSize: 16, fontWeight: '800', letterSpacing: -0.2 },
-  photoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg }, photoActions: { flex: 1, gap: spacing.xs }, buttonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
+  photoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md }, photoActions: { flex: 1, gap: spacing.xs }, buttonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
   helper: { fontSize: 11, lineHeight: 16 }, fieldGroup: { gap: 5 }, fieldLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.55 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   input: { minHeight: 50, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: spacing.md, paddingVertical: 11, fontSize: 14 }, multiline: { minHeight: 100, textAlignVertical: 'top' },
