@@ -23,7 +23,7 @@ Deno.serve(createHandler(
         organization_name: requiredString(body.name, "name", 160),
         organization_slug: slug(body.slug),
         organization_timezone: optionalString(body.timezone, "timezone", 64) ?? "UTC",
-        initial_branch_name: optionalString(body.initialBranchName, "initialBranchName", 160) ?? "Main Campus",
+        initial_branch_name: optionalString(body.initialBranchName, "initialBranchName", 160) ?? "Main Expression",
         initial_branch_code: (optionalString(body.initialBranchCode, "initialBranchCode", 40) ?? "MAIN").toUpperCase(),
       };
       const { data, error } = await auth.client.rpc("create_organization", values).single();
