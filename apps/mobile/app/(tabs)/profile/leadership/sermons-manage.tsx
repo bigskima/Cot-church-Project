@@ -30,33 +30,58 @@ export default function SermonsManageScreen() {
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
 
   const [composerOpen, setComposerOpen] = useState(false);
+  const [editingSermon, setEditingSermon] = useState<Sermon | null>(null);
   const [title, setTitle] = useState('');
   const [preacher, setPreacher] = useState('');
   const [scripture, setScripture] = useState('');
   const [description, setDescription] = useState('');
-  const [publishNow, setPublishNow] = useState(false);
+  const [status, setStatus] = useState<Sermon['status']>('draft');
   const [creating, setCreating] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
+  const canCreate = hasCapability('sermons.create') || hasCapability('*');
+  const canManage = hasCapability('sermons.manage') || hasCapability('*');
   const canPublish = hasCapability('sermons.publish') || hasCapability('*');
   const sermons = useResource<Sermon[]>(`leadership:sermons:${organizationId || 'none'}:${expression?.id ?? 'general'}`, (signal) =>
-    api.request<Sermon[]>('sermons', { signal })
+    api.request<Sermon[]>('sermons?view=manage', { signal })
   );
 
   const list = sermons.data ?? [];
   const publishedCount = useMemo(() => list.filter((sermon) => sermon.status === 'published').length, [list]);
 
   const resetComposer = () => {
+    setEditingSermon(null);
     setTitle('');
     setPreacher('');
     setScripture('');
     setDescription('');
-    setPublishNow(false);
+    setStatus('draft');
     setErrorMsg('');
   };
 
-  const handleCreateSermon = async () => {
+  const openCreate = () => {
+    if (!canCreate) return;
+    resetComposer();
+    setSuccessMsg('');
+    setComposerOpen(true);
+  };
+
+  const openEdit = (sermon: Sermon) => {
+    if (!canManage) return;
+    setEditingSermon(sermon);
+    setTitle(sermon.title ?? '');
+    setPreacher(sermon.preacher ?? sermon.preacher_name ?? '');
+    setScripture((sermon.scripture_references ?? []).join(', '));
+    setDescription(sermon.description ?? '');
+    setStatus(sermon.status ?? 'draft');
+    setErrorMsg('');
+    setSuccessMsg('');
+    setComposerOpen(true);
+  };
+
+  const handleSaveSermon = async () => {
+    if (editingSermon ? !canManage : !canCreate) return;
     if (!title.trim() || !preacher.trim()) {
       setErrorMsg('Enter both a sermon title and speaker.');
       return;
@@ -70,22 +95,39 @@ export default function SermonsManageScreen() {
         .map((item) => item.trim())
         .filter(Boolean);
 
+      const isEditing = Boolean(editingSermon);
+      if ((status === 'published' || status === 'scheduled') && !canPublish) {
+        setErrorMsg('Publishing sermons requires publish permission.');
+        return;
+      }
+      const basePayload = {
+        title: title.trim(),
+        preacher: preacher.trim(),
+        scriptures,
+        description: description.trim(),
+      };
       await api.request('sermons', {
-        method: 'POST',
-        body: JSON.stringify({
-          title: title.trim(),
-          preacher: preacher.trim(),
-          scriptures,
-          description: description.trim(),
-          ...(publishNow && canPublish ? { status: 'published' } : {}),
-        }),
+        method: isEditing ? 'PATCH' : 'POST',
+        body: JSON.stringify(
+          isEditing
+            ? {
+                id: editingSermon!.id,
+                ...basePayload,
+                ...(status !== editingSermon!.status ? { status } : {}),
+              }
+            : { ...basePayload, status },
+        ),
       });
-      resetComposer();
       setComposerOpen(false);
+      resetComposer();
       setSuccessMsg(
-        publishNow && canPublish
-          ? `Sermon published${expression?.name ? ` inside ${expression.name}` : ''}.`
-          : 'Sermon draft created.',
+        isEditing
+          ? 'Sermon updated.'
+          : status === 'published'
+            ? `Sermon published${expression?.name ? ` inside ${expression.name}` : ''}.`
+            : status === 'review'
+              ? 'Sermon saved for review.'
+              : 'Sermon draft created.',
       );
       sermons.refresh();
     } catch (err) {
@@ -109,7 +151,7 @@ export default function SermonsManageScreen() {
           kicker="LEADERSHIP"
           subtitle={expression?.name ? `Sermon library for ${expression.name}.` : 'Church sermon library and publishing.'}
           showBack
-          rightAction={<Button label="New sermon" onPress={() => setComposerOpen(true)} size="sm" />}
+          rightAction={canCreate ? <Button label="New sermon" onPress={openCreate} size="sm" /> : undefined}
         />
 
         <View style={styles.body}>
@@ -128,7 +170,7 @@ export default function SermonsManageScreen() {
               <Text style={[styles.summaryValue, { color: colors.text }]}>{publishedCount}</Text>
               <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Published in this scope</Text>
             </View>
-            <Button label="Create" onPress={() => setComposerOpen(true)} variant="secondary" size="sm" />
+{canCreate ? <Button label="Create" onPress={openCreate} variant="secondary" size="sm" /> : null}
           </View>
 
           <View style={styles.listSection}>
@@ -146,23 +188,26 @@ export default function SermonsManageScreen() {
                     onPress={() => router.push(`/sermon/${sermon.id}${expression?.id ? '?context=expression' : ''}` as any)}
                   />
                   <View style={styles.statusRow}>
-                    <Badge
-                      label={(sermon.status || 'draft').toUpperCase()}
-                      variant={sermon.status === 'published' ? 'success' : 'neutral'}
-                    />
-                    <Text style={[styles.scopeText, { color: colors.textMuted }]}>
-                      {sermon.visibility === 'public' ? 'Public' : expression?.name || 'Expression'}
-                    </Text>
+                    <View style={styles.statusMeta}>
+                      <Badge
+                        label={(sermon.status || 'draft').toUpperCase()}
+                        variant={sermon.status === 'published' ? 'success' : 'neutral'}
+                      />
+                      <Text style={[styles.scopeText, { color: colors.textMuted }]}>
+                        {sermon.visibility === 'public' ? 'Public' : expression?.name || 'Expression'}
+                      </Text>
+                    </View>
+                    {canManage ? <Button label="Edit" onPress={() => openEdit(sermon)} variant="outline" size="sm" /> : null}
                   </View>
                 </View>
               ))
             ) : (
               <EmptyState
                 title="No sermons yet"
-                message="Create a sermon draft and attach or process its media through the ministry media workflow."
+                message={canCreate ? 'Create a sermon draft and attach or process its media through the ministry media workflow.' : 'Sermons in this management scope will appear here.'}
                 iconName="book-outline"
-                actionLabel="Create sermon"
-                onAction={() => setComposerOpen(true)}
+                actionLabel={canCreate ? 'Create sermon' : undefined}
+                onAction={canCreate ? openCreate : undefined}
               />
             )}
           </View>
@@ -171,9 +216,14 @@ export default function SermonsManageScreen() {
 
       <BottomSheet
         visible={composerOpen}
-        onClose={() => !creating && setComposerOpen(false)}
-        title="Create sermon"
-        subtitle={expression?.name ? `Inside ${expression.name}` : 'Church-wide sermon'}
+        onClose={() => {
+          if (!creating) {
+            setComposerOpen(false);
+            resetComposer();
+          }
+        }}
+        title={editingSermon ? 'Edit sermon' : 'Create sermon'}
+        subtitle={editingSermon ? editingSermon.title : expression?.name ? `Inside ${expression.name}` : 'Church-wide sermon'}
         maxHeightPercent={94}
       >
         <View style={styles.form}>
@@ -189,24 +239,23 @@ export default function SermonsManageScreen() {
           <InputField label="Scripture references" value={scripture} onChangeText={setScripture} placeholder="Romans 8:28, Hebrews 11:1" helperText="Separate multiple passages with commas." />
           <InputField label="Notes / summary" value={description} onChangeText={setDescription} multiline numberOfLines={4} placeholder="Add sermon notes or a short summary…" />
 
-          {canPublish ? (
-            <>
-              <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>SAVE AS</Text>
-              <View style={styles.chips}>
-                <Chip label="Draft" selected={!publishNow} onPress={() => setPublishNow(false)} />
-                <Chip label="Publish now" selected={publishNow} onPress={() => setPublishNow(true)} />
-              </View>
-            </>
-          ) : (
+          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>STATUS</Text>
+          <View style={styles.chips}>
+            <Chip label="Draft" selected={status === 'draft'} onPress={() => setStatus('draft')} />
+            <Chip label="Review" selected={status === 'review'} onPress={() => setStatus('review')} />
+            {editingSermon ? <Chip label="Archived" selected={status === 'archived'} onPress={() => setStatus('archived')} /> : null}
+            {canPublish ? <Chip label="Published" selected={status === 'published'} onPress={() => setStatus('published')} /> : null}
+          </View>
+          {!canPublish ? (
             <View style={[styles.infoCard, { backgroundColor: colors.primarySoft }]}>
               <Icon name="lock-closed-outline" size={16} color={colors.interactive} />
-              <Text style={[styles.infoText, { color: colors.textSecondary }]}>You can create sermon drafts. Publishing remains limited to members with publish permission.</Text>
+              <Text style={[styles.infoText, { color: colors.textSecondary }]}>Publishing remains limited to members with sermon publish permission.</Text>
             </View>
-          )}
+          ) : null}
 
           <Button
-            label={publishNow && canPublish ? 'Publish sermon' : 'Save sermon draft'}
-            onPress={() => void handleCreateSermon()}
+            label={editingSermon ? 'Save changes' : status === 'published' ? 'Publish sermon' : status === 'review' ? 'Save for review' : 'Save sermon draft'}
+            onPress={() => void handleSaveSermon()}
             loading={creating}
             size="lg"
             fullWidth
@@ -230,7 +279,8 @@ const styles = StyleSheet.create({
   summaryLabel: { fontSize: 12, marginTop: 1 },
   listSection: { gap: spacing.sm },
   sermonWrap: { marginBottom: spacing.sm },
-  statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.xs, marginTop: -spacing.xs },
+  statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingHorizontal: spacing.xs, marginTop: -spacing.xs },
+  statusMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
   scopeText: { fontSize: 11, fontWeight: '600' },
   form: { gap: spacing.md },
   fieldLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.65 },
