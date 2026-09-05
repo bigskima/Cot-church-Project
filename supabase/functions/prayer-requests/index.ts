@@ -21,7 +21,7 @@ function toInternalVisibility(value: unknown): InternalVisibility {
   return "organization";
 }
 
-function toExternalPrayer(row: any) {
+function toExternalPrayer(row: any, viewerHasPrayed = false) {
   const privacy = row.visibility === "private"
     ? "pastoral_only"
     : row.visibility === "prayer_team"
@@ -39,7 +39,8 @@ function toExternalPrayer(row: any) {
     is_confidential: row.visibility === "private",
     is_anonymous: row.is_anonymous === true,
     status: row.status === "closed" ? "archived" : row.status,
-    prayer_count: 0,
+    prayer_count: Number(row.prayer_count ?? 0),
+    viewer_has_prayed: viewerHasPrayed,
     routing_status: row.routing_status ?? "queued",
     public_approved_at: row.public_approved_at ?? null,
     is_publicly_visible: row.visibility === "organization" && Boolean(row.public_approved_at),
@@ -164,7 +165,7 @@ Deno.serve(createHandler(
 
       let query = admin
         .from("prayer_requests")
-        .select("id,organization_id,branch_id,membership_id,submitted_by_profile_id,title,body,visibility,status,answered_testimony,is_anonymous,routing_status,routed_at,public_approved_at,public_approved_by,created_at,updated_at")
+        .select("id,organization_id,branch_id,membership_id,submitted_by_profile_id,title,body,visibility,status,answered_testimony,is_anonymous,routing_status,routed_at,public_approved_at,public_approved_by,prayer_count,created_at,updated_at")
         .eq("organization_id", organizationId)
         .order("created_at", { ascending: false })
         .limit(100);
@@ -177,16 +178,32 @@ Deno.serve(createHandler(
       const { data, error } = await query;
       if (error) throw new ApiError("PRAYER_LIST_FAILED", "Unable to retrieve prayer petitions", 500, undefined, false);
 
-      if (moderationView) return { data: (data ?? []).map(toExternalPrayer) };
+      const rows = data ?? [];
+      const supportedPrayerIds = new Set<string>();
+      if (identity.user && rows.length) {
+        const { data: supports, error: supportsError } = await admin
+          .from("prayer_supports")
+          .select("prayer_request_id")
+          .eq("profile_id", identity.user.id)
+          .in("prayer_request_id", rows.map((row: any) => row.id));
+        if (supportsError) {
+          throw new ApiError("PRAYER_SUPPORT_LOOKUP_FAILED", "Unable to load prayer support state", 500, undefined, false);
+        }
+        for (const support of supports ?? []) supportedPrayerIds.add(support.prayer_request_id);
+      }
+
+      if (moderationView) {
+        return { data: rows.map((row: any) => toExternalPrayer(row, supportedPrayerIds.has(row.id))) };
+      }
 
       const membershipId = identity.membership?.id ?? null;
-      const visible = (data ?? []).filter((row: any) => {
+      const visible = rows.filter((row: any) => {
         const publicApproved = row.visibility === "organization" && Boolean(row.public_approved_at) && row.status !== "closed";
         if (publicApproved) return true;
         if (!identity.user) return false;
         return row.submitted_by_profile_id === identity.user.id || (membershipId && row.membership_id === membershipId);
       });
-      return { data: visible.map(toExternalPrayer) };
+      return { data: visible.map((row: any) => toExternalPrayer(row, supportedPrayerIds.has(row.id))) };
     }
 
     const body = assertObject(await jsonBody(request));
@@ -242,11 +259,64 @@ Deno.serve(createHandler(
 
       const { data: routed } = await admin
         .from("prayer_requests")
-        .select("id,organization_id,branch_id,membership_id,submitted_by_profile_id,title,body,visibility,status,answered_testimony,is_anonymous,routing_status,routed_at,public_approved_at,public_approved_by,created_at,updated_at")
+        .select("id,organization_id,branch_id,membership_id,submitted_by_profile_id,title,body,visibility,status,answered_testimony,is_anonymous,routing_status,routed_at,public_approved_at,public_approved_by,prayer_count,created_at,updated_at")
         .eq("id", data.id)
         .single();
       return { data: toExternalPrayer(routed ?? data), status: 201 };
     }
+
+    const action = optionalString(body.action, "action", 32);
+    if (action === "pray") {
+      assertNoUnknownFields(body, ["action", "id"]);
+      const id = uuid(requiredString(body.id, "id", 36), "id", true)!;
+      const { data: existing, error: existingError } = await admin
+        .from("prayer_requests")
+        .select("id,organization_id,branch_id,visibility,status,public_approved_at,prayer_count")
+        .eq("id", id)
+        .maybeSingle();
+      if (existingError || !existing) throw new ApiError("PRAYER_NOT_FOUND", "Prayer petition not found", 404);
+      if (existing.visibility !== "organization" || !existing.public_approved_at || existing.status === "closed") {
+        throw new ApiError("PRAYER_SUPPORT_UNAVAILABLE", "This petition is not available on a prayer wall", 409);
+      }
+
+      const identity = await identityFor(request, existing.organization_id, existing.branch_id);
+      if (!identity.user) throw new ApiError("AUTHENTICATION_REQUIRED", "Sign in to pray with this request", 401);
+      if (existing.branch_id && !identity.membership) {
+        throw new ApiError("EXPRESSION_MEMBERSHIP_REQUIRED", "Join this Expression before interacting with its prayer wall", 403);
+      }
+
+      await enforceRateLimit(
+        request,
+        "prayer_support",
+        `${existing.organization_id}:${identity.user.id}`,
+        120,
+        60 * 60,
+      );
+
+      const { error: supportError } = await admin
+        .from("prayer_supports")
+        .upsert(
+          { prayer_request_id: id, profile_id: identity.user.id },
+          { onConflict: "prayer_request_id,profile_id", ignoreDuplicates: true },
+        );
+      if (supportError) throw new ApiError("PRAYER_SUPPORT_FAILED", "Unable to record prayer support", 500, undefined, false);
+
+      const { data: updated, error: updatedError } = await admin
+        .from("prayer_requests")
+        .select("id,prayer_count")
+        .eq("id", id)
+        .single();
+      if (updatedError) throw new ApiError("PRAYER_SUPPORT_FAILED", "Unable to refresh prayer support count", 500, undefined, false);
+
+      return {
+        data: {
+          id,
+          prayer_count: Number(updated.prayer_count ?? 0),
+          viewer_has_prayed: true,
+        },
+      };
+    }
+    if (action) throw new ApiError("VALIDATION_FAILED", "Unsupported prayer action", 422);
 
     assertNoUnknownFields(body, ["id", "organizationId", "status", "answeredTestimony", "visibility", "privacy", "approvePublic"]);
     const id = uuid(requiredString(body.id, "id", 36), "id", true)!;
