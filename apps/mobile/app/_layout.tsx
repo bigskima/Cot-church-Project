@@ -51,6 +51,8 @@ function AppContent() {
         <Stack.Screen name="expressions/index" options={{ headerShown: false }} />
         <Stack.Screen name="assistant" options={{ headerShown: false }} />
         <Stack.Screen name="studio/index" options={{ headerShown: false }} />
+        <Stack.Screen name="studio/reel" options={{ headerShown: false }} />
+        <Stack.Screen name="studio/video" options={{ headerShown: false }} />
         <Stack.Screen name="leadership/index" options={{ headerShown: false }} />
         <Stack.Screen name="leadership/media-studio" options={{ headerShown: false }} />
         <Stack.Screen name="leadership/pastoral-triage" options={{ headerShown: false }} />
