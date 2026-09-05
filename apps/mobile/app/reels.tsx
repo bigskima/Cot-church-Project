@@ -87,7 +87,16 @@ export default function FullScreenReelsScreen() {
   const reels = reelsResource.data ?? [];
   const canShareToGeneral =
     mode === 'authenticated' &&
-    (Boolean(context?.expressions?.some((item) => item.status === 'active')) || hasCapability('feed.post') || hasCapability('*'));
+    (
+      Boolean(
+        organizationId &&
+        context?.expressions?.some(
+          (item) => item.status === 'active' && item.organizationId === organizationId,
+        ),
+      ) ||
+      hasCapability('feed.post') ||
+      hasCapability('*')
+    );
 
   useEffect(() => {
     if (!reelId || !reels.length || appliedDeepLinkRef.current === reelId) return;
