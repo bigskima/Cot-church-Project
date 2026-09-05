@@ -126,7 +126,7 @@ export default function CommunityScreen() {
   const feedKey = `mobile:community:${activeTab}:${organizationId || 'auto'}:${expression?.id ?? 'none'}:${mode}`;
   const resource = useResource<CommunityPost[]>(feedKey, (signal) => {
     if (activeTab === 'general') {
-      const query = new URLSearchParams({ scope: 'all' });
+      const query = new URLSearchParams({ scope: 'church' });
       if (organizationId) query.set('organizationId', organizationId);
       return api.request<CommunityPost[]>(`public-social-feed?${query.toString()}`, { signal, context: 'public' });
     }
