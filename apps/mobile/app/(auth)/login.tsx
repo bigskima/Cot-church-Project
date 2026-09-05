@@ -305,6 +305,8 @@ const styles = StyleSheet.create({
     right: 12,
     top: 14,
   },
+  forgotPassword: { alignSelf: 'flex-end', paddingVertical: spacing.xs },
+  forgotPasswordText: { fontSize: 12, fontWeight: '700' },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
