@@ -59,8 +59,8 @@ export default function NotificationsScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 80 }}>
-        <ScreenHeader title="Notifications" subtitle="Invitations, church updates, and actions that need your attention." showBack />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 130 }}>
+        <ScreenHeader title="Notifications" kicker="INBOX" subtitle="Invitations, updates and actions that need your attention." showBack />
         <View style={styles.body}>
           {message ? <View style={[styles.message, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}><Text style={[styles.messageText, { color: colors.text }]}>{message}</Text></View> : null}
           <View style={styles.section}>
@@ -68,7 +68,7 @@ export default function NotificationsScreen() {
             {invitations.loading ? <Skeleton height={132} count={2} /> : invitations.error && !invitations.data ? (
               <ResourceError message={invitations.error} retry={invitations.refresh} />
             ) : pending.length ? pending.map((invite) => (
-              <View key={invite.id} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+              <View key={invite.id} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
                 <View style={styles.cardHeader}>
                   <View style={[styles.iconWrap, { backgroundColor: colors.primarySoft }]}><Icon name={invite.kind === 'platform_role' ? 'shield-checkmark-outline' : 'people-outline'} size={20} color={colors.interactive} /></View>
                   <View style={styles.cardHeaderText}>
@@ -92,8 +92,11 @@ export default function NotificationsScreen() {
             {notifications.loading ? <Skeleton height={86} count={2} /> : notifications.error && !notifications.data ? (
               <ResourceError message={notifications.error} retry={notifications.refresh} />
             ) : notifications.data?.length ? notifications.data.map((item) => (
-              <View key={item.id} style={[styles.notice, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
-                <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
+              <View key={item.id} style={[styles.notice, { backgroundColor: colors.card, borderColor: item.read_at ? colors.borderSubtle : colors.interactive }, shadows.sm]}>
+                <View style={styles.noticeTitleRow}>
+                  {!item.read_at ? <View style={[styles.unreadDot, { backgroundColor: colors.interactive }]} /> : null}
+                  <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
+                </View>
                 <Text style={[styles.bodyText, { color: colors.textSecondary }]}>{item.body}</Text>
                 <Text style={[styles.meta, { color: colors.textMuted }]}>{new Date(item.created_at).toLocaleString()}</Text>
               </View>
@@ -114,12 +117,14 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 }, body: { paddingHorizontal: spacing.lg, gap: spacing.xl }, section: { gap: spacing.sm },
+  screen: { flex: 1 }, body: { paddingHorizontal: spacing.md, gap: spacing.xl }, section: { gap: spacing.sm },
   message: { borderWidth: 1, borderRadius: radius.md, padding: spacing.md }, messageText: { fontSize: 13, fontWeight: '600' },
-  card: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.sm }, cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  card: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.lg, gap: spacing.sm }, cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   iconWrap: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }, cardHeaderText: { flex: 1 },
   title: { fontSize: 14, fontWeight: '800' }, bodyText: { fontSize: 13, lineHeight: 19 }, meta: { fontSize: 11, marginTop: 2 },
   actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm, marginTop: spacing.xs },
-  notice: { borderWidth: 1, borderRadius: radius.md, padding: spacing.md, gap: 4 },
+  notice: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: 5 },
+  noticeTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  unreadDot: { width: 7, height: 7, borderRadius: 4 },
   historyRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, borderBottomWidth: 1 }, emptyText: { fontSize: 13 },
 });
