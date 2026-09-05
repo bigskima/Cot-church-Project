@@ -168,9 +168,6 @@ export function PlatformOverview({
             {(!allowedPages || allowedPages.has('organizations')) ? (
               <Button variant="primary" size="md" onClick={() => onNavigate('organizations')} icon="ORG">Manage organisations</Button>
             ) : null}
-            {(!allowedPages || allowedPages.has('giving')) ? (
-              <Button variant="secondary" size="md" onClick={() => onNavigate('giving')} icon="GIVE">Church-wide giving</Button>
-            ) : null}
             {(!allowedPages || allowedPages.has('streaming')) ? (
               <Button variant="gold" size="md" onClick={() => onNavigate('streaming')} icon="LIVE">Streaming services</Button>
             ) : null}
