@@ -77,7 +77,7 @@ export default function CreatorStudioScreen() {
       iconName: 'calendar-outline',
       badge: 'EVENTS',
       route: '/leadership/events',
-      enabled: hasCapability('events.create') || hasCapability('events.update') || hasCapability('events.manage') || hasCapability('*'),
+      enabled: hasCapability('events.create') || hasCapability('events.update') || hasCapability('*'),
     },
     {
       title: 'Live Media Studio',
