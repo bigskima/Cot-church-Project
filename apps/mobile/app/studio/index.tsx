@@ -33,7 +33,9 @@ interface StudioOverview {
 
 export default function CreatorStudioScreen() {
   const insets = useSafeAreaInsets();
-  const { api } = useSession();
+  const { api, context, hasCapability } = useSession();
+  const expression = context?.expression;
+  const canPublishPosts = hasCapability('posts.create') || hasCapability('posts.publish') || hasCapability('*');
   const { colors } = useTheme();
 
   const [activeModal, setActiveModal] = useState<'post' | null>(null);
@@ -52,13 +54,17 @@ export default function CreatorStudioScreen() {
         method: 'POST',
         body: JSON.stringify({
           action: 'publish_post',
-          visibility: 'public',
+          expressionId: expression?.id ?? null,
+          visibility: expression?.id ? 'branch' : 'public',
           body: postBody.trim(),
         }),
       });
       setPostBody('');
       setActiveModal(null);
-      Alert.alert('Post Published', 'Your message is now live across the community feed.');
+      Alert.alert(
+        'Post Published',
+        expression?.name ? `Your message is now live inside ${expression.name}.` : 'Your message is now live in the General Community.',
+      );
       studioResource.refresh();
     } catch (err: any) {
       Alert.alert('Publish Failed', err.message ?? 'Unable to publish post');
@@ -69,55 +75,62 @@ export default function CreatorStudioScreen() {
 
   const leadershipModules = [
     {
-      title: 'Sermons & Archives',
-      description: 'Upload sermon audio/video, manage series, and add scripture notes',
+      title: 'Sermons',
+      description: 'Create sermon drafts, manage teachings and publish when authorized.',
       iconName: 'book-outline',
       badge: 'MEDIA',
       route: '/leadership/sermons',
+      enabled: hasCapability('sermons.create') || hasCapability('sermons.manage') || hasCapability('sermons.publish') || hasCapability('*'),
     },
     {
-      title: 'Events & Calendar',
-      description: 'Create Sunday services, retreats, conferences, and prayer meetings',
+      title: 'Events',
+      description: 'Create and manage gatherings in your current church scope.',
       iconName: 'calendar-outline',
       badge: 'EVENTS',
       route: '/leadership/events',
+      enabled: hasCapability('events.create') || hasCapability('events.update') || hasCapability('events.manage') || hasCapability('*'),
     },
     {
       title: 'Live Media Studio',
-      description: 'Broadcast live services, stream ingest keys, and stream health status',
+      description: 'Operate broadcasts and monitor streams when your role allows it.',
       iconName: 'radio-outline',
       badge: 'BROADCAST',
       route: '/leadership/media-studio',
+      enabled: hasCapability('streams.manage') || hasCapability('streams.broadcast') || hasCapability('livestream.operate') || hasCapability('*'),
     },
     {
-      title: 'Pastoral Triage & Care',
-      description: 'Review confidential member prayer requests and assign pastoral responses',
+      title: 'Pastoral Care',
+      description: 'Review confidential prayer requests and assigned follow-up.',
       iconName: 'heart-outline',
       badge: 'PASTORAL',
       route: '/leadership/pastoral-triage',
+      enabled: hasCapability('prayer.manage') || hasCapability('prayer.moderate') || hasCapability('prayer.pastoral_notes.manage') || hasCapability('*'),
     },
     {
-      title: 'Giving & Financial Configuration',
-      description: 'Track offering campaign goals, receipts, and configure bank wire setups',
+      title: 'Giving',
+      description: 'Manage giving destinations and finance information you can access.',
       iconName: 'gift-outline',
       badge: 'FINANCE',
       route: '/leadership/giving',
+      enabled: hasCapability('giving.campaigns.manage') || hasCapability('giving.finance.read') || hasCapability('*'),
     },
     {
       title: 'Expressions',
-      description: 'Manage Expression directory, timezones, leadership and community access',
-      iconName: 'business-outline',
+      description: 'Manage Expressions when your account has church-level authority.',
+      iconName: 'people-outline',
       badge: 'COMMUNITY',
       route: '/leadership/expressions',
+      enabled: hasCapability('branches.create') || hasCapability('organizations.manage') || hasCapability('expression.create') || hasCapability('*'),
     },
     {
       title: 'Expression Leadership',
-      description: 'View pastors, leaders, communication channels and ministry roles',
-      iconName: 'people-outline',
+      description: 'Manage leaders and ministry roles in the active Expression.',
+      iconName: 'people-circle-outline',
       badge: 'DIRECTORY',
       route: '/leadership/directory',
+      enabled: Boolean(expression?.id) && (hasCapability('expression.leadership.manage') || hasCapability('organization.leadership.manage') || hasCapability('*')),
     },
-  ];
+  ].filter((module) => module.enabled);
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -136,14 +149,16 @@ export default function CreatorStudioScreen() {
         />
 
         <View style={styles.body}>
-          {/* Quick Post Creator CTA */}
+          {canPublishPosts ? (
           <View style={[styles.quickPostCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
             <View style={styles.quickPostHeader}>
               <Icon name="create-outline" size={20} color={colors.interactive} />
               <Text style={[styles.quickPostTitle, { color: colors.text }]}>Quick Community Announcement</Text>
             </View>
             <Text style={[styles.quickPostSub, { color: colors.textSecondary }]}>
-              Share an encouragement or ministry update with the General Community.
+              {expression?.name
+                ? `Share an encouragement or update inside ${expression.name}.`
+                : 'Share an encouragement or ministry update with the General Community.'}
             </Text>
             <Button
               label="Compose Announcement"
@@ -153,10 +168,11 @@ export default function CreatorStudioScreen() {
               style={{ marginTop: spacing.xs }}
             />
           </View>
+          ) : null}
 
           {/* Operational Leadership Modules Grid */}
           <View style={styles.modulesSection}>
-            <SectionHeader title="Ministry Operations & Tools" />
+            <SectionHeader title="Your tools" badge={leadershipModules.length} subtitle="Only operations assigned to your role are shown" />
             {leadershipModules.map((module, idx) => (
               <LeadershipModuleCard
                 key={idx}
@@ -175,7 +191,7 @@ export default function CreatorStudioScreen() {
         visible={activeModal === 'post'}
         onClose={() => setActiveModal(null)}
         title="Publish announcement"
-        subtitle="Share this with the General Community."
+        subtitle={expression?.name ? `Share inside ${expression.name}.` : 'Share with the General Community.'}
       >
         <InputField
           label="Announcement"
