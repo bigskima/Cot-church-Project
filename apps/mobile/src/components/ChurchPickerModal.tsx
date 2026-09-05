@@ -1,7 +1,7 @@
 import React from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/state/theme';
-import { radius, spacing, typography } from '@/design-system/tokens';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 import { Badge } from './Badge';
 import { Button } from './Button';
 import { Icon } from './primitives/Icon';
@@ -33,14 +33,14 @@ export function ChurchPickerModal({
     >
       <View style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={onClose} />
-        <View style={[styles.sheet, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
+        <View style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.lg]}>
           <View style={[styles.handle, { backgroundColor: colors.borderStrong }]} />
 
           <View style={styles.header}>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.title, { color: colors.text }]}>Select Organization</Text>
+              <Text style={[styles.title, { color: colors.text }]}>Choose church</Text>
               <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                Choose a church organization or expression to browse.
+                Choose the church whose public content you want to explore.
               </Text>
             </View>
             <Pressable
@@ -69,12 +69,12 @@ export function ChurchPickerModal({
                       styles.churchTile,
                       {
                         backgroundColor: isSelected ? colors.primarySoft : colors.bgSecondary,
-                        borderColor: isSelected ? colors.interactive : colors.border,
+                        borderColor: isSelected ? colors.interactive : colors.borderSubtle,
                       },
                       pressed && styles.pressed,
                     ]}
                   >
-                    <View style={[styles.churchIcon, { backgroundColor: colors.card }]}>
+                    <View style={[styles.churchIcon, { backgroundColor: colors.cardElevated }]}>
                       <Icon
                         name="business-outline"
                         size={20}
@@ -127,9 +127,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sheet: {
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    borderTopWidth: 1,
+    borderTopLeftRadius: radius.sheet,
+    borderTopRightRadius: radius.sheet,
+    borderWidth: 1,
     padding: spacing.lg,
     maxHeight: '80%',
   },
@@ -163,12 +163,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     marginBottom: spacing.sm,
     borderWidth: 1,
   },
   pressed: {
-    opacity: 0.8,
+    opacity: 0.9,
+    transform: [{ scale: 0.992 }],
   },
   churchIcon: {
     width: 38,
@@ -183,7 +184,7 @@ const styles = StyleSheet.create({
   },
   churchName: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '800',
   },
   churchSlug: {
     fontSize: 12,
