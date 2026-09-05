@@ -25,9 +25,9 @@ export function PrayerCard({ prayer, onPray, style }: PrayerCardProps) {
         styles.card,
         {
           backgroundColor: colors.card,
-          borderColor: colors.border,
+          borderColor: colors.borderSubtle,
         },
-        shadows.sm,
+        shadows.md,
         style,
       ]}
     >
@@ -91,10 +91,10 @@ export function PrayerCard({ prayer, onPray, style }: PrayerCardProps) {
 const styles = StyleSheet.create({
   card: {
     padding: spacing.md,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     borderWidth: 1,
-    marginBottom: spacing.sm,
-    gap: spacing.xs,
+    marginBottom: spacing.md,
+    gap: spacing.sm,
   },
   headerRow: {
     flexDirection: 'row',
@@ -112,11 +112,11 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.h3,
-    fontSize: 15,
+    fontSize: 16,
   },
   body: {
     fontSize: 13,
-    lineHeight: 18,
+    lineHeight: 19,
     marginTop: 2,
   },
   footer: {
@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 6,
     borderRadius: radius.pill,
   },
   prayBtnText: {
