@@ -21,9 +21,11 @@ export default function ProfileScreen() {
   const { mode, context, hasCapability, signOut, api } = useSession();
   const { preference, setPreference, colors } = useTheme();
   const profile = context?.profile;
-  const organization = context?.organization ?? context?.organizations?.[0];
+  const membershipOrganization = context?.organization ?? context?.organizations?.[0];
+  const creatorOrganization = context?.creatorOrganizations?.[0];
+  const organization = membershipOrganization ?? creatorOrganization;
   const expression = context?.expression;
-  const hasOrganization = Boolean(context?.organization?.id ?? organization?.id);
+  const hasOrganization = Boolean(membershipOrganization?.id);
 
   const expressionCreatorState = useResource<{ organizationId: string; authorized: boolean }>(
     `profile:expression-creator:${context?.organization?.id ?? organization?.id ?? 'none'}`,
