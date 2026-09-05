@@ -163,7 +163,7 @@ export default function LivePlayerScreen() {
   const handleSendChat = async () => {
     if (!chatMessage.trim()) return;
     if (mode === 'visitor') {
-      router.push('/(auth)/login');
+      router.push({ pathname: '/(auth)/login', params: { returnTo: `/live/${id}` } } as any);
       return;
     }
     if (!access?.canChat) {
@@ -189,7 +189,7 @@ export default function LivePlayerScreen() {
   const submitSupport = async () => {
     if (mode === 'visitor') {
       setShowSupportSheet(false);
-      router.push('/(auth)/login');
+      router.push({ pathname: '/(auth)/login', params: { returnTo: `/live/${id}` } } as any);
       return;
     }
 
@@ -296,7 +296,7 @@ export default function LivePlayerScreen() {
             </Pressable>
           ) : null}
           <Pressable
-            onPress={() => mode === 'visitor' ? router.push('/(auth)/login') : setShowSupportSheet(true)}
+            onPress={() => mode === 'visitor' ? router.push({ pathname: '/(auth)/login', params: { returnTo: `/live/${id}` } } as any) : setShowSupportSheet(true)}
             style={[styles.actionPill, { backgroundColor: colors.bgSecondary }]}
           >
             <Icon name="heart-outline" size={14} color={colors.textSecondary} />
@@ -380,7 +380,7 @@ export default function LivePlayerScreen() {
           </View>
         ) : mode === 'visitor' ? (
           <Pressable
-            onPress={() => router.push('/(auth)/login')}
+            onPress={() => router.push({ pathname: '/(auth)/login', params: { returnTo: `/live/${id}` } } as any)}
             accessibilityRole="button"
             style={[styles.signInChat, { backgroundColor: colors.glass, borderColor: colors.borderSubtle, marginBottom: Math.max(insets.bottom, spacing.sm) }, shadows.floating]}
           >
