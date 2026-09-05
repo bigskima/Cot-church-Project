@@ -92,11 +92,19 @@ export default function SignupScreen() {
         }),
       });
 
-      if (res.status === 'verification_required' || !res.session) {
+      if (res.status === 'verification_required') {
         setVerificationPending(true);
-      } else {
+      } else if (res.session) {
         await setSession(res.session);
         router.replace(returnTo as any);
+      } else {
+        // The signup Edge Function may intentionally omit the raw Auth session.
+        // An active account is still a successful registration; route to login
+        // instead of incorrectly asking for an OTP that may not exist.
+        router.replace({
+          pathname: '/(auth)/login',
+          params: { returnTo, registered: '1' },
+        } as any);
       }
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Unable to complete registration.');
