@@ -93,7 +93,7 @@ export default function CreatorStudioScreen() {
       iconName: 'heart-outline',
       badge: 'PASTORAL',
       route: '/leadership/pastoral-triage',
-      enabled: hasCapability('prayer.manage') || hasCapability('prayer.moderate') || hasCapability('prayer.pastoral_notes.manage') || hasCapability('*'),
+      enabled: ((hasCapability('prayer.moderate') && (hasCapability('prayer.pastoral.receive') || hasCapability('prayer.team.receive'))) || hasCapability('pastoral.followups.receive') || hasCapability('*')),
     },
     {
       title: 'Giving Configuration',
