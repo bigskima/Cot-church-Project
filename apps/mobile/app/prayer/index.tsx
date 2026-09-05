@@ -74,7 +74,7 @@ export default function PrayerScreen() {
   };
 
   const prayers = useResource<RoutedPrayer[]>(
-    `prayer:wall:${wallScope}:${organizationId || 'auto'}:${expression?.id || 'none'}`,
+    `prayer:wall:${mode}:${wallScope}:${organizationId || 'auto'}:${expression?.id || 'none'}`,
     (signal) => api.request<RoutedPrayer[]>(buildPrayerPath(wallScope), { signal }),
   );
 
