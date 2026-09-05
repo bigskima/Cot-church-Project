@@ -102,7 +102,7 @@ Deno.serve(createHandler(
       const { data: elevatedPublisher, error: permissionError } = await auth.client.rpc("has_permission", {
         target_organization_id: auth.organizationId,
         requested_permission: "feed.post",
-        target_branch_id: branchId,
+        target_branch_id: branchId ?? auth.branchId ?? null,
       });
       if (permissionError) {
         throw new ApiError("PERMISSION_CHECK_FAILED", "Unable to validate community publishing access", 500, undefined, false);
