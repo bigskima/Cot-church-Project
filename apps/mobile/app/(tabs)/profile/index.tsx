@@ -56,7 +56,7 @@ export default function ProfileScreen() {
   const hasExpressionLeadershipAccess = Boolean(expression?.id) && (
     hasCapability('content.create') || hasCapability('streams.broadcast') ||
     hasCapability('sermons.create') || hasCapability('sermons.manage') || hasCapability('events.create') ||
-    hasCapability('events.manage') || hasCapability('prayer.manage') || hasCapability('members.invite') ||
+    hasCapability('events.update') || hasCapability('prayer.manage') || hasCapability('members.invite') ||
     hasCapability('roles.assign') || hasCapability('expression.leadership.manage')
   );
   const hasOrganizationLeadershipAccess =
