@@ -55,24 +55,11 @@ export function StoriesTray({
     });
   }
 
-  const sampleHighlights = [
-    { id: 'h1', title: 'Sunday Word', isLive: false, hasUnseen: true },
-    { id: 'h2', title: 'Worship Highlights', isLive: false, hasUnseen: true },
-    { id: 'h3', title: 'Prayer Focus', isLive: false, hasUnseen: false },
-    { id: 'h4', title: 'Testimonies', isLive: false, hasUnseen: false },
-  ];
-
-  sampleHighlights.forEach((h) => {
-    defaultItems.push({
-      id: h.id,
-      title: h.title,
-      isLive: false,
-      hasUnseen: h.hasUnseen,
-      onPress: () => onOpenStory?.(h.id),
-    });
-  });
-
   const stories = customStories && customStories.length > 0 ? customStories : defaultItems;
+
+  // Production UI must never invent church highlights. If there is no real
+  // live stream or story content, the tray simply does not render.
+  if (!stories.length) return null;
 
   return (
     <View style={[styles.container, { borderBottomColor: colors.borderSubtle }, style]}>
@@ -142,30 +129,29 @@ export function StoriesTray({
 
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
+    paddingVertical: spacing.md,
   },
   listContent: {
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     gap: spacing.md,
   },
   storyBubble: {
     alignItems: 'center',
-    width: 68,
+    width: 72,
     gap: 4,
   },
   gradientRing: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     padding: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
   liveRing: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     borderWidth: 2,
     padding: 1,
     alignItems: 'center',
@@ -173,9 +159,9 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   innerCircle: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -199,7 +185,7 @@ const styles = StyleSheet.create({
   },
   storyTitle: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
     textAlign: 'center',
   },
 });
