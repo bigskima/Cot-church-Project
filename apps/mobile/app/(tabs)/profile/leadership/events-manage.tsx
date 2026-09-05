@@ -23,6 +23,15 @@ import { radius, shadows, spacing } from '@/design-system/tokens';
 import type { Event } from '@/types/content';
 
 type EventVisibility = 'members' | 'public' | 'private';
+type EventStatus = 'draft' | 'published' | 'cancelled' | 'completed' | 'archived';
+
+function formatLocalDateTime(value?: string) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
 
 function parseLocalDateTime(value: string) {
   const trimmed = value.trim();
@@ -36,12 +45,15 @@ function parseLocalDateTime(value: string) {
 
 export default function EventsManageScreen() {
   const insets = useSafeAreaInsets();
-  const { api, context } = useSession();
+  const { api, context, hasCapability } = useSession();
   const { colors } = useTheme();
   const expression = context?.expression;
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
+  const canCreate = hasCapability('events.create') || hasCapability('*');
+  const canUpdate = hasCapability('events.update') || hasCapability('*');
 
   const [composerOpen, setComposerOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [locationName, setLocationName] = useState('');
@@ -50,6 +62,7 @@ export default function EventsManageScreen() {
   const [capacity, setCapacity] = useState('');
   const [isOnline, setIsOnline] = useState(false);
   const [visibility, setVisibility] = useState<EventVisibility>(expression?.id ? 'members' : 'public');
+  const [status, setStatus] = useState<EventStatus>('draft');
   const [creating, setCreating] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -65,6 +78,7 @@ export default function EventsManageScreen() {
   );
 
   const resetComposer = () => {
+    setEditingEvent(null);
     setTitle('');
     setDescription('');
     setLocationName('');
@@ -73,10 +87,35 @@ export default function EventsManageScreen() {
     setCapacity('');
     setIsOnline(false);
     setVisibility(expression?.id ? 'members' : 'public');
+    setStatus('draft');
     setErrorMsg('');
   };
 
-  const handleCreateEvent = async () => {
+  const openCreate = () => {
+    if (!canCreate) return;
+    resetComposer();
+    setComposerOpen(true);
+  };
+
+  const openEdit = (event: Event) => {
+    if (!canUpdate) return;
+    setEditingEvent(event);
+    setTitle(event.title ?? '');
+    setDescription(event.description ?? '');
+    setLocationName(event.location?.name ?? '');
+    setStartsAt(formatLocalDateTime(event.starts_at));
+    setEndsAt(formatLocalDateTime(event.ends_at));
+    setCapacity(event.capacity ? String(event.capacity) : '');
+    setIsOnline(event.location?.is_online === true);
+    setVisibility(['members', 'public', 'private'].includes(event.visibility) ? event.visibility as EventVisibility : 'members');
+    setStatus(['draft', 'published', 'cancelled', 'completed', 'archived'].includes(event.status ?? '') ? event.status as EventStatus : 'draft');
+    setErrorMsg('');
+    setSuccessMsg('');
+    setComposerOpen(true);
+  };
+
+  const handleSaveEvent = async () => {
+    if (editingEvent ? !canUpdate : !canCreate) return;
     const start = parseLocalDateTime(startsAt);
     const end = parseLocalDateTime(endsAt);
     if (!title.trim()) return setErrorMsg('Enter an event title.');
@@ -94,22 +133,29 @@ export default function EventsManageScreen() {
     setErrorMsg('');
     setSuccessMsg('');
     try {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      const eventPayload = {
+        title: title.trim(),
+        description: description.trim(),
+        visibility,
+        location: { name: locationName.trim(), is_online: isOnline },
+        timezone,
+        startsAt: start.toISOString(),
+        endsAt: end.toISOString(),
+        capacity: parsedCapacity,
+      };
+      const wasEditing = Boolean(editingEvent);
       await api.request('events', {
-        method: 'POST',
-        body: JSON.stringify({
-          title: title.trim(),
-          description: description.trim(),
-          visibility,
-          location: { name: locationName.trim(), is_online: isOnline },
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-          startsAt: start.toISOString(),
-          endsAt: end.toISOString(),
-          capacity: parsedCapacity,
-        }),
+        method: wasEditing ? 'PATCH' : 'POST',
+        body: JSON.stringify(
+          wasEditing
+            ? { id: editingEvent!.id, status, ...eventPayload }
+            : eventPayload,
+        ),
       });
-      resetComposer();
       setComposerOpen(false);
-      setSuccessMsg(`Event created${expression?.name ? ` inside ${expression.name}` : ''}.`);
+      resetComposer();
+      setSuccessMsg(wasEditing ? 'Event updated.' : `Event created${expression?.name ? ` inside ${expression.name}` : ''}.`);
       events.refresh();
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Unable to create event.');
@@ -132,7 +178,7 @@ export default function EventsManageScreen() {
           kicker="LEADERSHIP"
           subtitle={expression?.name ? `Manage gatherings inside ${expression.name}.` : 'Manage church-wide gatherings and public events.'}
           showBack
-          rightAction={<Button label="New event" onPress={() => setComposerOpen(true)} size="sm" />}
+          rightAction={canCreate ? <Button label="New event" onPress={openCreate} size="sm" /> : undefined}
         />
 
         <View style={styles.body}>
@@ -151,7 +197,7 @@ export default function EventsManageScreen() {
               <Text style={[styles.summaryValue, { color: colors.text }]}>{upcomingCount}</Text>
               <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Upcoming in this scope</Text>
             </View>
-            <Button label="Create" onPress={() => setComposerOpen(true)} variant="secondary" size="sm" />
+{canCreate ? <Button label="Create" onPress={openCreate} variant="secondary" size="sm" /> : null}
           </View>
 
           <View style={styles.listSection}>
@@ -168,20 +214,23 @@ export default function EventsManageScreen() {
                     onPress={() => router.push(`/event/${event.id}${expression?.id ? '?context=expression' : ''}` as any)}
                   />
                   <View style={styles.statusRow}>
-                    <Badge label={(event.status || 'draft').toUpperCase()} variant={event.status === 'published' ? 'success' : 'neutral'} />
-                    <Text style={[styles.scopeText, { color: colors.textMuted }]}>
-                      {event.visibility === 'public' ? 'Public' : event.visibility === 'private' ? 'Private' : 'Members'}
-                    </Text>
+                    <View style={styles.statusMeta}>
+                      <Badge label={(event.status || 'draft').toUpperCase()} variant={event.status === 'published' ? 'success' : 'neutral'} />
+                      <Text style={[styles.scopeText, { color: colors.textMuted }]}>
+                        {event.visibility === 'public' ? 'Public' : event.visibility === 'private' ? 'Private' : 'Members'}
+                      </Text>
+                    </View>
+                    {canUpdate ? <Button label="Edit" onPress={() => openEdit(event)} variant="outline" size="sm" /> : null}
                   </View>
                 </View>
               ))
             ) : (
               <EmptyState
                 title="No events yet"
-                message="Create a gathering when your church or Expression is ready."
+                message={canCreate ? 'Create a gathering when your church or Expression is ready.' : 'Events will appear here when they are created in this scope.'}
                 iconName="calendar-outline"
-                actionLabel="Create event"
-                onAction={() => setComposerOpen(true)}
+                actionLabel={canCreate ? 'Create event' : undefined}
+                onAction={canCreate ? openCreate : undefined}
               />
             )}
           </View>
@@ -190,9 +239,14 @@ export default function EventsManageScreen() {
 
       <BottomSheet
         visible={composerOpen}
-        onClose={() => !creating && setComposerOpen(false)}
-        title="Create event"
-        subtitle={expression?.name ? `Inside ${expression.name}` : 'Church-wide event'}
+        onClose={() => {
+          if (!creating) {
+            setComposerOpen(false);
+            resetComposer();
+          }
+        }}
+        title={editingEvent ? 'Edit event' : 'Create event'}
+        subtitle={editingEvent ? editingEvent.title : expression?.name ? `Inside ${expression.name}` : 'Church-wide event'}
         maxHeightPercent={94}
       >
         <View style={styles.form}>
@@ -229,7 +283,20 @@ export default function EventsManageScreen() {
 
           <InputField label="Description" value={description} onChangeText={setDescription} multiline numberOfLines={4} placeholder="What should people know about this event?" />
 
-          <Button label="Create event" onPress={() => void handleCreateEvent()} loading={creating} size="lg" fullWidth />
+          {editingEvent ? (
+            <>
+              <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>STATUS</Text>
+              <View style={styles.chips}>
+                <Chip label="Draft" selected={status === 'draft'} onPress={() => setStatus('draft')} />
+                <Chip label="Published" selected={status === 'published'} onPress={() => setStatus('published')} />
+                <Chip label="Completed" selected={status === 'completed'} onPress={() => setStatus('completed')} />
+                <Chip label="Cancelled" selected={status === 'cancelled'} onPress={() => setStatus('cancelled')} />
+                <Chip label="Archived" selected={status === 'archived'} onPress={() => setStatus('archived')} />
+              </View>
+            </>
+          ) : null}
+
+          <Button label={editingEvent ? 'Save changes' : 'Create event'} onPress={() => void handleSaveEvent()} loading={creating} size="lg" fullWidth />
         </View>
       </BottomSheet>
     </View>
@@ -249,7 +316,8 @@ const styles = StyleSheet.create({
   summaryLabel: { fontSize: 12, marginTop: 1 },
   listSection: { gap: spacing.sm },
   eventWrap: { marginBottom: spacing.sm },
-  statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: -spacing.xs, paddingHorizontal: spacing.xs },
+  statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginTop: -spacing.xs, paddingHorizontal: spacing.xs },
+  statusMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
   scopeText: { fontSize: 11, fontWeight: '600' },
   form: { gap: spacing.md },
   fieldLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.65 },
