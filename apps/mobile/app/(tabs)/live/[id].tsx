@@ -40,7 +40,7 @@ export default function LivePlayerScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { api, mode, context } = useSession();
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
 
   const [access, setAccess] = useState<StreamAccess | null>(null);
   const [loading, setLoading] = useState(true);
@@ -202,7 +202,7 @@ export default function LivePlayerScreen() {
           />
         ) : (
           <View style={styles.videoPlaceholder}>
-            <Icon name="radio" size={48} color="#5C8FF5" />
+            <Icon name="radio" size={48} color="#168FF0" />
             <Text style={styles.placeholderText}>
               {isLive ? 'Connecting to live video stream...' : 'Broadcast is currently offline.'}
             </Text>
@@ -228,9 +228,9 @@ export default function LivePlayerScreen() {
       </View>
 
       {/* Stream Info Header */}
-      <View style={[styles.streamInfoBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+      <View style={[styles.streamInfoBar, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
         <View style={styles.infoCol}>
-          <Text style={[styles.streamTitle, { color: colors.text }]} numberOfLines={1}>
+          <Text style={[styles.streamTitle, { color: colors.text }]} numberOfLines={2}>
             {access.stream.title}
           </Text>
           {access.stream.description ? (
@@ -286,7 +286,7 @@ export default function LivePlayerScreen() {
         />
 
         {/* Chat Input Box */}
-        {access.canChat ? <View style={[styles.chatInputBar, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, spacing.xs) }]}>
+        {access.canChat ? <View style={[styles.chatInputBar, { backgroundColor: colors.glass, borderColor: colors.borderSubtle, marginBottom: Math.max(insets.bottom, spacing.sm) }, shadows.floating]}>
           <TextInput
             value={chatMessage}
             onChangeText={setChatMessage}
@@ -294,7 +294,7 @@ export default function LivePlayerScreen() {
             placeholderTextColor={colors.textMuted}
             style={[
               styles.chatInput,
-              { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border },
+              { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.borderSubtle },
             ]}
           />
           <Pressable
@@ -311,7 +311,7 @@ export default function LivePlayerScreen() {
             <Icon name="arrow-up" size={18} color={chatMessage.trim() ? '#FFFFFF' : colors.textMuted} />
           </Pressable>
         </View> : (
-          <Pressable onPress={() => router.push('/(auth)/login')} accessibilityRole="button" style={[styles.signInChat, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
+          <Pressable onPress={() => router.push('/(auth)/login')} accessibilityRole="button" style={[styles.signInChat, { backgroundColor: colors.glass, borderColor: colors.borderSubtle, marginBottom: Math.max(insets.bottom, spacing.sm) }, shadows.floating]}>
             <Icon name="log-in-outline" size={17} color={colors.interactive} />
             <Text style={[styles.signInChatText, { color: colors.interactive }]}>Sign in to join live chat</Text>
           </Pressable>
@@ -322,7 +322,7 @@ export default function LivePlayerScreen() {
       <BottomSheet
         visible={showSupportSheet}
         onClose={() => setShowSupportSheet(false)}
-        title="Request Pastoral Prayer"
+        title="Request prayer support"
       >
         {supportSent ? (
           <View style={styles.sentWrap}>
@@ -335,19 +335,19 @@ export default function LivePlayerScreen() {
         ) : (
           <View style={{ gap: spacing.sm }}>
             <InputField
-              label="Your Name / Request"
+              label="Prayer need"
               value={supportName}
               onChangeText={setSupportName}
-              placeholder="e.g. Prayer for healing / provision"
+              placeholder="Healing, provision, guidance…"
             />
             <InputField
-              label="Contact / WhatsApp (Optional)"
+              label="Contact (optional)"
               value={supportContact}
               onChangeText={setSupportContact}
-              placeholder="+1 555 0199"
+              placeholder="Phone or preferred contact"
             />
             <Button
-              label="Submit Prayer Request"
+              label="Send request"
               onPress={submitSupport}
               variant="primary"
               size="md"
@@ -367,7 +367,7 @@ const styles = StyleSheet.create({
   videoContainer: {
     width: '100%',
     aspectRatio: 16 / 9,
-    backgroundColor: '#061426',
+    backgroundColor: '#000000',
     position: 'relative',
   },
   videoView: {
@@ -401,7 +401,9 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(6, 20, 38, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.52)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -409,17 +411,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderRadius: radius.xl,
+    gap: spacing.sm,
   },
   infoCol: {
     flex: 1,
     gap: 1,
   },
   streamTitle: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: '800',
+    letterSpacing: -0.25,
   },
   streamDesc: {
     fontSize: 11,
@@ -455,6 +462,7 @@ const styles = StyleSheet.create({
   },
   chatSection: {
     flex: 1,
+    paddingVertical: spacing.sm,
   },
   interactionError: {
     paddingHorizontal: spacing.md,
@@ -470,6 +478,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 7,
+    borderRadius: radius.lg,
   },
   chatUser: {
     fontSize: 13,
@@ -488,15 +499,16 @@ const styles = StyleSheet.create({
   },
   chatInputBar: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.xs,
-    borderTopWidth: 1,
+    alignItems: 'flex-end',
+    marginHorizontal: spacing.md,
+    padding: spacing.sm,
+    borderWidth: 1,
+    borderRadius: radius.xxl,
     gap: spacing.sm,
   },
   chatInput: {
     flex: 1,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -511,7 +523,9 @@ const styles = StyleSheet.create({
   },
   signInChat: {
     minHeight: 52,
-    borderTopWidth: 1,
+    marginHorizontal: spacing.md,
+    borderWidth: 1,
+    borderRadius: radius.xxl,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
