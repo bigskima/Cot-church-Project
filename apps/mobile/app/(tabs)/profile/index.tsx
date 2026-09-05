@@ -37,12 +37,15 @@ export default function ProfileScreen() {
   );
   const isAuthorizedExpressionCreator = expressionCreatorState.data?.authorized === true;
 
-  const aiReadiness = useResource<AiReadiness>('profile:assistant-readiness', (signal) => {
+  const aiReadiness = useResource<AiReadiness>(
+    `profile:assistant-readiness:${mode}:${membershipOrganization?.id ?? 'none'}:${expression?.id ?? 'general'}`,
+    (signal) => {
     if (mode !== 'authenticated' || !hasOrganization) {
       return Promise.resolve({ capability: 'assistant.answer', ready: false, reason: 'active_membership_required' });
     }
-    return api.request<AiReadiness>('ai-gateway?capability=assistant.answer', { signal });
-  });
+      return api.request<AiReadiness>('ai-gateway?capability=assistant.answer', { signal });
+    },
+  );
   const aiReady = aiReadiness.data?.ready === true;
   const aiSubtitle = aiReady
     ? 'Available now'
