@@ -147,14 +147,17 @@ export default function CommunityScreen() {
       (item) => item.status === 'active' && item.organizationId === organizationId,
     ),
   );
-  const elevatedFeedPublisher = hasCapability('feed.post') || hasCapability('*');
+  const elevatedGeneralPublisher =
+    context?.organizationPermissions?.includes('feed.post') === true ||
+    context?.organizationPermissions?.includes('*') === true;
+  const elevatedExpressionPublisher = hasCapability('feed.post') || hasCapability('*');
   const canPostGeneral =
-    mode === 'authenticated' && (hasActiveExpressionMembership || elevatedFeedPublisher);
+    mode === 'authenticated' && (hasActiveExpressionMembership || elevatedGeneralPublisher);
   const canPostExpression =
-    mode === 'authenticated' && Boolean(expression?.id) && elevatedFeedPublisher;
+    mode === 'authenticated' && Boolean(expression?.id) && elevatedExpressionPublisher;
   const canPostCurrent = activeTab === 'general' ? canPostGeneral : canPostExpression;
   const canPostDestination = postDestination === 'general' ? canPostGeneral : canPostExpression;
-  const ordinaryGeneralMemberLane = postDestination === 'general' && !elevatedFeedPublisher;
+  const ordinaryGeneralMemberLane = postDestination === 'general' && !elevatedGeneralPublisher;
   const attachmentLimit = ordinaryGeneralMemberLane ? MAX_MEMBER_PUBLIC_ATTACHMENTS : 10;
   const postTextLimit = ordinaryGeneralMemberLane ? 2200 : 10000;
   const canAttachAudio = !ordinaryGeneralMemberLane;
@@ -495,7 +498,7 @@ export default function CommunityScreen() {
           <View style={styles.composerCopy}>
             <Text style={[styles.composerPrompt, { color: colors.text }]}>Share with the community</Text>
             <Text style={[styles.composerPlaceholder, { color: colors.textMuted }]}>
-              {activeTab === 'general' && !elevatedFeedPublisher ? 'Text, photos or short video' : 'Text, photos, video or audio'}
+              {activeTab === 'general' && !elevatedGeneralPublisher ? 'Text, photos or short video' : 'Text, photos, video or audio'}
             </Text>
           </View>
           <Icon name="create-outline" size={20} color={colors.interactive} />
