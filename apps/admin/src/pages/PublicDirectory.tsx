@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ApiClient } from '../api';
+import { Badge, Button, Card, InputField, Modal, SelectField, Toggle } from '../components/ui';
 
 type Organization = { id: string; name: string; slug?: string; status: string };
 type Story = {
@@ -61,16 +62,28 @@ const blankStory: Story = {
   is_published: false,
 };
 const blankLeader: LeaderDraft = {
-  displayName: '', portraitUrl: '', roleTitle: '', shortBio: '', fullBio: '', ministry: '',
-  displayOrder: 0, isFounder: false, isFeaturedPublic: true, isActive: true,
+  displayName: '',
+  portraitUrl: '',
+  roleTitle: '',
+  shortBio: '',
+  fullBio: '',
+  ministry: '',
+  displayOrder: 0,
+  isFounder: false,
+  isFeaturedPublic: true,
+  isActive: true,
 };
 
 export function PublicDirectory({ api }: { api: ApiClient }) {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [organizationId, setOrganizationId] = useState('');
   const [story, setStory] = useState<Story>(blankStory);
+  const [storyDraft, setStoryDraft] = useState<Story>(blankStory);
   const [leaders, setLeaders] = useState<Leader[]>([]);
   const [leaderDraft, setLeaderDraft] = useState<LeaderDraft>(blankLeader);
+  const [storyOpen, setStoryOpen] = useState(false);
+  const [leaderOpen, setLeaderOpen] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState<Leader | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingStory, setSavingStory] = useState(false);
   const [savingLeader, setSavingLeader] = useState(false);
@@ -78,36 +91,42 @@ export function PublicDirectory({ api }: { api: ApiClient }) {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
-  const selectedOrganization = useMemo(() => organizations.find((item) => item.id === organizationId), [organizations, organizationId]);
+  const selectedOrganization = useMemo(
+    () => organizations.find((item) => item.id === organizationId) ?? null,
+    [organizations, organizationId],
+  );
+
+  const loadDirectory = async (orgId?: string) => {
+    setLoading(true);
+    setError('');
+    try {
+      const suffix = orgId ? `?organizationId=${encodeURIComponent(orgId)}` : '';
+      const data = await api.request<Payload>(`platform-public-directory${suffix}`);
+      setOrganizations(data.organizations ?? []);
+      const resolvedOrgId = orgId || organizationId || data.organizations?.find((item) => item.status === 'active')?.id || data.organizations?.[0]?.id || '';
+      if (resolvedOrgId && resolvedOrgId !== organizationId) setOrganizationId(resolvedOrgId);
+      if (orgId || resolvedOrgId === organizationId) {
+        setStory(data.story ?? blankStory);
+        setLeaders(data.leaders ?? []);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to load public directory.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    api.request<Payload>('platform-public-directory')
-      .then((data) => {
-        setOrganizations(data.organizations ?? []);
-        const first = data.organizations?.find((item) => item.status === 'active') ?? data.organizations?.[0];
-        if (first) setOrganizationId(first.id);
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : 'Unable to load public directory'))
-      .finally(() => setLoading(false));
+    void loadDirectory();
   }, [api]);
 
   useEffect(() => {
     if (!organizationId) return;
-    setLoading(true);
-    setError('');
-    api.request<Payload>(`platform-public-directory?organizationId=${encodeURIComponent(organizationId)}`)
-      .then((data) => {
-        setOrganizations(data.organizations ?? []);
-        setStory(data.story ?? blankStory);
-        setLeaders(data.leaders ?? []);
-        setLeaderDraft(blankLeader);
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : 'Unable to load public directory'))
-      .finally(() => setLoading(false));
-  }, [api, organizationId]);
+    void loadDirectory(organizationId);
+  }, [organizationId]);
 
   async function uploadImage(file: File) {
-    if (!organizationId) throw new Error('Select an organization first.');
+    if (!organizationId) throw new Error('Select a church first.');
     const intent = await api.request<{ mediaPath: string; signedUploadUrl: string }>('platform-public-directory', {
       method: 'POST',
       body: JSON.stringify({
@@ -132,185 +151,351 @@ export function PublicDirectory({ api }: { api: ApiClient }) {
 
   async function handleStoryImage(file?: File) {
     if (!file) return;
-    setUploading(true); setError('');
+    setUploading(true);
+    setError('');
     try {
       const result = await uploadImage(file);
-      setStory((current) => ({ ...current, banner_image_url: result.publicUrl }));
+      setStoryDraft((current) => ({ ...current, banner_image_url: result.publicUrl }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to upload story image');
-    } finally { setUploading(false); }
+      setError(err instanceof Error ? err.message : 'Unable to upload story image.');
+    } finally {
+      setUploading(false);
+    }
   }
 
   async function handleLeaderImage(file?: File) {
     if (!file) return;
-    setUploading(true); setError('');
+    setUploading(true);
+    setError('');
     try {
       const result = await uploadImage(file);
       setLeaderDraft((current) => ({ ...current, portraitUrl: result.publicUrl }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to upload portrait');
-    } finally { setUploading(false); }
+      setError(err instanceof Error ? err.message : 'Unable to upload portrait.');
+    } finally {
+      setUploading(false);
+    }
   }
 
-  async function saveStory(event: React.FormEvent) {
-    event.preventDefault();
+  const openStory = () => {
+    setStoryDraft(story);
+    setError('');
+    setMessage('');
+    setStoryOpen(true);
+  };
+
+  async function saveStory() {
     if (!organizationId) return;
-    setSavingStory(true); setError(''); setMessage('');
+    if (!storyDraft.title.trim()) {
+      setError('Public story title is required.');
+      return;
+    }
+    setSavingStory(true);
+    setError('');
+    setMessage('');
     try {
       const saved = await api.request<Story>('platform-public-directory', {
         method: 'PATCH',
         body: JSON.stringify({
-          action: 'upsert_story', organizationId,
-          title: story.title, subtitle: story.subtitle, mission: story.mission, vision: story.vision,
-          foundingStory: story.founding_story, foundingYear: story.founding_year,
-          historyMilestones: story.history_milestones, values: story.values,
-          bannerImageUrl: story.banner_image_url, isPublished: story.is_published,
+          action: 'upsert_story',
+          organizationId,
+          title: storyDraft.title.trim(),
+          subtitle: storyDraft.subtitle.trim(),
+          mission: storyDraft.mission.trim(),
+          vision: storyDraft.vision.trim(),
+          foundingStory: storyDraft.founding_story.trim(),
+          foundingYear: storyDraft.founding_year,
+          historyMilestones: storyDraft.history_milestones,
+          values: storyDraft.values,
+          bannerImageUrl: storyDraft.banner_image_url,
+          isPublished: storyDraft.is_published,
         }),
       });
-      setStory(saved); setMessage('General Community church story saved.');
-    } catch (err) { setError(err instanceof Error ? err.message : 'Unable to save church story'); }
-    finally { setSavingStory(false); }
+      setStory(saved);
+      setStoryOpen(false);
+      setMessage('General Community church story saved.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to save church story.');
+    } finally {
+      setSavingStory(false);
+    }
   }
 
-  function editLeader(leader: Leader) {
-    setLeaderDraft({
-      id: leader.id,
-      displayName: leader.display_name,
-      portraitUrl: leader.portrait_url ?? '',
-      roleTitle: leader.role_title,
-      shortBio: leader.short_bio ?? '',
-      fullBio: leader.full_bio ?? '',
-      ministry: leader.ministry ?? '',
-      displayOrder: leader.display_order ?? 0,
-      isFounder: leader.is_founder,
-      isFeaturedPublic: leader.is_featured_public,
-      isActive: leader.is_active,
-    });
-    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  function openLeader(leader?: Leader) {
+    setError('');
+    setMessage('');
+    if (leader) {
+      setLeaderDraft({
+        id: leader.id,
+        displayName: leader.display_name,
+        portraitUrl: leader.portrait_url ?? '',
+        roleTitle: leader.role_title,
+        shortBio: leader.short_bio ?? '',
+        fullBio: leader.full_bio ?? '',
+        ministry: leader.ministry ?? '',
+        displayOrder: leader.display_order ?? 0,
+        isFounder: leader.is_founder,
+        isFeaturedPublic: leader.is_featured_public,
+        isActive: leader.is_active,
+      });
+    } else {
+      setLeaderDraft(blankLeader);
+    }
+    setLeaderOpen(true);
   }
 
-  async function saveLeader(event: React.FormEvent) {
-    event.preventDefault();
+  async function saveLeader() {
     if (!organizationId) return;
-    setSavingLeader(true); setError(''); setMessage('');
+    if (!leaderDraft.displayName.trim() || !leaderDraft.roleTitle.trim()) {
+      setError('Public name and role title are required.');
+      return;
+    }
+
+    setSavingLeader(true);
+    setError('');
+    setMessage('');
     try {
       const saved = await api.request<Leader>('platform-public-directory', {
         method: 'PATCH',
         body: JSON.stringify({
           action: leaderDraft.id ? 'update_leader' : 'create_leader',
-          organizationId, leaderId: leaderDraft.id,
-          displayName: leaderDraft.displayName, portraitUrl: leaderDraft.portraitUrl || null,
-          roleTitle: leaderDraft.roleTitle, shortBio: leaderDraft.shortBio,
-          fullBio: leaderDraft.fullBio, ministry: leaderDraft.ministry || null,
-          displayOrder: leaderDraft.displayOrder, isFounder: leaderDraft.isFounder,
-          isFeaturedPublic: leaderDraft.isFeaturedPublic, isActive: leaderDraft.isActive,
+          organizationId,
+          leaderId: leaderDraft.id,
+          displayName: leaderDraft.displayName.trim(),
+          portraitUrl: leaderDraft.portraitUrl || null,
+          roleTitle: leaderDraft.roleTitle.trim(),
+          shortBio: leaderDraft.shortBio.trim(),
+          fullBio: leaderDraft.fullBio.trim(),
+          ministry: leaderDraft.ministry.trim() || null,
+          displayOrder: leaderDraft.displayOrder,
+          isFounder: leaderDraft.isFounder,
+          isFeaturedPublic: leaderDraft.isFeaturedPublic,
+          isActive: leaderDraft.isActive,
           socialLinks: {},
         }),
       });
-      setLeaders((current) => leaderDraft.id ? current.map((item) => item.id === saved.id ? saved : item) : [...current, saved].sort((a, b) => a.display_order - b.display_order));
+      setLeaders((current) =>
+        leaderDraft.id
+          ? current.map((item) => item.id === saved.id ? saved : item)
+          : [...current, saved].sort((a, b) => a.display_order - b.display_order),
+      );
+      setLeaderOpen(false);
       setLeaderDraft(blankLeader);
       setMessage(leaderDraft.id ? 'Leader profile updated.' : 'Leader profile added to the General Community directory.');
-    } catch (err) { setError(err instanceof Error ? err.message : 'Unable to save leader profile'); }
-    finally { setSavingLeader(false); }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to save leader profile.');
+    } finally {
+      setSavingLeader(false);
+    }
   }
 
-  async function archiveLeader(id: string) {
-    if (!organizationId || !window.confirm('Archive this public leader profile?')) return;
+  async function archiveLeader() {
+    if (!organizationId || !archiveTarget) return;
     setError('');
     try {
       await api.request('platform-public-directory', {
         method: 'DELETE',
-        body: JSON.stringify({ action: 'archive_leader', organizationId, leaderId: id }),
+        body: JSON.stringify({ action: 'archive_leader', organizationId, leaderId: archiveTarget.id }),
       });
-      setLeaders((current) => current.map((item) => item.id === id ? { ...item, is_active: false } : item));
-    } catch (err) { setError(err instanceof Error ? err.message : 'Unable to archive leader profile'); }
+      setLeaders((current) => current.map((item) => item.id === archiveTarget.id ? { ...item, is_active: false } : item));
+      setArchiveTarget(null);
+      setMessage('Leader profile archived from the active public directory.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to archive leader profile.');
+    }
   }
 
   return (
-    <div className="public-directory">
-      <section className="panel">
-        <div className="panel-title">
-          <div>
-            <span className="eyebrow">GENERAL COMMUNITY PUBLIC PRESENCE</span>
-            <h2>Church Story & Central Leadership</h2>
-            <p>Manage information intentionally published to visitors and the General Community. Expression leadership is managed inside each Expression and is not controlled here.</p>
+    <div className="admin-page-stack">
+      {error && !storyOpen && !leaderOpen && !archiveTarget ? <div className="admin-inline-error" role="alert">{error}</div> : null}
+      {message ? <div className="admin-status-message admin-status-success">{message}</div> : null}
+
+      <Card
+        title="Community directory"
+        subtitle="Manage information intentionally published to visitors and the General Community. Expression leadership remains managed inside each Expression."
+        headerAction={<Button variant="outline" size="sm" loading={loading} onClick={() => void loadDirectory(organizationId)}>Refresh</Button>}
+      >
+        <div className="admin-filter-bar">
+          <SelectField
+            label="Church organization"
+            value={organizationId}
+            onChange={(event) => setOrganizationId(event.target.value)}
+            options={organizations.map((organization) => ({
+              value: organization.id,
+              label: `${organization.name} · ${organization.status}`,
+            }))}
+          />
+          <div className="admin-filter-summary">
+            <span className="admin-filter-summary-label">PUBLIC SCOPE</span>
+            <strong>{selectedOrganization?.name ?? 'No church selected'}</strong>
+            <span>{leaders.filter((leader) => leader.is_active).length} active central leader profile(s)</span>
           </div>
-          <select className="search" value={organizationId} onChange={(e) => setOrganizationId(e.target.value)}>
-            {organizations.map((organization) => <option key={organization.id} value={organization.id}>{organization.name} · {organization.status}</option>)}
-          </select>
         </div>
-        {error && <div className="error">{error}</div>}
-        {message && <div className="pill green" style={{ padding: '8px 14px', margin: '12px 0' }}>{message}</div>}
-        {loading ? <div className="loading">Loading public directory…</div> : null}
-      </section>
+      </Card>
 
-      {!loading && selectedOrganization ? (
+      {selectedOrganization ? (
         <>
-          <section className="panel">
-            <div className="panel-title"><div><span className="eyebrow">PUBLIC CHURCH STORY</span><h2>{selectedOrganization.name}</h2><p>Only publish information that the church has actually configured and approved.</p></div></div>
-            <form onSubmit={saveStory} style={{ display: 'grid', gap: 14 }}>
-              <div className="grid">
-                <label><strong>Public title</strong><input className="search" style={{ width: '100%', marginTop: 6 }} value={story.title} onChange={(e) => setStory({ ...story, title: e.target.value })} required /></label>
-                <label><strong>Subtitle</strong><input className="search" style={{ width: '100%', marginTop: 6 }} value={story.subtitle} onChange={(e) => setStory({ ...story, subtitle: e.target.value })} /></label>
+          <Card
+            title="Public church story"
+            subtitle="Only publish information that the church has actually configured and approved."
+            headerAction={<Button variant="gold" size="sm" onClick={openStory}>Edit story</Button>}
+          >
+            <div className="admin-directory-story">
+              <div className="admin-directory-banner">
+                {story.banner_image_url ? <img src={story.banner_image_url} alt="" /> : <span>STORY</span>}
               </div>
-              <div className="grid">
-                <label><strong>Mission</strong><textarea className="search" style={{ width: '100%', minHeight: 110, marginTop: 6 }} value={story.mission} onChange={(e) => setStory({ ...story, mission: e.target.value })} /></label>
-                <label><strong>Vision</strong><textarea className="search" style={{ width: '100%', minHeight: 110, marginTop: 6 }} value={story.vision} onChange={(e) => setStory({ ...story, vision: e.target.value })} /></label>
+              <div className="admin-directory-story-copy">
+                <div className="admin-record-title-row">
+                  <strong>{story.title || 'No public story configured'}</strong>
+                  <Badge label={story.is_published ? 'PUBLISHED' : 'DRAFT'} variant={story.is_published ? 'active' : 'neutral'} />
+                </div>
+                <p>{story.subtitle || story.mission || 'Add the church story, mission, vision and heritage when it is ready for public presentation.'}</p>
+                <div className="admin-capability-tags">
+                  {story.mission ? <span className="active">Mission</span> : null}
+                  {story.vision ? <span className="active">Vision</span> : null}
+                  {story.founding_story ? <span className="active">Heritage</span> : null}
+                  {story.founding_year ? <span className="active">Founded {story.founding_year}</span> : null}
+                </div>
               </div>
-              <label><strong>Founding story</strong><textarea className="search" style={{ width: '100%', minHeight: 170, marginTop: 6 }} value={story.founding_story} onChange={(e) => setStory({ ...story, founding_story: e.target.value })} /></label>
-              <div className="grid">
-                <label><strong>Founding year (optional)</strong><input type="number" className="search" style={{ width: '100%', marginTop: 6 }} value={story.founding_year ?? ''} onChange={(e) => setStory({ ...story, founding_year: e.target.value ? Number(e.target.value) : null })} /></label>
-                <label><strong>Story banner</strong><input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploading} onChange={(e) => void handleStoryImage(e.target.files?.[0])} style={{ display: 'block', marginTop: 10 }} /></label>
-              </div>
-              {story.banner_image_url ? <img src={story.banner_image_url} alt="Church story banner preview" style={{ maxWidth: 420, maxHeight: 220, objectFit: 'cover', borderRadius: 12 }} /> : null}
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={story.is_published} onChange={(e) => setStory({ ...story, is_published: e.target.checked })} /> <strong>Publish this story in General Community</strong></label>
-              <div><button className="admin-btn-primary" type="submit" disabled={savingStory || uploading}>{savingStory ? 'Saving…' : 'Save Church Story'}</button></div>
-            </form>
-          </section>
+            </div>
+          </Card>
 
-          <section className="panel">
-            <div className="panel-title"><div><span className="eyebrow">CENTRAL PUBLIC LEADERSHIP</span><h2>Pastors & Leaders</h2><p>These profiles belong to the General Community directory only. They do not grant roles or permissions.</p></div></div>
+          <Card
+            title="Central public leadership"
+            subtitle="These profiles are public directory presentation only. They do not grant roles or Expression permissions."
+            headerAction={<Button variant="gold" size="sm" onClick={() => openLeader()}>Add leader</Button>}
+          >
             {leaders.length ? (
-              <div className="grid">
+              <div className="admin-leader-grid">
                 {leaders.map((leader) => (
-                  <article key={leader.id} className="panel" style={{ margin: 0, opacity: leader.is_active ? 1 : 0.55 }}>
-                    <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-                      {leader.portrait_url ? <img src={leader.portrait_url} alt="" style={{ width: 64, height: 64, borderRadius: 999, objectFit: 'cover' }} /> : <div style={{ width: 64, height: 64, borderRadius: 999, background: 'var(--panel-strong)' }} />}
-                      <div style={{ flex: 1 }}><strong>{leader.display_name}</strong><div>{leader.role_title}</div><small>{leader.is_featured_public ? 'Public' : 'Hidden'} · order {leader.display_order}</small></div>
+                  <div key={leader.id} className={`admin-leader-card ${leader.is_active ? '' : 'archived'}`}>
+                    <div className="admin-leader-photo">
+                      {leader.portrait_url ? <img src={leader.portrait_url} alt="" /> : <span>{leader.display_name?.[0]?.toUpperCase() ?? 'L'}</span>}
                     </div>
-                    <p>{leader.short_bio}</p>
-                    <div style={{ display: 'flex', gap: 8 }}><button type="button" onClick={() => editLeader(leader)}>Edit</button>{leader.is_active ? <button type="button" onClick={() => void archiveLeader(leader.id)}>Archive</button> : null}</div>
-                  </article>
+                    <div className="admin-leader-copy">
+                      <div className="admin-record-title-row">
+                        <strong>{leader.display_name}</strong>
+                        {leader.is_founder ? <Badge label="FOUNDER" variant="gold" /> : null}
+                      </div>
+                      <span>{leader.role_title}</span>
+                      <p>{leader.short_bio || leader.ministry || 'No public bio configured.'}</p>
+                      <div className="admin-record-title-row">
+                        <Badge label={leader.is_featured_public ? 'PUBLIC' : 'HIDDEN'} variant={leader.is_featured_public ? 'active' : 'neutral'} />
+                        <Badge label={leader.is_active ? 'ACTIVE' : 'ARCHIVED'} variant={leader.is_active ? 'active' : 'neutral'} />
+                        <span className="admin-row-meta">Order {leader.display_order}</span>
+                      </div>
+                    </div>
+                    <div className="admin-table-actions">
+                      <Button variant="outline" size="sm" onClick={() => openLeader(leader)}>Edit</Button>
+                      {leader.is_active ? <Button variant="danger" size="sm" onClick={() => { setError(''); setArchiveTarget(leader); }}>Archive</Button> : null}
+                    </div>
+                  </div>
                 ))}
               </div>
-            ) : <div className="alert-notice">No central public leaders have been configured yet.</div>}
-          </section>
-
-          <section className="panel">
-            <div className="panel-title"><div><span className="eyebrow">{leaderDraft.id ? 'EDIT CENTRAL PROFILE' : 'ADD CENTRAL PROFILE'}</span><h2>{leaderDraft.id ? 'Update Pastor / Leader' : 'Add Pastor / Leader'}</h2></div></div>
-            <form onSubmit={saveLeader} style={{ display: 'grid', gap: 14 }}>
-              <div className="grid">
-                <label><strong>Full public name</strong><input className="search" style={{ width: '100%', marginTop: 6 }} value={leaderDraft.displayName} onChange={(e) => setLeaderDraft({ ...leaderDraft, displayName: e.target.value })} required /></label>
-                <label><strong>Role / title</strong><input className="search" style={{ width: '100%', marginTop: 6 }} placeholder="Senior Pastor, Associate Pastor, Leader…" value={leaderDraft.roleTitle} onChange={(e) => setLeaderDraft({ ...leaderDraft, roleTitle: e.target.value })} required /></label>
-              </div>
-              <div className="grid">
-                <label><strong>Ministry / responsibility</strong><input className="search" style={{ width: '100%', marginTop: 6 }} value={leaderDraft.ministry} onChange={(e) => setLeaderDraft({ ...leaderDraft, ministry: e.target.value })} /></label>
-                <label><strong>Display order</strong><input type="number" className="search" style={{ width: '100%', marginTop: 6 }} value={leaderDraft.displayOrder} onChange={(e) => setLeaderDraft({ ...leaderDraft, displayOrder: Number(e.target.value) || 0 })} /></label>
-              </div>
-              <label><strong>Short public bio</strong><textarea className="search" style={{ width: '100%', minHeight: 90, marginTop: 6 }} value={leaderDraft.shortBio} onChange={(e) => setLeaderDraft({ ...leaderDraft, shortBio: e.target.value })} /></label>
-              <label><strong>Full biography</strong><textarea className="search" style={{ width: '100%', minHeight: 150, marginTop: 6 }} value={leaderDraft.fullBio} onChange={(e) => setLeaderDraft({ ...leaderDraft, fullBio: e.target.value })} /></label>
-              <label><strong>Portrait</strong><input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploading} onChange={(e) => void handleLeaderImage(e.target.files?.[0])} style={{ display: 'block', marginTop: 10 }} /></label>
-              {leaderDraft.portraitUrl ? <img src={leaderDraft.portraitUrl} alt="Leader portrait preview" style={{ width: 110, height: 110, borderRadius: 999, objectFit: 'cover' }} /> : null}
-              <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
-                <label><input type="checkbox" checked={leaderDraft.isFounder} onChange={(e) => setLeaderDraft({ ...leaderDraft, isFounder: e.target.checked })} /> Founder</label>
-                <label><input type="checkbox" checked={leaderDraft.isFeaturedPublic} onChange={(e) => setLeaderDraft({ ...leaderDraft, isFeaturedPublic: e.target.checked })} /> Show publicly</label>
-                <label><input type="checkbox" checked={leaderDraft.isActive} onChange={(e) => setLeaderDraft({ ...leaderDraft, isActive: e.target.checked })} /> Active</label>
-              </div>
-              <div style={{ display: 'flex', gap: 10 }}><button className="admin-btn-primary" type="submit" disabled={savingLeader || uploading}>{savingLeader ? 'Saving…' : leaderDraft.id ? 'Update Leader' : 'Add Leader'}</button>{leaderDraft.id ? <button type="button" onClick={() => setLeaderDraft(blankLeader)}>Cancel</button> : null}</div>
-            </form>
-          </section>
+            ) : <div className="admin-table-empty"><p>No central public leaders have been configured yet.</p></div>}
+          </Card>
         </>
       ) : null}
+
+      <Modal
+        isOpen={storyOpen}
+        onClose={() => { if (!savingStory && !uploading) setStoryOpen(false); }}
+        title="Edit public church story"
+        subtitle={selectedOrganization?.name}
+        maxWidth="xl"
+        footer={
+          <>
+            <Button variant="outline" disabled={savingStory || uploading} onClick={() => setStoryOpen(false)}>Cancel</Button>
+            <Button variant="gold" loading={savingStory} disabled={uploading} onClick={() => void saveStory()}>Save story</Button>
+          </>
+        }
+      >
+        <div className="admin-modal-form">
+          {error ? <div className="admin-inline-error" role="alert">{error}</div> : null}
+          <div className="admin-form-grid-two">
+            <InputField label="Public title" value={storyDraft.title} onChange={(e) => setStoryDraft({ ...storyDraft, title: e.target.value })} required />
+            <InputField label="Subtitle" value={storyDraft.subtitle} onChange={(e) => setStoryDraft({ ...storyDraft, subtitle: e.target.value })} />
+          </div>
+          <div className="admin-form-grid-two">
+            <TextAreaField label="Mission" value={storyDraft.mission} onChange={(value) => setStoryDraft({ ...storyDraft, mission: value })} />
+            <TextAreaField label="Vision" value={storyDraft.vision} onChange={(value) => setStoryDraft({ ...storyDraft, vision: value })} />
+          </div>
+          <TextAreaField label="Founding story" value={storyDraft.founding_story} onChange={(value) => setStoryDraft({ ...storyDraft, founding_story: value })} rows={6} />
+          <div className="admin-form-grid-two">
+            <InputField label="Founding year" type="number" value={storyDraft.founding_year ?? ''} onChange={(e) => setStoryDraft({ ...storyDraft, founding_year: e.target.value ? Number(e.target.value) : null })} placeholder="Optional" />
+            <FileField label="Story banner" disabled={uploading} onChange={(file) => void handleStoryImage(file)} />
+          </div>
+          {storyDraft.banner_image_url ? <img src={storyDraft.banner_image_url} alt="Church story banner preview" className="admin-directory-image-preview banner" /> : null}
+          <Toggle label="Publish in General Community" description="Makes this approved church story visible in the public directory." checked={storyDraft.is_published} onChange={(checked) => setStoryDraft({ ...storyDraft, is_published: checked })} />
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={leaderOpen}
+        onClose={() => { if (!savingLeader && !uploading) setLeaderOpen(false); }}
+        title={leaderDraft.id ? 'Edit central leader' : 'Add central leader'}
+        subtitle={selectedOrganization?.name}
+        maxWidth="xl"
+        footer={
+          <>
+            <Button variant="outline" disabled={savingLeader || uploading} onClick={() => setLeaderOpen(false)}>Cancel</Button>
+            <Button variant="gold" loading={savingLeader} disabled={uploading} onClick={() => void saveLeader()}>{leaderDraft.id ? 'Update leader' : 'Add leader'}</Button>
+          </>
+        }
+      >
+        <div className="admin-modal-form">
+          {error ? <div className="admin-inline-error" role="alert">{error}</div> : null}
+          <div className="admin-form-grid-two">
+            <InputField label="Full public name" value={leaderDraft.displayName} onChange={(e) => setLeaderDraft({ ...leaderDraft, displayName: e.target.value })} required />
+            <InputField label="Role / title" value={leaderDraft.roleTitle} onChange={(e) => setLeaderDraft({ ...leaderDraft, roleTitle: e.target.value })} placeholder="Senior Pastor, Associate Pastor, Leader…" required />
+            <InputField label="Ministry / responsibility" value={leaderDraft.ministry} onChange={(e) => setLeaderDraft({ ...leaderDraft, ministry: e.target.value })} />
+            <InputField label="Display order" type="number" value={leaderDraft.displayOrder} onChange={(e) => setLeaderDraft({ ...leaderDraft, displayOrder: Number(e.target.value) || 0 })} />
+          </div>
+          <TextAreaField label="Short public bio" value={leaderDraft.shortBio} onChange={(value) => setLeaderDraft({ ...leaderDraft, shortBio: value })} />
+          <TextAreaField label="Full biography" value={leaderDraft.fullBio} onChange={(value) => setLeaderDraft({ ...leaderDraft, fullBio: value })} rows={6} />
+          <FileField label="Portrait" disabled={uploading} onChange={(file) => void handleLeaderImage(file)} />
+          {leaderDraft.portraitUrl ? <img src={leaderDraft.portraitUrl} alt="Leader portrait preview" className="admin-directory-image-preview portrait" /> : null}
+          <div className="admin-toggle-grid">
+            <Toggle label="Founder" checked={leaderDraft.isFounder} onChange={(checked) => setLeaderDraft({ ...leaderDraft, isFounder: checked })} />
+            <Toggle label="Show publicly" checked={leaderDraft.isFeaturedPublic} onChange={(checked) => setLeaderDraft({ ...leaderDraft, isFeaturedPublic: checked })} />
+            <Toggle label="Active" checked={leaderDraft.isActive} onChange={(checked) => setLeaderDraft({ ...leaderDraft, isActive: checked })} />
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={!!archiveTarget}
+        onClose={() => setArchiveTarget(null)}
+        title="Archive public leader"
+        subtitle={archiveTarget?.display_name}
+        maxWidth="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setArchiveTarget(null)}>Cancel</Button>
+            <Button variant="danger" onClick={() => void archiveLeader()}>Archive leader</Button>
+          </>
+        }
+      >
+        <div className="admin-warning-callout">This removes the profile from the active public leadership directory without deleting its historical record.</div>
+      </Modal>
     </div>
+  );
+}
+
+function TextAreaField({ label, value, onChange, rows = 4 }: { label: string; value: string; onChange: (value: string) => void; rows?: number }) {
+  return (
+    <label className="admin-form-group">
+      <span className="admin-form-label">{label}</span>
+      <textarea className="admin-form-input admin-form-textarea" rows={rows} value={value} onChange={(event) => onChange(event.target.value)} />
+    </label>
+  );
+}
+
+function FileField({ label, disabled, onChange }: { label: string; disabled?: boolean; onChange: (file?: File) => void }) {
+  return (
+    <label className="admin-form-group">
+      <span className="admin-form-label">{label}</span>
+      <input className="admin-file-input" type="file" accept="image/jpeg,image/png,image/webp" disabled={disabled} onChange={(event) => onChange(event.target.files?.[0])} />
+    </label>
   );
 }
