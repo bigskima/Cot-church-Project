@@ -22,7 +22,7 @@ export default function SettingsScreen() {
 
   const handleSignOut = async () => {
     await signOut();
-    router.replace('/(auth)/login');
+    router.replace('/(tabs)/home');
   };
 
   return (
@@ -114,7 +114,7 @@ export default function SettingsScreen() {
           ) : (
             <Button
               label="Sign in"
-              onPress={() => router.push('/(auth)/login')}
+              onPress={() => router.push({ pathname: '/(auth)/login', params: { returnTo: '/settings' } } as any)}
               variant="primary"
               size="lg"
               style={{ marginTop: spacing.md }}
