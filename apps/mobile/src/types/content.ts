@@ -42,7 +42,13 @@ export type MediaAsset = {
   organization_id?: string;
   expression_id?: string | null;
   media_type?: MediaAssetType;
-  type?: 'image' | 'video' | 'audio';
+  type?: 'image' | 'video' | 'audio' | 'reel_reference';
+  reelId?: string;
+  mediaAssetId?: string;
+  caption?: string | null;
+  fileName?: string | null;
+  sizeBytes?: number;
+  mimeType?: string;
   processing_state?: MediaProcessingState;
   source_storage_path?: string;
   duration_seconds?: number | null;
