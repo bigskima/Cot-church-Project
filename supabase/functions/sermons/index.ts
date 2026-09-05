@@ -71,12 +71,7 @@ Deno.serve(createHandler(
         managementQuery = scopeId
           ? managementQuery.eq("expression_id", scopeId)
           : managementQuery.is("expression_id", null);
-        if (queryTerm) managementQuery = managementQuery.ilike("title", `%${queryTerm.replace(/[%_]/g, "\\    if (request.method === "GET") {
-      if (!organizationId) throw new ApiError("ORGANIZATION_REQUIRED", "Organization context is required", 400);
-      const sermonId = uuid(url.searchParams.get("id"), "id");
-      const seriesId = uuid(url.searchParams.get("seriesId"), "seriesId");
-      const queryTerm = url.searchParams.get("q")?.trim();
-      const client = auth?.client ?? (await import("../_shared/supabase.ts")).publicClient();")}%`);
+        if (queryTerm) managementQuery = managementQuery.ilike("title", `%${queryTerm.replace(/[%_]/g, "\\$&")}%`);
 
         const { data, error } = await managementQuery;
         if (error) throw new ApiError("SERMONS_LIST_FAILED", "Unable to retrieve sermons", 500, undefined, false);
