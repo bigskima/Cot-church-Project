@@ -217,7 +217,7 @@ export default function ExpressionProfileScreen() {
                     <SermonCard
                       key={s.id}
                       sermon={s}
-                      onPress={() => router.push(`/sermon/${s.id}?context=expression` as any)}
+                      onPress={() => router.push(`/sermon/${s.id}` as any)}
                     />
                   ))}
                 </View>
@@ -257,7 +257,7 @@ export default function ExpressionProfileScreen() {
                     <ReelCard
                       key={r.id}
                       reel={r}
-                      onPress={() => router.push('/reels')}
+                      onPress={() => router.push({ pathname: '/reels', params: { reelId: r.id } } as any)}
                     />
                   ))}
                 </View>
@@ -277,7 +277,7 @@ export default function ExpressionProfileScreen() {
                     <EventCard
                       key={e.id}
                       event={e}
-                      onPress={() => router.push(`/event/${e.id}?context=expression` as any)}
+                      onPress={() => router.push(`/event/${e.id}` as any)}
                     />
                   ))}
                 </View>
