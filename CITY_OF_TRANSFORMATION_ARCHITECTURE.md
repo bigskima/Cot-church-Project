@@ -245,11 +245,18 @@ account capability. An authenticated user may publish ordinary General Community
 posts only when they belong to at least one active Expression in that church. This grants
 a **member-social lane**, not ministry publishing authority.
 
-For an ordinary Expression member, a General Community post may contain text, images and
-short social video only. The validated community-media pipeline currently limits this lane
-to four attachments per post, 50 MB per attachment, and videos of at most three minutes.
-Standalone audio is excluded from this ordinary public lane so sermon/audio-ministry
-material cannot be smuggled into General as a normal member post.
+For an ordinary Expression member, a General Community post may contain concise text,
+images and short social video only. The validated community-media pipeline currently
+limits this lane to 2,200 text characters, four attachments per post, 50 MB per attachment,
+and videos of at most three minutes. Standalone audio is excluded from this ordinary
+public lane so sermon/audio-ministry material cannot be smuggled into General as a normal
+member post.
+
+Members may also reshare an **already-published public Reel** into General Community by
+reference. That operation creates a lightweight social post pointing to the canonical
+Reel; it does not duplicate the media asset and does not grant `reels.publish`. Private
+Expression Reels cannot be shared to General Community or through the external native
+share action.
 
 This member-social capability does **not** grant canonical Sermon, Watch/long-video, Reel
 publication, livestream broadcasting, or any other ministry-authoritative content type.
