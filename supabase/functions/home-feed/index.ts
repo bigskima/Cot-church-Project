@@ -4,6 +4,7 @@ import { createHandler } from "../_shared/handler.ts";
 import { adminClient, publicClient, userClient } from "../_shared/supabase.ts";
 import { uuid } from "../_shared/validation.ts";
 import { diversifyFeed, rankFeedCandidates, type FeedSignals } from "../_shared/feed-ranking.ts";
+import { enrichContentCreators } from "../_shared/public-identity.ts";
 
 function nestedItem(value: any) {
   return Array.isArray(value) ? value[0] ?? null : value ?? null;
