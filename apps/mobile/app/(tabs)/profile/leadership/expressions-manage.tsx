@@ -33,9 +33,12 @@ interface CreatorState {
 
 export default function ExpressionsManageScreen() {
   const insets = useSafeAreaInsets();
-  const { api, context } = useSession();
+  const { api, context, selectContext } = useSession();
   const { colors } = useTheme();
-  const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
+  const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? context?.creatorOrganizations?.[0]?.id ?? '';
+  const usingCreatorBootstrap = Boolean(
+    organizationId && !context?.organizations?.some((organization) => organization.id === organizationId),
+  );
   const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -46,8 +49,18 @@ export default function ExpressionsManageScreen() {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  const expressions = useResource<ExpressionItem[]>('leadership:expressions', (signal) =>
-    api.request<ExpressionItem[]>('branches', { signal })
+  const expressions = useResource<ExpressionItem[]>(
+    `leadership:expressions:${organizationId || 'none'}:${usingCreatorBootstrap ? 'creator' : 'member'}`,
+    (signal) => {
+      if (!organizationId) return Promise.resolve([]);
+      const path = usingCreatorBootstrap
+        ? `branches?organizationId=${encodeURIComponent(organizationId)}`
+        : 'branches';
+      return api.request<ExpressionItem[]>(path, {
+        signal,
+        context: usingCreatorBootstrap ? 'public' : 'current',
+      });
+    },
   );
   const creatorState = useResource<CreatorState>(`expression-creator:${organizationId}`, (signal) => {
     if (!organizationId) return Promise.resolve({ organizationId: '', authorized: false });
@@ -81,7 +94,9 @@ export default function ExpressionsManageScreen() {
     try {
       const created = await api.request<ExpressionItem>('branches', {
         method: 'POST',
+        context: usingCreatorBootstrap ? 'public' : 'current',
         body: JSON.stringify({
+          ...(usingCreatorBootstrap ? { organizationId } : {}),
           name: name.trim(),
           code: code.trim().toUpperCase(),
           timezone: timezone.trim() || detectedTimezone,
@@ -91,6 +106,7 @@ export default function ExpressionsManageScreen() {
       setCreateOpen(false);
       setSuccessMsg(`${created.name} is ready. You are its owner and Expression Admin.`);
       await expressions.refresh();
+      if (usingCreatorBootstrap) await selectContext(organizationId);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Unable to create Expression.');
     } finally {
