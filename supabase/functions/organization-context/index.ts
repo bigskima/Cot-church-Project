@@ -75,6 +75,7 @@ Deno.serve(createHandler(
           }));
 
     let effectivePermissions: string[] = [];
+    let organizationPermissions: string[] = [];
     if (auth.organizationId && auth.membershipId) {
       const { data: assignments, error: permissionError } = await auth.client
         .from("role_assignments")
@@ -85,14 +86,16 @@ Deno.serve(createHandler(
         throw new ApiError("CONTEXT_LOOKUP_FAILED", "Unable to resolve permissions", 500, undefined, false);
       }
       const now = Date.now();
-      effectivePermissions = [...new Set((assignments ?? [])
-        .filter((assignment) => !assignment.expires_at || Date.parse(assignment.expires_at) > now)
-        .flatMap((assignment) => {
-          const role = assignment.role as unknown as { role_permissions?: Array<{ permission?: { code?: string; is_active?: boolean } }> };
-          return (role?.role_permissions ?? [])
-            .filter((entry) => entry.permission?.is_active && entry.permission.code)
-            .map((entry) => entry.permission!.code!);
-        }))].sort();
+      const activeAssignments = (assignments ?? [])
+        .filter((assignment) => !assignment.expires_at || Date.parse(assignment.expires_at) > now);
+      const permissionsFor = (rows: typeof activeAssignments) => [...new Set(rows.flatMap((assignment) => {
+        const role = assignment.role as unknown as { role_permissions?: Array<{ permission?: { code?: string; is_active?: boolean } }> };
+        return (role?.role_permissions ?? [])
+          .filter((entry) => entry.permission?.is_active && entry.permission.code)
+          .map((entry) => entry.permission!.code!);
+      }))].sort();
+      effectivePermissions = permissionsFor(activeAssignments);
+      organizationPermissions = permissionsFor(activeAssignments.filter((assignment) => assignment.branch_id === null));
     }
 
     const organizationMap = new Map<string, {
@@ -178,6 +181,7 @@ Deno.serve(createHandler(
         creatorOrganizations,
         memberships,
         expressions,
+        organizationPermissions,
         effectivePermissions,
       },
     };
