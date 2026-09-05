@@ -204,7 +204,7 @@ export function PostCard({
               return (
                 <Pressable
                   key={key}
-                  onPress={() => reference.reelId && router.push({ pathname: '/reels', params: { reelId: reference.reelId } } as any)}
+                  onPress={() => reference.reelId && router.push({ pathname: '/reels', params: { reelId: reference.reelId, context: 'public' } } as any)}
                   style={({ pressed }) => [
                     styles.reelReference,
                     { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle },
