@@ -177,7 +177,7 @@ export default function HomeScreen() {
         <View style={[styles.publicNotice, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
           <Icon name="globe-outline" size={17} color={colors.interactive} />
           <View style={styles.noticeCopy}>
-            <Text style={[styles.publicNoticeTitle, { color: colors.text }]}>General Community</Text>
+            <Text style={[styles.publicNoticeTitle, { color: colors.text }]}>Public COT Home</Text>
             <Text style={[styles.publicNoticeText, { color: colors.textSecondary }]}>You’re in the public COT space. Enter an Expression when you want its private community.</Text>
             <Pressable onPress={() => router.push('/expressions')} accessibilityRole="button" style={[styles.expressionAction, { borderColor: colors.interactive }]}>
               <Text style={[styles.expressionActionText, { color: colors.interactive }]}>Join or enter an Expression</Text>
@@ -258,7 +258,7 @@ export default function HomeScreen() {
           ) : (
             <View style={[styles.campusPill, { backgroundColor: colors.bgSecondary }]}>
               <Icon name="globe-outline" size={12} color={colors.interactive} />
-              <Text style={[styles.campusPillText, { color: colors.interactive }]}>General</Text>
+              <Text style={[styles.campusPillText, { color: colors.interactive }]}>Public</Text>
             </View>
           )}
         </View>
