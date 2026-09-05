@@ -25,7 +25,7 @@ Deno.serve(createHandler(
   async ({ auth }) => {
     if (!auth) throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication required", 401);
 
-    const [membershipsResult, expressionMembershipsResult, profileResult] = await Promise.all([
+    const [membershipsResult, expressionMembershipsResult, profileResult, creatorOrganizationsResult] = await Promise.all([
       auth.client
         .from("memberships")
         .select("id, status, joined_at, branch_id, organization:organizations(id, name, slug, status, timezone), branch:branches(id, name, code, timezone, is_active)")
@@ -43,6 +43,11 @@ Deno.serve(createHandler(
         .select("id, display_name, avatar_url")
         .eq("id", auth.user.id)
         .maybeSingle(),
+      auth.client
+        .from("expression_creator_authorizations")
+        .select("organization_id, organization:organizations(id,name,slug,status,timezone)")
+        .eq("profile_id", auth.user.id)
+        .eq("is_active", true),
     ]);
 
     if (membershipsResult.error) {
@@ -57,6 +62,17 @@ Deno.serve(createHandler(
 
     const memberships = (membershipsResult.data ?? []) as unknown as MembershipRow[];
     const expressionMemberships = (expressionMembershipsResult.data ?? []) as unknown as ExpressionMembershipRow[];
+    const creatorOrganizations = creatorOrganizationsResult.error
+      ? []
+      : (creatorOrganizationsResult.data ?? [])
+          .map((row: any) => row.organization)
+          .filter((organization: any) => organization?.status === "active")
+          .map((organization: any) => ({
+            id: organization.id,
+            name: organization.name,
+            slug: organization.slug,
+            timezone: organization.timezone,
+          }));
 
     let effectivePermissions: string[] = [];
     if (auth.organizationId && auth.membershipId) {
@@ -159,6 +175,7 @@ Deno.serve(createHandler(
             }
           : undefined,
         organizations,
+        creatorOrganizations,
         memberships,
         expressions,
         effectivePermissions,
