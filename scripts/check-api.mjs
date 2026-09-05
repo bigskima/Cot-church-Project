@@ -115,6 +115,7 @@ const platformIntegrations = await readFile('supabase/functions/platform-integra
 const gatewayConfig = await readFile('supabase/config.toml', 'utf8');
 const privilegedRpcGrantHardening = await readFile('supabase/migrations/20260905121228_harden_remaining_privileged_rpc_execute_grants.sql', 'utf8');
 const streamGrantHardening = await readFile('supabase/migrations/20260905121401_restore_stream_and_idempotency_execute_boundaries.sql', 'utf8');
+const triggerGrantHardening = await readFile('supabase/migrations/20260905121523_remove_api_execute_from_security_definer_triggers.sql', 'utf8');
 
 const invariants = [
   [handler, /request\.method === "OPTIONS"/, 'CORS preflight handling'],
@@ -198,6 +199,7 @@ const invariants = [
   [privilegedRpcGrantHardening, /update_membership_status\(uuid,uuid,membership_status,uuid\).*from public, anon/s, 'membership mutation anonymous execute revocation'],
   [streamGrantHardening, /can_access_stream\(uuid\).*from public, anon/s, 'stream-access anonymous execute revocation'],
   [streamGrantHardening, /reserve_api_idempotency\(uuid,text,text,text\).*from public, anon/s, 'idempotency anonymous execute revocation'],
+  [triggerGrantHardening, /p\.prorettype = 'trigger'::regtype/, 'security-definer trigger execute hardening'],
 ];
 
 const missing = invariants.filter(([source, pattern]) => !pattern.test(source));
