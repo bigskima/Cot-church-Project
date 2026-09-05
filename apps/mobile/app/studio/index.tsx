@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   Alert,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,6 +14,7 @@ import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import {
   Badge,
+  BottomSheet,
   Button,
   Icon,
   InputField,
@@ -104,15 +104,15 @@ export default function CreatorStudioScreen() {
       route: '/leadership/giving',
     },
     {
-      title: 'Church Expressions & Campuses',
-      description: 'Manage multi-campus directory, timezones, and leadership assignments',
+      title: 'Expressions',
+      description: 'Manage Expression directory, timezones, leadership and community access',
       iconName: 'business-outline',
-      badge: 'CAMPUS',
+      badge: 'COMMUNITY',
       route: '/leadership/expressions',
     },
     {
-      title: 'Campus Leadership Directory',
-      description: 'View active pastoral rolls, communication channels, and ministry roles',
+      title: 'Expression Leadership',
+      description: 'View pastors, leaders, communication channels and ministry roles',
       iconName: 'people-outline',
       badge: 'DIRECTORY',
       route: '/leadership/directory',
@@ -125,24 +125,25 @@ export default function CreatorStudioScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + spacing.sm, paddingBottom: 100 },
+          { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 120 },
         ]}
       >
         <ScreenHeader
-          title="Ministry Studio Hub"
-          subtitle="Scoped leadership suite for content publishing, broadcasts, events, and pastoral operations."
+          title="Ministry Studio"
+          kicker="LEADERSHIP"
+          subtitle="Create, publish and manage only the ministry tools assigned to your role."
           showBack
         />
 
         <View style={styles.body}>
           {/* Quick Post Creator CTA */}
-          <View style={[styles.quickPostCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+          <View style={[styles.quickPostCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
             <View style={styles.quickPostHeader}>
               <Icon name="create-outline" size={20} color={colors.interactive} />
               <Text style={[styles.quickPostTitle, { color: colors.text }]}>Quick Community Announcement</Text>
             </View>
             <Text style={[styles.quickPostSub, { color: colors.textSecondary }]}>
-              Post an instant encouragement or ministry update to all church members.
+              Share an encouragement or ministry update with the General Community.
             </Text>
             <Button
               label="Compose Announcement"
@@ -170,49 +171,25 @@ export default function CreatorStudioScreen() {
         </View>
       </ScrollView>
 
-      {/* Post Modal */}
-      <Modal
+      <BottomSheet
         visible={activeModal === 'post'}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setActiveModal(null)}
+        onClose={() => setActiveModal(null)}
+        title="Publish announcement"
+        subtitle="Share this with the General Community."
       >
-        <View style={styles.modalBackdrop}>
-          <View style={[styles.modalSheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Publish Announcement</Text>
-              <Pressable onPress={() => setActiveModal(null)} hitSlop={8}>
-                <Icon name="close" size={20} color={colors.textMuted} />
-              </Pressable>
-            </View>
-
-            <InputField
-              label="Announcement Content"
-              value={postBody}
-              onChangeText={setPostBody}
-              multiline
-              numberOfLines={5}
-              placeholder="Write your pastoral announcement or spiritual encouragement..."
-            />
-
-            <View style={styles.modalActions}>
-              <Button
-                label="Cancel"
-                onPress={() => setActiveModal(null)}
-                variant="outline"
-                size="md"
-              />
-              <Button
-                label="Publish Post"
-                onPress={handlePublishPost}
-                loading={submitting}
-                variant="primary"
-                size="md"
-              />
-            </View>
-          </View>
+        <InputField
+          label="Announcement"
+          value={postBody}
+          onChangeText={setPostBody}
+          multiline
+          numberOfLines={5}
+          placeholder="Write your pastoral announcement or encouragement..."
+        />
+        <View style={styles.modalActions}>
+          <Button label="Cancel" onPress={() => setActiveModal(null)} variant="outline" size="md" />
+          <Button label="Publish" onPress={handlePublishPost} loading={submitting} variant="primary" size="md" />
         </View>
-      </Modal>
+      </BottomSheet>
     </View>
   );
 }
@@ -225,12 +202,12 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   body: {
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     gap: spacing.lg,
   },
   quickPostCard: {
     padding: spacing.lg,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     borderWidth: 1,
     gap: spacing.xs,
   },
@@ -249,26 +226,6 @@ const styles = StyleSheet.create({
   },
   modulesSection: {
     gap: spacing.xs,
-  },
-  modalBackdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(6, 20, 38, 0.65)',
-  },
-  modalSheet: {
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    borderTopWidth: 1,
-    padding: spacing.lg,
-    gap: spacing.md,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  modalTitle: {
-    ...typography.h2,
   },
   modalActions: {
     flexDirection: 'row',
