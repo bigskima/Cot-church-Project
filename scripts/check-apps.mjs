@@ -25,6 +25,7 @@ const files = [
   'apps/mobile/app/(tabs)/profile/leadership/giving-manage.tsx',
   'apps/admin/src/pages/GivingConfiguration.tsx',
   'apps/admin/src/pages/IntegrationsJobs.tsx',
+  'apps/admin/src/pages/PaymentInfrastructure.tsx',
   'apps/admin/src/api.ts',
   'supabase/functions/stream-access/index.ts',
   'supabase/functions/stream-presence/index.ts',
@@ -42,6 +43,7 @@ const givingUi = [
   sources.get('apps/admin/src/pages/GivingConfiguration.tsx') ?? '',
 ].join('\n');
 const integrationsUi = sources.get('apps/admin/src/pages/IntegrationsJobs.tsx') ?? '';
+const paymentInfrastructureUi = sources.get('apps/admin/src/pages/PaymentInfrastructure.tsx') ?? '';
 
 const checks = [
   [/expo-secure-store/, 'secure session persistence'],
@@ -90,8 +92,7 @@ const checks = [
   [/content-media\?action=playback/, 'signed video playback resolution'],
   [/comments\.refresh\(\)/, 'comment refresh after posting'],
   [/pathname:\s*['"]\/\(auth\)\/login['"]/, 'protected interaction sign-in gating'],
-  [/category:\s*['"]payments['"]/, 'payment credential category contract'],
-  [/providerCode/, 'payment credential provider-code contract'],
+
   [/public-content\?type=sermon&id=/, 'exact public sermon detail request'],
   [/Enter this Expression to play its internal sermon/, 'Expression sermon playback guard'],
   [/onProgress=\{syncProgress\}/, 'sermon audio and video continuity'],
@@ -117,20 +118,27 @@ const forbiddenIntegrationPatterns = [
   [/< 85ms|4 Active|HEALTHY|OPTIMAL/, 'fabricated integration health metric'],
 ];
 
+const paymentCredentialChecks = [
+  [/category:\s*['"]payments['"]/, 'payment credential category contract'],
+  [/providerCode:/, 'payment credential provider-code contract'],
+];
+
 const missing = checks.filter(([pattern]) => !pattern.test(joined));
 const forbidden = forbiddenGivingPatterns.filter(([pattern]) => pattern.test(givingUi));
 const forbiddenIntegrations = forbiddenIntegrationPatterns.filter(([pattern]) => pattern.test(integrationsUi));
+const missingPaymentCredentialChecks = paymentCredentialChecks.filter(([pattern]) => !pattern.test(paymentInfrastructureUi));
 
-if (missing.length || forbidden.length || forbiddenIntegrations.length) {
+if (missing.length || forbidden.length || forbiddenIntegrations.length || missingPaymentCredentialChecks.length) {
   const failures = [
     ...missing.map(([, name]) => name),
     ...forbidden.map(([, name]) => `remove ${name}`),
     ...forbiddenIntegrations.map(([, name]) => `remove ${name}`),
+    ...missingPaymentCredentialChecks.map(([, name]) => name),
   ];
   console.error(`Application check failed: ${failures.join(', ')}`);
   process.exit(1);
 }
 
 console.log(
-  `Application check passed (${files.length} files, ${checks.length} production invariants, ${forbiddenGivingPatterns.length + forbiddenIntegrationPatterns.length} anti-hardcode checks).`,
+  `Application check passed (${files.length} files, ${checks.length} production invariants, ${forbiddenGivingPatterns.length + forbiddenIntegrationPatterns.length} anti-hardcode checks, ${paymentCredentialChecks.length} payment contract checks).`,
 );
