@@ -252,7 +252,7 @@ Deno.serve(createHandler(
         .limit(10);
       let expressionsQuery = client
         .from("branches")
-        .select("id,organization_id,name,city,state,country,is_primary")
+        .select("id,organization_id,name,code,timezone,address,is_active")
         .eq("is_active", true)
         .ilike("name", `%${term}%`)
         .limit(10);
