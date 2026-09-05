@@ -149,6 +149,7 @@ Deno.serve(createHandler(
     if (error?.code === "42501") {
       const message = String(error.message ?? "");
       if (message.includes("Posting is restricted")) throw new ApiError("POSTING_RESTRICTED", "Your posting access is currently restricted", 403);
+      if (message.includes("Active Expression membership required")) throw new ApiError("GENERAL_POSTING_MEMBERSHIP_REQUIRED", "Join an active Expression before posting in General Community", 403);
       if (message.includes("Expression membership required")) throw new ApiError("EXPRESSION_MEMBERSHIP_REQUIRED", "Join an Expression before publishing", 403);
       if (message.includes("your own Expression")) throw new ApiError("EXPRESSION_SCOPE_DENIED", "You may publish only to your own Expression", 403);
       if (message.includes("media uploads")) throw new ApiError("MEDIA_SCOPE_DENIED", "One or more media uploads cannot be used in this feed", 403);
