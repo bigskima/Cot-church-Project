@@ -121,7 +121,7 @@ Deno.serve(createHandler(
           throw new ApiError("MEMBERSHIP_LOOKUP_FAILED", "Unable to validate Expression membership", 500, undefined, false);
         }
         if (!(memberships ?? []).length) {
-          throw new ApiError("EXPRESSION_MEMBERSHIP_REQUIRED", "Join an active Expression before posting in General Community", 403);
+          throw new ApiError("GENERAL_POSTING_MEMBERSHIP_REQUIRED", "Join an active Expression before posting in General Community", 403);
         }
         if (type.kind === "audio") {
           throw new ApiError(
