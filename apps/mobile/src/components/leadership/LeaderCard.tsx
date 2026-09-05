@@ -31,9 +31,9 @@ export function LeaderCard({
         styles.card,
         {
           backgroundColor: colors.card,
-          borderColor: colors.border,
+          borderColor: colors.borderSubtle,
         },
-        shadows.sm,
+        shadows.md,
         style,
       ]}
     >
@@ -54,9 +54,9 @@ export function LeaderCard({
 const styles = StyleSheet.create({
   card: {
     padding: spacing.md,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     borderWidth: 1,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
   },
   headerRow: {
     flexDirection: 'row',
@@ -69,15 +69,16 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
+    letterSpacing: -0.2,
   },
   role: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
   },
   bio: {
     fontSize: 13,
-    lineHeight: 18,
+    lineHeight: 19,
     marginTop: spacing.sm,
   },
 });
