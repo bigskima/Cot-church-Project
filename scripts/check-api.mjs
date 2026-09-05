@@ -151,7 +151,7 @@ const invariants = [
   [refreshSession, /auth\.refreshSession/, 'refresh-token session rotation'],
   [refreshSession, /enforceRateLimit/, 'refresh session rate limiting'],
   [passwordReset, /auth\.getUser\(token\)/, 'password reset recovery-token validation'],
-  [passwordReset, /updateUserById/, 'server-side password reset completion'],
+  [passwordReset, /auth\.updateUser\(\{ password \}\)/, 'Supabase recovery-session password reset completion'],
   [organizations, /create_organization/, 'transactional organization provisioning'],
   [memberships, /update_membership_status/, 'protected membership lifecycle'],
   [roles, /create_custom_role/, 'custom role administration'],
