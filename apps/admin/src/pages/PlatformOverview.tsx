@@ -94,7 +94,7 @@ export function PlatformOverview({
           value={metrics?.organizations.total ?? 0}
           subtitle={`${metrics?.organizations.active ?? 0} active · ${metrics?.organizations.suspended ?? 0} suspended`}
           trend={{ value: metrics?.organizations.archived ? `${metrics.organizations.archived} archived` : 'Lifecycle controlled', isPositive: (metrics?.organizations.suspended ?? 0) === 0 }}
-          icon="🏛"
+          icon="ORG"
           variant="gold"
         />
         <StatWidget
@@ -102,14 +102,14 @@ export function PlatformOverview({
           value={metrics?.expressions.total ?? 0}
           subtitle={`${metrics?.expressions.active ?? 0} active local expressions`}
           trend={{ value: `${metrics?.expressions.inactive ?? 0} inactive`, isPositive: (metrics?.expressions.inactive ?? 0) === 0 }}
-          icon="🌐"
+          icon="EXP"
         />
         <StatWidget
           title="Accounts"
           value={metrics?.identities.total ?? 0}
           subtitle={`${metrics?.identities.activeMemberships ?? 0} active memberships`}
           trend={{ value: 'Live account data', isPositive: true }}
-          icon="👥"
+          icon="ID"
           variant="success"
         />
         <StatWidget
@@ -117,7 +117,7 @@ export function PlatformOverview({
           value={metrics?.streaming.live ?? 0}
           subtitle={`${metrics?.streaming.scheduled ?? 0} scheduled · ${metrics?.streaming.processing ?? 0} processing`}
           trend={{ value: (metrics?.streaming.failed ?? 0) > 0 ? `${metrics?.streaming.failed} failed` : 'No stream failures', isPositive: (metrics?.streaming.failed ?? 0) === 0 }}
-          icon="📡"
+          icon="LIVE"
           variant="live"
         />
       </div>
@@ -128,13 +128,13 @@ export function PlatformOverview({
         </div>
       ) : null}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(260px, 1fr)', gap: 24, marginBottom: 24 }}>
+      <div className="admin-overview-grid">
         <Card
-          title="Platform Service Health"
+          title="Platform service health"
           subtitle={metrics?.generatedAt ? `Last updated ${new Date(metrics.generatedAt).toLocaleString()}` : 'Loading current status'}
           headerAction={<Button variant="outline" size="sm" onClick={load}>Refresh</Button>}
         >
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
+          <div className="admin-service-grid">
             {[
               ['Platform services', statusLabel(Boolean(metrics)), 'Administration service availability'],
               ['Streaming service', statusLabel(Boolean(metrics?.streaming.configured), (metrics?.streaming.failed ?? 0) > 0), `${metrics?.streaming.activeProviders ?? 0} provider(s) · ${metrics?.streaming.activeConfigurations ?? 0} active config(s)`],
@@ -145,12 +145,7 @@ export function PlatformOverview({
             ].map(([service, status, desc]) => (
               <div
                 key={service}
-                style={{
-                  backgroundColor: 'var(--bg-elevated)',
-                  padding: 16,
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--border-subtle)',
-                }}
+                className="admin-service-tile"
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                   <span style={{ fontSize: 13, fontWeight: 800 }}>{service}</span>
@@ -166,28 +161,28 @@ export function PlatformOverview({
           </div>
         </Card>
 
-        <Card title="Quick Actions" subtitle="Common Platform Administration tasks">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <Button variant="primary" size="md" onClick={() => onNavigate('organizations')} icon="🏛">
-              Manage Organisations
+        <Card title="Quick actions" subtitle="Common Platform Administration tasks">
+          <div className="admin-quick-actions">
+            <Button variant="primary" size="md" onClick={() => onNavigate('organizations')} icon="ORG">
+              Manage organisations
             </Button>
-            <Button variant="gold" size="md" onClick={() => onNavigate('streaming')} icon="📡">
-              Streaming Services
+            <Button variant="gold" size="md" onClick={() => onNavigate('streaming')} icon="LIVE">
+              Streaming services
             </Button>
-            <Button variant="secondary" size="md" onClick={() => onNavigate('ai')} icon="✦">
-              AI Services
+            <Button variant="secondary" size="md" onClick={() => onNavigate('ai')} icon="AI">
+              AI services
             </Button>
-            <Button variant="outline" size="md" onClick={() => onNavigate('integrations')} icon="⚡">
-              System Activity
+            <Button variant="outline" size="md" onClick={() => onNavigate('integrations')} icon="OPS">
+              System activity
             </Button>
-            <Button variant="outline" size="md" onClick={() => onNavigate('audit')} icon="🛡">
-              View Audit Log
+            <Button variant="outline" size="md" onClick={() => onNavigate('audit')} icon="AUDIT">
+              View audit log
             </Button>
           </div>
         </Card>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 24 }}>
+      <div className="admin-overview-secondary-grid">
         <Card title="AI activity (24h)">
           <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
             <div><strong style={{ fontSize: 24 }}>{metrics?.ai.runs24h ?? 0}</strong><p style={{ color: 'var(--text-muted)', fontSize: 12 }}>runs</p></div>
@@ -205,9 +200,9 @@ export function PlatformOverview({
       </div>
 
       <Card
-        title="Recent Administrative Activity"
+        title="Recent administrative activity"
         subtitle="Recent security-sensitive administrative actions"
-        headerAction={<Button variant="ghost" size="sm" onClick={() => onNavigate('audit')}>View Audit Log</Button>}
+        headerAction={<Button variant="ghost" size="sm" onClick={() => onNavigate('audit')}>View audit log</Button>}
       >
         <Table
           columns={[
