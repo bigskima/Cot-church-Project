@@ -148,7 +148,7 @@ export default function WatchDetailScreen() {
   };
 
   const handleShare = async () => {
-    if (!video) return;
+    if (!video || expressionMode) return;
     try {
       await Share.share({
         message: `Watch "${video.title}" on ${identity}.`,
