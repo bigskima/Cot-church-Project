@@ -1,4 +1,5 @@
 import React from 'react';
+import Constants from 'expo-constants';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,6 +18,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { mode, signOut } = useSession();
   const { preference, setPreference, colors } = useTheme();
+  const appVersion = Constants.expoConfig?.version ?? 'Development build';
 
   const handleSignOut = async () => {
     await signOut();
@@ -88,16 +90,15 @@ export default function SettingsScreen() {
 
             <View style={[styles.divider, { backgroundColor: colors.borderSubtle }]} />
 
-            <Pressable
-              onPress={() => {}}
-              style={({ pressed }) => [styles.menuRow, pressed && styles.pressed]}
-            >
+            <View style={styles.menuRow}>
               <View style={styles.menuLeft}>
                 <Icon name="code-slash-outline" size={18} color={colors.text} />
                 <Text style={[styles.menuText, { color: colors.text }]}>App version</Text>
               </View>
-              <Text style={[styles.versionTag, { color: colors.textMuted }]}>v1.0.0</Text>
-            </Pressable>
+              <Text style={[styles.versionTag, { color: colors.textMuted }]}>
+                {appVersion === 'Development build' ? appVersion : `v${appVersion}`}
+              </Text>
+            </View>
           </View>
 
           {/* Sign Out Button */}
@@ -172,7 +173,7 @@ const styles = StyleSheet.create({
   },
   menuText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   versionTag: {
     fontSize: 12,
@@ -182,6 +183,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   pressed: {
-    opacity: 0.7,
+    opacity: 0.88,
+    transform: [{ scale: 0.992 }],
   },
 });
