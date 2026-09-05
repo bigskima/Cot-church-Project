@@ -140,7 +140,7 @@ export function Button({
           },
           text: {
             ...typography.h3,
-            fontWeight: '750',
+            fontWeight: '700',
           },
         };
       case 'md':
@@ -154,7 +154,7 @@ export function Button({
           },
           text: {
             ...typography.bodySmall,
-            fontWeight: '750',
+            fontWeight: '700',
           },
         };
     }
@@ -173,7 +173,11 @@ export function Button({
         sStyles.container,
         fullWidth && styles.fullWidth,
         disabled && styles.disabled,
-        pressed && !disabled && !loading && { opacity: 0.9, transform: [{ scale: 0.985 }], backgroundColor: variant === 'primary' ? colors.interactiveHover : undefined },
+        pressed && !disabled && !loading && {
+          opacity: 0.9,
+          transform: [{ scale: 0.985 }],
+          backgroundColor: variant === 'primary' ? colors.interactiveHover : undefined,
+        },
         style,
       ]}
       accessibilityRole="button"
