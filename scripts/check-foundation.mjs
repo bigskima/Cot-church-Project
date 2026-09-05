@@ -24,6 +24,7 @@ const migrationPaths = [
   'supabase/migrations/20260905102731_lock_prayer_supports_to_server.sql',
   'supabase/migrations/20260905102909_harden_analytics_default_partition.sql',
   'supabase/migrations/20260905103057_restore_privileged_rpc_execute_boundaries.sql',
+  'supabase/migrations/20260905103708_restore_authenticated_interaction_rpc_boundaries.sql',
 ];
 
 const requiredPatterns = [
@@ -82,6 +83,10 @@ const requiredPatterns = [
   /grant execute on function public\.claim_notification_outbox\(integer\) to service_role/i,
   /revoke all on function public\.create_platform_role_invitation\(text,text,text,integer\) from public, anon/i,
   /grant execute on function public\.create_platform_role_invitation\(text,text,text,integer\) to authenticated, service_role/i,
+  /revoke all on function public\.register_for_event\(uuid,uuid\) from public, anon/i,
+  /grant execute on function public\.register_for_event\(uuid,uuid\) to authenticated, service_role/i,
+  /revoke all on function public\.comment_on_social_post\(uuid,text,uuid\) from public, anon/i,
+  /grant execute on function public\.comment_on_social_post\(uuid,text,uuid\) to authenticated, service_role/i,
 ];
 
 const source = (await Promise.all(migrationPaths.map((path) => readFile(path, 'utf8')))).join('\n');
