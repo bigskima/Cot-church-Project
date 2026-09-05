@@ -48,9 +48,11 @@ function statusLabel(ok: boolean, attention = false) {
 export function PlatformOverview({
   api,
   onNavigate,
+  allowedPages,
 }: {
   api: ApiClient;
   onNavigate: (page: string) => void;
+  allowedPages?: ReadonlySet<string>;
 }) {
   const [metrics, setMetrics] = useState<PlatformOverviewPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -163,21 +165,24 @@ export function PlatformOverview({
 
         <Card title="Quick actions" subtitle="Common Platform Administration tasks">
           <div className="admin-quick-actions">
-            <Button variant="primary" size="md" onClick={() => onNavigate('organizations')} icon="ORG">
-              Manage organisations
-            </Button>
-            <Button variant="gold" size="md" onClick={() => onNavigate('streaming')} icon="LIVE">
-              Streaming services
-            </Button>
-            <Button variant="secondary" size="md" onClick={() => onNavigate('ai')} icon="AI">
-              AI services
-            </Button>
-            <Button variant="outline" size="md" onClick={() => onNavigate('integrations')} icon="OPS">
-              System activity
-            </Button>
-            <Button variant="outline" size="md" onClick={() => onNavigate('audit')} icon="AUDIT">
-              View audit log
-            </Button>
+            {(!allowedPages || allowedPages.has('organizations')) ? (
+              <Button variant="primary" size="md" onClick={() => onNavigate('organizations')} icon="ORG">Manage organisations</Button>
+            ) : null}
+            {(!allowedPages || allowedPages.has('giving')) ? (
+              <Button variant="secondary" size="md" onClick={() => onNavigate('giving')} icon="GIVE">Church-wide giving</Button>
+            ) : null}
+            {(!allowedPages || allowedPages.has('streaming')) ? (
+              <Button variant="gold" size="md" onClick={() => onNavigate('streaming')} icon="LIVE">Streaming services</Button>
+            ) : null}
+            {(!allowedPages || allowedPages.has('ai')) ? (
+              <Button variant="secondary" size="md" onClick={() => onNavigate('ai')} icon="AI">AI services</Button>
+            ) : null}
+            {(!allowedPages || allowedPages.has('integrations')) ? (
+              <Button variant="outline" size="md" onClick={() => onNavigate('integrations')} icon="OPS">System activity</Button>
+            ) : null}
+            {(!allowedPages || allowedPages.has('audit')) ? (
+              <Button variant="outline" size="md" onClick={() => onNavigate('audit')} icon="AUDIT">View audit log</Button>
+            ) : null}
           </div>
         </Card>
       </div>
@@ -202,7 +207,7 @@ export function PlatformOverview({
       <Card
         title="Recent administrative activity"
         subtitle="Recent security-sensitive administrative actions"
-        headerAction={<Button variant="ghost" size="sm" onClick={() => onNavigate('audit')}>View audit log</Button>}
+        headerAction={(!allowedPages || allowedPages.has('audit')) ? <Button variant="ghost" size="sm" onClick={() => onNavigate('audit')}>View audit log</Button> : undefined}
       >
         <Table
           columns={[
