@@ -15,7 +15,7 @@ type Value = {
   authenticate: (value: StoredAuth) => Promise<void>;
   setSession: (session: any) => Promise<void>;
   login: (identifier: string, password: string) => Promise<void>;
-  continueAsVisitor: () => void;
+  continueAsVisitor: () => Promise<void>;
   enterAsVisitor: () => Promise<void>;
   selectContext: (organizationId: string, branchId?: string) => Promise<void>;
   enterExpression: (organizationId: string, expressionId: string) => Promise<void>;
@@ -335,9 +335,15 @@ export function SessionProvider({ children }: PropsWithChildren) {
         authenticate: persist,
         setSession,
         login,
-        continueAsVisitor: () => setMode('visitor'),
+        continueAsVisitor: async () => {
+          clearContextResources();
+          setContext(null);
+          await persist(null);
+        },
         enterAsVisitor: async () => {
-          setMode('visitor');
+          clearContextResources();
+          setContext(null);
+          await persist(null);
         },
         selectContext,
         enterExpression,
