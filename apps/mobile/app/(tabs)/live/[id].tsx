@@ -80,26 +80,13 @@ export default function LivePlayerScreen() {
 
     const fetchStream = async () => {
       try {
-        if (mode === 'visitor') {
-          const res = await api.request<LiveStream[]>('public-content?type=streams', { context: 'public' });
-          const match = res.find((stream) => stream.id === id);
-          if (!match) throw new Error('Live broadcast not found.');
-          if (isMounted) {
-            setAccess({
-              stream: match,
-              playbackUrl: match.playback_url ?? null,
-              viewerSessionId: null,
-              canChat: false,
-              givingEnabled: true,
-            });
-          }
-        } else {
-          const data = await api.request<StreamAccess>(
-            `stream-access?id=${encodeURIComponent(id)}`,
-            { method: 'POST', context: requestContext },
-          );
-          if (isMounted) setAccess(data);
-        }
+        // Discovery is public, but playback always resolves through stream-access
+        // so signed provider URLs are never exposed directly in catalogue data.
+        const data = await api.request<StreamAccess>(
+          `stream-access?id=${encodeURIComponent(id)}`,
+          { method: 'POST', context: mode === 'visitor' ? 'public' : requestContext },
+        );
+        if (isMounted) setAccess(data);
       } catch (value) {
         if (isMounted) {
           setError(value instanceof Error ? value.message : 'Unable to connect to live broadcast.');
