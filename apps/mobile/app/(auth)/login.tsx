@@ -199,8 +199,17 @@ export default function LoginScreen() {
             </View>
           </View>
 
+          <Pressable
+            onPress={() => router.push('/(auth)/forgot-password')}
+            hitSlop={8}
+            style={styles.forgotPassword}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.forgotPasswordText, { color: colors.interactive }]}>Forgot password?</Text>
+          </Pressable>
+
           <Button
-            label="Sign In"
+            label="Sign in"
             onPress={handleLogin}
             loading={loading}
             disabled={guestLoading}
@@ -210,7 +219,7 @@ export default function LoginScreen() {
           />
 
           <Button
-            label="Explore Public COT"
+            label="Explore public COT"
             onPress={handleGuestEntry}
             loading={guestLoading}
             disabled={loading}
