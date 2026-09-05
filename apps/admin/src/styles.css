@@ -2249,3 +2249,110 @@ body {
   margin-top: 2px;
   accent-color: var(--gold-dark);
 }
+
+
+/* -------------------------------------------------------------
+   GIVING & RECORD LIST COMPOSITION
+   ------------------------------------------------------------- */
+.admin-scope-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--bg-elevated);
+}
+
+.admin-scope-banner > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.admin-scope-banner strong {
+  font-size: 12px;
+}
+
+.admin-scope-banner span {
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.admin-settings-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.admin-card-footer-action {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.admin-record-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-record-grid-wide {
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+}
+
+.admin-record-card {
+  padding: 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 17px;
+  background: var(--bg-elevated);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.admin-record-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-record-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.admin-record-detail {
+  margin-top: 8px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-account-number {
+  display: inline-block;
+  margin-top: 6px;
+  color: var(--gold);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+@media (max-width: 640px) {
+  .admin-record-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-record-card > .admin-btn-base {
+    width: 100%;
+  }
+
+  .admin-card-footer-action .admin-btn-base {
+    width: 100%;
+  }
+}
