@@ -1,1 +1,1 @@
-export { default } from '../../(tabs)/live/[id]';
+export { default } from '../(tabs)/live/[id]';
