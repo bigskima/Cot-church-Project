@@ -312,7 +312,7 @@ export function StreamingInfrastructure({ api, canManage = false, canManageSecre
         onClose={() => { if (!actionBusy) { setConfigProvider(null); clearSecretInputs(); } }}
         title={configProvider ? `Configure ${configProvider.name}` : 'Configure streaming provider'}
         subtitle="You may paste real credentials here. Values are sent to the authenticated backend and encrypted in Supabase Vault; only their references remain in provider configuration."
-        footer={<div style={{ display: 'flex', gap: 12 }}><Button variant="outline" size="md" disabled={actionBusy} onClick={() => { setConfigProvider(null); clearSecretInputs(); }}>Cancel</Button><Button variant="gold" size="md" loading={actionBusy} onClick={() => void saveConfig()}>Encrypt credentials & save</Button></div>}
+        footer={<div style={{ display: 'flex', gap: 12 }}><Button variant="outline" size="md" disabled={actionBusy} onClick={() => { setConfigProvider(null); clearSecretInputs(); }}>Cancel</Button><Button variant="gold" size="md" loading={actionBusy} onClick={() => void saveConfig()}>{canManageSecrets ? 'Encrypt credentials & save' : 'Save configuration'}</Button></div>}
       >
         <InputField label="Provider credential reference" value={secretReference} onChange={(event) => setSecretReference(event.target.value.toUpperCase())} placeholder="STREAMING_MUX_PRIMARY" helperText="Stable server-side name. Existing Vault/environment credential is reused when raw fields below are left blank." />
         <InputField label="Webhook secret reference" value={webhookSecretReference} onChange={(event) => setWebhookSecretReference(event.target.value.toUpperCase())} placeholder="STREAMING_MUX_WEBHOOK_PRIMARY" />
