@@ -1,35 +1,33 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Platform, StyleSheet, type ColorValue } from 'react-native';
+import { Platform, StyleSheet, View, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/state/theme';
 import { Icon } from '@/components/primitives/Icon';
+import { radius, shadows } from '@/design-system/tokens';
 
-// Minimum accessible touch target (Android recommended 48dp)
-const TOUCH_TARGET = 48;
-const TAB_ICON_SIZE = 24;
+const TAB_ICON_SIZE = 23;
 
 export default function TabLayout() {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-
-  const barHeight = TOUCH_TARGET + 6 + Math.max(insets.bottom, 8);
+  const bottomInset = Math.max(insets.bottom, Platform.OS === 'web' ? 10 : 8);
+  const barHeight = 62 + bottomInset;
 
   const screenOptions = {
     headerShown: false,
     lazy: true,
     tabBarActiveTintColor: colors.interactive,
-    tabBarInactiveTintColor: isDark ? '#64748B' : '#94A3B8',
+    tabBarInactiveTintColor: colors.textMuted,
     tabBarLabelStyle: styles.label,
     tabBarHideOnKeyboard: true,
     tabBarStyle: [
       styles.tabBar,
       {
-        backgroundColor: colors.card,
-        borderTopColor: colors.border,
+        backgroundColor: colors.glass,
+        borderColor: colors.borderSubtle,
         height: barHeight,
-        paddingBottom: Math.max(insets.bottom, 8),
-        paddingTop: 8,
+        paddingBottom: bottomInset,
       },
     ] as any,
     tabBarItemStyle: styles.item,
@@ -39,18 +37,18 @@ export default function TabLayout() {
 
   const renderIcon = (filled: string, outline: string) =>
     ({ color, focused }: { color: ColorValue; focused: boolean }) => (
-      <Icon
-        name={focused ? filled : outline}
-        size={TAB_ICON_SIZE}
-        color={color as string}
-      />
+      <View
+        style={[
+          styles.iconShell,
+          focused && { backgroundColor: colors.primarySoft },
+        ]}
+      >
+        <Icon name={focused ? filled : outline} size={TAB_ICON_SIZE} color={color as string} />
+      </View>
     );
 
   return (
-    <Tabs
-      screenOptions={screenOptions}
-      backBehavior="history"
-    >
+    <Tabs screenOptions={screenOptions} backBehavior="history">
       <Tabs.Screen
         name="home"
         options={{
@@ -62,8 +60,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="discover"
         options={{
-          title: 'Discover',
-          tabBarAccessibilityLabel: 'Discover',
+          title: 'Explore',
+          tabBarAccessibilityLabel: 'Explore',
           tabBarIcon: renderIcon('compass', 'compass-outline'),
         }}
       />
@@ -72,7 +70,19 @@ export default function TabLayout() {
         options={{
           title: 'Reels',
           tabBarAccessibilityLabel: 'Reels',
-          tabBarIcon: renderIcon('flash', 'flash-outline'),
+          tabBarIcon: ({ color, focused }) => (
+            <View
+              style={[
+                styles.reelsButton,
+                {
+                  backgroundColor: focused ? colors.interactive : colors.cardElevated,
+                  borderColor: focused ? colors.interactive : colors.border,
+                },
+              ]}
+            >
+              <Icon name={focused ? 'play' : 'play-outline'} size={22} color={focused ? '#FFFFFF' : (color as string)} />
+            </View>
+          ),
         }}
       />
       <Tabs.Screen
@@ -86,14 +96,11 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
-          tabBarAccessibilityLabel: 'Profile',
+          title: 'You',
+          tabBarAccessibilityLabel: 'Your profile',
           tabBarIcon: renderIcon('person', 'person-outline'),
         }}
       />
-      {/* Internal stack screens nested within tab groups. They are not direct
-          tab children and never surface as bottom-tab items. The `live` group
-          is a direct child and is kept routable but hidden from the tab bar. */}
       <Tabs.Screen name="live" options={{ href: null }} />
       <Tabs.Screen name="watch" options={{ href: null }} />
     </Tabs>
@@ -102,22 +109,45 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   label: {
-    fontWeight: '600',
-    fontSize: 11,
-    marginTop: 2,
-    lineHeight: 16,
+    fontWeight: '700',
+    fontSize: 10,
+    marginTop: 1,
+    lineHeight: 13,
   },
   item: {
-    minHeight: 48,
-    paddingVertical: 2,
+    minHeight: 54,
+    paddingTop: 5,
   },
-  icon: {
-    marginTop: 2,
+  icon: { marginTop: 0 },
+  iconShell: {
+    minWidth: 38,
+    height: 30,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  reelsButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 17,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -10,
+    ...shadows.floating,
   },
   tabBar: {
-    borderTopWidth: 1,
-    maxWidth: Platform.OS === 'web' ? 860 : undefined,
-    width: '100%',
-    alignSelf: 'center',
+    position: Platform.OS === 'web' ? 'absolute' : 'absolute',
+    left: Platform.OS === 'web' ? '50%' : 10,
+    right: Platform.OS === 'web' ? undefined : 10,
+    bottom: Platform.OS === 'web' ? 10 : 8,
+    width: Platform.OS === 'web' ? 'min(720px, calc(100% - 24px))' as any : undefined,
+    transform: Platform.OS === 'web' ? [{ translateX: '-50%' as any }] : undefined,
+    borderTopWidth: 0,
+    borderWidth: 1,
+    borderRadius: radius.xxl,
+    overflow: 'visible',
+    ...shadows.floating,
   },
 });
