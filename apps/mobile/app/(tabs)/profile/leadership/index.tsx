@@ -30,7 +30,7 @@ export default function LeadershipHubScreen() {
   );
   const isCurrentExpressionOwner = ownershipState.data?.isCurrentOwner === true;
 
-  const canManageMedia = hasCapability('streams.broadcast') || hasCapability('streams.manage') || hasCapability('livestream.operate') || hasCapability('livestream.create') || hasCapability('*');
+  const canManageMedia = hasCapability('streams.broadcast') || hasCapability('*');
   const canPastoralTriage = hasCapability('prayer.manage') || hasCapability('prayer.moderate') || hasCapability('prayer.pastoral_notes.manage') || hasCapability('*');
   const canManageSermons = hasCapability('sermons.create') || hasCapability('sermons.manage') || hasCapability('sermons.publish') || hasCapability('*');
   const canManageEvents = hasCapability('events.create') || hasCapability('events.update') || hasCapability('events.manage') || hasCapability('*');
