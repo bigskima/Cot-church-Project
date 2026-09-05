@@ -32,6 +32,7 @@ export interface PostCardProps {
   onReact?: (reaction: string | null) => void | boolean | Promise<boolean>;
   onBookmark?: (currentlySaved: boolean) => void | boolean | Promise<boolean>;
   onShare?: () => void;
+  onMore?: () => void;
   style?: StyleProp<ViewStyle>;
   dark?: boolean;
 }
@@ -60,6 +61,7 @@ export function PostCard({
   onReact,
   onBookmark,
   onShare,
+  onMore,
   style,
 }: PostCardProps) {
   const { colors } = useTheme();
@@ -170,9 +172,11 @@ export function PostCard({
           </View>
         </View>
 
-        <Pressable hitSlop={8} style={styles.moreButton} accessibilityRole="button" accessibilityLabel="More post actions">
-          <Icon name="ellipsis-horizontal" size={19} color={colors.textMuted} />
-        </Pressable>
+        {onMore ? (
+          <Pressable onPress={onMore} hitSlop={8} style={styles.moreButton} accessibilityRole="button" accessibilityLabel="More post actions">
+            <Icon name="ellipsis-horizontal" size={19} color={colors.textMuted} />
+          </Pressable>
+        ) : null}
       </View>
 
       {badges.length ? (
