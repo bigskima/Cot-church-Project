@@ -230,7 +230,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
         if (cancelled) return;
         setContext(value);
 
-        const selectedOrganizationStillAvailable = !auth.organizationId || value.organizations.some((item) => item.id === auth.organizationId);
+        const selectedOrganizationStillAvailable = !auth.organizationId || value.organizations.some((item) => item.id === auth.organizationId) || value.creatorOrganizations?.some((item) => item.id === auth.organizationId);
         if (!selectedOrganizationStillAvailable) {
           await persist({ ...auth, organizationId: undefined, branchId: undefined });
           return;
@@ -244,13 +244,15 @@ export function SessionProvider({ children }: PropsWithChildren) {
           return;
         }
 
-        if (!auth.organizationId && value.organizations[0]) {
-          const firstOrganization = value.organizations[0];
-          await persist({
-            ...auth,
-            organizationId: firstOrganization.id,
-            branchId: undefined,
-          });
+        if (!auth.organizationId) {
+          const firstOrganization = value.organizations[0] ?? value.creatorOrganizations?.[0];
+          if (firstOrganization) {
+            await persist({
+              ...auth,
+              organizationId: firstOrganization.id,
+              branchId: undefined,
+            });
+          }
         }
       } catch (error) {
         if (cancelled) return;
