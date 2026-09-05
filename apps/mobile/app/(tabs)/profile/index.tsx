@@ -38,10 +38,22 @@ export default function ProfileScreen() {
       ? 'Checking availability…'
       : 'Temporarily unavailable. Please try again later.';
 
-  const hasLeadershipAccess = Boolean(expression?.id) && (
-    hasCapability('content.create') || hasCapability('streams.broadcast') || hasCapability('sermons.create') ||
-    hasCapability('events.manage') || hasCapability('finance.manage') || hasCapability('pastoral.manage') ||
-    hasCapability('members.manage') || hasCapability('*')
+  const hasExpressionLeadershipAccess = Boolean(expression?.id) && (
+    hasCapability('content.create') || hasCapability('streams.broadcast') || hasCapability('streams.manage') ||
+    hasCapability('sermons.create') || hasCapability('sermons.manage') || hasCapability('events.create') ||
+    hasCapability('events.manage') || hasCapability('prayer.manage') || hasCapability('members.invite') ||
+    hasCapability('roles.assign') || hasCapability('expression.leadership.manage')
+  );
+  const hasOrganizationLeadershipAccess =
+    hasCapability('organizations.manage') ||
+    hasCapability('organization.leadership.manage') ||
+    hasCapability('branches.create') ||
+    hasCapability('expression.create') ||
+    hasCapability('giving.campaigns.manage') ||
+    hasCapability('giving.finance.read');
+
+  const hasLeadershipAccess = mode === 'authenticated' && (
+    hasCapability('*') || hasOrganizationLeadershipAccess || hasExpressionLeadershipAccess
   );
 
   const serviceTile = (route: string, icon: string, title: string, subtitle: string, disabled = false) => (
@@ -117,11 +129,11 @@ export default function ProfileScreen() {
         {hasLeadershipAccess && (
           <View style={styles.sectionWrap}>
             <SectionHeader title="Ministry tools" subtitle="Only capabilities assigned to your role appear here" />
-            <Pressable onPress={() => router.push('/studio')} style={({ pressed }) => [styles.leadershipBanner, { backgroundColor: colors.card, borderColor: colors.interactive }, shadows.sm, pressed && styles.pressed]}>
+            <Pressable onPress={() => router.push('/(tabs)/profile/leadership')} style={({ pressed }) => [styles.leadershipBanner, { backgroundColor: colors.card, borderColor: colors.interactive }, shadows.md, pressed && styles.pressed]}>
               <View style={[styles.leadershipIconWrap, { backgroundColor: colors.primarySoft }]}><Icon name="construct-outline" size={22} color={colors.interactive} /></View>
               <View style={styles.leadershipContent}>
-                <View style={styles.leadershipTitleRow}><Text style={[styles.leadershipTitle, { color: colors.text }]}>Leadership Studio Hub</Text><Badge label="MINISTRY" variant="primary" /></View>
-                <Text style={[styles.leadershipSub, { color: colors.textSecondary }]}>Manage the church capabilities your role is authorized to operate</Text>
+                <View style={styles.leadershipTitleRow}><Text style={[styles.leadershipTitle, { color: colors.text }]}>Leadership tools</Text><Badge label="MINISTRY" variant="primary" /></View>
+                <Text style={[styles.leadershipSub, { color: colors.textSecondary }]}>Open only the church and Expression tools assigned to your role</Text>
               </View>
               <Icon name="chevron-forward" size={18} color={colors.textMuted} />
             </Pressable>
@@ -152,7 +164,7 @@ const styles = StyleSheet.create({
   memberCard: { padding: spacing.lg, borderRadius: radius.xxl, borderWidth: 1, gap: spacing.md }, memberHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md }, avatarHalo: { padding: 4, borderRadius: radius.pill }, memberInfo: { flex: 1, minWidth: 0, gap: 2 }, memberName: { fontSize: 20, fontWeight: '800', letterSpacing: -0.4 }, memberEmail: { fontSize: 13 }, memberContextRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }, memberOrg: { fontSize: 12, fontWeight: '700', flexShrink: 1 }, profileQuickActions: { flexDirection: 'row', gap: spacing.sm }, profileQuickAction: { flex: 1, minHeight: 42, borderRadius: radius.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: spacing.sm }, profileQuickActionText: { fontSize: 12, fontWeight: '700' },
   sectionWrap: { gap: spacing.sm }, linksList: { gap: spacing.sm }, linkTile: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.xl, borderWidth: 1, gap: spacing.md },
   tileIcon: { width: 42, height: 42, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' }, tileContent: { flex: 1, gap: 2 }, tileTitle: { fontSize: 15, fontWeight: '600' }, tileSub: { fontSize: 12, lineHeight: 16 },
-  leadershipBanner: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, gap: spacing.md }, leadershipIconWrap: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' }, leadershipContent: { flex: 1, gap: 2 },
+  leadershipBanner: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.xl, borderWidth: 1, gap: spacing.md }, leadershipIconWrap: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' }, leadershipContent: { flex: 1, gap: 2 },
   leadershipTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, leadershipTitle: { fontSize: 15, fontWeight: '700' }, leadershipSub: { fontSize: 12, lineHeight: 16 },
   themeCard: { padding: spacing.md, borderRadius: radius.lg, borderWidth: 1 }, themeChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }, disabled: { opacity: 0.58 }, pressed: { opacity: 0.8 },
 });
