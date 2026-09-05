@@ -14,8 +14,8 @@ export function Divider({ style, vertical = false }: DividerProps) {
     <View
       style={[
         vertical
-          ? { width: 1, height: '100%', backgroundColor: colors.border }
-          : { height: 1, width: '100%', backgroundColor: colors.border },
+          ? { width: 1, height: '100%', backgroundColor: colors.borderSubtle }
+          : { height: 1, width: '100%', backgroundColor: colors.borderSubtle },
         style,
       ]}
     />
