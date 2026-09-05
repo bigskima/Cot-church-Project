@@ -248,10 +248,12 @@ export default function WatchDetailScreen() {
                 </Text>
               </Pressable>
 
-              <Pressable onPress={handleShare} style={styles.actionBtn}>
-                <Icon name="share-social-outline" size={20} color={colors.text} />
-                <Text style={[styles.actionBtnText, { color: colors.text }]}>Share</Text>
-              </Pressable>
+              {!expressionMode ? (
+                <Pressable onPress={handleShare} style={styles.actionBtn}>
+                  <Icon name="share-social-outline" size={20} color={colors.text} />
+                  <Text style={[styles.actionBtnText, { color: colors.text }]}>Share</Text>
+                </Pressable>
+              ) : null}
 
               <Pressable onPress={() => mode === 'visitor' ? router.push({
       pathname: '/(auth)/login',
