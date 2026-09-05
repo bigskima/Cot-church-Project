@@ -2,58 +2,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { ApiError } from "../_shared/errors.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { adminClient, publicClient } from "../_shared/supabase.ts";
+import { enrichContentCreators } from "../_shared/public-identity.ts";
 import { uuid } from "../_shared/validation.ts";
-
-function nestedContentItem(value: any) {
-  return Array.isArray(value) ? value[0] ?? null : value ?? null;
-}
-
-async function enrichPublicMediaIdentity<T extends { content_items?: any }>(rows: T[]) {
-  if (!rows.length) return rows;
-  const admin = adminClient();
-  const items = rows.map((row) => nestedContentItem(row.content_items)).filter(Boolean);
-  const profileIds = [...new Set(items.map((item) => item.author_profile_id).filter(Boolean))] as string[];
-  const expressionIds = [...new Set(items.map((item) => item.expression_id).filter(Boolean))] as string[];
-  const organizationIds = [...new Set(items.map((item) => item.organization_id).filter(Boolean))] as string[];
-
-  const [profilesResult, expressionsResult, organizationsResult] = await Promise.all([
-    profileIds.length
-      ? admin.from("profiles").select("id,display_name,username,avatar_url").in("id", profileIds)
-      : Promise.resolve({ data: [] as any[], error: null }),
-    expressionIds.length
-      ? admin.from("branches").select("id,name,code,is_active").in("id", expressionIds).eq("is_active", true)
-      : Promise.resolve({ data: [] as any[], error: null }),
-    organizationIds.length
-      ? admin.from("organizations").select("id,name,status").in("id", organizationIds).eq("status", "active")
-      : Promise.resolve({ data: [] as any[], error: null }),
-  ]);
-
-  const profileMap = new Map((profilesResult.data ?? []).map((profile: any) => [profile.id, profile]));
-  const expressionMap = new Map((expressionsResult.data ?? []).map((expression: any) => [expression.id, expression]));
-  const organizationMap = new Map((organizationsResult.data ?? []).map((organization: any) => [organization.id, organization]));
-
-  return rows.map((row) => {
-    const item = nestedContentItem(row.content_items);
-    if (!item) return row;
-    const author = item.author_profile_id ? profileMap.get(item.author_profile_id) ?? null : null;
-    const expression = item.expression_id ? expressionMap.get(item.expression_id) ?? null : null;
-    const organization = item.organization_id ? organizationMap.get(item.organization_id) ?? null : null;
-    return {
-      ...row,
-      content_items: {
-        ...item,
-        author: author ? {
-          id: author.id,
-          display_name: author.display_name,
-          username: author.username,
-          avatar_url: author.avatar_url,
-        } : null,
-        expression: expression ? { id: expression.id, name: expression.name, code: expression.code } : null,
-        organization: organization ? { id: organization.id, name: organization.name } : null,
-      },
-    };
-  });
-}
 
 Deno.serve(createHandler(
   { methods: ["GET"], authentication: "none", organization: "none" },
@@ -148,7 +98,7 @@ Deno.serve(createHandler(
           expression,
           sermons: sermons.data ?? [],
           videos: videos.data ?? [],
-          reels: await enrichPublicMediaIdentity(reels.data ?? []),
+          reels: await enrichContentCreators(reels.data ?? []),
           events: events.data ?? [],
           leaders: (leaders.data ?? []).map((leader) => ({
             id: leader.id,
@@ -186,7 +136,7 @@ Deno.serve(createHandler(
       if (expressionId) query = query.eq("content_items.expression_id", expressionId);
       const { data, error } = await query;
       if (error) throw new ApiError("PUBLIC_REELS_FAILED", "Unable to retrieve public reels", 500, undefined, false);
-      return { data: await enrichPublicMediaIdentity(data ?? []) };
+      return { data: await enrichContentCreators(data ?? []) };
     }
 
     if (type === "videos") {
