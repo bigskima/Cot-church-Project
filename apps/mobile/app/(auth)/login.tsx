@@ -17,7 +17,7 @@ import { useTheme } from '@/state/theme';
 import { BrandMark } from '@/components/primitives/BrandMark';
 import { Icon } from '@/components/primitives/Icon';
 import { Button } from '@/components/Button';
-import { radius, spacing, typography } from '@/design-system/tokens';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 
 function loginErrorMessage(error: unknown) {
   if (!(error instanceof ApiError)) {
@@ -120,6 +120,7 @@ export default function LoginScreen() {
           </Text>
         </View>
 
+        <View style={[styles.authCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
         {errorMsg ? (
           <View
             style={[styles.errorBanner, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}
@@ -218,6 +219,8 @@ export default function LoginScreen() {
           />
         </View>
 
+        </View>
+
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: colors.textSecondary }]}>Don't have an account? </Text>
           <Link href="/(auth)/signup" asChild>
@@ -243,14 +246,19 @@ const styles = StyleSheet.create({
   },
   brandMarkContainer: {
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  authCard: {
+    borderWidth: 1,
+    borderRadius: radius.xxl,
+    padding: spacing.lg,
   },
   header: {
-    marginBottom: spacing.xxl,
+    marginBottom: spacing.xl,
     alignItems: 'center',
   },
   title: {
-    ...typography.h1,
+    ...typography.display,
     textAlign: 'center',
   },
   subtitle: {
@@ -263,7 +271,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     marginBottom: spacing.lg,
   },
   errorText: {
