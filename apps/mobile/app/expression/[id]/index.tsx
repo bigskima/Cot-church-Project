@@ -82,7 +82,7 @@ export default function ExpressionProfileScreen() {
 
   const handleToggleFollow = async () => {
     if (mode === 'visitor') {
-      router.push('/(auth)/login');
+      router.push({ pathname: '/(auth)/login', params: { returnTo: `/expression/${id}` } } as any);
       return;
     }
     setFollowingLoading(true);
@@ -160,7 +160,12 @@ export default function ExpressionProfileScreen() {
                 ) : mode === 'authenticated' ? (
                   <Button label="Join with code" onPress={() => router.push('/expressions')} variant="outline" size="md" />
                 ) : (
-                  <Button label="Sign in to join" onPress={() => router.push('/(auth)/login')} variant="outline" size="md" />
+                  <Button
+                    label="Sign in to join"
+                    onPress={() => router.push({ pathname: '/(auth)/login', params: { returnTo: `/expression/${id}` } } as any)}
+                    variant="outline"
+                    size="md"
+                  />
                 )}
               </View>
               {followError ? <Text style={[styles.followError, { color: colors.live }]} accessibilityRole="alert">{followError}</Text> : null}
