@@ -74,11 +74,11 @@ export default function ExpressionBirthdaysScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={resource.refreshing} onRefresh={resource.refresh} tintColor={colors.interactive} />}
-        contentContainerStyle={{ paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 90 }}
+        contentContainerStyle={{ paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 120 }}
       >
-        <ScreenHeader title="Expression Birthdays" subtitle={`Upcoming birthdays shared inside ${expression.name}. Birth years are never shown.`} showBack />
+        <ScreenHeader title="Birthdays" subtitle={`Upcoming birthdays shared inside ${expression.name}. Birth years are never shown.`} showBack />
         <View style={styles.body}>
-          <View style={[styles.privacyCard, { backgroundColor: colors.primarySoft, borderColor: colors.border }]}> 
+          <View style={[styles.privacyCard, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}> 
             <Icon name="shield-checkmark-outline" size={18} color={colors.interactive} />
             <Text style={[styles.privacyText, { color: colors.textSecondary }]}>Only active members of this Expression can see this calendar. Each person controls birthday visibility from Account Settings.</Text>
           </View>
@@ -89,9 +89,9 @@ export default function ExpressionBirthdaysScreen() {
             <ResourceError message={resource.error} retry={resource.refresh} />
           ) : entries.length ? (
             <>
-              {today.length ? <View style={styles.section}><SectionHeader title="Celebrating Today" badge={today.length} />{today.map(birthdayCard)}</View> : null}
+              {today.length ? <View style={styles.section}><SectionHeader title="Celebrating today" badge={today.length} />{today.map(birthdayCard)}</View> : null}
               <View style={styles.section}>
-                <SectionHeader title="Upcoming · Next 120 Days" badge={upcoming.length} />
+                <SectionHeader title="Upcoming · next 120 days" badge={upcoming.length} />
                 {upcoming.length ? upcoming.map(birthdayCard) : <Text style={[styles.emptyLine, { color: colors.textMuted }]}>No other shared birthdays in the next 120 days.</Text>}
               </View>
             </>
@@ -107,10 +107,10 @@ export default function ExpressionBirthdaysScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   body: { paddingHorizontal: spacing.md, gap: spacing.lg },
-  privacyCard: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, borderWidth: 1, borderRadius: radius.md, padding: spacing.md },
+  privacyCard: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md },
   privacyText: { flex: 1, fontSize: 12, lineHeight: 18 },
   section: { gap: spacing.sm },
-  card: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md },
+  card: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md },
   cardBody: { flex: 1, gap: 3 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   name: { flex: 1, fontSize: 14, fontWeight: '800' },
