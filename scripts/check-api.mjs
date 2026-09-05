@@ -167,10 +167,8 @@ const invariants = [
   [publicGiving, /ORGANIZATION_REQUIRED/, 'public giving requires explicit church scope'],
   [publicGiving, /expressionId/, 'public giving supports explicit expression scope'],
   [publicGiving, /manualBankTransfer/, 'manual transfer is exposed as a server-driven giving method'],
-  [platformGiving, /authorizePlatform\(auth, "platform\.giving\.read"\)/, 'Level-1 church-wide giving read authorization'],
-  [platformGiving, /authorizePlatform\(auth, "platform\.giving\.manage"\)/, 'Level-1 church-wide giving manage authorization'],
-  [platformGiving, /ONLINE_GIVING_NOT_READY/, 'online giving cannot be enabled before real provider integration'],
-  [platformGiving, /currency.*3-letter ISO/s, 'currency-neutral giving account validation'],
+  [platformGiving, /PLATFORM_GIVING_RETIRED/, 'retired Platform Giving endpoint boundary'],
+  [platformGiving, /does not own church giving/i, 'church-owned giving retirement message'],
   [platformPayments, /authorizePlatform\(auth, "platform\.payments\.read"\)/, 'Level-1 payment read authorization'],
   [platformPayments, /authorizePlatform\(auth, "platform\.payments\.manage"\)/, 'Level-1 payment manage authorization'],
   [platformPayments, /payment_provider_configs/, 'database-driven payment provider configuration'],
@@ -184,6 +182,7 @@ const invariants = [
 
 const missing = invariants.filter(([source, pattern]) => !pattern.test(source));
 const forbidden = [
+  [platformGiving, /platform\.giving\.(?:read|manage)|authorizePlatform/, 'retired Platform Giving authorization path'],
   [churchStory, /Foundation & First Gathering|Multi-Expression Expansion|Global Digital Ministry/, 'fabricated church story fallback'],
   [signup, /password\(body\.password\)/, 'hardcoded signup password policy'],
   [signup, /length\s*<\s*\d+.*password|password.*length\s*<\s*\d+/s, 'hardcoded signup password length rule'],
