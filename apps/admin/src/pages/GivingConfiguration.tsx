@@ -409,7 +409,7 @@ export function GivingConfiguration({ api }: { api: ApiClient }) {
       {tab === 'accounts' ? (
         <Card
           title="Published transfer destinations"
-          subtitle={`${accounts.length} manual transfer account${accounts.length === 1 ? '' : 's'} configured. Currency remains data, not application code.`}
+          subtitle={`${accounts.length} manual transfer account${accounts.length === 1 ? '' : 's'} configured. Currency is data, not application code.`}
           headerAction={<Button variant="gold" size="sm" onClick={() => { setError(''); setAccountOpen(true); }}>New transfer account</Button>}
         >
           {accounts.length ? (
