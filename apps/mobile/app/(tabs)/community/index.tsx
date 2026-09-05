@@ -514,6 +514,7 @@ export default function CommunityScreen() {
               post={item}
               expressionName={item.expression?.name}
               canEngage={canEngage}
+              allowExternalShare={item.visibility === 'public'}
               onReply={canEngage ? () => setCommentTarget({ postId: item.id, scope: activeTab }) : undefined}
               onReact={canEngage ? (reaction) => reactToPost(item.id, reaction, activeTab) : undefined}
               onBookmark={canEngage ? (currentlySaved) => bookmarkPost(item.id, currentlySaved, activeTab) : undefined}
