@@ -21,7 +21,7 @@ interface OrganizationListResponse {
   total: number;
 }
 
-export function OrganizationsGovernance({ api }: { api: ApiClient }) {
+export function OrganizationsGovernance({ api, canManage = false }: { api: ApiClient; canManage?: boolean }) {
   const [organizations, setOrganizations] = useState<OrganizationItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -55,7 +55,7 @@ export function OrganizationsGovernance({ api }: { api: ApiClient }) {
   const lifecycleTarget = lifecycleOrg?.status === 'active' ? 'suspended' : 'active';
 
   const applyLifecycleChange = async () => {
-    if (!lifecycleOrg) return;
+    if (!canManage || !lifecycleOrg) return;
     if (lifecycleTarget === 'suspended' && !governanceReason.trim()) {
       setError('A governance reason is required before suspending an organisation.');
       return;
@@ -190,7 +190,7 @@ export function OrganizationsGovernance({ api }: { api: ApiClient }) {
       </Modal>
 
       <Modal
-        isOpen={!!lifecycleOrg}
+        isOpen={canManage && !!lifecycleOrg}
         onClose={() => {
           if (!actionBusy) setLifecycleOrg(null);
         }}
