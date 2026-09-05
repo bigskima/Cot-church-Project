@@ -114,10 +114,11 @@ export default function EventDetailScreen() {
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 60 }]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 130 }]}
       >
         <ScreenHeader
           title={event?.title ?? 'Event'}
+          kicker="EVENT"
           subtitle={event?.location?.name ?? undefined}
           showBack
         />
@@ -132,7 +133,7 @@ export default function EventDetailScreen() {
         ) : event ? (
           <View style={styles.body}>
             {/* Event Time & Location Card */}
-            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
               <View style={styles.cardRow}>
                 <View style={[styles.iconCircle, { backgroundColor: colors.primarySoft }]}>
                   <Icon name="calendar-outline" size={20} color={colors.interactive} />
@@ -165,7 +166,7 @@ export default function EventDetailScreen() {
 
             {/* Description */}
             {event.description ? (
-              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
                 <Text style={[styles.cardKicker, { color: colors.interactive }]}>ABOUT THIS GATHERING</Text>
                 <Text style={[styles.bodyText, { color: colors.text }]}>{event.description}</Text>
               </View>
@@ -185,7 +186,7 @@ export default function EventDetailScreen() {
             ) : null}
             {actionError ? <Text style={[styles.statusMessage, { color: colors.live }]} accessibilityRole="alert">{actionError}</Text> : null}
             {actionMessage ? <Text style={[styles.statusMessage, { color: colors.success }]} accessibilityRole="alert">{actionMessage}</Text> : null}
-            <View style={styles.actionRow}>
+            <View style={[styles.actionRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
               <Button
                 label={registration && registration.status !== 'attended' ? 'Cancel Registration' : registration?.status === 'attended' ? 'Attendance Recorded' : registrationAvailability.label}
                 onPress={registration && registration.status !== 'attended' ? handleCancel : handleRegister}
@@ -219,12 +220,12 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   body: {
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     gap: spacing.lg,
   },
   card: {
     padding: spacing.lg,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     borderWidth: 1,
     gap: spacing.md,
   },
@@ -269,8 +270,11 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     gap: spacing.sm,
+    padding: spacing.sm,
+    borderRadius: radius.xxl,
+    borderWidth: 1,
   },
   statusMessage: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
-  registrationState: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.md, padding: spacing.md },
+  registrationState: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md },
   registrationHint: { fontSize: 12, lineHeight: 17 },
 });
