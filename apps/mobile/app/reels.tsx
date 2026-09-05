@@ -25,7 +25,7 @@ type ReelWithViewerState = Reel & {
 export default function FullScreenReelsScreen() {
   const insets = useSafeAreaInsets();
   const { api, mode, context, hasCapability } = useSession();
-  const { reelId } = useLocalSearchParams<{ reelId?: string }>();
+  const { reelId, context: requestedContext } = useLocalSearchParams<{ reelId?: string; context?: string }>();
   const { colors } = useTheme();
   const [activeIndex, setActiveIndex] = useState(0);
   const [activeReelForComments, setActiveReelForComments] = useState<Reel | null>(null);
@@ -37,7 +37,8 @@ export default function FullScreenReelsScreen() {
   const listRef = useRef<FlatList<ReelWithViewerState>>(null);
   const appliedDeepLinkRef = useRef<string | null>(null);
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
-  const expressionId = context?.expression?.id;
+  const forcePublic = requestedContext === 'public';
+  const expressionId = forcePublic ? undefined : context?.expression?.id;
 
   const reelsResource = useResource<ReelWithViewerState[]>(`reels:immersive:${expressionId ? `expression:${expressionId}` : `public:${organizationId || 'auto'}`}:${mode}`, async (signal) => {
     const reels = expressionId
