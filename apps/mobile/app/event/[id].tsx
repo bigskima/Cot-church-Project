@@ -200,13 +200,15 @@ export default function EventDetailScreen() {
                 style={{ flex: 1 }}
                 icon={<Icon name={registration ? 'checkmark-circle' : 'ticket-outline'} size={18} color={registration ? colors.interactive : colors.textInverse} />}
               />
-              <Button
-                label="Share"
-                onPress={handleShare}
-                variant="outline"
-                size="lg"
-                icon={<Icon name="share-outline" size={18} color={colors.text} />}
-              />
+              {!expressionMode ? (
+                <Button
+                  label="Share"
+                  onPress={handleShare}
+                  variant="outline"
+                  size="lg"
+                  icon={<Icon name="share-outline" size={18} color={colors.text} />}
+                />
+              ) : null}
             </View>
           </View>
         ) : null}
