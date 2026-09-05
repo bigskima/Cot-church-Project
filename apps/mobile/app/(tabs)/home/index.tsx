@@ -26,7 +26,7 @@ import {
   StoriesTray,
   VideoCard,
 } from '@/components';
-import { radius, spacing } from '@/design-system/tokens';
+import { radius, shadows, spacing } from '@/design-system/tokens';
 import type { Event, LiveStream, Reel, Sermon, SocialPost, Video } from '@/types/content';
 
 interface HomePayload {
@@ -179,17 +179,17 @@ export default function HomeScreen() {
     return list;
   }, [activeStream, reels]);
 
-  const canEngage = mode === 'authenticated' && Boolean(contextOrganization?.id);
+  const canEngage = mode === 'authenticated';
   const reelWidth = Math.max(260, Math.min(width - spacing.lg * 2, 460));
 
   const listHeader = (
     <>
       {mode === 'authenticated' && !expression?.id ? (
-        <View style={[styles.publicNotice, { backgroundColor: colors.primarySoft, borderBottomColor: colors.borderSubtle }]}>
+        <View style={[styles.publicNotice, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
           <Icon name="globe-outline" size={17} color={colors.interactive} />
           <View style={styles.noticeCopy}>
             <Text style={[styles.publicNoticeTitle, { color: colors.text }]}>General Community</Text>
-            <Text style={[styles.publicNoticeText, { color: colors.textSecondary }]}>Public sermons, videos, Reels, teachings, events and community posts remain available even before you join an Expression.</Text>
+            <Text style={[styles.publicNoticeText, { color: colors.textSecondary }]}>You’re in the public COT space. Enter an Expression when you want its private community.</Text>
             <Pressable onPress={() => router.push('/expressions')} accessibilityRole="button" style={[styles.expressionAction, { borderColor: colors.interactive }]}>
               <Text style={[styles.expressionActionText, { color: colors.interactive }]}>Join or enter an Expression</Text>
               <Icon name="arrow-forward" size={14} color={colors.interactive} />
@@ -199,11 +199,11 @@ export default function HomeScreen() {
       ) : null}
 
       {mode === 'authenticated' && expression?.id ? (
-        <View style={[styles.expressionNotice, { backgroundColor: colors.primarySoft, borderBottomColor: colors.borderSubtle }]}>
+        <View style={[styles.expressionNotice, { backgroundColor: colors.card, borderColor: colors.primarySoftStrong }, shadows.sm]}>
           <Icon name="people" size={17} color={colors.interactive} />
           <View style={styles.noticeCopy}>
             <Text style={[styles.publicNoticeTitle, { color: colors.text }]}>Expression Space · {expression.name}</Text>
-            <Text style={[styles.publicNoticeText, { color: colors.textSecondary }]}>Only resources belonging to this Expression appear here. Leave this space to return to the public platform.</Text>
+            <Text style={[styles.publicNoticeText, { color: colors.textSecondary }]}>You’re inside this Expression. Switch spaces anytime from Expressions.</Text>
           </View>
           <Pressable onPress={() => router.push('/expressions')} accessibilityRole="button" accessibilityLabel="Change or leave Expression" hitSlop={8}>
             <Icon name="swap-horizontal" size={20} color={colors.interactive} />
@@ -229,7 +229,7 @@ export default function HomeScreen() {
       {feed.length ? (
         <View style={styles.timelineHeading}>
           <Text style={[styles.timelineTitle, { color: colors.text }]}>{expression?.name ? `${expression.name} Home` : rankingMode === 'personalized' ? 'For You' : 'Latest Public Content'}</Text>
-          <Text style={[styles.timelineSubtitle, { color: colors.textMuted }]}>Reels, sermons, audio, long video, teachings, events and conversations in one feed.</Text>
+          <Text style={[styles.timelineSubtitle, { color: colors.textMuted }]}>Fresh from the COT community.</Text>
         </View>
       ) : null}
     </>
@@ -237,7 +237,7 @@ export default function HomeScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <View style={[styles.topBar, { paddingTop: insets.top + spacing.xs, backgroundColor: colors.bg, borderBottomColor: colors.borderSubtle }]}>
+      <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm, backgroundColor: colors.glass, borderColor: colors.borderSubtle }, shadows.sm]}>
         <View style={styles.topBarLeft}>
           <Text style={[styles.brandWordmark, { color: colors.text }]} numberOfLines={1}>{organization?.name ?? 'Church Community'}</Text>
           {expression?.name ? (
@@ -290,7 +290,7 @@ export default function HomeScreen() {
               />
             </View>
           }
-          contentContainerStyle={{ paddingBottom: insets.bottom + 90 }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 130 }}
           refreshControl={<RefreshControl refreshing={resource.refreshing} onRefresh={resource.refresh} tintColor={colors.interactive} />}
           renderItem={({ item }) => {
             if (item.kind === 'post') {
@@ -337,15 +337,15 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingBottom: spacing.sm, borderBottomWidth: 1 },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: spacing.md, marginTop: spacing.xs, paddingHorizontal: spacing.md, paddingBottom: spacing.md, borderWidth: 1, borderRadius: radius.xl },
   topBarLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1, minWidth: 0 },
-  brandWordmark: { fontSize: 20, fontWeight: '800', letterSpacing: -0.5, flexShrink: 1 },
+  brandWordmark: { fontSize: 21, fontWeight: '800', letterSpacing: -0.65, flexShrink: 1 },
   campusPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, maxWidth: 150 },
   campusPillText: { fontSize: 12, fontWeight: '600', flexShrink: 1 },
   topBarRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  iconButton: { width: 36, height: 36, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  publicNotice: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start', paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1 },
-  expressionNotice: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start', paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1 },
+  iconButton: { width: 38, height: 38, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  publicNotice: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start', marginHorizontal: spacing.md, marginTop: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderWidth: 1, borderRadius: radius.xl },
+  expressionNotice: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start', marginHorizontal: spacing.md, marginTop: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderWidth: 1, borderRadius: radius.xl },
   noticeCopy: { flex: 1 },
   publicNoticeTitle: { fontSize: 13, fontWeight: '800', marginBottom: 2 },
   publicNoticeText: { fontSize: 11, lineHeight: 16 },
@@ -353,11 +353,11 @@ const styles = StyleSheet.create({
   expressionActionText: { fontSize: 12, fontWeight: '700' },
   degradedBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, margin: spacing.lg, marginBottom: 0, padding: spacing.md, borderWidth: 1, borderRadius: radius.md },
   degradedText: { flex: 1, fontSize: 11, lineHeight: 16 },
-  heroSection: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
-  timelineHeading: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.sm },
+  heroSection: { paddingHorizontal: spacing.md, paddingTop: spacing.md },
+  timelineHeading: { paddingHorizontal: spacing.md, paddingTop: spacing.xl, paddingBottom: spacing.sm },
   timelineTitle: { fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
   timelineSubtitle: { fontSize: 11, lineHeight: 16, marginTop: 2 },
-  feedCardWrap: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(127,127,127,0.18)' },
+  feedCardWrap: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   itemLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.sm },
   itemLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
   loadingContainer: { padding: spacing.lg, gap: spacing.md },
