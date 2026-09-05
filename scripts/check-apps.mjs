@@ -23,7 +23,6 @@ const files = [
   'apps/mobile/app/event/[id].tsx',
   'apps/mobile/src/features/giving/GivingScreen.tsx',
   'apps/mobile/app/(tabs)/profile/leadership/giving-manage.tsx',
-  'apps/admin/src/pages/GivingConfiguration.tsx',
   'apps/admin/src/components/Shell.tsx',
   'apps/admin/src/pages/IntegrationsJobs.tsx',
   'apps/admin/src/pages/PaymentInfrastructure.tsx',
@@ -41,9 +40,9 @@ const joined = [...sources.values()].join('\n');
 const givingUi = [
   sources.get('apps/mobile/src/features/giving/GivingScreen.tsx') ?? '',
   sources.get('apps/mobile/app/(tabs)/profile/leadership/giving-manage.tsx') ?? '',
-  sources.get('apps/admin/src/pages/GivingConfiguration.tsx') ?? '',
 ].join('\n');
 const integrationsUi = sources.get('apps/admin/src/pages/IntegrationsJobs.tsx') ?? '';
+const platformShellUi = sources.get('apps/admin/src/components/Shell.tsx') ?? '';
 const paymentInfrastructureUi = sources.get('apps/admin/src/pages/PaymentInfrastructure.tsx') ?? '';
 
 const checks = [
@@ -62,7 +61,6 @@ const checks = [
   [/Church-wide/, 'church-wide giving scope'],
   [/Expression Giving Settings/, 'expression-owned giving settings'],
   [/Currency is (?:configuration|data), not (?:code|application code)/, 'currency-neutral giving configuration'],
-  [/case 'giving': return <GivingConfiguration/, 'routed church-wide giving administration'],
   [/effectivePermissions/, 'permission-aware Platform Administration navigation'],
   [/platform-integrations/, 'real platform integration telemetry'],
   [/retry_job/, 'failed integration job retry'],
@@ -116,6 +114,10 @@ const forbiddenGivingPatterns = [
   [/\$\{?amount|\$20|\$50|\$100|\$250|\$500/, 'hardcoded dollar giving presentation'],
 ];
 
+const forbiddenPlatformBoundaryPatterns = [
+  [/platform\.giving\.(?:read|manage)|GivingConfiguration|key:\s*['"]giving['"]/, 'platform-owned church giving route'],
+];
+
 const forbiddenIntegrationPatterns = [
   [/Just now|15m ago/, 'fabricated integration activity time'],
   [/< 85ms|4 Active|HEALTHY|OPTIMAL/, 'fabricated integration health metric'],
@@ -128,13 +130,15 @@ const paymentCredentialChecks = [
 
 const missing = checks.filter(([pattern]) => !pattern.test(joined));
 const forbidden = forbiddenGivingPatterns.filter(([pattern]) => pattern.test(givingUi));
+const forbiddenPlatformBoundaries = forbiddenPlatformBoundaryPatterns.filter(([pattern]) => pattern.test(platformShellUi));
 const forbiddenIntegrations = forbiddenIntegrationPatterns.filter(([pattern]) => pattern.test(integrationsUi));
 const missingPaymentCredentialChecks = paymentCredentialChecks.filter(([pattern]) => !pattern.test(paymentInfrastructureUi));
 
-if (missing.length || forbidden.length || forbiddenIntegrations.length || missingPaymentCredentialChecks.length) {
+if (missing.length || forbidden.length || forbiddenPlatformBoundaries.length || forbiddenIntegrations.length || missingPaymentCredentialChecks.length) {
   const failures = [
     ...missing.map(([, name]) => name),
     ...forbidden.map(([, name]) => `remove ${name}`),
+    ...forbiddenPlatformBoundaries.map(([, name]) => `remove ${name}`),
     ...forbiddenIntegrations.map(([, name]) => `remove ${name}`),
     ...missingPaymentCredentialChecks.map(([, name]) => name),
   ];
@@ -143,5 +147,5 @@ if (missing.length || forbidden.length || forbiddenIntegrations.length || missin
 }
 
 console.log(
-  `Application check passed (${files.length} files, ${checks.length} production invariants, ${forbiddenGivingPatterns.length + forbiddenIntegrationPatterns.length} anti-hardcode checks, ${paymentCredentialChecks.length} payment contract checks).`,
+  `Application check passed (${files.length} files, ${checks.length} production invariants, ${forbiddenGivingPatterns.length + forbiddenPlatformBoundaryPatterns.length + forbiddenIntegrationPatterns.length} anti-hardcode/boundary checks, ${paymentCredentialChecks.length} payment contract checks).`,
 );
