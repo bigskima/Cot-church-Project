@@ -16,8 +16,6 @@ export const brand = {
 
 export const palette = {
   black: '#000000',
-
-  // Deep social surfaces. Near-black rather than flat navy keeps media vivid.
   darkBg: '#070B12',
   darkBgSecondary: '#0B111B',
   darkCard: '#0D1420',
@@ -26,8 +24,6 @@ export const palette = {
   darkBorderSubtle: '#151F2D',
   darkGlass: 'rgba(13, 20, 32, 0.92)',
   darkPressed: '#182334',
-
-  // Light surfaces use tonal separation instead of heavy borders.
   white: '#FFFFFF',
   lightBg: '#F7F9FC',
   lightBgSecondary: '#EEF3F8',
@@ -37,16 +33,12 @@ export const palette = {
   lightBorderSubtle: '#EAF0F6',
   lightGlass: 'rgba(255, 255, 255, 0.94)',
   lightPressed: '#E8EEF5',
-
-  // Product accent. Strong enough for social actions without dominating content.
   blue: '#168FF0',
   blueHover: '#0877D8',
   blueSoft: 'rgba(22, 143, 240, 0.12)',
   blueSoftStrong: 'rgba(22, 143, 240, 0.18)',
   violet: '#7657FF',
   violetSoft: 'rgba(118, 87, 255, 0.13)',
-
-  // Semantic states.
   live: '#F04452',
   liveSoft: 'rgba(240, 68, 82, 0.14)',
   success: '#19A66A',
@@ -55,11 +47,9 @@ export const palette = {
   warningSoft: 'rgba(233, 154, 18, 0.14)',
   prayer: '#8A63F6',
   prayerSoft: 'rgba(138, 99, 246, 0.13)',
-
   textDarkPrimary: '#F7FAFC',
   textDarkSecondary: '#A7B4C5',
   textDarkMuted: '#738196',
-
   textLightPrimary: '#0D1726',
   textLightSecondary: '#48586C',
   textLightMuted: '#7A899D',
@@ -105,7 +95,7 @@ export const typography = {
   },
   h2: {
     fontSize: 20,
-    fontWeight: '750' as const,
+    fontWeight: '700' as const,
     letterSpacing: -0.45,
     lineHeight: 26,
   },
@@ -123,7 +113,7 @@ export const typography = {
   },
   bodyStrong: {
     fontSize: 15,
-    fontWeight: '650' as const,
+    fontWeight: '600' as const,
     lineHeight: 21,
     letterSpacing: -0.12,
   },
@@ -139,7 +129,7 @@ export const typography = {
   },
   kicker: {
     fontSize: 11,
-    fontWeight: '750' as const,
+    fontWeight: '700' as const,
     letterSpacing: 0.7,
     lineHeight: 15,
     textTransform: 'uppercase' as const,
