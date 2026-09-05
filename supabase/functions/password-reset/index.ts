@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { ApiError } from "../_shared/errors.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
-import { adminClient, publicClient } from "../_shared/supabase.ts";
+import { userClient } from "../_shared/supabase.ts";
 import { assertNoUnknownFields, assertObject, requiredString } from "../_shared/validation.ts";
 
 function bearerToken(request: Request) {
@@ -22,14 +22,16 @@ Deno.serve(createHandler(
 
     // Validate the recovery access token with Supabase Auth before performing
     // any privileged update. The client never receives service credentials.
-    const { data: userData, error: userError } = await publicClient().auth.getUser(token);
+    const client = userClient(token);
+    const { data: userData, error: userError } = await client.auth.getUser(token);
     if (userError || !userData.user) {
       throw new ApiError("RECOVERY_SESSION_INVALID", "This password-reset link is invalid or has expired.", 401);
     }
 
-    // Password acceptance remains owned by the configured Supabase Auth policy.
-    // Do not duplicate length/complexity rules in the mobile/web client.
-    const { error: updateError } = await adminClient().auth.admin.updateUserById(userData.user.id, { password });
+    // Use the authenticated recovery session for the password change. This is
+    // Supabase's documented recovery completion path and keeps the hosted Auth
+    // password policy authoritative.
+    const { error: updateError } = await client.auth.updateUser({ password });
     if (updateError) {
       const message = /password/i.test(updateError.message)
         ? updateError.message
