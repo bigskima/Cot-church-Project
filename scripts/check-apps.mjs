@@ -90,6 +90,8 @@ const checks = [
   [/content-media\?action=playback/, 'signed video playback resolution'],
   [/comments\.refresh\(\)/, 'comment refresh after posting'],
   [/pathname:\s*['"]\/\(auth\)\/login['"]/, 'protected interaction sign-in gating'],
+  [/category:\s*['"]payments['"]/, 'payment credential category contract'],
+  [/providerCode/, 'payment credential provider-code contract'],
   [/public-content\?type=sermon&id=/, 'exact public sermon detail request'],
   [/Enter this Expression to play its internal sermon/, 'Expression sermon playback guard'],
   [/onProgress=\{syncProgress\}/, 'sermon audio and video continuity'],
