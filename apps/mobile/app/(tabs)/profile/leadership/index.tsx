@@ -31,7 +31,9 @@ export default function LeadershipHubScreen() {
   const isCurrentExpressionOwner = ownershipState.data?.isCurrentOwner === true;
 
   const canManageMedia = hasCapability('streams.broadcast') || hasCapability('*');
-  const canPastoralTriage = hasCapability('prayer.manage') || hasCapability('prayer.moderate') || hasCapability('prayer.pastoral_notes.manage') || hasCapability('*');
+  const canModeratePrayer = (hasCapability('prayer.moderate') && (hasCapability('prayer.pastoral.receive') || hasCapability('prayer.team.receive'))) || hasCapability('*');
+  const canReceivePastoralFollowups = hasCapability('pastoral.followups.receive') || hasCapability('*');
+  const canPastoralTriage = canModeratePrayer || canReceivePastoralFollowups;
   const canManageSermons = hasCapability('sermons.create') || hasCapability('sermons.manage') || hasCapability('*');
   const canManageEvents = hasCapability('events.create') || hasCapability('events.update') || hasCapability('*');
   const canManageGiving = hasCapability('giving.campaigns.manage') || hasCapability('*');
