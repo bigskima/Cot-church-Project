@@ -327,44 +327,62 @@ export default function ExpressionGivingManageScreen() {
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 80 }}
+        contentContainerStyle={{ paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 120 }}
       >
-        <ScreenHeader
-          title={activeScope === 'organization' ? 'Church Giving Settings' : 'Expression Giving Settings'}
-          subtitle={activeScope === 'organization'
-            ? `Manage the giving information shared across ${organization.name}.`
-            : `Manage giving for ${expression?.name ?? 'the selected Expression'}.`}
-          showBack
-        />
+        <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+          <ScreenHeader
+            title="Giving management"
+            kicker="LEADERSHIP"
+            subtitle={activeScope === 'organization'
+              ? `Church-wide giving for ${organization.name}.`
+              : `Giving configuration for ${expression?.name ?? 'the selected Expression'}.`}
+            showBack
+            rightAction={
+              tab === 'purposes'
+                ? <Button label="New purpose" onPress={() => setPurposeOpen(true)} size="sm" />
+                : tab === 'accounts'
+                  ? <Button label="New account" onPress={() => setAccountOpen(true)} size="sm" />
+                  : undefined
+            }
+          />
+        </View>
 
         <View style={styles.body}>
-          {scopeAccess.loading ? <Skeleton height={44} /> : scopeAccess.data?.organization && scopeAccess.data?.expression && expression ? (
-            <View style={styles.scopeTabs}>
+          {scopeAccess.loading ? (
+            <Skeleton height={44} />
+          ) : scopeAccess.data?.organization && scopeAccess.data?.expression && expression ? (
+            <View style={[styles.scopeTabs, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
               <Chip label="Church-wide" selected={activeScope === 'organization'} onPress={() => setGivingScope('organization')} />
               <Chip label={expression.name} selected={activeScope === 'expression'} onPress={() => setGivingScope('expression')} />
             </View>
           ) : null}
 
-          <View style={[styles.scopeCard, { backgroundColor: colors.primarySoft, borderColor: colors.border }]}>
-            <Icon name={activeScope === 'organization' ? 'business-outline' : 'location-outline'} size={18} color={colors.interactive} />
-            <View style={{ flex: 1 }}>
+          <View style={[styles.scopeCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+            <View style={[styles.scopeIcon, { backgroundColor: colors.primarySoft }]}>
+              <Icon name={activeScope === 'organization' ? 'business-outline' : 'people-outline'} size={19} color={colors.interactive} />
+            </View>
+            <View style={styles.flex}>
               <Text style={[styles.scopeTitle, { color: colors.text }]}>{activeScope === 'organization' ? organization.name : expression?.name}</Text>
-              <Text style={[styles.scopeCopy, { color: colors.textSecondary }]}>{activeScope === 'organization' ? 'These settings apply to the church-wide giving destination.' : 'These settings apply only to this Expression.'}</Text>
+              <Text style={[styles.scopeCopy, { color: colors.textSecondary }]}>
+                {activeScope === 'organization' ? 'Changes here affect the church-wide giving destination.' : 'Changes here affect only this Expression.'}
+              </Text>
             </View>
           </View>
 
           {notice ? (
             <View style={[styles.banner, { backgroundColor: colors.successSoft, borderColor: colors.success }]}>
+              <Icon name="checkmark-circle" size={17} color={colors.success} />
               <Text style={[styles.bannerText, { color: colors.success }]}>{notice}</Text>
             </View>
           ) : null}
-          {error ? (
+          {error && !purposeOpen && !accountOpen ? (
             <View style={[styles.banner, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}>
+              <Icon name="alert-circle" size={17} color={colors.live} />
               <Text style={[styles.bannerText, { color: colors.live }]}>{error}</Text>
             </View>
           ) : null}
 
-          <View style={styles.tabs}>
+          <View style={[styles.tabs, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
             <Chip label="Settings" selected={tab === 'settings'} onPress={() => setTab('settings')} />
             <Chip label="Purposes" selected={tab === 'purposes'} onPress={() => setTab('purposes')} />
             <Chip label="Accounts" selected={tab === 'accounts'} onPress={() => setTab('accounts')} />
@@ -375,26 +393,26 @@ export default function ExpressionGivingManageScreen() {
           ) : configuration.error ? (
             <ResourceError message={configuration.error} retry={configuration.refresh} />
           ) : tab === 'settings' ? (
-            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
-              <SectionHeader title="Giving presentation" />
+            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+              <SectionHeader title="Giving presentation" subtitle="What members see when they open this giving destination" />
               <InputField label="Title" value={displayTitle} onChangeText={setDisplayTitle} placeholder="Giving" />
               <InputField
                 label="Description"
                 value={displaySubtitle}
                 onChangeText={setDisplaySubtitle}
-                placeholder={activeScope === 'organization' ? 'Optional message shown above church giving details' : "Optional message shown above this Expression's giving details"}
+                placeholder={activeScope === 'organization' ? 'Optional church-wide giving message' : 'Optional Expression giving message'}
                 multiline
                 numberOfLines={3}
               />
               <ToggleRow
-                label={activeScope === 'organization' ? 'Publish church-wide giving' : 'Publish expression giving'}
-                description={activeScope === 'organization' ? 'When off, the church-wide giving destination is unavailable.' : "When off, this Expression's giving destination is unavailable to members."}
+                label={activeScope === 'organization' ? 'Publish church-wide giving' : 'Publish Expression giving'}
+                description={activeScope === 'organization' ? 'When off, the church-wide giving destination is unavailable.' : 'When off, this Expression giving destination is unavailable.'}
                 value={isEnabled}
                 onPress={() => setIsEnabled((value) => !value)}
               />
               <ToggleRow
                 label="Manual bank transfer"
-                description={activeScope === 'organization' ? 'Show the church-wide transfer accounts.' : "Show this Expression's published transfer accounts."}
+                description="Show the published transfer accounts for this scope."
                 value={manualEnabled}
                 onPress={() => setManualEnabled((value) => !value)}
               />
@@ -405,150 +423,192 @@ export default function ExpressionGivingManageScreen() {
                 onPress={() => undefined}
                 disabled
               />
-              <Button label={activeScope === 'organization' ? 'Save Church Giving' : 'Save Expression Giving'} onPress={saveSettings} loading={busy} size="lg" />
+              <Button label="Save giving settings" onPress={() => void saveSettings()} loading={busy} size="lg" fullWidth />
             </View>
           ) : tab === 'purposes' ? (
-            <>
-              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
-                <SectionHeader title="Add giving purpose or fund" />
-                <InputField
-                  label="Name"
-                  value={purposeName}
-                  onChangeText={setPurposeName}
-                  placeholder={activeScope === 'organization' ? 'e.g. General Offering' : 'e.g. Expression Offering'}
-                />
-                <InputField
-                  label="Description"
-                  value={purposeDescription}
-                  onChangeText={setPurposeDescription}
-                  placeholder="Optional explanation"
-                  multiline
-                  numberOfLines={3}
-                />
-                <ToggleRow
-                  label="Default purpose"
-                  description={activeScope === 'organization' ? 'Preselect this purpose when someone opens church giving.' : 'Preselect this purpose when members open Expression giving.'}
-                  value={purposeDefault}
-                  onPress={() => setPurposeDefault((value) => !value)}
-                />
-                <Button label="Publish Purpose" onPress={addPurpose} loading={busy} />
-              </View>
-
-              <View style={styles.list}>
-                <SectionHeader title="Configured purposes" badge={purposes.length} />
-                {purposes.length ? purposes.map((purpose) => (
-                  <View key={purpose.id} style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    <View style={{ flex: 1 }}>
-                      <View style={styles.rowTitleLine}>
-                        <Text style={[styles.rowTitle, { color: colors.text }]}>{purpose.name}</Text>
-                        {purpose.is_default ? <Badge label="DEFAULT" variant="primary" /> : null}
-                      </View>
-                      {purpose.description ? <Text style={[styles.rowCopy, { color: colors.textSecondary }]}>{purpose.description}</Text> : null}
+            <View style={styles.list}>
+              <SectionHeader
+                title="Giving purposes"
+                badge={purposes.length}
+                subtitle="Funds people can choose when giving"
+                actionLabel="New"
+                onAction={() => {
+                  setPurposeName('');
+                  setPurposeDescription('');
+                  setPurposeDefault(false);
+                  setError('');
+                  setPurposeOpen(true);
+                }}
+              />
+              {purposes.length ? purposes.map((purpose) => (
+                <View key={purpose.id} style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+                  <View style={styles.flex}>
+                    <View style={styles.rowTitleLine}>
+                      <Text style={[styles.rowTitle, { color: colors.text }]}>{purpose.name}</Text>
+                      {purpose.is_default ? <Badge label="DEFAULT" variant="primary" /> : null}
+                      <Badge label={purpose.status.toUpperCase()} variant={purpose.status === 'active' ? 'active' : 'neutral'} />
                     </View>
-                    <View style={styles.rowActions}>
-                      {!purpose.is_default && purpose.status === 'active' ? (
-                        <Button label="Set default" onPress={() => updatePurpose(purpose, { isDefault: true })} variant="outline" size="sm" />
-                      ) : null}
-                      <Button
-                        label={purpose.status === 'active' ? 'Hide' : 'Publish'}
-                        onPress={() => updatePurpose(purpose, { status: purpose.status === 'active' ? 'inactive' : 'active' })}
-                        variant="ghost"
-                        size="sm"
-                      />
-                    </View>
+                    {purpose.description ? <Text style={[styles.rowCopy, { color: colors.textSecondary }]}>{purpose.description}</Text> : null}
                   </View>
-                )) : (
-                  <EmptyState title="No purposes yet" message={activeScope === 'organization' ? 'Add the giving purposes your church wants people to see.' : 'Add the giving purposes your Expression wants members to see.'} iconName="gift-outline" />
-                )}
-              </View>
-            </>
-          ) : (
-            <>
-              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
-                <SectionHeader title="Add transfer account" />
-                <Text style={[styles.helper, { color: colors.textSecondary }]}>Enter the 3-letter currency code for this account, for example NGN, USD or GBP.</Text>
-                <InputField label="Display label" value={accountLabel} onChangeText={setAccountLabel} placeholder="e.g. NGN Giving Account" />
-                <InputField label="Currency code" value={currency} onChangeText={(value) => setCurrency(value.toUpperCase())} autoCapitalize="characters" maxLength={3} placeholder="NGN" />
-                <InputField label="Bank name" value={bankName} onChangeText={setBankName} placeholder="Bank name" />
-                <InputField label="Account name" value={accountName} onChangeText={setAccountName} placeholder="Account beneficiary" />
-                <InputField label="Account number" value={accountNumber} onChangeText={setAccountNumber} placeholder="Account number" />
-                <InputField label="Routing / sort code (optional)" value={routingNumber} onChangeText={setRoutingNumber} placeholder="Routing or sort code" />
-                <InputField label="SWIFT / BIC (optional)" value={swiftCode} onChangeText={setSwiftCode} placeholder="SWIFT/BIC" />
-                <InputField label="IBAN (optional)" value={iban} onChangeText={setIban} placeholder="IBAN" />
-                <InputField
-                  label="Transfer instructions"
-                  value={transferInstructions}
-                  onChangeText={setTransferInstructions}
-                  placeholder="Instructions shown to donors"
-                  multiline
-                  numberOfLines={3}
-                />
-                <InputField
-                  label="Additional instructions (optional)"
-                  value={additionalInstructions}
-                  onChangeText={setAdditionalInstructions}
-                  placeholder="Any currency- or bank-specific note"
-                  multiline
-                  numberOfLines={2}
-                />
-                <InputField label="Reference prefix (optional)" value={referencePrefix} onChangeText={setReferencePrefix} placeholder="e.g. GIVE-" />
-                <Button label="Publish Transfer Account" onPress={addAccount} loading={busy} />
-              </View>
-
-              <View style={styles.list}>
-                <SectionHeader title={activeScope === 'organization' ? 'Church transfer accounts' : 'Expression transfer accounts'} badge={accounts.length} />
-                {accounts.length ? accounts.map((account) => (
-                  <View key={account.id} style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    <View style={{ flex: 1 }}>
-                      <View style={styles.rowTitleLine}>
-                        <Text style={[styles.rowTitle, { color: colors.text }]}>{account.label}</Text>
-                        <Badge label={account.currency} variant="primary" />
-                      </View>
-                      <Text style={[styles.rowCopy, { color: colors.textSecondary }]}>{account.bank_name} · {account.account_name}</Text>
-                      <Text selectable style={[styles.accountNumber, { color: colors.interactive }]}>{account.account_number}</Text>
-                    </View>
+                  <View style={styles.rowActions}>
+                    {!purpose.is_default && purpose.status === 'active' ? (
+                      <Button label="Set default" onPress={() => void updatePurpose(purpose, { isDefault: true })} variant="outline" size="sm" />
+                    ) : null}
                     <Button
-                      label={account.is_active ? 'Hide' : 'Publish'}
-                      onPress={() => updateAccountVisibility(account, !account.is_active)}
-                      variant="outline"
+                      label={purpose.status === 'active' ? 'Hide' : 'Publish'}
+                      onPress={() => void updatePurpose(purpose, { status: purpose.status === 'active' ? 'inactive' : 'active' })}
+                      variant="ghost"
                       size="sm"
                     />
                   </View>
-                )) : (
-                  <EmptyState title="No transfer accounts" message={activeScope === 'organization' ? 'Add the first church-wide transfer account.' : 'Add the first transfer account for this Expression.'} iconName="business-outline" />
-                )}
-              </View>
-            </>
+                </View>
+              )) : (
+                <EmptyState
+                  title="No giving purposes yet"
+                  message={activeScope === 'organization' ? 'Add the funds your church wants people to see.' : 'Add the funds this Expression wants members to see.'}
+                  iconName="gift-outline"
+                  actionLabel="New purpose"
+                  onAction={() => setPurposeOpen(true)}
+                />
+              )}
+            </View>
+          ) : (
+            <View style={styles.list}>
+              <SectionHeader
+                title={activeScope === 'organization' ? 'Church transfer accounts' : 'Expression transfer accounts'}
+                badge={accounts.length}
+                subtitle="Published bank-transfer destinations"
+                actionLabel="New"
+                onAction={() => {
+                  setError('');
+                  setAccountOpen(true);
+                }}
+              />
+              {accounts.length ? accounts.map((account) => (
+                <View key={account.id} style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+                  <View style={[styles.bankIcon, { backgroundColor: colors.primarySoft }]}>
+                    <Icon name="business-outline" size={18} color={colors.interactive} />
+                  </View>
+                  <View style={styles.flex}>
+                    <View style={styles.rowTitleLine}>
+                      <Text style={[styles.rowTitle, { color: colors.text }]}>{account.label}</Text>
+                      <Badge label={account.currency} variant="primary" />
+                    </View>
+                    <Text style={[styles.rowCopy, { color: colors.textSecondary }]}>{account.bank_name} · {account.account_name}</Text>
+                    <Text selectable style={[styles.accountNumber, { color: colors.interactive }]}>{account.account_number}</Text>
+                  </View>
+                  <Button
+                    label={account.is_active ? 'Hide' : 'Publish'}
+                    onPress={() => void updateAccountVisibility(account, !account.is_active)}
+                    variant="outline"
+                    size="sm"
+                  />
+                </View>
+              )) : (
+                <EmptyState
+                  title="No transfer accounts"
+                  message={activeScope === 'organization' ? 'Add the first church-wide transfer account.' : 'Add the first transfer account for this Expression.'}
+                  iconName="business-outline"
+                  actionLabel="New account"
+                  onAction={() => setAccountOpen(true)}
+                />
+              )}
+            </View>
           )}
         </View>
       </ScrollView>
+
+      <BottomSheet
+        visible={purposeOpen}
+        onClose={() => !busy && setPurposeOpen(false)}
+        title="New giving purpose"
+        subtitle={activeScope === 'organization' ? organization.name : expression?.name}
+        maxHeightPercent={88}
+      >
+        <View style={styles.form}>
+          {error ? (
+            <View style={[styles.banner, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}>
+              <Icon name="alert-circle" size={17} color={colors.live} />
+              <Text style={[styles.bannerText, { color: colors.live }]}>{error}</Text>
+            </View>
+          ) : null}
+          <InputField
+            label="Name"
+            value={purposeName}
+            onChangeText={setPurposeName}
+            placeholder={activeScope === 'organization' ? 'General Offering' : 'Expression Offering'}
+          />
+          <InputField label="Description" value={purposeDescription} onChangeText={setPurposeDescription} placeholder="Optional explanation" multiline numberOfLines={3} />
+          <ToggleRow
+            label="Default purpose"
+            description="Preselect this purpose when people open giving."
+            value={purposeDefault}
+            onPress={() => setPurposeDefault((value) => !value)}
+          />
+          <Button label="Publish purpose" onPress={() => void addPurpose()} loading={busy} size="lg" fullWidth />
+        </View>
+      </BottomSheet>
+
+      <BottomSheet
+        visible={accountOpen}
+        onClose={() => !busy && setAccountOpen(false)}
+        title="New transfer account"
+        subtitle={activeScope === 'organization' ? organization.name : expression?.name}
+        maxHeightPercent={96}
+      >
+        <View style={styles.form}>
+          {error ? (
+            <View style={[styles.banner, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}>
+              <Icon name="alert-circle" size={17} color={colors.live} />
+              <Text style={[styles.bannerText, { color: colors.live }]}>{error}</Text>
+            </View>
+          ) : null}
+          <InputField label="Display label" value={accountLabel} onChangeText={setAccountLabel} placeholder="NGN Giving Account" />
+          <InputField label="Currency code" value={currency} onChangeText={(value) => setCurrency(value.toUpperCase())} autoCapitalize="characters" maxLength={3} placeholder="NGN" />
+          <InputField label="Bank name" value={bankName} onChangeText={setBankName} placeholder="Bank name" />
+          <InputField label="Account name" value={accountName} onChangeText={setAccountName} placeholder="Account beneficiary" />
+          <InputField label="Account number" value={accountNumber} onChangeText={setAccountNumber} placeholder="Account number" />
+          <InputField label="Routing / sort code (optional)" value={routingNumber} onChangeText={setRoutingNumber} placeholder="Routing or sort code" />
+          <InputField label="SWIFT / BIC (optional)" value={swiftCode} onChangeText={setSwiftCode} placeholder="SWIFT/BIC" />
+          <InputField label="IBAN (optional)" value={iban} onChangeText={setIban} placeholder="IBAN" />
+          <InputField label="Transfer instructions" value={transferInstructions} onChangeText={setTransferInstructions} placeholder="Instructions shown to donors" multiline numberOfLines={3} />
+          <InputField label="Additional instructions (optional)" value={additionalInstructions} onChangeText={setAdditionalInstructions} placeholder="Currency- or bank-specific note" multiline numberOfLines={2} />
+          <InputField label="Reference prefix (optional)" value={referencePrefix} onChangeText={setReferencePrefix} placeholder="GIVE-" />
+          <Button label="Publish transfer account" onPress={() => void addAccount()} loading={busy} size="lg" fullWidth />
+        </View>
+      </BottomSheet>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  center: { justifyContent: 'center', padding: spacing.lg },
-  body: { paddingHorizontal: spacing.lg, gap: spacing.lg },
-  scopeCard: { flexDirection: 'row', gap: spacing.sm, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, alignItems: 'center' },
+  center: { justifyContent: 'center', padding: spacing.md },
+  headerCard: { marginHorizontal: spacing.md, borderWidth: 1, borderRadius: radius.xxl, overflow: 'hidden' },
+  body: { paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: spacing.xl },
+  flex: { flex: 1 },
+  scopeCard: { flexDirection: 'row', gap: spacing.md, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, alignItems: 'center' },
+  scopeIcon: { width: 42, height: 42, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
   scopeTitle: { fontSize: 14, fontWeight: '800' },
-  scopeCopy: { fontSize: 12, lineHeight: 18, marginTop: 2 },
-  banner: { borderWidth: 1, borderRadius: radius.md, padding: spacing.md },
-  bannerText: { fontSize: 13, fontWeight: '700' },
-  scopeTabs: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  card: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md },
+  scopeCopy: { fontSize: 11, lineHeight: 16, marginTop: 2 },
+  banner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md },
+  bannerText: { flex: 1, fontSize: 13, fontWeight: '600' },
+  scopeTabs: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, padding: 5, borderWidth: 1, borderRadius: radius.xl, alignSelf: 'flex-start' },
+  tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, padding: 5, borderWidth: 1, borderRadius: radius.xl, alignSelf: 'flex-start' },
+  card: { borderWidth: 1, borderRadius: radius.xxl, padding: spacing.lg, gap: spacing.md },
   helper: { fontSize: 12, lineHeight: 18 },
-  toggleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.xs },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
   toggleLabel: { fontSize: 14, fontWeight: '700' },
   toggleDescription: { fontSize: 12, lineHeight: 18, marginTop: 2 },
   toggleTrack: { width: 42, height: 24, borderRadius: 12, padding: 3, justifyContent: 'center' },
   toggleThumb: { width: 18, height: 18, borderRadius: 9 },
   list: { gap: spacing.sm },
-  rowCard: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm },
+  rowCard: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm },
+  bankIcon: { width: 40, height: 40, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
   rowTitleLine: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.xs },
   rowTitle: { fontSize: 15, fontWeight: '800' },
   rowCopy: { fontSize: 12, lineHeight: 18, marginTop: 2 },
   accountNumber: { fontSize: 15, fontWeight: '800', marginTop: 3 },
   rowActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  form: { gap: spacing.md },
 });
