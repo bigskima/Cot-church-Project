@@ -22,12 +22,14 @@ import type { LeadershipProfile } from '@church/types';
 
 export default function ExpressionLeadershipManage() {
   const insets = useSafeAreaInsets();
-  const { api, context } = useSession();
+  const { api, context, hasCapability } = useSession();
   const { colors } = useTheme();
   const expression = context?.expression;
   const branchId = expression?.id;
+  const canManage = Boolean(branchId) && (hasCapability('expression.leadership.manage') || hasCapability('*'));
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingLeader, setEditingLeader] = useState<LeadershipProfile | null>(null);
   const [displayName, setDisplayName] = useState('');
   const [roleTitle, setRoleTitle] = useState('');
   const [ministry, setMinistry] = useState('');
@@ -57,6 +59,7 @@ export default function ExpressionLeadershipManage() {
   }
 
   const resetForm = () => {
+    setEditingLeader(null);
     setDisplayName('');
     setRoleTitle('');
     setMinistry('');
@@ -66,11 +69,26 @@ export default function ExpressionLeadershipManage() {
   };
 
   const openCreate = () => {
+    if (!canManage) return;
     resetForm();
     setCreateOpen(true);
   };
 
-  async function handleAddLeader() {
+  const openEdit = (leader: LeadershipProfile) => {
+    if (!canManage) return;
+    setEditingLeader(leader);
+    setDisplayName(leader.display_name ?? '');
+    setRoleTitle(leader.role_title ?? '');
+    setMinistry(leader.ministry ?? '');
+    setShortBio(leader.short_bio ?? '');
+    setFeaturePublicly(leader.is_featured_public === true);
+    setErrorMsg('');
+    setSuccessMsg('');
+    setCreateOpen(true);
+  };
+
+  async function handleSaveLeader() {
+    if (!canManage) return;
     if (!displayName.trim() || !roleTitle.trim()) {
       setErrorMsg('Provide the leader name and role title.');
       return;
@@ -80,10 +98,11 @@ export default function ExpressionLeadershipManage() {
     setErrorMsg('');
     setSuccessMsg('');
     try {
+      const isEditing = Boolean(editingLeader);
       await api.request('church-story', {
-        method: 'POST',
+        method: isEditing ? 'PATCH' : 'POST',
         body: JSON.stringify({
-          expressionId: branchId,
+          ...(isEditing ? { id: editingLeader!.id } : { expressionId: branchId }),
           displayName: displayName.trim(),
           roleTitle: roleTitle.trim(),
           ministry: ministry.trim() || null,
@@ -92,9 +111,11 @@ export default function ExpressionLeadershipManage() {
         }),
       });
       setSuccessMsg(
-        featurePublicly
-          ? 'Leader added to the Expression directory and marked for public leadership presentation.'
-          : 'Leader added to the Expression directory.',
+        isEditing
+          ? 'Leader profile updated.'
+          : featurePublicly
+            ? 'Leader added to the Expression directory and marked for public leadership presentation.'
+            : 'Leader added to the Expression directory.',
       );
       setCreateOpen(false);
       resetForm();
@@ -123,7 +144,7 @@ export default function ExpressionLeadershipManage() {
             kicker="LEADERSHIP"
             subtitle={`Pastors and ministry leaders serving ${expression.name}.`}
             showBack
-            rightAction={<Button label="Add leader" onPress={openCreate} size="sm" />}
+            rightAction={canManage ? <Button label="Add leader" onPress={openCreate} size="sm" /> : undefined}
           />
         </View>
 
@@ -146,22 +167,27 @@ export default function ExpressionLeadershipManage() {
               title="Leadership directory"
               badge={leaderList.length}
               subtitle="Expression leadership remains private to this scope unless explicitly featured publicly"
-              actionLabel="Add"
-              onAction={openCreate}
+              actionLabel={canManage ? 'Add' : undefined}
+              onAction={canManage ? openCreate : undefined}
             />
             {leaders.loading ? (
               <Skeleton height={92} count={2} />
             ) : leaders.error && !leaders.data ? (
               <ResourceError message={leaders.error} retry={leaders.refresh} />
             ) : leaderList.length ? (
-              leaderList.map((leader) => <LeaderCard key={leader.id} leader={leader} variant="standard" />)
+              leaderList.map((leader) => (
+                <View key={leader.id} style={styles.leaderRow}>
+                  <View style={styles.flex}><LeaderCard leader={leader} variant="standard" /></View>
+                  {canManage ? <Button label="Edit" onPress={() => openEdit(leader)} variant="outline" size="sm" /> : null}
+                </View>
+              ))
             ) : (
               <EmptyState
                 title="No leaders configured"
                 message="Add the pastoral and ministry team serving this Expression."
                 iconName="people-outline"
-                actionLabel="Add leader"
-                onAction={openCreate}
+                actionLabel={canManage ? 'Add leader' : undefined}
+                onAction={canManage ? openCreate : undefined}
               />
             )}
           </View>
@@ -170,9 +196,14 @@ export default function ExpressionLeadershipManage() {
 
       <BottomSheet
         visible={createOpen}
-        onClose={() => !saving && setCreateOpen(false)}
-        title="Add Expression leader"
-        subtitle={`Inside ${expression.name}`}
+        onClose={() => {
+          if (!saving) {
+            setCreateOpen(false);
+            resetForm();
+          }
+        }}
+        title={editingLeader ? 'Edit Expression leader' : 'Add Expression leader'}
+        subtitle={editingLeader ? editingLeader.display_name : `Inside ${expression.name}`}
         maxHeightPercent={92}
       >
         <View style={styles.form}>
@@ -197,7 +228,7 @@ export default function ExpressionLeadershipManage() {
             Public featuring is optional. Expression leaders are not automatically added to the church-wide public leadership presentation.
           </Text>
 
-          <Button label="Save leader" onPress={() => void handleAddLeader()} loading={saving} size="lg" fullWidth />
+          <Button label={editingLeader ? 'Save changes' : 'Save leader'} onPress={() => void handleSaveLeader()} loading={saving} size="lg" fullWidth />
         </View>
       </BottomSheet>
     </View>
@@ -209,6 +240,8 @@ const styles = StyleSheet.create({
   content: { flexGrow: 1 },
   headerCard: { marginHorizontal: spacing.md, borderWidth: 1, borderRadius: radius.xxl, overflow: 'hidden' },
   body: { paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: spacing.xl },
+  flex: { flex: 1 },
+  leaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   emptyPad: { paddingHorizontal: spacing.md },
   banner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1 },
   bannerText: { fontSize: 13, fontWeight: '600', flex: 1 },
