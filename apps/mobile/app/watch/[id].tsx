@@ -143,7 +143,9 @@ export default function WatchDetailScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <ScreenHeader title="" showBack style={{ backgroundColor: 'transparent' }} />
+      <View style={{ paddingTop: insets.top }}>
+        <ScreenHeader title="Watch" kicker="VIDEO" showBack style={{ backgroundColor: 'transparent' }} />
+      </View>
 
       {resource.loading ? (
         <WatchSkeleton />
@@ -152,7 +154,7 @@ export default function WatchDetailScreen() {
       ) : video ? (
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 60 }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}
         >
           {/* Dominant 16:9 Video Canvas */}
           {playback.error ? <ResourceError message={playback.error} retry={playback.refresh} /> : <VideoPlayer
@@ -167,6 +169,10 @@ export default function WatchDetailScreen() {
 
           {/* Video Metadata & Title */}
           <View style={styles.metadataSection}>
+            <View style={[styles.contextPill, { backgroundColor: expressionMode ? colors.accentSoft : colors.primarySoft }]}>
+              <Icon name={expressionMode ? 'people-outline' : 'globe-outline'} size={13} color={expressionMode ? colors.accent : colors.interactive} />
+              <Text style={[styles.contextPillText, { color: expressionMode ? colors.accent : colors.interactive }]}>{expressionMode ? 'Expression video' : 'Public video'}</Text>
+            </View>
             <Text style={[styles.title, { color: colors.text }]}>{video.title}</Text>
 
             <View style={styles.authorRow}>
@@ -183,7 +189,7 @@ export default function WatchDetailScreen() {
             {actionError ? <Text style={[styles.actionError, { color: colors.live }]} accessibilityRole="alert">{actionError}</Text> : null}
 
             {/* YouTube-Style Action Rail (Like, Save, Share, Comments) */}
-            <View style={[styles.actionsBar, { borderTopColor: colors.borderSubtle, borderBottomColor: colors.borderSubtle }]}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.actionsBar, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
               <Pressable
                 onPress={handleLike}
                 style={[styles.actionBtn, isLiked && { backgroundColor: colors.primarySoft }]}
@@ -221,11 +227,11 @@ export default function WatchDetailScreen() {
                 <Icon name="chatbubble-ellipses-outline" size={20} color={colors.text} />
                 <Text style={[styles.actionBtnText, { color: colors.text }]}>Comments</Text>
               </Pressable>
-            </View>
+            </ScrollView>
 
             {/* Description */}
             {video.description ? (
-              <View style={[styles.descCard, { backgroundColor: colors.bgSecondary }]}>
+              <View style={[styles.descCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
                 <Text style={[styles.descText, { color: colors.text }]}>{video.description}</Text>
               </View>
             ) : null}
@@ -281,13 +287,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   metadataSection: {
-    padding: spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.lg,
     gap: spacing.md,
   },
+  contextPill: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderRadius: radius.pill },
+  contextPillText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.2 },
   title: {
-    fontSize: 18,
+    fontSize: 21,
     fontWeight: '800',
-    lineHeight: 24,
+    lineHeight: 27,
+    letterSpacing: -0.45,
   },
   authorRow: {
     flexDirection: 'row',
@@ -304,17 +314,17 @@ const styles = StyleSheet.create({
   actionsBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingVertical: spacing.sm,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
+    gap: spacing.xs,
+    padding: spacing.xs,
+    borderWidth: 1,
+    borderRadius: radius.xl,
   },
   actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
     borderRadius: radius.pill,
   },
   actionBtnText: {
@@ -322,8 +332,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   descCard: {
-    padding: spacing.md,
-    borderRadius: radius.md,
+    padding: spacing.lg,
+    borderRadius: radius.xl,
+    borderWidth: 1,
   },
   descText: {
     fontSize: 13,
