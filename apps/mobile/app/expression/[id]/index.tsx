@@ -114,7 +114,7 @@ export default function ExpressionProfileScreen() {
       ) : expression ? (
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 60 }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}
         >
           <View style={[styles.headerSection, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
             <View style={[styles.avatarWrap, { borderColor: colors.bg }]}>
@@ -136,32 +136,33 @@ export default function ExpressionProfileScreen() {
                 </View>
               ) : null}
 
-              {/* Follow Button */}
-              <Button
-                label={isFollowing ? 'Following' : 'Follow Expression'}
-                onPress={handleToggleFollow}
-                loading={followingLoading}
-                variant={isFollowing ? 'outline' : 'primary'}
-                size="md"
-                style={{ marginTop: spacing.sm, alignSelf: 'flex-start' }}
-                icon={<Icon name={isFollowing ? 'checkmark' : 'add'} size={16} color={isFollowing ? colors.interactive : '#FFFFFF'} />}
-              />
-              {membership ? (
+              <View style={styles.actionRow}>
                 <Button
-                  label={context?.expression?.id === id ? 'Expression Entered' : 'Enter Expression'}
-                  onPress={async () => {
-                    if (context?.expression?.id === id) return;
-                    await enterExpression(membership.organizationId, membership.id);
-                    router.replace('/(tabs)/home');
-                  }}
-                  disabled={context?.expression?.id === id}
-                  variant="outline"
+                  label={isFollowing ? 'Following' : 'Follow'}
+                  onPress={handleToggleFollow}
+                  loading={followingLoading}
+                  variant={isFollowing ? 'outline' : 'primary'}
                   size="md"
-                  style={{ marginTop: spacing.sm, alignSelf: 'flex-start' }}
+                  icon={<Icon name={isFollowing ? 'checkmark' : 'add'} size={16} color={isFollowing ? colors.interactive : '#FFFFFF'} />}
                 />
-              ) : mode === 'authenticated' ? (
-                <Button label="Join with Invite Code" onPress={() => router.push('/expressions')} variant="outline" size="md" style={{ marginTop: spacing.sm, alignSelf: 'flex-start' }} />
-              ) : null}
+                {membership ? (
+                  <Button
+                    label={context?.expression?.id === id ? 'Inside Expression' : 'Enter Expression'}
+                    onPress={async () => {
+                      if (context?.expression?.id === id) return;
+                      await enterExpression(membership.organizationId, membership.id);
+                      router.replace('/(tabs)/home');
+                    }}
+                    disabled={context?.expression?.id === id}
+                    variant="outline"
+                    size="md"
+                  />
+                ) : mode === 'authenticated' ? (
+                  <Button label="Join with code" onPress={() => router.push('/expressions')} variant="outline" size="md" />
+                ) : (
+                  <Button label="Sign in to join" onPress={() => router.push('/(auth)/login')} variant="outline" size="md" />
+                )}
+              </View>
               {followError ? <Text style={[styles.followError, { color: colors.live }]} accessibilityRole="alert">{followError}</Text> : null}
             </View>
           </View>
@@ -278,7 +279,7 @@ export default function ExpressionProfileScreen() {
               ) : (
                 <EmptyState
                   title="No Upcoming Events"
-                  message="Calendar gatherings for this campus will appear here."
+                  message="Calendar gatherings for this Expression will appear here."
                   iconName="calendar-outline"
                 />
               )
@@ -344,6 +345,12 @@ const styles = StyleSheet.create({
   },
   locationText: {
     fontSize: 13,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
   },
   followError: {
     fontSize: 12,
