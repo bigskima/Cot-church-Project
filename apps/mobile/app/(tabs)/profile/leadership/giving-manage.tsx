@@ -331,7 +331,7 @@ export default function ExpressionGivingManageScreen() {
       >
         <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
           <ScreenHeader
-            title="Giving management"
+            title={activeScope === 'organization' ? 'Church Giving Settings' : 'Expression Giving Settings'}
             kicker="LEADERSHIP"
             subtitle={activeScope === 'organization'
               ? `Church-wide giving for ${organization.name}.`
