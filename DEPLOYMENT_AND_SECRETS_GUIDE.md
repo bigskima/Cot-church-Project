@@ -44,7 +44,7 @@ You can run this single command to set all your secrets at once:
 supabase secrets set \
   ALLOWED_ORIGINS="https://admin.yourchurch.com,https://app.yourchurch.com,http://localhost:5173" \
   RATE_LIMIT_PEPPER="$(openssl rand -hex 32)" \
-  PASSWORD_RECOVERY_REDIRECT_URL="https://admin.yourchurch.com/reset-password" \
+  PASSWORD_RECOVERY_REDIRECT_URL="https://cot-app-green.vercel.app/reset-password" \
   NOTIFICATION_WORKER_SECRET="$(openssl rand -hex 32)" \
   WORKFLOW_WORKER_SECRET="$(openssl rand -hex 32)" \
   PAYMENT_WEBHOOK_SECRET="$(openssl rand -hex 32)" \
@@ -68,7 +68,9 @@ supabase secrets set \
 | :--- | :--- | :--- |
 | `ALLOWED_ORIGINS` | Your frontend domains | Comma-separated domains allowed for CORS (e.g. `https://your-admin.vercel.app,https://your-mobile.vercel.app`). |
 | `RATE_LIMIT_PEPPER` | Terminal: `openssl rand -hex 32` | 64-character random hex string for hashing IP rate limits. |
-| `PASSWORD_RECOVERY_REDIRECT_URL` | Your frontend URL | URL where users land after password reset (e.g. `https://admin.yourdomain.com/reset-password`). |
+| `PASSWORD_RECOVERY_REDIRECT_URL` | Your frontend URL | COT **app** reset route, never the Platform Administration site. Current connected production web target: `https://cot-app-green.vercel.app/reset-password`. Native app scheme: `churchos://reset-password`; use it only when your Supabase/Auth redirect configuration and mobile deep-link delivery are intentionally set up for the native flow. |
+
+> **Password recovery boundary:** account recovery is a COT member-app flow. Do not point `PASSWORD_RECOVERY_REDIRECT_URL` at `cot-admin` or any Platform Administration URL. The destination must render the app's `/reset-password` route that consumes the Supabase recovery session and completes the password update.
 | `NOTIFICATION_WORKER_SECRET` | Terminal: `openssl rand -hex 32` | Secret key authenticating internal notification dispatch workers. |
 | `WORKFLOW_WORKER_SECRET` | Terminal: `openssl rand -hex 32` | Secret key authenticating internal background workflow jobs. |
 | `PAYMENT_WEBHOOK_SECRET` | Stripe / Paystack Webhook settings OR `openssl rand -hex 32` | HMAC SHA-256 secret for verifying inbound payment notifications. |
