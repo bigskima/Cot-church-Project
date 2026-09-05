@@ -1,10 +1,10 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/state/theme';
-import { Icon } from '@/components/primitives/Icon';
-import { spacing } from '@/design-system/tokens';
+import { Button, Icon } from '@/components';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 
 export default function NotFoundScreen() {
   const insets = useSafeAreaInsets();
@@ -21,16 +21,16 @@ export default function NotFoundScreen() {
         },
       ]}
     >
-      <Icon name="compass-outline" size={40} color={colors.interactive} />
-      <Text style={[styles.title, { color: colors.text }]}>This page isn’t available</Text>
-      <Text style={[styles.body, { color: colors.textSecondary }]}>The link may be outdated, private, or no longer available.</Text>
-      <Pressable
-        onPress={() => router.replace('/(tabs)/home')}
-        style={[styles.button, { backgroundColor: colors.interactive }]}
-        accessibilityRole="button"
-      >
-        <Text style={styles.buttonText}>Go home</Text>
-      </Pressable>
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+        <View style={[styles.iconWrap, { backgroundColor: colors.primarySoft }]}>
+          <Icon name="compass-outline" size={30} color={colors.interactive} />
+        </View>
+        <Text style={[styles.title, { color: colors.text }]}>This page isn’t available</Text>
+        <Text style={[styles.body, { color: colors.textSecondary }]}>
+          The link may be outdated, private, or no longer available. Public COT content is still available from Home.
+        </Text>
+        <Button label="Go to Home" onPress={() => router.replace('/(tabs)/home')} size="lg" fullWidth />
+      </View>
     </View>
   );
 }
@@ -40,33 +40,32 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: spacing.md,
   },
-  title: {
-    marginTop: 18,
-    fontSize: 22,
-    fontWeight: '700',
-    textAlign: 'center',
+  card: {
+    width: '100%',
+    maxWidth: 430,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: radius.xxl,
+    padding: spacing.xxl,
+    gap: spacing.md,
   },
-  body: {
-    marginTop: 8,
-    maxWidth: 360,
-    fontSize: 14,
-    lineHeight: 21,
-    textAlign: 'center',
-  },
-  button: {
-    marginTop: 24,
-    minHeight: 46,
-    minWidth: 150,
-    borderRadius: 10,
-    paddingHorizontal: 20,
+  iconWrap: {
+    width: 62,
+    height: 62,
+    borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
+  title: {
+    ...typography.h1,
+    textAlign: 'center',
+  },
+  body: {
+    ...typography.bodySmall,
+    maxWidth: 340,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });
