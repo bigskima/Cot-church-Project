@@ -132,8 +132,11 @@ export default function CommunityScreen() {
   const hasChurchMembership = Boolean(
     context?.organizations?.some((organization) => organization.memberships?.some((membership) => membership.status === 'active')),
   );
-  const canPost = mode === 'authenticated' && hasChurchMembership;
-  const canEngage = mode === 'authenticated' && hasChurchMembership;
+  // General Community is public to read and available to any authenticated
+  // account for interaction. Expression-only posting remains scoped by the
+  // selected Expression below and is still enforced by the API.
+  const canPost = mode === 'authenticated';
+  const canEngage = mode === 'authenticated';
 
   const cleanupAttachments = async (items = attachments) => {
     if (!items.length) return;
@@ -365,7 +368,7 @@ export default function CommunityScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <View style={[styles.headerBar, { paddingTop: insets.top + spacing.xs, backgroundColor: colors.bg, borderBottomColor: colors.borderSubtle }]}>
+      <View style={[styles.headerBar, { paddingTop: insets.top + spacing.sm, backgroundColor: colors.glass, borderColor: colors.borderSubtle }]}>
         <View style={styles.headerIdentity}>
           <BrandMark variant="compact" size={30} />
           <View>
@@ -380,21 +383,24 @@ export default function CommunityScreen() {
         ) : null}
       </View>
 
-      <View style={[styles.tabBar, { borderBottomColor: colors.borderSubtle }]}>
-        <Pressable onPress={() => setActiveTab('general')} style={[styles.tabItem, activeTab === 'general' && { borderBottomColor: colors.interactive }]}>
-          <Text style={[styles.tabText, { color: activeTab === 'general' ? colors.text : colors.textMuted }, activeTab === 'general' && styles.tabTextActive]}>General Community</Text>
+      <View style={[styles.tabBar, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+        <Pressable onPress={() => setActiveTab('general')} style={[styles.tabItem, activeTab === 'general' && { backgroundColor: colors.primarySoft }]}>
+          <Text style={[styles.tabText, { color: activeTab === 'general' ? colors.interactive : colors.textMuted }, activeTab === 'general' && styles.tabTextActive]}>General</Text>
         </Pressable>
         {expression?.id ? (
-          <Pressable onPress={() => setActiveTab('expression')} style={[styles.tabItem, activeTab === 'expression' && { borderBottomColor: colors.interactive }]}>
-            <Text style={[styles.tabText, { color: activeTab === 'expression' ? colors.text : colors.textMuted }, activeTab === 'expression' && styles.tabTextActive]} numberOfLines={1}>{expression.name}</Text>
+          <Pressable onPress={() => setActiveTab('expression')} style={[styles.tabItem, activeTab === 'expression' && { backgroundColor: colors.primarySoft }]}>
+            <Text style={[styles.tabText, { color: activeTab === 'expression' ? colors.interactive : colors.textMuted }, activeTab === 'expression' && styles.tabTextActive]} numberOfLines={1}>{expression.name}</Text>
           </Pressable>
         ) : null}
       </View>
 
       {canPost ? (
-        <Pressable onPress={openComposer} style={[styles.composerStrip, { borderBottomColor: colors.borderSubtle }]}>
+        <Pressable onPress={openComposer} style={({ pressed }) => [styles.composerStrip, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, pressed && styles.composerPressed]}>
           <Avatar url={context?.profile?.avatar_url} name={context?.profile?.display_name || 'Me'} size="sm" />
-          <Text style={[styles.composerPlaceholder, { color: colors.textMuted }]}>Share text, photos, video or audio...</Text>
+          <View style={styles.composerCopy}>
+            <Text style={[styles.composerPrompt, { color: colors.text }]}>Share with the community</Text>
+            <Text style={[styles.composerPlaceholder, { color: colors.textMuted }]}>Text, photos, video or audio</Text>
+          </View>
           <Icon name="create-outline" size={20} color={colors.interactive} />
         </Pressable>
       ) : mode === 'authenticated' ? (
@@ -413,7 +419,7 @@ export default function CommunityScreen() {
           data={posts}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 80 }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 130 }}
           refreshControl={<RefreshControl refreshing={resource.refreshing} onRefresh={resource.refresh} tintColor={colors.interactive} />}
           renderItem={({ item }) => (
             <PostCard
@@ -433,7 +439,7 @@ export default function CommunityScreen() {
         />
       )}
 
-      <BottomSheet visible={composerOpen} onClose={closeComposer} title="Create Post">
+      <BottomSheet visible={composerOpen} onClose={closeComposer} title="Create post" subtitle="Share something meaningful with your community.">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.composerBody}>
           <View style={styles.destinationBlock}>
             <Text style={[styles.destinationLabel, { color: colors.textSecondary }]}>POST TO</Text>
@@ -548,17 +554,20 @@ export default function CommunityScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  headerBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingBottom: spacing.sm, borderBottomWidth: 1 },
-  headerIdentity: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  headerTitle: { fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
-  headerSubtitle: { fontSize: 10, marginTop: 1 },
+  headerBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: spacing.md, marginTop: spacing.xs, paddingHorizontal: spacing.md, paddingBottom: spacing.md, borderWidth: 1, borderRadius: radius.xl },
+  headerIdentity: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1, minWidth: 0 },
+  headerTitle: { fontSize: 21, fontWeight: '800', letterSpacing: -0.55 },
+  headerSubtitle: { fontSize: 11, lineHeight: 15, marginTop: 1 },
   headerIconBtn: { width: 36, height: 36, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  tabBar: { flexDirection: 'row', borderBottomWidth: 1 },
-  tabItem: { flex: 1, alignItems: 'center', paddingVertical: 12, paddingHorizontal: spacing.xs, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tabBar: { flexDirection: 'row', marginHorizontal: spacing.md, marginTop: spacing.sm, padding: 4, borderWidth: 1, borderRadius: radius.pill },
+  tabItem: { flex: 1, alignItems: 'center', paddingVertical: 9, paddingHorizontal: spacing.sm, borderRadius: radius.pill },
   tabText: { fontSize: 14, fontWeight: '600' },
   tabTextActive: { fontWeight: '800' },
-  composerStrip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1, gap: spacing.md },
-  composerPlaceholder: { flex: 1, fontSize: 14 },
+  composerStrip: { flexDirection: 'row', alignItems: 'center', marginHorizontal: spacing.md, marginVertical: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderWidth: 1, borderRadius: radius.xl, gap: spacing.md },
+  composerPressed: { opacity: 0.88, transform: [{ scale: 0.992 }] },
+  composerCopy: { flex: 1, minWidth: 0 },
+  composerPrompt: { fontSize: 14, fontWeight: '700', letterSpacing: -0.15 },
+  composerPlaceholder: { fontSize: 11, marginTop: 2 },
   membershipNotice: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderBottomWidth: 1 },
   membershipNoticeText: { flex: 1, fontSize: 12, lineHeight: 17 },
   loadingContainer: { padding: spacing.lg, gap: spacing.md },
