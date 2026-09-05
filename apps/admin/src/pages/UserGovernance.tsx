@@ -137,12 +137,12 @@ export function UserGovernance({ api }: { api: ApiClient }) {
     : false;
 
   return (
-    <div>
+    <div className="admin-page-stack">
       <Card
         title="Accounts & Access"
-        subtitle={`${total} account${total === 1 ? 'y' : 'ies'} · platform-level safety and access controls`}
+        subtitle={`${total} account${total === 1 ? '' : 's'} · platform-level safety and access controls`}
         headerAction={
-          <div style={{ display: 'flex', gap: 12 }}>
+          <div className="admin-header-actions">
             <SearchBar value={search} onChange={setSearch} placeholder="Search name, email, or phone..." />
             <Button variant="outline" size="md" onClick={() => void loadUsers()} loading={loading}>Refresh</Button>
           </div>
@@ -157,13 +157,11 @@ export function UserGovernance({ api }: { api: ApiClient }) {
               accessor: (item) => {
                 const label = item.display_name?.trim() || item.email || item.phone || 'Platform account';
                 return (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-pill)', backgroundColor: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: 'var(--text-primary)', fontSize: 14 }}>
-                      {label[0]?.toUpperCase() ?? 'U'}
-                    </div>
+                  <div className="admin-identity-cell">
+                    <div className="admin-identity-avatar">{label[0]?.toUpperCase() ?? 'U'}</div>
                     <div>
-                      <div style={{ fontWeight: 800 }}>{label}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{item.email ?? item.phone ?? `ID ${item.id.slice(0, 8)}`}</div>
+                      <div className="admin-row-title">{label}</div>
+                      <div className="admin-row-meta">{item.email ?? item.phone ?? `ID ${item.id.slice(0, 8)}`}</div>
                     </div>
                   </div>
                 );
@@ -273,9 +271,9 @@ export function UserGovernance({ api }: { api: ApiClient }) {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ backgroundColor: 'var(--bg-elevated)', padding: 14, borderRadius: 8 }}>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 800 }}>{label}</div>
-      <div style={{ fontSize: 14, fontWeight: 800, marginTop: 4, overflowWrap: 'anywhere' }}>{value}</div>
+    <div className="admin-metric-tile">
+      <div className="admin-metric-label">{label}</div>
+      <div className="admin-metric-value">{value}</div>
     </div>
   );
 }
