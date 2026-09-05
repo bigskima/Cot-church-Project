@@ -54,6 +54,18 @@ export function ReelPlayer({
     reel.media_assets?.renditions?.find((r) => r.rendition_kind === 'video_stream')?.storage_path ||
     reel.media_assets?.url;
   const thumbnailUrl = reel.media_assets?.thumbnailUrl || reel.media_assets?.url;
+  const contentIdentity = reel.content_items;
+  const creator = contentIdentity?.author;
+  const resolvedExpressionName = expressionName || contentIdentity?.expression?.name || undefined;
+  const creatorName =
+    creator?.display_name ||
+    resolvedExpressionName ||
+    contentIdentity?.organization?.name ||
+    'City of Transformation';
+  const creatorMeta = [
+    creator?.username ? `@${creator.username}` : null,
+    resolvedExpressionName && resolvedExpressionName !== creatorName ? resolvedExpressionName : null,
+  ].filter(Boolean).join(' · ');
 
   const player = useVideoPlayer(videoUrl || '', (p) => {
     p.loop = true;
@@ -239,10 +251,11 @@ export function ReelPlayer({
         >
           {/* Creator Identity */}
           <View style={styles.creatorRow}>
-            <Avatar name={expressionName || 'Church'} size="sm" />
-            <Text style={styles.creatorName} numberOfLines={1}>
-              {expressionName || 'Church Fellowship'}
-            </Text>
+            <Avatar url={creator?.avatar_url} name={creatorName} size="sm" />
+            <View style={styles.creatorCopy}>
+              <Text style={styles.creatorName} numberOfLines={1}>{creatorName}</Text>
+              {creatorMeta ? <Text style={styles.creatorMeta} numberOfLines={1}>{creatorMeta}</Text> : null}
+            </View>
             {onFollow ? (
               <Pressable
                 onPress={onFollow}
@@ -376,14 +389,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
+  creatorCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
   creatorName: {
     color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '800',
     flexShrink: 1,
     textShadowColor: 'rgba(0, 0, 0, 0.8)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+  },
+  creatorMeta: {
+    color: 'rgba(255,255,255,0.78)',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 1,
   },
   followBtn: {
     paddingHorizontal: 12,
