@@ -94,6 +94,17 @@ Deno.serve(createHandler(
       const commentBody = requiredString(body.body, "body", 3000);
       const parentId = body.parentCommentId ? uuid(String(body.parentCommentId), "parentCommentId", true) : null;
 
+      if (parentId) {
+        const { data: parentComment, error: parentError } = await auth.client
+          .from("content_comments")
+          .select("id")
+          .eq("id", parentId)
+          .eq("content_item_id", contentId)
+          .maybeSingle();
+        if (parentError) throw new ApiError("COMMENT_PARENT_CHECK_FAILED", "Unable to validate the reply target", 500, undefined, false);
+        if (!parentComment) throw new ApiError("INVALID_PARENT_COMMENT", "Reply target does not belong to this post", 422);
+      }
+
       const { data, error } = await auth.client
         .from("content_comments")
         .insert({
