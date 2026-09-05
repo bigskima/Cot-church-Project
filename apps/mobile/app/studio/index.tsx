@@ -80,6 +80,22 @@ export default function CreatorStudioScreen() {
       enabled: (hasCapability('media.upload') && hasCapability('videos.publish')) || hasCapability('*'),
     },
     {
+      title: 'Create Reel',
+      description: 'Upload and publish a short vertical video to public COT or the active Expression.',
+      iconName: 'flash-outline',
+      badge: 'REELS',
+      route: '/studio/reel',
+      enabled: (hasCapability('media.upload') && hasCapability('reels.publish')) || hasCapability('*'),
+    },
+    {
+      title: 'Create Watch Video',
+      description: 'Upload and publish long-form teachings, worship, testimonies and other video.',
+      iconName: 'videocam-outline',
+      badge: 'WATCH',
+      route: '/studio/video',
+      enabled: (hasCapability('media.upload') && hasCapability('videos.publish')) || hasCapability('*'),
+    },
+    {
       title: 'Sermons',
       description: 'Create sermon drafts, manage teachings and publish when authorized.',
       iconName: 'book-outline',
