@@ -85,7 +85,7 @@ export default function CreatorStudioScreen() {
       iconName: 'radio-outline',
       badge: 'BROADCAST',
       route: '/leadership/media-studio',
-      enabled: hasCapability('streams.manage') || hasCapability('streams.broadcast') || hasCapability('livestream.operate') || hasCapability('*'),
+      enabled: hasCapability('streams.broadcast') || hasCapability('*'),
     },
     {
       title: 'Pastoral Care',
