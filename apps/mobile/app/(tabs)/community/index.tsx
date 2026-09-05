@@ -101,7 +101,7 @@ async function readUploadBody(media: UploadableMedia) {
 
 export default function CommunityScreen() {
   const insets = useSafeAreaInsets();
-  const { api, context, mode } = useSession();
+  const { api, context, mode, hasCapability } = useSession();
   const { colors } = useTheme();
   const expression = context?.expression;
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
@@ -147,6 +147,7 @@ export default function CommunityScreen() {
   // organization membership.
   const canPost = mode === 'authenticated' && hasChurchMembership;
   const canEngage = mode === 'authenticated';
+  const canCreateReel = mode === 'authenticated' && hasCapability('media.upload') && hasCapability('reels.publish');
 
   const cleanupAttachments = async (items = attachments) => {
     if (!items.length) return;
@@ -548,10 +549,12 @@ export default function CommunityScreen() {
               <Icon name="musical-notes-outline" size={18} color={colors.interactive} />
               <Text style={[styles.mediaButtonText, { color: colors.text }]}>Audio</Text>
             </Pressable>
-            <Pressable onPress={() => { closeComposer(); router.push('/studio/reel' as any); }} style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
-              <Icon name="flash-outline" size={18} color={colors.interactive} />
-              <Text style={[styles.mediaButtonText, { color: colors.text }]}>Create Reel</Text>
-            </Pressable>
+            {canCreateReel ? (
+              <Pressable onPress={() => { closeComposer(); router.push('/studio/reel' as any); }} style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
+                <Icon name="flash-outline" size={18} color={colors.interactive} />
+                <Text style={[styles.mediaButtonText, { color: colors.text }]}>Create Reel</Text>
+              </Pressable>
+            ) : null}
           </View>
           <Text style={[styles.mediaHelp, { color: colors.textMuted }]}>Up to 10 attachments · 50 MB each · images, videos and audio upload through the same validated Storage pipeline.</Text>
 
