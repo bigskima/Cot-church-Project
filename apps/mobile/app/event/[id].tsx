@@ -64,7 +64,10 @@ export default function EventDetailScreen() {
 
   const handleRegister = async () => {
     if (mode === 'visitor') {
-      router.push('/(auth)/login');
+      router.push({
+        pathname: '/(auth)/login',
+        params: { returnTo: `/event/${id}${expressionMode ? '?context=expression' : ''}` },
+      } as any);
       return;
     }
     setRegistering(true);
