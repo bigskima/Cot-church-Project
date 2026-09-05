@@ -39,6 +39,7 @@ export default function EventsManageScreen() {
   const { api, context } = useSession();
   const { colors } = useTheme();
   const expression = context?.expression;
+  const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
 
   const [composerOpen, setComposerOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -53,7 +54,7 @@ export default function EventsManageScreen() {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  const events = useResource<Event[]>('leadership:events', (signal) =>
+  const events = useResource<Event[]>(`leadership:events:${organizationId || 'none'}:${expression?.id ?? 'general'}`, (signal) =>
     api.request<Event[]>('events', { signal })
   );
 
