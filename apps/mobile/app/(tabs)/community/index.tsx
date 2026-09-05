@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -38,6 +37,10 @@ type PublicBadge = { id?: string; code?: string; label: string; backgroundColor:
 type CommunityPost = SocialPost & {
   author?: { id: string; displayName?: string; username?: string; avatarUrl?: string | null; bio?: string | null; badges?: PublicBadge[] } | null;
   expression?: { id: string; name: string; code?: string } | null;
+  likes_count?: number;
+  comments_count?: number;
+  viewer_reaction?: string | null;
+  viewer_bookmarked?: boolean;
 };
 type CommunityComment = ContentComment & {
   author?: { id: string; displayName?: string; username?: string; avatarUrl?: string | null; badges?: PublicBadge[] } | null;
@@ -111,7 +114,7 @@ export default function CommunityScreen() {
   const [mediaUploading, setMediaUploading] = useState(false);
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState('');
-  const [commentTargetPostId, setCommentTargetPostId] = useState<string | null>(null);
+  const [commentTarget, setCommentTarget] = useState<{ postId: string; scope: FeedScope } | null>(null);
   const [comments, setComments] = useState<CommunityComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
 
@@ -119,12 +122,12 @@ export default function CommunityScreen() {
     if (!expression?.id && activeTab === 'expression') setActiveTab('general');
   }, [activeTab, expression?.id]);
 
-  const feedKey = `mobile:community:${activeTab}:${organizationId || 'auto'}:${expression?.id ?? 'none'}`;
+  const feedKey = `mobile:community:${activeTab}:${organizationId || 'auto'}:${expression?.id ?? 'none'}:${mode}`;
   const resource = useResource<CommunityPost[]>(feedKey, (signal) => {
     if (activeTab === 'general') {
       const query = new URLSearchParams({ scope: 'all' });
       if (organizationId) query.set('organizationId', organizationId);
-      return api.request<CommunityPost[]>(`public-social-feed?${query.toString()}`, { signal });
+      return api.request<CommunityPost[]>(`public-social-feed?${query.toString()}`, { signal, context: 'public' });
     }
     return api.request<CommunityPost[]>('social-feed?scope=expression', { signal });
   });
@@ -327,45 +330,73 @@ export default function CommunityScreen() {
   };
 
   useEffect(() => {
-    if (!commentTargetPostId || !canEngage) {
+    if (!commentTarget || !canEngage) {
       setComments([]);
       return;
     }
     let active = true;
     setCommentsLoading(true);
-    api.request<CommunityComment[]>(`social-feed?postId=${encodeURIComponent(commentTargetPostId)}`)
+    const requestContext = commentTarget.scope === 'general' ? 'public' : 'current';
+    api.request<CommunityComment[]>(
+      `engagement?contentId=${encodeURIComponent(commentTarget.postId)}`,
+      { context: requestContext },
+    )
       .then((items) => { if (active) setComments(items); })
-      .catch((error) => {
-        if (active) Alert.alert('Comments unavailable', error instanceof Error ? error.message : 'Unable to load comments.');
-      })
+      .catch(() => { if (active) setComments([]); })
       .finally(() => { if (active) setCommentsLoading(false); });
     return () => { active = false; };
-  }, [api, commentTargetPostId, canEngage]);
+  }, [api, commentTarget, canEngage]);
 
   const submitComment = async (body: string, parentCommentId?: string | null) => {
-    if (!commentTargetPostId || !canEngage) return;
+    if (!commentTarget || !canEngage) return;
+    const requestContext = commentTarget.scope === 'general' ? 'public' : 'current';
+    const created = await api.request<CommunityComment>('engagement', {
+      method: 'POST',
+      context: requestContext,
+      body: JSON.stringify({
+        action: 'comment',
+        contentId: commentTarget.postId,
+        body,
+        parentCommentId: parentCommentId ?? undefined,
+      }),
+    });
+    if (created) setComments((current) => [...current, created]);
+    void resource.refresh();
+  };
+
+  const reactToPost = async (postId: string, reaction: string | null, scope: FeedScope) => {
+    if (!canEngage) return false;
+    const requestContext = scope === 'general' ? 'public' : 'current';
     try {
-      await api.request('social-feed', {
+      await api.request('engagement', {
         method: 'POST',
-        body: JSON.stringify({ action: 'comment', postId: commentTargetPostId, body, parentCommentId: parentCommentId ?? undefined }),
+        context: requestContext,
+        body: JSON.stringify(
+          reaction
+            ? { action: 'react', contentId: postId, reaction }
+            : { action: 'unreact', contentId: postId },
+        ),
       });
-      const refreshed = await api.request<CommunityComment[]>(`social-feed?postId=${encodeURIComponent(commentTargetPostId)}`);
-      setComments(refreshed);
-    } catch (error) {
-      Alert.alert('Comment not posted', error instanceof Error ? error.message : 'Unable to add comment.');
-      throw error;
+      void resource.refresh();
+      return true;
+    } catch {
+      return false;
     }
   };
 
-  const reactToPost = async (postId: string, reaction: string) => {
-    if (!canEngage) return;
+  const bookmarkPost = async (postId: string, currentlySaved: boolean, scope: FeedScope) => {
+    if (!canEngage) return false;
+    const requestContext = scope === 'general' ? 'public' : 'current';
     try {
-      await api.request('social-feed', {
+      const result = await api.request<{ bookmarked: boolean }>('engagement', {
         method: 'POST',
-        body: JSON.stringify({ action: 'react', postId, reaction }),
+        context: requestContext,
+        body: JSON.stringify({ action: 'bookmark', contentId: postId }),
       });
-    } catch (error) {
-      Alert.alert('Reaction not saved', error instanceof Error ? error.message : 'Unable to save reaction.');
+      void resource.refresh();
+      return result.bookmarked === !currentlySaved;
+    } catch {
+      return false;
     }
   };
 
@@ -427,8 +458,9 @@ export default function CommunityScreen() {
               post={item}
               expressionName={item.expression?.name}
               canEngage={canEngage}
-              onReply={canEngage ? () => setCommentTargetPostId(item.id) : undefined}
-              onReact={canEngage ? (reaction) => void reactToPost(item.id, reaction) : undefined}
+              onReply={canEngage ? () => setCommentTarget({ postId: item.id, scope: activeTab }) : undefined}
+              onReact={canEngage ? (reaction) => reactToPost(item.id, reaction, activeTab) : undefined}
+              onBookmark={canEngage ? (currentlySaved) => bookmarkPost(item.id, currentlySaved, activeTab) : undefined}
             />
           )}
         />
@@ -540,10 +572,10 @@ export default function CommunityScreen() {
         </KeyboardAvoidingView>
       </BottomSheet>
 
-      {commentTargetPostId ? (
+      {commentTarget ? (
         <CommentSheet
           visible
-          onClose={() => setCommentTargetPostId(null)}
+          onClose={() => setCommentTarget(null)}
           comments={comments}
           loading={commentsLoading}
           onSubmitComment={submitComment}
