@@ -63,23 +63,46 @@ export default function WatchDetailScreen() {
     return api.request<Video[]>(`public-content?type=videos${organizationId ? `&organizationId=${encodeURIComponent(organizationId)}` : ''}`, { signal, context: 'public' });
   });
 
-  const engagement = useResource<EngagementState>(`watch:engagement:${mode}:${id}`, (signal) => mode === 'authenticated'
-    ? api.request<EngagementState>(`engagement?contentId=${id}&view=state`, { signal, context: expressionMode ? 'current' : 'public' })
-    : Promise.resolve({ reaction: null, bookmarked: false, progress: null }));
-  const comments = useResource<ContentComment[]>(`watch:comments:${id}`, (signal) => api.request<ContentComment[]>(`engagement?contentId=${id}`, { signal, context: expressionMode ? 'current' : 'public' }));
-  const playback = useResource<PlaybackInfo>(`watch:playback:${expressionMode ? context?.expression?.id ?? 'none' : 'public'}:${id}`, (signal) =>
-    api.request<PlaybackInfo>(`content-media?action=playback&contentId=${encodeURIComponent(id)}`, { signal, context: expressionMode ? 'current' : 'public' }));
-
   const video = resource.data;
+  const contentId = video?.content_items?.id;
+
+  const engagement = useResource<EngagementState>(
+    `watch:engagement:${mode}:${contentId ?? 'pending'}`,
+    (signal) => mode === 'authenticated' && contentId
+      ? api.request<EngagementState>(
+          `engagement?contentId=${encodeURIComponent(contentId)}&view=state`,
+          { signal, context: expressionMode ? 'current' : 'public' },
+        )
+      : Promise.resolve({ reaction: null, bookmarked: false, progress: null }),
+  );
+  const comments = useResource<ContentComment[]>(
+    `watch:comments:${contentId ?? 'pending'}`,
+    (signal) => contentId
+      ? api.request<ContentComment[]>(
+          `engagement?contentId=${encodeURIComponent(contentId)}`,
+          { signal, context: expressionMode ? 'current' : 'public' },
+        )
+      : Promise.resolve([]),
+  );
+  const playback = useResource<PlaybackInfo>(
+    `watch:playback:${expressionMode ? context?.expression?.id ?? 'none' : 'public'}:${contentId ?? 'pending'}`,
+    (signal) => contentId
+      ? api.request<PlaybackInfo>(
+          `content-media?action=playback&contentId=${encodeURIComponent(contentId)}`,
+          { signal, context: expressionMode ? 'current' : 'public' },
+        )
+      : Promise.resolve({ available: false, renditions: [] }),
+  );
+
   const relatedVideos = (relatedResource.data ?? []).filter((v) => v.id !== id);
 
   const videoUrl = playback.data?.renditions?.find((rendition) => rendition.kind === 'video_stream')?.playbackUrl;
   const posterUrl = video?.media_assets?.thumbnailUrl || video?.media_assets?.url;
-  const contentId = video?.content_items?.id ?? id;
   const identity = (video?.content_items as any)?.expression?.name || (video?.content_items as any)?.organization?.name || context?.organization?.name || 'Church Community';
 
   const handleLike = async () => {
     if (mode === 'visitor') { router.push('/(auth)/login'); return; }
+    if (!contentId) { setActionError('This video is missing its engagement identity.'); return; }
     setActionError('');
     try {
       await api.request('engagement', {
@@ -100,6 +123,7 @@ export default function WatchDetailScreen() {
 
   const handleSave = async () => {
     if (mode === 'visitor') { router.push('/(auth)/login'); return; }
+    if (!contentId) { setActionError('This video is missing its engagement identity.'); return; }
     setActionError('');
     try {
       const result = await api.request<{ bookmarked: boolean }>('engagement', {
@@ -245,7 +269,7 @@ export default function WatchDetailScreen() {
                     <VideoCard
                       key={v.id}
                       video={v}
-                      onPress={() => router.push(`/watch/${v.id}` as any)}
+                      onPress={() => router.push(`/watch/${v.id}${expressionMode ? '?context=expression' : ''}` as any)}
                     />
                   ))}
                 </View>
@@ -262,20 +286,18 @@ export default function WatchDetailScreen() {
         comments={comments.data ?? []}
         loading={comments.loading}
         onSubmitComment={async (body, parentCommentId) => {
-          try {
-            await api.request('engagement', {
-              method: 'POST',
-              body: JSON.stringify({
-                action: 'comment',
-                contentId,
-                body,
-                parentCommentId,
-              }),
-            });
-            comments.refresh();
-          } catch (err) {
-            setActionError(err instanceof Error ? err.message : 'Unable to post comment');
-          }
+          if (!contentId) throw new Error('This video is missing its engagement identity.');
+          await api.request('engagement', {
+            method: 'POST',
+            context: expressionMode ? 'current' : 'public',
+            body: JSON.stringify({
+              action: 'comment',
+              contentId,
+              body,
+              parentCommentId,
+            }),
+          });
+          await comments.refresh();
         }}
       />
     </View>
