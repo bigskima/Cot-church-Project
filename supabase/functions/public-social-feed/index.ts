@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { ApiError } from "../_shared/errors.ts";
 import { createHandler } from "../_shared/handler.ts";
-import { enrichSocialPosts } from "../_shared/public-identity.ts";
+import { enrichContentEngagement, enrichSocialPosts } from "../_shared/public-identity.ts";
 import { adminClient, publicClient } from "../_shared/supabase.ts";
 import { uuid } from "../_shared/validation.ts";
 
@@ -33,8 +33,8 @@ async function resolveOrganizationId(raw: string | null) {
 }
 
 Deno.serve(createHandler(
-  { methods: ["GET"], authentication: "none", organization: "none" },
-  async ({ request }) => {
+  { methods: ["GET"], authentication: "optional", organization: "none" },
+  async ({ request, auth }) => {
     const url = new URL(request.url);
     const organizationId = await resolveOrganizationId(url.searchParams.get("organizationId"));
     const expressionParam = url.searchParams.get("expressionId");
@@ -57,9 +57,10 @@ Deno.serve(createHandler(
       if (error || !expression) throw new ApiError("EXPRESSION_NOT_FOUND", "This Expression is not available", 404);
     }
 
-    let query = publicClient()
+    const publicDb = publicClient();
+    let query = publicDb
       .from("social_posts")
-      .select("id,organization_id,author_membership_id,branch_id,group_id,visibility,status,body,media,published_at,edited_at,created_at,social_reactions(reaction)")
+      .select("id,organization_id,author_membership_id,branch_id,group_id,visibility,status,body,media,published_at,edited_at,created_at")
       .eq("organization_id", organizationId)
       .eq("visibility", "public")
       .eq("status", "published")
@@ -71,6 +72,12 @@ Deno.serve(createHandler(
 
     const { data, error } = await query;
     if (error) throw new ApiError("PUBLIC_FEED_FAILED", "Unable to retrieve public community posts", 500, undefined, false);
-    return { data: await enrichSocialPosts(data ?? []) };
+    const identified = await enrichSocialPosts(data ?? []);
+    const engaged = await enrichContentEngagement(
+      identified,
+      auth?.client ?? publicDb,
+      auth?.user.id,
+    );
+    return { data: engaged };
   },
 ));

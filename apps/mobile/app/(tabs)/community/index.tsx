@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -38,6 +37,10 @@ type PublicBadge = { id?: string; code?: string; label: string; backgroundColor:
 type CommunityPost = SocialPost & {
   author?: { id: string; displayName?: string; username?: string; avatarUrl?: string | null; bio?: string | null; badges?: PublicBadge[] } | null;
   expression?: { id: string; name: string; code?: string } | null;
+  likes_count?: number;
+  comments_count?: number;
+  viewer_reaction?: string | null;
+  viewer_bookmarked?: boolean;
 };
 type CommunityComment = ContentComment & {
   author?: { id: string; displayName?: string; username?: string; avatarUrl?: string | null; badges?: PublicBadge[] } | null;
@@ -111,29 +114,39 @@ export default function CommunityScreen() {
   const [mediaUploading, setMediaUploading] = useState(false);
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState('');
-  const [commentTargetPostId, setCommentTargetPostId] = useState<string | null>(null);
+  const [commentTarget, setCommentTarget] = useState<{ postId: string; scope: FeedScope } | null>(null);
   const [comments, setComments] = useState<CommunityComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
+  const [interactionError, setInteractionError] = useState('');
 
   useEffect(() => {
     if (!expression?.id && activeTab === 'expression') setActiveTab('general');
   }, [activeTab, expression?.id]);
 
-  const feedKey = `mobile:community:${activeTab}:${organizationId || 'auto'}:${expression?.id ?? 'none'}`;
+  const feedKey = `mobile:community:${activeTab}:${organizationId || 'auto'}:${expression?.id ?? 'none'}:${mode}`;
   const resource = useResource<CommunityPost[]>(feedKey, (signal) => {
     if (activeTab === 'general') {
       const query = new URLSearchParams({ scope: 'all' });
       if (organizationId) query.set('organizationId', organizationId);
-      return api.request<CommunityPost[]>(`public-social-feed?${query.toString()}`, { signal });
+      return api.request<CommunityPost[]>(`public-social-feed?${query.toString()}`, { signal, context: 'public' });
     }
     return api.request<CommunityPost[]>('social-feed?scope=expression', { signal });
   });
 
+  // General Community is public to read and available to any authenticated
+  // account for interaction. Expression-only posting remains scoped by the
+  // selected Expression below and is still enforced by the API.
   const hasChurchMembership = Boolean(
-    context?.organizations?.some((organization) => organization.memberships?.some((membership) => membership.status === 'active')),
+    context?.organizations?.some((organization) =>
+      organization.memberships?.some((membership) => membership.status === 'active'),
+    ),
   );
+
+  // Signed-in users may interact with public community content. Publishing is
+  // still membership-scoped because the server-side post RPC enforces active
+  // organization membership.
   const canPost = mode === 'authenticated' && hasChurchMembership;
-  const canEngage = mode === 'authenticated' && hasChurchMembership;
+  const canEngage = mode === 'authenticated';
 
   const cleanupAttachments = async (items = attachments) => {
     if (!items.length) return;
@@ -318,45 +331,85 @@ export default function CommunityScreen() {
   };
 
   useEffect(() => {
-    if (!commentTargetPostId || !canEngage) {
+    if (!commentTarget || !canEngage) {
       setComments([]);
       return;
     }
     let active = true;
     setCommentsLoading(true);
-    api.request<CommunityComment[]>(`social-feed?postId=${encodeURIComponent(commentTargetPostId)}`)
-      .then((items) => { if (active) setComments(items); })
-      .catch((error) => {
-        if (active) Alert.alert('Comments unavailable', error instanceof Error ? error.message : 'Unable to load comments.');
+    const requestContext = commentTarget.scope === 'general' ? 'public' : 'current';
+    api.request<CommunityComment[]>(
+      `engagement?contentId=${encodeURIComponent(commentTarget.postId)}`,
+      { context: requestContext },
+    )
+      .then((items) => {
+        if (!active) return;
+        setComments(items);
+        setInteractionError('');
+      })
+      .catch((value) => {
+        if (!active) return;
+        setComments([]);
+        setInteractionError(value instanceof Error ? value.message : 'Unable to load comments.');
       })
       .finally(() => { if (active) setCommentsLoading(false); });
     return () => { active = false; };
-  }, [api, commentTargetPostId, canEngage]);
+  }, [api, commentTarget, canEngage]);
 
   const submitComment = async (body: string, parentCommentId?: string | null) => {
-    if (!commentTargetPostId || !canEngage) return;
+    if (!commentTarget || !canEngage) return;
+    const requestContext = commentTarget.scope === 'general' ? 'public' : 'current';
+    const created = await api.request<CommunityComment>('engagement', {
+      method: 'POST',
+      context: requestContext,
+      body: JSON.stringify({
+        action: 'comment',
+        contentId: commentTarget.postId,
+        body,
+        parentCommentId: parentCommentId ?? undefined,
+      }),
+    });
+    if (created) setComments((current) => [...current, created]);
+    void resource.refresh();
+  };
+
+  const reactToPost = async (postId: string, reaction: string | null, scope: FeedScope) => {
+    if (!canEngage) return false;
+    const requestContext = scope === 'general' ? 'public' : 'current';
     try {
-      await api.request('social-feed', {
+      setInteractionError('');
+      await api.request('engagement', {
         method: 'POST',
-        body: JSON.stringify({ action: 'comment', postId: commentTargetPostId, body, parentCommentId: parentCommentId ?? undefined }),
+        context: requestContext,
+        body: JSON.stringify(
+          reaction
+            ? { action: 'react', contentId: postId, reaction }
+            : { action: 'unreact', contentId: postId },
+        ),
       });
-      const refreshed = await api.request<CommunityComment[]>(`social-feed?postId=${encodeURIComponent(commentTargetPostId)}`);
-      setComments(refreshed);
-    } catch (error) {
-      Alert.alert('Comment not posted', error instanceof Error ? error.message : 'Unable to add comment.');
-      throw error;
+      void resource.refresh();
+      return true;
+    } catch (value) {
+      setInteractionError(value instanceof Error ? value.message : 'Unable to update this reaction.');
+      return false;
     }
   };
 
-  const reactToPost = async (postId: string, reaction: string) => {
-    if (!canEngage) return;
+  const bookmarkPost = async (postId: string, currentlySaved: boolean, scope: FeedScope) => {
+    if (!canEngage) return false;
+    const requestContext = scope === 'general' ? 'public' : 'current';
     try {
-      await api.request('social-feed', {
+      setInteractionError('');
+      const result = await api.request<{ bookmarked: boolean }>('engagement', {
         method: 'POST',
-        body: JSON.stringify({ action: 'react', postId, reaction }),
+        context: requestContext,
+        body: JSON.stringify({ action: 'bookmark', contentId: postId }),
       });
-    } catch (error) {
-      Alert.alert('Reaction not saved', error instanceof Error ? error.message : 'Unable to save reaction.');
+      void resource.refresh();
+      return result.bookmarked === !currentlySaved;
+    } catch (value) {
+      setInteractionError(value instanceof Error ? value.message : 'Unable to update this bookmark.');
+      return false;
     }
   };
 
@@ -365,7 +418,7 @@ export default function CommunityScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <View style={[styles.headerBar, { paddingTop: insets.top + spacing.xs, backgroundColor: colors.bg, borderBottomColor: colors.borderSubtle }]}>
+      <View style={[styles.headerBar, { paddingTop: insets.top + spacing.sm, backgroundColor: colors.glass, borderColor: colors.borderSubtle }]}>
         <View style={styles.headerIdentity}>
           <BrandMark variant="compact" size={30} />
           <View>
@@ -380,28 +433,39 @@ export default function CommunityScreen() {
         ) : null}
       </View>
 
-      <View style={[styles.tabBar, { borderBottomColor: colors.borderSubtle }]}>
-        <Pressable onPress={() => setActiveTab('general')} style={[styles.tabItem, activeTab === 'general' && { borderBottomColor: colors.interactive }]}>
-          <Text style={[styles.tabText, { color: activeTab === 'general' ? colors.text : colors.textMuted }, activeTab === 'general' && styles.tabTextActive]}>General Community</Text>
+      <View style={[styles.tabBar, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+        <Pressable onPress={() => setActiveTab('general')} style={[styles.tabItem, activeTab === 'general' && { backgroundColor: colors.primarySoft }]}>
+          <Text style={[styles.tabText, { color: activeTab === 'general' ? colors.interactive : colors.textMuted }, activeTab === 'general' && styles.tabTextActive]}>General</Text>
         </Pressable>
         {expression?.id ? (
-          <Pressable onPress={() => setActiveTab('expression')} style={[styles.tabItem, activeTab === 'expression' && { borderBottomColor: colors.interactive }]}>
-            <Text style={[styles.tabText, { color: activeTab === 'expression' ? colors.text : colors.textMuted }, activeTab === 'expression' && styles.tabTextActive]} numberOfLines={1}>{expression.name}</Text>
+          <Pressable onPress={() => setActiveTab('expression')} style={[styles.tabItem, activeTab === 'expression' && { backgroundColor: colors.primarySoft }]}>
+            <Text style={[styles.tabText, { color: activeTab === 'expression' ? colors.interactive : colors.textMuted }, activeTab === 'expression' && styles.tabTextActive]} numberOfLines={1}>{expression.name}</Text>
           </Pressable>
         ) : null}
       </View>
 
+      {interactionError ? (
+        <Pressable
+          onPress={() => setInteractionError('')}
+          style={[styles.feedError, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss community error"
+        >
+          <Icon name="alert-circle-outline" size={16} color={colors.live} />
+          <Text style={[styles.feedErrorText, { color: colors.live }]} numberOfLines={2}>{interactionError}</Text>
+          <Icon name="close" size={14} color={colors.live} />
+        </Pressable>
+      ) : null}
+
       {canPost ? (
-        <Pressable onPress={openComposer} style={[styles.composerStrip, { borderBottomColor: colors.borderSubtle }]}>
+        <Pressable onPress={openComposer} style={({ pressed }) => [styles.composerStrip, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, pressed && styles.composerPressed]}>
           <Avatar url={context?.profile?.avatar_url} name={context?.profile?.display_name || 'Me'} size="sm" />
-          <Text style={[styles.composerPlaceholder, { color: colors.textMuted }]}>Share text, photos, video or audio...</Text>
+          <View style={styles.composerCopy}>
+            <Text style={[styles.composerPrompt, { color: colors.text }]}>Share with the community</Text>
+            <Text style={[styles.composerPlaceholder, { color: colors.textMuted }]}>Text, photos, video or audio</Text>
+          </View>
           <Icon name="create-outline" size={20} color={colors.interactive} />
         </Pressable>
-      ) : mode === 'authenticated' ? (
-        <View style={[styles.membershipNotice, { backgroundColor: colors.primarySoft, borderBottomColor: colors.borderSubtle }]}>
-          <Icon name="globe-outline" size={17} color={colors.interactive} />
-          <Text style={[styles.membershipNoticeText, { color: colors.textSecondary }]}>You can always read the General Community. Join an Expression to publish and join member conversations.</Text>
-        </View>
       ) : null}
 
       {resource.loading && !resource.data ? (
@@ -413,15 +477,16 @@ export default function CommunityScreen() {
           data={posts}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 80 }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 130 }}
           refreshControl={<RefreshControl refreshing={resource.refreshing} onRefresh={resource.refresh} tintColor={colors.interactive} />}
           renderItem={({ item }) => (
             <PostCard
               post={item}
               expressionName={item.expression?.name}
               canEngage={canEngage}
-              onReply={canEngage ? () => setCommentTargetPostId(item.id) : undefined}
-              onReact={canEngage ? (reaction) => void reactToPost(item.id, reaction) : undefined}
+              onReply={canEngage ? () => setCommentTarget({ postId: item.id, scope: activeTab }) : undefined}
+              onReact={canEngage ? (reaction) => reactToPost(item.id, reaction, activeTab) : undefined}
+              onBookmark={canEngage ? (currentlySaved) => bookmarkPost(item.id, currentlySaved, activeTab) : undefined}
             />
           )}
         />
@@ -433,7 +498,7 @@ export default function CommunityScreen() {
         />
       )}
 
-      <BottomSheet visible={composerOpen} onClose={closeComposer} title="Create Post">
+      <BottomSheet visible={composerOpen} onClose={closeComposer} title="Create post" subtitle="Share something meaningful with your community.">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.composerBody}>
           <View style={styles.destinationBlock}>
             <Text style={[styles.destinationLabel, { color: colors.textSecondary }]}>POST TO</Text>
@@ -475,7 +540,7 @@ export default function CommunityScreen() {
           </View>
 
           <View style={styles.mediaToolbar}>
-            <Pressable onPress={() => void choosePhotoOrVideo()} disabled={mediaUploading || attachments.length >= 10} style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
+            <Pressable onPress={() => void choosePhotoOrVideo()} disabled={mediaUploading || attachments.length >= 10} style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
               <Icon name="images-outline" size={18} color={colors.interactive} />
               <Text style={[styles.mediaButtonText, { color: colors.text }]}>Photo / Video</Text>
             </Pressable>
@@ -533,10 +598,10 @@ export default function CommunityScreen() {
         </KeyboardAvoidingView>
       </BottomSheet>
 
-      {commentTargetPostId ? (
+      {commentTarget ? (
         <CommentSheet
           visible
-          onClose={() => setCommentTargetPostId(null)}
+          onClose={() => setCommentTarget(null)}
           comments={comments}
           loading={commentsLoading}
           onSubmitComment={submitComment}
@@ -548,19 +613,22 @@ export default function CommunityScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  headerBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingBottom: spacing.sm, borderBottomWidth: 1 },
-  headerIdentity: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  headerTitle: { fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
-  headerSubtitle: { fontSize: 10, marginTop: 1 },
+  headerBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: spacing.md, marginTop: spacing.xs, paddingHorizontal: spacing.md, paddingBottom: spacing.md, borderWidth: 1, borderRadius: radius.xl },
+  headerIdentity: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1, minWidth: 0 },
+  headerTitle: { fontSize: 21, fontWeight: '800', letterSpacing: -0.55 },
+  headerSubtitle: { fontSize: 11, lineHeight: 15, marginTop: 1 },
   headerIconBtn: { width: 36, height: 36, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  tabBar: { flexDirection: 'row', borderBottomWidth: 1 },
-  tabItem: { flex: 1, alignItems: 'center', paddingVertical: 12, paddingHorizontal: spacing.xs, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tabBar: { flexDirection: 'row', marginHorizontal: spacing.md, marginTop: spacing.sm, padding: 4, borderWidth: 1, borderRadius: radius.pill },
+  tabItem: { flex: 1, alignItems: 'center', paddingVertical: 9, paddingHorizontal: spacing.sm, borderRadius: radius.pill },
   tabText: { fontSize: 14, fontWeight: '600' },
   tabTextActive: { fontWeight: '800' },
-  composerStrip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1, gap: spacing.md },
-  composerPlaceholder: { flex: 1, fontSize: 14 },
-  membershipNotice: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderBottomWidth: 1 },
-  membershipNoticeText: { flex: 1, fontSize: 12, lineHeight: 17 },
+  feedError: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.md, marginTop: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderRadius: radius.lg },
+  feedErrorText: { flex: 1, fontSize: 12, lineHeight: 17, fontWeight: '700' },
+  composerStrip: { flexDirection: 'row', alignItems: 'center', marginHorizontal: spacing.md, marginVertical: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderWidth: 1, borderRadius: radius.xl, gap: spacing.md },
+  composerPressed: { opacity: 0.88, transform: [{ scale: 0.992 }] },
+  composerCopy: { flex: 1, minWidth: 0 },
+  composerPrompt: { fontSize: 14, fontWeight: '700', letterSpacing: -0.15 },
+  composerPlaceholder: { fontSize: 11, marginTop: 2 },
   loadingContainer: { padding: spacing.lg, gap: spacing.md },
   composerBody: { gap: spacing.md },
   destinationBlock: { gap: spacing.xs },

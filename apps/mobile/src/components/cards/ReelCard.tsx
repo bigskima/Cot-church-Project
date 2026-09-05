@@ -12,7 +12,7 @@ export interface ReelCardProps {
   width?: number;
 }
 
-export function ReelCard({ reel, onPress, width = 130 }: ReelCardProps) {
+export function ReelCard({ reel, onPress, width = 150 }: ReelCardProps) {
   const { colors } = useTheme();
 
   const formatViews = (views: number) => {
@@ -28,8 +28,7 @@ export function ReelCard({ reel, onPress, width = 130 }: ReelCardProps) {
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
-        { width, backgroundColor: colors.card, borderColor: colors.border },
-        shadows.sm,
+        { width, backgroundColor: colors.card, borderColor: colors.borderSubtle },
         pressed && styles.pressed,
       ]}
       accessibilityRole="button"
@@ -39,31 +38,32 @@ export function ReelCard({ reel, onPress, width = 130 }: ReelCardProps) {
         {thumbnailUrl ? (
           <Image source={{ uri: thumbnailUrl }} style={styles.thumbnail} resizeMode="cover" />
         ) : (
-          <View style={[styles.placeholder, { backgroundColor: '#091B33' }]}>
-            <Icon name="film-outline" size={24} color="#5C8FF5" />
+          <View style={[styles.placeholder, { backgroundColor: colors.cardElevated }]}>
+            <View style={[styles.placeholderIcon, { backgroundColor: colors.primarySoft }]}>
+              <Icon name="play" size={22} color={colors.interactive} />
+            </View>
           </View>
         )}
 
-        {/* Top Views Badge */}
-        <View style={styles.viewsBadge}>
-          <Icon name="play" size={10} color="#FFFFFF" style={{ marginRight: 3 }} />
+        <View style={styles.playChip}>
+          <Icon name="play" size={10} color="#FFFFFF" />
           <Text style={styles.viewsText}>{formatViews(reel.views_count)}</Text>
         </View>
 
-        {/* Bottom Caption Overlay */}
         <LinearGradient
-          colors={['transparent', 'rgba(6, 20, 38, 0.85)', 'rgba(6, 20, 38, 0.98)']}
+          colors={['transparent', 'rgba(0,0,0,0.28)', 'rgba(0,0,0,0.88)']}
+          locations={[0, 0.48, 1]}
           style={styles.captionOverlay}
         >
           <Text style={styles.captionText} numberOfLines={2}>
-            {reel.caption}
+            {reel.caption || 'Reel'}
           </Text>
           {reel.audio_title ? (
             <View style={styles.audioRow}>
-              <Icon name="musical-notes" size={10} color="#8FB4F8" style={{ marginRight: 3 }} />
-              <Text style={styles.audioText} numberOfLines={1}>
-                {reel.audio_title}
-              </Text>
+              <View style={styles.audioIcon}>
+                <Icon name="musical-notes" size={10} color="#FFFFFF" />
+              </View>
+              <Text style={styles.audioText} numberOfLines={1}>{reel.audio_title}</Text>
             </View>
           ) : null}
         </LinearGradient>
@@ -74,66 +74,81 @@ export function ReelCard({ reel, onPress, width = 130 }: ReelCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: radius.md,
+    borderRadius: radius.xl,
     overflow: 'hidden',
     borderWidth: 1,
+    ...shadows.md,
   },
   frame: {
     width: '100%',
     aspectRatio: 9 / 16,
     position: 'relative',
   },
-  thumbnail: {
-    width: '100%',
-    height: '100%',
-  },
+  thumbnail: { width: '100%', height: '100%' },
   placeholder: {
     width: '100%',
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  viewsBadge: {
+  placeholderIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playChip: {
     position: 'absolute',
-    top: 8,
-    left: 8,
+    top: spacing.sm,
+    left: spacing.sm,
+    height: 27,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(6, 20, 38, 0.75)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.56)',
+    paddingHorizontal: 8,
     borderRadius: radius.pill,
   },
   viewsText: {
     color: '#FFFFFF',
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   captionOverlay: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 8,
-    gap: 2,
+    minHeight: '43%',
+    justifyContent: 'flex-end',
+    padding: spacing.md,
+    gap: spacing.xs,
   },
   captionText: {
     color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '600',
-    lineHeight: 14,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 17,
+    letterSpacing: -0.15,
   },
-  audioRow: {
-    flexDirection: 'row',
+  audioRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  audioIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   audioText: {
-    color: '#8FB4F8',
-    fontSize: 9,
-    fontWeight: '500',
+    color: 'rgba(255,255,255,0.82)',
+    fontSize: 10,
+    fontWeight: '600',
+    flexShrink: 1,
   },
   pressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.98 }],
+    opacity: 0.92,
+    transform: [{ scale: 0.985 }],
   },
 });

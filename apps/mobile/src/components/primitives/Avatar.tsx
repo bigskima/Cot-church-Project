@@ -1,7 +1,6 @@
 import React from 'react';
 import { Image, StyleSheet, Text, View, StyleProp, ViewStyle } from 'react-native';
 import { useTheme } from '@/state/theme';
-import { brand, radius } from '@/design-system/tokens';
 
 export interface AvatarProps {
   url?: string | null;
@@ -53,8 +52,8 @@ export function Avatar({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    borderWidth: showBorder ? 2 : 0,
-    borderColor: colors.borderStrong,
+    borderWidth: showBorder ? 2 : 1,
+    borderColor: showBorder ? colors.interactive : colors.borderSubtle,
   };
 
   if (url) {
@@ -74,7 +73,7 @@ export function Avatar({
       <Text
         style={{
           fontSize,
-          fontWeight: '700',
+          fontWeight: '800',
           color: colors.interactive,
           letterSpacing: 0.2,
         }}

@@ -5,7 +5,7 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import { EmptyState, LeaderCard, ResourceError, ScreenHeader, Skeleton } from '@/components';
-import { spacing } from '@/design-system/tokens';
+import { radius, shadows, spacing } from '@/design-system/tokens';
 import type { LeadershipProfile } from '@church/types';
 
 export default function ExpressionLeadershipScreen() {
@@ -23,7 +23,7 @@ export default function ExpressionLeadershipScreen() {
   if (!branchId) {
     return (
       <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top + spacing.sm }]}>
-        <ScreenHeader title="Expression Leadership" showBack />
+        <ScreenHeader title="Expression Leadership" kicker="COMMUNITY" showBack />
         <View style={styles.body}><EmptyState title="Enter an Expression first" message="Internal leadership directories are available only inside an active Expression context." iconName="lock-closed-outline" /></View>
       </View>
     );
@@ -35,14 +35,17 @@ export default function ExpressionLeadershipScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + spacing.sm, paddingBottom: 60 },
+          { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 120 },
         ]}
       >
-        <ScreenHeader
-          title="Campus Leadership"
-          subtitle="Pastors, directors, and coordinators serving this local sanctuary expression."
-          showBack
-        />
+        <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+          <ScreenHeader
+            title="Expression Leadership"
+            kicker="COMMUNITY"
+            subtitle={`Pastors and ministry leaders serving ${context?.expression?.name ?? 'this Expression'}.`}
+            showBack
+          />
+        </View>
 
         <View style={styles.body}>
           {leadersResource.loading ? (
@@ -65,8 +68,8 @@ export default function ExpressionLeadershipScreen() {
             ))
           ) : (
             <EmptyState
-              title="No Campus Leaders Listed"
-              message="Campus leadership directory will appear here once assigned by church administration."
+              title="No Expression leaders listed"
+              message="Expression leadership will appear here once assigned by church administration."
               iconName="people-outline"
             />
           )}
@@ -83,8 +86,10 @@ const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
   },
+  headerCard: { marginHorizontal: spacing.md, borderWidth: 1, borderRadius: radius.xxl, overflow: 'hidden' },
   body: {
-    paddingHorizontal: spacing.lg,
-    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    gap: spacing.sm,
   },
 });

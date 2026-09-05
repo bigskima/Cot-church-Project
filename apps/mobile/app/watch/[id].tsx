@@ -63,23 +63,49 @@ export default function WatchDetailScreen() {
     return api.request<Video[]>(`public-content?type=videos${organizationId ? `&organizationId=${encodeURIComponent(organizationId)}` : ''}`, { signal, context: 'public' });
   });
 
-  const engagement = useResource<EngagementState>(`watch:engagement:${mode}:${id}`, (signal) => mode === 'authenticated'
-    ? api.request<EngagementState>(`engagement?contentId=${id}&view=state`, { signal, context: expressionMode ? 'current' : 'public' })
-    : Promise.resolve({ reaction: null, bookmarked: false, progress: null }));
-  const comments = useResource<ContentComment[]>(`watch:comments:${id}`, (signal) => api.request<ContentComment[]>(`engagement?contentId=${id}`, { signal, context: expressionMode ? 'current' : 'public' }));
-  const playback = useResource<PlaybackInfo>(`watch:playback:${expressionMode ? context?.expression?.id ?? 'none' : 'public'}:${id}`, (signal) =>
-    api.request<PlaybackInfo>(`content-media?action=playback&contentId=${encodeURIComponent(id)}`, { signal, context: expressionMode ? 'current' : 'public' }));
-
   const video = resource.data;
+  const contentId = video?.content_items?.id;
+
+  const engagement = useResource<EngagementState>(
+    `watch:engagement:${mode}:${contentId ?? 'pending'}`,
+    (signal) => mode === 'authenticated' && contentId
+      ? api.request<EngagementState>(
+          `engagement?contentId=${encodeURIComponent(contentId)}&view=state`,
+          { signal, context: expressionMode ? 'current' : 'public' },
+        )
+      : Promise.resolve({ reaction: null, bookmarked: false, progress: null }),
+  );
+  const comments = useResource<ContentComment[]>(
+    `watch:comments:${contentId ?? 'pending'}`,
+    (signal) => contentId
+      ? api.request<ContentComment[]>(
+          `engagement?contentId=${encodeURIComponent(contentId)}`,
+          { signal, context: expressionMode ? 'current' : 'public' },
+        )
+      : Promise.resolve([]),
+  );
+  const playback = useResource<PlaybackInfo>(
+    `watch:playback:${expressionMode ? context?.expression?.id ?? 'none' : 'public'}:${contentId ?? 'pending'}`,
+    (signal) => contentId
+      ? api.request<PlaybackInfo>(
+          `content-media?action=playback&contentId=${encodeURIComponent(contentId)}`,
+          { signal, context: expressionMode ? 'current' : 'public' },
+        )
+      : Promise.resolve({ available: false, renditions: [] }),
+  );
+
   const relatedVideos = (relatedResource.data ?? []).filter((v) => v.id !== id);
 
   const videoUrl = playback.data?.renditions?.find((rendition) => rendition.kind === 'video_stream')?.playbackUrl;
   const posterUrl = video?.media_assets?.thumbnailUrl || video?.media_assets?.url;
-  const contentId = video?.content_items?.id ?? id;
   const identity = (video?.content_items as any)?.expression?.name || (video?.content_items as any)?.organization?.name || context?.organization?.name || 'Church Community';
 
   const handleLike = async () => {
-    if (mode === 'visitor') { router.push('/(auth)/login'); return; }
+    if (mode === 'visitor') { router.push({
+      pathname: '/(auth)/login',
+      params: { returnTo: `/watch/${id}${expressionMode ? '?context=expression' : ''}` },
+    } as any); return; }
+    if (!contentId) { setActionError('This video is missing its engagement identity.'); return; }
     setActionError('');
     try {
       await api.request('engagement', {
@@ -99,7 +125,11 @@ export default function WatchDetailScreen() {
   };
 
   const handleSave = async () => {
-    if (mode === 'visitor') { router.push('/(auth)/login'); return; }
+    if (mode === 'visitor') { router.push({
+      pathname: '/(auth)/login',
+      params: { returnTo: `/watch/${id}${expressionMode ? '?context=expression' : ''}` },
+    } as any); return; }
+    if (!contentId) { setActionError('This video is missing its engagement identity.'); return; }
     setActionError('');
     try {
       const result = await api.request<{ bookmarked: boolean }>('engagement', {
@@ -143,7 +173,9 @@ export default function WatchDetailScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <ScreenHeader title="" showBack style={{ backgroundColor: 'transparent' }} />
+      <View style={{ paddingTop: insets.top }}>
+        <ScreenHeader title="Watch" kicker="VIDEO" showBack style={{ backgroundColor: 'transparent' }} />
+      </View>
 
       {resource.loading ? (
         <WatchSkeleton />
@@ -152,7 +184,7 @@ export default function WatchDetailScreen() {
       ) : video ? (
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 60 }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}
         >
           {/* Dominant 16:9 Video Canvas */}
           {playback.error ? <ResourceError message={playback.error} retry={playback.refresh} /> : <VideoPlayer
@@ -167,6 +199,10 @@ export default function WatchDetailScreen() {
 
           {/* Video Metadata & Title */}
           <View style={styles.metadataSection}>
+            <View style={[styles.contextPill, { backgroundColor: expressionMode ? colors.accentSoft : colors.primarySoft }]}>
+              <Icon name={expressionMode ? 'people-outline' : 'globe-outline'} size={13} color={expressionMode ? colors.accent : colors.interactive} />
+              <Text style={[styles.contextPillText, { color: expressionMode ? colors.accent : colors.interactive }]}>{expressionMode ? 'Expression video' : 'Public video'}</Text>
+            </View>
             <Text style={[styles.title, { color: colors.text }]}>{video.title}</Text>
 
             <View style={styles.authorRow}>
@@ -183,7 +219,7 @@ export default function WatchDetailScreen() {
             {actionError ? <Text style={[styles.actionError, { color: colors.live }]} accessibilityRole="alert">{actionError}</Text> : null}
 
             {/* YouTube-Style Action Rail (Like, Save, Share, Comments) */}
-            <View style={[styles.actionsBar, { borderTopColor: colors.borderSubtle, borderBottomColor: colors.borderSubtle }]}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.actionsBar, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
               <Pressable
                 onPress={handleLike}
                 style={[styles.actionBtn, isLiked && { backgroundColor: colors.primarySoft }]}
@@ -217,15 +253,18 @@ export default function WatchDetailScreen() {
                 <Text style={[styles.actionBtnText, { color: colors.text }]}>Share</Text>
               </Pressable>
 
-              <Pressable onPress={() => mode === 'visitor' ? router.push('/(auth)/login') : setCommentsOpen(true)} style={styles.actionBtn}>
+              <Pressable onPress={() => mode === 'visitor' ? router.push({
+      pathname: '/(auth)/login',
+      params: { returnTo: `/watch/${id}${expressionMode ? '?context=expression' : ''}` },
+    } as any) : setCommentsOpen(true)} style={styles.actionBtn}>
                 <Icon name="chatbubble-ellipses-outline" size={20} color={colors.text} />
                 <Text style={[styles.actionBtnText, { color: colors.text }]}>Comments</Text>
               </Pressable>
-            </View>
+            </ScrollView>
 
             {/* Description */}
             {video.description ? (
-              <View style={[styles.descCard, { backgroundColor: colors.bgSecondary }]}>
+              <View style={[styles.descCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
                 <Text style={[styles.descText, { color: colors.text }]}>{video.description}</Text>
               </View>
             ) : null}
@@ -239,7 +278,7 @@ export default function WatchDetailScreen() {
                     <VideoCard
                       key={v.id}
                       video={v}
-                      onPress={() => router.push(`/watch/${v.id}` as any)}
+                      onPress={() => router.push(`/watch/${v.id}${expressionMode ? '?context=expression' : ''}` as any)}
                     />
                   ))}
                 </View>
@@ -256,20 +295,18 @@ export default function WatchDetailScreen() {
         comments={comments.data ?? []}
         loading={comments.loading}
         onSubmitComment={async (body, parentCommentId) => {
-          try {
-            await api.request('engagement', {
-              method: 'POST',
-              body: JSON.stringify({
-                action: 'comment',
-                contentId,
-                body,
-                parentCommentId,
-              }),
-            });
-            comments.refresh();
-          } catch (err) {
-            setActionError(err instanceof Error ? err.message : 'Unable to post comment');
-          }
+          if (!contentId) throw new Error('This video is missing its engagement identity.');
+          await api.request('engagement', {
+            method: 'POST',
+            context: expressionMode ? 'current' : 'public',
+            body: JSON.stringify({
+              action: 'comment',
+              contentId,
+              body,
+              parentCommentId,
+            }),
+          });
+          await comments.refresh();
         }}
       />
     </View>
@@ -281,13 +318,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   metadataSection: {
-    padding: spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.lg,
     gap: spacing.md,
   },
+  contextPill: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderRadius: radius.pill },
+  contextPillText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.2 },
   title: {
-    fontSize: 18,
+    fontSize: 21,
     fontWeight: '800',
-    lineHeight: 24,
+    lineHeight: 27,
+    letterSpacing: -0.45,
   },
   authorRow: {
     flexDirection: 'row',
@@ -304,17 +345,17 @@ const styles = StyleSheet.create({
   actionsBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingVertical: spacing.sm,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
+    gap: spacing.xs,
+    padding: spacing.xs,
+    borderWidth: 1,
+    borderRadius: radius.xl,
   },
   actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
     borderRadius: radius.pill,
   },
   actionBtnText: {
@@ -322,8 +363,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   descCard: {
-    padding: spacing.md,
-    borderRadius: radius.md,
+    padding: spacing.lg,
+    borderRadius: radius.xl,
+    borderWidth: 1,
   },
   descText: {
     fontSize: 13,

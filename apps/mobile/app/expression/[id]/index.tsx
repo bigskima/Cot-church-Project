@@ -19,6 +19,7 @@ import {
   Button,
   Chip,
   EmptyState,
+  EventCard,
   ExpressionSkeleton,
   Icon,
   LeaderCard,
@@ -81,7 +82,7 @@ export default function ExpressionProfileScreen() {
 
   const handleToggleFollow = async () => {
     if (mode === 'visitor') {
-      router.push('/(auth)/login');
+      router.push({ pathname: '/(auth)/login', params: { returnTo: `/expression/${id}` } } as any);
       return;
     }
     setFollowingLoading(true);
@@ -104,7 +105,7 @@ export default function ExpressionProfileScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <ScreenHeader title="" showBack style={{ backgroundColor: 'transparent' }} />
+      <ScreenHeader title="Expression" showBack style={{ backgroundColor: 'transparent' }} />
 
       {resource.loading ? (
         <ExpressionSkeleton />
@@ -113,10 +114,9 @@ export default function ExpressionProfileScreen() {
       ) : expression ? (
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 60 }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}
         >
-          {/* Header Banner / Identity Section */}
-          <View style={styles.headerSection}>
+          <View style={[styles.headerSection, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
             <View style={[styles.avatarWrap, { borderColor: colors.bg }]}>
               <Avatar name={expression.name} size="xl" />
             </View>
@@ -124,7 +124,7 @@ export default function ExpressionProfileScreen() {
             <View style={styles.infoBlock}>
               <View style={styles.nameRow}>
                 <Text style={[styles.title, { color: colors.text }]}>{expression.name}</Text>
-                <Badge label={expression.code || 'CAMPUS'} variant="primary" />
+                <Badge label={expression.code || 'EXPRESSION'} variant="primary" />
               </View>
 
               {expression.address ? (
@@ -136,32 +136,38 @@ export default function ExpressionProfileScreen() {
                 </View>
               ) : null}
 
-              {/* Follow Button */}
-              <Button
-                label={isFollowing ? 'Following Campus' : 'Follow Campus'}
-                onPress={handleToggleFollow}
-                loading={followingLoading}
-                variant={isFollowing ? 'outline' : 'primary'}
-                size="md"
-                style={{ marginTop: spacing.sm, alignSelf: 'flex-start' }}
-                icon={<Icon name={isFollowing ? 'checkmark' : 'add'} size={16} color={isFollowing ? colors.interactive : '#FFFFFF'} />}
-              />
-              {membership ? (
+              <View style={styles.actionRow}>
                 <Button
-                  label={context?.expression?.id === id ? 'Expression Entered' : 'Enter Expression'}
-                  onPress={async () => {
-                    if (context?.expression?.id === id) return;
-                    await enterExpression(membership.organizationId, membership.id);
-                    router.replace('/(tabs)/home');
-                  }}
-                  disabled={context?.expression?.id === id}
-                  variant="outline"
+                  label={isFollowing ? 'Following' : 'Follow'}
+                  onPress={handleToggleFollow}
+                  loading={followingLoading}
+                  variant={isFollowing ? 'outline' : 'primary'}
                   size="md"
-                  style={{ marginTop: spacing.sm, alignSelf: 'flex-start' }}
+                  icon={<Icon name={isFollowing ? 'checkmark' : 'add'} size={16} color={isFollowing ? colors.interactive : '#FFFFFF'} />}
                 />
-              ) : mode === 'authenticated' ? (
-                <Button label="Join with Invite Code" onPress={() => router.push('/expressions')} variant="outline" size="md" style={{ marginTop: spacing.sm, alignSelf: 'flex-start' }} />
-              ) : null}
+                {membership ? (
+                  <Button
+                    label={context?.expression?.id === id ? 'Inside Expression' : 'Enter Expression'}
+                    onPress={async () => {
+                      if (context?.expression?.id === id) return;
+                      await enterExpression(membership.organizationId, membership.id);
+                      router.replace('/(tabs)/home');
+                    }}
+                    disabled={context?.expression?.id === id}
+                    variant="outline"
+                    size="md"
+                  />
+                ) : mode === 'authenticated' ? (
+                  <Button label="Join with code" onPress={() => router.push('/expressions')} variant="outline" size="md" />
+                ) : (
+                  <Button
+                    label="Sign in to join"
+                    onPress={() => router.push({ pathname: '/(auth)/login', params: { returnTo: `/expression/${id}` } } as any)}
+                    variant="outline"
+                    size="md"
+                  />
+                )}
+              </View>
               {followError ? <Text style={[styles.followError, { color: colors.live }]} accessibilityRole="alert">{followError}</Text> : null}
             </View>
           </View>
@@ -218,7 +224,7 @@ export default function ExpressionProfileScreen() {
               ) : (
                 <EmptyState
                   title="No Sermons Published"
-                  message="This campus expression has not uploaded sermon recordings yet."
+                  message="This Expression has not published sermon recordings yet."
                   iconName="book-outline"
                 />
               )
@@ -268,24 +274,17 @@ export default function ExpressionProfileScreen() {
               events.length > 0 ? (
                 <View style={styles.cardStack}>
                   {events.map((e) => (
-                    <Pressable
+                    <EventCard
                       key={e.id}
-                      onPress={() => router.push(`/event/${e.id}` as any)}
-                      style={[styles.eventTile, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}
-                    >
-                      <Text style={[styles.eventTitle, { color: colors.text }]}>{e.title}</Text>
-                      {e.starts_at ? (
-                        <Text style={[styles.eventDate, { color: colors.interactive }]}>
-                          {new Date(e.starts_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
-                        </Text>
-                      ) : null}
-                    </Pressable>
+                      event={e}
+                      onPress={() => router.push(`/event/${e.id}?context=expression` as any)}
+                    />
                   ))}
                 </View>
               ) : (
                 <EmptyState
                   title="No Upcoming Events"
-                  message="Calendar gatherings for this campus will appear here."
+                  message="Calendar gatherings for this Expression will appear here."
                   iconName="calendar-outline"
                 />
               )
@@ -305,7 +304,7 @@ export default function ExpressionProfileScreen() {
               ) : (
                 <EmptyState
                   title="No Leaders Listed"
-                  message="Campus pastors and leaders will appear here."
+                  message="Expression pastors and leaders will appear here."
                   iconName="people-outline"
                 />
               )
@@ -322,8 +321,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerSection: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
+    marginHorizontal: spacing.md,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderRadius: radius.xxl,
     gap: spacing.md,
   },
   avatarWrap: {
@@ -339,8 +340,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   title: {
-    fontSize: 22,
-    fontWeight: '800',
+    ...typography.h1,
   },
   locationRow: {
     flexDirection: 'row',
@@ -351,21 +351,29 @@ const styles = StyleSheet.create({
   locationText: {
     fontSize: 13,
   },
+  actionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
   followError: {
     fontSize: 12,
     lineHeight: 17,
     marginTop: spacing.xs,
   },
   tabsBar: {
-    paddingVertical: spacing.xs,
-    borderBottomWidth: 1,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.sm,
   },
   tabsRow: {
-    paddingHorizontal: spacing.lg,
-    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    gap: spacing.sm,
   },
   tabContentArea: {
-    padding: spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.lg,
   },
   cardStack: {
     gap: spacing.md,
@@ -375,18 +383,5 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.sm,
   },
-  eventTile: {
-    padding: spacing.md,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    gap: 2,
-  },
-  eventTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  eventDate: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
+
 });

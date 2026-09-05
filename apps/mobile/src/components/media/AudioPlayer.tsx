@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, StyleProp, ViewStyle } from 'react-native';
 import { useVideoPlayer } from 'expo-video';
 import { useTheme } from '@/state/theme';
-import { radius, spacing } from '@/design-system/tokens';
+import { radius, shadows, spacing } from '@/design-system/tokens';
 import { Icon } from '../primitives/Icon';
 
 export interface AudioPlayerProps {
@@ -113,7 +113,8 @@ export function AudioPlayer({
     <View
       style={[
         styles.container,
-        { backgroundColor: colors.card, borderColor: colors.border },
+        { backgroundColor: colors.card, borderColor: colors.borderSubtle },
+        shadows.md,
         style,
       ]}
     >
@@ -189,7 +190,7 @@ export function AudioPlayer({
 const styles = StyleSheet.create({
   container: {
     padding: spacing.lg,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     borderWidth: 1,
     gap: spacing.md,
   },
@@ -211,7 +212,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   speaker: {
     fontSize: 13,
@@ -242,8 +243,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   speedBtn: {
+    minWidth: 44,
+    alignItems: 'center',
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: radius.pill,
   },
   speedText: {
@@ -256,12 +259,16 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
   },
   skipBtn: {
-    padding: 6,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   playBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },

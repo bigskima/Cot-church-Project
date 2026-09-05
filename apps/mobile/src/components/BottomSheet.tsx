@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/state/theme';
-import { radius, spacing, typography } from '@/design-system/tokens';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 import { Icon } from './primitives/Icon';
 
 export interface BottomSheetProps {
@@ -32,20 +32,15 @@ export function BottomSheet({
   title,
   subtitle,
   children,
-  maxHeightPercent = 85,
+  maxHeightPercent = 88,
   style,
 }: BottomSheetProps) {
   const insets = useSafeAreaInsets();
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <View style={styles.overlay}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={[styles.overlay, { backgroundColor: colors.scrim }]}>
         <Pressable
           style={styles.backdrop}
           onPress={onClose}
@@ -57,8 +52,8 @@ export function BottomSheet({
           style={[
             styles.sheetContainer,
             {
-              backgroundColor: colors.card,
-              borderTopColor: colors.border,
+              backgroundColor: colors.cardElevated,
+              borderColor: colors.borderSubtle,
               paddingBottom: Math.max(insets.bottom, spacing.lg),
               maxHeight: `${maxHeightPercent}%`,
             },
@@ -67,25 +62,27 @@ export function BottomSheet({
         >
           <View style={[styles.handleBar, { backgroundColor: colors.borderStrong }]} />
 
-          {(title || subtitle) && (
-            <View style={[styles.header, { borderBottomColor: colors.border }]}>
-              <View style={{ flex: 1 }}>
-                {title && <Text style={[styles.title, { color: colors.text }]}>{title}</Text>}
-                {subtitle && (
-                  <Text style={[styles.subtitle, { color: colors.textMuted }]}>{subtitle}</Text>
-                )}
+          {(title || subtitle) ? (
+            <View style={styles.header}>
+              <View style={styles.headerCopy}>
+                {title ? <Text style={[styles.title, { color: colors.text }]}>{title}</Text> : null}
+                {subtitle ? <Text style={[styles.subtitle, { color: colors.textMuted }]}>{subtitle}</Text> : null}
               </View>
               <Pressable
                 onPress={onClose}
                 hitSlop={8}
-                style={styles.closeButton}
+                style={({ pressed }) => [
+                  styles.closeButton,
+                  { backgroundColor: colors.bgSecondary },
+                  pressed && { backgroundColor: colors.pressed },
+                ]}
                 accessibilityRole="button"
                 accessibilityLabel="Close"
               >
-                <Icon name="close" size={20} color={colors.textMuted} />
+                <Icon name="close" size={18} color={colors.textSecondary} />
               </Pressable>
             </View>
-          )}
+          ) : null}
 
           <ScrollView
             showsVerticalScrollIndicator={false}
@@ -104,47 +101,52 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(6, 20, 38, 0.65)',
   },
-  backdrop: {
-    flex: 1,
-  },
+  backdrop: { flex: 1 },
   sheetContainer: {
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    borderTopWidth: 1,
     width: '100%',
-    maxWidth: Platform.OS === 'web' ? 680 : undefined,
+    maxWidth: Platform.OS === 'web' ? 720 : undefined,
     alignSelf: 'center',
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderTopLeftRadius: radius.sheet,
+    borderTopRightRadius: radius.sheet,
+    overflow: 'hidden',
+    ...shadows.floating,
   },
   handleBar: {
-    width: 36,
-    height: 4,
+    width: 42,
+    height: 5,
     borderRadius: radius.pill,
     alignSelf: 'center',
     marginTop: spacing.sm,
     marginBottom: spacing.xs,
+    opacity: 0.8,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
+    gap: spacing.md,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
   },
-  title: {
-    ...typography.h3,
-  },
+  headerCopy: { flex: 1, minWidth: 0 },
+  title: { ...typography.h2 },
   subtitle: {
-    ...typography.caption,
-    marginTop: 2,
+    ...typography.bodySmall,
+    marginTop: 3,
   },
   closeButton: {
-    padding: 4,
-    marginLeft: spacing.sm,
+    width: 38,
+    height: 38,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   contentContainer: {
-    padding: spacing.lg,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xxl,
   },
 });

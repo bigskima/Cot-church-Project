@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View, StyleProp, ViewStyle } from 'react-native';
 import { radius } from '@/design-system/tokens';
+import { useTheme } from '@/state/theme';
 
 export type BadgeVariant =
   | 'live'
@@ -12,7 +13,7 @@ export type BadgeVariant =
   | 'prayer'
   | 'neutral'
   | 'outline'
-  | 'gold'; // backwards compatibility
+  | 'gold';
 
 export interface BadgeProps {
   label: string;
@@ -31,53 +32,55 @@ export function Badge({
   style,
   size = 'sm',
 }: BadgeProps) {
+  const { colors } = useTheme();
+
   const getStyles = () => {
     switch (variant) {
       case 'live':
         return {
-          container: { backgroundColor: 'rgba(229, 72, 77, 0.12)', borderColor: 'rgba(229, 72, 77, 0.35)', borderWidth: 1 },
-          text: { color: '#E5484D' },
-          dot: '#E5484D',
+          container: { backgroundColor: colors.liveSoft, borderColor: colors.live },
+          text: { color: colors.live },
+          dot: colors.live,
         };
       case 'active':
       case 'success':
         return {
-          container: { backgroundColor: 'rgba(22, 163, 106, 0.12)', borderColor: 'rgba(22, 163, 106, 0.3)', borderWidth: 1 },
-          text: { color: '#16A36A' },
-          dot: '#16A36A',
+          container: { backgroundColor: colors.successSoft, borderColor: colors.success },
+          text: { color: colors.success },
+          dot: colors.success,
         };
       case 'warning':
         return {
-          container: { backgroundColor: 'rgba(233, 162, 59, 0.12)', borderColor: 'rgba(233, 162, 59, 0.3)', borderWidth: 1 },
-          text: { color: '#E9A23B' },
-          dot: '#E9A23B',
+          container: { backgroundColor: colors.warningSoft, borderColor: colors.warning },
+          text: { color: colors.warning },
+          dot: colors.warning,
         };
       case 'prayer':
         return {
-          container: { backgroundColor: 'rgba(139, 92, 246, 0.12)', borderColor: 'rgba(139, 92, 246, 0.3)', borderWidth: 1 },
-          text: { color: '#8B5CF6' },
-          dot: '#8B5CF6',
+          container: { backgroundColor: colors.prayerSoft, borderColor: colors.prayer },
+          text: { color: colors.prayer },
+          dot: colors.prayer,
         };
       case 'outline':
         return {
-          container: { backgroundColor: 'transparent', borderColor: '#CBD5E1', borderWidth: 1 },
-          text: { color: '#475467' },
-          dot: '#475467',
+          container: { backgroundColor: 'transparent', borderColor: colors.borderStrong },
+          text: { color: colors.textSecondary },
+          dot: colors.textSecondary,
         };
       case 'gold':
       case 'primary':
       case 'info':
         return {
-          container: { backgroundColor: '#EAF1FA', borderColor: '#CBDDF8', borderWidth: 1 },
-          text: { color: '#18528B' },
-          dot: '#2F6FED',
+          container: { backgroundColor: colors.primarySoft, borderColor: colors.primarySoftStrong },
+          text: { color: colors.interactive },
+          dot: colors.interactive,
         };
       case 'neutral':
       default:
         return {
-          container: { backgroundColor: '#F1F5F9', borderColor: '#E2E8F0', borderWidth: 1 },
-          text: { color: '#475467' },
-          dot: '#64748B',
+          container: { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle },
+          text: { color: colors.textSecondary },
+          dot: colors.textMuted,
         };
     }
   };
@@ -86,20 +89,26 @@ export function Badge({
 
   return (
     <View style={[styles.base, size === 'md' ? styles.sizeMd : styles.sizeSm, v.container, style]}>
-      {pulse && <View style={[styles.pulseDot, { backgroundColor: v.dot }]} />}
-      {icon && <View style={styles.iconContainer}>{icon}</View>}
+      {pulse ? <View style={[styles.pulseDot, { backgroundColor: v.dot }]} /> : null}
+      {icon ? <View style={styles.iconContainer}>{icon}</View> : null}
       <Text style={[styles.text, size === 'md' ? styles.textMd : styles.textSm, v.text]}>{label}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  base: { flexDirection: 'row', alignItems: 'center', borderRadius: radius.sm, alignSelf: 'flex-start' },
-  sizeSm: { paddingHorizontal: 7, paddingVertical: 2 },
-  sizeMd: { paddingHorizontal: 10, paddingVertical: 4 },
+  base: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+  },
+  sizeSm: { minHeight: 23, paddingHorizontal: 8, paddingVertical: 3 },
+  sizeMd: { minHeight: 28, paddingHorizontal: 10, paddingVertical: 5 },
   pulseDot: { width: 6, height: 6, borderRadius: 3, marginRight: 5 },
   iconContainer: { marginRight: 4 },
-  text: { fontWeight: '700', letterSpacing: 0.3, textTransform: 'uppercase' },
-  textSm: { fontSize: 10, lineHeight: 13 },
-  textMd: { fontSize: 11, lineHeight: 15 },
+  text: { fontWeight: '800', letterSpacing: 0.35, textTransform: 'uppercase' },
+  textSm: { fontSize: 9, lineHeight: 12 },
+  textMd: { fontSize: 10, lineHeight: 14 },
 });

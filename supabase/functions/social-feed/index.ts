@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { ApiError } from "../_shared/errors.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
-import { enrichSocialComments, enrichSocialPosts } from "../_shared/public-identity.ts";
+import { enrichContentEngagement, enrichSocialPosts } from "../_shared/public-identity.ts";
 import { assertNoUnknownFields, assertObject, requiredString, uuid } from "../_shared/validation.ts";
 
 const visibilities = new Set(["public", "organization", "branch", "group", "private"]);
@@ -44,17 +44,21 @@ Deno.serve(createHandler(
       const url = new URL(request.url);
       const postId = uuid(url.searchParams.get("postId"), "postId");
       if (postId) {
-        const { data, error } = await auth.client.from("social_comments")
-          .select("id,post_id,author_membership_id,parent_comment_id,body,is_hidden,created_at,updated_at")
-          .eq("post_id", postId).eq("is_hidden", false).order("created_at").limit(200);
+        const { data, error } = await auth.client
+          .from("content_comments")
+          .select("id,content_item_id,author_profile_id,parent_comment_id,body,created_at,profiles(id,display_name,avatar_url)")
+          .eq("content_item_id", postId)
+          .eq("is_hidden", false)
+          .order("created_at")
+          .limit(200);
         if (error) throw new ApiError("COMMENT_LIST_FAILED", "Unable to retrieve comments", 500, undefined, false);
-        return { data: await enrichSocialComments(data ?? []) };
+        return { data: data ?? [] };
       }
 
       const scope = url.searchParams.get("scope") ?? "all";
       if (!scopes.has(scope)) throw new ApiError("VALIDATION_FAILED", "Invalid community feed scope", 422);
       let query = auth.client.from("social_posts")
-        .select("id,organization_id,author_membership_id,branch_id,group_id,visibility,status,body,media,published_at,edited_at,created_at,social_reactions(reaction)")
+        .select("id,organization_id,author_membership_id,branch_id,group_id,visibility,status,body,media,published_at,edited_at,created_at")
         .eq("organization_id", auth.organizationId)
         .eq("status", "published")
         .order("published_at", { ascending: false })
@@ -66,27 +70,50 @@ Deno.serve(createHandler(
       }
       const { data, error } = await query;
       if (error) throw new ApiError("FEED_READ_FAILED", "Unable to retrieve community feed", 500, undefined, false);
-      return { data: await enrichSocialPosts(data ?? []) };
+      const identified = await enrichSocialPosts(data ?? []);
+      return {
+        data: await enrichContentEngagement(identified, auth.client, auth.user.id),
+      };
     }
 
     const body = assertObject(await jsonBody(request));
     if (body.action === "comment") {
       assertNoUnknownFields(body, ["action", "postId", "body", "parentCommentId"]);
-      const { data, error } = await auth.client.rpc("comment_on_social_post", {
-        target_post_id: uuid(requiredString(body.postId, "postId", 36), "postId", true),
-        comment_body: requiredString(body.body, "body", 3000),
-        target_parent_comment_id: body.parentCommentId ? uuid(String(body.parentCommentId), "parentCommentId", true) : null,
-      }).single();
+      const contentId = uuid(requiredString(body.postId, "postId", 36), "postId", true)!;
+      const parentCommentId = body.parentCommentId
+        ? uuid(String(body.parentCommentId), "parentCommentId", true)
+        : null;
+      const { data, error } = await auth.client
+        .from("content_comments")
+        .insert({
+          content_item_id: contentId,
+          author_profile_id: auth.user.id,
+          parent_comment_id: parentCommentId,
+          body: requiredString(body.body, "body", 3000).trim(),
+        })
+        .select("id,content_item_id,author_profile_id,parent_comment_id,body,created_at,profiles(id,display_name,avatar_url)")
+        .single();
       if (error?.code === "42501") throw new ApiError("PERMISSION_DENIED", "You do not have access to comment on this post", 403);
       if (error) throw new ApiError("COMMENT_CREATE_FAILED", "Unable to comment", 500, undefined, false);
       return { data, status: 201 };
     }
     if (body.action === "react") {
       assertNoUnknownFields(body, ["action", "postId", "reaction"]);
-      const { data, error } = await auth.client.rpc("react_to_social_post", {
-        target_post_id: uuid(requiredString(body.postId, "postId", 36), "postId", true),
-        target_reaction: requiredString(body.reaction, "reaction", 20),
-      }).single();
+      const contentId = uuid(requiredString(body.postId, "postId", 36), "postId", true)!;
+      const reaction = requiredString(body.reaction, "reaction", 20);
+      if (!new Set(["like", "love", "pray", "celebrate", "amen", "support"]).has(reaction)) {
+        throw new ApiError("VALIDATION_FAILED", "Invalid reaction type", 422);
+      }
+      const { data, error } = await auth.client
+        .from("content_reactions")
+        .upsert({
+          content_item_id: contentId,
+          profile_id: auth.user.id,
+          reaction,
+          created_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
       if (error?.code === "42501") throw new ApiError("PERMISSION_DENIED", "You do not have access to react to this post", 403);
       if (error) throw new ApiError("REACTION_FAILED", "Unable to react", 500, undefined, false);
       return { data };

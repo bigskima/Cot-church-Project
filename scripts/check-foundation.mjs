@@ -20,6 +20,11 @@ const migrationPaths = [
   'supabase/migrations/20260904130000_public_expression_context_and_invite_codes.sql',
   'supabase/migrations/20260904140000_event_access_and_registration_lifecycle.sql',
   'supabase/migrations/20260904150000_media_playback_scope_hardening.sql',
+  'supabase/migrations/20260905102255_prayer_support_interactions.sql',
+  'supabase/migrations/20260905102731_lock_prayer_supports_to_server.sql',
+  'supabase/migrations/20260905102909_harden_analytics_default_partition.sql',
+  'supabase/migrations/20260905103057_restore_privileged_rpc_execute_boundaries.sql',
+  'supabase/migrations/20260905103708_restore_authenticated_interaction_rpc_boundaries.sql',
 ];
 
 const requiredPatterns = [
@@ -69,6 +74,19 @@ const requiredPatterns = [
   /events_member_read[\s\S]*public\.is_expression_member/i,
   /get_media_playback_info[\s\S]*can_read_social_scope/i,
   /sync_content_playback[\s\S]*Invalid playback progress/i,
+  /create table if not exists public\.prayer_supports/i,
+  /prayer_count integer not null default 0/i,
+  /create policy prayer_supports_no_client_access/i,
+  /alter table public\.analytics_events_default enable row level security/i,
+  /revoke all on table public\.analytics_events_default from anon, authenticated/i,
+  /revoke all on function public\.claim_notification_outbox\(integer\) from public, anon, authenticated/i,
+  /grant execute on function public\.claim_notification_outbox\(integer\) to service_role/i,
+  /revoke all on function public\.create_platform_role_invitation\(text,text,text,integer\) from public, anon/i,
+  /grant execute on function public\.create_platform_role_invitation\(text,text,text,integer\) to authenticated, service_role/i,
+  /revoke all on function public\.register_for_event\(uuid,uuid\) from public, anon/i,
+  /grant execute on function public\.register_for_event\(uuid,uuid\) to authenticated, service_role/i,
+  /revoke all on function public\.comment_on_social_post\(uuid,text,uuid\) from public, anon/i,
+  /grant execute on function public\.comment_on_social_post\(uuid,text,uuid\) to authenticated, service_role/i,
 ];
 
 const source = (await Promise.all(migrationPaths.map((path) => readFile(path, 'utf8')))).join('\n');

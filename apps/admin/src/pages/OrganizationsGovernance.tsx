@@ -86,12 +86,12 @@ export function OrganizationsGovernance({ api }: { api: ApiClient }) {
   const activeCount = useMemo(() => organizations.filter((item) => item.status === 'active').length, [organizations]);
 
   return (
-    <div>
+    <div className="admin-page-stack">
       <Card
-        title="Church Organisations Governance"
+        title="Church organisations"
         subtitle={`${total} peer church organisation${total === 1 ? '' : 's'} · ${activeCount} active in the current result set`}
         headerAction={
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <div className="admin-header-actions">
             <SearchBar
               value={search}
               onChange={setSearch}
@@ -167,7 +167,7 @@ export function OrganizationsGovernance({ api }: { api: ApiClient }) {
       <Modal
         isOpen={!!selectedOrg}
         onClose={() => setSelectedOrg(null)}
-        title={selectedOrg?.name ?? 'Organisation Governance'}
+        title={selectedOrg?.name ?? 'Organisation details'}
         subtitle={selectedOrg ? `Platform organisation ID: ${selectedOrg.id}` : undefined}
         maxWidth="lg"
         footer={<Button variant="primary" size="md" onClick={() => setSelectedOrg(null)}>Close</Button>}
@@ -232,9 +232,9 @@ export function OrganizationsGovernance({ api }: { api: ApiClient }) {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ backgroundColor: 'var(--bg-elevated)', padding: 14, borderRadius: 8 }}>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 800 }}>{label}</div>
-      <div style={{ fontSize: 15, fontWeight: 800, marginTop: 4 }}>{value}</div>
+    <div className="admin-metric-tile">
+      <div className="admin-metric-label">{label}</div>
+      <div className="admin-metric-value">{value}</div>
     </div>
   );
 }

@@ -34,17 +34,16 @@ export function EventCard({
         styles.container,
         {
           backgroundColor: colors.card,
-          borderColor: colors.border,
+          borderColor: colors.borderSubtle,
         },
-        shadows.sm,
+        shadows.md,
         pressed && styles.pressed,
         style,
       ]}
       accessibilityRole="button"
       accessibilityLabel={`Event: ${event.title}`}
     >
-      {/* Date Block */}
-      <View style={[styles.dateBlock, { backgroundColor: colors.primarySoft }]}>
+      <View style={[styles.dateBlock, { backgroundColor: colors.primarySoft, borderColor: colors.primarySoftStrong }]}>
         <Text style={[styles.monthText, { color: colors.interactive }]}>{monthStr}</Text>
         <Text style={[styles.dayText, { color: colors.text }]}>{dayStr}</Text>
       </View>
@@ -93,15 +92,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     borderWidth: 1,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
     gap: spacing.md,
   },
   dateBlock: {
-    width: 52,
-    height: 58,
-    borderRadius: radius.md,
+    width: 58,
+    height: 64,
+    borderRadius: radius.lg,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -111,8 +111,8 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   dayText: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: '800',
     lineHeight: 24,
   },
   contentArea: {
@@ -143,6 +143,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   pressed: {
-    opacity: 0.8,
+    opacity: 0.9,
+    transform: [{ scale: 0.992 }],
   },
 });

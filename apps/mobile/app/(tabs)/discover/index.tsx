@@ -17,7 +17,7 @@ import {
   SermonCard,
   Skeleton,
 } from '@/components';
-import { radius, spacing, typography } from '@/design-system/tokens';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 import type { CampusBranch, ChurchOrganization, Event, Leader, Reel, Sermon, SermonSeries, Video } from '@/types/content';
 
 type SearchResults = { sermons: Sermon[]; videos: Video[]; reels: Reel[]; expressions: CampusBranch[]; leaders: Leader[] };
@@ -97,15 +97,22 @@ export default function DiscoverScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: 100 }]}
       >
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+          <View style={styles.eyebrowRow}>
+            <View style={[styles.eyebrowDot, { backgroundColor: colors.interactive }]} />
+            <Text style={[styles.eyebrow, { color: colors.interactive }]}>DISCOVER COT</Text>
+          </View>
           <View style={styles.headerTitleRow}>
-            <Text style={[styles.title, { color: colors.text }]}>Discover</Text>
+            <View style={styles.titleCopy}>
+              <Text style={[styles.title, { color: colors.text }]}>Explore</Text>
+              <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Teachings, people, Expressions, events and stories in one place.</Text>
+            </View>
             {churches.data && churches.data.length > 1 ? (
               <Pressable
                 onPress={() => setShowChurchPicker(true)}
                 style={({ pressed }) => [
                   styles.churchSelectorPill,
-                  { backgroundColor: colors.bgSecondary, borderColor: colors.border },
+                  { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle },
                   pressed && styles.pressed,
                 ]}
               >
@@ -121,8 +128,8 @@ export default function DiscoverScreen() {
           <SearchBar
             value={query}
             onChangeText={setQuery}
-            placeholder="Search teachings, scriptures, pastors, events..."
-            style={{ marginTop: spacing.sm }}
+            placeholder="Search COT"
+            style={styles.searchBar}
           />
 
           <View style={styles.chipsRow}>
@@ -148,13 +155,13 @@ export default function DiscoverScreen() {
           <View style={styles.body}>
             {deferredQuery.length >= 2 ? (
               <View style={styles.sectionWrap}>
-                <SectionHeader title="Search across public content" />
+                <SectionHeader title="Search results" subtitle="Across public COT content" />
                 {search.loading && !search.data ? <Skeleton height={58} count={3} /> : search.error ? <ResourceError message={search.error} retry={search.refresh} /> : (
                   <>
-                    {(search.data?.videos ?? []).map((video) => <Pressable key={`video-${video.id}`} accessibilityRole="button" onPress={() => router.push(`/watch/${video.id}` as any)} style={[styles.searchRow, { backgroundColor: colors.card, borderColor: colors.border }]}><Icon name="play-circle-outline" size={20} color={colors.interactive} /><View style={styles.searchCopy}><Text style={[styles.searchTitle, { color: colors.text }]}>{video.title}</Text><Text style={[styles.searchMeta, { color: colors.textMuted }]}>VIDEO · {video.category}</Text></View><Icon name="chevron-forward" size={17} color={colors.textMuted} /></Pressable>)}
-                    {(search.data?.reels ?? []).map((reel) => <Pressable key={`reel-${reel.id}`} accessibilityRole="button" onPress={() => router.push('/reels')} style={[styles.searchRow, { backgroundColor: colors.card, borderColor: colors.border }]}><Icon name="flash-outline" size={20} color={colors.interactive} /><View style={styles.searchCopy}><Text numberOfLines={2} style={[styles.searchTitle, { color: colors.text }]}>{reel.caption}</Text><Text style={[styles.searchMeta, { color: colors.textMuted }]}>REEL</Text></View><Icon name="chevron-forward" size={17} color={colors.textMuted} /></Pressable>)}
-                    {(search.data?.expressions ?? []).map((expression) => <Pressable key={`expression-${expression.id}`} accessibilityRole="button" onPress={() => router.push(`/expression/${expression.id}` as any)} style={[styles.searchRow, { backgroundColor: colors.card, borderColor: colors.border }]}><Icon name="business-outline" size={20} color={colors.interactive} /><View style={styles.searchCopy}><Text style={[styles.searchTitle, { color: colors.text }]}>{expression.name}</Text><Text style={[styles.searchMeta, { color: colors.textMuted }]}>PUBLIC EXPRESSION PROFILE</Text></View><Icon name="chevron-forward" size={17} color={colors.textMuted} /></Pressable>)}
-                    {(search.data?.leaders ?? []).map((leader) => <View key={`leader-${leader.id}`} style={[styles.searchRow, { backgroundColor: colors.card, borderColor: colors.border }]}><Icon name="person-outline" size={20} color={colors.interactive} /><View style={styles.searchCopy}><Text style={[styles.searchTitle, { color: colors.text }]}>{leader.name ?? (leader as any).display_name}</Text><Text style={[styles.searchMeta, { color: colors.textMuted }]}>{leader.role_title || 'PUBLIC LEADER'}</Text></View></View>)}
+                    {(search.data?.videos ?? []).map((video) => <Pressable key={`video-${video.id}`} accessibilityRole="button" onPress={() => router.push(`/watch/${video.id}` as any)} style={({ pressed }) => [styles.searchRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}><Icon name="play-circle-outline" size={20} color={colors.interactive} /><View style={styles.searchCopy}><Text style={[styles.searchTitle, { color: colors.text }]}>{video.title}</Text><Text style={[styles.searchMeta, { color: colors.textMuted }]}>VIDEO · {video.category}</Text></View><Icon name="chevron-forward" size={17} color={colors.textMuted} /></Pressable>)}
+                    {(search.data?.reels ?? []).map((reel) => <Pressable key={`reel-${reel.id}`} accessibilityRole="button" onPress={() => router.push('/reels')} style={({ pressed }) => [styles.searchRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}><Icon name="flash-outline" size={20} color={colors.interactive} /><View style={styles.searchCopy}><Text numberOfLines={2} style={[styles.searchTitle, { color: colors.text }]}>{reel.caption}</Text><Text style={[styles.searchMeta, { color: colors.textMuted }]}>REEL</Text></View><Icon name="chevron-forward" size={17} color={colors.textMuted} /></Pressable>)}
+                    {(search.data?.expressions ?? []).map((expression) => <Pressable key={`expression-${expression.id}`} accessibilityRole="button" onPress={() => router.push(`/expression/${expression.id}` as any)} style={({ pressed }) => [styles.searchRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}><Icon name="business-outline" size={20} color={colors.interactive} /><View style={styles.searchCopy}><Text style={[styles.searchTitle, { color: colors.text }]}>{expression.name}</Text><Text style={[styles.searchMeta, { color: colors.textMuted }]}>PUBLIC EXPRESSION PROFILE</Text></View><Icon name="chevron-forward" size={17} color={colors.textMuted} /></Pressable>)}
+                    {(search.data?.leaders ?? []).map((leader) => <View key={`leader-${leader.id}`} style={[styles.searchRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}><Icon name="person-outline" size={20} color={colors.interactive} /><View style={styles.searchCopy}><Text style={[styles.searchTitle, { color: colors.text }]}>{leader.name ?? (leader as any).display_name}</Text><Text style={[styles.searchMeta, { color: colors.textMuted }]}>{leader.role_title || 'PUBLIC LEADER'}</Text></View></View>)}
                     {!(search.data?.videos.length || search.data?.reels.length || search.data?.expressions.length || search.data?.leaders.length) ? <Text style={[styles.noExtraResults, { color: colors.textMuted }]}>No additional public videos, Reels, Expressions, or leaders match this search.</Text> : null}
                   </>
                 )}
@@ -179,7 +186,7 @@ export default function DiscoverScreen() {
               <View style={styles.sectionWrap}>
                 <SectionHeader title="Series" badge={filteredSeries.length} />
                 {filteredSeries.map((item) => (
-                  <Pressable key={item.id} accessibilityRole="button" onPress={() => router.push(`/series/${item.id}` as any)} style={[styles.seriesRow, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                  <Pressable key={item.id} accessibilityRole="button" onPress={() => router.push(`/series/${item.id}` as any)} style={({ pressed }) => [styles.seriesRow, { borderColor: colors.borderSubtle, backgroundColor: colors.card }, shadows.sm, pressed && styles.pressed]}>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.seriesTitle, { color: colors.text }]}>{item.title}</Text>
                       {item.description ? <Text style={[styles.seriesDescription, { color: colors.textSecondary }]} numberOfLines={2}>{item.description}</Text> : null}
@@ -222,18 +229,24 @@ export default function DiscoverScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: { flexGrow: 1 },
-  header: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
-  headerTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { ...typography.h1, marginTop: 2 },
-  churchSelectorPill: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5, paddingHorizontal: 10, borderRadius: radius.pill, borderWidth: 1, gap: 4, maxWidth: 160 },
+  header: { marginHorizontal: spacing.md, padding: spacing.lg, borderWidth: 1, borderRadius: radius.xxl },
+  eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.xs },
+  eyebrowDot: { width: 6, height: 6, borderRadius: 3 },
+  eyebrow: { ...typography.kicker },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
+  titleCopy: { flex: 1, minWidth: 0 },
+  title: { ...typography.display },
+  subtitle: { ...typography.bodySmall, marginTop: 3, maxWidth: 420 },
+  searchBar: { marginTop: spacing.md, height: 48, borderRadius: radius.lg },
+  churchSelectorPill: { flexDirection: 'row', alignItems: 'center', paddingVertical: 7, paddingHorizontal: 10, borderRadius: radius.pill, borderWidth: 1, gap: 4, maxWidth: 160 },
   churchSelectorText: { fontSize: 12, fontWeight: '600', flex: 1 },
   chipsRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm, flexWrap: 'wrap' },
-  body: { paddingHorizontal: spacing.lg },
-  sectionWrap: { marginBottom: spacing.md, gap: spacing.xs },
-  seriesRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.xs },
+  body: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
+  sectionWrap: { marginBottom: spacing.lg, gap: spacing.xs },
+  seriesRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.sm },
   seriesTitle: { fontSize: 15, fontWeight: '700' },
   seriesDescription: { fontSize: 12, lineHeight: 17, marginTop: 3 },
-  searchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.xs },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.sm },
   searchCopy: { flex: 1, gap: 2 }, searchTitle: { fontSize: 14, fontWeight: '700' }, searchMeta: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
   noExtraResults: { fontSize: 13, lineHeight: 18, paddingVertical: spacing.sm },
   pressed: { opacity: 0.8 },

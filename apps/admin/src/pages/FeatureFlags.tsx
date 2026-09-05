@@ -134,12 +134,12 @@ export function FeatureFlags({ api }: { api: ApiClient }) {
   };
 
   return (
-    <div>
+    <div className="admin-page-stack">
       <Card
-        title="Feature Availability"
+        title="Feature availability"
         subtitle="Control which platform features are available globally. Church-specific availability can be adjusted separately where supported."
         headerAction={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="admin-header-actions">
             <SearchBar
               value={search}
               onChange={setSearch}
@@ -152,7 +152,7 @@ export function FeatureFlags({ api }: { api: ApiClient }) {
         }
       >
         {error ? (
-          <div className="admin-form-error" role="alert" style={{ marginBottom: 16 }}>
+          <div className="admin-inline-error" role="alert">
             {error}
           </div>
         ) : null}
@@ -163,10 +163,8 @@ export function FeatureFlags({ api }: { api: ApiClient }) {
               header: 'FEATURE',
               accessor: (item) => (
                 <div>
-                  <div style={{ fontWeight: 800 }}>{item.name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.55 }}>
-                    <code style={{ color: 'var(--gold)' }}>{item.key}</code> · {item.description}
-                  </div>
+                  <div className="admin-row-title">{item.name}</div>
+                  <div className="admin-row-meta"><code className="admin-secret-reference">{item.key}</code> · {item.description}</div>
                 </div>
               ),
             },
@@ -191,7 +189,7 @@ export function FeatureFlags({ api }: { api: ApiClient }) {
             {
               header: 'CONTROL',
               accessor: (item) => (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div className="admin-table-actions">
                   <Toggle
                     label=""
                     checked={item.global_enabled}
@@ -229,7 +227,7 @@ export function FeatureFlags({ api }: { api: ApiClient }) {
         title={editing ? `Feature policy · ${editing.name}` : 'Feature policy'}
         subtitle={editing?.key}
         footer={
-          <div style={{ display: 'flex', gap: 12 }}>
+          <div className="admin-header-actions">
             <Button variant="outline" disabled={!!busyKey} onClick={() => setEditing(null)}>
               Cancel
             </Button>

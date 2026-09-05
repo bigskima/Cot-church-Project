@@ -20,7 +20,7 @@ export function Chip({
   count,
   style,
 }: ChipProps) {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
 
   return (
     <Pressable
@@ -29,16 +29,8 @@ export function Chip({
       style={({ pressed }) => [
         styles.chip,
         {
-          backgroundColor: selected
-            ? isDark
-              ? '#FFFFFF'
-              : '#0D294B'
-            : colors.bgSecondary,
-          borderColor: selected
-            ? isDark
-              ? '#FFFFFF'
-              : '#0D294B'
-            : colors.border,
+          backgroundColor: selected ? colors.primarySoftStrong : colors.bgSecondary,
+          borderColor: selected ? colors.interactive : colors.borderSubtle,
         },
         pressed && styles.pressed,
         style,
@@ -51,11 +43,7 @@ export function Chip({
         style={[
           styles.label,
           {
-            color: selected
-              ? isDark
-                ? '#0D294B'
-                : '#FFFFFF'
-              : colors.textSecondary,
+            color: selected ? colors.interactive : colors.textSecondary,
           },
         ]}
       >
@@ -66,11 +54,7 @@ export function Chip({
           style={[
             styles.countBadge,
             {
-              backgroundColor: selected
-                ? isDark
-                  ? 'rgba(13, 41, 75, 0.15)'
-                  : 'rgba(255, 255, 255, 0.25)'
-                : colors.card,
+              backgroundColor: selected ? colors.card : colors.card,
             },
           ]}
         >
@@ -78,11 +62,7 @@ export function Chip({
             style={[
               styles.countText,
               {
-                color: selected
-                  ? isDark
-                    ? '#0D294B'
-                    : '#FFFFFF'
-                  : colors.textMuted,
+                color: selected ? colors.interactive : colors.textMuted,
               },
             ]}
           >
@@ -98,7 +78,8 @@ const styles = StyleSheet.create({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 6,
+    minHeight: 36,
+    paddingVertical: 7,
     paddingHorizontal: 12,
     borderRadius: radius.pill,
     borderWidth: 1,
@@ -106,7 +87,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   iconSlot: {
     marginRight: 6,
@@ -122,6 +103,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   pressed: {
-    opacity: 0.75,
+    opacity: 0.82,
+    transform: [{ scale: 0.98 }],
   },
 });

@@ -16,6 +16,7 @@ const requiredFiles = [
   'supabase/functions/refresh-session/index.ts',
   'supabase/functions/signup/index.ts',
   'supabase/functions/password-recovery/index.ts',
+  'supabase/functions/password-reset/index.ts',
   'supabase/functions/profile/index.ts',
   'supabase/functions/verify-otp/index.ts',
   'supabase/functions/organization-context/index.ts',
@@ -74,6 +75,7 @@ const requiredFiles = [
   'supabase/functions/platform-integrations/index.ts',
   'supabase/functions/platform-payments/index.ts',
   'supabase/functions/platform-giving/index.ts',
+  'supabase/functions/search/index.ts',
 ];
 
 await Promise.all(requiredFiles.map((file) => access(file)));
@@ -84,6 +86,7 @@ const signup = await readFile('supabase/functions/signup/index.ts', 'utf8');
 const organizationContext = await readFile('supabase/functions/organization-context/index.ts', 'utf8');
 const login = await readFile('supabase/functions/login/index.ts', 'utf8');
 const refreshSession = await readFile('supabase/functions/refresh-session/index.ts', 'utf8');
+const passwordReset = await readFile('supabase/functions/password-reset/index.ts', 'utf8');
 const organizations = await readFile('supabase/functions/organizations/index.ts', 'utf8');
 const memberships = await readFile('supabase/functions/memberships/index.ts', 'utf8');
 const expressionMemberships = await readFile('supabase/functions/expression-memberships/index.ts', 'utf8');
@@ -99,15 +102,21 @@ const eventRegistrations = await readFile('supabase/functions/event-registration
 const sermons = await readFile('supabase/functions/sermons/index.ts', 'utf8');
 const branding = await readFile('supabase/functions/branding/index.ts', 'utf8');
 const churchStory = await readFile('supabase/functions/church-story/index.ts', 'utf8');
+const prayerRequests = await readFile('supabase/functions/prayer-requests/index.ts', 'utf8');
 const giving = await readFile('supabase/functions/giving/index.ts', 'utf8');
 const publicGiving = await readFile('supabase/functions/public-giving/index.ts', 'utf8');
 const platformGiving = await readFile('supabase/functions/platform-giving/index.ts', 'utf8');
+const retiredSearch = await readFile('supabase/functions/search/index.ts', 'utf8');
 const platformPayments = await readFile('supabase/functions/platform-payments/index.ts', 'utf8');
 const platformStreaming = await readFile('supabase/functions/platform-streaming/index.ts', 'utf8');
 const platformAi = await readFile('supabase/functions/platform-ai/index.ts', 'utf8');
 const platformFeatures = await readFile('supabase/functions/platform-features/index.ts', 'utf8');
 const platformIntegrations = await readFile('supabase/functions/platform-integrations/index.ts', 'utf8');
 const gatewayConfig = await readFile('supabase/config.toml', 'utf8');
+const privilegedRpcGrantHardening = await readFile('supabase/migrations/20260905121228_harden_remaining_privileged_rpc_execute_grants.sql', 'utf8');
+const streamGrantHardening = await readFile('supabase/migrations/20260905121401_restore_stream_and_idempotency_execute_boundaries.sql', 'utf8');
+const triggerGrantHardening = await readFile('supabase/migrations/20260905121523_remove_api_execute_from_security_definer_triggers.sql', 'utf8');
+const profileStateRpcHardening = await readFile('supabase/migrations/20260905122057_harden_ai_usage_and_profile_state_rpc_access.sql', 'utf8');
 
 const invariants = [
   [handler, /request\.method === "OPTIONS"/, 'CORS preflight handling'],
@@ -148,7 +157,10 @@ const invariants = [
   [login, /signInWithPassword/, 'password login workflow'],
   [refreshSession, /auth\.refreshSession/, 'refresh-token session rotation'],
   [refreshSession, /enforceRateLimit/, 'refresh session rate limiting'],
+  [passwordReset, /auth\.getUser\(token\)/, 'password reset recovery-token validation'],
+  [passwordReset, /auth\.updateUser\(\{ password \}\)/, 'Supabase recovery-session password reset completion'],
   [organizations, /create_organization/, 'transactional organization provisioning'],
+  [organizations, /Main Expression/, 'canonical initial Expression provisioning'],
   [memberships, /update_membership_status/, 'protected membership lifecycle'],
   [roles, /create_custom_role/, 'custom role administration'],
   [events, /events\.create/, 'event authorization'],
@@ -158,15 +170,20 @@ const invariants = [
   [sermons, /sermons\.create/, 'sermon authorization'],
   [branding, /platform\.branding\.manage/, 'branding authorization'],
   [churchStory, /leadership_profiles/, 'leadership profile management'],
+  [prayerRequests, /action === "pray"/, 'prayer-wall support action'],
+  [prayerRequests, /prayer_supports/, 'server-backed prayer support persistence'],
+  [prayerRequests, /viewer_has_prayed/, 'per-viewer prayer support state'],
+  [prayerRequests, /ignoreDuplicates:\s*true/, 'idempotent prayer support'],
+  [prayerRequests, /prayer_count/, 'server-backed prayer support count'],
   [giving, /requireExpression\(auth\.branchId\)/, 'expression giving management requires expression context'],
   [giving, /online_payment_enabled:\s*false/, 'expression online giving remains unavailable'],
   [publicGiving, /ORGANIZATION_REQUIRED/, 'public giving requires explicit church scope'],
   [publicGiving, /expressionId/, 'public giving supports explicit expression scope'],
   [publicGiving, /manualBankTransfer/, 'manual transfer is exposed as a server-driven giving method'],
-  [platformGiving, /authorizePlatform\(auth, "platform\.giving\.read"\)/, 'Level-1 church-wide giving read authorization'],
-  [platformGiving, /authorizePlatform\(auth, "platform\.giving\.manage"\)/, 'Level-1 church-wide giving manage authorization'],
-  [platformGiving, /ONLINE_GIVING_NOT_READY/, 'online giving cannot be enabled before real provider integration'],
-  [platformGiving, /currency.*3-letter ISO/s, 'currency-neutral giving account validation'],
+  [platformGiving, /PLATFORM_GIVING_RETIRED/, 'retired Platform Giving endpoint boundary'],
+  [platformGiving, /does not own church giving/i, 'church-owned giving retirement message'],
+  [retiredSearch, /SEARCH_ENDPOINT_RETIRED/, 'retired duplicate search endpoint'],
+  [retiredSearch, /public-content/, 'canonical public discovery search destination'],
   [platformPayments, /authorizePlatform\(auth, "platform\.payments\.read"\)/, 'Level-1 payment read authorization'],
   [platformPayments, /authorizePlatform\(auth, "platform\.payments\.manage"\)/, 'Level-1 payment manage authorization'],
   [platformPayments, /payment_provider_configs/, 'database-driven payment provider configuration'],
@@ -176,11 +193,25 @@ const invariants = [
   [platformAi, /platform\.ai\./, 'Level-1 AI authority'],
   [platformFeatures, /platform\.features\./, 'Level-1 feature authority'],
   [platformIntegrations, /platform\.integrations\./, 'Level-1 integrations authority'],
+  [privilegedRpcGrantHardening, /platform_store_secret\(text,text,text,text,text\).*from public, anon/s, 'secret-store anonymous execute revocation'],
+  [privilegedRpcGrantHardening, /resolve_runtime_secret\(text\).*from public, anon, authenticated/s, 'runtime-secret service-only execute boundary'],
+  [privilegedRpcGrantHardening, /process_payment_result\(text,text,text,uuid,text,payment_attempt_status,jsonb,text\).*from public, anon, authenticated/s, 'payment-result service-only execute boundary'],
+  [privilegedRpcGrantHardening, /generate_expression_invite_code\(uuid,uuid,integer,integer\).*from public, anon/s, 'Expression invite anonymous execute revocation'],
+  [privilegedRpcGrantHardening, /update_membership_status\(uuid,uuid,membership_status,uuid\).*from public, anon/s, 'membership mutation anonymous execute revocation'],
+  [streamGrantHardening, /can_access_stream\(uuid\).*from public, anon/s, 'stream-access anonymous execute revocation'],
+  [streamGrantHardening, /reserve_api_idempotency\(uuid,text,text,text\).*from public, anon/s, 'idempotency anonymous execute revocation'],
+  [triggerGrantHardening, /p\.prorettype = 'trigger'::regtype/, 'security-definer trigger execute hardening'],
+  [profileStateRpcHardening, /ai_usage_totals\(uuid,text,timestamptz\).*from public, anon, authenticated/s, 'AI usage totals service-only boundary'],
+  [profileStateRpcHardening, /target_profile_id <> auth\.uid\(\)/, 'profile-state self-only direct RPC boundary'],
 ];
 
 const missing = invariants.filter(([source, pattern]) => !pattern.test(source));
 const forbidden = [
+  [organizations, /Main Campus/, 'stale Campus default in organization provisioning'],
+  [platformGiving, /platform\.giving\.(?:read|manage)|authorizePlatform/, 'retired Platform Giving authorization path'],
   [churchStory, /Foundation & First Gathering|Multi-Expression Expansion|Global Digital Ministry/, 'fabricated church story fallback'],
+  [signup, /password\(body\.password\)/, 'hardcoded signup password policy'],
+  [signup, /length\s*<\s*\d+.*password|password.*length\s*<\s*\d+/s, 'hardcoded signup password length rule'],
 ];
 const presentForbidden = forbidden.filter(([source, pattern]) => pattern.test(source));
 

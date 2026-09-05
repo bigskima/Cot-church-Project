@@ -9,7 +9,6 @@ import {
   assertObject,
   email,
   optionalString,
-  password,
   phone,
   requiredString,
 } from "../_shared/validation.ts";
@@ -66,7 +65,12 @@ Deno.serve(createHandler(
     if (usernameError) throw new ApiError("USERNAME_CHECK_FAILED", "Unable to validate username availability", 503, undefined, false);
     if (existingUsername) throw new ApiError("USERNAME_TAKEN", "That username is already in use", 409, { username: "Choose another username" });
 
-    const submittedPassword = password(body.password);
+    if (typeof body.password !== "string" || body.password.length === 0) {
+      throw new ApiError("VALIDATION_FAILED", "A password is required", 422, { password: "Enter a password" });
+    }
+    // Password complexity/length is intentionally not duplicated here.
+    // Supabase Auth project configuration is the single policy authority.
+    const submittedPassword = body.password;
     const metadata = {
       display_name: displayName,
       username: submittedUsername,
@@ -82,8 +86,20 @@ Deno.serve(createHandler(
       : await client.auth.signUp({ phone: phoneNumber!, password: submittedPassword, options: { data: metadata, channel: "sms" } });
 
     if (error) {
-      if (error.status && error.status >= 500) throw new ApiError("IDENTITY_PROVIDER_UNAVAILABLE", "Registration is temporarily unavailable", 503);
-      // Authentication-provider responses remain enumeration-resistant.
+      if (error.status && error.status >= 500) {
+        throw new ApiError("IDENTITY_PROVIDER_UNAVAILABLE", "Registration is temporarily unavailable", 503);
+      }
+
+      // Supabase Auth owns the password policy. Surface only password-policy
+      // rejections so the user can satisfy the currently configured policy.
+      const authCode = typeof (error as { code?: unknown }).code === "string"
+        ? (error as { code: string }).code
+        : "";
+      if (authCode === "weak_password" || /password/i.test(error.message)) {
+        throw new ApiError("PASSWORD_POLICY_REJECTED", error.message, 422, undefined, true);
+      }
+
+      // Other auth-provider responses remain enumeration-resistant.
       return { data: { status: "verification_required" }, status: 202 };
     }
 

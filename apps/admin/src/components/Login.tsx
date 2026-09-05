@@ -49,15 +49,15 @@ export function Login({
     <main className="platform-login-shell">
       <section className="platform-login-panel" aria-labelledby="platform-login-title">
         <div className="platform-login-brand">
-          <div className="platform-login-mark" aria-hidden="true">C</div>
+          <div className="platform-login-mark" aria-hidden="true">COT</div>
           <div>
-            <p className="platform-login-kicker">Church Digital Platform</p>
+            <p className="platform-login-kicker">City of Transformation</p>
             <h1 id="platform-login-title">Platform Administration</h1>
           </div>
         </div>
 
         <p className="platform-login-copy">
-          Sign in with an account that has access to Platform Administration.
+          Secure administration for church organisations, Expressions, platform services and governance.
         </p>
 
         <Card>
@@ -68,7 +68,7 @@ export function Login({
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@example.com"
+              placeholder="Administrator email"
               required
             />
             <InputField
@@ -77,7 +77,7 @@ export function Login({
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
+              placeholder="Password"
               required
             />
 
@@ -89,9 +89,12 @@ export function Login({
           </form>
         </Card>
 
-        <p className="platform-login-footnote">
-          Administrative actions are protected by account permissions and recorded for security.
-        </p>
+        <div className="platform-login-security">
+          <span className="platform-login-security-dot" aria-hidden="true" />
+          <p className="platform-login-footnote">
+            Access is permission-gated and administrative actions are recorded in the security audit trail.
+          </p>
+        </div>
       </section>
     </main>
   );

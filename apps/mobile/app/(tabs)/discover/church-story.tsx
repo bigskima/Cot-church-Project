@@ -45,17 +45,20 @@ export default function ChurchStoryScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + spacing.sm, paddingBottom: 60 },
+          { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 120 },
         ]}
       >
-        <ScreenHeader
-          title={story?.title ?? 'Our Story & Heritage'}
-          subtitle={story?.subtitle ?? 'Learn more about our mission, vision, and pastoral leadership.'}
-          showBack
-        />
+        <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+          <ScreenHeader
+            title={story?.title ?? 'Our Story'}
+            kicker="COT"
+            subtitle={story?.subtitle ?? 'Mission, vision, heritage and pastoral leadership.'}
+            showBack
+          />
+        </View>
 
         {/* Tab Toggle */}
-        <View style={styles.tabContainer}>
+        <View style={[styles.tabContainer, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
           <Chip
             label="History & Vision"
             selected={activeTab === 'story'}
@@ -81,28 +84,28 @@ export default function ChurchStoryScreen() {
             hasStoryContent ? (
               <View style={styles.storySection}>
                 {story.mission ? (
-                  <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+                  <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
                     <Text style={[styles.cardKicker, { color: colors.interactive }]}>OUR MISSION</Text>
                     <Text style={[styles.cardBody, { color: colors.text }]}>{story.mission}</Text>
                   </View>
                 ) : null}
 
                 {story.vision ? (
-                  <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+                  <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
                     <Text style={[styles.cardKicker, { color: colors.interactive }]}>OUR VISION</Text>
                     <Text style={[styles.cardBody, { color: colors.text }]}>{story.vision}</Text>
                   </View>
                 ) : null}
 
                 {story.founding_story ? (
-                  <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+                  <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
                     <Text style={[styles.cardKicker, { color: colors.interactive }]}>FOUNDING HERITAGE {story.founding_year ? `(${story.founding_year})` : ''}</Text>
                     <Text style={[styles.cardBody, { color: colors.textSecondary }]}>{story.founding_story}</Text>
                   </View>
                 ) : null}
 
                 {story.values && story.values.length > 0 ? (
-                  <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+                  <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
                     <Text style={[styles.cardKicker, { color: colors.interactive }]}>CORE VALUES</Text>
                     <View style={styles.valuesList}>
                       {story.values.map((val, idx) => (
@@ -157,21 +160,27 @@ const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
   },
+  headerCard: { marginHorizontal: spacing.md, borderWidth: 1, borderRadius: radius.xxl, overflow: 'hidden' },
   tabContainer: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    padding: 5,
     gap: spacing.xs,
-    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderRadius: radius.xl,
+    alignSelf: 'flex-start',
   },
   body: {
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
   },
   storySection: {
     gap: spacing.md,
   },
   sectionCard: {
     padding: spacing.lg,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     borderWidth: 1,
     gap: 6,
   },
@@ -188,7 +197,7 @@ const styles = StyleSheet.create({
   },
   valueBlock: {
     padding: spacing.md,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     gap: 2,
   },
   valueTitle: {

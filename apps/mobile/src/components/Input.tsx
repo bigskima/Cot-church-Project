@@ -10,7 +10,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { useTheme } from '@/state/theme';
-import { radius, spacing, typography } from '@/design-system/tokens';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 import { Icon } from './primitives/Icon';
 
 export interface InputFieldProps extends TextInputProps {
@@ -20,7 +20,7 @@ export interface InputFieldProps extends TextInputProps {
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
   containerStyle?: StyleProp<ViewStyle>;
-  dark?: boolean; // kept for compatibility
+  dark?: boolean;
 }
 
 export function InputField({
@@ -40,28 +40,21 @@ export function InputField({
 
   return (
     <View style={[styles.container, containerStyle]}>
-      {label && <Text style={[styles.label, { color: colors.text }]}>{label}</Text>}
+      {label ? <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text> : null}
       <View
         style={[
           styles.inputWrapper,
           {
             backgroundColor: colors.inputBg,
-            borderColor: error
-              ? colors.live
-              : isFocused
-              ? colors.interactive
-              : colors.inputBorder,
+            borderColor: error ? colors.live : isFocused ? colors.inputBorderFocus : colors.inputBorder,
           },
+          isFocused && styles.focusedInput,
         ]}
       >
-        {leftIcon && <View style={styles.iconLeft}>{leftIcon}</View>}
+        {leftIcon ? <View style={styles.iconLeft}>{leftIcon}</View> : null}
         <TextInput
           placeholderTextColor={colors.textMuted}
-          style={[
-            styles.input,
-            { color: colors.text },
-            style,
-          ]}
+          style={[styles.input, { color: colors.text }, style]}
           onFocus={(e) => {
             setIsFocused(true);
             onFocus?.(e);
@@ -72,10 +65,13 @@ export function InputField({
           }}
           {...props}
         />
-        {rightIcon && <View style={styles.iconRight}>{rightIcon}</View>}
+        {rightIcon ? <View style={styles.iconRight}>{rightIcon}</View> : null}
       </View>
       {error ? (
-        <Text style={[styles.errorText, { color: colors.live }]}>{error}</Text>
+        <View style={styles.supportRow}>
+          <Icon name="alert-circle-outline" size={13} color={colors.live} />
+          <Text style={[styles.errorText, { color: colors.live }]}>{error}</Text>
+        </View>
       ) : helperText ? (
         <Text style={[styles.helperText, { color: colors.textMuted }]}>{helperText}</Text>
       ) : null}
@@ -91,19 +87,20 @@ export interface SearchBarProps {
   onSubmitEditing?: () => void;
   autoFocus?: boolean;
   style?: StyleProp<ViewStyle>;
-  dark?: boolean; // kept for compatibility
+  dark?: boolean;
 }
 
 export function SearchBar({
   value,
   onChangeText,
-  placeholder = 'Search sermons, events, series, topics...',
+  placeholder = 'Search sermons, events, people and topics',
   onClear,
   onSubmitEditing,
   autoFocus = false,
   style,
 }: SearchBarProps) {
   const { colors } = useTheme();
+  const [focused, setFocused] = useState(false);
 
   const handleClear = () => {
     onChangeText('');
@@ -115,13 +112,16 @@ export function SearchBar({
       style={[
         styles.searchContainer,
         {
-          backgroundColor: colors.bgSecondary,
-          borderColor: colors.border,
+          backgroundColor: colors.card,
+          borderColor: focused ? colors.inputBorderFocus : colors.borderSubtle,
         },
+        focused && styles.searchFocused,
         style,
       ]}
     >
-      <Icon name="search" size={18} color={colors.textMuted} style={styles.searchIcon} />
+      <View style={[styles.searchIconWrap, { backgroundColor: colors.bgSecondary }]}>
+        <Icon name="search" size={17} color={focused ? colors.interactive : colors.textMuted} />
+      </View>
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -131,75 +131,95 @@ export function SearchBar({
         returnKeyType="search"
         onSubmitEditing={onSubmitEditing}
         autoFocus={autoFocus}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
       />
-      {value.length > 0 && (
+      {value.length > 0 ? (
         <Pressable
           onPress={handleClear}
           hitSlop={8}
-          style={styles.clearButton}
+          style={({ pressed }) => [
+            styles.clearButton,
+            { backgroundColor: colors.bgSecondary },
+            pressed && { backgroundColor: colors.pressed },
+          ]}
           accessibilityRole="button"
           accessibilityLabel="Clear search"
         >
-          <Icon name="close-circle" size={18} color={colors.textMuted} />
+          <Icon name="close" size={14} color={colors.textSecondary} />
         </Pressable>
-      )}
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    marginBottom: spacing.md,
-  },
+  container: { marginBottom: spacing.lg },
   label: {
     ...typography.caption,
-    fontWeight: '600',
-    marginBottom: spacing.xxs + 2,
+    fontWeight: '700',
+    marginBottom: spacing.sm,
+    paddingHorizontal: 2,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: spacing.md,
-    minHeight: 46,
+    minHeight: 50,
   },
+  focusedInput: { ...shadows.sm },
   input: {
     flex: 1,
-    fontSize: 14,
-    paddingVertical: 10,
+    fontSize: 15,
+    lineHeight: 20,
+    paddingVertical: 12,
   },
-  iconLeft: {
-    marginRight: spacing.sm,
+  iconLeft: { marginRight: spacing.sm },
+  iconRight: { marginLeft: spacing.sm },
+  supportRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 6,
+    paddingHorizontal: 2,
   },
-  iconRight: {
-    marginLeft: spacing.sm,
-  },
-  errorText: {
-    fontSize: 12,
-    marginTop: 4,
-  },
+  errorText: { fontSize: 12, flex: 1 },
   helperText: {
     fontSize: 12,
-    marginTop: 4,
+    lineHeight: 17,
+    marginTop: 6,
+    paddingHorizontal: 2,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    height: 42,
+    borderRadius: radius.pill,
+    paddingHorizontal: 7,
+    minHeight: 48,
     borderWidth: 1,
   },
-  searchIcon: {
+  searchFocused: { ...shadows.sm },
+  searchIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: spacing.sm,
   },
   searchInput: {
     flex: 1,
     fontSize: 14,
-    paddingVertical: 8,
+    paddingVertical: 10,
   },
   clearButton: {
-    padding: 2,
+    width: 30,
+    height: 30,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: spacing.xs,
   },
 });

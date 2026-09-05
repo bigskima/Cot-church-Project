@@ -60,12 +60,12 @@ export function AuditSecurity({ api }: { api: ApiClient }) {
   }, [logs, search]);
 
   return (
-    <div>
+    <div className="admin-page-stack">
       <Card
-        title="Audit & Security"
+        title="Audit & security"
         subtitle={`${total} administrative event${total === 1 ? '' : 's'} · protected activity history`}
         headerAction={
-          <div style={{ display: 'flex', gap: 12 }}>
+          <div className="admin-header-actions">
             <SearchBar
               value={search}
               onChange={setSearch}
@@ -77,7 +77,7 @@ export function AuditSecurity({ api }: { api: ApiClient }) {
           </div>
         }
       >
-        {error ? <div className="admin-form-error" role="alert" style={{ marginBottom: 16 }}>{error}</div> : null}
+        {error ? <div className="admin-inline-error" role="alert">{error}</div> : null}
 
         <Table
           columns={[
@@ -86,10 +86,8 @@ export function AuditSecurity({ api }: { api: ApiClient }) {
               header: 'TARGET',
               accessor: (item) => (
                 <div>
-                  <strong style={{ fontSize: 13 }}>{item.target_type}</strong>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                    {item.target_id ? `ID: ${item.target_id}` : 'No target ID'}
-                  </div>
+                  <div className="admin-row-title">{item.target_type}</div>
+                  <div className="admin-row-meta">{item.target_id ? `ID: ${item.target_id}` : 'No target ID'}</div>
                 </div>
               ),
             },
@@ -100,7 +98,7 @@ export function AuditSecurity({ api }: { api: ApiClient }) {
             {
               header: 'REQUEST',
               accessor: (item) => item.request_id ? (
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>{item.request_id}</span>
+                <span className="admin-secret-reference">{item.request_id}</span>
               ) : '—',
             },
             { header: 'RECORDED', accessor: (item) => new Date(item.occurred_at).toLocaleString() },
@@ -123,7 +121,7 @@ export function AuditSecurity({ api }: { api: ApiClient }) {
       <Modal
         isOpen={!!selectedAudit}
         onClose={() => setSelectedAudit(null)}
-        title="Platform Audit Record"
+        title="Platform audit record"
         subtitle={selectedAudit ? `Event ID: ${selectedAudit.id}` : undefined}
         maxWidth="lg"
         footer={<Button variant="primary" size="md" onClick={() => setSelectedAudit(null)}>Close</Button>}
@@ -136,26 +134,14 @@ export function AuditSecurity({ api }: { api: ApiClient }) {
               <Metric label="TARGET ID" value={selectedAudit.target_id ?? 'None'} />
               <Metric label="ACTOR" value={selectedAudit.profiles?.display_name ?? selectedAudit.actor_profile_id ?? 'system'} />
               <Metric label="REQUEST ID" value={selectedAudit.request_id ?? 'None'} />
-              <div style={{ backgroundColor: 'var(--bg-elevated)', padding: 14, borderRadius: 8 }}>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 800 }}>STORAGE GUARANTEE</div>
-                <div style={{ marginTop: 6 }}><Badge label="APPEND-ONLY" variant="healthy" /></div>
+              <div className="admin-metric-tile">
+                <div className="admin-metric-label">STORAGE GUARANTEE</div>
+                <div style={{ marginTop: 7 }}><Badge label="APPEND-ONLY" variant="healthy" /></div>
               </div>
             </div>
 
             <Card title="Recorded metadata" subtitle="The payload below is the stored event metadata; no synthetic verification fields are added by the UI.">
-              <pre
-                style={{
-                  backgroundColor: 'var(--bg-input)',
-                  padding: 16,
-                  borderRadius: 8,
-                  fontSize: 12,
-                  fontFamily: 'var(--font-mono)',
-                  color: 'var(--text-primary)',
-                  overflowX: 'auto',
-                  whiteSpace: 'pre-wrap',
-                  overflowWrap: 'anywhere',
-                }}
-              >
+              <pre className="admin-code-block">
                 {JSON.stringify(selectedAudit.metadata ?? {}, null, 2)}
               </pre>
             </Card>
@@ -168,9 +154,9 @@ export function AuditSecurity({ api }: { api: ApiClient }) {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ backgroundColor: 'var(--bg-elevated)', padding: 14, borderRadius: 8 }}>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 800 }}>{label}</div>
-      <div style={{ fontSize: 14, fontWeight: 800, marginTop: 4, overflowWrap: 'anywhere' }}>{value}</div>
+    <div className="admin-metric-tile">
+      <div className="admin-metric-label">{label}</div>
+      <div className="admin-metric-value">{value}</div>
     </div>
   );
 }

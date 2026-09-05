@@ -1,4 +1,5 @@
 import React from 'react';
+import Constants from 'expo-constants';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,12 +16,13 @@ import { radius, shadows, spacing } from '@/design-system/tokens';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
-  const { mode, signOut, context } = useSession();
+  const { mode, signOut } = useSession();
   const { preference, setPreference, colors } = useTheme();
+  const appVersion = Constants.expoConfig?.version ?? 'Development build';
 
   const handleSignOut = async () => {
     await signOut();
-    router.replace('/(auth)/login');
+    router.replace('/(tabs)/home');
   };
 
   return (
@@ -29,36 +31,39 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 60 },
+          { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 120 },
         ]}
       >
-        <ScreenHeader
-          title="App Settings & Preferences"
-          subtitle="Customize your appearance, notification alerts, and account security."
-          showBack
-        />
+        <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+          <ScreenHeader
+            title="Settings"
+            kicker="APP"
+            subtitle="Appearance, information and account actions."
+            showBack
+          />
+        </View>
 
         <View style={styles.body}>
           {/* Appearance Settings */}
-          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
             <View style={styles.cardHeader}>
               <Icon name="color-palette-outline" size={20} color={colors.interactive} />
-              <Text style={[styles.cardTitle, { color: colors.text }]}>Appearance & Theme</Text>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Appearance</Text>
             </View>
 
             <View style={styles.themeChips}>
               <Chip
-                label="System Auto"
+                label="System"
                 selected={preference === 'system'}
                 onPress={() => setPreference('system')}
               />
               <Chip
-                label="Light Mode"
+                label="Light"
                 selected={preference === 'light'}
                 onPress={() => setPreference('light')}
               />
               <Chip
-                label="Dark Mode"
+                label="Dark"
                 selected={preference === 'dark'}
                 onPress={() => setPreference('dark')}
               />
@@ -66,10 +71,10 @@ export default function SettingsScreen() {
           </View>
 
           {/* Account Security & Support */}
-          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
             <View style={styles.cardHeader}>
               <Icon name="shield-checkmark-outline" size={20} color={colors.interactive} />
-              <Text style={[styles.cardTitle, { color: colors.text }]}>Security & Support</Text>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>About & support</Text>
             </View>
 
             <Pressable
@@ -78,29 +83,28 @@ export default function SettingsScreen() {
             >
               <View style={styles.menuLeft}>
                 <Icon name="information-circle-outline" size={18} color={colors.text} />
-                <Text style={[styles.menuText, { color: colors.text }]}>About Church of the Truth</Text>
+                <Text style={[styles.menuText, { color: colors.text }]}>About City of Transformation</Text>
               </View>
               <Icon name="chevron-forward" size={16} color={colors.textMuted} />
             </Pressable>
 
             <View style={[styles.divider, { backgroundColor: colors.borderSubtle }]} />
 
-            <Pressable
-              onPress={() => alert('Platform version 1.0.0 (Production Build)')}
-              style={({ pressed }) => [styles.menuRow, pressed && styles.pressed]}
-            >
+            <View style={styles.menuRow}>
               <View style={styles.menuLeft}>
                 <Icon name="code-slash-outline" size={18} color={colors.text} />
-                <Text style={[styles.menuText, { color: colors.text }]}>Platform Version</Text>
+                <Text style={[styles.menuText, { color: colors.text }]}>App version</Text>
               </View>
-              <Text style={[styles.versionTag, { color: colors.textMuted }]}>v1.0.0</Text>
-            </Pressable>
+              <Text style={[styles.versionTag, { color: colors.textMuted }]}>
+                {appVersion === 'Development build' ? appVersion : `v${appVersion}`}
+              </Text>
+            </View>
           </View>
 
           {/* Sign Out Button */}
           {mode !== 'visitor' ? (
             <Button
-              label="Sign Out of Account"
+              label="Sign out"
               onPress={handleSignOut}
               variant="outline"
               size="lg"
@@ -109,8 +113,8 @@ export default function SettingsScreen() {
             />
           ) : (
             <Button
-              label="Sign In to Member Account"
-              onPress={() => router.push('/(auth)/login')}
+              label="Sign in"
+              onPress={() => router.push({ pathname: '/(auth)/login', params: { returnTo: '/settings' } } as any)}
               variant="primary"
               size="lg"
               style={{ marginTop: spacing.md }}
@@ -129,13 +133,15 @@ const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
   },
+  headerCard: { marginHorizontal: spacing.md, borderWidth: 1, borderRadius: radius.xxl, overflow: 'hidden' },
   body: {
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
     gap: spacing.lg,
   },
   card: {
     padding: spacing.lg,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     borderWidth: 1,
     gap: spacing.md,
   },
@@ -146,17 +152,19 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   themeChips: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.xs,
   },
   menuRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: spacing.xs,
+    minHeight: 46,
+    paddingVertical: spacing.sm,
   },
   menuLeft: {
     flexDirection: 'row',
@@ -165,7 +173,7 @@ const styles = StyleSheet.create({
   },
   menuText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   versionTag: {
     fontSize: 12,
@@ -175,6 +183,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   pressed: {
-    opacity: 0.7,
+    opacity: 0.88,
+    transform: [{ scale: 0.992 }],
   },
 });

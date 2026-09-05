@@ -64,6 +64,21 @@ export type ContentItem = {
   expression_id?: string | null;
   group_id?: string | null;
   author_profile_id?: string | null;
+  author?: {
+    id?: string;
+    display_name?: string | null;
+    username?: string | null;
+    avatar_url?: string | null;
+  } | null;
+  expression?: {
+    id?: string;
+    name?: string | null;
+    code?: string | null;
+  } | null;
+  organization?: {
+    id?: string;
+    name?: string | null;
+  } | null;
   content_type: ContentItemType;
   visibility: ContentVisibility;
   status: PublicationStatus;
@@ -381,6 +396,7 @@ export type PrayerRequest = {
   is_anonymous?: boolean;
   status: 'submitted' | 'praying' | 'answered' | 'archived';
   prayer_count?: number;
+  viewer_has_prayed?: boolean;
   created_at: string;
 };
 

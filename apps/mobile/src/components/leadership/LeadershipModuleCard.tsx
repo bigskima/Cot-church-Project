@@ -32,9 +32,9 @@ export function LeadershipModuleCard({
         styles.card,
         {
           backgroundColor: colors.card,
-          borderColor: colors.border,
+          borderColor: colors.borderSubtle,
         },
-        shadows.sm,
+        shadows.md,
         pressed && styles.pressed,
         style,
       ]}
@@ -63,15 +63,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     borderWidth: 1,
     marginBottom: spacing.sm,
     gap: spacing.md,
   },
   iconWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.md,
+    width: 48,
+    height: 48,
+    borderRadius: radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -86,7 +86,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '800',
+    letterSpacing: -0.2,
     flex: 1,
   },
   description: {
@@ -94,6 +95,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   pressed: {
-    opacity: 0.8,
+    opacity: 0.9,
+    transform: [{ scale: 0.992 }],
   },
 });

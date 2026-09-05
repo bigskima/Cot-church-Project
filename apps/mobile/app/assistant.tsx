@@ -123,12 +123,17 @@ export default function AssistantScreen() {
   if (mode !== 'authenticated') {
     return (
       <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top + spacing.xs }]}>
-        <ScreenHeader title="Spiritual Assistant" subtitle="Verified church information and ministry guidance." showBack />
+        <ScreenHeader title="COT Assistant" subtitle="Verified church information and ministry guidance." showBack />
         <View style={styles.stateWrap}>
           <View style={[styles.stateIcon, { backgroundColor: colors.primarySoft }]}><Icon name="sparkles" size={30} color={colors.interactive} /></View>
           <Text style={[styles.stateTitle, { color: colors.text }]}>Sign in to use the church assistant</Text>
           <Text style={[styles.stateBody, { color: colors.textSecondary }]}>The assistant uses your active church context so it can answer only from information you are allowed to access.</Text>
-          <Button label="Sign In" onPress={() => router.replace('/(auth)/login')} variant="primary" size="lg" />
+          <Button
+            label="Sign in"
+            onPress={() => router.push({ pathname: '/(auth)/login', params: { returnTo: '/assistant' } } as any)}
+            variant="primary"
+            size="lg"
+          />
         </View>
       </View>
     );
@@ -137,7 +142,7 @@ export default function AssistantScreen() {
   if (checkingReadiness) {
     return (
       <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top + spacing.xs }]}>
-        <ScreenHeader title="Spiritual Assistant" subtitle="Getting things ready…" showBack />
+        <ScreenHeader title="COT Assistant" subtitle="Getting things ready…" showBack />
         <View style={styles.stateWrap}><Skeleton height={80} count={3} /></View>
       </View>
     );
@@ -146,14 +151,14 @@ export default function AssistantScreen() {
   if (!readiness?.ready) {
     return (
       <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top + spacing.xs }]}>
-        <ScreenHeader title="Spiritual Assistant" subtitle="Helpful answers based on available church information." showBack />
+        <ScreenHeader title="COT Assistant" subtitle="Helpful answers based on available church information." showBack />
         <View style={styles.stateWrap}>
           <View style={[styles.stateIcon, { backgroundColor: colors.bgSecondary }]}><Icon name="sparkles-outline" size={30} color={colors.textMuted} /></View>
           <Badge label="UNAVAILABLE" variant="neutral" />
           <Text style={[styles.stateTitle, { color: colors.text }]}>The church assistant is temporarily unavailable</Text>
           <Text style={[styles.stateBody, { color: colors.textSecondary }]}>Please try again later. You can continue using sermons, events, prayer and the rest of the app while this feature is unavailable.</Text>
           {readinessError ? <Text style={[styles.readinessError, { color: colors.textMuted }]}>We couldn’t confirm availability right now.</Text> : null}
-          <Button label="Check Again" onPress={() => void loadReadiness()} variant="outline" size="md" />
+          <Button label="Check again" onPress={() => void loadReadiness()} variant="outline" size="md" />
         </View>
       </View>
     );
@@ -161,8 +166,8 @@ export default function AssistantScreen() {
 
   return (
     <KeyboardAvoidingView style={[styles.screen, { backgroundColor: colors.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={{ paddingTop: insets.top + spacing.xs }}>
-        <ScreenHeader title="Spiritual Assistant" subtitle="Verified scriptures, sermons, schedules, and church guidance." showBack />
+      <View style={[styles.assistantHeader, { paddingTop: insets.top + spacing.sm, backgroundColor: colors.glass, borderColor: colors.borderSubtle }, shadows.sm]}>
+        <ScreenHeader title="COT Assistant" kicker="VERIFIED CHURCH AI" subtitle="Scriptures, sermons, schedules and church guidance." showBack />
         <View style={styles.providerRow}>
           <Badge label="AVAILABLE" variant="active" />
           <Text style={[styles.providerText, { color: colors.textMuted }]}>Ready to help</Text>
@@ -176,7 +181,7 @@ export default function AssistantScreen() {
         showsVerticalScrollIndicator={false}
         ListFooterComponent={() => messages.length <= 2 ? (
           <View style={styles.suggestionsWrap}>
-            <Text style={[styles.suggestionsLabel, { color: colors.textMuted }]}>Suggested Questions</Text>
+            <Text style={[styles.suggestionsLabel, { color: colors.textMuted }]}>Try asking</Text>
             <View style={styles.chipsWrap}>{suggestedPrompts.map((prompt) => <Chip key={prompt} label={prompt} onPress={() => void handleSend(prompt)} />)}</View>
           </View>
         ) : null}
@@ -185,7 +190,7 @@ export default function AssistantScreen() {
           return (
             <View style={[styles.bubbleRow, isUser ? styles.userRow : styles.assistantRow]}>
               {!isUser ? <View style={[styles.assistantIcon, { backgroundColor: colors.primarySoft }]}><Icon name="sparkles" size={16} color={colors.interactive} /></View> : null}
-              <View style={[styles.bubble, isUser ? { backgroundColor: colors.interactive } : { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }, shadows.sm]}>
+              <View style={[styles.bubble, isUser ? { backgroundColor: colors.interactive } : { backgroundColor: colors.card, borderColor: colors.borderSubtle, borderWidth: 1 }, isUser ? shadows.none : shadows.sm]}>
                 <Text style={[styles.bubbleText, { color: isUser ? '#FFFFFF' : colors.text }, item.pending && { color: colors.textMuted, fontStyle: 'italic' }]}>{item.text}</Text>
               </View>
             </View>
@@ -195,13 +200,13 @@ export default function AssistantScreen() {
 
       {error ? <View style={[styles.errorBar, { backgroundColor: colors.liveSoft }]}><Text style={[styles.errorText, { color: colors.live }]}>{error}</Text></View> : null}
 
-      <View style={[styles.composer, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+      <View style={[styles.composer, { backgroundColor: colors.glass, borderColor: colors.borderSubtle, marginBottom: Math.max(insets.bottom, spacing.sm) }, shadows.floating]}>
         <TextInput
           value={text}
           onChangeText={setText}
           placeholder="Ask about sermons, scriptures, prayer..."
           placeholderTextColor={colors.textMuted}
-          style={[styles.input, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
+          style={[styles.input, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.borderSubtle }]}
           multiline
           maxLength={400}
         />
@@ -221,26 +226,27 @@ export default function AssistantScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  stateWrap: { flex: 1, paddingHorizontal: spacing.xxl, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
+  stateWrap: { flex: 1, paddingHorizontal: spacing.lg, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
   stateIcon: { width: 68, height: 68, borderRadius: 34, alignItems: 'center', justifyContent: 'center' },
   stateTitle: { fontSize: 20, fontWeight: '800', textAlign: 'center' },
   stateBody: { fontSize: 13, lineHeight: 20, textAlign: 'center', maxWidth: 460 },
   readinessError: { fontSize: 12, textAlign: 'center' },
-  providerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
+  assistantHeader: { marginHorizontal: spacing.md, marginTop: spacing.xs, borderWidth: 1, borderRadius: radius.xxl, overflow: 'hidden' },
+  providerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, paddingBottom: spacing.md },
   providerText: { fontSize: 11, fontWeight: '600' },
-  chatList: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, gap: spacing.md },
+  chatList: { paddingHorizontal: spacing.md, paddingVertical: spacing.lg, gap: spacing.md },
   bubbleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs },
   userRow: { justifyContent: 'flex-end' },
   assistantRow: { justifyContent: 'flex-start' },
   assistantIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
-  bubble: { maxWidth: '80%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: radius.lg },
+  bubble: { maxWidth: '84%', paddingHorizontal: 14, paddingVertical: 11, borderRadius: radius.xl },
   bubbleText: { fontSize: 14, lineHeight: 20 },
   suggestionsWrap: { marginTop: spacing.lg, gap: spacing.xs },
-  suggestionsLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3, textTransform: 'uppercase' },
+  suggestionsLabel: { fontSize: 12, fontWeight: '800', letterSpacing: 0.1 },
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  errorBar: { paddingHorizontal: spacing.lg, paddingVertical: 6 },
+  errorBar: { marginHorizontal: spacing.md, marginBottom: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: 8, borderRadius: radius.lg },
   errorText: { fontSize: 12, textAlign: 'center' },
-  composer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.sm, borderTopWidth: 1, gap: spacing.sm },
-  input: { flex: 1, borderRadius: radius.md, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8, fontSize: 14, maxHeight: 90 },
+  composer: { flexDirection: 'row', alignItems: 'flex-end', marginHorizontal: spacing.md, padding: spacing.sm, borderWidth: 1, borderRadius: radius.xxl, gap: spacing.sm },
+  input: { flex: 1, borderRadius: radius.lg, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, maxHeight: 110 },
   sendBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
 });

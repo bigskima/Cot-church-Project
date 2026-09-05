@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ApiClient } from '../api';
-import { Badge, Button, Card, InputField, SelectField, StatWidget, Table } from '../components/ui';
+import { Badge, Button, Card, InputField, Modal, SelectField, StatWidget, Table } from '../components/ui';
 
 type SecretCategory = 'ai' | 'streaming' | 'payments' | 'communications' | 'integration' | 'other';
 
@@ -55,6 +55,8 @@ export function ProviderCredentials({ api }: { api: ApiClient }) {
   const [items, setItems] = useState<SecretMetadata[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<SecretMetadata | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [reference, setReference] = useState('');
@@ -80,24 +82,47 @@ export function ProviderCredentials({ api }: { api: ApiClient }) {
 
   useEffect(() => { void load(); }, [api]);
 
+  const clearForm = () => {
+    setReference('');
+    setCategory('ai');
+    setProviderCode('');
+    setDescription('');
+    setValue('');
+    setShowValue(false);
+    setHelper('The credential is encrypted in Supabase Vault and cannot be read back from this UI.');
+    setError('');
+  };
+
+  const openNew = () => {
+    clearForm();
+    setSuccess('');
+    setEditorOpen(true);
+  };
+
   const applyPreset = (preset: Preset) => {
     setReference(preset.reference);
     setCategory(preset.category);
     setProviderCode(preset.providerCode);
     setDescription(preset.description);
     setValue('');
+    setShowValue(false);
     setHelper(preset.helper);
     setSuccess('');
     setError('');
+    setEditorOpen(true);
   };
 
-  const clearForm = () => {
-    setReference('');
-    setProviderCode('');
-    setDescription('');
+  const openRotate = (item: SecretMetadata) => {
+    setReference(item.secret_reference);
+    setCategory(item.category);
+    setProviderCode(item.provider_code ?? '');
+    setDescription(item.description ?? '');
     setValue('');
     setShowValue(false);
-    setHelper('The credential is encrypted in Supabase Vault and cannot be read back from this UI.');
+    setHelper('Paste a new value to rotate this credential. The previous value is replaced atomically in Vault.');
+    setSuccess('');
+    setError('');
+    setEditorOpen(true);
   };
 
   const store = async () => {
@@ -110,6 +135,7 @@ export function ProviderCredentials({ api }: { api: ApiClient }) {
       setError('Paste the provider credential before saving.');
       return;
     }
+
     setBusy(true);
     setError('');
     setSuccess('');
@@ -125,10 +151,10 @@ export function ProviderCredentials({ api }: { api: ApiClient }) {
           description: description.trim() || undefined,
         }),
       });
-      // Never retain the raw secret in component state after the request succeeds.
       setValue('');
       setShowValue(false);
-      setSuccess(`${normalized} was encrypted and stored. The value cannot be read back from the Admin UI.`);
+      setEditorOpen(false);
+      setSuccess(`${normalized} was encrypted and stored. The value cannot be read back from Platform Administration.`);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to store provider credential.');
@@ -150,8 +176,9 @@ export function ProviderCredentials({ api }: { api: ApiClient }) {
     }
   };
 
-  const remove = async (secretReference: string) => {
-    if (!window.confirm(`Remove ${secretReference} from Platform Vault? Provider features using this reference will stop working unless the same reference exists as a deployment environment secret.`)) return;
+  const remove = async () => {
+    if (!deleteTarget) return;
+    const secretReference = deleteTarget.secret_reference;
     setBusy(true);
     setError('');
     setSuccess('');
@@ -166,6 +193,7 @@ export function ProviderCredentials({ api }: { api: ApiClient }) {
         delete next[secretReference];
         return next;
       });
+      setDeleteTarget(null);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to remove provider credential.');
@@ -180,69 +208,102 @@ export function ProviderCredentials({ api }: { api: ApiClient }) {
     return result;
   }, [items]);
 
+  const rotatingExisting = items.some((item) => item.secret_reference === reference.trim().toUpperCase());
+
   return (
-    <div>
+    <div className="admin-page-stack">
       <div className="admin-stats-grid">
-        <StatWidget title="Encrypted Credentials" value={items.length} subtitle="Stored in Supabase Vault" trend={{ value: 'NO READBACK', isPositive: true }} icon="🔐" variant="success" />
-        <StatWidget title="AI Credentials" value={categoryCounts.ai ?? 0} subtitle="OpenAI, Gemini, Claude and future adapters" trend={{ value: 'PROVIDER NEUTRAL', isPositive: true }} icon="✦" />
-        <StatWidget title="Media & Payment" value={(categoryCounts.streaming ?? 0) + (categoryCounts.payments ?? 0)} subtitle="Streaming and gateway infrastructure" trend={{ value: 'SERVER ONLY', isPositive: true }} icon="🛡" variant="gold" />
+        <StatWidget title="Encrypted credentials" value={items.length} subtitle="Stored in Supabase Vault" trend={{ value: 'NO READBACK', isPositive: true }} icon="VAULT" variant="success" />
+        <StatWidget title="AI credentials" value={categoryCounts.ai ?? 0} subtitle="OpenAI, Gemini, Claude and future adapters" trend={{ value: 'PROVIDER NEUTRAL', isPositive: true }} icon="AI" />
+        <StatWidget title="Media & payment" value={(categoryCounts.streaming ?? 0) + (categoryCounts.payments ?? 0)} subtitle="Streaming and gateway infrastructure" trend={{ value: 'SERVER ONLY', isPositive: true }} icon="SEC" variant="gold" />
       </div>
 
-      {error ? <div className="admin-form-error" role="alert" style={{ marginBottom: 16 }}>{error}</div> : null}
-      {success ? <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, border: '1px solid var(--success)', color: 'var(--success)' }}>{success}</div> : null}
+      {error && !editorOpen && !deleteTarget ? <div className="admin-inline-error" role="alert">{error}</div> : null}
+      {success ? <div className="admin-status-message admin-status-success">{success}</div> : null}
 
-      <Card title="Quick Provider Presets" subtitle="Choose a common credential to prefill its safe server reference. You still paste the real value yourself.">
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+      <Card
+        title="Provider credentials"
+        subtitle="Only metadata is displayed. Raw credential values are write-only and cannot be retrieved from this screen."
+        headerAction={<div className="admin-header-actions"><Button variant="outline" size="sm" onClick={() => void load()} loading={loading}>Refresh</Button><Button variant="gold" size="sm" onClick={openNew}>Add credential</Button></div>}
+      >
+        <div className="admin-preset-strip">
           {presets.map((preset) => <Button key={preset.reference} variant="outline" size="sm" onClick={() => applyPreset(preset)}>{preset.label}</Button>)}
         </div>
-      </Card>
 
-      <Card title={items.some((item) => item.secret_reference === reference.trim().toUpperCase()) ? 'Rotate Provider Credential' : 'Add Provider Credential'} subtitle="The raw value travels only to the authenticated Edge Function and encrypted Vault write. It is never stored in the browser after a successful save.">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
-          <InputField label="Secret reference" value={reference} onChange={(event) => setReference(event.target.value.toUpperCase())} placeholder="AI_OPENAI_PRIMARY" autoComplete="off" helperText="Stable server-side name used by provider configuration." />
-          <SelectField label="Category" value={category} onChange={(event) => setCategory(event.target.value as SecretCategory)} options={categoryOptions} />
-          <InputField label="Provider code" value={providerCode} onChange={(event) => setProviderCode(event.target.value.toLowerCase())} placeholder="openai, mux, paystack..." autoComplete="off" />
-          <InputField label="Description" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="What this credential is used for" autoComplete="off" />
-        </div>
-        <div style={{ marginTop: 14 }}>
-          <InputField
-            label="API key / credential value"
-            type={showValue ? 'text' : 'password'}
-            value={value}
-            onChange={(event) => setValue(event.target.value)}
-            placeholder="Paste the secret value here"
-            autoComplete="new-password"
-            spellCheck={false}
-            helperText={helper}
-          />
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 10 }}>
-            <Button variant="outline" size="sm" onClick={() => setShowValue((current) => !current)}>{showValue ? 'Hide value' : 'Show while entering'}</Button>
-            <Button variant="gold" size="sm" onClick={() => void store()} loading={busy}>Encrypt & Save Credential</Button>
-            <Button variant="ghost" size="sm" onClick={clearForm} disabled={busy}>Clear form</Button>
-          </div>
-        </div>
-      </Card>
-
-      <Card title="Stored Credential References" subtitle="Only metadata is displayed. Raw values cannot be retrieved through this screen." headerAction={<Button variant="outline" size="sm" onClick={() => void load()} loading={loading}>Refresh</Button>}>
         <Table
           columns={[
-            { header: 'REFERENCE', accessor: (item) => <div><strong style={{ fontFamily: 'var(--font-mono)' }}>{item.secret_reference}</strong><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{item.description || 'No description'}</div></div> },
+            { header: 'REFERENCE', accessor: (item) => <div><strong className="admin-secret-reference">{item.secret_reference}</strong><div className="admin-row-meta">{item.description || 'No description'}</div></div> },
             { header: 'CATEGORY', accessor: (item) => <Badge label={item.category.toUpperCase()} variant="neutral" /> },
             { header: 'PROVIDER', accessor: (item) => item.provider_code || '—' },
             { header: 'ROTATED', accessor: (item) => item.rotated_at ? new Date(item.rotated_at).toLocaleString() : '—' },
-            { header: 'RUNTIME CHECK', accessor: (item) => {
+            { header: 'RUNTIME', accessor: (item) => {
               const state = checks[item.secret_reference];
               if (!state) return <Button variant="outline" size="sm" onClick={() => void check(item.secret_reference)}>Check</Button>;
               return <Badge label={state.configured ? (state.source === 'platform_vault' ? 'VAULT READY' : 'ENV READY') : 'MISSING'} variant={state.configured ? 'active' : 'warning'} />;
             } },
-            { header: 'ACTIONS', accessor: (item) => <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><Button variant="outline" size="sm" onClick={() => { setReference(item.secret_reference); setCategory(item.category); setProviderCode(item.provider_code ?? ''); setDescription(item.description ?? ''); setValue(''); setHelper('Paste a new value to rotate this credential. The previous value will be replaced atomically in Vault.'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Rotate</Button><Button variant="danger" size="sm" disabled={busy} onClick={() => void remove(item.secret_reference)}>Remove</Button></div> },
+            { header: 'ACTIONS', accessor: (item) => <div className="admin-table-actions"><Button variant="outline" size="sm" onClick={() => openRotate(item)}>Rotate</Button><Button variant="danger" size="sm" disabled={busy} onClick={() => { setError(''); setDeleteTarget(item); }}>Remove</Button></div> },
           ]}
           data={items}
           keyExtractor={(item) => item.secret_reference}
           loading={loading}
-          emptyMessage="No Platform Vault credentials have been stored yet. Deployment environment secrets can still work until you migrate them here."
+          emptyMessage="No Platform Vault credentials have been stored yet. Deployment environment secrets can still operate until migrated here."
         />
       </Card>
+
+      <Modal
+        isOpen={editorOpen}
+        onClose={() => { if (!busy) setEditorOpen(false); }}
+        title={rotatingExisting ? 'Rotate provider credential' : 'Add provider credential'}
+        subtitle="The raw value is sent only to the authenticated server function and encrypted Vault write."
+        maxWidth="lg"
+        footer={
+          <>
+            <Button variant="outline" size="md" disabled={busy} onClick={() => setEditorOpen(false)}>Cancel</Button>
+            <Button variant="gold" size="md" loading={busy} onClick={() => void store()}>{rotatingExisting ? 'Rotate credential' : 'Encrypt & save'}</Button>
+          </>
+        }
+      >
+        <div className="admin-modal-form">
+          {error ? <div className="admin-inline-error" role="alert">{error}</div> : null}
+          <div className="admin-form-grid-two">
+            <InputField label="Secret reference" value={reference} onChange={(event) => setReference(event.target.value.toUpperCase())} placeholder="AI_OPENAI_PRIMARY" autoComplete="off" helperText="Stable server-side reference." />
+            <SelectField label="Category" value={category} onChange={(event) => setCategory(event.target.value as SecretCategory)} options={categoryOptions} />
+            <InputField label="Provider code" value={providerCode} onChange={(event) => setProviderCode(event.target.value.toLowerCase())} placeholder="openai, mux, paystack…" autoComplete="off" />
+            <InputField label="Description" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="What this credential is used for" autoComplete="off" />
+          </div>
+          <InputField
+            label="Credential value"
+            type={showValue ? 'text' : 'password'}
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            placeholder="Paste the secret value"
+            autoComplete="new-password"
+            spellCheck={false}
+            helperText={helper}
+          />
+          <Button variant="ghost" size="sm" onClick={() => setShowValue((current) => !current)}>{showValue ? 'Hide value' : 'Show while entering'}</Button>
+          <div className="admin-info-callout">Secret values are never displayed again after a successful save.</div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={!!deleteTarget}
+        onClose={() => { if (!busy) setDeleteTarget(null); }}
+        title="Remove provider credential"
+        subtitle={deleteTarget?.secret_reference}
+        maxWidth="sm"
+        footer={
+          <>
+            <Button variant="outline" size="md" disabled={busy} onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button variant="danger" size="md" loading={busy} onClick={() => void remove()}>Remove credential</Button>
+          </>
+        }
+      >
+        {error ? <div className="admin-inline-error" role="alert">{error}</div> : null}
+        <div className="admin-warning-callout">
+          Removing this Vault reference can stop provider features unless the same reference is supplied by the deployment environment.
+        </div>
+      </Modal>
     </div>
   );
 }

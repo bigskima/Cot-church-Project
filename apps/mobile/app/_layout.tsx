@@ -8,6 +8,7 @@ import { SessionProvider } from '@/state/session';
 import { ThemeProvider, useTheme } from '@/state/theme';
 import { BrandingProvider } from '@/state/branding';
 import { fetchPlatformBranding } from '@/services/branding';
+import { palette, radius, spacing } from '@/design-system/tokens';
 
 // Keep the native splash visible only until the React application shell mounts.
 // Remote configuration must never block every route from rendering.
@@ -74,9 +75,12 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   return (
     <View style={styles.errorScreen}>
       <View style={styles.errorCard}>
+        <View style={styles.errorIcon}>
+          <Text style={styles.errorIconText}>!</Text>
+        </View>
         <Text style={styles.errorTitle}>We couldn’t open this screen</Text>
         <Text style={styles.errorMessage}>
-          Something went wrong while opening this page. Please try again.
+          Something went wrong while opening this page. Your account and church data have not been changed.
         </Text>
         {showTechnicalDetail && error?.message ? (
           <Text style={styles.technicalMessage}>{error.message}</Text>
@@ -106,34 +110,35 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   errorScreen: {
     flex: 1,
-    backgroundColor: '#07111F',
+    backgroundColor: palette.darkBg,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    padding: spacing.xxl,
   },
   errorCard: {
     width: '100%',
     maxWidth: 460,
-    borderRadius: 16,
+    borderRadius: radius.xxl,
     borderWidth: 1,
-    borderColor: '#21344B',
-    backgroundColor: '#0C1929',
-    padding: 24,
+    borderColor: palette.darkBorder,
+    backgroundColor: palette.darkCard,
+    padding: spacing.xxl,
   },
   errorTitle: {
-    color: '#F8FAFC',
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 8,
+    color: palette.textDarkPrimary,
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+    marginBottom: spacing.sm,
   },
   errorMessage: {
-    color: '#CBD5E1',
+    color: palette.textDarkSecondary,
     fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 20,
+    lineHeight: 21,
+    marginBottom: spacing.xl,
   },
   technicalMessage: {
-    color: '#94A3B8',
+    color: palette.textDarkMuted,
     fontSize: 12,
     lineHeight: 18,
     marginTop: -10,
@@ -141,8 +146,8 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     minHeight: 46,
-    borderRadius: 10,
-    backgroundColor: '#2F6FED',
+    borderRadius: radius.lg,
+    backgroundColor: palette.blue,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 18,
@@ -150,6 +155,21 @@ const styles = StyleSheet.create({
   retryText: {
     color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '800',
+  },
+  errorIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: palette.liveSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  errorIconText: {
+    color: palette.live,
+    fontSize: 24,
+    lineHeight: 28,
+    fontWeight: '800',
   },
 });

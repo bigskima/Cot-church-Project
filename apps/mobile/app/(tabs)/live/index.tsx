@@ -14,7 +14,7 @@ import {
   SectionHeader,
   Skeleton,
 } from '@/components';
-import { spacing } from '@/design-system/tokens';
+import { radius, shadows, spacing } from '@/design-system/tokens';
 import type { LiveStream } from '@/types/content';
 
 type LiveHomePayload = {
@@ -54,7 +54,7 @@ export default function LiveDiscoveryScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + spacing.sm, paddingBottom: 60 },
+          { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 120 },
         ]}
         refreshControl={
           <RefreshControl
@@ -64,11 +64,14 @@ export default function LiveDiscoveryScreen() {
           />
         }
       >
-        <ScreenHeader
-          title="Live Broadcasts"
-          subtitle={expression?.name ? `General Community and ${expression.name} broadcasts.` : 'Live services and replays available to the General Community.'}
-          showBack
-        />
+        <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+          <ScreenHeader
+            title="Live"
+            kicker="BROADCASTS"
+            subtitle={expression?.name ? `General Community + ${expression.name}` : 'Services, gatherings and replays from COT.'}
+            showBack
+          />
+        </View>
 
         <View style={styles.body}>
           {resource.loading && !resource.data ? (
@@ -136,8 +139,9 @@ export default function LiveDiscoveryScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: { flexGrow: 1 },
-  body: { paddingHorizontal: spacing.lg, gap: spacing.lg },
+  body: { paddingHorizontal: spacing.md, gap: spacing.xl },
+  headerCard: { marginHorizontal: spacing.md, borderWidth: 1, borderRadius: radius.xxl, overflow: 'hidden' },
   loadingWrapper: { gap: spacing.md },
-  sectionWrap: { gap: spacing.xs },
+  sectionWrap: { gap: spacing.sm },
   carouselContainer: { gap: spacing.md, paddingVertical: spacing.xs },
 });

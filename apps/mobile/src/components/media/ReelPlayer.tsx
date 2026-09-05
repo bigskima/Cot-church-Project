@@ -20,10 +20,12 @@ export interface ReelPlayerProps {
   expressionName?: string;
   isFollowing?: boolean;
   isActive?: boolean;
+  initialLiked?: boolean;
+  initialSaved?: boolean;
   onFollow?: () => void;
-  onLike?: () => boolean | Promise<boolean>;
+  onLike?: (currentlyLiked: boolean) => boolean | Promise<boolean>;
   onOpenComments?: () => void;
-  onSave?: () => boolean | Promise<boolean>;
+  onSave?: (currentlySaved: boolean) => boolean | Promise<boolean>;
   onShare?: () => void;
   containerHeight?: number;
 }
@@ -33,6 +35,8 @@ export function ReelPlayer({
   expressionName,
   isFollowing = false,
   isActive = true,
+  initialLiked = false,
+  initialSaved = false,
   onFollow,
   onLike,
   onOpenComments,
@@ -41,8 +45,8 @@ export function ReelPlayer({
   containerHeight,
 }: ReelPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(true);
-  const [isLiked, setIsLiked] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
+  const [isLiked, setIsLiked] = useState(initialLiked);
+  const [isSaved, setIsSaved] = useState(initialSaved);
   const [isCaptionExpanded, setIsCaptionExpanded] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
 
@@ -50,6 +54,18 @@ export function ReelPlayer({
     reel.media_assets?.renditions?.find((r) => r.rendition_kind === 'video_stream')?.storage_path ||
     reel.media_assets?.url;
   const thumbnailUrl = reel.media_assets?.thumbnailUrl || reel.media_assets?.url;
+  const contentIdentity = reel.content_items;
+  const creator = contentIdentity?.author;
+  const resolvedExpressionName = expressionName || contentIdentity?.expression?.name || undefined;
+  const creatorName =
+    creator?.display_name ||
+    resolvedExpressionName ||
+    contentIdentity?.organization?.name ||
+    'City of Transformation';
+  const creatorMeta = [
+    creator?.username ? `@${creator.username}` : null,
+    resolvedExpressionName && resolvedExpressionName !== creatorName ? resolvedExpressionName : null,
+  ].filter(Boolean).join(' · ');
 
   const player = useVideoPlayer(videoUrl || '', (p) => {
     p.loop = true;
@@ -93,18 +109,28 @@ export function ReelPlayer({
     }
   };
 
+  useEffect(() => {
+    setIsLiked(initialLiked);
+  }, [initialLiked, reel.id]);
+
+  useEffect(() => {
+    setIsSaved(initialSaved);
+  }, [initialSaved, reel.id]);
+
   const toggleLike = async () => {
-    if (!onLike || await onLike()) setIsLiked((value) => !value);
+    const next = onLike ? await onLike(isLiked) : !isLiked;
+    setIsLiked(next);
   };
 
   const toggleSave = async () => {
-    if (!onSave || await onSave()) setIsSaved((value) => !value);
+    const next = onSave ? await onSave(isSaved) : !isSaved;
+    setIsSaved(next);
   };
 
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Watch this reel on Church: ${reel.caption || 'Spiritual teaching'}`,
+        message: `Watch this Reel on City of Transformation: ${reel.caption || 'Church video'}`,
       });
       onShare?.();
     } catch {
@@ -167,7 +193,7 @@ export function ReelPlayer({
               />
             </View>
             <Text style={styles.actionLabel}>
-              {reel.likes_count + (isLiked ? 1 : 0)}
+              {Math.max(0, reel.likes_count + (isLiked ? 1 : 0) - (initialLiked ? 1 : 0))}
             </Text>
           </Pressable>
 
@@ -197,7 +223,7 @@ export function ReelPlayer({
               <Icon
                 name={isSaved ? 'bookmark' : 'bookmark-outline'}
                 size={24}
-                color={isSaved ? '#1D9BF0' : '#FFFFFF'}
+                color={isSaved ? '#168FF0' : '#FFFFFF'}
               />
             </View>
             <Text style={styles.actionLabel}>Save</Text>
@@ -225,10 +251,11 @@ export function ReelPlayer({
         >
           {/* Creator Identity */}
           <View style={styles.creatorRow}>
-            <Avatar name={expressionName || 'Church'} size="sm" />
-            <Text style={styles.creatorName} numberOfLines={1}>
-              {expressionName || 'Church Fellowship'}
-            </Text>
+            <Avatar url={creator?.avatar_url} name={creatorName} size="sm" />
+            <View style={styles.creatorCopy}>
+              <Text style={styles.creatorName} numberOfLines={1}>{creatorName}</Text>
+              {creatorMeta ? <Text style={styles.creatorMeta} numberOfLines={1}>{creatorMeta}</Text> : null}
+            </View>
             {onFollow ? (
               <Pressable
                 onPress={onFollow}
@@ -337,7 +364,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(239, 68, 68, 0.25)',
   },
   savedCircle: {
-    backgroundColor: 'rgba(29, 155, 240, 0.25)',
+    backgroundColor: 'rgba(22, 143, 240, 0.25)',
   },
   actionLabel: {
     color: '#FFFFFF',
@@ -362,14 +389,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
+  creatorCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
   creatorName: {
     color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '800',
     flexShrink: 1,
     textShadowColor: 'rgba(0, 0, 0, 0.8)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+  },
+  creatorMeta: {
+    color: 'rgba(255,255,255,0.78)',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 1,
   },
   followBtn: {
     paddingHorizontal: 12,

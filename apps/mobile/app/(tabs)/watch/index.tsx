@@ -22,7 +22,7 @@ import {
   VideoCard,
   WatchSkeleton,
 } from '@/components';
-import { radius, spacing } from '@/design-system/tokens';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 import type { Reel, Sermon, Video } from '@/types/content';
 
 export default function WatchScreen() {
@@ -61,7 +61,15 @@ export default function WatchScreen() {
       ? videos
       : videos.filter((v) => v.category?.toLowerCase() === selectedCategory.toLowerCase());
 
-  const categories = ['all', 'Sermons', 'Worship', 'Conferences', 'Devotionals', 'Documentary'];
+  const categories = [
+    { value: 'all', label: 'All videos' },
+    { value: 'teaching', label: 'Teachings' },
+    { value: 'worship', label: 'Worship' },
+    { value: 'conference', label: 'Conferences' },
+    { value: 'testimony', label: 'Testimonies' },
+    { value: 'interview', label: 'Interviews' },
+    { value: 'documentary', label: 'Documentary' },
+  ];
 
   const openReels = () => router.push('/reels');
 
@@ -72,12 +80,15 @@ export default function WatchScreen() {
           styles.headerBar,
           {
             paddingTop: insets.top + spacing.xs,
-            backgroundColor: colors.bg,
-            borderBottomColor: colors.borderSubtle,
+            backgroundColor: colors.glass,
+            borderColor: colors.borderSubtle,
           },
         ]}
       >
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Watch</Text>
+        <View>
+          <Text style={[styles.headerKicker, { color: colors.interactive }]}>WATCH</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Long-form & teachings</Text>
+        </View>
       </View>
 
       {/* Entry point into full-screen Reels */}
@@ -86,30 +97,30 @@ export default function WatchScreen() {
           onPress={openReels}
           accessibilityRole="button"
           accessibilityLabel="Open full-screen Shorts"
-          style={[styles.reelsBanner, { backgroundColor: '#061426', borderColor: '#1A263D' }]}
+          style={({ pressed }) => [styles.reelsBanner, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md, pressed && styles.pressed]}
         >
           <View style={styles.reelsBannerIconWrap}>
-            <Icon name="play-circle" size={22} color="#EF4444" />
+            <Icon name="play-circle" size={22} color={colors.live} />
           </View>
           <View style={styles.reelsBannerCopy}>
-            <Text style={styles.reelsBannerTitle}>Shorts & Story Clips</Text>
-            <Text style={styles.reelsBannerSubtitle}>
-              {reels.length} short clips · Full-screen viewing
+            <Text style={[styles.reelsBannerTitle, { color: colors.text }]}>Reels</Text>
+            <Text style={[styles.reelsBannerSubtitle, { color: colors.textMuted }]}>
+              {reels.length} vertical clips · Full-screen viewing
             </Text>
           </View>
-          <Icon name="chevron-forward" size={18} color="#94A3B8" />
+          <Icon name="chevron-forward" size={18} color={colors.textMuted} />
         </Pressable>
       ) : null}
 
       {/* Category Chips Bar */}
       <View style={[styles.categoriesContainer, { borderBottomColor: colors.borderSubtle }]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
-          {categories.map((cat) => (
+          {categories.map((category) => (
             <Chip
-              key={cat}
-              label={cat === 'all' ? 'All Videos' : cat}
-              selected={selectedCategory === cat}
-              onPress={() => setSelectedCategory(cat)}
+              key={category.value}
+              label={category.label}
+              selected={selectedCategory === category.value}
+              onPress={() => setSelectedCategory(category.value)}
             />
           ))}
         </ScrollView>
@@ -119,7 +130,7 @@ export default function WatchScreen() {
         data={filteredVideos}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 48 }]}
+        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 130 }]}
         refreshControl={
           <RefreshControl
             refreshing={catalogue.refreshing}
@@ -129,7 +140,7 @@ export default function WatchScreen() {
         }
         ListHeaderComponent={
           filteredVideos.length > 0 ? (
-            <Text style={[styles.featuredTitle, { color: colors.text }]}>Long-form Teachings</Text>
+            <Text style={[styles.featuredTitle, { color: colors.text }]}>Featured videos</Text>
           ) : null
         }
         ListEmptyComponent={
@@ -178,24 +189,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: 1,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.md,
+    borderWidth: 1,
+    borderRadius: radius.xl,
   },
+  headerKicker: { ...typography.kicker, marginBottom: 2 },
   headerTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    letterSpacing: -0.5,
+    ...typography.h1,
   },
   reelsBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: spacing.lg,
+    marginHorizontal: spacing.md,
     marginTop: spacing.md,
     padding: spacing.md,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     borderWidth: 1,
     gap: spacing.md,
   },
@@ -212,12 +223,11 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   reelsBannerTitle: {
-    color: '#F8FAFC',
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: -0.2,
   },
   reelsBannerSubtitle: {
-    color: '#94A3B8',
     fontSize: 12,
   },
   categoriesContainer: {
@@ -229,7 +239,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   listContent: {
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
     gap: spacing.md,
   },
@@ -239,9 +249,10 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   sermonsSection: {
-    marginTop: spacing.lg,
+    marginTop: spacing.xl,
     paddingTop: spacing.lg,
     borderTopWidth: 1,
     borderTopColor: 'transparent',
   },
+  pressed: { opacity: 0.9, transform: [{ scale: 0.992 }] },
 });

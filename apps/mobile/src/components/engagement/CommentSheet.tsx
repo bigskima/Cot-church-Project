@@ -30,6 +30,7 @@ export function CommentSheet({ visible, onClose, comments, onSubmitComment, load
   const { colors } = useTheme();
   const [text, setText] = useState('');
   const [replyingTo, setReplyingTo] = useState<ContentComment | null>(null);
+  const [submitError, setSubmitError] = useState('');
 
   const identityFor = (item: ContentComment) => {
     const row = item as any;
@@ -46,9 +47,14 @@ export function CommentSheet({ visible, onClose, comments, onSubmitComment, load
     if (!text.trim() || loading) return;
     const bodyToSend = text.trim();
     const parentId = replyingTo?.id;
-    await onSubmitComment(bodyToSend, parentId);
-    setText('');
-    setReplyingTo(null);
+    setSubmitError('');
+    try {
+      await onSubmitComment(bodyToSend, parentId);
+      setText('');
+      setReplyingTo(null);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Unable to post this comment.');
+    }
   };
 
   return (
@@ -59,11 +65,11 @@ export function CommentSheet({ visible, onClose, comments, onSubmitComment, load
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={[
             styles.sheet,
-            { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, spacing.md) },
+            { backgroundColor: colors.card, borderColor: colors.borderSubtle, paddingBottom: Math.max(insets.bottom, spacing.md) },
             shadows.lg,
           ]}
         >
-          <View style={[styles.header, { borderBottomColor: colors.border }]}>
+          <View style={[styles.header, { borderBottomColor: colors.borderSubtle }]}>
             <View style={[styles.dragHandle, { backgroundColor: colors.borderStrong }]} />
             <View style={styles.headerRow}>
               <Text style={[styles.headerTitle, { color: colors.text }]}>Comments ({comments.length})</Text>
@@ -124,13 +130,20 @@ export function CommentSheet({ visible, onClose, comments, onSubmitComment, load
             </View>
           ) : null}
 
-          <View style={[styles.inputBar, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
+          {submitError ? (
+            <View style={[styles.submitError, { backgroundColor: colors.liveSoft }]}>
+              <Icon name="alert-circle-outline" size={15} color={colors.live} />
+              <Text style={[styles.submitErrorText, { color: colors.live }]}>{submitError}</Text>
+            </View>
+          ) : null}
+
+          <View style={[styles.inputBar, { backgroundColor: colors.glass, borderTopColor: colors.borderSubtle }]}>
             <TextInput
               value={text}
               onChangeText={setText}
               placeholder={replyingTo ? 'Write a reply...' : 'Add a thoughtful comment...'}
               placeholderTextColor={colors.textMuted}
-              style={[styles.textInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.border }]}
+              style={[styles.textInput, { backgroundColor: colors.inputBg, color: colors.text, borderColor: colors.borderSubtle }]}
               multiline
               maxLength={3000}
             />
@@ -151,21 +164,21 @@ export function CommentSheet({ visible, onClose, comments, onSubmitComment, load
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(6, 20, 38, 0.65)' },
+  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0, 0, 0, 0.56)' },
   dismissArea: { flex: 1 },
-  sheet: { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, borderTopWidth: 1, height: '75%', width: '100%', maxWidth: Platform.OS === 'web' ? 680 : undefined, alignSelf: 'center' },
-  header: { paddingHorizontal: spacing.lg, paddingTop: spacing.xs, paddingBottom: spacing.md, borderBottomWidth: 1 },
+  sheet: { borderTopLeftRadius: radius.sheet, borderTopRightRadius: radius.sheet, borderWidth: 1, height: '78%', width: '100%', maxWidth: Platform.OS === 'web' ? 680 : undefined, alignSelf: 'center', overflow: 'hidden' },
+  header: { paddingHorizontal: spacing.md, paddingTop: spacing.xs, paddingBottom: spacing.md, borderBottomWidth: 1 },
   dragHandle: { width: 36, height: 4, borderRadius: radius.pill, alignSelf: 'center', marginBottom: spacing.sm },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerTitle: { ...typography.h3 },
   closeBtn: { padding: 4 },
   listContent: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
-  commentItem: { flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.md, borderBottomWidth: 1 },
+  commentItem: { flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth },
   replyItem: { paddingLeft: spacing.xl },
   commentContent: { flex: 1, gap: 3 },
   authorRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   authorIdentity: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
-  authorName: { fontSize: 13, fontWeight: '700', flexShrink: 1 },
+  authorName: { fontSize: 13, fontWeight: '800', flexShrink: 1 },
   username: { fontSize: 11, flexShrink: 1 },
   commentTime: { fontSize: 11 },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
@@ -178,7 +191,9 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 13, textAlign: 'center' },
   replyBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: 6 },
   replyBannerText: { fontSize: 12, fontWeight: '600' },
-  inputBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.sm, borderTopWidth: 1 },
-  textInput: { flex: 1, borderRadius: radius.md, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, maxHeight: 100, fontSize: 14 },
+  submitError: { flexDirection: 'row', alignItems: 'center', gap: 7, marginHorizontal: spacing.md, marginTop: spacing.xs, paddingHorizontal: spacing.sm, paddingVertical: 7, borderRadius: radius.lg },
+  submitErrorText: { flex: 1, fontSize: 11, lineHeight: 16, fontWeight: '600' },
+  inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.sm, borderTopWidth: 1 },
+  textInput: { flex: 1, borderRadius: radius.lg, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, maxHeight: 110, fontSize: 14 },
   sendBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
 });

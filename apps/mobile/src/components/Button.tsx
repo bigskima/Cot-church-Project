@@ -10,7 +10,7 @@ import {
   TextStyle,
 } from 'react-native';
 import { useTheme } from '@/state/theme';
-import { radius, spacing, typography } from '@/design-system/tokens';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 
 export type ButtonVariant =
   | 'primary'
@@ -19,7 +19,7 @@ export type ButtonVariant =
   | 'ghost'
   | 'destructive'
   | 'live'
-  | 'gold'; // backwards compatibility mapping
+  | 'gold';
 
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
@@ -35,6 +35,7 @@ export interface ButtonProps {
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
   badge?: string | number;
+  fullWidth?: boolean;
 }
 
 export function Button({
@@ -49,6 +50,7 @@ export function Button({
   style,
   textStyle,
   badge,
+  fullWidth = false,
 }: ButtonProps) {
   const { colors, isDark } = useTheme();
 
@@ -57,13 +59,12 @@ export function Button({
       case 'secondary':
         return {
           container: {
-            backgroundColor: colors.bgSecondary,
-            borderColor: colors.border,
+            backgroundColor: colors.cardElevated,
+            borderColor: colors.borderSubtle,
             borderWidth: 1,
+            ...shadows.sm,
           },
-          text: {
-            color: colors.text,
-          },
+          text: { color: colors.text },
           indicatorColor: colors.text,
         };
       case 'outline':
@@ -73,10 +74,8 @@ export function Button({
             borderColor: colors.borderStrong,
             borderWidth: 1,
           },
-          text: {
-            color: colors.interactive,
-          },
-          indicatorColor: colors.interactive,
+          text: { color: colors.text },
+          indicatorColor: colors.text,
         };
       case 'ghost':
         return {
@@ -85,33 +84,19 @@ export function Button({
             borderColor: 'transparent',
             borderWidth: 0,
           },
-          text: {
-            color: colors.textSecondary,
-          },
+          text: { color: colors.textSecondary },
           indicatorColor: colors.textSecondary,
         };
       case 'destructive':
-        return {
-          container: {
-            backgroundColor: '#E5484D',
-            borderColor: '#E5484D',
-            borderWidth: 1,
-          },
-          text: {
-            color: '#FFFFFF',
-          },
-          indicatorColor: '#FFFFFF',
-        };
       case 'live':
         return {
           container: {
-            backgroundColor: '#E5484D',
-            borderColor: '#E5484D',
+            backgroundColor: colors.live,
+            borderColor: colors.live,
             borderWidth: 1,
+            ...(variant === 'live' ? shadows.live : shadows.sm),
           },
-          text: {
-            color: '#FFFFFF',
-          },
+          text: { color: '#FFFFFF' },
           indicatorColor: '#FFFFFF',
         };
       case 'gold':
@@ -119,14 +104,13 @@ export function Button({
       default:
         return {
           container: {
-            backgroundColor: isDark ? '#FFFFFF' : '#0D294B',
-            borderColor: isDark ? '#FFFFFF' : '#0D294B',
+            backgroundColor: colors.interactive,
+            borderColor: colors.interactive,
             borderWidth: 1,
+            ...shadows.sm,
           },
-          text: {
-            color: isDark ? '#0D294B' : '#FFFFFF',
-          },
-          indicatorColor: isDark ? '#0D294B' : '#FFFFFF',
+          text: { color: '#FFFFFF' },
+          indicatorColor: '#FFFFFF',
         };
     }
   };
@@ -136,14 +120,14 @@ export function Button({
       case 'sm':
         return {
           container: {
-            paddingVertical: 6,
+            paddingVertical: 7,
             paddingHorizontal: spacing.md,
-            minHeight: 34,
-            borderRadius: radius.md,
+            minHeight: 36,
+            borderRadius: radius.pill,
           },
           text: {
-            fontSize: 13,
-            fontWeight: '600',
+            ...typography.caption,
+            fontWeight: '700',
           },
         };
       case 'lg':
@@ -151,26 +135,26 @@ export function Button({
           container: {
             paddingVertical: 14,
             paddingHorizontal: spacing.xxl,
-            minHeight: 52,
+            minHeight: 54,
             borderRadius: radius.lg,
           },
           text: {
-            fontSize: 16,
-            fontWeight: '600',
+            ...typography.h3,
+            fontWeight: '700',
           },
         };
       case 'md':
       default:
         return {
           container: {
-            paddingVertical: 10,
-            paddingHorizontal: spacing.lg,
-            minHeight: 44,
-            borderRadius: radius.md,
+            paddingVertical: 11,
+            paddingHorizontal: spacing.xl,
+            minHeight: 46,
+            borderRadius: radius.lg,
           },
           text: {
-            fontSize: 14,
-            fontWeight: '600',
+            ...typography.bodySmall,
+            fontWeight: '700',
           },
         };
     }
@@ -187,24 +171,28 @@ export function Button({
         styles.base,
         vStyles.container,
         sStyles.container,
+        fullWidth && styles.fullWidth,
         disabled && styles.disabled,
-        pressed && !disabled && !loading && styles.pressed,
+        pressed && !disabled && !loading && {
+          opacity: 0.9,
+          transform: [{ scale: 0.985 }],
+          backgroundColor: variant === 'primary' ? colors.interactiveHover : undefined,
+        },
         style,
       ]}
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled: disabled || loading, busy: loading }}
     >
       {loading ? (
         <ActivityIndicator size="small" color={vStyles.indicatorColor} />
       ) : (
         <View style={styles.contentRow}>
           {icon && <View style={styles.iconLeft}>{icon}</View>}
-          <Text style={[styles.baseText, sStyles.text, vStyles.text, textStyle]}>
-            {label}
-          </Text>
+          <Text style={[styles.baseText, sStyles.text, vStyles.text, textStyle]}>{label}</Text>
           {badge !== undefined && (
-            <View style={[styles.badgeWrapper, { backgroundColor: colors.bgSecondary }]}>
-              <Text style={[styles.badgeText, { color: colors.text }]}>{badge}</Text>
+            <View style={[styles.badgeWrapper, { backgroundColor: isDark ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.22)' }]}>
+              <Text style={[styles.badgeText, { color: vStyles.text.color }]}>{badge}</Text>
             </View>
           )}
           {iconRight && <View style={styles.iconRight}>{iconRight}</View>}
@@ -218,7 +206,7 @@ export interface IconButtonProps {
   icon: React.ReactNode;
   onPress: () => void;
   size?: 'sm' | 'md' | 'lg';
-  variant?: 'default' | 'filled' | 'outline' | 'ghost';
+  variant?: 'default' | 'filled' | 'outline' | 'ghost' | 'accent';
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
   accessibilityLabel: string;
@@ -234,8 +222,7 @@ export function IconButton({
   accessibilityLabel,
 }: IconButtonProps) {
   const { colors } = useTheme();
-
-  const dim = size === 'sm' ? 32 : size === 'lg' ? 48 : 40;
+  const dim = size === 'sm' ? 34 : size === 'lg' ? 50 : 42;
 
   const getBgStyle = (): ViewStyle => {
     switch (variant) {
@@ -245,9 +232,11 @@ export function IconButton({
         return { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border };
       case 'ghost':
         return { backgroundColor: 'transparent', borderWidth: 0 };
+      case 'accent':
+        return { backgroundColor: colors.primarySoft, borderWidth: 1, borderColor: colors.primarySoftStrong };
       case 'default':
       default:
-        return { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border };
+        return { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderSubtle, ...shadows.sm };
     }
   };
 
@@ -266,11 +255,12 @@ export function IconButton({
         },
         getBgStyle(),
         disabled && styles.disabled,
-        pressed && styles.pressed,
+        pressed && { opacity: 0.82, transform: [{ scale: 0.95 }] },
         style,
       ]}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled }}
     >
       {icon}
     </Pressable>
@@ -283,6 +273,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  fullWidth: { width: '100%' },
   contentRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -290,29 +281,19 @@ const styles = StyleSheet.create({
   },
   baseText: {
     textAlign: 'center',
-    letterSpacing: -0.2,
+    letterSpacing: -0.15,
   },
-  iconLeft: {
-    marginRight: spacing.xs + 2,
-  },
-  iconRight: {
-    marginLeft: spacing.xs + 2,
-  },
+  iconLeft: { marginRight: 7 },
+  iconRight: { marginLeft: 7 },
   badgeWrapper: {
     borderRadius: radius.pill,
-    paddingHorizontal: 6,
+    paddingHorizontal: 7,
     paddingVertical: 2,
-    marginLeft: spacing.xs,
+    marginLeft: spacing.sm,
   },
   badgeText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '800',
   },
-  disabled: {
-    opacity: 0.45,
-  },
-  pressed: {
-    opacity: 0.8,
-    transform: [{ scale: 0.98 }],
-  },
+  disabled: { opacity: 0.42 },
 });

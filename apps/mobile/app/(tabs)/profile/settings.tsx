@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
@@ -117,7 +117,7 @@ export default function AccountSettingsScreen() {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('Photo access required', 'Allow photo-library access to choose a profile picture.');
+        setError('Photo access is required to choose a profile picture. Allow photo-library access in your device settings and try again.');
         return;
       }
 
@@ -176,8 +176,8 @@ export default function AccountSettingsScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 80 }]}>
-        <ScreenHeader title="Account Settings" subtitle="Manage your public profile and private account details." showBack />
+      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 150 }]}>
+        <ScreenHeader title="Edit profile" kicker="ACCOUNT" subtitle="Update your identity, privacy and contact details." showBack />
 
         {loading && !profile ? (
           <View style={styles.body}><Skeleton height={180} /><Skeleton height={64} count={4} /></View>
@@ -188,7 +188,7 @@ export default function AccountSettingsScreen() {
             {success ? <View style={[styles.banner, { backgroundColor: colors.successSoft, borderColor: colors.success }]}><Icon name="checkmark-circle" size={18} color={colors.success} /><Text style={[styles.bannerText, { color: colors.success }]}>{success}</Text></View> : null}
             {error ? <View style={[styles.banner, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}><Icon name="alert-circle" size={18} color={colors.live} /><Text style={[styles.bannerText, { color: colors.live }]}>{error}</Text></View> : null}
 
-            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
               <View style={styles.photoRow}>
                 <Avatar url={profile.avatar_url} name={profile.display_name} size="lg" />
                 <View style={styles.photoActions}>
@@ -202,7 +202,7 @@ export default function AccountSettingsScreen() {
               </View>
             </View>
 
-            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
               <Text style={[styles.cardTitle, { color: colors.text }]}>Profile Identity</Text>
               <Field label="FULL NAME" value={displayName} onChangeText={setDisplayName} placeholder="Your full name" colors={colors} autoCapitalize="words" />
               <Field label="USERNAME" value={username} onChangeText={setUsername} placeholder="your.username" colors={colors} autoCapitalize="none" />
@@ -224,7 +224,7 @@ export default function AccountSettingsScreen() {
               <Field label="BIO" value={bio} onChangeText={setBio} placeholder="A short introduction" colors={colors} multiline maxLength={500} />
             </View>
 
-            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
               <Text style={[styles.cardTitle, { color: colors.text }]}>Contact Details</Text>
               <Field label="PROFILE PHONE" value={phoneNumber} onChangeText={setPhoneNumber} placeholder="+234..." colors={colors} keyboardType="phone-pad" />
               <View style={[styles.readOnlyRow, { borderColor: colors.borderSubtle }]}>
@@ -239,10 +239,14 @@ export default function AccountSettingsScreen() {
               ) : null}
             </View>
 
-            <Button label="Save Profile" onPress={() => void saveProfile()} loading={saving} disabled={photoBusy} variant="primary" size="lg" />
           </View>
         ) : null}
       </ScrollView>
+      {profile ? (
+        <View style={[styles.saveBar, { backgroundColor: colors.glass, borderColor: colors.borderSubtle }, shadows.floating]}>
+          <Button label="Save changes" onPress={() => void saveProfile()} loading={saving} disabled={photoBusy} variant="primary" size="lg" fullWidth />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -263,18 +267,19 @@ function Field({ label, value, onChangeText, placeholder, colors, autoCapitalize
   return (
     <View style={styles.fieldGroup}>
       <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{label}</Text>
-      <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={colors.textMuted} autoCapitalize={autoCapitalize} keyboardType={keyboardType} multiline={multiline} maxLength={maxLength} style={[styles.input, multiline && styles.multiline, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]} />
+      <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={colors.textMuted} autoCapitalize={autoCapitalize} keyboardType={keyboardType} multiline={multiline} maxLength={maxLength} style={[styles.input, multiline && styles.multiline, { backgroundColor: colors.inputBg, borderColor: colors.borderSubtle, color: colors.text }]} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 }, content: { flexGrow: 1 }, body: { paddingHorizontal: spacing.lg, gap: spacing.lg },
-  banner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.md, padding: spacing.md }, bannerText: { flex: 1, fontSize: 13, fontWeight: '600' },
-  card: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md }, cardTitle: { fontSize: 16, fontWeight: '800' },
-  photoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg }, photoActions: { flex: 1, gap: spacing.xs }, buttonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
+  screen: { flex: 1 }, content: { flexGrow: 1 }, body: { paddingHorizontal: spacing.md, gap: spacing.lg },
+  banner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md }, bannerText: { flex: 1, fontSize: 13, fontWeight: '600' },
+  card: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.lg, gap: spacing.md }, cardTitle: { fontSize: 16, fontWeight: '800', letterSpacing: -0.2 },
+  photoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md }, photoActions: { flex: 1, gap: spacing.xs }, buttonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
   helper: { fontSize: 11, lineHeight: 16 }, fieldGroup: { gap: 5 }, fieldLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.55 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  input: { minHeight: 48, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: 11, fontSize: 14 }, multiline: { minHeight: 100, textAlignVertical: 'top' },
+  input: { minHeight: 50, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: spacing.md, paddingVertical: 11, fontSize: 14 }, multiline: { minHeight: 100, textAlignVertical: 'top' },
+  saveBar: { position: 'absolute', left: spacing.md, right: spacing.md, bottom: spacing.md, borderWidth: 1, borderRadius: radius.xxl, padding: spacing.sm },
   readOnlyRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderTopWidth: 1, paddingTop: spacing.md }, readOnlyValue: { fontSize: 13, fontWeight: '600', marginTop: 3 },
 });

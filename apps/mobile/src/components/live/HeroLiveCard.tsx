@@ -39,13 +39,13 @@ export function HeroLiveCard({ stream, onPress, style }: HeroLiveCardProps) {
       <ImageBackground
         source={stream.thumbnail_url ? { uri: stream.thumbnail_url } : undefined}
         style={styles.background}
-        imageStyle={{ borderRadius: radius.lg }}
+        imageStyle={{ borderRadius: radius.xl }}
       >
         <LinearGradient
           colors={
             isLive
-              ? ['rgba(6, 20, 38, 0.2)', 'rgba(6, 20, 38, 0.75)', 'rgba(6, 20, 38, 0.95)']
-              : ['rgba(9, 27, 51, 0.3)', 'rgba(9, 27, 51, 0.8)', 'rgba(9, 27, 51, 0.95)']
+              ? ['rgba(0, 0, 0, 0.08)', 'rgba(0, 0, 0, 0.58)', 'rgba(0, 0, 0, 0.92)']
+              : ['rgba(0, 0, 0, 0.12)', 'rgba(0, 0, 0, 0.62)', 'rgba(0, 0, 0, 0.90)']
           }
           style={styles.gradient}
         >
@@ -78,7 +78,7 @@ export function HeroLiveCard({ stream, onPress, style }: HeroLiveCardProps) {
             ) : null}
 
             <View style={styles.ctaRow}>
-              <View style={[styles.ctaButton, { backgroundColor: isLive ? '#E5484D' : '#2F6FED' }]}>
+              <View style={[styles.ctaButton, { backgroundColor: isLive ? '#F04452' : '#168FF0' }]}>
                 <Icon
                   name={isLive ? 'play' : 'calendar-outline'}
                   size={15}
@@ -86,7 +86,7 @@ export function HeroLiveCard({ stream, onPress, style }: HeroLiveCardProps) {
                   style={{ marginRight: 6 }}
                 />
                 <Text style={styles.ctaText}>
-                  {isLive ? 'Watch Live Service' : 'View Service Schedule'}
+                  {isLive ? 'Watch live' : 'View details'}
                 </Text>
               </View>
               {stream.viewer_count !== undefined && isLive ? (
@@ -105,21 +105,21 @@ export function HeroLiveCard({ stream, onPress, style }: HeroLiveCardProps) {
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     overflow: 'hidden',
-    backgroundColor: '#091B33',
+    backgroundColor: '#000000',
     minHeight: 200,
   },
   background: {
     minHeight: 200,
     justifyContent: 'flex-end',
-    backgroundColor: '#0D294B',
+    backgroundColor: '#000000',
   },
   gradient: {
     minHeight: 200,
     padding: spacing.lg,
     justifyContent: 'space-between',
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
   },
   topRow: {
     flexDirection: 'row',
@@ -159,9 +159,9 @@ const styles = StyleSheet.create({
   ctaButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 9,
     paddingHorizontal: 14,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
   },
   ctaText: {
     color: '#FFFFFF',

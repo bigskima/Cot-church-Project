@@ -21,10 +21,13 @@ const files = [
   'apps/mobile/app/reels.tsx',
   'apps/mobile/app/expression/[id]/index.tsx',
   'apps/mobile/app/event/[id].tsx',
+  'apps/mobile/app/prayer/index.tsx',
+  'apps/mobile/src/components/prayer/PrayerCard.tsx',
   'apps/mobile/src/features/giving/GivingScreen.tsx',
   'apps/mobile/app/(tabs)/profile/leadership/giving-manage.tsx',
-  'apps/admin/src/pages/GivingConfiguration.tsx',
+  'apps/admin/src/components/Shell.tsx',
   'apps/admin/src/pages/IntegrationsJobs.tsx',
+  'apps/admin/src/pages/PaymentInfrastructure.tsx',
   'apps/admin/src/api.ts',
   'supabase/functions/stream-access/index.ts',
   'supabase/functions/stream-presence/index.ts',
@@ -39,9 +42,14 @@ const joined = [...sources.values()].join('\n');
 const givingUi = [
   sources.get('apps/mobile/src/features/giving/GivingScreen.tsx') ?? '',
   sources.get('apps/mobile/app/(tabs)/profile/leadership/giving-manage.tsx') ?? '',
-  sources.get('apps/admin/src/pages/GivingConfiguration.tsx') ?? '',
+].join('\n');
+const prayerUi = [
+  sources.get('apps/mobile/app/prayer/index.tsx') ?? '',
+  sources.get('apps/mobile/src/components/prayer/PrayerCard.tsx') ?? '',
 ].join('\n');
 const integrationsUi = sources.get('apps/admin/src/pages/IntegrationsJobs.tsx') ?? '';
+const platformShellUi = sources.get('apps/admin/src/components/Shell.tsx') ?? '';
+const paymentInfrastructureUi = sources.get('apps/admin/src/pages/PaymentInfrastructure.tsx') ?? '';
 
 const checks = [
   [/expo-secure-store/, 'secure session persistence'],
@@ -58,7 +66,9 @@ const checks = [
   [/manualBankTransfer/, 'manual transfer production giving'],
   [/Church-wide/, 'church-wide giving scope'],
   [/Expression Giving Settings/, 'expression-owned giving settings'],
-  [/Currency is (?:configuration|data), not (?:code|application code)/, 'currency-neutral giving configuration'],
+  [/details\?\.currencies\s*\?\?\s*\[\]/, 'server-driven giving currencies'],
+  [/account\.currency\s*===\s*currency/, 'currency-filtered giving accounts'],
+  [/effectivePermissions/, 'permission-aware Platform Administration navigation'],
   [/platform-integrations/, 'real platform integration telemetry'],
   [/retry_job/, 'failed integration job retry'],
   [/set_connection_status/, 'integration connection governance'],
@@ -89,7 +99,11 @@ const checks = [
   [/initialPositionSeconds/, 'playback position restoration'],
   [/content-media\?action=playback/, 'signed video playback resolution'],
   [/comments\.refresh\(\)/, 'comment refresh after posting'],
-  [/router\.push\('\/\(auth\)\/login'\)/, 'protected interaction sign-in gating'],
+  [/pathname:\s*['"]\/\(auth\)\/login['"]/, 'protected interaction sign-in gating'],
+  [/action:\s*['"]pray['"]/, 'prayer-wall support request'],
+  [/viewer_has_prayed/, 'prayer support viewer state'],
+  [/prayingIds/, 'prayer support pending state'],
+
   [/public-content\?type=sermon&id=/, 'exact public sermon detail request'],
   [/Enter this Expression to play its internal sermon/, 'Expression sermon playback guard'],
   [/onProgress=\{syncProgress\}/, 'sermon audio and video continuity'],
@@ -110,25 +124,44 @@ const forbiddenGivingPatterns = [
   [/\$\{?amount|\$20|\$50|\$100|\$250|\$500/, 'hardcoded dollar giving presentation'],
 ];
 
+const forbiddenPrayerPatterns = [
+  [/onPray=\{\(\)\s*=>\s*\{\s*\}\}/, 'no-op prayer interaction'],
+];
+
+const forbiddenPlatformBoundaryPatterns = [
+  [/platform\.giving\.(?:read|manage)|GivingConfiguration|key:\s*['"]giving['"]/, 'platform-owned church giving route'],
+];
+
 const forbiddenIntegrationPatterns = [
   [/Just now|15m ago/, 'fabricated integration activity time'],
   [/< 85ms|4 Active|HEALTHY|OPTIMAL/, 'fabricated integration health metric'],
 ];
 
+const paymentCredentialChecks = [
+  [/category:\s*['"]payments['"]/, 'payment credential category contract'],
+  [/providerCode:/, 'payment credential provider-code contract'],
+];
+
 const missing = checks.filter(([pattern]) => !pattern.test(joined));
 const forbidden = forbiddenGivingPatterns.filter(([pattern]) => pattern.test(givingUi));
+const forbiddenPrayer = forbiddenPrayerPatterns.filter(([pattern]) => pattern.test(prayerUi));
+const forbiddenPlatformBoundaries = forbiddenPlatformBoundaryPatterns.filter(([pattern]) => pattern.test(platformShellUi));
 const forbiddenIntegrations = forbiddenIntegrationPatterns.filter(([pattern]) => pattern.test(integrationsUi));
+const missingPaymentCredentialChecks = paymentCredentialChecks.filter(([pattern]) => !pattern.test(paymentInfrastructureUi));
 
-if (missing.length || forbidden.length || forbiddenIntegrations.length) {
+if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenPlatformBoundaries.length || forbiddenIntegrations.length || missingPaymentCredentialChecks.length) {
   const failures = [
     ...missing.map(([, name]) => name),
     ...forbidden.map(([, name]) => `remove ${name}`),
+    ...forbiddenPrayer.map(([, name]) => `remove ${name}`),
+    ...forbiddenPlatformBoundaries.map(([, name]) => `remove ${name}`),
     ...forbiddenIntegrations.map(([, name]) => `remove ${name}`),
+    ...missingPaymentCredentialChecks.map(([, name]) => name),
   ];
   console.error(`Application check failed: ${failures.join(', ')}`);
   process.exit(1);
 }
 
 console.log(
-  `Application check passed (${files.length} files, ${checks.length} production invariants, ${forbiddenGivingPatterns.length + forbiddenIntegrationPatterns.length} anti-hardcode checks).`,
+  `Application check passed (${files.length} files, ${checks.length} production invariants, ${forbiddenGivingPatterns.length + forbiddenPrayerPatterns.length + forbiddenPlatformBoundaryPatterns.length + forbiddenIntegrationPatterns.length} anti-hardcode/boundary checks, ${paymentCredentialChecks.length} payment contract checks).`,
 );

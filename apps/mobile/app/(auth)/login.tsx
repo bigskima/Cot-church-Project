@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Link, router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiError } from '@/api';
 import { useSession } from '@/state/session';
@@ -17,7 +17,14 @@ import { useTheme } from '@/state/theme';
 import { BrandMark } from '@/components/primitives/BrandMark';
 import { Icon } from '@/components/primitives/Icon';
 import { Button } from '@/components/Button';
-import { radius, spacing, typography } from '@/design-system/tokens';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
+
+function safeReturnTo(value?: string) {
+  if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('://') || value.startsWith('/(auth)')) {
+    return '/(tabs)/home';
+  }
+  return value;
+}
 
 function loginErrorMessage(error: unknown) {
   if (!(error instanceof ApiError)) {
@@ -47,6 +54,8 @@ function loginErrorMessage(error: unknown) {
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
+  const { returnTo: requestedReturnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const returnTo = safeReturnTo(requestedReturnTo);
   const { login, enterAsVisitor } = useSession();
   const { colors } = useTheme();
 
@@ -72,7 +81,7 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await login(identifier.trim(), password);
-      router.replace('/(tabs)/home');
+      router.replace(returnTo as any);
     } catch (error) {
       setErrorMsg(loginErrorMessage(error));
     } finally {
@@ -116,10 +125,11 @@ export default function LoginScreen() {
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.text }]}>Welcome Back</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Sign in to access sermons, live services, giving, prayer, and your church community.
+            Sign in to interact, join your Expression, manage your account, and use member-only church features.
           </Text>
         </View>
 
+        <View style={[styles.authCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
         {errorMsg ? (
           <View
             style={[styles.errorBanner, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}
@@ -150,7 +160,7 @@ export default function LoginScreen() {
                 styles.input,
                 {
                   backgroundColor: colors.bgSecondary,
-                  borderColor: colors.border,
+                  borderColor: colors.borderSubtle,
                   color: colors.text,
                 },
               ]}
@@ -176,7 +186,7 @@ export default function LoginScreen() {
                   styles.input,
                   {
                     backgroundColor: colors.bgSecondary,
-                    borderColor: colors.border,
+                    borderColor: colors.borderSubtle,
                     color: colors.text,
                     paddingRight: 44,
                   },
@@ -198,8 +208,17 @@ export default function LoginScreen() {
             </View>
           </View>
 
+          <Pressable
+            onPress={() => router.push('/(auth)/forgot-password')}
+            hitSlop={8}
+            style={styles.forgotPassword}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.forgotPasswordText, { color: colors.interactive }]}>Forgot password?</Text>
+          </Pressable>
+
           <Button
-            label="Sign In"
+            label="Sign in"
             onPress={handleLogin}
             loading={loading}
             disabled={guestLoading}
@@ -209,7 +228,7 @@ export default function LoginScreen() {
           />
 
           <Button
-            label="Continue as Guest"
+            label="Explore public COT"
             onPress={handleGuestEntry}
             loading={guestLoading}
             disabled={loading}
@@ -218,13 +237,16 @@ export default function LoginScreen() {
           />
         </View>
 
+        </View>
+
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: colors.textSecondary }]}>Don't have an account? </Text>
-          <Link href="/(auth)/signup" asChild>
-            <Pressable accessibilityRole="link">
-              <Text style={[styles.footerLink, { color: colors.interactive }]}>Sign up</Text>
-            </Pressable>
-          </Link>
+          <Pressable
+            accessibilityRole="link"
+            onPress={() => router.push({ pathname: '/(auth)/signup', params: { returnTo } } as any)}
+          >
+            <Text style={[styles.footerLink, { color: colors.interactive }]}>Sign up</Text>
+          </Pressable>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -243,14 +265,19 @@ const styles = StyleSheet.create({
   },
   brandMarkContainer: {
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  authCard: {
+    borderWidth: 1,
+    borderRadius: radius.xxl,
+    padding: spacing.lg,
   },
   header: {
-    marginBottom: spacing.xxl,
+    marginBottom: spacing.xl,
     alignItems: 'center',
   },
   title: {
-    ...typography.h1,
+    ...typography.display,
     textAlign: 'center',
   },
   subtitle: {
@@ -263,7 +290,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     marginBottom: spacing.lg,
   },
   errorText: {
@@ -284,7 +311,7 @@ const styles = StyleSheet.create({
   },
   input: {
     height: 48,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: spacing.md,
     fontSize: 15,
@@ -297,6 +324,8 @@ const styles = StyleSheet.create({
     right: 12,
     top: 14,
   },
+  forgotPassword: { alignSelf: 'flex-end', paddingVertical: spacing.xs },
+  forgotPasswordText: { fontSize: 12, fontWeight: '700' },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',

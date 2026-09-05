@@ -162,8 +162,8 @@ export function PaymentInfrastructure({ api }: { api: ApiClient }) {
       body: JSON.stringify({
         action: 'store',
         reference,
-        category: 'payment',
-        provider: provider?.code ?? 'payment',
+        category: 'payments',
+        providerCode: provider?.code ?? 'payment',
         description,
         value,
       }),
@@ -208,13 +208,13 @@ export function PaymentInfrastructure({ api }: { api: ApiClient }) {
   };
 
   return (
-    <div>
+    <div className="admin-page-stack">
       <Card
-        title="Payment Infrastructure — Future Online Rails"
+        title="Payment infrastructure"
         subtitle="Manual bank transfer is the active production giving method. Online provider adapters remain installed but release-locked until provider onboarding and production verification are approved."
         headerAction={<Button variant="outline" size="sm" onClick={() => void load()} loading={loading}>Refresh</Button>}
       >
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 14 }}>
+        <div className="admin-stats-grid">
           <div className="admin-stat-card"><div className="admin-stat-title">Release State</div><div className="admin-stat-value">Unavailable</div><div className="admin-stat-subtitle">Manual transfer only</div></div>
           <div className="admin-stat-card"><div className="admin-stat-title">Provider Adapters</div><div className="admin-stat-value">{data.providers.length}</div><div className="admin-stat-subtitle">Future infrastructure</div></div>
           <div className="admin-stat-card"><div className="admin-stat-title">Prepared Configs</div><div className="admin-stat-value">{preparedConfigs}</div><div className="admin-stat-subtitle">Stored inactive</div></div>
@@ -222,18 +222,18 @@ export function PaymentInfrastructure({ api }: { api: ApiClient }) {
         </div>
       </Card>
 
-      {error ? <div className="admin-form-error" role="alert" style={{ marginBottom: 18 }}>{error}</div> : null}
-      {message ? <div style={{ marginBottom: 18, color: 'var(--success)', fontWeight: 700 }}>{message}</div> : null}
+      {error ? <div className="admin-inline-error" role="alert">{error}</div> : null}
+      {message ? <div className="admin-status-message admin-status-success">{message}</div> : null}
 
       <Card
-        title="Provider Preparation"
+        title="Provider preparation"
         subtitle="You may safely store credentials now. They are encrypted in Supabase Vault and are never displayed back to the browser. Saving credentials does not enable online giving."
       >
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+        <div className="admin-provider-grid">
           {data.providers.map((item) => {
             const globalConfig = item.configurations.find((config) => config.organization_id === null);
             return (
-              <div key={item.id} style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', padding: 18 }}>
+              <div key={item.id} className="admin-provider-card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
                   <div>
                     <h4 style={{ margin: 0, fontSize: 16 }}>{item.name}</h4>
@@ -244,8 +244,8 @@ export function PaymentInfrastructure({ api }: { api: ApiClient }) {
                 <p style={{ color: 'var(--text-secondary)', fontSize: 12, lineHeight: 1.6 }}>
                   {globalConfig ? `Credential reference prepared: ${globalConfig.secret_reference}` : 'No global provider configuration has been prepared yet.'}
                 </p>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
-                  {(item.capabilities ?? []).map((capability) => <span key={capability} style={{ fontSize: 10, border: '1px solid var(--border-subtle)', borderRadius: 999, padding: '3px 7px' }}>{capability}</span>)}
+                <div className="admin-capability-tags">
+                  {(item.capabilities ?? []).map((capability) => <span key={capability} className="active">{capability}</span>)}
                 </div>
                 <Button variant="outline" size="sm" onClick={() => openConfiguration(item)}>Prepare credentials</Button>
               </div>
@@ -255,7 +255,7 @@ export function PaymentInfrastructure({ api }: { api: ApiClient }) {
       </Card>
 
       <Card
-        title="Routing Registry"
+        title="Routing registry"
         subtitle="Read-only while online giving is release-locked. No route may be active in the current production release."
       >
         <Table
@@ -273,7 +273,7 @@ export function PaymentInfrastructure({ api }: { api: ApiClient }) {
         />
       </Card>
 
-      <Card title="Payment Attempt Ledger" subtitle="Historical/provider attempt telemetry remains available for audit and future rollout verification.">
+      <Card title="Payment attempt ledger" subtitle="Historical/provider attempt telemetry remains available for audit and future rollout verification.">
         <Table
           columns={[
             { header: 'PROVIDER', accessor: (item) => item.provider },
@@ -296,7 +296,7 @@ export function PaymentInfrastructure({ api }: { api: ApiClient }) {
         subtitle="Credentials are written to Supabase Vault over the authenticated Platform Admin API. The provider remains inactive after saving."
         footer={<div style={{ display: 'flex', gap: 10 }}><Button variant="outline" disabled={busy} onClick={() => setProvider(null)}>Cancel</Button><Button variant="primary" loading={busy} onClick={() => void savePreparation()}>Save preparation</Button></div>}
       >
-        <div style={{ display: 'grid', gap: 14 }}>
+        <div className="admin-modal-form">
           <label className="admin-form-group">
             <span className="admin-form-label">Environment</span>
             <select className="admin-form-select" value={environment} onChange={(event) => setEnvironment(event.target.value as 'production' | 'sandbox')}>
@@ -308,8 +308,8 @@ export function PaymentInfrastructure({ api }: { api: ApiClient }) {
           <InputField label="Provider API secret / key" type={showSecrets ? 'text' : 'password'} value={secretValue} onChange={(event) => setSecretValue(event.target.value)} placeholder="Leave blank to keep the existing secret" autoComplete="new-password" />
           <InputField label="Webhook secret reference" value={webhookReference} onChange={(event) => setWebhookReference(event.target.value.toUpperCase())} />
           <InputField label="Webhook verification secret" type={showSecrets ? 'text' : 'password'} value={webhookValue} onChange={(event) => setWebhookValue(event.target.value)} placeholder="Leave blank to keep the existing secret" autoComplete="new-password" />
-          <label style={{ display: 'flex', gap: 8, alignItems: 'center', color: 'var(--text-secondary)', fontSize: 12 }}><input type="checkbox" checked={showSecrets} onChange={(event) => setShowSecrets(event.target.checked)} />Show values while entering them on this device</label>
-          <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 10, padding: 12, color: 'var(--text-secondary)', fontSize: 12, lineHeight: 1.6 }}>
+          <label className="admin-inline-check"><input type="checkbox" checked={showSecrets} onChange={(event) => setShowSecrets(event.target.checked)} /><span>Show values while entering them on this device</span></label>
+          <div className="admin-warning-callout">
             Saving here does <strong>not</strong> enable online payment. Manual transfer remains the production giving method until a future provider rollout is explicitly released.
           </div>
         </div>

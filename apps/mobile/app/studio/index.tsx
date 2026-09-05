@@ -1,8 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Alert,
-  Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,56 +9,54 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
-import { useResource } from '@/hooks/use-resource';
 import {
-  Badge,
+  BottomSheet,
   Button,
   Icon,
   InputField,
   LeadershipModuleCard,
   ScreenHeader,
   SectionHeader,
-  Skeleton,
 } from '@/components';
-import { radius, shadows, spacing, typography } from '@/design-system/tokens';
-
-interface StudioOverview {
-  drafts?: { id: string; content_type: string; status: string; created_at: string }[];
-  mediaQueue?: { id: string; media_type: string; processing_state: string; created_at: string }[];
-  totalPublished?: number;
-}
+import { radius, shadows, spacing } from '@/design-system/tokens';
 
 export default function CreatorStudioScreen() {
   const insets = useSafeAreaInsets();
-  const { api } = useSession();
+  const { api, context, hasCapability } = useSession();
+  const expression = context?.expression;
+  const canPublishPosts = hasCapability('posts.create') || hasCapability('posts.publish') || hasCapability('*');
   const { colors } = useTheme();
 
   const [activeModal, setActiveModal] = useState<'post' | null>(null);
   const [postBody, setPostBody] = useState('');
   const [submitting, setSubmitting] = useState(false);
-
-  const studioResource = useResource<StudioOverview>('studio:overview', (signal) =>
-    api.request<StudioOverview>('creator-studio', { signal })
-  );
+  const [publishNotice, setPublishNotice] = useState('');
+  const [publishError, setPublishError] = useState('');
 
   const handlePublishPost = async () => {
     if (!postBody.trim()) return;
     setSubmitting(true);
+    setPublishError('');
+    setPublishNotice('');
     try {
       await api.request('creator-studio', {
         method: 'POST',
         body: JSON.stringify({
           action: 'publish_post',
-          visibility: 'public',
+          expressionId: expression?.id ?? null,
+          visibility: expression?.id ? 'branch' : 'public',
           body: postBody.trim(),
         }),
       });
       setPostBody('');
       setActiveModal(null);
-      Alert.alert('Post Published', 'Your message is now live across the community feed.');
-      studioResource.refresh();
-    } catch (err: any) {
-      Alert.alert('Publish Failed', err.message ?? 'Unable to publish post');
+      setPublishNotice(
+        expression?.name
+          ? `Your announcement is live inside ${expression.name}.`
+          : 'Your announcement is live in the General Community.',
+      );
+    } catch (err: unknown) {
+      setPublishError(err instanceof Error ? err.message : 'Unable to publish this announcement.');
     } finally {
       setSubmitting(false);
     }
@@ -69,55 +64,62 @@ export default function CreatorStudioScreen() {
 
   const leadershipModules = [
     {
-      title: 'Sermons & Archives',
-      description: 'Upload sermon audio/video, manage series, and add scripture notes',
+      title: 'Sermons',
+      description: 'Create sermon drafts, manage teachings and publish when authorized.',
       iconName: 'book-outline',
       badge: 'MEDIA',
       route: '/leadership/sermons',
+      enabled: hasCapability('sermons.create') || hasCapability('sermons.manage') || hasCapability('sermons.publish') || hasCapability('*'),
     },
     {
-      title: 'Events & Calendar',
-      description: 'Create Sunday services, retreats, conferences, and prayer meetings',
+      title: 'Events',
+      description: 'Create and manage gatherings in your current church scope.',
       iconName: 'calendar-outline',
       badge: 'EVENTS',
       route: '/leadership/events',
+      enabled: hasCapability('events.create') || hasCapability('events.update') || hasCapability('events.manage') || hasCapability('*'),
     },
     {
       title: 'Live Media Studio',
-      description: 'Broadcast live services, stream ingest keys, and stream health status',
+      description: 'Operate broadcasts and monitor streams when your role allows it.',
       iconName: 'radio-outline',
       badge: 'BROADCAST',
       route: '/leadership/media-studio',
+      enabled: hasCapability('streams.manage') || hasCapability('streams.broadcast') || hasCapability('livestream.operate') || hasCapability('*'),
     },
     {
-      title: 'Pastoral Triage & Care',
-      description: 'Review confidential member prayer requests and assign pastoral responses',
+      title: 'Pastoral Care',
+      description: 'Review confidential prayer requests and assigned follow-up.',
       iconName: 'heart-outline',
       badge: 'PASTORAL',
       route: '/leadership/pastoral-triage',
+      enabled: hasCapability('prayer.manage') || hasCapability('prayer.moderate') || hasCapability('prayer.pastoral_notes.manage') || hasCapability('*'),
     },
     {
-      title: 'Giving & Financial Configuration',
-      description: 'Track offering campaign goals, receipts, and configure bank wire setups',
+      title: 'Giving',
+      description: 'Manage giving destinations and finance information you can access.',
       iconName: 'gift-outline',
       badge: 'FINANCE',
       route: '/leadership/giving',
+      enabled: hasCapability('giving.campaigns.manage') || hasCapability('giving.finance.read') || hasCapability('*'),
     },
     {
-      title: 'Church Expressions & Campuses',
-      description: 'Manage multi-campus directory, timezones, and leadership assignments',
-      iconName: 'business-outline',
-      badge: 'CAMPUS',
-      route: '/leadership/expressions',
-    },
-    {
-      title: 'Campus Leadership Directory',
-      description: 'View active pastoral rolls, communication channels, and ministry roles',
+      title: 'Expressions',
+      description: 'Manage Expressions when your account has church-level authority.',
       iconName: 'people-outline',
+      badge: 'COMMUNITY',
+      route: '/leadership/expressions',
+      enabled: hasCapability('branches.create') || hasCapability('organizations.manage') || hasCapability('expression.create') || hasCapability('*'),
+    },
+    {
+      title: 'Expression Leadership',
+      description: 'Manage leaders and ministry roles in the active Expression.',
+      iconName: 'people-circle-outline',
       badge: 'DIRECTORY',
       route: '/leadership/directory',
+      enabled: Boolean(expression?.id) && (hasCapability('expression.leadership.manage') || hasCapability('organization.leadership.manage') || hasCapability('*')),
     },
-  ];
+  ].filter((module) => module.enabled);
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -125,24 +127,33 @@ export default function CreatorStudioScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + spacing.sm, paddingBottom: 100 },
+          { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 120 },
         ]}
       >
         <ScreenHeader
-          title="Ministry Studio Hub"
-          subtitle="Scoped leadership suite for content publishing, broadcasts, events, and pastoral operations."
+          title="Ministry Studio"
+          kicker="LEADERSHIP"
+          subtitle="Create, publish and manage only the ministry tools assigned to your role."
           showBack
         />
 
         <View style={styles.body}>
-          {/* Quick Post Creator CTA */}
-          <View style={[styles.quickPostCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+          {publishNotice ? (
+            <View style={[styles.banner, { backgroundColor: colors.successSoft, borderColor: colors.success }]}>
+              <Icon name="checkmark-circle" size={17} color={colors.success} />
+              <Text style={[styles.bannerText, { color: colors.success }]}>{publishNotice}</Text>
+            </View>
+          ) : null}
+          {canPublishPosts ? (
+          <View style={[styles.quickPostCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
             <View style={styles.quickPostHeader}>
               <Icon name="create-outline" size={20} color={colors.interactive} />
               <Text style={[styles.quickPostTitle, { color: colors.text }]}>Quick Community Announcement</Text>
             </View>
             <Text style={[styles.quickPostSub, { color: colors.textSecondary }]}>
-              Post an instant encouragement or ministry update to all church members.
+              {expression?.name
+                ? `Share an encouragement or update inside ${expression.name}.`
+                : 'Share an encouragement or ministry update with the General Community.'}
             </Text>
             <Button
               label="Compose Announcement"
@@ -152,10 +163,11 @@ export default function CreatorStudioScreen() {
               style={{ marginTop: spacing.xs }}
             />
           </View>
+          ) : null}
 
           {/* Operational Leadership Modules Grid */}
           <View style={styles.modulesSection}>
-            <SectionHeader title="Ministry Operations & Tools" />
+            <SectionHeader title="Your tools" badge={leadershipModules.length} subtitle="Only operations assigned to your role are shown" />
             {leadershipModules.map((module, idx) => (
               <LeadershipModuleCard
                 key={idx}
@@ -170,49 +182,36 @@ export default function CreatorStudioScreen() {
         </View>
       </ScrollView>
 
-      {/* Post Modal */}
-      <Modal
+      <BottomSheet
         visible={activeModal === 'post'}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setActiveModal(null)}
+        onClose={() => {
+          if (!submitting) {
+            setActiveModal(null);
+            setPublishError('');
+          }
+        }}
+        title="Publish announcement"
+        subtitle={expression?.name ? `Share inside ${expression.name}.` : 'Share with the General Community.'}
       >
-        <View style={styles.modalBackdrop}>
-          <View style={[styles.modalSheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Publish Announcement</Text>
-              <Pressable onPress={() => setActiveModal(null)} hitSlop={8}>
-                <Icon name="close" size={20} color={colors.textMuted} />
-              </Pressable>
-            </View>
-
-            <InputField
-              label="Announcement Content"
-              value={postBody}
-              onChangeText={setPostBody}
-              multiline
-              numberOfLines={5}
-              placeholder="Write your pastoral announcement or spiritual encouragement..."
-            />
-
-            <View style={styles.modalActions}>
-              <Button
-                label="Cancel"
-                onPress={() => setActiveModal(null)}
-                variant="outline"
-                size="md"
-              />
-              <Button
-                label="Publish Post"
-                onPress={handlePublishPost}
-                loading={submitting}
-                variant="primary"
-                size="md"
-              />
-            </View>
+        {publishError ? (
+          <View style={[styles.banner, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}>
+            <Icon name="alert-circle" size={17} color={colors.live} />
+            <Text style={[styles.bannerText, { color: colors.live }]}>{publishError}</Text>
           </View>
+        ) : null}
+        <InputField
+          label="Announcement"
+          value={postBody}
+          onChangeText={setPostBody}
+          multiline
+          numberOfLines={5}
+          placeholder="Write your pastoral announcement or encouragement..."
+        />
+        <View style={styles.modalActions}>
+          <Button label="Cancel" onPress={() => { setActiveModal(null); setPublishError(''); }} variant="outline" size="md" disabled={submitting} />
+          <Button label="Publish" onPress={handlePublishPost} loading={submitting} variant="primary" size="md" />
         </View>
-      </Modal>
+      </BottomSheet>
     </View>
   );
 }
@@ -225,12 +224,26 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   body: {
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     gap: spacing.lg,
+  },
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+  },
+  bannerText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
   },
   quickPostCard: {
     padding: spacing.lg,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     borderWidth: 1,
     gap: spacing.xs,
   },
@@ -249,26 +262,6 @@ const styles = StyleSheet.create({
   },
   modulesSection: {
     gap: spacing.xs,
-  },
-  modalBackdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(6, 20, 38, 0.65)',
-  },
-  modalSheet: {
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    borderTopWidth: 1,
-    padding: spacing.lg,
-    gap: spacing.md,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  modalTitle: {
-    ...typography.h2,
   },
   modalActions: {
     flexDirection: 'row',
