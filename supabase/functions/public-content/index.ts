@@ -4,6 +4,57 @@ import { createHandler } from "../_shared/handler.ts";
 import { adminClient, publicClient } from "../_shared/supabase.ts";
 import { uuid } from "../_shared/validation.ts";
 
+function nestedContentItem(value: any) {
+  return Array.isArray(value) ? value[0] ?? null : value ?? null;
+}
+
+async function enrichPublicMediaIdentity<T extends { content_items?: any }>(rows: T[]) {
+  if (!rows.length) return rows;
+  const admin = adminClient();
+  const items = rows.map((row) => nestedContentItem(row.content_items)).filter(Boolean);
+  const profileIds = [...new Set(items.map((item) => item.author_profile_id).filter(Boolean))] as string[];
+  const expressionIds = [...new Set(items.map((item) => item.expression_id).filter(Boolean))] as string[];
+  const organizationIds = [...new Set(items.map((item) => item.organization_id).filter(Boolean))] as string[];
+
+  const [profilesResult, expressionsResult, organizationsResult] = await Promise.all([
+    profileIds.length
+      ? admin.from("profiles").select("id,display_name,username,avatar_url").in("id", profileIds)
+      : Promise.resolve({ data: [] as any[], error: null }),
+    expressionIds.length
+      ? admin.from("branches").select("id,name,code,is_active").in("id", expressionIds).eq("is_active", true)
+      : Promise.resolve({ data: [] as any[], error: null }),
+    organizationIds.length
+      ? admin.from("organizations").select("id,name,status").in("id", organizationIds).eq("status", "active")
+      : Promise.resolve({ data: [] as any[], error: null }),
+  ]);
+
+  const profileMap = new Map((profilesResult.data ?? []).map((profile: any) => [profile.id, profile]));
+  const expressionMap = new Map((expressionsResult.data ?? []).map((expression: any) => [expression.id, expression]));
+  const organizationMap = new Map((organizationsResult.data ?? []).map((organization: any) => [organization.id, organization]));
+
+  return rows.map((row) => {
+    const item = nestedContentItem(row.content_items);
+    if (!item) return row;
+    const author = item.author_profile_id ? profileMap.get(item.author_profile_id) ?? null : null;
+    const expression = item.expression_id ? expressionMap.get(item.expression_id) ?? null : null;
+    const organization = item.organization_id ? organizationMap.get(item.organization_id) ?? null : null;
+    return {
+      ...row,
+      content_items: {
+        ...item,
+        author: author ? {
+          id: author.id,
+          display_name: author.display_name,
+          username: author.username,
+          avatar_url: author.avatar_url,
+        } : null,
+        expression: expression ? { id: expression.id, name: expression.name, code: expression.code } : null,
+        organization: organization ? { id: organization.id, name: organization.name } : null,
+      },
+    };
+  });
+}
+
 Deno.serve(createHandler(
   { methods: ["GET"], authentication: "none", organization: "none" },
   async ({ request }) => {
@@ -84,8 +135,8 @@ Deno.serve(createHandler(
 
       const [sermons, videos, reels, events, leaders] = await Promise.all([
         client.from("sermons").select("id,organization_id,expression_id,series_id,title,slug,preacher,sermon_date,scripture_references,topics,description,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,duration_seconds,status,visibility,is_featured,play_count,published_at").eq("expression_id", expressionId).eq("visibility", "public").eq("status", "published").order("published_at", { ascending: false }).limit(30),
-        client.from("videos").select("id,organization_id,media_asset_id,series_id,title,slug,description,category,chapters,views_count,likes_count,comments_count,shares_count,created_at,content_items!inner(id,organization_id,expression_id,author_profile_id,visibility,status,published_at,author:profiles(id,display_name,username,avatar_url),expression:branches(id,name,code),organization:organizations(id,name)),media_assets(id,media_type,duration_seconds,aspect_ratio,media_renditions(id,rendition_kind,container,codec,width,height,storage_path,provider_playback_id),media_thumbnails(storage_path,is_primary))").eq("content_items.expression_id", expressionId).eq("content_items.visibility", "public").eq("content_items.status", "published").order("created_at", { ascending: false }).limit(30),
-        client.from("reels").select("id,organization_id,media_asset_id,caption,audio_title,audio_artist,views_count,likes_count,comments_count,shares_count,created_at,content_items!inner(id,organization_id,expression_id,author_profile_id,visibility,status,published_at,author:profiles(id,display_name,username,avatar_url),expression:branches(id,name,code),organization:organizations(id,name)),media_assets(id,media_type,duration_seconds,aspect_ratio,media_renditions(id,rendition_kind,container,codec,width,height,storage_path,provider_playback_id),media_thumbnails(storage_path,is_primary))").eq("content_items.expression_id", expressionId).eq("content_items.visibility", "public").eq("content_items.status", "published").order("created_at", { ascending: false }).limit(30),
+        client.from("videos").select("id,organization_id,media_asset_id,series_id,title,slug,description,category,chapters,views_count,likes_count,comments_count,shares_count,created_at,content_items!inner(id,organization_id,expression_id,author_profile_id,visibility,status,published_at),media_assets(id,media_type,duration_seconds,aspect_ratio,media_renditions(id,rendition_kind,container,codec,width,height,storage_path,provider_playback_id),media_thumbnails(storage_path,is_primary))").eq("content_items.expression_id", expressionId).eq("content_items.visibility", "public").eq("content_items.status", "published").order("created_at", { ascending: false }).limit(30),
+        client.from("reels").select("id,organization_id,media_asset_id,caption,audio_title,audio_artist,views_count,likes_count,comments_count,shares_count,created_at,content_items!inner(id,organization_id,expression_id,author_profile_id,visibility,status,published_at),media_assets(id,media_type,duration_seconds,aspect_ratio,media_renditions(id,rendition_kind,container,codec,width,height,storage_path,provider_playback_id),media_thumbnails(storage_path,is_primary))").eq("content_items.expression_id", expressionId).eq("content_items.visibility", "public").eq("content_items.status", "published").order("created_at", { ascending: false }).limit(30),
         client.from("events").select("id,organization_id,branch_id,title,description,starts_at,ends_at,location,capacity,visibility").eq("branch_id", expressionId).eq("visibility", "public").gte("ends_at", new Date().toISOString()).order("starts_at").limit(30),
         client.from("leadership_profiles").select("id,organization_id,expression_id,profile_id,display_name,portrait_url,role_title,short_bio,full_bio,ministry,display_order,is_founder,is_featured_public").eq("expression_id", expressionId).eq("is_active", true).eq("is_featured_public", true).order("display_order").limit(50),
       ]);
@@ -97,7 +148,7 @@ Deno.serve(createHandler(
           expression,
           sermons: sermons.data ?? [],
           videos: videos.data ?? [],
-          reels: reels.data ?? [],
+          reels: await enrichPublicMediaIdentity(reels.data ?? []),
           events: events.data ?? [],
           leaders: (leaders.data ?? []).map((leader) => ({
             id: leader.id,
@@ -122,12 +173,7 @@ Deno.serve(createHandler(
         .select(`
           id, organization_id, media_asset_id, caption, audio_title, audio_artist,
           views_count, likes_count, comments_count, shares_count, created_at,
-          content_items!inner(
-            id, organization_id, expression_id, author_profile_id, visibility, status, published_at,
-            author:profiles(id, display_name, username, avatar_url),
-            expression:branches(id, name, code),
-            organization:organizations(id, name)
-          ),
+          content_items!inner(id, organization_id, expression_id, author_profile_id, visibility, status, published_at),
           media_assets(id, media_type, duration_seconds, aspect_ratio,
             media_renditions(id, rendition_kind, container, codec, width, height, storage_path, provider_playback_id),
             media_thumbnails(storage_path, is_primary))
@@ -140,7 +186,7 @@ Deno.serve(createHandler(
       if (expressionId) query = query.eq("content_items.expression_id", expressionId);
       const { data, error } = await query;
       if (error) throw new ApiError("PUBLIC_REELS_FAILED", "Unable to retrieve public reels", 500, undefined, false);
-      return { data: data ?? [] };
+      return { data: await enrichPublicMediaIdentity(data ?? []) };
     }
 
     if (type === "videos") {
