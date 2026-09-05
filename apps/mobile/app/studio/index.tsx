@@ -157,7 +157,7 @@ export default function CreatorStudioScreen() {
       iconName: 'people-circle-outline',
       badge: 'DIRECTORY',
       route: '/leadership/directory',
-      enabled: Boolean(expression?.id) && (hasCapability('expression.leadership.manage') || hasCapability('organization.leadership.manage') || hasCapability('*')),
+      enabled: Boolean(expression?.id) && (hasCapability('expression.leadership.manage') || hasCapability('*')),
     },
   ].filter((module) => module.enabled);
 
