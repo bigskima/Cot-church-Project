@@ -1,7 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { ApiError } from "../_shared/errors.ts";
 import { createHandler } from "../_shared/handler.ts";
-import { enrichSocialPosts } from "../_shared/public-identity.ts";
 import { adminClient, publicClient, userClient } from "../_shared/supabase.ts";
 import { uuid } from "../_shared/validation.ts";
 import { diversifyFeed, rankFeedCandidates, type FeedSignals } from "../_shared/feed-ranking.ts";
@@ -124,7 +123,7 @@ Deno.serve(createHandler(
     const degraded: string[] = [];
     const recentEventCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-    const [streamsResult, reelsResult, videosResult, sermonsResult, eventsResult, postsResult] = await Promise.all([
+    const [streamsResult, reelsResult, videosResult, sermonsResult, eventsResult] = await Promise.all([
       client
         .from("live_streams")
         .select("id,organization_id,branch_id,title,description,status,visibility,scheduled_start,started_at,ended_at,recording_url,thumbnail_url,viewer_count,playback_url,playback_token_required,created_at")
@@ -160,13 +159,7 @@ Deno.serve(createHandler(
         .gte("ends_at", recentEventCutoff)
         .order("starts_at", { ascending: true })
         .limit(30),
-      client
-        .from("social_posts")
-        .select("id,organization_id,author_membership_id,branch_id,group_id,visibility,status,body,media,published_at,edited_at,created_at,social_reactions(reaction)")
-        .eq("organization_id", organizationId)
-        .eq("status", "published")
-        .order("published_at", { ascending: false })
-        .limit(60),
+
     ]);
 
     const streams = resultData<any[]>(streamsResult as any, "live", degraded)
@@ -184,10 +177,6 @@ Deno.serve(createHandler(
       .filter((row) => inSelectedExperience(row, selectedExpressionId, "expression_id"));
     const events = resultData<any[]>(eventsResult as any, "events", degraded)
       .filter((row) => inSelectedExperience(row, selectedExpressionId, "branch_id"));
-    const rawPosts = resultData<any[]>(postsResult as any, "community", degraded)
-      .filter((row) => inSelectedExperience(row, selectedExpressionId, "branch_id"));
-    let posts = await enrichSocialPosts(rawPosts);
-
     let rankingMode: "personalized" | "recent" | "expression" = selectedExpressionId ? "expression" : "recent";
     if (!selectedExpressionId && userId) {
       const signals = emptySignals();
@@ -212,7 +201,6 @@ Deno.serve(createHandler(
         }
 
         const candidates = [
-          ...posts.map((row: any) => ({ key: `post:${row.id}`, kind: "post" as const, publishedAt: row.published_at ?? row.created_at, expressionId: row.branch_id, authorProfileId: row.author?.id, engagementCount: row.social_reactions?.length ?? 0 })),
           ...reels.map((row: any) => { const item = nestedItem(row.content_items); return { key: `reel:${row.id}`, kind: "reel" as const, publishedAt: item?.published_at ?? row.created_at, expressionId: item?.expression_id, authorProfileId: item?.author_profile_id, contentItemId: item?.id, engagementCount: row.likes_count + row.comments_count + row.shares_count }; }),
           ...videos.map((row: any) => { const item = nestedItem(row.content_items); return { key: `video:${row.id}`, kind: "video" as const, publishedAt: item?.published_at ?? row.created_at, expressionId: item?.expression_id, authorProfileId: item?.author_profile_id, contentItemId: item?.id, engagementCount: row.likes_count + row.comments_count + row.shares_count }; }),
           ...sermons.map((row: any) => ({ key: `sermon:${row.id}`, kind: "sermon" as const, publishedAt: row.published_at ?? row.sermon_date, expressionId: row.expression_id, contentItemId: row.content_item_id, engagementCount: row.play_count })),
@@ -220,7 +208,6 @@ Deno.serve(createHandler(
         ];
         const ranked = diversifyFeed(rankFeedCandidates(candidates, organization.id, signals));
         const ranking = new Map(ranked.map((item, index) => [item.key, { feed_rank: ranked.length - index, feed_reason: item.reason }]));
-        posts = posts.map((row: any) => ({ ...row, ...ranking.get(`post:${row.id}`) }));
         reels.forEach((row: any) => Object.assign(row, ranking.get(`reel:${row.id}`)));
         videos.forEach((row: any) => Object.assign(row, ranking.get(`video:${row.id}`)));
         sermons.forEach((row: any) => Object.assign(row, ranking.get(`sermon:${row.id}`)));
@@ -231,7 +218,7 @@ Deno.serve(createHandler(
       }
     }
 
-    if (["live", "reels", "videos", "sermons", "events", "community"].every((section) => degraded.includes(section))) {
+    if (["live", "reels", "videos", "sermons", "events"].every((section) => degraded.includes(section))) {
       throw new ApiError("HOME_FEED_FAILED", "Home content is temporarily unavailable", 503, undefined, true);
     }
 
@@ -245,7 +232,6 @@ Deno.serve(createHandler(
         videos,
         sermons,
         events,
-        posts,
         rankingMode,
         degradedSections: degraded,
       },
