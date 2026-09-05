@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiError } from '@/api';
-import { Badge, Button, EmptyState, Icon, ScreenHeader } from '@/components';
+import { Badge, Button, EmptyState, Icon, InputField, ScreenHeader } from '@/components';
 import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -86,7 +86,9 @@ export default function ExpressionsScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + spacing.xxl }]} keyboardShouldPersistTaps="handled">
-        <ScreenHeader title="My Expressions" subtitle="Enter a contained community space or join one with an invite code." showBack />
+        <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+          <ScreenHeader title="Expressions" kicker="YOUR SPACES" subtitle="Enter a community you belong to, or join one with an invite code." showBack />
+        </View>
 
         {activeExpressionId ? (
           <View style={[styles.activeCard, { backgroundColor: colors.primarySoft, borderColor: colors.interactive }]}>
@@ -94,7 +96,7 @@ export default function ExpressionsScreen() {
               <Icon name="people" size={22} color={colors.interactive} />
               <View style={styles.flex}>
                 <Text style={[styles.cardTitle, { color: colors.text }]}>{context?.expression?.name}</Text>
-                <Text style={[styles.copy, { color: colors.textSecondary }]}>You are inside this Expression. Internal navigation and permissions are active.</Text>
+                <Text style={[styles.copy, { color: colors.textSecondary }]}>You’re currently inside this private community space.</Text>
               </View>
               <Badge label="ACTIVE" variant="active" />
             </View>
@@ -105,8 +107,8 @@ export default function ExpressionsScreen() {
         <View style={styles.section}>
           <Text style={[styles.heading, { color: colors.text }]}>Your memberships</Text>
           {expressions.length ? expressions.map((expression) => (
-            <View key={expression.membershipId} style={[styles.membershipCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
-              <View style={[styles.expressionIcon, { backgroundColor: colors.primarySoft }]}><Icon name="business-outline" size={22} color={colors.interactive} /></View>
+            <View key={expression.membershipId} style={[styles.membershipCard, { backgroundColor: colors.card, borderColor: activeExpressionId === expression.id ? colors.interactive : colors.borderSubtle }, shadows.sm]}>
+              <View style={[styles.expressionIcon, { backgroundColor: colors.primarySoft }]}><Icon name="people-outline" size={22} color={colors.interactive} /></View>
               <View style={styles.flex}>
                 <Text style={[styles.cardTitle, { color: colors.text }]}>{expression.name}</Text>
                 <Text style={[styles.copy, { color: colors.textSecondary }]}>{expression.code || 'Expression member'}</Text>
@@ -124,21 +126,20 @@ export default function ExpressionsScreen() {
           )}
         </View>
 
-        <View style={[styles.joinCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+        <View style={[styles.joinCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
           <Text style={[styles.heading, { color: colors.text }]}>Join an Expression</Text>
-          <Text style={[styles.copy, { color: colors.textSecondary }]}>Joining is invite-only. Codes are validated securely before membership is created.</Text>
-          <TextInput
+          <Text style={[styles.copy, { color: colors.textSecondary }]}>Invite-only spaces stay private until you join.</Text>
+          <InputField
+            label="Invite code"
             value={code}
             onChangeText={(value) => { setCode(value.toUpperCase()); setPreview(null); setError(''); }}
             placeholder="COT-XXXX-XXXX-XXXX-XXXX"
-            placeholderTextColor={colors.textMuted}
             autoCapitalize="characters"
             autoCorrect={false}
-            style={[styles.input, { color: colors.text, backgroundColor: colors.inputBg, borderColor: error ? colors.live : colors.border }]}
+            error={error || undefined}
             accessibilityLabel="Expression invite code"
           />
-          {error ? <Text style={[styles.message, { color: colors.live }]} accessibilityRole="alert">{error}</Text> : null}
-          {success ? <Text style={[styles.message, { color: colors.success }]} accessibilityRole="alert">{success}</Text> : null}
+                    {success ? <Text style={[styles.message, { color: colors.success }]} accessibilityRole="alert">{success}</Text> : null}
           {preview ? (
             <View style={[styles.preview, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
               <Icon name="checkmark-circle" size={24} color={colors.success} />
@@ -158,19 +159,19 @@ export default function ExpressionsScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  content: { paddingHorizontal: spacing.lg, gap: spacing.xl },
+  content: { paddingHorizontal: spacing.md, gap: spacing.xl },
   section: { gap: spacing.sm },
   heading: { ...typography.h3 },
-  activeCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.lg, gap: spacing.md },
-  joinCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.lg, gap: spacing.md },
-  membershipCard: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, gap: spacing.md },
+  heroCard: { borderWidth: 1, borderRadius: radius.xxl, overflow: 'hidden' },
+  activeCard: { borderWidth: 1, borderRadius: radius.xxl, padding: spacing.lg, gap: spacing.md },
+  joinCard: { borderWidth: 1, borderRadius: radius.xxl, padding: spacing.lg, gap: spacing.md },
+  membershipCard: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.md },
   expressionIcon: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
   flex: { flex: 1 },
   cardTitle: { fontSize: 15, fontWeight: '700' },
   copy: { ...typography.bodySmall, lineHeight: 18 },
   meta: { fontSize: 11, marginTop: 4 },
-  input: { minHeight: 52, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: spacing.md, fontSize: 16, fontWeight: '700', letterSpacing: 0.8 },
   preview: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
   message: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
 });
