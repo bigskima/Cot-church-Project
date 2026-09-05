@@ -35,11 +35,11 @@ export default function NotificationsScreen() {
   const [busyNotificationId, setBusyNotificationId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
 
-  const invitations = useResource<GovernanceInvitation[]>('governance:inbox', (signal) => {
+  const invitations = useResource<GovernanceInvitation[]>(`governance:inbox:${mode}`, (signal) => {
     if (mode !== 'authenticated') return Promise.resolve([]);
     return api.request<GovernanceInvitation[]>('governance-invitations', { signal });
   });
-  const notifications = useResource<NotificationItem[]>('notifications:inbox', (signal) => {
+  const notifications = useResource<NotificationItem[]>(`notifications:inbox:${mode}:${context?.organization?.id ?? 'none'}`, (signal) => {
     if (mode !== 'authenticated' || !context?.organization?.id) return Promise.resolve([]);
     return api.request<NotificationItem[]>('notifications', { signal });
   });
