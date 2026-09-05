@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View, StyleProp, ViewStyle, Share } from 'react-native';
 import { useTheme } from '@/state/theme';
 import { radius, shadows, spacing } from '@/design-system/tokens';
@@ -29,8 +29,8 @@ export interface PostCardProps {
   onLike?: () => void;
   onComment?: () => void;
   onReply?: () => void;
-  onReact?: (reaction: string) => void;
-  onBookmark?: () => void;
+  onReact?: (reaction: string | null) => void | boolean | Promise<boolean>;
+  onBookmark?: (currentlySaved: boolean) => void | boolean | Promise<boolean>;
   onShare?: () => void;
   style?: StyleProp<ViewStyle>;
   dark?: boolean;
@@ -73,22 +73,42 @@ export function PostCard({
   const isVerified = author.isVerified || author.is_verified || postAsAny.is_verified || false;
   const badges: PublicIdentityBadge[] = Array.isArray(author.badges) ? author.badges : [];
 
-  const [hasLiked, setHasLiked] = useState(false);
+  const [hasLiked, setHasLiked] = useState(Boolean(postAsAny.viewer_reaction));
   const [likeCount, setLikeCount] = useState(postAsAny.likes_count ?? (post.social_reactions?.length || 0));
-  const [hasSaved, setHasSaved] = useState(false);
+  const [hasSaved, setHasSaved] = useState(Boolean(postAsAny.viewer_bookmarked));
 
-  const handleLike = () => {
-    if (!canEngage || hasLiked) return;
-    setHasLiked(true);
-    setLikeCount((count: number) => count + 1);
-    onReact?.('like');
-    onLike?.();
+  useEffect(() => {
+    setHasLiked(Boolean(postAsAny.viewer_reaction));
+    setLikeCount(postAsAny.likes_count ?? (post.social_reactions?.length || 0));
+    setHasSaved(Boolean(postAsAny.viewer_bookmarked));
+  }, [
+    post.id,
+    postAsAny.viewer_reaction,
+    postAsAny.viewer_bookmarked,
+    postAsAny.likes_count,
+    post.social_reactions,
+  ]);
+
+  const handleLike = async () => {
+    if (!canEngage || (!onReact && !onLike)) return;
+    const nextLiked = !hasLiked;
+    if (onReact) {
+      const saved = await onReact(nextLiked ? 'like' : null);
+      if (saved === false) return;
+    } else if (nextLiked) {
+      onLike?.();
+    } else {
+      return;
+    }
+    setHasLiked(nextLiked);
+    setLikeCount((count: number) => Math.max(0, count + (nextLiked ? 1 : -1)));
   };
 
-  const handleSave = () => {
-    if (!canEngage) return;
+  const handleSave = async () => {
+    if (!canEngage || !onBookmark) return;
+    const saved = await onBookmark(hasSaved);
+    if (saved === false) return;
     setHasSaved(!hasSaved);
-    onBookmark?.();
   };
 
   const handleNativeShare = async () => {
@@ -212,13 +232,15 @@ export function PostCard({
               <Icon name="chatbubble-outline" size={19} color={colors.textSecondary} />
               <Text style={[styles.actionCount, { color: colors.textSecondary }]}>{postAsAny.comments_count || ''}</Text>
             </Pressable>
-            <Pressable onPress={handleLike} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed && { backgroundColor: colors.liveSoft }]} accessibilityRole="button" accessibilityLabel="Like post">
+            <Pressable onPress={() => void handleLike()} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed && { backgroundColor: colors.liveSoft }]} accessibilityRole="button" accessibilityLabel="Like post">
               <Icon name={hasLiked ? 'heart' : 'heart-outline'} size={19} color={hasLiked ? colors.live : colors.textSecondary} />
               <Text style={[styles.actionCount, { color: hasLiked ? colors.live : colors.textSecondary }]}>{likeCount > 0 ? likeCount : ''}</Text>
             </Pressable>
-            <Pressable onPress={handleSave} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed && { backgroundColor: colors.primarySoft }]} accessibilityRole="button" accessibilityLabel="Bookmark post">
-              <Icon name={hasSaved ? 'bookmark' : 'bookmark-outline'} size={19} color={hasSaved ? colors.interactive : colors.textSecondary} />
-            </Pressable>
+            {onBookmark ? (
+              <Pressable onPress={() => void handleSave()} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed && { backgroundColor: colors.primarySoft }]} accessibilityRole="button" accessibilityLabel="Bookmark post">
+                <Icon name={hasSaved ? 'bookmark' : 'bookmark-outline'} size={19} color={hasSaved ? colors.interactive : colors.textSecondary} />
+              </Pressable>
+            ) : null}
           </>
         ) : (
           <Text style={[styles.guestMeta, { color: colors.textMuted }]}>Sign in to join the conversation</Text>
