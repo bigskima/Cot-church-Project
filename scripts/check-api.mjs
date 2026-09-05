@@ -185,6 +185,8 @@ const invariants = [
 const missing = invariants.filter(([source, pattern]) => !pattern.test(source));
 const forbidden = [
   [churchStory, /Foundation & First Gathering|Multi-Expression Expansion|Global Digital Ministry/, 'fabricated church story fallback'],
+  [signup, /password\(body\.password\)/, 'hardcoded signup password policy'],
+  [signup, /length\s*<\s*\d+.*password|password.*length\s*<\s*\d+/s, 'hardcoded signup password length rule'],
 ];
 const presentForbidden = forbidden.filter(([source, pattern]) => pattern.test(source));
 
