@@ -12,7 +12,6 @@ import { PublicDirectory } from '../pages/PublicDirectory';
 import { StreamingInfrastructure } from '../pages/StreamingInfrastructure';
 import { AiInfrastructure } from '../pages/AiInfrastructure';
 import { PaymentInfrastructure } from '../pages/PaymentInfrastructure';
-import { GivingConfiguration } from '../pages/GivingConfiguration';
 import { ProviderCredentials } from '../pages/ProviderCredentials';
 import { FeatureFlags } from '../pages/FeatureFlags';
 import { IntegrationsJobs } from '../pages/IntegrationsJobs';
@@ -33,7 +32,6 @@ const allNavSections: NavSection[] = [
       { key: 'expression-creators', label: 'Expression Creation Access', permission: 'platform.expression_creators.manage', superAdminOnly: true },
       { key: 'branding', label: 'Branding & Identity', permission: 'platform.branding.manage' },
       { key: 'public-directory', label: 'Community Directory', permission: 'platform.public_directory.manage' },
-      { key: 'giving', label: 'Church-wide Giving', permission: 'platform.giving.read' },
       { key: 'features', label: 'Feature Availability', permission: 'platform.features.read' },
     ],
   },
@@ -123,7 +121,6 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
       case 'expression-creators': return isSuperAdmin ? <ExpressionCreators api={api} /> : <PlatformOverview api={api} onNavigate={navigate} allowedPages={allowedPageKeys} />;
       case 'branding': return <BrandingAppearance api={api} />;
       case 'public-directory': return <PublicDirectory api={api} />;
-      case 'giving': return <GivingConfiguration api={api} />;
       case 'credentials': return <ProviderCredentials api={api} />;
       case 'streaming': return <StreamingInfrastructure api={api} />;
       case 'ai': return <AiInfrastructure api={api} />;
