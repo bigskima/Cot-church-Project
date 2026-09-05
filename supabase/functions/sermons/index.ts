@@ -48,7 +48,42 @@ Deno.serve(createHandler(
       const sermonId = uuid(url.searchParams.get("id"), "id");
       const seriesId = uuid(url.searchParams.get("seriesId"), "seriesId");
       const queryTerm = url.searchParams.get("q")?.trim();
+      const view = url.searchParams.get("view") ?? "published";
       const client = auth?.client ?? (await import("../_shared/supabase.ts")).publicClient();
+
+      if (view === "manage") {
+        if (!auth?.user || !auth.organizationId) {
+          throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication and organization context required", 401);
+        }
+        const scopeId = auth.branchId ?? null;
+        const canManage =
+          await hasScopedPermission(auth, "sermons.create", scopeId) ||
+          await hasScopedPermission(auth, "sermons.manage", scopeId) ||
+          await hasScopedPermission(auth, "sermons.publish", scopeId);
+        if (!canManage) throw new ApiError("PERMISSION_DENIED", "You cannot manage sermons in this scope", 403);
+
+        let managementQuery = auth.client
+          .from("sermons")
+          .select("id,organization_id,expression_id,series_id,recording_id,title,slug,preacher,sermon_date,scripture_references,topics,description,transcript,audio_url,video_url,thumbnail_url,duration_seconds,status,visibility,is_featured,play_count,published_at")
+          .eq("organization_id", auth.organizationId)
+          .order("sermon_date", { ascending: false })
+          .limit(200);
+        managementQuery = scopeId
+          ? managementQuery.eq("expression_id", scopeId)
+          : managementQuery.is("expression_id", null);
+        if (queryTerm) managementQuery = managementQuery.ilike("title", `%${queryTerm.replace(/[%_]/g, "\\    if (request.method === "GET") {
+      if (!organizationId) throw new ApiError("ORGANIZATION_REQUIRED", "Organization context is required", 400);
+      const sermonId = uuid(url.searchParams.get("id"), "id");
+      const seriesId = uuid(url.searchParams.get("seriesId"), "seriesId");
+      const queryTerm = url.searchParams.get("q")?.trim();
+      const client = auth?.client ?? (await import("../_shared/supabase.ts")).publicClient();")}%`);
+
+        const { data, error } = await managementQuery;
+        if (error) throw new ApiError("SERMONS_LIST_FAILED", "Unable to retrieve sermons", 500, undefined, false);
+        return { data: data ?? [] };
+      }
+
+      if (view !== "published") throw new ApiError("VALIDATION_FAILED", "Unsupported sermon view", 422);
 
       if (url.searchParams.get("type") === "series") {
         let seriesQuery = client
