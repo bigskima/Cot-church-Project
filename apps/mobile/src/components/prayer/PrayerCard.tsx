@@ -9,15 +9,21 @@ import type { PrayerRequest } from '@/types/content';
 export interface PrayerCardProps {
   prayer: PrayerRequest;
   onPray?: () => void;
+  busy?: boolean;
   style?: StyleProp<ViewStyle>;
   dark?: boolean; // backwards compatibility
 }
 
-export function PrayerCard({ prayer, onPray, style }: PrayerCardProps) {
+export function PrayerCard({ prayer, onPray, busy = false, style }: PrayerCardProps) {
   const { colors } = useTheme();
 
   const isConfidential = prayer.privacy === 'pastoral_only';
   const isAnswered = prayer.status === 'answered';
+  const hasPrayed = prayer.viewer_has_prayed === true;
+  const prayerCount = prayer.prayer_count ?? 0;
+  const prayerLabel = hasPrayed
+    ? prayerCount > 1 ? `Praying · ${prayerCount}` : 'Praying'
+    : prayerCount > 0 ? `${prayerCount} Praying` : 'Pray';
 
   return (
     <View
@@ -72,14 +78,21 @@ export function PrayerCard({ prayer, onPray, style }: PrayerCardProps) {
         {onPray ? (
           <Pressable
             onPress={onPray}
+            disabled={busy || hasPrayed}
             hitSlop={6}
-            style={[styles.prayBtn, { backgroundColor: colors.primarySoft }]}
+            style={({ pressed }) => [
+              styles.prayBtn,
+              { backgroundColor: hasPrayed ? colors.prayerSoft : colors.primarySoft },
+              pressed && !busy && !hasPrayed ? styles.prayBtnPressed : null,
+              busy ? styles.prayBtnBusy : null,
+            ]}
             accessibilityRole="button"
-            accessibilityLabel="Pray for this request"
+            accessibilityState={{ disabled: busy || hasPrayed, busy }}
+            accessibilityLabel={hasPrayed ? 'You are praying for this request' : 'Pray for this request'}
           >
-            <Icon name="heart-outline" size={14} color={colors.interactive} />
-            <Text style={[styles.prayBtnText, { color: colors.interactive }]}>
-              {prayer.prayer_count && prayer.prayer_count > 0 ? `${prayer.prayer_count} Praying` : 'Pray'}
+            <Icon name={hasPrayed ? 'heart' : 'heart-outline'} size={14} color={hasPrayed ? colors.prayer : colors.interactive} />
+            <Text style={[styles.prayBtnText, { color: hasPrayed ? colors.prayer : colors.interactive }]}>
+              {busy ? 'Saving…' : prayerLabel}
             </Text>
           </Pressable>
         ) : null}
@@ -146,5 +159,12 @@ const styles = StyleSheet.create({
   prayBtnText: {
     fontSize: 12,
     fontWeight: '700',
+  },
+  prayBtnPressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.98 }],
+  },
+  prayBtnBusy: {
+    opacity: 0.7,
   },
 });
