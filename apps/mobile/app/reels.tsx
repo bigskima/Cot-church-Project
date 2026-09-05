@@ -119,7 +119,7 @@ export default function FullScreenReelsScreen() {
   return (
     <View style={styles.screen}>
       <View style={[styles.closeButton, { top: insets.top + 8 }]}>
-        <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close Reels" style={[styles.closeBtnInner, { backgroundColor: colors.cardElevated }]}>
+        <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close Reels" style={styles.closeBtnInner}>
           <Icon name="close" size={22} color="#FFFFFF" />
         </Pressable>
       </View>
@@ -129,7 +129,7 @@ export default function FullScreenReelsScreen() {
       ) : reelsResource.error && !reels.length ? (
         <View style={styles.centerWrapper}><ResourceError message={reelsResource.error} retry={reelsResource.refresh} /></View>
       ) : reels.length === 0 ? (
-        <View style={styles.centerWrapper}><ResourceError message="No Short Clips Yet" retry={reelsResource.refresh} /></View>
+        <View style={styles.centerWrapper}><ResourceError message="No Reels Yet" retry={reelsResource.refresh} /></View>
       ) : (
         <FlatList
           data={reels}
@@ -141,7 +141,7 @@ export default function FullScreenReelsScreen() {
           decelerationRate="fast"
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
-          refreshControl={<RefreshControl refreshing={reelsResource.loading} onRefresh={reelsResource.refresh} tintColor="#2F6FED" />}
+          refreshControl={<RefreshControl refreshing={reelsResource.loading} onRefresh={reelsResource.refresh} tintColor={colors.interactive} />}
           renderItem={({ item, index }) => (
             <ReelPlayer
               reel={item}
@@ -167,8 +167,8 @@ export default function FullScreenReelsScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#061426' },
+  screen: { flex: 1, backgroundColor: '#000000' },
   closeButton: { position: 'absolute', right: 16, zIndex: 10 },
-  closeBtnInner: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', opacity: 0.9 },
+  closeBtnInner: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.48)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
   centerWrapper: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
 });
