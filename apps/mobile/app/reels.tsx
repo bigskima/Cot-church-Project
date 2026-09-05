@@ -1,11 +1,11 @@
-import React, { useRef, useState } from 'react';
-import { Dimensions, FlatList, Pressable, RefreshControl, StyleSheet, Text, View, ViewToken } from 'react-native';
-import { router } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
+import { Dimensions, FlatList, Pressable, RefreshControl, Share, StyleSheet, Text, View, ViewToken } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
-import { CommentSheet, Icon, ReelPlayer, ResourceError, Skeleton } from '@/components';
+import { BottomSheet, Button, CommentSheet, Icon, ReelPlayer, ResourceError, Skeleton } from '@/components';
 import type { ContentComment, Reel } from '@/types/content';
 
 const { height: windowHeight } = Dimensions.get('window');
@@ -24,13 +24,18 @@ type ReelWithViewerState = Reel & {
 
 export default function FullScreenReelsScreen() {
   const insets = useSafeAreaInsets();
-  const { api, mode, context } = useSession();
+  const { api, mode, context, hasCapability } = useSession();
+  const { reelId } = useLocalSearchParams<{ reelId?: string }>();
   const { colors } = useTheme();
   const [activeIndex, setActiveIndex] = useState(0);
   const [activeReelForComments, setActiveReelForComments] = useState<Reel | null>(null);
   const [comments, setComments] = useState<ContentComment[]>([]);
   const [commentLoading, setCommentLoading] = useState(false);
   const [actionError, setActionError] = useState('');
+  const [shareTarget, setShareTarget] = useState<ReelWithViewerState | null>(null);
+  const [shareBusy, setShareBusy] = useState(false);
+  const listRef = useRef<FlatList<ReelWithViewerState>>(null);
+  const appliedDeepLinkRef = useRef<string | null>(null);
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
   const expressionId = context?.expression?.id;
 
@@ -80,6 +85,21 @@ export default function FullScreenReelsScreen() {
   });
 
   const reels = reelsResource.data ?? [];
+  const canShareToGeneral =
+    mode === 'authenticated' &&
+    (Boolean(context?.expressions?.some((item) => item.status === 'active')) || hasCapability('feed.post') || hasCapability('*'));
+
+  useEffect(() => {
+    if (!reelId || !reels.length || appliedDeepLinkRef.current === reelId) return;
+    const targetIndex = reels.findIndex((item) => item.id === reelId);
+    if (targetIndex < 0) return;
+    appliedDeepLinkRef.current = reelId;
+    setActiveIndex(targetIndex);
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToIndex({ index: targetIndex, animated: false });
+    });
+  }, [reelId, reels]);
+
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     if (viewableItems.length > 0 && viewableItems[0].index !== null) setActiveIndex(viewableItems[0].index);
   }).current;
@@ -165,6 +185,56 @@ export default function FullScreenReelsScreen() {
     }
   };
 
+  const handleShareReel = (reel: ReelWithViewerState) => {
+    if (mode === 'visitor') {
+      router.push({ pathname: '/(auth)/login', params: { returnTo: '/reels' } } as any);
+      return;
+    }
+    setActionError('');
+    setShareTarget(reel);
+  };
+
+  const shareReelToGeneral = async () => {
+    if (!shareTarget || !canShareToGeneral) return;
+    const isPublic = shareTarget.content_items?.visibility === 'public';
+    if (!isPublic) {
+      setActionError('This Reel belongs to a private Expression and cannot be shared to General Community.');
+      setShareTarget(null);
+      return;
+    }
+    setShareBusy(true);
+    setActionError('');
+    try {
+      await api.request('social-feed', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'share_reel', reelId: shareTarget.id }),
+      });
+      setShareTarget(null);
+    } catch (value) {
+      setActionError(value instanceof Error ? value.message : 'Unable to share this Reel to General Community.');
+    } finally {
+      setShareBusy(false);
+    }
+  };
+
+  const shareReelExternally = async () => {
+    if (!shareTarget) return;
+    const isPublic = shareTarget.content_items?.visibility === 'public';
+    if (!isPublic) {
+      setActionError('This Reel belongs to a private Expression and cannot be shared outside it.');
+      setShareTarget(null);
+      return;
+    }
+    try {
+      await Share.share({
+        message: `Watch this Reel on City of Transformation: ${shareTarget.caption || 'Church video'}`,
+      });
+      setShareTarget(null);
+    } catch {
+      // Dismissing the native share sheet does not change Reel state.
+    }
+  };
+
   const expressionName = context?.expression?.name;
 
   return (
@@ -196,9 +266,11 @@ export default function FullScreenReelsScreen() {
         <View style={styles.centerWrapper}><ResourceError message="No Reels Yet" retry={reelsResource.refresh} /></View>
       ) : (
         <FlatList
+          ref={listRef}
           data={reels}
           keyExtractor={(item) => item.id}
           pagingEnabled
+          getItemLayout={(_, index) => ({ length: windowHeight, offset: windowHeight * index, index })}
           showsVerticalScrollIndicator={false}
           snapToInterval={windowHeight}
           snapToAlignment="start"
@@ -216,10 +288,50 @@ export default function FullScreenReelsScreen() {
               onLike={(currentlyLiked) => handleLikeReel(item, currentlyLiked)}
               onSave={(currentlySaved) => handleSaveReel(item, currentlySaved)}
               onOpenComments={() => handleOpenComments(item)}
+              onShare={() => handleShareReel(item)}
             />
           )}
         />
       )}
+
+      <BottomSheet
+        visible={!!shareTarget}
+        onClose={() => { if (!shareBusy) setShareTarget(null); }}
+        title="Share Reel"
+        subtitle={shareTarget?.caption || 'Choose where to share this Reel.'}
+      >
+        <View style={styles.shareSheet}>
+          {shareTarget?.content_items?.visibility === 'public' ? (
+            <>
+              {canShareToGeneral ? (
+                <Button
+                  label="Share to General Community"
+                  onPress={() => void shareReelToGeneral()}
+                  loading={shareBusy}
+                  variant="primary"
+                  size="lg"
+                  fullWidth
+                />
+              ) : (
+                <Text style={styles.shareHint}>Join an active Expression before sharing a Reel into General Community.</Text>
+              )}
+              <Button
+                label="Share externally"
+                onPress={() => void shareReelExternally()}
+                disabled={shareBusy}
+                variant="outline"
+                size="lg"
+                fullWidth
+              />
+            </>
+          ) : (
+            <View style={styles.privateShareNotice}>
+              <Icon name="lock-closed-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.privateShareText}>This Reel is private to its Expression and cannot be shared outside that space.</Text>
+            </View>
+          )}
+        </View>
+      </BottomSheet>
 
       <CommentSheet
         visible={!!activeReelForComments}
@@ -239,4 +351,8 @@ const styles = StyleSheet.create({
   errorToast: { position: 'absolute', left: 16, right: 68, zIndex: 20, minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 16, backgroundColor: 'rgba(180,35,24,0.92)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
   errorToastText: { flex: 1, color: '#FFFFFF', fontSize: 12, lineHeight: 17, fontWeight: '700' },
   centerWrapper: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  shareSheet: { gap: 12 },
+  shareHint: { fontSize: 12, lineHeight: 18, color: '#9AA8B8', textAlign: 'center' },
+  privateShareNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.08)' },
+  privateShareText: { flex: 1, color: '#FFFFFF', fontSize: 12, lineHeight: 18, fontWeight: '600' },
 });
