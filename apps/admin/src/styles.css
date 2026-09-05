@@ -2232,3 +2232,20 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+
+.admin-inline-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+  cursor: pointer;
+}
+
+.admin-inline-check input {
+  margin-top: 2px;
+  accent-color: var(--gold-dark);
+}
