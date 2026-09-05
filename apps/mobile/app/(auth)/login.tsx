@@ -116,7 +116,7 @@ export default function LoginScreen() {
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.text }]}>Welcome Back</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Sign in to access sermons, live services, giving, prayer, and your church community.
+            Sign in to interact, join your Expression, manage your account, and use member-only church features.
           </Text>
         </View>
 
@@ -151,7 +151,7 @@ export default function LoginScreen() {
                 styles.input,
                 {
                   backgroundColor: colors.bgSecondary,
-                  borderColor: colors.border,
+                  borderColor: colors.borderSubtle,
                   color: colors.text,
                 },
               ]}
@@ -210,7 +210,7 @@ export default function LoginScreen() {
           />
 
           <Button
-            label="Continue as Guest"
+            label="Explore Public COT"
             onPress={handleGuestEntry}
             loading={guestLoading}
             disabled={loading}
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
   },
   input: {
     height: 48,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: spacing.md,
     fontSize: 15,
