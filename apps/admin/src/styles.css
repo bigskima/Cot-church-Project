@@ -2008,3 +2008,142 @@ body {
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
+
+
+/* -------------------------------------------------------------
+   BRANDING CONFIGURATION
+   ------------------------------------------------------------- */
+.admin-branding-summary {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-branding-hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.admin-branding-preview {
+  width: 82px;
+  height: 82px;
+  flex: 0 0 auto;
+  border-radius: 22px;
+  border: 1px solid var(--border-subtle);
+  background:
+    radial-gradient(circle at 30% 20%, rgba(92, 143, 245, 0.18), transparent 45%),
+    var(--bg-elevated);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: var(--gold);
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.6px;
+}
+
+.admin-branding-preview img,
+.admin-brand-asset-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.admin-branding-name {
+  margin-top: 3px;
+  color: var(--text-primary);
+  font-size: clamp(22px, 3vw, 30px);
+  font-weight: 900;
+  letter-spacing: -0.8px;
+}
+
+.admin-branding-meta {
+  margin-top: 9px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.admin-brand-asset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+}
+
+.admin-brand-asset-card {
+  min-height: 70px;
+  padding: 10px;
+  border-radius: 16px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-brand-asset-thumb {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: var(--text-muted);
+}
+
+.admin-brand-asset-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-brand-asset-copy strong {
+  font-size: 12px;
+}
+
+.admin-brand-asset-copy span {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.admin-form-section-title {
+  margin: 10px 0 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.85px;
+  text-transform: uppercase;
+}
+
+.admin-form-grid-two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 700px) {
+  .admin-branding-hero {
+    align-items: flex-start;
+  }
+
+  .admin-branding-preview {
+    width: 64px;
+    height: 64px;
+    border-radius: 18px;
+  }
+
+  .admin-form-grid-two {
+    grid-template-columns: 1fr;
+  }
+}
