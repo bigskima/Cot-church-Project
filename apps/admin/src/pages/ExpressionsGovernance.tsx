@@ -23,7 +23,7 @@ interface ExpressionListResponse {
   total: number;
 }
 
-export function ExpressionsGovernance({ api }: { api: ApiClient }) {
+export function ExpressionsGovernance({ api, canManage = false }: { api: ApiClient; canManage?: boolean }) {
   const [expressions, setExpressions] = useState<ExpressionItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -55,7 +55,7 @@ export function ExpressionsGovernance({ api }: { api: ApiClient }) {
   }, [api, search]);
 
   const applyLifecycle = async () => {
-    if (!lifecycleExp) return;
+    if (!canManage || !lifecycleExp) return;
     const isActive = !lifecycleExp.is_active;
     if (!isActive && !governanceReason.trim()) {
       setError('A governance reason is required before disabling an expression.');
@@ -183,7 +183,7 @@ export function ExpressionsGovernance({ api }: { api: ApiClient }) {
       </Modal>
 
       <Modal
-        isOpen={!!lifecycleExp}
+        isOpen={canManage && !!lifecycleExp}
         onClose={() => {
           if (!actionBusy) setLifecycleExp(null);
         }}
