@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -32,6 +32,7 @@ export default function NotificationsScreen() {
   const { api, mode, context, auth, selectContext } = useSession();
   const { colors } = useTheme();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [busyNotificationId, setBusyNotificationId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
 
   const invitations = useResource<GovernanceInvitation[]>('governance:inbox', (signal) => {
@@ -72,6 +73,22 @@ export default function NotificationsScreen() {
     }
   };
 
+  const markRead = async (item: NotificationItem) => {
+    if (item.read_at || busyNotificationId === item.id) return;
+    setBusyNotificationId(item.id);
+    try {
+      await api.request('notifications', {
+        method: 'PATCH',
+        body: JSON.stringify({ id: item.id, read: true }),
+      });
+      await notifications.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Unable to update this notification.');
+    } finally {
+      setBusyNotificationId(null);
+    }
+  };
+
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 130 }}>
@@ -107,14 +124,27 @@ export default function NotificationsScreen() {
             {notifications.loading ? <Skeleton height={86} count={2} /> : notifications.error && !notifications.data ? (
               <ResourceError message={notifications.error} retry={notifications.refresh} />
             ) : notifications.data?.length ? notifications.data.map((item) => (
-              <View key={item.id} style={[styles.notice, { backgroundColor: colors.card, borderColor: item.read_at ? colors.borderSubtle : colors.interactive }, shadows.sm]}>
+              <Pressable
+                key={item.id}
+                onPress={() => void markRead(item)}
+                disabled={Boolean(item.read_at) || busyNotificationId === item.id}
+                accessibilityRole="button"
+                accessibilityLabel={item.read_at ? item.title : `${item.title}. Mark as read`}
+                style={({ pressed }) => [
+                  styles.notice,
+                  { backgroundColor: colors.card, borderColor: item.read_at ? colors.borderSubtle : colors.interactive },
+                  shadows.sm,
+                  pressed && !item.read_at && styles.noticePressed,
+                ]}
+              >
                 <View style={styles.noticeTitleRow}>
                   {!item.read_at ? <View style={[styles.unreadDot, { backgroundColor: colors.interactive }]} /> : null}
                   <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
+                  {!item.read_at ? <Text style={[styles.markReadHint, { color: colors.interactive }]}>Tap to mark read</Text> : null}
                 </View>
                 <Text style={[styles.bodyText, { color: colors.textSecondary }]}>{item.body}</Text>
                 <Text style={[styles.meta, { color: colors.textMuted }]}>{new Date(item.created_at).toLocaleString()}</Text>
-              </View>
+              </Pressable>
             )) : <Text style={[styles.emptyText, { color: colors.textMuted }]}>No church notifications yet.</Text>}
           </View>
 
@@ -141,5 +171,7 @@ const styles = StyleSheet.create({
   notice: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: 5 },
   noticeTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   unreadDot: { width: 7, height: 7, borderRadius: 4 },
+  markReadHint: { marginLeft: 'auto', fontSize: 10, fontWeight: '700' },
+  noticePressed: { opacity: 0.88, transform: [{ scale: 0.995 }] },
   historyRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, borderBottomWidth: 1 }, emptyText: { fontSize: 13 },
 });
