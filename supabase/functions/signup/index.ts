@@ -104,7 +104,17 @@ Deno.serve(createHandler(
     }
 
     return {
-      data: { status: data.session ? "active" : "verification_required" },
+      data: {
+        status: data.session ? "active" : "verification_required",
+        session: data.session
+          ? {
+              accessToken: data.session.access_token,
+              refreshToken: data.session.refresh_token,
+              expiresAt: data.session.expires_at,
+              tokenType: data.session.token_type,
+            }
+          : undefined,
+      },
       status: data.session ? 201 : 202,
     };
   },
