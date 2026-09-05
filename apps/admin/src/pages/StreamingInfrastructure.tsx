@@ -55,7 +55,7 @@ interface StreamingPayload {
   recentWebhooks: WebhookEvent[];
 }
 
-export function StreamingInfrastructure({ api }: { api: ApiClient }) {
+export function StreamingInfrastructure({ api, canManage = false, canManageSecrets = false }: { api: ApiClient; canManage?: boolean; canManageSecrets?: boolean }) {
   const [data, setData] = useState<StreamingPayload>({ providers: [], globalConfigs: [], streams: [], recentWebhooks: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -104,6 +104,7 @@ export function StreamingInfrastructure({ api }: { api: ApiClient }) {
   };
 
   const openConfig = (provider: StreamingProvider) => {
+    if (!canManage) return;
     const config = configByProvider.get(provider.id);
     setConfigProvider(provider);
     setSecretReference(config?.secret_reference ?? (provider.code === 'mux' ? 'STREAMING_MUX_PRIMARY' : `STREAMING_${provider.code.toUpperCase()}_PRIMARY`));
@@ -116,6 +117,7 @@ export function StreamingInfrastructure({ api }: { api: ApiClient }) {
   };
 
   const storeSecret = async (reference: string, value: string, description: string) => {
+    if (!canManageSecrets) throw new Error('Your role cannot store or rotate platform secrets.');
     await api.request('platform-secrets', {
       method: 'POST',
       body: JSON.stringify({
@@ -130,7 +132,11 @@ export function StreamingInfrastructure({ api }: { api: ApiClient }) {
   };
 
   const saveConfig = async () => {
-    if (!configProvider) return;
+    if (!canManage || !configProvider) return;
+    if ((muxTokenId || muxTokenSecret || muxWebhookSecret || muxSigningKeyId || muxSigningPrivateKey) && !canManageSecrets) {
+      setError('Your role can configure streaming but cannot store or rotate platform secrets.');
+      return;
+    }
     const primaryRef = secretReference.trim().toUpperCase();
     const webhookRef = webhookSecretReference.trim().toUpperCase();
     const signingRef = signingKeyReference.trim().toUpperCase();
@@ -188,13 +194,14 @@ export function StreamingInfrastructure({ api }: { api: ApiClient }) {
   };
 
   const requestProviderStateChange = (provider: StreamingProvider) => {
+    if (!canManage) return;
     setProviderStateTarget(provider);
     setProviderStateReason('');
     setError('');
   };
 
   const applyProviderStateChange = async () => {
-    if (!providerStateTarget) return;
+    if (!canManage || !providerStateTarget) return;
     const nextActive = !providerStateTarget.is_active;
     if (!nextActive && !providerStateReason.trim()) {
       setError('A governance reason is required before disabling a streaming provider.');
@@ -224,7 +231,7 @@ export function StreamingInfrastructure({ api }: { api: ApiClient }) {
   };
 
   const terminateStream = async () => {
-    if (!selectedStreamToKill) return;
+    if (!canManage || !selectedStreamToKill) return;
     if (!terminationReason.trim()) {
       setError('A safety or governance reason is required for emergency termination.');
       return;
@@ -287,7 +294,7 @@ export function StreamingInfrastructure({ api }: { api: ApiClient }) {
             { header: 'EXPRESSION', accessor: (item) => item.branches?.name ?? 'Organisation-wide' },
             { header: 'STATUS', accessor: (item) => <Badge label={item.status.toUpperCase()} variant={item.status === 'live' ? 'live' : item.status === 'failed' ? 'suspended' : item.status === 'scheduled' ? 'gold' : 'neutral'} pulse={item.status === 'live'} /> },
             { header: 'LATENCY', accessor: (item) => item.latency_mode ?? 'standard' },
-            { header: 'EMERGENCY', accessor: (item) => <Button variant="danger" size="sm" disabled={!['live', 'ready', 'provisioning'].includes(item.status)} onClick={() => { setSelectedStreamToKill(item); setTerminationReason(''); }}>Terminate</Button> },
+            { header: 'EMERGENCY', accessor: (item) => canManage ? <Button variant="danger" size="sm" disabled={!['live', 'ready', 'provisioning'].includes(item.status)} onClick={() => { setSelectedStreamToKill(item); setTerminationReason(''); }}>Terminate</Button> : <span style={{ color: 'var(--text-muted)' }}>Read only</span> },
           ]}
           data={data.streams}
           keyExtractor={(item) => item.id}
@@ -297,7 +304,7 @@ export function StreamingInfrastructure({ api }: { api: ApiClient }) {
       </Card>
 
       <Modal
-        isOpen={!!configProvider}
+        isOpen={canManage && !!configProvider}
         onClose={() => { if (!actionBusy) { setConfigProvider(null); clearSecretInputs(); } }}
         title={configProvider ? `Configure ${configProvider.name}` : 'Configure streaming provider'}
         subtitle="You may paste real credentials here. Values are sent to the authenticated backend and encrypted in Supabase Vault; only their references remain in provider configuration."
@@ -329,7 +336,7 @@ export function StreamingInfrastructure({ api }: { api: ApiClient }) {
       </Modal>
 
       <Modal
-        isOpen={!!providerStateTarget}
+        isOpen={canManage && !!providerStateTarget}
         onClose={() => { if (!actionBusy) { setProviderStateTarget(null); setProviderStateReason(''); } }}
         title={providerStateTarget?.is_active ? 'Disable streaming provider' : 'Enable streaming provider'}
         subtitle={providerStateTarget?.name}
@@ -363,7 +370,7 @@ export function StreamingInfrastructure({ api }: { api: ApiClient }) {
       </Modal>
 
       <Modal
-        isOpen={!!selectedStreamToKill}
+        isOpen={canManage && !!selectedStreamToKill}
         onClose={() => { if (!actionBusy) setSelectedStreamToKill(null); }}
         title="Emergency Broadcast Termination"
         subtitle="This performs a real provider stop through the configured adapter and then finalizes platform state."
