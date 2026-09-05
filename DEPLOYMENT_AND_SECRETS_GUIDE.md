@@ -41,18 +41,35 @@ git pull --ff-only origin main
 git status --short --branch
 ```
 
-If the error still lists exactly these five versions, reconcile the migration
-history and capture the current remote schema as a new local migration:
+If the error still lists exactly these five remote-only versions, remove their
+stale history entries:
 
 ```powershell
 supabase migration repair --status reverted 20260905182821 20260905183329 20260905183803 20260905184356 20260905185101
-supabase db pull
 supabase migration list
 ```
 
-Review the newly generated SQL file under `supabase/migrations/` before doing
-anything else. It is a real recovery artifact and **must be committed and pushed**
-so every future checkout has the same migration history:
+The CLI may then report that these five canonical local migrations are missing
+from remote history. If, and only if, it lists exactly the versions below, mark
+them as applied before pulling:
+
+```powershell
+supabase migration repair --status applied 20260905184500
+supabase migration repair --status applied 20260905191000
+supabase migration repair --status applied 20260905194500
+supabase migration repair --status applied 20260905201500
+supabase migration repair --status applied 20260905203500
+supabase migration list
+supabase db pull
+```
+
+These are existing, reviewed migrations in this repository; marking them applied
+aligns history with the canonical filenames without running the same schema
+changes a second time. Do not substitute other version numbers.
+
+If `db pull` generates a new SQL file under `supabase/migrations/`, review it
+before doing anything else. It is a real recovery artifact and **must be committed
+and pushed** so every future checkout has the same migration history:
 
 ```powershell
 git add supabase/migrations
@@ -61,14 +78,12 @@ git push
 supabase db push
 ```
 
-Only use the five-version repair command when Supabase reports those exact
-versions for the project reference shown above. If it reports different versions,
-stop and compare `supabase migration list` with the filenames in
-`supabase/migrations/` rather than copying this command blindly. The
-`supabase migration repair --status reverted` command repairs migration-history
-metadata; it does not undo the schema objects already present remotely. `db pull`
-is therefore required to
-record the remote schema state in source control.
+Only use these repair commands when Supabase reports these exact versions for the
+project reference shown above. If it reports different versions, stop and compare
+`supabase migration list` with the filenames in `supabase/migrations/` rather than
+copying these commands blindly. Migration repair changes history metadata; it does
+not apply or undo schema objects. The final `db pull` checks the actual remote
+schema and records any remaining difference in source control.
 
 ### 3. Deploy All Edge Functions
 ```bash
