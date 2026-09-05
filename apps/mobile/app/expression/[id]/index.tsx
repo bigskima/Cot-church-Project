@@ -257,7 +257,7 @@ export default function ExpressionProfileScreen() {
                     <ReelCard
                       key={r.id}
                       reel={r}
-                      onPress={() => router.push({ pathname: '/reels', params: { reelId: r.id } } as any)}
+                      onPress={() => router.push({ pathname: '/reels', params: { reelId: r.id, context: 'public' } } as any)}
                     />
                   ))}
                 </View>
