@@ -6,6 +6,7 @@ import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import {
   Badge,
+  BottomSheet,
   Button,
   Chip,
   EmptyState,
@@ -77,6 +78,8 @@ export default function ExpressionGivingManageScreen() {
   const expression = context?.expression;
 
   const [tab, setTab] = useState<Tab>('settings');
+  const [purposeOpen, setPurposeOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [givingScope, setGivingScope] = useState<GivingScope>(expression ? 'expression' : 'organization');
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
@@ -146,9 +149,11 @@ export default function ExpressionGivingManageScreen() {
     try {
       await work();
       setNotice(success);
-      configuration.refresh();
+      await configuration.refresh();
+      return true;
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to save giving settings.');
+      return false;
     } finally {
       setBusy(false);
     }
@@ -177,7 +182,7 @@ export default function ExpressionGivingManageScreen() {
       setError('Enter a giving purpose or fund name.');
       return;
     }
-    await run(
+    const saved = await run(
       () =>
         api.request(givingPath, {
           method: 'POST',
@@ -191,9 +196,11 @@ export default function ExpressionGivingManageScreen() {
         }),
       'Giving purpose published.',
     );
+    if (!saved) return;
     setPurposeName('');
     setPurposeDescription('');
     setPurposeDefault(false);
+    setPurposeOpen(false);
   };
 
   const updatePurpose = (purpose: GivingPurpose, patch: { status?: string; isDefault?: boolean }) =>
@@ -224,7 +231,7 @@ export default function ExpressionGivingManageScreen() {
       setError('Enter a 3-letter currency code, for example NGN, USD, GBP, EUR or CAD.');
       return;
     }
-    await run(
+    const saved = await run(
       () =>
         api.request(givingPath, {
           method: 'POST',
@@ -247,6 +254,7 @@ export default function ExpressionGivingManageScreen() {
         }),
       activeScope === 'organization' ? `${code} transfer account published for the church.` : `${code} transfer account published for this expression.`,
     );
+    if (!saved) return;
     setAccountLabel('');
     setCurrency('');
     setBankName('');
@@ -258,6 +266,7 @@ export default function ExpressionGivingManageScreen() {
     setTransferInstructions('');
     setAdditionalInstructions('');
     setReferencePrefix('');
+    setAccountOpen(false);
   };
 
   const updateAccountVisibility = (account: BankAccount, isActive: boolean) =>
