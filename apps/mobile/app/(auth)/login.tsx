@@ -54,8 +54,9 @@ function loginErrorMessage(error: unknown) {
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
-  const { returnTo: requestedReturnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const { returnTo: requestedReturnTo, registered } = useLocalSearchParams<{ returnTo?: string; registered?: string }>();
   const returnTo = safeReturnTo(requestedReturnTo);
+  const registrationComplete = registered === '1';
   const { login, enterAsVisitor } = useSession();
   const { colors } = useTheme();
 
@@ -130,6 +131,12 @@ export default function LoginScreen() {
         </View>
 
         <View style={[styles.authCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+        {registrationComplete && !errorMsg ? (
+          <View style={[styles.successBanner, { backgroundColor: colors.successSoft }]}>
+            <Icon name="checkmark-circle" size={18} color={colors.success} style={{ marginRight: 8 }} />
+            <Text style={[styles.successText, { color: colors.success }]}>Your account is ready. Sign in to continue.</Text>
+          </View>
+        ) : null}
         {errorMsg ? (
           <View
             style={[styles.errorBanner, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}
@@ -294,6 +301,18 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   errorText: {
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
+  },
+  successBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    marginBottom: spacing.lg,
+  },
+  successText: {
     fontSize: 13,
     fontWeight: '600',
     flex: 1,
