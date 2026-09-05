@@ -40,7 +40,7 @@ type Ownership = {
 
 export default function ExpressionGovernanceScreen() {
   const insets = useSafeAreaInsets();
-  const { api, context } = useSession();
+  const { api, context, hasCapability } = useSession();
   const { colors } = useTheme();
   const expression = context?.expression;
   const expressionName = expression?.name ?? 'Expression';
@@ -56,9 +56,17 @@ export default function ExpressionGovernanceScreen() {
   const [feedback, setFeedback] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
+  const canInviteRoles =
+    hasCapability('members.invite') &&
+    hasCapability('roles.assign');
+
   const governance = useResource<InvitePayload>(
-    `expression:governance:roles:${expression?.id ?? 'none'}`,
-    (signal) => (expression?.id ? api.request<InvitePayload>('expression-role-invitations', { signal }) : Promise.resolve({ invitations: [], roles: [] })),
+    `expression:governance:roles:${expression?.id ?? 'none'}:${canInviteRoles}`,
+    (signal) => (
+      expression?.id && canInviteRoles
+        ? api.request<InvitePayload>('expression-role-invitations', { signal })
+        : Promise.resolve({ invitations: [], roles: [] })
+    ),
   );
   const ownership = useResource<Ownership | null>(
     `expression:governance:ownership:${expression?.id ?? 'none'}`,
@@ -177,7 +185,7 @@ export default function ExpressionGovernanceScreen() {
             kicker="EXPRESSION GOVERNANCE"
             subtitle={`Roles, invitations and accountable ownership for ${expressionName}.`}
             showBack
-            rightAction={<Button label="Invite" onPress={openInvite} size="sm" />}
+            rightAction={canInviteRoles ? <Button label="Invite" onPress={openInvite} size="sm" /> : undefined}
           />
         </View>
 
@@ -220,34 +228,43 @@ export default function ExpressionGovernanceScreen() {
             ) : null}
           </View>
 
-          <View style={styles.section}>
-            <SectionHeader title="Pending invitations" badge={pending.length} subtitle="Roles activate only after acceptance" actionLabel="Invite" onAction={openInvite} />
-            {governance.loading ? (
-              <Skeleton height={86} count={2} />
-            ) : governance.error && !governance.data ? (
-              <ResourceError message={governance.error} retry={governance.refresh} />
-            ) : pending.length ? (
-              pending.map((invite) => {
-                const role = roles.find((item) => item.id === invite.organization_role_id);
-                return (
-                  <View key={invite.id} style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
-                    <View style={[styles.inviteIcon, { backgroundColor: colors.primarySoft }]}>
-                      <Icon name="person-add-outline" size={18} color={colors.interactive} />
+          {canInviteRoles ? (
+            <View style={styles.section}>
+              <SectionHeader title="Pending invitations" badge={pending.length} subtitle="Roles activate only after acceptance" actionLabel="Invite" onAction={openInvite} />
+              {governance.loading ? (
+                <Skeleton height={86} count={2} />
+              ) : governance.error && !governance.data ? (
+                <ResourceError message={governance.error} retry={governance.refresh} />
+              ) : pending.length ? (
+                pending.map((invite) => {
+                  const role = roles.find((item) => item.id === invite.organization_role_id);
+                  return (
+                    <View key={invite.id} style={[styles.rowCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+                      <View style={[styles.inviteIcon, { backgroundColor: colors.primarySoft }]}>
+                        <Icon name="person-add-outline" size={18} color={colors.interactive} />
+                      </View>
+                      <View style={styles.flex}>
+                        <Text style={[styles.rowTitle, { color: colors.text }]}>{invite.target_email}</Text>
+                        <Text style={[styles.rowMeta, { color: colors.textSecondary }]}>
+                          {role?.name ?? 'Expression role'} · expires {new Date(invite.expires_at).toLocaleDateString()}
+                        </Text>
+                      </View>
+                      <Button label="Revoke" variant="outline" size="sm" disabled={busy} onPress={() => void revokeInvitation(invite.id)} />
                     </View>
-                    <View style={styles.flex}>
-                      <Text style={[styles.rowTitle, { color: colors.text }]}>{invite.target_email}</Text>
-                      <Text style={[styles.rowMeta, { color: colors.textSecondary }]}>
-                        {role?.name ?? 'Expression role'} · expires {new Date(invite.expires_at).toLocaleDateString()}
-                      </Text>
-                    </View>
-                    <Button label="Revoke" variant="outline" size="sm" disabled={busy} onPress={() => void revokeInvitation(invite.id)} />
-                  </View>
-                );
-              })
-            ) : (
-              <EmptyState title="No pending invitations" message="Invite a trusted member when a role needs to be assigned." iconName="person-add-outline" actionLabel="Invite member" onAction={openInvite} />
-            )}
-          </View>
+                  );
+                })
+              ) : (
+                <EmptyState title="No pending invitations" message="Invite a trusted member when a role needs to be assigned." iconName="person-add-outline" actionLabel="Invite member" onAction={openInvite} />
+              )}
+            </View>
+          ) : (
+            <View style={[styles.permissionCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+              <Icon name="shield-outline" size={18} color={colors.textMuted} />
+              <Text style={[styles.permissionText, { color: colors.textSecondary }]}>
+                Role invitations are hidden because this account does not have both member-invite and role-assignment authority. Ownership controls remain available to the current owner.
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -347,4 +364,6 @@ const styles = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   helper: { fontSize: 12, lineHeight: 18 },
   warningCard: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, borderRadius: radius.lg, padding: spacing.md },
+  permissionCard: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md },
+  permissionText: { flex: 1, fontSize: 12, lineHeight: 18 },
 });
