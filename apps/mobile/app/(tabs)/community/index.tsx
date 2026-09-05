@@ -156,6 +156,7 @@ export default function CommunityScreen() {
   const canPostDestination = postDestination === 'general' ? canPostGeneral : canPostExpression;
   const ordinaryGeneralMemberLane = postDestination === 'general' && !elevatedFeedPublisher;
   const attachmentLimit = ordinaryGeneralMemberLane ? MAX_MEMBER_PUBLIC_ATTACHMENTS : 10;
+  const postTextLimit = ordinaryGeneralMemberLane ? 2200 : 10000;
   const canAttachAudio = !ordinaryGeneralMemberLane;
   const canEngage = mode === 'authenticated';
   const canCreateReel = mode === 'authenticated' && hasCapability('media.upload') && hasCapability('reels.publish');
@@ -574,7 +575,7 @@ export default function CommunityScreen() {
               placeholderTextColor={colors.textMuted}
               multiline
               autoFocus
-              maxLength={10000}
+              maxLength={postTextLimit}
               style={[styles.composerInput, { color: colors.text }]}
             />
           </View>
@@ -599,7 +600,7 @@ export default function CommunityScreen() {
           </View>
           <Text style={[styles.mediaHelp, { color: colors.textMuted }]}>
             {ordinaryGeneralMemberLane
-              ? 'General member post · up to 4 attachments · 50 MB each · videos must be 3 minutes or shorter.'
+              ? 'General member post · up to 2,200 characters · 4 attachments · 50 MB each · videos must be 3 minutes or shorter.'
               : `Up to ${attachmentLimit} attachments · 50 MB each · validated media upload pipeline.`}
           </Text>
 
@@ -634,7 +635,7 @@ export default function CommunityScreen() {
           ) : null}
 
           <View style={[styles.composerFooter, { borderTopColor: colors.borderSubtle }]}>
-            <Text style={[styles.characterCount, { color: colors.textMuted }]}>{postText.length.toLocaleString()} / 10,000 · {attachments.length}/{attachmentLimit} media</Text>
+            <Text style={[styles.characterCount, { color: colors.textMuted }]}>{postText.length.toLocaleString()} / {postTextLimit.toLocaleString()} · {attachments.length}/{attachmentLimit} media</Text>
             <Pressable
               onPress={handleCreatePost}
               disabled={!canPublishCurrent}
