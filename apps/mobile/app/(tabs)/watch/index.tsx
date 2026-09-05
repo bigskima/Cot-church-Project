@@ -61,7 +61,15 @@ export default function WatchScreen() {
       ? videos
       : videos.filter((v) => v.category?.toLowerCase() === selectedCategory.toLowerCase());
 
-  const categories = ['all', 'Sermons', 'Worship', 'Conferences', 'Devotionals', 'Documentary'];
+  const categories = [
+    { value: 'all', label: 'All videos' },
+    { value: 'teaching', label: 'Teachings' },
+    { value: 'worship', label: 'Worship' },
+    { value: 'conference', label: 'Conferences' },
+    { value: 'testimony', label: 'Testimonies' },
+    { value: 'interview', label: 'Interviews' },
+    { value: 'documentary', label: 'Documentary' },
+  ];
 
   const openReels = () => router.push('/reels');
 
@@ -92,27 +100,27 @@ export default function WatchScreen() {
           style={({ pressed }) => [styles.reelsBanner, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md, pressed && styles.pressed]}
         >
           <View style={styles.reelsBannerIconWrap}>
-            <Icon name="play-circle" size={22} color="#EF4444" />
+            <Icon name="play-circle" size={22} color={colors.live} />
           </View>
           <View style={styles.reelsBannerCopy}>
             <Text style={[styles.reelsBannerTitle, { color: colors.text }]}>Reels</Text>
-            <Text style={styles.reelsBannerSubtitle}>
+            <Text style={[styles.reelsBannerSubtitle, { color: colors.textMuted }]}>
               {reels.length} vertical clips · Full-screen viewing
             </Text>
           </View>
-          <Icon name="chevron-forward" size={18} color="#94A3B8" />
+          <Icon name="chevron-forward" size={18} color={colors.textMuted} />
         </Pressable>
       ) : null}
 
       {/* Category Chips Bar */}
       <View style={[styles.categoriesContainer, { borderBottomColor: colors.borderSubtle }]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
-          {categories.map((cat) => (
+          {categories.map((category) => (
             <Chip
-              key={cat}
-              label={cat === 'all' ? 'All Videos' : cat}
-              selected={selectedCategory === cat}
-              onPress={() => setSelectedCategory(cat)}
+              key={category.value}
+              label={category.label}
+              selected={selectedCategory === category.value}
+              onPress={() => setSelectedCategory(category.value)}
             />
           ))}
         </ScrollView>
@@ -183,7 +191,7 @@ const styles = StyleSheet.create({
   headerBar: {
     marginHorizontal: spacing.md,
     marginTop: spacing.xs,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     paddingBottom: spacing.md,
     borderWidth: 1,
     borderRadius: radius.xl,
@@ -220,7 +228,6 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   reelsBannerSubtitle: {
-    color: '#94A3B8',
     fontSize: 12,
   },
   categoriesContainer: {
