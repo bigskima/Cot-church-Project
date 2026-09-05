@@ -400,11 +400,6 @@ export default function CommunityScreen() {
           </View>
           <Icon name="create-outline" size={20} color={colors.interactive} />
         </Pressable>
-      ) : mode === 'authenticated' ? (
-        <View style={[styles.membershipNotice, { backgroundColor: colors.primarySoft, borderBottomColor: colors.borderSubtle }]}>
-          <Icon name="globe-outline" size={17} color={colors.interactive} />
-          <Text style={[styles.membershipNoticeText, { color: colors.textSecondary }]}>You can always read the General Community. Join an Expression to publish and join member conversations.</Text>
-        </View>
       ) : null}
 
       {resource.loading && !resource.data ? (
@@ -565,8 +560,6 @@ const styles = StyleSheet.create({
   composerCopy: { flex: 1, minWidth: 0 },
   composerPrompt: { fontSize: 14, fontWeight: '700', letterSpacing: -0.15 },
   composerPlaceholder: { fontSize: 11, marginTop: 2 },
-  membershipNotice: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderBottomWidth: 1 },
-  membershipNoticeText: { flex: 1, fontSize: 12, lineHeight: 17 },
   loadingContainer: { padding: spacing.lg, gap: spacing.md },
   composerBody: { gap: spacing.md },
   destinationBlock: { gap: spacing.xs },
