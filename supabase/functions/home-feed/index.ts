@@ -169,10 +169,14 @@ Deno.serve(createHandler(
         playback_url: stream.playback_token_required ? null : stream.playback_url,
         recording_url: stream.playback_token_required ? null : stream.recording_url,
       }));
-    const reels = resultData<any[]>(reelsResult as any, "reels", degraded)
+    let reels = resultData<any[]>(reelsResult as any, "reels", degraded)
       .filter((row) => inSelectedExperience(row, selectedExpressionId, "content_items"));
-    const videos = resultData<any[]>(videosResult as any, "videos", degraded)
+    let videos = resultData<any[]>(videosResult as any, "videos", degraded)
       .filter((row) => inSelectedExperience(row, selectedExpressionId, "content_items"));
+    [reels, videos] = await Promise.all([
+      enrichContentCreators(reels),
+      enrichContentCreators(videos),
+    ]);
     const sermons = resultData<any[]>(sermonsResult as any, "sermons", degraded)
       .filter((row) => inSelectedExperience(row, selectedExpressionId, "expression_id"));
     const events = resultData<any[]>(eventsResult as any, "events", degraded)
