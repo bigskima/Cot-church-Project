@@ -27,7 +27,7 @@ export function LiveCard({ stream, onPress, style }: LiveCardProps) {
       onPress={onPress}
       style={({ pressed }) => [
         styles.container,
-        isLive ? shadows.live : shadows.sm,
+        isLive ? shadows.live : shadows.md,
         pressed && styles.pressed,
         style,
       ]}
@@ -37,10 +37,10 @@ export function LiveCard({ stream, onPress, style }: LiveCardProps) {
       <ImageBackground
         source={stream.thumbnail_url ? { uri: stream.thumbnail_url } : undefined}
         style={styles.background}
-        imageStyle={{ borderRadius: radius.md }}
+        imageStyle={{ borderRadius: radius.lg }}
       >
         <LinearGradient
-          colors={['rgba(6, 20, 38, 0.1)', 'rgba(6, 20, 38, 0.85)']}
+          colors={['rgba(0, 0, 0, 0.08)', 'rgba(0, 0, 0, 0.86)']}
           style={styles.gradient}
         >
           <View style={styles.topRow}>
@@ -73,15 +73,15 @@ const styles = StyleSheet.create({
   container: {
     width: 220,
     height: 140,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     overflow: 'hidden',
-    backgroundColor: '#091B33',
+    backgroundColor: '#000000',
   },
   background: {
     width: '100%',
     height: '100%',
     justifyContent: 'flex-end',
-    backgroundColor: '#0D294B',
+    backgroundColor: '#000000',
   },
   gradient: {
     flex: 1,
@@ -104,6 +104,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   pressed: {
-    opacity: 0.85,
+    opacity: 0.9,
+    transform: [{ scale: 0.985 }],
   },
 });
