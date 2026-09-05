@@ -117,6 +117,7 @@ export default function CommunityScreen() {
   const [commentTarget, setCommentTarget] = useState<{ postId: string; scope: FeedScope } | null>(null);
   const [comments, setComments] = useState<CommunityComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
+  const [interactionError, setInteractionError] = useState('');
 
   useEffect(() => {
     if (!expression?.id && activeTab === 'expression') setActiveTab('general');
@@ -341,8 +342,16 @@ export default function CommunityScreen() {
       `engagement?contentId=${encodeURIComponent(commentTarget.postId)}`,
       { context: requestContext },
     )
-      .then((items) => { if (active) setComments(items); })
-      .catch(() => { if (active) setComments([]); })
+      .then((items) => {
+        if (!active) return;
+        setComments(items);
+        setInteractionError('');
+      })
+      .catch((value) => {
+        if (!active) return;
+        setComments([]);
+        setInteractionError(value instanceof Error ? value.message : 'Unable to load comments.');
+      })
       .finally(() => { if (active) setCommentsLoading(false); });
     return () => { active = false; };
   }, [api, commentTarget, canEngage]);
@@ -368,6 +377,7 @@ export default function CommunityScreen() {
     if (!canEngage) return false;
     const requestContext = scope === 'general' ? 'public' : 'current';
     try {
+      setInteractionError('');
       await api.request('engagement', {
         method: 'POST',
         context: requestContext,
@@ -379,7 +389,8 @@ export default function CommunityScreen() {
       });
       void resource.refresh();
       return true;
-    } catch {
+    } catch (value) {
+      setInteractionError(value instanceof Error ? value.message : 'Unable to update this reaction.');
       return false;
     }
   };
@@ -388,6 +399,7 @@ export default function CommunityScreen() {
     if (!canEngage) return false;
     const requestContext = scope === 'general' ? 'public' : 'current';
     try {
+      setInteractionError('');
       const result = await api.request<{ bookmarked: boolean }>('engagement', {
         method: 'POST',
         context: requestContext,
@@ -395,7 +407,8 @@ export default function CommunityScreen() {
       });
       void resource.refresh();
       return result.bookmarked === !currentlySaved;
-    } catch {
+    } catch (value) {
+      setInteractionError(value instanceof Error ? value.message : 'Unable to update this bookmark.');
       return false;
     }
   };
@@ -430,6 +443,19 @@ export default function CommunityScreen() {
           </Pressable>
         ) : null}
       </View>
+
+      {interactionError ? (
+        <Pressable
+          onPress={() => setInteractionError('')}
+          style={[styles.feedError, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss community error"
+        >
+          <Icon name="alert-circle-outline" size={16} color={colors.live} />
+          <Text style={[styles.feedErrorText, { color: colors.live }]} numberOfLines={2}>{interactionError}</Text>
+          <Icon name="close" size={14} color={colors.live} />
+        </Pressable>
+      ) : null}
 
       {canPost ? (
         <Pressable onPress={openComposer} style={({ pressed }) => [styles.composerStrip, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, pressed && styles.composerPressed]}>
@@ -514,7 +540,7 @@ export default function CommunityScreen() {
           </View>
 
           <View style={styles.mediaToolbar}>
-            <Pressable onPress={() => void choosePhotoOrVideo()} disabled={mediaUploading || attachments.length >= 10} style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
+            <Pressable onPress={() => void choosePhotoOrVideo()} disabled={mediaUploading || attachments.length >= 10} style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
               <Icon name="images-outline" size={18} color={colors.interactive} />
               <Text style={[styles.mediaButtonText, { color: colors.text }]}>Photo / Video</Text>
             </Pressable>
@@ -596,6 +622,8 @@ const styles = StyleSheet.create({
   tabItem: { flex: 1, alignItems: 'center', paddingVertical: 9, paddingHorizontal: spacing.sm, borderRadius: radius.pill },
   tabText: { fontSize: 14, fontWeight: '600' },
   tabTextActive: { fontWeight: '800' },
+  feedError: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.md, marginTop: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderRadius: radius.lg },
+  feedErrorText: { flex: 1, fontSize: 12, lineHeight: 17, fontWeight: '700' },
   composerStrip: { flexDirection: 'row', alignItems: 'center', marginHorizontal: spacing.md, marginVertical: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderWidth: 1, borderRadius: radius.xl, gap: spacing.md },
   composerPressed: { opacity: 0.88, transform: [{ scale: 0.992 }] },
   composerCopy: { flex: 1, minWidth: 0 },
