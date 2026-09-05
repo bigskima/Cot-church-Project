@@ -161,14 +161,14 @@ export function ExpressionsGovernance({ api }: { api: ApiClient }) {
       <Modal
         isOpen={!!selectedExp}
         onClose={() => setSelectedExp(null)}
-        title={selectedExp?.name ?? 'Expression Details'}
-        subtitle={selectedExp ? `Canonical expression ID: ${selectedExp.id}` : undefined}
+        title={selectedExp?.name ?? 'Expression details'}
+        subtitle={selectedExp ? `Expression ID: ${selectedExp.id}` : undefined}
         footer={<Button variant="primary" size="md" onClick={() => setSelectedExp(null)}>Close</Button>}
       >
         {selectedExp ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14 }}>
-              <Metric label="CAMPUS CODE" value={selectedExp.code} />
+              <Metric label="EXPRESSION CODE" value={selectedExp.code} />
               <Metric label="STATUS" value={selectedExp.is_active ? 'ACTIVE' : 'DISABLED'} />
               <Metric label="PARENT CHURCH" value={selectedExp.organizations?.name ?? selectedExp.organization_id} />
               <Metric label="TIMEZONE" value={selectedExp.timezone || 'UTC'} />
@@ -223,7 +223,7 @@ export function ExpressionsGovernance({ api }: { api: ApiClient }) {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ backgroundColor: 'var(--bg-elevated)', padding: 14, borderRadius: 8 }}>
+    <div style={{ backgroundColor: 'var(--bg-elevated)', padding: 14, borderRadius: 14 }}>
       <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 800 }}>{label}</div>
       <div style={{ fontSize: 15, fontWeight: 800, marginTop: 4, overflowWrap: 'anywhere' }}>{value}</div>
     </div>
