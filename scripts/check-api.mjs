@@ -156,6 +156,7 @@ const invariants = [
   [passwordReset, /auth\.getUser\(token\)/, 'password reset recovery-token validation'],
   [passwordReset, /auth\.updateUser\(\{ password \}\)/, 'Supabase recovery-session password reset completion'],
   [organizations, /create_organization/, 'transactional organization provisioning'],
+  [organizations, /Main Expression/, 'canonical initial Expression provisioning'],
   [memberships, /update_membership_status/, 'protected membership lifecycle'],
   [roles, /create_custom_role/, 'custom role administration'],
   [events, /events\.create/, 'event authorization'],
@@ -192,6 +193,7 @@ const invariants = [
 
 const missing = invariants.filter(([source, pattern]) => !pattern.test(source));
 const forbidden = [
+  [organizations, /Main Campus/, 'stale Campus default in organization provisioning'],
   [platformGiving, /platform\.giving\.(?:read|manage)|authorizePlatform/, 'retired Platform Giving authorization path'],
   [churchStory, /Foundation & First Gathering|Multi-Expression Expansion|Global Digital Ministry/, 'fabricated church story fallback'],
   [signup, /password\(body\.password\)/, 'hardcoded signup password policy'],
