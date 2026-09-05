@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -53,6 +54,8 @@ export default function PrayerScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [prayingIds, setPrayingIds] = useState<Set<string>>(() => new Set());
+  const [wallActionError, setWallActionError] = useState('');
 
   const canUseExpressionScope = mode === 'authenticated' && Boolean(expression?.id);
 
@@ -134,6 +137,37 @@ export default function PrayerScreen() {
     }
   };
 
+  const handlePray = async (prayer: RoutedPrayer) => {
+    if (prayer.viewer_has_prayed || prayingIds.has(prayer.id)) return;
+    if (mode === 'visitor') {
+      router.push({ pathname: '/(auth)/login', params: { returnTo: '/prayer' } } as any);
+      return;
+    }
+
+    setWallActionError('');
+    setPrayingIds((current) => {
+      const next = new Set(current);
+      next.add(prayer.id);
+      return next;
+    });
+
+    try {
+      await api.request<{ id: string; prayer_count: number; viewer_has_prayed: boolean }>('prayer-requests', {
+        method: 'PATCH',
+        body: JSON.stringify({ action: 'pray', id: prayer.id }),
+      });
+      await prayers.refresh();
+    } catch (error) {
+      setWallActionError(error instanceof Error ? error.message : 'Unable to record that you are praying for this request.');
+    } finally {
+      setPrayingIds((current) => {
+        const next = new Set(current);
+        next.delete(prayer.id);
+        return next;
+      });
+    }
+  };
+
   const publicPrayerList = (prayers.data ?? []).filter(
     (prayer) => prayer.privacy === 'public_approved' && prayer.is_publicly_visible === true,
   );
@@ -184,12 +218,25 @@ export default function PrayerScreen() {
 
           <View style={styles.wallSection}>
             <SectionHeader title={wallTitle} badge={publicPrayerList.length} subtitle="Approved petitions the community can pray with" />
+            {wallActionError ? (
+              <View style={[styles.errorBanner, { backgroundColor: colors.liveSoft }]}>
+                <Icon name="alert-circle" size={17} color={colors.live} />
+                <Text style={[styles.errorText, { color: colors.live }]}>{wallActionError}</Text>
+              </View>
+            ) : null}
             {prayers.loading && !prayers.data ? (
               <Skeleton height={140} count={3} />
             ) : prayers.error && !prayers.data ? (
               <ResourceError message={prayers.error} retry={prayers.refresh} />
             ) : publicPrayerList.length > 0 ? (
-              publicPrayerList.map((prayer) => <PrayerCard key={prayer.id} prayer={prayer} onPray={() => {}} />)
+              publicPrayerList.map((prayer) => (
+                <PrayerCard
+                  key={prayer.id}
+                  prayer={prayer}
+                  busy={prayingIds.has(prayer.id)}
+                  onPray={() => void handlePray(prayer)}
+                />
+              ))
             ) : (
               <EmptyState
                 title={wallScope === 'expression' ? 'No Expression prayers on the wall yet' : 'No public prayers yet'}
