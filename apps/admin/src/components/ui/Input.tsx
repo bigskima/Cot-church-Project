@@ -72,7 +72,7 @@ export function SearchBar({
 }: SearchBarProps) {
   return (
     <div className={`admin-search-container ${className}`}>
-      <span className="admin-search-icon">🔍</span>
+      <span className="admin-search-icon" aria-hidden="true" />
       <input
         type="text"
         value={value}
@@ -85,8 +85,9 @@ export function SearchBar({
           type="button"
           onClick={() => onChange('')}
           className="admin-search-clear"
+          aria-label="Clear search"
         >
-          ✕
+          <span aria-hidden="true">×</span>
         </button>
       )}
     </div>
