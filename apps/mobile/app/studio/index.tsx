@@ -69,7 +69,7 @@ export default function CreatorStudioScreen() {
       iconName: 'book-outline',
       badge: 'MEDIA',
       route: '/leadership/sermons',
-      enabled: hasCapability('sermons.create') || hasCapability('sermons.manage') || hasCapability('sermons.publish') || hasCapability('*'),
+      enabled: hasCapability('sermons.create') || hasCapability('sermons.manage') || hasCapability('*'),
     },
     {
       title: 'Events',
