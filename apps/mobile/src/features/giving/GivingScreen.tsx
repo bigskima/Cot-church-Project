@@ -124,7 +124,7 @@ export function GivingScreen() {
     },
   );
 
-  const receipts = useResource<Receipt[]>('giving:receipts', (signal) =>
+  const receipts = useResource<Receipt[]>(`giving:receipts:${mode}:${organizationId || 'none'}:${expressionId ?? 'general'}`, (signal) =>
     mode === 'authenticated'
       ? api.request<Receipt[]>('giving?view=receipts', { signal })
       : Promise.resolve([]),
