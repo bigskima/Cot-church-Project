@@ -62,10 +62,14 @@ export default function HomeScreen() {
 
   const hasAnyLeadershipCapability = Boolean(context?.expression?.id) && (
     hasCapability('posts.create') ||
-    hasCapability('reels.create') ||
-    hasCapability('videos.create') ||
+    hasCapability('posts.publish') ||
+    (hasCapability('media.upload') && hasCapability('reels.publish')) ||
+    (hasCapability('media.upload') && hasCapability('videos.publish')) ||
     hasCapability('streams.broadcast') ||
     hasCapability('sermons.create') ||
+    hasCapability('sermons.manage') ||
+    hasCapability('events.create') ||
+    hasCapability('events.update') ||
     hasCapability('studio.access') ||
     hasCapability('*')
   );
