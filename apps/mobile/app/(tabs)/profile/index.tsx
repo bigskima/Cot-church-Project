@@ -21,7 +21,7 @@ export default function ProfileScreen() {
   const { mode, context, hasCapability, signOut, api } = useSession();
   const { preference, setPreference, colors } = useTheme();
   const profile = context?.profile;
-  const organization = context?.organizations?.[0];
+  const organization = context?.organization ?? context?.organizations?.[0];
   const expression = context?.expression;
   const hasOrganization = Boolean(context?.organization?.id ?? organization?.id);
 
@@ -71,7 +71,7 @@ export default function ProfileScreen() {
     <Pressable
       onPress={() => !disabled && router.push(route as any)}
       disabled={disabled}
-      style={({ pressed }) => [styles.linkTile, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm, disabled && styles.disabled, pressed && !disabled && styles.pressed]}
+      style={({ pressed }) => [styles.linkTile, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, disabled && styles.disabled, pressed && !disabled && styles.pressed]}
     >
       <View style={[styles.tileIcon, { backgroundColor: colors.primarySoft }]}><Icon name={icon} size={20} color={disabled ? colors.textMuted : colors.interactive} /></View>
       <View style={styles.tileContent}>
@@ -88,11 +88,11 @@ export default function ProfileScreen() {
         <ScreenHeader title="You" subtitle="Your identity, community and church tools." kicker="PROFILE" />
 
         {mode === 'visitor' ? (
-          <View style={[styles.visitorCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+          <View style={[styles.visitorCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
             <View style={[styles.visitorIconWrap, { backgroundColor: colors.primarySoft }]}><Icon name="person-add" size={28} color={colors.interactive} /></View>
-            <Text style={[styles.visitorTitle, { color: colors.text }]}>Join the Church Family</Text>
-            <Text style={[styles.visitorSubtitle, { color: colors.textSecondary }]}>Sign in or create an account to connect with an Expression, receive invitations, participate in community, and access member services.</Text>
-            <Button label="Sign In or Create Account" onPress={() => router.replace('/(auth)/login')} variant="primary" size="lg" style={{ width: '100%', marginTop: spacing.sm }} />
+            <Text style={[styles.visitorTitle, { color: colors.text }]}>Your COT account</Text>
+            <Text style={[styles.visitorSubtitle, { color: colors.textSecondary }]}>Public COT stays open to browse. Sign in when you want to interact, join an Expression, receive invitations, or use member-only features.</Text>
+            <Button label="Sign in or create account" onPress={() => router.replace('/(auth)/login')} variant="primary" size="lg" style={{ width: '100%', marginTop: spacing.sm }} />
           </View>
         ) : (
           <View style={[styles.memberCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
@@ -153,16 +153,16 @@ export default function ProfileScreen() {
 
         <View style={styles.sectionWrap}>
           <SectionHeader title="Appearance" subtitle="Choose how COT looks on this device" />
-          <View style={[styles.themeCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.sm]}>
+          <View style={[styles.themeCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
             <View style={styles.themeChipsRow}>
-              <Chip label="System Auto" selected={preference === 'system'} onPress={() => setPreference('system')} icon={<Icon name="phone-portrait-outline" size={14} color={preference === 'system' ? colors.interactive : colors.textSecondary} />} />
-              <Chip label="Light Theme" selected={preference === 'light'} onPress={() => setPreference('light')} icon={<Icon name="sunny-outline" size={14} color={preference === 'light' ? colors.interactive : colors.textSecondary} />} />
-              <Chip label="Dark Theme" selected={preference === 'dark'} onPress={() => setPreference('dark')} icon={<Icon name="moon-outline" size={14} color={preference === 'dark' ? colors.interactive : colors.textSecondary} />} />
+              <Chip label="System" selected={preference === 'system'} onPress={() => setPreference('system')} icon={<Icon name="phone-portrait-outline" size={14} color={preference === 'system' ? colors.interactive : colors.textSecondary} />} />
+              <Chip label="Light" selected={preference === 'light'} onPress={() => setPreference('light')} icon={<Icon name="sunny-outline" size={14} color={preference === 'light' ? colors.interactive : colors.textSecondary} />} />
+              <Chip label="Dark" selected={preference === 'dark'} onPress={() => setPreference('dark')} icon={<Icon name="moon-outline" size={14} color={preference === 'dark' ? colors.interactive : colors.textSecondary} />} />
             </View>
           </View>
         </View>
 
-        {mode === 'authenticated' ? <View style={styles.sectionWrap}><Button label="Sign Out" onPress={() => signOut()} variant="destructive" size="lg" /></View> : null}
+        {mode === 'authenticated' ? <View style={styles.sectionWrap}><Button label="Sign out" onPress={() => signOut()} variant="destructive" size="lg" /></View> : null}
       </ScrollView>
     </View>
   );
@@ -170,12 +170,12 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 }, content: { flexGrow: 1, paddingHorizontal: spacing.md, gap: spacing.xl },
-  visitorCard: { padding: spacing.xl, borderRadius: radius.xl, borderWidth: 1, alignItems: 'center', gap: spacing.xs }, visitorIconWrap: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xs },
+  visitorCard: { padding: spacing.xl, borderRadius: radius.xxl, borderWidth: 1, alignItems: 'center', gap: spacing.xs }, visitorIconWrap: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xs },
   visitorTitle: { ...typography.h2, textAlign: 'center' }, visitorSubtitle: { ...typography.bodySmall, textAlign: 'center', lineHeight: 18 },
   memberCard: { padding: spacing.lg, borderRadius: radius.xxl, borderWidth: 1, gap: spacing.md }, memberHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md }, avatarHalo: { padding: 4, borderRadius: radius.pill }, memberInfo: { flex: 1, minWidth: 0, gap: 2 }, memberName: { fontSize: 20, fontWeight: '800', letterSpacing: -0.4 }, memberEmail: { fontSize: 13 }, memberContextRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }, memberOrg: { fontSize: 12, fontWeight: '700', flexShrink: 1 }, profileQuickActions: { flexDirection: 'row', gap: spacing.sm }, profileQuickAction: { flex: 1, minHeight: 42, borderRadius: radius.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: spacing.sm }, profileQuickActionText: { fontSize: 12, fontWeight: '700' },
   sectionWrap: { gap: spacing.sm }, linksList: { gap: spacing.sm }, linkTile: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.xl, borderWidth: 1, gap: spacing.md },
-  tileIcon: { width: 42, height: 42, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' }, tileContent: { flex: 1, gap: 2 }, tileTitle: { fontSize: 15, fontWeight: '600' }, tileSub: { fontSize: 12, lineHeight: 16 },
+  tileIcon: { width: 42, height: 42, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' }, tileContent: { flex: 1, gap: 2 }, tileTitle: { fontSize: 15, fontWeight: '700' }, tileSub: { fontSize: 12, lineHeight: 16 },
   leadershipBanner: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.xl, borderWidth: 1, gap: spacing.md }, leadershipIconWrap: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' }, leadershipContent: { flex: 1, gap: 2 },
   leadershipTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, leadershipTitle: { fontSize: 15, fontWeight: '700' }, leadershipSub: { fontSize: 12, lineHeight: 16 },
-  themeCard: { padding: spacing.md, borderRadius: radius.lg, borderWidth: 1 }, themeChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }, disabled: { opacity: 0.58 }, pressed: { opacity: 0.8 },
+  themeCard: { padding: spacing.md, borderRadius: radius.xl, borderWidth: 1 }, themeChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }, disabled: { opacity: 0.58 }, pressed: { opacity: 0.9, transform: [{ scale: 0.992 }] },
 });
