@@ -7,7 +7,7 @@ import { useTheme } from '@/state/theme';
 import { BrandMark } from '@/components/primitives/BrandMark';
 import { Icon } from '@/components/primitives/Icon';
 import { Button } from '@/components/Button';
-import { radius, spacing, typography } from '@/design-system/tokens';
+import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 
 export default function SignupScreen() {
   const insets = useSafeAreaInsets();
@@ -27,11 +27,6 @@ export default function SignupScreen() {
   const [verifying, setVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState('');
 
-  const hasMinLength = password.length >= 12 && password.length <= 128;
-  const hasUppercase = /[A-Z]/.test(password);
-  const hasLowercase = /[a-z]/.test(password);
-  const hasNumber = /\d/.test(password);
-  const isPasswordValid = hasMinLength && hasUppercase && hasLowercase && hasNumber;
   const usernameValid = /^[a-z0-9][a-z0-9._]{2,29}$/.test(username.trim().toLowerCase());
   const birthdayValid = /^\d{4}-\d{2}-\d{2}$/.test(birthday.trim());
 
@@ -41,7 +36,7 @@ export default function SignupScreen() {
     if (!usernameValid) return setErrorMsg('Choose a username using 3-30 letters, numbers, dots or underscores.');
     if (!birthdayValid) return setErrorMsg('Enter your birthday as YYYY-MM-DD.');
     if (!email.trim() || !email.includes('@')) return setErrorMsg('Please enter a valid email address.');
-    if (!isPasswordValid) return setErrorMsg('Please ensure your password satisfies all security requirements.');
+    if (!password) return setErrorMsg('Please enter a password.');
     if (password !== confirmPassword) return setErrorMsg('Passwords do not match.');
 
     setLoading(true);
@@ -97,7 +92,6 @@ export default function SignupScreen() {
   );
 
   const errorBanner = (message: string) => <View style={[styles.errorBanner, { backgroundColor: colors.liveSoft }]}><Icon name="alert-circle" size={18} color={colors.live} /><Text style={[styles.errorText, { color: colors.live }]}>{message}</Text></View>;
-  const passwordCheck = (passed: boolean, label: string) => <View style={styles.checkItem}><Icon name={passed ? 'checkmark-circle' : 'ellipse-outline'} size={15} color={passed ? colors.success : colors.textMuted} /><Text style={[styles.checkText, { color: passed ? colors.text : colors.textMuted }]}>{label}</Text></View>;
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -122,7 +116,8 @@ export default function SignupScreen() {
               <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Your account is separate from Expression membership. Joining an Expression later unlocks its member-only community and birthday features.</Text>
             </View>
             {errorMsg ? errorBanner(errorMsg) : null}
-            <View style={styles.form}>
+            <View style={[styles.authCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+              <View style={styles.form}>
               {field('FULL NAME', fullName, setFullName, 'e.g. Grace Adebayo', { autoCapitalize: 'words', textContentType: 'name' })}
               {field('USERNAME', username, (value) => setUsername(value.replace(/\s/g, '').toLowerCase()), 'grace.adebayo', { autoCapitalize: 'none', autoCorrect: false })}
               <Text style={[styles.helper, { color: colors.textMuted }]}>Your username is public. It is not a church role or permission.</Text>
@@ -131,15 +126,10 @@ export default function SignupScreen() {
               {field('EMAIL ADDRESS', email, setEmail, 'name@example.com', { autoCapitalize: 'none', keyboardType: 'email-address', textContentType: 'emailAddress' })}
               {field('PHONE NUMBER (OPTIONAL)', phone, setPhone, '+234…', { keyboardType: 'phone-pad', textContentType: 'telephoneNumber' })}
               {field('PASSWORD', password, setPassword, 'Create a strong password', { secureTextEntry: true, textContentType: 'newPassword' })}
-              <View style={[styles.checklistCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
-                <Text style={[styles.checklistTitle, { color: colors.textSecondary }]}>PASSWORD REQUIREMENTS</Text>
-                {passwordCheck(hasMinLength, '12 to 128 characters')}
-                {passwordCheck(hasUppercase, 'At least one uppercase letter')}
-                {passwordCheck(hasLowercase, 'At least one lowercase letter')}
-                {passwordCheck(hasNumber, 'At least one number')}
-              </View>
+              <Text style={[styles.helper, { color: colors.textMuted }]}>Use the password accepted by the platform’s current account security policy.</Text>
               {field('CONFIRM PASSWORD', confirmPassword, setConfirmPassword, 'Repeat password', { secureTextEntry: true, textContentType: 'newPassword' })}
               <Button label="Create Account" onPress={handleSignup} loading={loading} variant="primary" size="lg" style={{ marginTop: spacing.sm }} />
+              </View>
             </View>
             <View style={styles.footer}><Text style={[styles.footerText, { color: colors.textSecondary }]}>Already have an account? </Text><Link href="/(auth)/login" asChild><Pressable><Text style={[styles.footerLink, { color: colors.interactive }]}>Sign in</Text></Pressable></Link></View>
           </>
@@ -164,10 +154,7 @@ const styles = StyleSheet.create({
   input: { minHeight: 48, borderRadius: radius.md, borderWidth: 1, paddingHorizontal: spacing.md, fontSize: 15 },
   helper: { fontSize: 11, lineHeight: 16, marginTop: -8 },
   otpInput: { height: 54, borderRadius: radius.md, borderWidth: 1, paddingHorizontal: spacing.md, fontSize: 24, fontWeight: '700', textAlign: 'center', letterSpacing: 6 },
-  checklistCard: { padding: spacing.md, borderRadius: radius.md, borderWidth: 1, gap: 6 },
-  checklistTitle: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5, marginBottom: 2 },
-  checkItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  checkText: { fontSize: 12, fontWeight: '500' },
+  authCard: { padding: spacing.lg, borderRadius: radius.xxl, borderWidth: 1 },
   verificationContainer: { alignItems: 'center', gap: spacing.sm },
   switchMethodBtn: { marginTop: spacing.md, padding: spacing.sm },
   switchMethodText: { fontSize: 14, fontWeight: '600' },
