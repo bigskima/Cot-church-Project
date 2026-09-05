@@ -41,14 +41,6 @@ export function phone(value: unknown) {
   return normalized;
 }
 
-export function password(value: unknown) {
-  if (typeof value !== "string" || value.length < 12 || value.length > 128 || !/[a-z]/.test(value) || !/[A-Z]/.test(value) || !/\d/.test(value)) {
-    throw new ApiError("VALIDATION_FAILED", "Password does not meet security requirements", 422, {
-      password: "Must be 12-128 characters and include upper-case, lower-case, and numeric characters",
-    });
-  }
-  return value;
-}
 
 export function uuid(value: string | null, field: string, required = false) {
   if (!value && !required) return null;
