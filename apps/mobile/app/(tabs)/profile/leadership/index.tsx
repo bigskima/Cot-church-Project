@@ -43,7 +43,7 @@ export default function LeadershipHubScreen() {
     isCurrentExpressionOwner ||
     (hasCapability('members.invite') && hasCapability('roles.assign')) ||
     hasCapability('*');
-  const canManageExpressions = isAuthorizedExpressionCreator || hasCapability('organizations.manage') || hasCapability('branches.create') || hasCapability('expression.create') || hasCapability('*');
+  const canManageExpressions = isAuthorizedExpressionCreator || hasCapability('branches.create') || hasCapability('*');
 
   const tools = [
     { title: 'Live Media Studio', description: 'Create live broadcasts, retrieve ingest details, and monitor stream health.', iconName: 'radio-outline', badge: 'LIVE OPS', route: '/(tabs)/profile/leadership/media-studio', enabled: canManageMedia },
