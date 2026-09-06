@@ -122,7 +122,7 @@ export function FeatureFlags({ api, canManage = false }: { api: ApiClient; canMa
       return;
     }
     if (!disableReason.trim()) {
-      setError('A governance reason is required before globally disabling a feature.');
+      setError('Add a reason before turning this feature off for everyone.');
       return;
     }
     try {
@@ -138,7 +138,7 @@ export function FeatureFlags({ api, canManage = false }: { api: ApiClient; canMa
     <div className="admin-page-stack">
       <Card
         title="Feature availability"
-        subtitle="Control which platform features are available globally. Church-specific availability can be adjusted separately where supported."
+        subtitle="Choose which COT features are available by default. Individual churches may have additional limits where supported."
         headerAction={
           <div className="admin-header-actions">
             <SearchBar
@@ -165,7 +165,7 @@ export function FeatureFlags({ api, canManage = false }: { api: ApiClient; canMa
               accessor: (item) => (
                 <div>
                   <div className="admin-row-title">{item.name}</div>
-                  <div className="admin-row-meta"><code className="admin-secret-reference">{item.key}</code> · {item.description}</div>
+                  <div className="admin-row-meta">{item.description}</div>
                 </div>
               ),
             },
@@ -230,7 +230,7 @@ export function FeatureFlags({ api, canManage = false }: { api: ApiClient; canMa
           if (!busyKey) setEditing(null);
         }}
         title={editing ? `Feature policy · ${editing.name}` : 'Feature policy'}
-        subtitle={editing?.key}
+        subtitle={editing?.description || editing?.name}
         footer={
           <div className="admin-header-actions">
             <Button variant="outline" disabled={!!busyKey} onClick={() => setEditing(null)}>
@@ -238,7 +238,7 @@ export function FeatureFlags({ api, canManage = false }: { api: ApiClient; canMa
             </Button>
             {editing?.global_enabled ? (
               <Button variant="danger" loading={busyKey === editing.key} onClick={() => void saveSettings()}>
-                Save & disable globally
+                Save & turn off
               </Button>
             ) : (
               <Button
@@ -267,7 +267,7 @@ export function FeatureFlags({ api, canManage = false }: { api: ApiClient; canMa
           max={100}
           value={rolloutPercentage}
           onChange={(event) => setRolloutPercentage(event.target.value)}
-          helperText="This is the default availability across the platform. Church-specific settings may further limit access."
+          helperText="This is the default availability for COT. Individual church settings may further limit access."
         />
         {editing?.global_enabled ? (
           <InputField
