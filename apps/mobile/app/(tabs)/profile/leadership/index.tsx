@@ -10,7 +10,7 @@ import { useResource } from '@/hooks/use-resource';
 
 export default function LeadershipHubScreen() {
   const insets = useSafeAreaInsets();
-  const { hasCapability, hasPublicCapability, context, api, mode, accessReady } = useSession();
+  const { hasCapability, hasOrganizationCapability, hasPublicCapability, context, api, mode, accessReady } = useSession();
   const { colors } = useTheme();
 
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? context?.creatorOrganizations?.[0]?.id ?? '';
@@ -29,20 +29,34 @@ export default function LeadershipHubScreen() {
   const authorityReady = accessReady && ownershipReady;
   const isCurrentExpressionOwner = ownershipState.data?.isCurrentOwner === true;
 
-  const canManageMedia = hasPublicCapability('public.live_stream.create') || hasCapability('streams.broadcast') || hasCapability('*');
-  const canModeratePrayer = (hasCapability('prayer.moderate') && (hasCapability('prayer.pastoral.receive') || hasCapability('prayer.team.receive'))) || hasCapability('*');
-  const canReceivePastoralFollowups = hasCapability('pastoral.followups.receive') || hasCapability('*');
-  const canPastoralTriage = canModeratePrayer || canReceivePastoralFollowups;
-  const canManageSermons = hasCapability('sermons.create') || hasCapability('sermons.manage') || hasCapability('*');
-  const canManageEvents = hasCapability('events.create') || hasCapability('events.update') || hasCapability('*');
-  const canManageGiving = hasCapability('giving.campaigns.manage') || hasCapability('*');
-  const canReadGivingFinance = hasCapability('giving.finance.read') || hasCapability('*');
-  const canManageLeadership = hasCapability('expression.leadership.manage') || hasCapability('*');
-  const canManageChurchLeadership = hasCapability('organization.leadership.manage') || hasCapability('*');
+  const hasExpression = Boolean(context?.expression?.id);
+  const canManageMedia =
+    hasPublicCapability('public.live_stream.create') ||
+    (hasExpression && hasCapability('streams.broadcast'));
+  const canModerateGeneralPrayer =
+    hasOrganizationCapability('prayer.moderate') &&
+    (hasOrganizationCapability('prayer.pastoral.receive') || hasOrganizationCapability('prayer.team.receive'));
+  const canModerateExpressionPrayer =
+    hasExpression &&
+    hasCapability('prayer.moderate') &&
+    (hasCapability('prayer.pastoral.receive') || hasCapability('prayer.team.receive'));
+  const canReceiveGeneralPastoralFollowups = hasOrganizationCapability('pastoral.followups.receive');
+  const canReceiveExpressionPastoralFollowups = hasExpression && hasCapability('pastoral.followups.receive');
+  const canPastoralTriage =
+    canModerateGeneralPrayer ||
+    canModerateExpressionPrayer ||
+    canReceiveGeneralPastoralFollowups ||
+    canReceiveExpressionPastoralFollowups;
+  const canManageSermons = hasCapability('sermons.create') || hasCapability('sermons.manage');
+  const canManageEvents = hasCapability('events.create') || hasCapability('events.update');
+  const canManageGiving = hasCapability('giving.campaigns.manage');
+  const canReadGivingFinance = hasCapability('giving.finance.read');
+  const canManageLeadership = hasExpression && hasCapability('expression.leadership.manage');
+  const canManageChurchLeadership = hasOrganizationCapability('organization.leadership.manage');
   const canManageExpressionAccess =
-    isCurrentExpressionOwner ||
-    (hasCapability('members.invite') && hasCapability('roles.assign')) ||
-    hasCapability('*');
+    hasExpression &&
+    (isCurrentExpressionOwner ||
+      (hasCapability('members.invite') && hasCapability('roles.assign')));
   const canManageExpressions = isAuthorizedExpressionCreator;
 
   const tools = [
