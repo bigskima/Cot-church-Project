@@ -58,11 +58,22 @@ function timeValue(value?: string | null) {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { api, context, mode, hasCapability, hasPublicCapability } = useSession();
+  const { api, context, mode, hasCapability, hasOrganizationCapability, hasPublicCapability } = useSession();
   const { colors } = useTheme();
 
   const hasPublicBroadcastAccess = hasPublicCapability('public.live_stream.create');
-  const hasAnyLeadershipCapability = hasPublicBroadcastAccess || (Boolean(context?.expression?.id) && (
+  const hasGeneralPastoralAccess =
+    (hasOrganizationCapability('prayer.moderate') &&
+      (hasOrganizationCapability('prayer.pastoral.receive') || hasOrganizationCapability('prayer.team.receive'))) ||
+    hasOrganizationCapability('pastoral.followups.receive');
+  const hasGeneralLeadershipCapability =
+    hasPublicBroadcastAccess ||
+    hasOrganizationCapability('organization.leadership.manage') ||
+    hasOrganizationCapability('giving.campaigns.manage') ||
+    hasOrganizationCapability('giving.finance.read') ||
+    hasGeneralPastoralAccess ||
+    Boolean(context?.creatorOrganizations?.length);
+  const hasExpressionLeadershipCapability = Boolean(context?.expression?.id) && (
     hasCapability('posts.create') ||
     hasCapability('posts.publish') ||
     (hasCapability('media.upload') && hasCapability('reels.publish')) ||
@@ -73,8 +84,15 @@ export default function HomeScreen() {
     hasCapability('events.create') ||
     hasCapability('events.update') ||
     hasCapability('studio.access') ||
-    hasCapability('*')
-  ));
+    hasCapability('prayer.moderate') ||
+    hasCapability('pastoral.followups.receive') ||
+    hasCapability('giving.campaigns.manage') ||
+    hasCapability('giving.finance.read') ||
+    hasCapability('expression.leadership.manage') ||
+    hasCapability('members.invite') ||
+    hasCapability('roles.assign')
+  );
+  const hasAnyLeadershipCapability = hasGeneralLeadershipCapability || hasExpressionLeadershipCapability;
 
   const contextOrganization = context?.organization ?? context?.organizations?.[0];
   const contextExpression = context?.expression;
