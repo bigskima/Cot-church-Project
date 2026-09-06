@@ -87,17 +87,7 @@ export default function FullScreenReelsScreen() {
 
   const reels = reelsResource.data ?? [];
   const canShareToGeneral =
-    mode === 'authenticated' &&
-    (
-      Boolean(
-        organizationId &&
-        context?.expressions?.some(
-          (item) => item.status === 'active' && item.organizationId === organizationId,
-        ),
-      ) ||
-      context?.organizationPermissions?.includes('feed.post') === true ||
-      context?.organizationPermissions?.includes('*') === true
-    );
+    mode === 'authenticated' && Boolean(organizationId);
 
   useEffect(() => {
     if (!reelId || !reels.length || appliedDeepLinkRef.current === reelId) return;
@@ -217,7 +207,8 @@ export default function FullScreenReelsScreen() {
     try {
       await api.request('social-feed', {
         method: 'POST',
-        body: JSON.stringify({ action: 'share_reel', reelId: shareTarget.id }),
+        context: 'public',
+        body: JSON.stringify({ action: 'share_reel', organizationId, reelId: shareTarget.id }),
       });
       setShareTarget(null);
     } catch (value) {
