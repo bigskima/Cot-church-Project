@@ -57,7 +57,7 @@ export function OrganizationsGovernance({ api, canManage = false }: { api: ApiCl
   const applyLifecycleChange = async () => {
     if (!canManage || !lifecycleOrg) return;
     if (lifecycleTarget === 'suspended' && !governanceReason.trim()) {
-      setError('A governance reason is required before suspending an organisation.');
+      setError('Add a reason before suspending this church organisation.');
       return;
     }
 
@@ -168,7 +168,7 @@ export function OrganizationsGovernance({ api, canManage = false }: { api: ApiCl
         isOpen={!!selectedOrg}
         onClose={() => setSelectedOrg(null)}
         title={selectedOrg?.name ?? 'Organisation details'}
-        subtitle={selectedOrg ? `Platform organisation ID: ${selectedOrg.id}` : undefined}
+        subtitle={selectedOrg ? `Organisation reference: ${selectedOrg.id}` : undefined}
         maxWidth="lg"
         footer={<Button variant="primary" size="md" onClick={() => setSelectedOrg(null)}>Close</Button>}
       >
@@ -182,7 +182,7 @@ export function OrganizationsGovernance({ api, canManage = false }: { api: ApiCl
             </div>
             <Card title="Organisation status" subtitle="Status changes are protected and recorded.">
               <p style={{ color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1.65 }}>
-                Suspending an organisation temporarily blocks its platform access while preserving its records so access can be restored later.
+                Suspending an organisation temporarily blocks access to COT while preserving its records so access can be restored later.
               </p>
             </Card>
           </div>
@@ -214,11 +214,11 @@ export function OrganizationsGovernance({ api, canManage = false }: { api: ApiCl
       >
         {lifecycleTarget === 'suspended' ? (
           <InputField
-            label="Governance reason"
+            label="Reason for suspension"
             value={governanceReason}
             onChange={(event) => setGovernanceReason(event.target.value)}
             placeholder="Explain why this organisation is being restricted"
-            helperText="This reason is written to the immutable platform audit trail."
+            helperText="This reason is recorded in protected administration history."
           />
         ) : (
           <p style={{ color: 'var(--text-secondary)', lineHeight: 1.65 }}>
