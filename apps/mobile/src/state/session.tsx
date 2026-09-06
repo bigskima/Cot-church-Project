@@ -11,6 +11,7 @@ type Value = {
   context: MembershipContext | null;
   permissions: string[];
   hasCapability: (code: string) => boolean;
+  updateContextProfile: (changes: Partial<MembershipContext['profile']>) => void;
   api: ApiClient;
   authenticate: (value: StoredAuth) => Promise<void>;
   setSession: (session: any) => Promise<void>;
@@ -282,6 +283,12 @@ export function SessionProvider({ children }: PropsWithChildren) {
     };
   }, [mode, auth, api, persist]);
 
+  const updateContextProfile = useCallback((changes: Partial<MembershipContext['profile']>) => {
+    setContext((current) => current
+      ? { ...current, profile: { ...current.profile, ...changes } }
+      : current);
+  }, []);
+
   const permissions = useMemo(() => context?.effectivePermissions ?? [], [context]);
 
   const hasCapability = useCallback(
@@ -337,6 +344,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
         context,
         permissions,
         hasCapability,
+        updateContextProfile,
         api,
         authenticate: persist,
         setSession,

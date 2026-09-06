@@ -84,6 +84,7 @@ const requiredFiles = [
 await Promise.all(requiredFiles.map((file) => access(file)));
 
 const handler = await readFile('supabase/functions/_shared/handler.ts', 'utf8');
+const authContext = await readFile('supabase/functions/_shared/context.ts', 'utf8');
 const response = await readFile('supabase/functions/_shared/response.ts', 'utf8');
 const signup = await readFile('supabase/functions/signup/index.ts', 'utf8');
 const organizationContext = await readFile('supabase/functions/organization-context/index.ts', 'utf8');
@@ -145,6 +146,9 @@ const profileStateRpcHardening = await readFile('supabase/migrations/20260905122
 const invariants = [
   [handler, /request\.method === "OPTIONS"/, 'CORS preflight handling'],
   [handler, /authenticate\(request/, 'central authentication'],
+  [handler, /options\.organization \?\? "optional"/, 'handler preserves explicit organisation context mode'],
+  [authContext, /organizationMode === "none"[\s\S]*?organizationId[\s\S]*?null/, 'organisation-independent endpoints ignore stale organisation headers'],
+  [authContext, /organizationMode === "none"[\s\S]*?branchId[\s\S]*?null/, 'organisation-independent endpoints ignore stale Expression headers'],
   [handler, /authorize\(auth/, 'central authorization'],
   [handler, /api_request_failed/, 'structured failure logging'],
   [response, /requestId/, 'request IDs in response envelopes'],

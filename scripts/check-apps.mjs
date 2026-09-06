@@ -16,6 +16,7 @@ const files = [
   'apps/mobile/app/series/[id].tsx',
   'apps/mobile/app/(tabs)/community/index.tsx',
   'apps/mobile/app/(tabs)/profile/index.tsx',
+  'apps/mobile/app/(tabs)/profile/settings.tsx',
   'apps/mobile/app/expressions/index.tsx',
   'apps/mobile/app/leadership/invite-codes.tsx',
   'apps/mobile/app/reels.tsx',
@@ -50,6 +51,8 @@ const prayerUi = [
 const integrationsUi = sources.get('apps/admin/src/pages/IntegrationsJobs.tsx') ?? '';
 const platformShellUi = sources.get('apps/admin/src/components/Shell.tsx') ?? '';
 const paymentInfrastructureUi = sources.get('apps/admin/src/pages/PaymentInfrastructure.tsx') ?? '';
+const profileSettingsUi = sources.get('apps/mobile/app/(tabs)/profile/settings.tsx') ?? '';
+const sessionUi = sources.get('apps/mobile/src/state/session.tsx') ?? '';
 
 const checks = [
   [/expo-secure-store/, 'secure session persistence'],
@@ -87,6 +90,9 @@ const checks = [
   [/action: 'generate'/, 'invite-code generation flow'],
   [/codeId/, 'invite-code revocation flow'],
   [/context: 'public'/, 'public interaction request scope'],
+  [profileSettingsUi, /api\.request<ProfilePayload>\('profile', \{ context: 'public' \}\)/, 'profile read is independent of church membership context'],
+  [profileSettingsUi, /profile-avatar'[\s\S]*context: 'public'/, 'profile photo changes are independent of church membership context'],
+  [sessionUi, /updateContextProfile/, 'profile changes update shared session data without reselecting church context'],
   [/clearContextResources/, 'Expression cache invalidation'],
   [/public-content\?type=event&id=/, 'exact public event detail request'],
   [/Cancel Registration/, 'event registration cancellation action'],

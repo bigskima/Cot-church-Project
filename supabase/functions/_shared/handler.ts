@@ -43,7 +43,7 @@ export function createHandler(options: HandlerOptions, callback: (context: Reque
       const hasBearer = /^Bearer\s+.+$/i.test(request.headers.get("authorization") ?? "");
       let auth: AuthContext | null = null;
       if (authMode === "required" || (authMode === "optional" && hasBearer)) {
-        auth = await authenticate(request, options.organization === "required");
+        auth = await authenticate(request, options.organization ?? "optional");
       }
 
       if (options.permission) {

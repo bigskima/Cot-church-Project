@@ -13,14 +13,24 @@ export interface AuthContext {
   membershipId: string | null;
 }
 
-export async function authenticate(request: Request, requireOrganization: boolean): Promise<AuthContext> {
+export type OrganizationContextMode = "required" | "optional" | "none";
+
+export async function authenticate(request: Request, organizationMode: OrganizationContextMode = "optional"): Promise<AuthContext> {
   const token = bearerToken(request);
   const client = userClient(token);
   const { data, error } = await client.auth.getUser(token);
   if (error || !data.user) throw new ApiError("INVALID_SESSION", "Session is invalid or expired", 401);
 
-  const organizationId = uuid(request.headers.get("x-organization-id"), "organizationId", requireOrganization);
-  const branchId = uuid(request.headers.get("x-branch-id"), "branchId");
+  // Handlers that explicitly declare organization:"none" are global/account
+  // workflows. Ignore stale organisation/expression headers completely so a
+  // previously selected context can never make profile/auth/public-account
+  // operations depend on membership.
+  const organizationId = organizationMode === "none"
+    ? null
+    : uuid(request.headers.get("x-organization-id"), "organizationId", organizationMode === "required");
+  const branchId = organizationMode === "none"
+    ? null
+    : uuid(request.headers.get("x-branch-id"), "branchId");
   if (branchId && !organizationId) throw new ApiError("ORGANIZATION_REQUIRED", "Organization context is required when an expression is selected", 400);
 
   let membershipId: string | null = null;

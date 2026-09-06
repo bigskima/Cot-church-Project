@@ -32,7 +32,7 @@ function inferMimeType(fileName?: string | null) {
 
 export default function AccountSettingsScreen() {
   const insets = useSafeAreaInsets();
-  const { api, auth, selectContext } = useSession();
+  const { api, updateContextProfile } = useSession();
   const { colors } = useTheme();
 
   const [profile, setProfile] = useState<ProfilePayload | null>(null);
@@ -54,7 +54,7 @@ export default function AccountSettingsScreen() {
     setLoading(true);
     setError('');
     try {
-      const data = await api.request<ProfilePayload>('profile');
+      const data = await api.request<ProfilePayload>('profile', { context: 'public' });
       setProfile(data);
       setDisplayName(data.display_name ?? '');
       setUsername(data.username ?? '');
@@ -63,6 +63,10 @@ export default function AccountSettingsScreen() {
       setBirthdayPublicVisible(data.birthday_public_visible === true);
       setBio(data.bio ?? '');
       setPhoneNumber(data.phone_number ?? '');
+      updateContextProfile({
+        display_name: data.display_name,
+        avatar_url: data.avatar_url ?? undefined,
+      });
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to load account settings.');
     } finally {
@@ -73,10 +77,6 @@ export default function AccountSettingsScreen() {
   useEffect(() => {
     void loadProfile();
   }, [api]);
-
-  const refreshSessionContext = async () => {
-    if (auth?.organizationId) await selectContext(auth.organizationId, auth.branchId);
-  };
 
   const saveProfile = async () => {
     if (!displayName.trim()) {
@@ -89,6 +89,7 @@ export default function AccountSettingsScreen() {
     try {
       const updated = await api.request<ProfilePayload>('profile', {
         method: 'PATCH',
+        context: 'public',
         body: JSON.stringify({
           displayName: displayName.trim(),
           username: username.trim(),
@@ -102,8 +103,11 @@ export default function AccountSettingsScreen() {
       setProfile(updated);
       setBirthdayExpressionVisible(updated.birthday_expression_visible !== false);
       setBirthdayPublicVisible(updated.birthday_public_visible === true);
+      updateContextProfile({
+        display_name: updated.display_name,
+        avatar_url: updated.avatar_url ?? undefined,
+      });
       setSuccess('Profile settings saved.');
-      await refreshSessionContext();
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to save your profile.');
     } finally {
@@ -148,10 +152,10 @@ export default function AccountSettingsScreen() {
         } as any);
       }
 
-      const response = await api.request<{ avatarUrl: string }>('profile-avatar', { method: 'POST', body: form });
+      const response = await api.request<{ avatarUrl: string }>('profile-avatar', { method: 'POST', context: 'public', body: form });
       setProfile((current) => current ? { ...current, avatar_url: response.avatarUrl } : current);
+      updateContextProfile({ avatar_url: response.avatarUrl });
       setSuccess('Profile photo updated.');
-      await refreshSessionContext();
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to update your profile photo.');
     } finally {
@@ -164,10 +168,10 @@ export default function AccountSettingsScreen() {
     setError('');
     setSuccess('');
     try {
-      await api.request<{ avatarUrl: null }>('profile-avatar', { method: 'DELETE' });
+      await api.request<{ avatarUrl: null }>('profile-avatar', { method: 'DELETE', context: 'public' });
       setProfile((current) => current ? { ...current, avatar_url: null } : current);
+      updateContextProfile({ avatar_url: undefined });
       setSuccess('Profile photo removed.');
-      await refreshSessionContext();
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to remove your profile photo.');
     } finally {

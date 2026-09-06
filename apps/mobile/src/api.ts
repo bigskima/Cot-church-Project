@@ -106,6 +106,7 @@ function userFacingApiMessage(code: string, status: number, serverMessage?: stri
     PERMISSION_DENIED: 'You don’t have access to this action.',
     PLATFORM_PERMISSION_DENIED: 'You don’t have access to this action.',
     EXPRESSION_REQUIRED: 'Enter an Expression to continue.',
+    ORGANIZATION_ACCESS_DENIED: 'This church context is no longer available. You can continue in General Community or choose another church.',
     EXPRESSION_MEMBERSHIP_REQUIRED: 'Join this Expression before accessing its private space.',
     GENERAL_POSTING_MEMBERSHIP_REQUIRED: 'Join an active Expression before posting in General Community.',
     GENERAL_MEDIA_RESTRICTED: 'General Community member posts support text, photos and short videos only.',
