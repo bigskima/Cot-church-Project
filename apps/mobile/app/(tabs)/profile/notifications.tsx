@@ -60,7 +60,11 @@ export default function NotificationsScreen() {
         method: 'POST',
         body: JSON.stringify({ invitationId: invitation.id, decision }),
       });
-      setMessage(decision === 'accept' ? 'Invitation accepted. Your access has been refreshed.' : 'Invitation declined.');
+      setMessage(decision === 'accept'
+        ? invitation.kind === 'expression_role'
+          ? 'Invitation accepted. Your Expression access is now active.'
+          : 'Invitation accepted. Your access has been refreshed.'
+        : 'Invitation declined.');
       await invitations.refresh();
 
       if (decision === 'accept') {
@@ -68,12 +72,13 @@ export default function NotificationsScreen() {
           ? invitation.organization_id ?? auth?.organizationId ?? undefined
           : auth?.organizationId ?? invitation.organization_id ?? undefined;
         if (organizationId) {
-          const preserveBranch =
-            invitation.kind !== 'expression_role' &&
-            auth?.organizationId === organizationId
-              ? auth.branchId
-              : undefined;
-          await selectContext(organizationId, preserveBranch);
+          const nextBranch =
+            invitation.kind === 'expression_role'
+              ? invitation.branch_id ?? undefined
+              : auth?.organizationId === organizationId
+                ? auth.branchId
+                : undefined;
+          await selectContext(organizationId, nextBranch);
         }
       }
     } catch (error) {
