@@ -46,7 +46,7 @@ export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
   const { returnTo: requestedReturnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const returnTo = safeReturnTo(requestedReturnTo);
-  const { mode, context, permissions, api } = useSession();
+  const { mode, context, permissions, publicCapabilities, api } = useSession();
   const { colors } = useTheme();
   const [payload, setPayload] = React.useState<OnboardingPayload | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -55,7 +55,7 @@ export default function OnboardingScreen() {
   const [stepIndex, setStepIndex] = React.useState(0);
 
   const hasExpressions = Boolean(context?.expressions?.length);
-  const hasLeadership = permissions.includes('*') || permissions.some((permission) =>
+  const hasLeadership = publicCapabilities.includes('public.live_stream.create') || permissions.includes('*') || permissions.some((permission) =>
     ['posts.create', 'reels.create', 'videos.create', 'media.upload', 'studio.access', 'streams.broadcast', 'sermons.manage', 'events.create', 'roles.assign', 'organization.leadership.manage', 'expression.leadership.manage'].includes(permission),
   );
 
