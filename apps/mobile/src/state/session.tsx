@@ -5,10 +5,15 @@ import type { MembershipContext } from '../types/content';
 import { invalidate } from '../services/query-cache';
 
 type Mode = 'restoring' | 'visitor' | 'authenticated';
+type ContextStatus = 'idle' | 'loading' | 'ready' | 'error';
 type Value = {
   auth: StoredAuth | null;
   mode: Mode;
   context: MembershipContext | null;
+  contextStatus: ContextStatus;
+  contextRefreshing: boolean;
+  contextError: string;
+  refreshContext: () => void;
   permissions: string[];
   hasCapability: (code: string) => boolean;
   updateContextProfile: (changes: Partial<MembershipContext['profile']>) => void;
@@ -78,6 +83,10 @@ export function SessionProvider({ children }: PropsWithChildren) {
   const [auth, setAuth] = useState<StoredAuth | null>(null);
   const [mode, setMode] = useState<Mode>('restoring');
   const [context, setContext] = useState<MembershipContext | null>(null);
+  const [contextStatus, setContextStatus] = useState<ContextStatus>('idle');
+  const [contextRefreshing, setContextRefreshing] = useState(false);
+  const [contextError, setContextError] = useState('');
+  const [contextVersion, setContextVersion] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -226,14 +235,26 @@ export function SessionProvider({ children }: PropsWithChildren) {
   };
 
   useEffect(() => {
-    if (mode !== 'authenticated' || !auth) return;
+    if (mode !== 'authenticated' || !auth) {
+      setContextStatus('idle');
+      setContextRefreshing(false);
+      setContextError('');
+      return;
+    }
     let cancelled = false;
+    const hadContext = context !== null;
+    setContextStatus(hadContext ? 'ready' : 'loading');
+    setContextRefreshing(hadContext);
+    setContextError('');
 
     const loadContext = async () => {
       try {
         const value = await api.request<MembershipContext>('organization-context');
         if (cancelled) return;
         setContext(value);
+        setContextStatus('ready');
+        setContextRefreshing(false);
+        setContextError('');
 
         const selectedOrganizationStillAvailable = !auth.organizationId || value.organizations.some((item) => item.id === auth.organizationId) || value.creatorOrganizations?.some((item) => item.id === auth.organizationId);
         if (!selectedOrganizationStillAvailable) {
@@ -264,16 +285,24 @@ export function SessionProvider({ children }: PropsWithChildren) {
         if (error instanceof ApiError) {
           if (auth.branchId && ['EXPRESSION_UNAVAILABLE', 'EXPRESSION_MEMBERSHIP_REQUIRED', 'BRANCH_ACCESS_DENIED'].includes(error.code)) {
             setContext(null);
+            setContextStatus('loading');
+            setContextRefreshing(false);
             await persist({ ...auth, branchId: undefined });
             return;
           }
           if (auth.organizationId && error.code === 'ORGANIZATION_ACCESS_DENIED') {
             setContext(null);
+            setContextStatus('loading');
+            setContextRefreshing(false);
             await persist({ ...auth, organizationId: undefined, branchId: undefined });
             return;
           }
         }
-        setContext(null);
+        // A failed background refresh must not blank already-resolved context.
+        // Keep safe data visible and surface the refresh failure separately.
+        setContextStatus(hadContext ? 'ready' : 'error');
+        setContextRefreshing(false);
+        setContextError(error instanceof Error ? error.message : 'Unable to refresh your church access.');
       }
     };
 
@@ -281,7 +310,9 @@ export function SessionProvider({ children }: PropsWithChildren) {
     return () => {
       cancelled = true;
     };
-  }, [mode, auth, api, persist]);
+  }, [mode, auth, api, persist, contextVersion]);
+
+  const refreshContext = useCallback(() => setContextVersion((value) => value + 1), []);
 
   const updateContextProfile = useCallback((changes: Partial<MembershipContext['profile']>) => {
     setContext((current) => current
@@ -303,6 +334,9 @@ export function SessionProvider({ children }: PropsWithChildren) {
     if (auth) {
       clearContextResources();
       setContext(null);
+      setContextStatus('loading');
+      setContextRefreshing(false);
+      setContextError('');
       await persist({ ...auth, organizationId, branchId });
     }
   };
@@ -323,6 +357,9 @@ export function SessionProvider({ children }: PropsWithChildren) {
     if (!auth) return;
     clearContextResources();
     setContext(null);
+    setContextStatus('loading');
+    setContextRefreshing(false);
+    setContextError('');
     await persist({ ...auth, branchId: undefined });
   };
 
@@ -333,6 +370,9 @@ export function SessionProvider({ children }: PropsWithChildren) {
   const signOut = async () => {
     clearContextResources();
     setContext(null);
+    setContextStatus('idle');
+    setContextRefreshing(false);
+    setContextError('');
     await persist(null);
   };
 
@@ -342,6 +382,10 @@ export function SessionProvider({ children }: PropsWithChildren) {
         auth,
         mode,
         context,
+        contextStatus,
+        contextRefreshing,
+        contextError,
+        refreshContext,
         permissions,
         hasCapability,
         updateContextProfile,
@@ -352,6 +396,9 @@ export function SessionProvider({ children }: PropsWithChildren) {
         continueAsVisitor: async () => {
           clearContextResources();
           setContext(null);
+          setContextStatus('idle');
+          setContextRefreshing(false);
+          setContextError('');
           await persist(null);
         },
         enterAsVisitor: async () => {
