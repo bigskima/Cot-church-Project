@@ -73,6 +73,9 @@ const checks = [
   [/LiveCard/, 'reusable live media'],
   [/VideoView/, 'native live player'],
   [/viewerSessionId/, 'live attendance'],
+  [/REPLAY PROCESSING|PROCESSING/, 'livestream lifecycle-aware player states'],
+  [/Live fellowship opens when this broadcast begins/, 'pre-live fellowship state'],
+  [/Replays & recordings/, 'recording processing and replay discovery'],
   [/follow_up/, 'private live follow-up'],
   [/social-feed/, 'scoped social experience'],
   [/ResourceError/, 'section error states'],
@@ -153,6 +156,10 @@ const forbiddenGivingPatterns = [
   [/\$\{?amount|\$20|\$50|\$100|\$250|\$500/, 'hardcoded dollar giving presentation'],
 ];
 
+const forbiddenSocialCopyPatterns = [
+  [/Join an active Expression before sharing a Reel into General Community/, 'stale Expression-membership Reel sharing guidance'],
+];
+
 const forbiddenPrayerPatterns = [
   [/onPray=\{\(\)\s*=>\s*\{\s*\}\}/, 'no-op prayer interaction'],
 ];
@@ -174,15 +181,17 @@ const paymentCredentialChecks = [
 const missing = checks.filter(([pattern]) => !pattern.test(joined));
 const forbidden = forbiddenGivingPatterns.filter(([pattern]) => pattern.test(givingUi));
 const forbiddenPrayer = forbiddenPrayerPatterns.filter(([pattern]) => pattern.test(prayerUi));
+const forbiddenSocialCopy = forbiddenSocialCopyPatterns.filter(([pattern]) => pattern.test(joined));
 const forbiddenPlatformBoundaries = forbiddenPlatformBoundaryPatterns.filter(([pattern]) => pattern.test(platformShellUi));
 const forbiddenIntegrations = forbiddenIntegrationPatterns.filter(([pattern]) => pattern.test(integrationsUi));
 const missingPaymentCredentialChecks = paymentCredentialChecks.filter(([pattern]) => !pattern.test(paymentInfrastructureUi));
 
-if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenPlatformBoundaries.length || forbiddenIntegrations.length || missingPaymentCredentialChecks.length) {
+if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenSocialCopy.length || forbiddenPlatformBoundaries.length || forbiddenIntegrations.length || missingPaymentCredentialChecks.length) {
   const failures = [
     ...missing.map(([, name]) => name),
     ...forbidden.map(([, name]) => `remove ${name}`),
     ...forbiddenPrayer.map(([, name]) => `remove ${name}`),
+    ...forbiddenSocialCopy.map(([, name]) => `remove ${name}`),
     ...forbiddenPlatformBoundaries.map(([, name]) => `remove ${name}`),
     ...forbiddenIntegrations.map(([, name]) => `remove ${name}`),
     ...missingPaymentCredentialChecks.map(([, name]) => name),
@@ -192,5 +201,5 @@ if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenPla
 }
 
 console.log(
-  `Application check passed (${files.length} files, ${checks.length} production invariants, ${forbiddenGivingPatterns.length + forbiddenPrayerPatterns.length + forbiddenPlatformBoundaryPatterns.length + forbiddenIntegrationPatterns.length} anti-hardcode/boundary checks, ${paymentCredentialChecks.length} payment contract checks).`,
+  `Application check passed (${files.length} files, ${checks.length} production invariants, ${forbiddenGivingPatterns.length + forbiddenPrayerPatterns.length + forbiddenSocialCopyPatterns.length + forbiddenPlatformBoundaryPatterns.length + forbiddenIntegrationPatterns.length} anti-hardcode/boundary checks, ${paymentCredentialChecks.length} payment contract checks).`,
 );
