@@ -121,6 +121,7 @@ const platformIntegrations = await readFile('supabase/functions/platform-integra
 const notifications = await readFile('supabase/functions/notifications/index.ts', 'utf8');
 const notificationSettings = await readFile('supabase/functions/notification-settings/index.ts', 'utf8');
 const mobileNotificationSettingsPage = await readFile('apps/mobile/app/(tabs)/profile/notification-settings.tsx', 'utf8');
+const mobileSavedLibrary = await readFile('apps/mobile/app/(tabs)/profile/saved.tsx', 'utf8');
 const governanceInvitations = await readFile('supabase/functions/governance-invitations/index.ts', 'utf8');
 const mobileNotificationsPage = await readFile('apps/mobile/app/(tabs)/profile/notifications.tsx', 'utf8');
 const adminAiPage = await readFile('apps/admin/src/pages/AiInfrastructure.tsx', 'utf8');
@@ -231,6 +232,11 @@ const invariants = [
   [mobileNotificationSettingsPage, /api\.request<NotificationPreferences>\('notification-settings'/, 'Mobile notification settings read contract'],
   [mobileNotificationSettingsPage, /method:\s*'PUT'/, 'Mobile notification settings update method'],
   [mobileNotificationSettingsPage, /emailEnabled[\s\S]*smsEnabled[\s\S]*pushEnabled[\s\S]*quietHours/, 'Mobile notification preference payload'],
+  [engagement, /view"\) === "saved"/, 'authenticated Saved Library backend view'],
+  [engagement, /content_bookmarks/, 'Saved Library canonical bookmark source'],
+  [engagement, /social_posts[\s\S]*reels[\s\S]*videos[\s\S]*sermons/, 'Saved Library typed content hydration'],
+  [mobileSavedLibrary, /engagement\?view=saved/, 'mobile Saved Library API contract'],
+  [mobileSavedLibrary, /action:\s*'bookmark'/, 'Saved Library remove action'],
   [mobileNotificationsPage, /api\.request\('governance-invitations',\s*\{[\s\S]*?method:\s*'POST'[\s\S]*?JSON\.stringify\(\{\s*invitationId:\s*invitation\.id,\s*decision\s*\}\)/, 'Mobile governance invitation response client payload'],
   [governanceInvitations, /methods:\s*\[\s*"GET"\s*,\s*"POST"\s*\]/, 'Governance invitation backend methods'],
   [governanceInvitations, /assertNoUnknownFields\(body,\s*\[\s*"invitationId"\s*,\s*"decision"\s*\]\)/, 'Governance invitation backend payload fields'],

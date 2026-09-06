@@ -135,6 +135,7 @@ export default function ProfileScreen() {
         <View style={styles.sectionWrap}>
           <SectionHeader title="Your church" subtitle="Community, Expressions and personal services" />
           <View style={styles.linksList}>
+            {mode === 'authenticated' ? serviceTile('/(tabs)/profile/saved', 'bookmark-outline', 'Saved Library', 'Return to posts, Reels, Watch videos and sermons you kept for later') : null}
             {mode === 'authenticated' ? serviceTile('/expressions', 'business-outline', 'My Expressions', expression?.name ? `Inside ${expression.name} · change or leave this space` : 'Join with an invite code or enter one of your Expressions') : null}
             {mode === 'authenticated' && expression?.id ? serviceTile('/(tabs)/community/groups', 'people-outline', 'Expression Groups', `Discover and join groups inside ${expression.name}`) : null}
             {mode === 'authenticated' && expression?.id ? serviceTile('/(tabs)/community/birthdays', 'gift-outline', 'Expression Birthdays', 'Private upcoming birthday calendar with month/day only') : null}

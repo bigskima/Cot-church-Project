@@ -13,6 +13,90 @@ Deno.serve(createHandler(
 
     // GET Comments on Content Item (publicly readable if content item is public)
     if (request.method === "GET") {
+      if (url.searchParams.get("view") === "saved") {
+        if (!auth?.user) throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication required for saved content", 401);
+
+        const { data: bookmarks, error: bookmarksError } = await auth.client
+          .from("content_bookmarks")
+          .select("content_item_id,created_at,content_items!inner(id,organization_id,expression_id,content_type,visibility,status,published_at,created_at)")
+          .eq("profile_id", auth.user.id)
+          .order("created_at", { ascending: false })
+          .limit(200);
+        if (bookmarksError) throw new ApiError("BOOKMARKS_FETCH_FAILED", "Unable to retrieve saved content", 500, undefined, false);
+
+        const rows = bookmarks ?? [];
+        const contentItem = (row: any) => Array.isArray(row.content_items) ? row.content_items[0] : row.content_items;
+        const idsFor = (type: string) => rows
+          .filter((row: any) => contentItem(row)?.content_type === type)
+          .map((row: any) => row.content_item_id);
+
+        const postIds = idsFor("post");
+        const reelIds = idsFor("reel");
+        const videoIds = idsFor("video");
+        const sermonContentIds = idsFor("sermon");
+
+        const [postsResult, reelsResult, videosResult, sermonsResult] = await Promise.all([
+          postIds.length
+            ? auth.client.from("social_posts").select("id,body,published_at,created_at").in("id", postIds)
+            : Promise.resolve({ data: [], error: null }),
+          reelIds.length
+            ? auth.client.from("reels").select("id,caption,audio_title,audio_artist,created_at").in("id", reelIds)
+            : Promise.resolve({ data: [], error: null }),
+          videoIds.length
+            ? auth.client.from("videos").select("id,title,description,category,created_at").in("id", videoIds)
+            : Promise.resolve({ data: [], error: null }),
+          sermonContentIds.length
+            ? auth.client.from("sermons").select("id,content_item_id,title,preacher,sermon_date,published_at").in("content_item_id", sermonContentIds)
+            : Promise.resolve({ data: [], error: null }),
+        ]);
+        if (postsResult.error || reelsResult.error || videosResult.error || sermonsResult.error) {
+          throw new ApiError("BOOKMARK_DETAILS_FAILED", "Unable to retrieve saved content details", 500, undefined, false);
+        }
+
+        const posts = new Map((postsResult.data ?? []).map((item: any) => [item.id, item]));
+        const reels = new Map((reelsResult.data ?? []).map((item: any) => [item.id, item]));
+        const videos = new Map((videosResult.data ?? []).map((item: any) => [item.id, item]));
+        const sermons = new Map((sermonsResult.data ?? []).map((item: any) => [item.content_item_id, item]));
+
+        const items = rows.flatMap((row: any) => {
+          const item = contentItem(row);
+          if (!item || item.status !== "published") return [];
+          const common = {
+            contentId: row.content_item_id,
+            type: item.content_type,
+            savedAt: row.created_at,
+            organizationId: item.organization_id,
+            expressionId: item.expression_id ?? null,
+            visibility: item.visibility,
+            publishedAt: item.published_at ?? item.created_at,
+          };
+
+          if (item.content_type === "post") {
+            const post: any = posts.get(row.content_item_id);
+            if (!post) return [];
+            return [{ ...common, routeId: post.id, title: "Community post", summary: post.body ?? "" }];
+          }
+          if (item.content_type === "reel") {
+            const reel: any = reels.get(row.content_item_id);
+            if (!reel) return [];
+            return [{ ...common, routeId: reel.id, title: reel.audio_title || "Saved Reel", summary: reel.caption ?? "" }];
+          }
+          if (item.content_type === "video") {
+            const video: any = videos.get(row.content_item_id);
+            if (!video) return [];
+            return [{ ...common, routeId: video.id, title: video.title, summary: video.description ?? "", meta: video.category ?? null }];
+          }
+          if (item.content_type === "sermon") {
+            const sermon: any = sermons.get(row.content_item_id);
+            if (!sermon) return [];
+            return [{ ...common, routeId: sermon.id, title: sermon.title, summary: sermon.preacher ? `Message by ${sermon.preacher}` : "", meta: sermon.sermon_date ?? null }];
+          }
+          return [];
+        });
+
+        return { data: items };
+      }
+
       const contentId = uuid(url.searchParams.get("contentId"), "contentId");
       if (!contentId) throw new ApiError("VALIDATION_FAILED", "contentId is required", 400);
 
