@@ -4,19 +4,19 @@ import { Button, Card, InputField } from './ui';
 
 const ACCESS_POINTS = [
   {
-    label: 'Governance',
+    label: 'Administration',
     title: 'Organisations & Expressions',
-    copy: 'Manage platform structure, authority and access without mixing it with local ministry operations.',
+    copy: 'Manage church structure and access from one trusted administration workspace.',
   },
   {
-    label: 'Infrastructure',
+    label: 'Services',
     title: 'Services & providers',
     copy: 'Control AI, streaming, payments, integrations and feature availability from one operating surface.',
   },
   {
     label: 'Security',
     title: 'Audit-aware administration',
-    copy: 'Sensitive actions remain permission-gated and are recorded for platform accountability.',
+    copy: 'Sensitive actions are restricted by role and recorded for accountability.',
   },
 ];
 
@@ -89,15 +89,15 @@ export function Login({
               </div>
               <div>
                 <p className="platform-login-kicker">City of Transformation</p>
-                <p className="platform-login-product">Platform Control</p>
+                <p className="platform-login-product">Platform Administration</p>
               </div>
             </div>
 
             <div className="platform-login-hero-copy">
-              <span className="platform-login-eyebrow">CENTRAL PLATFORM AUTHORITY</span>
-              <h1>Operate the digital church platform with clarity.</h1>
+              <span className="platform-login-eyebrow">COT PLATFORM ADMINISTRATION</span>
+              <h1>Manage the COT digital platform with clarity.</h1>
               <p>
-                A focused control surface for platform governance, infrastructure, security
+                A focused workspace for church organisations, access, services and security
                 and service readiness. Local ministry work stays inside the church and
                 Expression experiences where it belongs.
               </p>
@@ -118,7 +118,7 @@ export function Login({
             <span className="platform-login-security-dot" aria-hidden="true" />
             <div>
               <strong>Protected administration surface</strong>
-              <p>Authentication is followed by a live Platform Administration permission check.</p>
+              <p>After sign-in, COT confirms that this account currently has administration access.</p>
             </div>
           </div>
         </aside>
@@ -130,15 +130,15 @@ export function Login({
             </div>
             <div>
               <p className="platform-login-kicker">City of Transformation</p>
-              <p className="platform-login-product">Platform Control</p>
+              <p className="platform-login-product">Platform Administration</p>
             </div>
           </div>
 
           <Card className="platform-login-card" glass>
             <div className="platform-login-form-heading">
-              <span className="platform-login-form-kicker">AUTHORIZED ACCESS</span>
+              <span className="platform-login-form-kicker">ADMINISTRATOR SIGN IN</span>
               <h2 id="platform-login-title">Welcome back</h2>
-              <p>Sign in with an account that has an active Platform Administration role.</p>
+              <p>Sign in with an account that currently has access to Platform Administration.</p>
             </div>
 
             <form onSubmit={handleSubmit} className="platform-login-form">
@@ -197,14 +197,14 @@ export function Login({
             <div className="platform-login-form-footer">
               <span className="platform-login-lock" aria-hidden="true">◆</span>
               <p>
-                Your session is stored only for this browser session. Platform permissions
+                Your session lasts only for this browser session. Administration access
                 are resolved again after sign-in.
               </p>
             </div>
           </Card>
 
           <p className="platform-login-footnote">
-            This surface is for platform operators. Church and Expression leaders use their
+            This area is for COT administrators. Church and Expression leaders use their
             assigned ministry tools in the main application.
           </p>
         </section>
