@@ -35,24 +35,47 @@ type CareFollowUp = LiveFollowUp & {
 
 export default function PastoralTriageScreen() {
   const insets = useSafeAreaInsets();
-  const { api, context, hasCapability } = useSession();
+  const { api, context, hasCapability, hasOrganizationCapability } = useSession();
   const { colors } = useTheme();
   const expression = context?.expression;
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
-  const canModeratePrayer =
-    (hasCapability('prayer.moderate') &&
-      (hasCapability('prayer.pastoral.receive') || hasCapability('prayer.team.receive'))) ||
-    hasCapability('*');
-  const canReceiveFollowups = hasCapability('pastoral.followups.receive') || hasCapability('*');
 
-  const [activeQueue, setActiveQueue] = useState<'prayer' | 'care'>(canModeratePrayer ? 'prayer' : 'care');
-  const [ministryScope, setMinistryScope] = useState<PrayerScope>(expression?.id ? 'expression' : 'general');
+  const canModerateGeneralPrayer =
+    hasOrganizationCapability('prayer.moderate') &&
+    (hasOrganizationCapability('prayer.pastoral.receive') || hasOrganizationCapability('prayer.team.receive'));
+  const canModerateExpressionPrayer =
+    Boolean(expression?.id) &&
+    hasCapability('prayer.moderate') &&
+    (hasCapability('prayer.pastoral.receive') || hasCapability('prayer.team.receive'));
+  const canReceiveGeneralFollowups = hasOrganizationCapability('pastoral.followups.receive');
+  const canReceiveExpressionFollowups =
+    Boolean(expression?.id) && hasCapability('pastoral.followups.receive');
+
+  const canUseGeneralScope = canModerateGeneralPrayer || canReceiveGeneralFollowups;
+  const canUseExpressionScope =
+    Boolean(expression?.id) && (canModerateExpressionPrayer || canReceiveExpressionFollowups);
+  const initialScope: PrayerScope = canUseExpressionScope ? 'expression' : 'general';
+
+  const [ministryScope, setMinistryScope] = useState<PrayerScope>(initialScope);
+  const canModeratePrayer =
+    ministryScope === 'expression' ? canModerateExpressionPrayer : canModerateGeneralPrayer;
+  const canReceiveFollowups =
+    ministryScope === 'expression' ? canReceiveExpressionFollowups : canReceiveGeneralFollowups;
+  const [activeQueue, setActiveQueue] = useState<'prayer' | 'care'>(
+    (initialScope === 'expression' ? canModerateExpressionPrayer : canModerateGeneralPrayer) ? 'prayer' : 'care',
+  );
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
 
   useEffect(() => {
-    if (!expression?.id && ministryScope === 'expression') setMinistryScope('general');
-  }, [expression?.id, ministryScope]);
+    if (ministryScope === 'expression' && !canUseExpressionScope && canUseGeneralScope) {
+      setMinistryScope('general');
+    } else if (ministryScope === 'general' && !canUseGeneralScope && canUseExpressionScope) {
+      setMinistryScope('expression');
+    } else if (!expression?.id && ministryScope === 'expression') {
+      setMinistryScope('general');
+    }
+  }, [expression?.id, ministryScope, canUseExpressionScope, canUseGeneralScope]);
 
   useEffect(() => {
     if (activeQueue === 'prayer' && !canModeratePrayer && canReceiveFollowups) setActiveQueue('care');
@@ -123,7 +146,7 @@ export default function PastoralTriageScreen() {
     ? `${expression.name} Prayer Queue`
     : 'General Prayer Ministry Queue';
 
-  const scopeTabs = expression?.id ? (
+  const scopeTabs = expression?.id && canUseGeneralScope && canUseExpressionScope ? (
     <View style={styles.scopeTabs}>
       <Chip label="General" selected={ministryScope === 'general'} onPress={() => setMinistryScope('general')} />
       <Chip label={expression.name} selected={ministryScope === 'expression'} onPress={() => setMinistryScope('expression')} />
@@ -160,10 +183,10 @@ export default function PastoralTriageScreen() {
         ) : null}
 
         <View style={styles.body}>
-          {!canModeratePrayer && !canReceiveFollowups ? (
+          {!canUseGeneralScope && !canUseExpressionScope ? (
             <EmptyState
               title="Pastoral access unavailable"
-              message="Your current role is not assigned to prayer moderation or pastoral follow-up in this scope."
+              message="Your current role is not assigned to prayer moderation or pastoral follow-up in this church or active Expression."
               iconName="lock-closed-outline"
             />
           ) : null}
