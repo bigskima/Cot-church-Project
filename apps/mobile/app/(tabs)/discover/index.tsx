@@ -6,6 +6,7 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import {
+  BrandMark,
   Chip,
   ChurchPickerModal,
   EmptyState,
@@ -98,13 +99,18 @@ export default function DiscoverScreen() {
         contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: 100 }]}
       >
         <View style={[styles.header, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
-          <View style={styles.eyebrowRow}>
-            <View style={[styles.eyebrowDot, { backgroundColor: colors.interactive }]} />
-            <Text style={[styles.eyebrow, { color: colors.interactive }]}>DISCOVER COT</Text>
+          <View style={styles.discoverBrandRow}>
+            <View style={[styles.discoverBrandShell, { backgroundColor: colors.cardElevated, borderColor: colors.borderSubtle }]}>
+              <BrandMark variant="header" size={31} />
+            </View>
+            <View style={styles.discoverBrandCopy}>
+              <Text style={[styles.eyebrow, { color: colors.textMuted }]}>CITY OF TRANSFORMATION</Text>
+              <Text style={[styles.discoverBrandTitle, { color: colors.text }]}>Discover</Text>
+            </View>
           </View>
           <View style={styles.headerTitleRow}>
             <View style={styles.titleCopy}>
-              <Text style={[styles.title, { color: colors.text }]}>Explore</Text>
+              <Text style={[styles.title, { color: colors.text }]}>Explore what’s happening</Text>
               <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Teachings, people, Expressions, events and stories in one place.</Text>
             </View>
             {churches.data && churches.data.length > 1 ? (
@@ -159,7 +165,7 @@ export default function DiscoverScreen() {
                 {search.loading && !search.data ? <Skeleton height={58} count={3} /> : search.error ? <ResourceError message={search.error} retry={search.refresh} /> : (
                   <>
                     {(search.data?.videos ?? []).map((video) => <Pressable key={`video-${video.id}`} accessibilityRole="button" onPress={() => router.push(`/watch/${video.id}` as any)} style={({ pressed }) => [styles.searchRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}><Icon name="play-circle-outline" size={20} color={colors.interactive} /><View style={styles.searchCopy}><Text style={[styles.searchTitle, { color: colors.text }]}>{video.title}</Text><Text style={[styles.searchMeta, { color: colors.textMuted }]}>VIDEO · {video.category}</Text></View><Icon name="chevron-forward" size={17} color={colors.textMuted} /></Pressable>)}
-                    {(search.data?.reels ?? []).map((reel) => <Pressable key={`reel-${reel.id}`} accessibilityRole="button" onPress={() => router.push('/reels')} style={({ pressed }) => [styles.searchRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}><Icon name="flash-outline" size={20} color={colors.interactive} /><View style={styles.searchCopy}><Text numberOfLines={2} style={[styles.searchTitle, { color: colors.text }]}>{reel.caption}</Text><Text style={[styles.searchMeta, { color: colors.textMuted }]}>REEL</Text></View><Icon name="chevron-forward" size={17} color={colors.textMuted} /></Pressable>)}
+                    {(search.data?.reels ?? []).map((reel) => <Pressable key={`reel-${reel.id}`} accessibilityRole="button" onPress={() => router.push({ pathname: '/reels', params: { reelId: reel.id, context: 'public' } } as any)} style={({ pressed }) => [styles.searchRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}><Icon name="flash-outline" size={20} color={colors.interactive} /><View style={styles.searchCopy}><Text numberOfLines={2} style={[styles.searchTitle, { color: colors.text }]}>{reel.caption}</Text><Text style={[styles.searchMeta, { color: colors.textMuted }]}>REEL</Text></View><Icon name="chevron-forward" size={17} color={colors.textMuted} /></Pressable>)}
                     {(search.data?.expressions ?? []).map((expression) => <Pressable key={`expression-${expression.id}`} accessibilityRole="button" onPress={() => router.push(`/expression/${expression.id}` as any)} style={({ pressed }) => [styles.searchRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}><Icon name="business-outline" size={20} color={colors.interactive} /><View style={styles.searchCopy}><Text style={[styles.searchTitle, { color: colors.text }]}>{expression.name}</Text><Text style={[styles.searchMeta, { color: colors.textMuted }]}>PUBLIC EXPRESSION PROFILE</Text></View><Icon name="chevron-forward" size={17} color={colors.textMuted} /></Pressable>)}
                     {(search.data?.leaders ?? []).map((leader) => <View key={`leader-${leader.id}`} style={[styles.searchRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}><Icon name="person-outline" size={20} color={colors.interactive} /><View style={styles.searchCopy}><Text style={[styles.searchTitle, { color: colors.text }]}>{leader.name ?? (leader as any).display_name}</Text><Text style={[styles.searchMeta, { color: colors.textMuted }]}>{leader.role_title || 'PUBLIC LEADER'}</Text></View></View>)}
                     {!(search.data?.videos.length || search.data?.reels.length || search.data?.expressions.length || search.data?.leaders.length) ? <Text style={[styles.noExtraResults, { color: colors.textMuted }]}>No additional public videos, Reels, Expressions, or leaders match this search.</Text> : null}
@@ -230,6 +236,10 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: { flexGrow: 1 },
   header: { marginHorizontal: spacing.md, padding: spacing.lg, borderWidth: 1, borderRadius: radius.xxl },
+  discoverBrandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
+  discoverBrandShell: { width: 46, height: 46, borderRadius: radius.lg, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  discoverBrandCopy: { flex: 1, minWidth: 0 },
+  discoverBrandTitle: { fontSize: 15, fontWeight: '800', letterSpacing: -0.35, marginTop: 1 },
   eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.xs },
   eyebrowDot: { width: 6, height: 6, borderRadius: 3 },
   eyebrow: { ...typography.kicker },
