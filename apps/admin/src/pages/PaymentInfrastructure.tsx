@@ -217,7 +217,7 @@ export function PaymentInfrastructure({ api, canManage = false, canManageSecrets
     <div className="admin-page-stack">
       <Card
         title="Payment infrastructure"
-        subtitle="Manual bank transfer is the active production giving method. Online provider adapters remain installed but release-locked until provider onboarding and production verification are approved."
+        subtitle="Manual bank transfer is the active production giving method. Online payment services remain unavailable until service setup and production approval are complete."
         headerAction={<Button variant="outline" size="sm" onClick={() => void load()} loading={loading}>Refresh</Button>}
       >
         <div className="admin-stats-grid">
@@ -229,7 +229,7 @@ export function PaymentInfrastructure({ api, canManage = false, canManageSecrets
             variant="gold"
           />
           <StatWidget
-            title="Provider Adapters"
+            title="Payment Services"
             value={data.providers.length}
             subtitle="Installed for future verified rollout"
             icon="ADAPTERS"
@@ -246,7 +246,7 @@ export function PaymentInfrastructure({ api, canManage = false, canManageSecrets
             value={data.summary.activeRoutes}
             subtitle={data.summary.activeRoutes === 0 ? 'Correct release-locked state' : 'Review immediately'}
             trend={{
-              value: data.summary.activeRoutes === 0 ? 'No live provider routing' : 'Unexpected active routing',
+              value: data.summary.activeRoutes === 0 ? 'No online payment path active' : 'Unexpected online payment path',
               isPositive: data.summary.activeRoutes === 0,
             }}
             icon="ROUTES"
@@ -259,8 +259,8 @@ export function PaymentInfrastructure({ api, canManage = false, canManageSecrets
       {message ? <div className="admin-status-message admin-status-success">{message}</div> : null}
 
       <Card
-        title="Provider preparation"
-        subtitle="You may safely store credentials now. They are encrypted in Supabase Vault and are never displayed back to the browser. Saving credentials does not enable online giving."
+        title="Payment service setup"
+        subtitle="You may safely save payment credentials now. They are encrypted and cannot be displayed again. Saving credentials does not enable online giving."
       >
         <div className="admin-provider-grid">
           {data.providers.map((item) => {
@@ -270,12 +270,12 @@ export function PaymentInfrastructure({ api, canManage = false, canManageSecrets
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
                   <div>
                     <h4 style={{ margin: 0, fontSize: 16 }}>{item.name}</h4>
-                    <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 4 }}>{item.code} · adapter {item.adapter_version}</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 4 }}>{item.code} · connection {item.adapter_version}</div>
                   </div>
                   <Badge label="FUTURE / OFF" variant="neutral" />
                 </div>
                 <p style={{ color: 'var(--text-secondary)', fontSize: 12, lineHeight: 1.6 }}>
-                  {globalConfig ? `Credential reference prepared: ${globalConfig.secret_reference}` : 'No global provider configuration has been prepared yet.'}
+                  {globalConfig ? `Credential name prepared: ${globalConfig.secret_reference}` : 'This payment service has not been prepared yet.'}
                 </p>
                 <div className="admin-capability-tags">
                   {(item.capabilities ?? []).map((capability) => <span key={capability} className="active">{capability}</span>)}
@@ -288,28 +288,28 @@ export function PaymentInfrastructure({ api, canManage = false, canManageSecrets
       </Card>
 
       <Card
-        title="Routing registry"
-        subtitle="Read-only while online giving is release-locked. No route may be active in the current production release."
+        title="Online payment paths"
+        subtitle="Online payment remains unavailable in the current release. No payment path should be active."
       >
         <Table
           columns={[
             { header: 'CURRENCY', accessor: (item) => item.currency },
             { header: 'METHOD', accessor: (item) => item.payment_method },
-            { header: 'PROVIDER', accessor: (item) => item.payment_providers?.name ?? '—' },
+            { header: 'SERVICE', accessor: (item) => item.payment_providers?.name ?? '—' },
             { header: 'PRIORITY', accessor: (item) => item.priority },
             { header: 'STATE', accessor: (item) => <Badge label={item.is_active ? 'BLOCKED ACTIVE' : 'INACTIVE'} variant={item.is_active ? 'warning' : 'neutral'} /> },
           ]}
           data={data.routes}
           keyExtractor={(item) => item.id}
           loading={loading}
-          emptyMessage="No future online-payment routing rules are configured."
+          emptyMessage="No future online payment paths have been prepared."
         />
       </Card>
 
-      <Card title="Payment attempt ledger" subtitle="Historical/provider attempt telemetry remains available for audit and future rollout verification.">
+      <Card title="Payment activity history" subtitle="Review past online payment attempts for audit and future rollout checks.">
         <Table
           columns={[
-            { header: 'PROVIDER', accessor: (item) => item.provider },
+            { header: 'SERVICE', accessor: (item) => item.provider },
             { header: 'CHURCH', accessor: (item) => item.organizations?.name ?? '—' },
             { header: 'AMOUNT', accessor: (item) => money(item.amount_minor, item.currency) },
             { header: 'STATUS', accessor: (item) => <Badge label={item.status.toUpperCase()} variant={item.status === 'succeeded' ? 'active' : item.status === 'failed' ? 'suspended' : 'neutral'} /> },
@@ -326,7 +326,7 @@ export function PaymentInfrastructure({ api, canManage = false, canManageSecrets
         isOpen={canManage && !!provider}
         onClose={() => { if (!busy) setProvider(null); }}
         title={provider ? `Prepare ${provider.name}` : 'Prepare payment provider'}
-        subtitle="Credentials are written to Supabase Vault over the authenticated Platform Admin API. The provider remains inactive after saving."
+        subtitle="Credentials are encrypted and protected when saved. The payment service remains inactive after preparation."
         footer={<div style={{ display: 'flex', gap: 10 }}><Button variant="outline" disabled={busy} onClick={() => setProvider(null)}>Cancel</Button><Button variant="primary" loading={busy} onClick={() => void savePreparation()}>Save preparation</Button></div>}
       >
         <div className="admin-modal-form">
@@ -337,10 +337,10 @@ export function PaymentInfrastructure({ api, canManage = false, canManageSecrets
               <option value="sandbox">Sandbox / test</option>
             </select>
           </label>
-          <InputField label="Provider secret reference" value={secretReference} onChange={(event) => setSecretReference(event.target.value.toUpperCase())} helperText="Stable reference only; the raw key is stored in Vault." />
+          <InputField label="Payment credential name" value={secretReference} onChange={(event) => setSecretReference(event.target.value.toUpperCase())} helperText="Stable name used by COT for the protected payment credential." />
           {canManageSecrets ? <InputField label="Provider API secret / key" type={showSecrets ? 'text' : 'password'} value={secretValue} onChange={(event) => setSecretValue(event.target.value)} placeholder="Leave blank to keep the existing secret" autoComplete="new-password" /> : null}
-          <InputField label="Webhook secret reference" value={webhookReference} onChange={(event) => setWebhookReference(event.target.value.toUpperCase())} />
-          {canManageSecrets ? <InputField label="Webhook verification secret" type={showSecrets ? 'text' : 'password'} value={webhookValue} onChange={(event) => setWebhookValue(event.target.value)} placeholder="Leave blank to keep the existing secret" autoComplete="new-password" /> : <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Your role may reuse stored secret references but cannot add or rotate payment credentials.</p>}
+          <InputField label="Payment verification credential name" value={webhookReference} onChange={(event) => setWebhookReference(event.target.value.toUpperCase())} />
+          {canManageSecrets ? <InputField label="Webhook verification secret" type={showSecrets ? 'text' : 'password'} value={webhookValue} onChange={(event) => setWebhookValue(event.target.value)} placeholder="Leave blank to keep the existing secret" autoComplete="new-password" /> : <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Your role may reuse saved credential names but cannot add or replace payment credentials.</p>}
           {canManageSecrets ? <label className="admin-inline-check"><input type="checkbox" checked={showSecrets} onChange={(event) => setShowSecrets(event.target.checked)} /><span>Show values while entering them on this device</span></label> : null}
           <div className="admin-warning-callout">
             Saving here does <strong>not</strong> enable online payment. Manual transfer remains the production giving method until a future provider rollout is explicitly released.
