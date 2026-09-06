@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
@@ -48,6 +48,7 @@ export default function AccountSettingsScreen() {
   const [photoBusy, setPhotoBusy] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [activeSection, setActiveSection] = useState<'identity' | 'privacy' | 'contact'>('identity');
 
   const loadProfile = async () => {
     setLoading(true);
@@ -202,42 +203,119 @@ export default function AccountSettingsScreen() {
               </View>
             </View>
 
-            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>Profile Identity</Text>
-              <Field label="FULL NAME" value={displayName} onChangeText={setDisplayName} placeholder="Your full name" colors={colors} autoCapitalize="words" />
-              <Field label="USERNAME" value={username} onChangeText={setUsername} placeholder="your.username" colors={colors} autoCapitalize="none" />
-              <Text style={[styles.helper, { color: colors.textMuted }]}>Username uses 3–30 lowercase letters, numbers, dots or underscores.</Text>
-              <Field label="BIRTHDAY" value={birthday} onChangeText={setBirthday} placeholder="YYYY-MM-DD" colors={colors} keyboardType="numbers-and-punctuation" />
-              <Text style={[styles.helper, { color: colors.textMuted }]}>Your full birth date is always private. The controls below decide whether only month/day may appear in the General Community and/or your own Expression.</Text>
-
-              <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>GENERAL COMMUNITY BIRTHDAY VISIBILITY</Text>
-              <View style={styles.chips}>
-                <Chip label="Show my month/day publicly" selected={birthdayPublicVisible} onPress={() => setBirthdayPublicVisible(true)} />
-                <Chip label="Keep it out of General Community" selected={!birthdayPublicVisible} onPress={() => setBirthdayPublicVisible(false)} />
-              </View>
-
-              <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>EXPRESSION BIRTHDAY VISIBILITY</Text>
-              <View style={styles.chips}>
-                <Chip label="Share month/day with my Expression" selected={birthdayExpressionVisible} onPress={() => setBirthdayExpressionVisible(true)} />
-                <Chip label="Keep it hidden in my Expression" selected={!birthdayExpressionVisible} onPress={() => setBirthdayExpressionVisible(false)} />
-              </View>
-              <Field label="BIO" value={bio} onChangeText={setBio} placeholder="A short introduction" colors={colors} multiline maxLength={500} />
+            <View style={[styles.sectionNav, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+              {([
+                ['identity', 'person-outline', 'Identity'],
+                ['privacy', 'shield-checkmark-outline', 'Privacy'],
+                ['contact', 'call-outline', 'Contact'],
+              ] as const).map(([key, icon, label]) => {
+                const selected = activeSection === key;
+                return (
+                  <Pressable
+                    key={key}
+                    onPress={() => setActiveSection(key)}
+                    style={({ pressed }) => [
+                      styles.sectionTab,
+                      selected && { backgroundColor: colors.primarySoft },
+                      pressed && styles.sectionTabPressed,
+                    ]}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected }}
+                  >
+                    <View style={[styles.sectionTabIcon, { backgroundColor: selected ? colors.cardElevated : colors.bgSecondary }]}>
+                      <Icon name={icon} size={16} color={selected ? colors.interactive : colors.textMuted} />
+                    </View>
+                    <Text style={[styles.sectionTabText, { color: selected ? colors.interactive : colors.textSecondary }]}>{label}</Text>
+                  </Pressable>
+                );
+              })}
             </View>
 
-            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>Contact Details</Text>
-              <Field label="PROFILE PHONE" value={phoneNumber} onChangeText={setPhoneNumber} placeholder="+234..." colors={colors} keyboardType="phone-pad" />
-              <View style={[styles.readOnlyRow, { borderColor: colors.borderSubtle }]}>
-                <View style={{ flex: 1 }}><Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>LOGIN EMAIL</Text><Text style={[styles.readOnlyValue, { color: colors.text }]}>{profile.email || 'Not configured'}</Text></View>
-                <Icon name="lock-closed-outline" size={16} color={colors.textMuted} />
-              </View>
-              {profile.verifiedPhoneNumber ? (
-                <View style={[styles.readOnlyRow, { borderColor: colors.borderSubtle }]}>
-                  <View style={{ flex: 1 }}><Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>VERIFIED AUTH PHONE</Text><Text style={[styles.readOnlyValue, { color: colors.text }]}>{profile.verifiedPhoneNumber}</Text></View>
-                  <Icon name="shield-checkmark-outline" size={16} color={colors.success} />
+            {activeSection === 'identity' ? (
+              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+                <View style={styles.cardHeadingRow}>
+                  <View style={[styles.cardHeadingIcon, { backgroundColor: colors.primarySoft }]}>
+                    <Icon name="person-outline" size={18} color={colors.interactive} />
+                  </View>
+                  <View style={styles.flex}>
+                    <Text style={[styles.cardTitle, { color: colors.text }]}>Profile identity</Text>
+                    <Text style={[styles.helper, { color: colors.textMuted }]}>How your name and introduction appear around COT.</Text>
+                  </View>
                 </View>
-              ) : null}
-            </View>
+                <Field label="FULL NAME" value={displayName} onChangeText={setDisplayName} placeholder="Your full name" colors={colors} autoCapitalize="words" />
+                <Field label="USERNAME" value={username} onChangeText={setUsername} placeholder="your.username" colors={colors} autoCapitalize="none" />
+                <Text style={[styles.helper, { color: colors.textMuted }]}>Username uses 3–30 lowercase letters, numbers, dots or underscores.</Text>
+                <Field label="BIO" value={bio} onChangeText={setBio} placeholder="A short introduction" colors={colors} multiline maxLength={500} />
+              </View>
+            ) : null}
+
+            {activeSection === 'privacy' ? (
+              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+                <View style={styles.cardHeadingRow}>
+                  <View style={[styles.cardHeadingIcon, { backgroundColor: colors.primarySoft }]}>
+                    <Icon name="shield-checkmark-outline" size={18} color={colors.interactive} />
+                  </View>
+                  <View style={styles.flex}>
+                    <Text style={[styles.cardTitle, { color: colors.text }]}>Birthday privacy</Text>
+                    <Text style={[styles.helper, { color: colors.textMuted }]}>Your full date stays private. You control whether month/day is shown.</Text>
+                  </View>
+                </View>
+                <Field label="BIRTHDAY" value={birthday} onChangeText={setBirthday} placeholder="YYYY-MM-DD" colors={colors} keyboardType="numbers-and-punctuation" />
+
+                <View style={[styles.privacyChoice, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+                  <View style={styles.privacyChoiceHeader}>
+                    <Icon name="globe-outline" size={17} color={colors.interactive} />
+                    <View style={styles.flex}>
+                      <Text style={[styles.privacyChoiceTitle, { color: colors.text }]}>General Community</Text>
+                      <Text style={[styles.helper, { color: colors.textMuted }]}>Choose whether your month/day can appear publicly.</Text>
+                    </View>
+                  </View>
+                  <View style={styles.chips}>
+                    <Chip label="Show month/day" selected={birthdayPublicVisible} onPress={() => setBirthdayPublicVisible(true)} />
+                    <Chip label="Keep private" selected={!birthdayPublicVisible} onPress={() => setBirthdayPublicVisible(false)} />
+                  </View>
+                </View>
+
+                <View style={[styles.privacyChoice, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+                  <View style={styles.privacyChoiceHeader}>
+                    <Icon name="people-outline" size={17} color={colors.interactive} />
+                    <View style={styles.flex}>
+                      <Text style={[styles.privacyChoiceTitle, { color: colors.text }]}>My Expression</Text>
+                      <Text style={[styles.helper, { color: colors.textMuted }]}>Choose whether members in your Expression can see month/day.</Text>
+                    </View>
+                  </View>
+                  <View style={styles.chips}>
+                    <Chip label="Share month/day" selected={birthdayExpressionVisible} onPress={() => setBirthdayExpressionVisible(true)} />
+                    <Chip label="Keep private" selected={!birthdayExpressionVisible} onPress={() => setBirthdayExpressionVisible(false)} />
+                  </View>
+                </View>
+              </View>
+            ) : null}
+
+            {activeSection === 'contact' ? (
+              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+                <View style={styles.cardHeadingRow}>
+                  <View style={[styles.cardHeadingIcon, { backgroundColor: colors.primarySoft }]}>
+                    <Icon name="call-outline" size={18} color={colors.interactive} />
+                  </View>
+                  <View style={styles.flex}>
+                    <Text style={[styles.cardTitle, { color: colors.text }]}>Contact & sign-in</Text>
+                    <Text style={[styles.helper, { color: colors.textMuted }]}>Profile contact can be edited here; authentication identity stays protected.</Text>
+                  </View>
+                </View>
+                <Field label="PROFILE PHONE" value={phoneNumber} onChangeText={setPhoneNumber} placeholder="+234..." colors={colors} keyboardType="phone-pad" />
+                <View style={[styles.readOnlyRow, { borderColor: colors.borderSubtle }]}>
+                  <View style={styles.flex}><Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>LOGIN EMAIL</Text><Text style={[styles.readOnlyValue, { color: colors.text }]}>{profile.email || 'Not configured'}</Text></View>
+                  <View style={[styles.lockIcon, { backgroundColor: colors.bgSecondary }]}><Icon name="lock-closed-outline" size={15} color={colors.textMuted} /></View>
+                </View>
+                {profile.verifiedPhoneNumber ? (
+                  <View style={[styles.readOnlyRow, { borderColor: colors.borderSubtle }]}>
+                    <View style={styles.flex}><Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>VERIFIED AUTH PHONE</Text><Text style={[styles.readOnlyValue, { color: colors.text }]}>{profile.verifiedPhoneNumber}</Text></View>
+                    <View style={[styles.lockIcon, { backgroundColor: colors.successSoft }]}><Icon name="shield-checkmark-outline" size={15} color={colors.success} /></View>
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
 
           </View>
         ) : null}
@@ -275,8 +353,20 @@ function Field({ label, value, onChangeText, placeholder, colors, autoCapitalize
 const styles = StyleSheet.create({
   screen: { flex: 1 }, content: { flexGrow: 1 }, body: { paddingHorizontal: spacing.md, gap: spacing.lg },
   banner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md }, bannerText: { flex: 1, fontSize: 13, fontWeight: '600' },
+  flex: { flex: 1 },
   card: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.lg, gap: spacing.md }, cardTitle: { fontSize: 16, fontWeight: '800', letterSpacing: -0.2 },
+  cardHeadingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  cardHeadingIcon: { width: 40, height: 40, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
   photoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md }, photoActions: { flex: 1, gap: spacing.xs }, buttonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
+  sectionNav: { flexDirection: 'row', padding: 4, borderWidth: 1, borderRadius: radius.xl, gap: 3 },
+  sectionTab: { flex: 1, minHeight: 56, alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: radius.lg, paddingHorizontal: 4 },
+  sectionTabPressed: { opacity: 0.82, transform: [{ scale: 0.98 }] },
+  sectionTabIcon: { width: 27, height: 27, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  sectionTabText: { fontSize: 10.5, fontWeight: '800' },
+  privacyChoice: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm },
+  privacyChoiceHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  privacyChoiceTitle: { fontSize: 13, fontWeight: '800', marginBottom: 2 },
+  lockIcon: { width: 32, height: 32, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   helper: { fontSize: 11, lineHeight: 16 }, fieldGroup: { gap: 5 }, fieldLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.55 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   input: { minHeight: 50, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: spacing.md, paddingVertical: 11, fontSize: 14 }, multiline: { minHeight: 100, textAlignVertical: 'top' },
