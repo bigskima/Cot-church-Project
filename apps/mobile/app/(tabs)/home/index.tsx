@@ -58,10 +58,11 @@ function timeValue(value?: string | null) {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { api, context, mode, hasCapability } = useSession();
+  const { api, context, mode, hasCapability, hasPublicCapability } = useSession();
   const { colors } = useTheme();
 
-  const hasAnyLeadershipCapability = Boolean(context?.expression?.id) && (
+  const hasPublicBroadcastAccess = hasPublicCapability('public.live_stream.create');
+  const hasAnyLeadershipCapability = hasPublicBroadcastAccess || (Boolean(context?.expression?.id) && (
     hasCapability('posts.create') ||
     hasCapability('posts.publish') ||
     (hasCapability('media.upload') && hasCapability('reels.publish')) ||
@@ -73,7 +74,7 @@ export default function HomeScreen() {
     hasCapability('events.update') ||
     hasCapability('studio.access') ||
     hasCapability('*')
-  );
+  ));
 
   const contextOrganization = context?.organization ?? context?.organizations?.[0];
   const contextExpression = context?.expression;
