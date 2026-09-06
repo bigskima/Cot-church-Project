@@ -157,7 +157,24 @@ export function RolesAccess({ api, canManage = false }: { api: ApiClient; canMan
         }
       >
         {error ? <div className="admin-form-error" role="alert" style={{ marginBottom: 16 }}>{error}</div> : null}
-        {success ? <div className="admin-form-success" role="status" style={{ marginBottom: 16 }}>{success}</div> : null}
+        {success ? (
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
+              marginBottom: 16,
+              padding: '11px 13px',
+              borderRadius: 12,
+              border: '1px solid rgba(16,185,129,.28)',
+              background: 'rgba(16,185,129,.10)',
+              color: 'var(--text-secondary)',
+              fontSize: 12,
+              fontWeight: 700,
+            }}
+          >
+            {success}
+          </div>
+        ) : null}
 
         <Table
           columns={[
@@ -256,7 +273,7 @@ export function RolesAccess({ api, canManage = false }: { api: ApiClient; canMan
                           padding: 16,
                           border: '1px solid var(--border-subtle)',
                           borderRadius: 16,
-                          background: 'var(--surface-secondary)',
+                          background: 'var(--bg-elevated)',
                           opacity: busy ? 0.7 : 1,
                         }}
                       >
