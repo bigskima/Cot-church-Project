@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { ApiError } from "../_shared/errors.ts";
-import { authorize } from "../_shared/context.ts";
+import { authorize, authorizeOrganization } from "../_shared/context.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString, uuid } from "../_shared/validation.ts";
@@ -25,7 +25,7 @@ Deno.serve(
           if (!auth?.user || !auth.organizationId) {
             throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication and organization context required", 401);
           }
-          await authorize(auth, "organization.leadership.manage");
+          await authorizeOrganization(auth, "organization.leadership.manage");
           const { data, error } = await auth.client
             .from("leadership_profiles")
             .select("id, organization_id, expression_id, profile_id, display_name, portrait_url, role_title, short_bio, full_bio, ministry, display_order, tenure_start, tenure_end, is_founder, is_featured_public, is_active, social_links, created_at, updated_at")
@@ -90,7 +90,7 @@ Deno.serve(
 
       if (request.method === "POST") {
         if (body.type === "story") {
-          await authorize(auth, "organization.leadership.manage");
+          await authorizeOrganization(auth, "organization.leadership.manage");
           assertNoUnknownFields(body, ["type", "title", "subtitle", "mission", "vision", "foundingStory", "foundingYear", "milestones", "values", "bannerImageUrl"]);
 
           const record = {
@@ -123,7 +123,7 @@ Deno.serve(
         if (expressionId) {
           await authorize(auth, "expression.leadership.manage");
         } else {
-          await authorize(auth, "organization.leadership.manage");
+          await authorizeOrganization(auth, "organization.leadership.manage");
         }
 
         assertNoUnknownFields(body, [
@@ -179,7 +179,7 @@ Deno.serve(
       if (existing.expression_id) {
         await authorize(auth, "expression.leadership.manage");
       } else {
-        await authorize(auth, "organization.leadership.manage");
+        await authorizeOrganization(auth, "organization.leadership.manage");
       }
 
       assertNoUnknownFields(body, [
