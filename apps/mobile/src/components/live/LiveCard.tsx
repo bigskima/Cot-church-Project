@@ -19,8 +19,32 @@ export interface LiveCardProps {
   style?: StyleProp<ViewStyle>;
 }
 
+function statusPresentation(status: LiveStream['status']) {
+  switch (status) {
+    case 'live':
+      return { label: 'LIVE', variant: 'live' as const, pulse: true };
+    case 'scheduled':
+      return { label: 'SCHEDULED', variant: 'primary' as const, pulse: false };
+    case 'provisioning':
+      return { label: 'PREPARING', variant: 'warning' as const, pulse: false };
+    case 'ready':
+      return { label: 'READY', variant: 'active' as const, pulse: false };
+    case 'processing':
+      return { label: 'PROCESSING', variant: 'warning' as const, pulse: false };
+    case 'replay_ready':
+      return { label: 'REPLAY', variant: 'primary' as const, pulse: false };
+    case 'ended':
+      return { label: 'ENDED', variant: 'neutral' as const, pulse: false };
+    case 'failed':
+      return { label: 'UNAVAILABLE', variant: 'neutral' as const, pulse: false };
+    default:
+      return { label: status.replace(/_/g, ' ').toUpperCase(), variant: 'neutral' as const, pulse: false };
+  }
+}
+
 export function LiveCard({ stream, onPress, style }: LiveCardProps) {
   const isLive = stream.status === 'live';
+  const presentation = statusPresentation(stream.status);
 
   return (
     <Pressable
@@ -45,22 +69,28 @@ export function LiveCard({ stream, onPress, style }: LiveCardProps) {
         >
           <View style={styles.topRow}>
             <Badge
-              label={isLive ? 'LIVE' : 'UPCOMING'}
-              variant={isLive ? 'live' : 'primary'}
-              pulse={isLive}
+              label={presentation.label}
+              variant={presentation.variant}
+              pulse={presentation.pulse}
             />
           </View>
           <View>
             <Text numberOfLines={2} style={styles.title}>
               {stream.title}
             </Text>
-            {stream.scheduled_start ? (
+            {stream.scheduled_start && ['scheduled', 'provisioning', 'ready'].includes(stream.status) ? (
               <Text style={styles.timeText}>
-                {new Date(stream.scheduled_start).toLocaleTimeString([], {
+                {new Date(stream.scheduled_start).toLocaleString([], {
+                  month: 'short',
+                  day: 'numeric',
                   hour: '2-digit',
                   minute: '2-digit',
                 })}
               </Text>
+            ) : stream.status === 'processing' ? (
+              <Text style={styles.timeText}>Recording is being prepared</Text>
+            ) : stream.status === 'replay_ready' ? (
+              <Text style={styles.timeText}>Replay available</Text>
             ) : null}
           </View>
         </LinearGradient>
