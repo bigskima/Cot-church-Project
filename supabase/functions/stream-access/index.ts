@@ -19,7 +19,7 @@ Deno.serve(createHandler(
 
     const { data: stream, error } = await admin
       .from("live_streams")
-      .select("id,organization_id,title,description,status,visibility,provider_config_id,provider_metadata,playback_url,recording_url,playback_token_required,scheduled_start,started_at,ended_at")
+      .select("id,organization_id,branch_id,title,description,status,visibility,provider_config_id,provider_metadata,playback_url,recording_url,playback_token_required,scheduled_start,started_at,ended_at")
       .eq("id", id)
       .single();
     if (error || !stream) throw new ApiError("STREAM_NOT_FOUND", "Broadcast not found", 404);
@@ -126,6 +126,16 @@ Deno.serve(createHandler(
       hasActiveMembership = Boolean(membership);
     }
 
+    let givingQuery = admin
+      .from("giving_settings")
+      .select("is_enabled")
+      .eq("organization_id", stream.organization_id);
+    givingQuery = stream.branch_id
+      ? givingQuery.eq("branch_id", stream.branch_id)
+      : givingQuery.is("branch_id", null);
+    const { data: givingSettings } = await givingQuery.maybeSingle();
+    const givingEnabled = givingSettings?.is_enabled === true;
+
     return {
       data: {
         stream: {
@@ -142,7 +152,7 @@ Deno.serve(createHandler(
         playbackExpiresAt: expiresAt,
         viewerSessionId,
         canChat: Boolean(auth) && stream.status === "live" && hasActiveMembership,
-        givingEnabled: true,
+        givingEnabled,
       },
     };
   },
