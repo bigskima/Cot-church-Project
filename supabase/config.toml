@@ -116,3 +116,6 @@ verify_jwt = false
 # playback grant, and authenticates bearer sessions when one is supplied.
 [functions.sermon-playback]
 verify_jwt = false
+
+[functions.platform-admin-guide]
+verify_jwt = true
