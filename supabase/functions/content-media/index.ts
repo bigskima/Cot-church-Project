@@ -3,6 +3,7 @@ import { ApiError } from "../_shared/errors.ts";
 import { authorize } from "../_shared/context.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
+import { enrichContentCreators } from "../_shared/public-identity.ts";
 import { adminClient, publicClient } from "../_shared/supabase.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString, uuid } from "../_shared/validation.ts";
 
@@ -51,6 +52,25 @@ Deno.serve(createHandler(
   async ({ request, auth }) => {
     const url = new URL(request.url);
     const admin = adminClient();
+
+    if (request.method === "GET" && url.searchParams.get("action") === "video_detail") {
+      if (!auth?.user || !auth.organizationId || !auth.branchId) {
+        throw new ApiError("EXPRESSION_CONTEXT_REQUIRED", "Enter an Expression to view this internal video", 403);
+      }
+      const videoId = uuid(url.searchParams.get("id"), "id", true)!;
+      const { data, error } = await auth.client
+        .from("videos")
+        .select("id,organization_id,media_asset_id,series_id,title,slug,description,category,chapters,transcript,views_count,likes_count,comments_count,shares_count,created_at,content_items!inner(id,organization_id,expression_id,author_profile_id,visibility,status,published_at),media_assets(id,media_type,processing_state,duration_seconds,aspect_ratio,media_renditions(id,rendition_kind,container,codec,width,height,storage_path,provider_playback_id),media_thumbnails(storage_path,is_primary))")
+        .eq("id", videoId)
+        .eq("organization_id", auth.organizationId)
+        .eq("content_items.expression_id", auth.branchId)
+        .eq("content_items.status", "published")
+        .maybeSingle();
+      if (error) throw new ApiError("VIDEO_DETAIL_FAILED", "Unable to retrieve this Expression video", 500, undefined, false);
+      if (!data) throw new ApiError("VIDEO_NOT_FOUND", "This video is not available in the active Expression", 404);
+      const [enriched] = await enrichContentCreators([data]);
+      return { data: enriched };
+    }
 
     if (request.method === "GET" && url.searchParams.get("action") === "playback") {
       const contentId = uuid(url.searchParams.get("contentId"), "contentId");
