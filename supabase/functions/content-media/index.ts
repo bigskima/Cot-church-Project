@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import type { SupabaseClient } from "npm:@supabase/supabase-js@2.57.4";
 import { ApiError } from "../_shared/errors.ts";
 import { authorize } from "../_shared/context.ts";
 import { createHandler } from "../_shared/handler.ts";
@@ -47,6 +48,34 @@ async function findOwnedAsset(organizationId: string, profileId: string, assetId
   return data;
 }
 
+function playbackContentIds(value: string | null) {
+  const ids = [...new Set((value ?? "").split(",").map((item) => item.trim()).filter(Boolean))];
+  if (!ids.length) throw new ApiError("VALIDATION_FAILED", "At least one contentId is required", 400);
+  if (ids.length > 30) throw new ApiError("VALIDATION_FAILED", "A maximum of 30 media items can be prepared at once", 422);
+  return ids.map((id) => uuid(id, "contentId", true)!);
+}
+
+async function resolvePlayback(client: SupabaseClient, admin: SupabaseClient, contentId: string) {
+  const { data, error } = await client.rpc("get_media_playback_info", { p_content_id: contentId });
+  if (error) {
+    if (error.code === "403" || error.code === "42501") throw new ApiError("FORBIDDEN", "Media playback restricted", 403);
+    if (error.code === "404" || error.code === "P0002") throw new ApiError("NOT_FOUND", "Content not found", 404);
+    throw new ApiError("PLAYBACK_INFO_FAILED", "Unable to resolve media playback", 500, undefined, false);
+  }
+  if (!data?.available) return data;
+
+  const renditions = await Promise.all((data.renditions ?? []).map(async (rendition: Record<string, unknown>) => {
+    const storagePath = typeof rendition.storagePath === "string" ? rendition.storagePath : null;
+    if (!storagePath) return rendition;
+    const { data: signed, error: signError } = await admin.storage.from(BUCKET).createSignedUrl(storagePath, 3600);
+    if (signError || !signed?.signedUrl) {
+      throw new ApiError("PLAYBACK_SIGNING_FAILED", "Unable to authorize media playback", 500, undefined, false);
+    }
+    return { ...rendition, playbackUrl: signed.signedUrl };
+  }));
+  return { ...data, renditions };
+}
+
 Deno.serve(createHandler(
   { methods: ["GET", "POST"], authentication: "optional", organization: "optional" },
   async ({ request, auth }) => {
@@ -72,26 +101,21 @@ Deno.serve(createHandler(
       return { data: enriched };
     }
 
+    if (request.method === "GET" && url.searchParams.get("action") === "playback_batch") {
+      const contentIds = playbackContentIds(url.searchParams.get("contentIds"));
+      const client = auth?.client ?? publicClient();
+      const items = await Promise.all(contentIds.map(async (contentId) => ({
+        contentId,
+        ...(await resolvePlayback(client, admin, contentId)),
+      })));
+      return { data: items };
+    }
+
     if (request.method === "GET" && url.searchParams.get("action") === "playback") {
       const contentId = uuid(url.searchParams.get("contentId"), "contentId");
       if (!contentId) throw new ApiError("VALIDATION_FAILED", "contentId is required", 400);
       const client = auth?.client ?? publicClient();
-      const { data, error } = await client.rpc("get_media_playback_info", { p_content_id: contentId });
-      if (error) {
-        if (error.code === "403") throw new ApiError("FORBIDDEN", "Media playback restricted", 403);
-        if (error.code === "404") throw new ApiError("NOT_FOUND", "Content not found", 404);
-        throw new ApiError("PLAYBACK_INFO_FAILED", "Unable to resolve media playback", 500, undefined, false);
-      }
-      if (!data?.available) return { data };
-
-      const renditions = await Promise.all((data.renditions ?? []).map(async (rendition: Record<string, unknown>) => {
-        const storagePath = typeof rendition.storagePath === "string" ? rendition.storagePath : null;
-        if (!storagePath) return rendition;
-        const { data: signed, error: signError } = await admin.storage.from(BUCKET).createSignedUrl(storagePath, 3600);
-        if (signError || !signed?.signedUrl) throw new ApiError("PLAYBACK_SIGNING_FAILED", "Unable to authorize media playback", 500, undefined, false);
-        return { ...rendition, playbackUrl: signed.signedUrl };
-      }));
-      return { data: { ...data, renditions } };
+      return { data: await resolvePlayback(client, admin, contentId) };
     }
 
     if (!auth?.user || !auth.organizationId) {
