@@ -39,6 +39,7 @@ const requiredFiles = [
   'supabase/functions/conversations/index.ts',
   'supabase/functions/notifications/index.ts',
   'supabase/functions/notification-dispatch/index.ts',
+  'supabase/functions/governance-invitations/index.ts',
   'supabase/functions/membership-invitations/index.ts',
   'supabase/functions/expression-memberships/index.ts',
   'supabase/functions/_shared/rate-limit.ts',
@@ -112,6 +113,9 @@ const platformStreaming = await readFile('supabase/functions/platform-streaming/
 const platformAi = await readFile('supabase/functions/platform-ai/index.ts', 'utf8');
 const platformFeatures = await readFile('supabase/functions/platform-features/index.ts', 'utf8');
 const platformIntegrations = await readFile('supabase/functions/platform-integrations/index.ts', 'utf8');
+const notifications = await readFile('supabase/functions/notifications/index.ts', 'utf8');
+const governanceInvitations = await readFile('supabase/functions/governance-invitations/index.ts', 'utf8');
+const mobileNotificationsPage = await readFile('apps/mobile/app/(tabs)/profile/notifications.tsx', 'utf8');
 const adminAiPage = await readFile('apps/admin/src/pages/AiInfrastructure.tsx', 'utf8');
 const adminStreamingPage = await readFile('apps/admin/src/pages/StreamingInfrastructure.tsx', 'utf8');
 const adminPaymentsPage = await readFile('apps/admin/src/pages/PaymentInfrastructure.tsx', 'utf8');
@@ -198,6 +202,13 @@ const invariants = [
   [platformAi, /platform\.ai\./, 'Level-1 AI authority'],
   [platformFeatures, /platform\.features\./, 'Level-1 feature authority'],
   [platformIntegrations, /platform\.integrations\./, 'Level-1 integrations authority'],
+  [mobileNotificationsPage, /api\.request\('notifications',\s*\{[\s\S]*?method:\s*'PATCH'[\s\S]*?JSON\.stringify\(\{\s*id:\s*item\.id,\s*read:\s*true\s*\}\)/, 'Mobile notification read client payload'],
+  [notifications, /methods:\s*\[\s*"GET"\s*,\s*"PATCH"\s*\]/, 'Notification read/update backend methods'],
+  [notifications, /assertNoUnknownFields\(body,\s*\[\s*"id"\s*,\s*"read"\s*\]\)/, 'Notification update backend payload fields'],
+  [mobileNotificationsPage, /api\.request\('governance-invitations',\s*\{[\s\S]*?method:\s*'POST'[\s\S]*?JSON\.stringify\(\{\s*invitationId:\s*invitation\.id,\s*decision\s*\}\)/, 'Mobile governance invitation response client payload'],
+  [governanceInvitations, /methods:\s*\[\s*"GET"\s*,\s*"POST"\s*\]/, 'Governance invitation backend methods'],
+  [governanceInvitations, /assertNoUnknownFields\(body,\s*\[\s*"invitationId"\s*,\s*"decision"\s*\]\)/, 'Governance invitation backend payload fields'],
+  [governanceInvitations, /new Set\(\[\s*"accept"\s*,\s*"decline"\s*\]\)/, 'Governance invitation decision values'],
   [adminAiPage, /action:\s*'configure_provider'/, 'Admin AI configure-provider client action'],
   [platformAi, /action === "configure_provider"/, 'Admin AI configure-provider backend action'],
   [adminAiPage, /action:\s*'upsert_model'/, 'Admin AI model client action'],
