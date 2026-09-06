@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ApiClient, AuthState } from '../api';
 import { Badge } from './ui';
+import { AdminGuide } from './AdminGuide';
 import { PlatformOverview } from '../pages/PlatformOverview';
 import { OrganizationsGovernance } from '../pages/OrganizationsGovernance';
 import { ExpressionsGovernance } from '../pages/ExpressionsGovernance';
@@ -197,13 +198,14 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
                 <img src="/cot-family-logo.png" alt="" />
               </div>
               <div className="admin-page-heading">
-                <span className="admin-topbar-kicker">City of Transformation · Platform control</span>
+                <span className="admin-topbar-kicker">City of Transformation · Administration</span>
                 <h2 className="admin-topbar-title">{getPageTitle()}</h2>
               </div>
             </div>
             <Badge label={isSuperAdmin ? "SUPER ADMIN" : "ADMIN"} variant="gold" />
           </div>
           <div className="admin-topbar-right">
+            <AdminGuide api={api} page={page} pageTitle={getPageTitle()} canOpenAi={allowedPageKeys.has('ai')} onNavigate={navigate} />
             <button
               type="button"
               onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
