@@ -89,14 +89,28 @@ Deno.serve(createHandler(
             timezone: organization.timezone,
           }));
 
+    const requestedMembership = auth.organizationId
+      ? memberships.find((membership) => membership.organization?.id === auth.organizationId) ?? null
+      : memberships[0] ?? null;
+    const selectedOrganization = requestedMembership?.organization?.status === "active"
+      ? requestedMembership.organization
+      : null;
+
+    const requestedExpressionMembership = auth.branchId
+      ? expressionMemberships.find((membership) => membership.branch_id === auth.branchId && membership.organization_id === auth.organizationId)
+      : null;
+    const requestedExpression = requestedExpressionMembership?.branch ?? null;
+    const selectedExpression = requestedExpression?.is_active ? requestedExpression : null;
+
     let effectivePermissions: string[] = [];
     let organizationPermissions: string[] = [];
-    if (auth.organizationId && auth.membershipId) {
+    if (requestedMembership?.id) {
+      const selectedBranchId = selectedExpression?.id ?? null;
       const { data: assignments, error: permissionError } = await auth.client
         .from("role_assignments")
         .select("branch_id, expires_at, role:roles(role_permissions(permission:permissions(code, is_active)))")
-        .eq("membership_id", auth.membershipId)
-        .or(`branch_id.is.null,branch_id.eq.${auth.branchId ?? "00000000-0000-0000-0000-000000000000"}`);
+        .eq("membership_id", requestedMembership.id)
+        .or(`branch_id.is.null,branch_id.eq.${selectedBranchId ?? "00000000-0000-0000-0000-000000000000"}`);
       if (permissionError) {
         throw new ApiError("CONTEXT_LOOKUP_FAILED", "Unable to resolve permissions", 500, undefined, false);
       }
@@ -140,19 +154,6 @@ Deno.serve(createHandler(
     }
 
     const organizations = [...organizationMap.values()];
-    const selectedMembership =
-      memberships.find((membership) => membership.organization?.id === auth.organizationId) ??
-      memberships[0] ??
-      null;
-    const selectedOrganization = selectedMembership?.organization?.status === "active"
-      ? selectedMembership.organization
-      : null;
-
-    const requestedExpressionMembership = auth.branchId
-      ? expressionMemberships.find((membership) => membership.branch_id === auth.branchId && membership.organization_id === auth.organizationId)
-      : null;
-    const requestedExpression = requestedExpressionMembership?.branch ?? null;
-    const selectedExpression = requestedExpression?.is_active ? requestedExpression : null;
 
     const expressions = expressionMemberships
       .filter((membership) => membership.branch?.is_active)
