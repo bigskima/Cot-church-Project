@@ -73,6 +73,7 @@ const requiredFiles = [
   'supabase/functions/platform-audit/index.ts',
   'supabase/functions/platform-streaming/index.ts',
   'supabase/functions/platform-ai/index.ts',
+  'supabase/functions/platform-admin-guide/index.ts',
   'supabase/functions/platform-features/index.ts',
   'supabase/functions/platform-integrations/index.ts',
   'supabase/functions/platform-payments/index.ts',
@@ -116,6 +117,10 @@ const retiredSearch = await readFile('supabase/functions/search/index.ts', 'utf8
 const platformPayments = await readFile('supabase/functions/platform-payments/index.ts', 'utf8');
 const platformStreaming = await readFile('supabase/functions/platform-streaming/index.ts', 'utf8');
 const platformAi = await readFile('supabase/functions/platform-ai/index.ts', 'utf8');
+const platformAdminGuide = await readFile('supabase/functions/platform-admin-guide/index.ts', 'utf8');
+const aiRouter = await readFile('supabase/functions/_shared/ai/router.ts', 'utf8');
+const adminGuidePage = await readFile('apps/admin/src/components/AdminGuide.tsx', 'utf8');
+const adminShell = await readFile('apps/admin/src/components/Shell.tsx', 'utf8');
 const platformSecrets = await readFile('supabase/functions/platform-secrets/index.ts', 'utf8');
 const platformFeatures = await readFile('supabase/functions/platform-features/index.ts', 'utf8');
 const platformIntegrations = await readFile('supabase/functions/platform-integrations/index.ts', 'utf8');
@@ -249,6 +254,13 @@ const invariants = [
   [platformAi, /AI_PROVIDER_CREDENTIAL_MISSING/, 'AI provider activation requires a resolvable credential'],
   [platformAi, /ai_providers!inner\(status\)/, 'AI route model validation includes provider state'],
   [platformAi, /belong to an active provider/, 'AI routes reject disabled-provider models'],
+  [aiRouter, /'admin\.help': 'generateText'/, 'Admin Guide capability uses provider-neutral AI routing'],
+  [aiRouter, /organizationId: string \| null/, 'AI router supports platform-wide global routes'],
+  [platformAdminGuide, /authorizePlatform\(auth,\s*"platform\.overview\.read"\)/, 'Admin Guide requires Platform Administration authority'],
+  [platformAdminGuide, /capabilityCode:\s*"admin\.help"/, 'Admin Guide executes the dedicated admin-help capability'],
+  [platformAdminGuide, /organizationId:\s*null/, 'Admin Guide uses a global platform AI route'],
+  [adminGuidePage, /platform-admin-guide/, 'Admin Guide UI is connected to its backend endpoint'],
+  [adminShell, /<AdminGuide/, 'Admin Guide is available throughout the shared admin shell'],
   [platformAi, /resolve_runtime_secret/, 'AI provider credential validation uses runtime secret resolver'],
   [adminAiPage, /action:\s*'upsert_model'/, 'Admin AI model client action'],
   [platformAi, /action === "upsert_model"/, 'Admin AI model backend action'],
