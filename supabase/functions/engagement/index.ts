@@ -6,6 +6,13 @@ import { assertNoUnknownFields, assertObject, optionalString, requiredString, uu
 
 const allowedReactions = new Set(["like", "love", "pray", "celebrate", "amen", "support"]);
 
+function requestedContentIds(value: string | null) {
+  const ids = [...new Set((value ?? "").split(",").map((item) => item.trim()).filter(Boolean))];
+  if (!ids.length) throw new ApiError("VALIDATION_FAILED", "At least one contentId is required", 400);
+  if (ids.length > 30) throw new ApiError("VALIDATION_FAILED", "A maximum of 30 content activity states can be loaded at once", 422);
+  return ids.map((id) => uuid(id, "contentId", true)!);
+}
+
 Deno.serve(createHandler(
   { methods: ["GET", "POST"], authentication: "optional", organization: "optional" },
   async ({ request, auth }) => {
@@ -13,6 +20,59 @@ Deno.serve(createHandler(
 
     // GET Comments on Content Item (publicly readable if content item is public)
     if (request.method === "GET") {
+      if (url.searchParams.get("view") === "states") {
+        const contentIds = requestedContentIds(url.searchParams.get("contentIds"));
+        if (!auth?.user) {
+          return {
+            data: contentIds.map((contentId) => ({
+              contentId,
+              reaction: null,
+              bookmarked: false,
+              progress: null,
+            })),
+          };
+        }
+
+        const [reactions, bookmarks, progress] = await Promise.all([
+          auth.client
+            .from("content_reactions")
+            .select("content_item_id,reaction")
+            .eq("profile_id", auth.user.id)
+            .in("content_item_id", contentIds),
+          auth.client
+            .from("content_bookmarks")
+            .select("content_item_id")
+            .eq("profile_id", auth.user.id)
+            .in("content_item_id", contentIds),
+          auth.client
+            .from("content_playback_progress")
+            .select("content_item_id,progress_seconds,duration_seconds,completed,last_played_at")
+            .eq("profile_id", auth.user.id)
+            .in("content_item_id", contentIds),
+        ]);
+        if (reactions.error || bookmarks.error || progress.error) {
+          throw new ApiError("ENGAGEMENT_STATE_FAILED", "Unable to retrieve your content activity", 500, undefined, false);
+        }
+
+        const reactionMap = new Map((reactions.data ?? []).map((item: any) => [item.content_item_id, item.reaction]));
+        const bookmarkSet = new Set((bookmarks.data ?? []).map((item: any) => item.content_item_id));
+        const progressMap = new Map((progress.data ?? []).map((item: any) => [item.content_item_id, {
+          progress_seconds: item.progress_seconds,
+          duration_seconds: item.duration_seconds,
+          completed: item.completed,
+          last_played_at: item.last_played_at,
+        }]));
+
+        return {
+          data: contentIds.map((contentId) => ({
+            contentId,
+            reaction: reactionMap.get(contentId) ?? null,
+            bookmarked: bookmarkSet.has(contentId),
+            progress: progressMap.get(contentId) ?? null,
+          })),
+        };
+      }
+
       if (url.searchParams.get("view") === "saved") {
         if (!auth?.user) throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication required for saved content", 401);
 
