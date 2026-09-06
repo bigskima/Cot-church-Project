@@ -36,11 +36,12 @@ function postBody(value: unknown, hasMedia: boolean) {
 }
 
 Deno.serve(createHandler(
-  { methods: ["GET", "POST"], authentication: "required", organization: "required" },
+  { methods: ["GET", "POST"], authentication: "required", organization: "optional" },
   async ({ request, auth }) => {
-    if (!auth?.organizationId) throw new ApiError("ORGANIZATION_REQUIRED", "Organization context is required", 400);
+    if (!auth) throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication required", 401);
 
     if (request.method === "GET") {
+      if (!auth.organizationId) throw new ApiError("ORGANIZATION_REQUIRED", "Choose a church community first", 400);
       const url = new URL(request.url);
       const postId = uuid(url.searchParams.get("postId"), "postId");
       if (postId) {
@@ -77,8 +78,16 @@ Deno.serve(createHandler(
     }
 
     const body = assertObject(await jsonBody(request));
+    const targetOrganizationId = body.organizationId
+      ? uuid(String(body.organizationId), "organizationId", true)!
+      : auth.organizationId;
+    if (!targetOrganizationId) throw new ApiError("ORGANIZATION_REQUIRED", "Choose a church community before publishing", 422);
+    if (auth.organizationId && targetOrganizationId !== auth.organizationId) {
+      throw new ApiError("ORGANIZATION_ACCESS_DENIED", "The selected church does not match this request", 403);
+    }
+
     if (body.action === "comment") {
-      assertNoUnknownFields(body, ["action", "postId", "body", "parentCommentId"]);
+      assertNoUnknownFields(body, ["action", "organizationId", "postId", "body", "parentCommentId"]);
       const contentId = uuid(requiredString(body.postId, "postId", 36), "postId", true)!;
       const parentCommentId = body.parentCommentId
         ? uuid(String(body.parentCommentId), "parentCommentId", true)
@@ -108,11 +117,11 @@ Deno.serve(createHandler(
       return { data, status: 201 };
     }
     if (body.action === "share_reel") {
-      assertNoUnknownFields(body, ["action", "reelId", "body"]);
+      assertNoUnknownFields(body, ["action", "organizationId", "reelId", "body"]);
       const reelId = uuid(requiredString(body.reelId, "reelId", 36), "reelId", true)!;
       const shareBody = body.body === undefined || body.body === null ? "" : requiredString(body.body, "body", 10000).trim();
       const { data, error } = await auth.client.rpc("publish_social_reel_share", {
-        target_organization_id: auth.organizationId,
+        target_organization_id: targetOrganizationId,
         target_reel_id: reelId,
         post_body: shareBody,
       }).single();
@@ -120,7 +129,7 @@ Deno.serve(createHandler(
       if (error?.code === "42501") {
         const message = String(error.message ?? "");
         if (message.includes("Posting is currently restricted")) throw new ApiError("POSTING_RESTRICTED", "Your posting access is currently restricted", 403);
-        if (message.includes("Active Expression membership required")) throw new ApiError("GENERAL_POSTING_MEMBERSHIP_REQUIRED", "Join an active Expression before sharing to General Community", 403);
+
         if (message.includes("Only published public Reels")) throw new ApiError("REEL_SHARE_UNAVAILABLE", "Only public Reels can be shared to General Community", 403);
         throw new ApiError("PERMISSION_DENIED", "You do not have permission to share this Reel to General Community", 403);
       }
@@ -150,7 +159,7 @@ Deno.serve(createHandler(
       return { data };
     }
 
-    assertNoUnknownFields(body, ["body", "visibility", "branchId", "groupId", "media", "mediaUploadIds"]);
+    assertNoUnknownFields(body, ["organizationId", "body", "visibility", "branchId", "groupId", "media", "mediaUploadIds"]);
     const visibility = requiredString(body.visibility, "visibility", 20);
     if (!visibilities.has(visibility)) throw new ApiError("VALIDATION_FAILED", "Invalid visibility", 422);
     const uploadIds = mediaUploadIds(body);
@@ -159,7 +168,7 @@ Deno.serve(createHandler(
     const targetGroupId = body.groupId ? uuid(String(body.groupId), "groupId", true) : null;
 
     const { data, error } = await auth.client.rpc("publish_social_post_with_uploads", {
-      target_organization_id: auth.organizationId,
+      target_organization_id: targetOrganizationId,
       target_visibility: visibility,
       post_body: normalizedBody,
       target_branch_id: targetBranchId,
@@ -170,7 +179,7 @@ Deno.serve(createHandler(
     if (error?.code === "42501") {
       const message = String(error.message ?? "");
       if (message.includes("Posting is restricted")) throw new ApiError("POSTING_RESTRICTED", "Your posting access is currently restricted", 403);
-      if (message.includes("Active Expression membership required")) throw new ApiError("GENERAL_POSTING_MEMBERSHIP_REQUIRED", "Join an active Expression before posting in General Community", 403);
+
       if (message.includes("Expression membership required")) throw new ApiError("EXPRESSION_MEMBERSHIP_REQUIRED", "Join an Expression before publishing", 403);
       if (message.includes("your own Expression")) throw new ApiError("EXPRESSION_SCOPE_DENIED", "You may publish only to your own Expression", 403);
       if (message.includes("media uploads")) throw new ApiError("MEDIA_SCOPE_DENIED", "One or more media uploads cannot be used in this feed", 403);
