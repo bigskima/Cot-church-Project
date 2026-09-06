@@ -43,6 +43,7 @@ const methodFor: Record<string, AiCapability> = {
   'content.moderate': 'moderateContent',
   'pastoral.triage': 'generateStructuredData',
   'admin.insight': 'generateStructuredData',
+  'admin.help': 'generateText',
 };
 
 async function digest(value: string) {
@@ -50,19 +51,21 @@ async function digest(value: string) {
   return [...new Uint8Array(result)].map((value) => value.toString(16).padStart(2, '0')).join('');
 }
 
-async function routeFor(organizationId: string, capability: string): Promise<Route> {
+async function routeFor(organizationId: string | null, capability: string): Promise<Route> {
   const admin = adminClient();
   const select = 'id,primary_model_id,fallback_model_ids,timeout_ms,max_retries';
 
-  const { data: tenantRoute, error: tenantError } = await admin
-    .from('ai_routes')
-    .select(select)
-    .eq('organization_id', organizationId)
-    .eq('capability_code', capability)
-    .eq('is_active', true)
-    .maybeSingle();
-  if (tenantError) throw new ApiError('AI_ROUTE_LOOKUP_FAILED', 'Unable to resolve the AI route', 500, undefined, false);
-  if (tenantRoute) return tenantRoute as Route;
+  if (organizationId) {
+    const { data: tenantRoute, error: tenantError } = await admin
+      .from('ai_routes')
+      .select(select)
+      .eq('organization_id', organizationId)
+      .eq('capability_code', capability)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (tenantError) throw new ApiError('AI_ROUTE_LOOKUP_FAILED', 'Unable to resolve the AI route', 500, undefined, false);
+    if (tenantRoute) return tenantRoute as Route;
+  }
 
   const { data: globalRoute, error: globalError } = await admin
     .from('ai_routes')
@@ -98,14 +101,18 @@ function startForPeriod(period: 'day' | 'month') {
   return start.toISOString();
 }
 
-async function enforceLimit(organizationId: string, capability: string) {
+async function enforceLimit(organizationId: string | null, capability: string) {
   const admin = adminClient();
-  const { data, error } = await admin
+  let query = admin
     .from('ai_usage_limits')
     .select('capability_code,period,max_requests,max_tokens,max_cost_minor')
-    .eq('is_active', true)
-    .or(`organization_id.eq.${organizationId},organization_id.is.null`)
-    .or(`capability_code.eq.${capability},capability_code.is.null`);
+    .eq('is_active', true);
+
+  query = organizationId
+    ? query.or(`organization_id.eq.${organizationId},organization_id.is.null`)
+    : query.is('organization_id', null);
+
+  const { data, error } = await query.or(`capability_code.eq.${capability},capability_code.is.null`);
   if (error) throw new ApiError('AI_LIMIT_LOOKUP_FAILED', 'Unable to verify AI usage limits', 500, undefined, false);
 
   for (const rawLimit of data ?? []) {
@@ -164,7 +171,7 @@ async function invoke(model: Model, capability: AiCapability, request: AiRequest
 }
 
 export async function runAi(input: {
-  organizationId: string;
+  organizationId: string | null;
   profileId: string;
   capabilityCode: string;
   request: AiRequest;
@@ -246,6 +253,9 @@ export async function runAi(input: {
         if (completionError) throw new ApiError('AI_RUN_UPDATE_FAILED', 'AI completed but the audit record could not be finalized', 500, undefined, false);
 
         if (capability.requires_human_review) {
+          if (!input.organizationId) {
+            throw new ApiError('AI_REVIEW_CONTEXT_REQUIRED', 'This AI task requires a church context for human review', 409);
+          }
           const { error: draftError } = await admin.from('ai_content_drafts').insert({
             organization_id: input.organizationId,
             run_id: run.id,
