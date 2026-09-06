@@ -30,7 +30,12 @@ import type { Video } from '@/types/content';
 import type { ContentComment } from '@/types/content';
 
 type EngagementState = { reaction: string | null; bookmarked: boolean; progress: { progress_seconds: number; duration_seconds: number; completed: boolean } | null };
-type PlaybackInfo = { available: boolean; renditions?: { kind?: string; playbackUrl?: string; storagePath?: string }[] };
+type PlaybackInfo = {
+  available: boolean;
+  reason?: string;
+  processingState?: string;
+  renditions?: { kind?: string; playbackUrl?: string; storagePath?: string }[];
+};
 
 export default function WatchDetailScreen() {
   const { id, context: requestedContext } = useLocalSearchParams<{ id: string; context?: string }>();
@@ -103,8 +108,8 @@ export default function WatchDetailScreen() {
     contentIdentity?.expression?.name ||
     contentIdentity?.organization?.name ||
     context?.organization?.name ||
-    'City of Transformation';
-  const creatorName = contentIdentity?.author?.display_name || sourceName;
+    null;
+  const creatorName = contentIdentity?.author?.display_name || sourceName || 'COT';
   const creatorAvatar = contentIdentity?.author?.avatar_url ?? undefined;
 
   const handleLike = async () => {
@@ -158,7 +163,7 @@ export default function WatchDetailScreen() {
     if (!video || expressionMode) return;
     try {
       await Share.share({
-        message: `Watch "${video.title}" on ${sourceName}.`,
+        message: `Watch "${video.title}" on ${sourceName || 'COT'}.`,
       });
     } catch {
       // Ignored
@@ -194,15 +199,36 @@ export default function WatchDetailScreen() {
           contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}
         >
           {/* Dominant 16:9 Video Canvas */}
-          {playback.error ? <ResourceError message={playback.error} retry={playback.refresh} /> : <VideoPlayer
-            title={video.title}
-            sourceUrl={videoUrl}
-            posterUrl={posterUrl}
-            durationSeconds={video.media_assets?.duration_seconds}
-            chapters={video.chapters}
-            initialPositionSeconds={engagement.data?.progress?.completed ? 0 : engagement.data?.progress?.progress_seconds ?? 0}
-            onProgress={syncProgress}
-          />}
+          {playback.error ? (
+            <ResourceError message={playback.error} retry={playback.refresh} />
+          ) : playback.data && !playback.data.available ? (
+            <View style={[styles.playbackState, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+              <View style={[styles.playbackStateIcon, { backgroundColor: colors.primarySoft }]}>
+                <Icon
+                  name={playback.data.processingState && playback.data.processingState !== 'ready' ? 'hourglass-outline' : 'videocam-off-outline'}
+                  size={28}
+                  color={colors.interactive}
+                />
+              </View>
+              <Text style={[styles.playbackStateTitle, { color: colors.text }]}>
+                {playback.data.processingState && playback.data.processingState !== 'ready' ? 'Video is being prepared' : 'Video is not available'}
+              </Text>
+              <Text style={[styles.playbackStateCopy, { color: colors.textSecondary }]}>
+                {playback.data.reason || 'Playback is temporarily unavailable for this video.'}
+              </Text>
+              <Button label="Check again" variant="outline" size="sm" onPress={playback.refresh} />
+            </View>
+          ) : (
+            <VideoPlayer
+              title={video.title}
+              sourceUrl={videoUrl}
+              posterUrl={posterUrl}
+              durationSeconds={video.media_assets?.duration_seconds}
+              chapters={video.chapters}
+              initialPositionSeconds={engagement.data?.progress?.completed ? 0 : engagement.data?.progress?.progress_seconds ?? 0}
+              onProgress={syncProgress}
+            />
+          )}
 
           {/* Video Metadata & Title */}
           <View style={styles.metadataSection}>
@@ -219,7 +245,7 @@ export default function WatchDetailScreen() {
                   {creatorName}
                 </Text>
                 <Text style={[styles.authorSub, { color: colors.textSecondary }]} numberOfLines={1}>
-                  {sourceName}{video.category ? ` · ${video.category}` : ''}
+                  {[sourceName, video.category].filter(Boolean).join(' · ') || 'COT video'}
                 </Text>
               </View>
             </View>
@@ -281,7 +307,7 @@ export default function WatchDetailScreen() {
             {/* Related Videos Stack */}
             {relatedVideos.length > 0 && (
               <View style={styles.relatedSection}>
-                <Text style={[styles.relatedHeading, { color: colors.text }]}>Related Teachings</Text>
+                <Text style={[styles.relatedHeading, { color: colors.text }]}>More to watch</Text>
                 <View style={styles.relatedGrid}>
                   {relatedVideos.slice(0, 3).map((v) => (
                     <VideoCard
@@ -331,6 +357,25 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     gap: spacing.md,
   },
+  playbackState: {
+    aspectRatio: 16 / 9,
+    marginHorizontal: spacing.md,
+    borderWidth: 1,
+    borderRadius: radius.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+    gap: spacing.sm,
+  },
+  playbackStateIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playbackStateTitle: { fontSize: 17, fontWeight: '800', textAlign: 'center' },
+  playbackStateCopy: { fontSize: 12, lineHeight: 18, textAlign: 'center', maxWidth: 360 },
   contextPill: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderRadius: radius.pill },
   contextPillText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.2 },
   title: {
