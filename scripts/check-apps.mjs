@@ -3,6 +3,9 @@ import { access, readFile } from 'node:fs/promises';
 const files = [
   'apps/mobile/src/api.ts',
   'apps/mobile/src/state/session.tsx',
+  'apps/mobile/app/(tabs)/profile/leadership/expressions-manage.tsx',
+  'apps/mobile/app/(tabs)/profile/leadership/index.tsx',
+  'apps/mobile/app/_layout.tsx',
   'apps/mobile/src/hooks/use-resource.ts',
   'apps/mobile/src/services/query-cache.ts',
   'apps/mobile/src/components/cards.tsx',
@@ -67,6 +70,11 @@ const checks = [
   [/stale: boolean/, 'resource stale-data state'],
   [/contextStatus/, 'deterministic membership context state'],
   [/contextRefreshing/, 'background membership refresh state'],
+  [/accessReady/, 'resolved access gate for permission-driven UI'],
+  [/Loading your COT access/, 'app shell waits for resolved role access'],
+  [/firstMembershipOrganization = value\.organizations\[0\]/, 'creator bootstrap authority is not persisted as membership context'],
+  [/creatorOrganizations\?\.some/, 'Expression creator gating uses resolved membership context'],
+  [/Resolving Platform Administration access/, 'admin shell waits for resolved platform authority'],
   [/setInterval\(refreshContext, 120_000\)/, 'role grants refresh without re-login'],
   [/hasPublicCapability\('public\.live_stream\.create'\)[\s\S]*Go live/, 'assigned public broadcaster live entry point'],
   [/failed background refresh must not blank already-resolved context/, 'membership refresh preserves resolved context'],
@@ -166,6 +174,11 @@ const forbiddenWatchCopyPatterns = [
   [/Related Teachings/, 'sermon-only Watch related-content wording'],
 ];
 
+const forbiddenPermissionGatePatterns = [
+  [/expression-creators\?mode=self/, 'duplicate Expression creator self-fetch in role-gated UI'],
+  [/hasCapability\(['"]branches\.create['"]\)/, 'legacy branches.create client gate for canonical Expression creation'],
+];
+
 const forbiddenSocialCopyPatterns = [
   [/Join an active Expression before sharing a Reel into General Community/, 'stale Expression-membership Reel sharing guidance'],
 ];
@@ -191,6 +204,7 @@ const paymentCredentialChecks = [
 const missing = checks.filter(([pattern]) => !pattern.test(joined));
 const forbidden = forbiddenGivingPatterns.filter(([pattern]) => pattern.test(givingUi));
 const forbiddenPrayer = forbiddenPrayerPatterns.filter(([pattern]) => pattern.test(prayerUi));
+const forbiddenPermissionGates = forbiddenPermissionGatePatterns.filter(([pattern]) => pattern.test(joined));
 const forbiddenSocialCopy = forbiddenSocialCopyPatterns.filter(([pattern]) => pattern.test(joined));
 const forbiddenWatchCopy = forbiddenWatchCopyPatterns.filter(([pattern]) => pattern.test(sources.get('apps/mobile/app/watch/[id].tsx') ?? ''));
 const forbiddenPlatformBoundaries = forbiddenPlatformBoundaryPatterns.filter(([pattern]) => pattern.test(platformShellUi));
@@ -202,6 +216,7 @@ if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenSoc
     ...missing.map(([, name]) => name),
     ...forbidden.map(([, name]) => `remove ${name}`),
     ...forbiddenPrayer.map(([, name]) => `remove ${name}`),
+    ...forbiddenPermissionGates.map(([, name]) => `remove ${name}`),
     ...forbiddenSocialCopy.map(([, name]) => `remove ${name}`),
     ...forbiddenWatchCopy.map(([, name]) => `remove ${name}`),
     ...forbiddenPlatformBoundaries.map(([, name]) => `remove ${name}`),
