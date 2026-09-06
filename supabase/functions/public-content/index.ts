@@ -41,7 +41,8 @@ Deno.serve(createHandler(
       const { data, error } = await query.maybeSingle();
       if (error) throw new ApiError("PUBLIC_VIDEO_FAILED", "Unable to retrieve this video", 500, undefined, false);
       if (!data) throw new ApiError("VIDEO_NOT_FOUND", "This video is not available", 404);
-      return { data };
+      const [enriched] = await enrichContentCreators([data]);
+      return { data: enriched };
     }
 
     if (type === "sermon") {
@@ -97,7 +98,7 @@ Deno.serve(createHandler(
         data: {
           expression,
           sermons: sermons.data ?? [],
-          videos: videos.data ?? [],
+          videos: await enrichContentCreators(videos.data ?? []),
           reels: await enrichContentCreators(reels.data ?? []),
           events: events.data ?? [],
           leaders: (leaders.data ?? []).map((leader) => ({
@@ -145,7 +146,7 @@ Deno.serve(createHandler(
         .select(`
           id, organization_id, media_asset_id, series_id, title, slug, description, category,
           chapters, transcript, views_count, likes_count, comments_count, shares_count, created_at,
-          content_items!inner(id, organization_id, expression_id, visibility, status, published_at),
+          content_items!inner(id, organization_id, expression_id, author_profile_id, visibility, status, published_at),
           media_assets(id, media_type, duration_seconds, aspect_ratio,
             media_renditions(id, rendition_kind, container, codec, width, height, storage_path, provider_playback_id),
             media_thumbnails(storage_path, is_primary))
@@ -158,7 +159,7 @@ Deno.serve(createHandler(
       if (expressionId) query = query.eq("content_items.expression_id", expressionId);
       const { data, error } = await query;
       if (error) throw new ApiError("PUBLIC_VIDEOS_FAILED", "Unable to retrieve public videos", 500, undefined, false);
-      return { data: data ?? [] };
+      return { data: await enrichContentCreators(data ?? []) };
     }
 
     if (type === "sermons") {
@@ -297,7 +298,7 @@ Deno.serve(createHandler(
         .from("live_streams")
         .select("id,organization_id,branch_id,title,description,status,playback_url,playback_token_required,scheduled_start,started_at,ended_at,recording_url,thumbnail_url")
         .eq("visibility", "public")
-        .in("status", ["scheduled", "live", "ended"])
+        .in("status", ["scheduled", "provisioning", "ready", "live", "ended", "processing", "replay_ready"])
         .order("scheduled_start", { ascending: false })
         .limit(50);
       if (organizationId) query = query.eq("organization_id", organizationId);
