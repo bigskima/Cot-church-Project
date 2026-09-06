@@ -32,6 +32,8 @@ export default function ExpressionsScreen() {
 
   const expressions = useMemo(() => context?.expressions ?? [], [context?.expressions]);
   const activeExpressionId = context?.expression?.id;
+  const canCreateExpression = Boolean(context?.creatorOrganizations?.length);
+  const openExpressionCreation = () => router.push('/(tabs)/profile/leadership/expressions-manage' as any);
 
   if (mode === 'visitor') {
     return (
@@ -87,7 +89,13 @@ export default function ExpressionsScreen() {
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + spacing.xxl }]} keyboardShouldPersistTaps="handled">
         <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
-          <ScreenHeader title="Expressions" kicker="YOUR SPACES" subtitle="Enter a community you belong to, or join one with an invite code." showBack />
+          <ScreenHeader
+            title="Expressions"
+            kicker="YOUR SPACES"
+            subtitle="Enter a community you belong to, or join one with an invite code."
+            showBack
+            rightAction={canCreateExpression ? <Button label="Create" onPress={openExpressionCreation} size="sm" /> : undefined}
+          />
         </View>
 
         {activeExpressionId ? (
@@ -122,7 +130,15 @@ export default function ExpressionsScreen() {
               />
             </View>
           )) : (
-            <EmptyState title="No Expression memberships yet" message="Use an invite code from an authorized Expression leader to join." iconName="people-outline" />
+            <EmptyState
+              title="No Expression memberships yet"
+              message={canCreateExpression
+                ? 'Your account can create an Expression, or you can join one with an invite code.'
+                : 'Use an invite code from an authorized Expression leader to join.'}
+              iconName="people-outline"
+              actionLabel={canCreateExpression ? 'Create Expression' : undefined}
+              onAction={canCreateExpression ? openExpressionCreation : undefined}
+            />
           )}
         </View>
 
