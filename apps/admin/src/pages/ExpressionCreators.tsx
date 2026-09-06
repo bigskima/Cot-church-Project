@@ -42,7 +42,7 @@ export function ExpressionCreators({ api }: { api: ApiClient }) {
       setAuthorizations([]);
       return;
     }
-    const data = await api.request<Access[]>(`expression-creators?organizationId=${encodeURIComponent(orgId)}`);
+    const data = await api.request<Authorization[]>(`expression-creators?organizationId=${encodeURIComponent(orgId)}`);
     setAuthorizations(data ?? []);
   };
 
