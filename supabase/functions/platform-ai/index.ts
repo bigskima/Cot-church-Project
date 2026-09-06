@@ -148,8 +148,20 @@ Deno.serve(
         const { data: capability } = await admin.from("ai_capabilities").select("code").eq("code", capabilityCode).maybeSingle();
         if (!capability) throw new ApiError("AI_CAPABILITY_NOT_FOUND", "AI capability not found", 404);
         const modelIds = [primaryModelId, ...fallbackModelIds];
-        const { data: models, error: modelsError } = await admin.from("ai_models").select("id,is_active").in("id", modelIds);
-        if (modelsError || (models ?? []).length !== modelIds.length || (models ?? []).some((model) => !model.is_active)) throw new ApiError("AI_ROUTE_MODEL_INVALID", "All route models must exist and be active", 409);
+        const { data: models, error: modelsError } = await admin
+          .from("ai_models")
+          .select("id,is_active,ai_providers!inner(status)")
+          .in("id", modelIds);
+        const routeModelsReady =
+          !modelsError &&
+          (models ?? []).length === modelIds.length &&
+          (models ?? []).every((model: any) => {
+            const provider = Array.isArray(model.ai_providers) ? model.ai_providers[0] : model.ai_providers;
+            return model.is_active && provider?.status === "active";
+          });
+        if (!routeModelsReady) {
+          throw new ApiError("AI_ROUTE_MODEL_INVALID", "All route models must be active and belong to an active provider", 409);
+        }
         const record = { organization_id: null, capability_code: capabilityCode, primary_model_id: primaryModelId, fallback_model_ids: fallbackModelIds, timeout_ms: timeoutMs, max_retries: maxRetries, is_active: body.isActive === undefined ? true : Boolean(body.isActive) };
         const { data: existing } = await admin.from("ai_routes").select("id").is("organization_id", null).eq("capability_code", capabilityCode).maybeSingle();
         const query = existing?.id ? admin.from("ai_routes").update(record).eq("id", existing.id) : admin.from("ai_routes").insert(record);
