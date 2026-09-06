@@ -177,7 +177,7 @@ export default function LivePlayerScreen() {
     return () => {
       isMounted = false;
     };
-  }, [api, id, mode, requestContext, showFellowshipHistory]);
+  }, [api, id, mode, requestContext]);
 
   const player = useVideoPlayer(access?.playbackUrl ?? '', (videoPlayer) => {
     videoPlayer.loop = false;
@@ -204,7 +204,7 @@ export default function LivePlayerScreen() {
     } finally {
       if (showLoading) setChatLoading(false);
     }
-  }, [api, id, mode, requestContext]);
+  }, [api, id, mode, requestContext, showFellowshipHistory]);
 
   useEffect(() => {
     if (mode !== 'authenticated' || !access?.stream.id || !showFellowshipHistory) {
