@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
@@ -115,6 +116,22 @@ export default function NotificationsScreen() {
           kicker="INBOX"
           subtitle="Decisions, church updates and invitation history in one focused workspace."
           showBack
+          rightAction={
+            mode === 'authenticated' && context?.organization?.id ? (
+              <Pressable
+                onPress={() => router.push('/(tabs)/profile/notification-settings')}
+                style={({ pressed }) => [
+                  styles.headerSettingsButton,
+                  { backgroundColor: colors.cardElevated, borderColor: colors.borderSubtle },
+                  pressed && styles.pressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Notification preferences"
+              >
+                <Icon name="settings-outline" size={19} color={colors.text} />
+              </Pressable>
+            ) : null
+          }
         />
 
         <View style={styles.body}>
@@ -371,6 +388,7 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
+  headerSettingsButton: { width: 40, height: 40, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   screen: { flex: 1 },
   body: { paddingHorizontal: spacing.md, gap: spacing.lg },
   overviewCard: { borderWidth: 1, borderRadius: radius.xxl, padding: spacing.md, gap: spacing.md },
