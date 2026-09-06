@@ -64,7 +64,7 @@ export function PlatformOverview({
     api
       .request<PlatformOverviewPayload>('platform-overview')
       .then(setMetrics)
-      .catch((value) => setError(value instanceof Error ? value.message : 'Unable to load the platform overview.'))
+      .catch((value) => setError(value instanceof Error ? value.message : 'Unable to load the administration overview.'))
       .finally(() => setLoading(false));
   };
 
@@ -81,7 +81,7 @@ export function PlatformOverview({
 
   if (error && !metrics) {
     return (
-      <Card title="Platform overview unavailable" subtitle="The page is still available, but the latest platform information could not be loaded.">
+      <Card title="Administration overview unavailable" subtitle="The page is still available, but the latest administration information could not be loaded.">
         <div className="admin-inline-error" role="alert" style={{ marginBottom: 16 }}>{error}</div>
         <Button variant="primary" onClick={load}>Try again</Button>
       </Card>
@@ -126,21 +126,21 @@ export function PlatformOverview({
 
       {metrics?.state === 'attention' ? (
         <div className="admin-inline-error" role="status" style={{ marginBottom: 24 }}>
-          One or more platform services need attention. Review the affected services below.
+          One or more COT services need attention. Review the affected areas below.
         </div>
       ) : null}
 
       <div className="admin-overview-grid">
         <Card
-          title="Platform service health"
+          title="COT service health"
           subtitle={metrics?.generatedAt ? `Last updated ${new Date(metrics.generatedAt).toLocaleString()}` : 'Loading current status'}
           headerAction={<Button variant="outline" size="sm" onClick={load}>Refresh</Button>}
         >
           <div className="admin-service-grid">
             {[
-              ['Platform services', statusLabel(Boolean(metrics)), 'Administration service availability'],
-              ['Streaming service', statusLabel(Boolean(metrics?.streaming.configured), (metrics?.streaming.failed ?? 0) > 0), `${metrics?.streaming.activeProviders ?? 0} provider(s) · ${metrics?.streaming.activeConfigurations ?? 0} active config(s)`],
-              ['AI service', statusLabel(Boolean(metrics?.ai.configured), (metrics?.ai.failed24h ?? 0) > 0), `${metrics?.ai.activeProviders ?? 0} provider(s) · ${metrics?.ai.activeModels ?? 0} model(s)`],
+              ['Administration', statusLabel(Boolean(metrics)), 'Platform Administration availability'],
+              ['Streaming service', statusLabel(Boolean(metrics?.streaming.configured), (metrics?.streaming.failed ?? 0) > 0), `${metrics?.streaming.activeProviders ?? 0} streaming service(s) · ${metrics?.streaming.activeConfigurations ?? 0} active setup(s)`],
+              ['AI service', statusLabel(Boolean(metrics?.ai.configured), (metrics?.ai.failed24h ?? 0) > 0), `${metrics?.ai.activeProviders ?? 0} streaming service(s) · ${metrics?.ai.activeModels ?? 0} model(s)`],
               ['Background tasks', statusLabel(true, queueAttention), `${metrics?.jobs.workflows.queued ?? 0} queued · ${metrics?.jobs.workflows.running ?? 0} running`],
               ['Connected services', statusLabel(true, queueAttention), `${metrics?.jobs.integrations.queued ?? 0} queued · ${metrics?.jobs.integrations.running ?? 0} running`],
               ['AI review', (metrics?.ai.requiresReview ?? 0) > 0 ? 'attention' : 'healthy', `${metrics?.ai.requiresReview ?? 0} item(s) require ministry review`],
@@ -163,7 +163,7 @@ export function PlatformOverview({
           </div>
         </Card>
 
-        <Card title="Quick actions" subtitle="Common Platform Administration tasks">
+        <Card title="Quick actions" subtitle="Common administration tasks">
           <div className="admin-quick-actions">
             {(!allowedPages || allowedPages.has('organizations')) ? (
               <Button variant="primary" size="md" onClick={() => onNavigate('organizations')} icon="ORG">Manage organisations</Button>
@@ -209,8 +209,8 @@ export function PlatformOverview({
         <Table
           columns={[
             { header: 'EVENT ACTION', accessor: (item) => <Badge label={item.action} variant="gold" /> },
-            { header: 'TARGET DOMAIN', accessor: 'target_type' },
-            { header: 'ACTOR PROFILE', accessor: (item) => item.actor_profile_id ?? 'system' },
+            { header: 'AFFECTED AREA', accessor: 'target_type' },
+            { header: 'PERFORMED BY', accessor: (item) => item.actor_profile_id ?? 'system' },
             { header: 'TIMESTAMP', accessor: (item) => new Date(item.occurred_at).toLocaleString() },
           ]}
           data={metrics?.recentAudit ?? []}
