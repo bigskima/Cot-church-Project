@@ -243,7 +243,7 @@ export type LiveStream = {
   branch_id?: string | null;
   title: string;
   description: string;
-  status: 'provisioning' | 'ready' | 'scheduled' | 'live' | 'ended' | 'cancelled' | 'failed';
+  status: 'draft' | 'scheduled' | 'provisioning' | 'ready' | 'live' | 'ended' | 'processing' | 'replay_ready' | 'failed' | 'cancelled' | 'archived';
   visibility: ContentVisibility;
   scheduled_start?: string;
   started_at?: string;
