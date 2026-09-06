@@ -141,7 +141,7 @@ export function StreamingInfrastructure({ api, canManage = false, canManageSecre
     const webhookRef = webhookSecretReference.trim().toUpperCase();
     const signingRef = signingKeyReference.trim().toUpperCase();
     if (!primaryRef || !webhookRef) {
-      setError('Provider and webhook secret references are required.');
+      setError('Streaming credential names are required.');
       return;
     }
     if (configProvider.code === 'mux') {
@@ -160,7 +160,7 @@ export function StreamingInfrastructure({ api, canManage = false, canManageSecre
     setSuccess('');
     try {
       if (configProvider.code === 'mux' && muxTokenId && muxTokenSecret) {
-        await storeSecret(primaryRef, JSON.stringify({ tokenId: muxTokenId.trim(), tokenSecret: muxTokenSecret.trim() }), 'Mux API access token used by the broadcast adapter');
+        await storeSecret(primaryRef, JSON.stringify({ tokenId: muxTokenId.trim(), tokenSecret: muxTokenSecret.trim() }), 'Mux API access token used by the broadcast service');
       }
       if (configProvider.code === 'mux' && muxWebhookSecret) {
         await storeSecret(webhookRef, muxWebhookSecret.trim(), 'Mux webhook signing secret');
@@ -256,26 +256,26 @@ export function StreamingInfrastructure({ api, canManage = false, canManageSecre
   return (
     <div className="admin-page-stack">
       <div className="admin-stats-grid">
-        <StatWidget title="Active Live Broadcasts" value={liveCount} subtitle={`${data.streams.length} active/scheduled control-plane records`} trend={{ value: liveCount > 0 ? 'LIVE NOW' : 'No live feeds', isPositive: true }} icon="LIVE" variant="live" />
-        <StatWidget title="Primary Video Provider" value={primaryConfig?.streaming_providers?.name ?? 'Not configured'} subtitle={primaryConfig ? `Credential ref: ${primaryConfig.secret_reference}` : 'Set a global default provider'} trend={{ value: primaryConfig ? 'ACTIVE' : 'ACTION REQUIRED', isPositive: Boolean(primaryConfig) }} icon="VIDEO" variant="gold" />
-        <StatWidget title="Recent Webhook Health" value={webhookIssues === 0 ? 'Healthy' : `${webhookIssues} issue(s)`} subtitle={`${data.recentWebhooks.length} recent delivery events inspected`} trend={{ value: webhookIssues === 0 ? 'NO RECENT ERRORS' : 'REVIEW EVENTS', isPositive: webhookIssues === 0 }} icon="HOOKS" variant="success" />
+        <StatWidget title="Active Live Broadcasts" value={liveCount} subtitle={`${data.streams.length} scheduled or active broadcasts`} trend={{ value: liveCount > 0 ? 'LIVE NOW' : 'No live feeds', isPositive: true }} icon="LIVE" variant="live" />
+        <StatWidget title="Primary streaming service" value={primaryConfig?.streaming_providers?.name ?? 'Not configured'} subtitle={primaryConfig ? `Credential name: ${primaryConfig.secret_reference}` : 'Choose the primary streaming service'} trend={{ value: primaryConfig ? 'ACTIVE' : 'ACTION REQUIRED', isPositive: Boolean(primaryConfig) }} icon="VIDEO" variant="gold" />
+        <StatWidget title="Recent delivery health" value={webhookIssues === 0 ? 'Healthy' : `${webhookIssues} issue(s)`} subtitle={`${data.recentWebhooks.length} recent service events reviewed`} trend={{ value: webhookIssues === 0 ? 'NO RECENT ERRORS' : 'REVIEW ACTIVITY', isPositive: webhookIssues === 0 }} icon="HOOKS" variant="success" />
       </div>
 
       {error && !providerStateTarget ? <div className="admin-inline-error" role="alert">{error}</div> : null}
       {success ? <div className="admin-status-message admin-status-success">{success}</div> : null}
 
-      <Card title="Streaming provider registry" subtitle="Configure provider adapters and, when needed, paste credentials directly into the encrypted Platform Vault." headerAction={<Button variant="outline" size="sm" onClick={() => void load()} loading={loading}>Refresh</Button>}>
+      <Card title="Streaming services" subtitle="Set up approved streaming services and add protected credentials when needed." headerAction={<Button variant="outline" size="sm" onClick={() => void load()} loading={loading}>Refresh</Button>}>
         <div className="admin-provider-grid">
           {data.providers.map((provider) => {
             const config = configByProvider.get(provider.id);
             return (
               <div key={provider.id} className="admin-provider-card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                  <div><h4 style={{ fontSize: 16, fontWeight: 900 }}>{provider.name}</h4><p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>{provider.code} · adapter {provider.adapter_version}</p></div>
+                  <div><h4 style={{ fontSize: 16, fontWeight: 900 }}>{provider.name}</h4><p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>{provider.code} · connection {provider.adapter_version}</p></div>
                   <Badge label={provider.is_active ? 'ENABLED' : 'DISABLED'} variant={provider.is_active ? 'active' : 'suspended'} pulse={provider.is_active} />
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>Global config: <strong style={{ color: config?.is_active ? 'var(--gold)' : 'var(--text-muted)' }}>{config?.is_active ? 'ACTIVE' : 'NOT CONFIGURED'}</strong>{config?.is_default ? ' · DEFAULT' : ''}</div>
-                {config ? <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 12, lineHeight: 1.6 }}>Credential ref: <code>{config.secret_reference}</code><br />Webhook ref: <code>{config.webhook_secret_reference}</code>{config.signing_key_reference ? <><br />Signing ref: <code>{config.signing_key_reference}</code></> : null}</div> : null}
+                {config ? <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 12, lineHeight: 1.6 }}>Credential name: <code>{config.secret_reference}</code><br />Verification name: <code>{config.webhook_secret_reference}</code>{config.signing_key_reference ? <><br />Playback signing name: <code>{config.signing_key_reference}</code></> : null}</div> : null}
                 <div className="admin-capability-tags">{provider.capabilities.map((capability) => <span key={capability} className="active">{capability}</span>)}</div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 12, borderTop: '1px solid var(--border-subtle)' }}>
                   {canManage ? (
@@ -311,12 +311,12 @@ export function StreamingInfrastructure({ api, canManage = false, canManageSecre
         isOpen={canManage && !!configProvider}
         onClose={() => { if (!actionBusy) { setConfigProvider(null); clearSecretInputs(); } }}
         title={configProvider ? `Configure ${configProvider.name}` : 'Configure streaming provider'}
-        subtitle="You may paste real credentials here. Values are sent to the authenticated backend and encrypted in Supabase Vault; only their references remain in provider configuration."
+        subtitle="You may add real service credentials here. Values are encrypted and protected; only their credential names remain visible in administration."
         footer={<div style={{ display: 'flex', gap: 12 }}><Button variant="outline" size="md" disabled={actionBusy} onClick={() => { setConfigProvider(null); clearSecretInputs(); }}>Cancel</Button><Button variant="gold" size="md" loading={actionBusy} onClick={() => void saveConfig()}>{canManageSecrets ? 'Encrypt credentials & save' : 'Save configuration'}</Button></div>}
       >
-        <InputField label="Provider credential reference" value={secretReference} onChange={(event) => setSecretReference(event.target.value.toUpperCase())} placeholder="STREAMING_MUX_PRIMARY" helperText="Stable server-side name. Existing Vault/environment credential is reused when raw fields below are left blank." />
-        <InputField label="Webhook secret reference" value={webhookSecretReference} onChange={(event) => setWebhookSecretReference(event.target.value.toUpperCase())} placeholder="STREAMING_MUX_WEBHOOK_PRIMARY" />
-        <InputField label="Playback signing key reference (optional)" value={signingKeyReference} onChange={(event) => setSigningKeyReference(event.target.value.toUpperCase())} placeholder="STREAMING_MUX_SIGNING_PRIMARY" />
+        <InputField label="Streaming credential name" value={secretReference} onChange={(event) => setSecretReference(event.target.value.toUpperCase())} placeholder="STREAMING_MUX_PRIMARY" helperText="Stable name used by COT. Leave the credential fields blank to keep the value already saved under this name." />
+        <InputField label="Delivery verification credential name" value={webhookSecretReference} onChange={(event) => setWebhookSecretReference(event.target.value.toUpperCase())} placeholder="STREAMING_MUX_WEBHOOK_PRIMARY" />
+        <InputField label="Playback signing credential name (optional)" value={signingKeyReference} onChange={(event) => setSigningKeyReference(event.target.value.toUpperCase())} placeholder="STREAMING_MUX_SIGNING_PRIMARY" />
 
         {configProvider?.code === 'mux' ? (
           <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border-subtle)' }}>
@@ -333,7 +333,7 @@ export function StreamingInfrastructure({ api, canManage = false, canManageSecre
             </div>
           </div>
         ) : (
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 12 }}>Use Provider Credentials to store credentials for this adapter, then reference them here.</p>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 12 }}>Use Secure Credentials to save credentials for this service, then select the same credential names here.</p>
         )}
 
         <label className="admin-inline-check"><input type="checkbox" checked={makeDefault} onChange={(event) => setMakeDefault(event.target.checked)} /><span>Use this provider as the global default for organisations without an override.</span></label>
@@ -369,7 +369,7 @@ export function StreamingInfrastructure({ api, canManage = false, canManageSecre
             helperText="The provider-state change and reason are written to the platform audit trail."
           />
         ) : (
-          <div className="admin-info-callout">Enabling this provider makes the adapter available again. Active configuration still determines whether it can carry production broadcasts.</div>
+          <div className="admin-info-callout">Enabling this service makes it available for streaming again. The active streaming setup still determines whether it can carry production broadcasts.</div>
         )}
       </Modal>
 
@@ -377,7 +377,7 @@ export function StreamingInfrastructure({ api, canManage = false, canManageSecre
         isOpen={canManage && !!selectedStreamToKill}
         onClose={() => { if (!actionBusy) setSelectedStreamToKill(null); }}
         title="Emergency Broadcast Termination"
-        subtitle="This performs a real provider stop through the configured adapter and then finalizes platform state."
+        subtitle="This stops the live broadcast through the connected streaming service and then updates COT’s broadcast status."
         footer={<div style={{ display: 'flex', gap: 12 }}><Button variant="outline" size="md" disabled={actionBusy} onClick={() => setSelectedStreamToKill(null)}>Cancel</Button><Button variant="danger" size="md" loading={actionBusy} onClick={() => void terminateStream()}>Terminate provider feed</Button></div>}
       >
         <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, fontSize: 14, marginBottom: 14 }}>You are terminating <strong style={{ color: 'var(--text-primary)' }}>{selectedStreamToKill?.title}</strong>. The provider broadcast is stopped first; the platform record is marked ended only after the provider confirms the stop request.</p>
