@@ -117,3 +117,5 @@ Authenticated endpoints require `Authorization: Bearer <access-token>`. Tenant e
 - `WORKFLOW_WORKER_SECRET`
 
 Secrets must be supplied by the deployment environment and must never be committed.
+
+| `platform-admin-guide` | GET, POST | Platform `platform.overview.read` | Context-aware Admin Guide availability and provider-neutral AI explanations for Platform Administration workflows. |
