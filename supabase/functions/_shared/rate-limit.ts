@@ -1,6 +1,6 @@
 import { getRateLimitPepper } from "./config.ts";
 import { ApiError } from "./errors.ts";
-import { publicClient } from "./supabase.ts";
+import { adminClient } from "./supabase.ts";
 
 async function sha256(value: string) {
   const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
@@ -11,7 +11,7 @@ export async function enforceRateLimit(request: Request, bucket: string, subject
   const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
   const clientAddress = forwarded ?? request.headers.get("cf-connecting-ip") ?? "unknown";
   const subjectHash = await sha256(`${getRateLimitPepper()}:${clientAddress}:${subject.toLowerCase()}`);
-  const { data, error } = await publicClient().rpc("consume_rate_limit", {
+  const { data, error } = await adminClient().rpc("consume_rate_limit", {
     rate_bucket: bucket,
     rate_subject_hash: subjectHash,
     maximum_requests: maximumRequests,

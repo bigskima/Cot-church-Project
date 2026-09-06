@@ -94,6 +94,7 @@ const expressionMemberships = await readFile('supabase/functions/expression-memb
 const roles = await readFile('supabase/functions/roles/index.ts', 'utf8');
 const events = await readFile('supabase/functions/events/index.ts', 'utf8');
 const signupRateLimited = await readFile('supabase/functions/signup/index.ts', 'utf8');
+const rateLimit = await readFile('supabase/functions/_shared/rate-limit.ts', 'utf8');
 const paymentEvents = await readFile('supabase/functions/payment-events/index.ts', 'utf8');
 const publicContent = await readFile('supabase/functions/public-content/index.ts', 'utf8');
 const engagement = await readFile('supabase/functions/engagement/index.ts', 'utf8');
@@ -122,6 +123,7 @@ const adminPaymentsPage = await readFile('apps/admin/src/pages/PaymentInfrastruc
 const adminIntegrationsPage = await readFile('apps/admin/src/pages/IntegrationsJobs.tsx', 'utf8');
 const adminFeaturesPage = await readFile('apps/admin/src/pages/FeatureFlags.tsx', 'utf8');
 const gatewayConfig = await readFile('supabase/config.toml', 'utf8');
+const rateLimitRpcHardening = await readFile('supabase/migrations/20260905103057_restore_privileged_rpc_execute_boundaries.sql', 'utf8');
 const privilegedRpcGrantHardening = await readFile('supabase/migrations/20260905121228_harden_remaining_privileged_rpc_execute_grants.sql', 'utf8');
 const streamGrantHardening = await readFile('supabase/migrations/20260905121401_restore_stream_and_idempotency_execute_boundaries.sql', 'utf8');
 const triggerGrantHardening = await readFile('supabase/migrations/20260905121523_remove_api_execute_from_security_definer_triggers.sql', 'utf8');
@@ -174,6 +176,10 @@ const invariants = [
   [roles, /create_custom_role/, 'custom role administration'],
   [events, /events\.create/, 'event authorization'],
   [signupRateLimited, /enforceRateLimit/, 'signup rate limiting'],
+  [rateLimit, /import \{ adminClient \} from "\.\/supabase\.ts";/, 'rate limiter uses server-privileged Supabase client'],
+  [rateLimit, /adminClient\(\)\.rpc\("consume_rate_limit"/, 'rate limiter invokes privileged RPC through service role'],
+  [rateLimitRpcHardening, /revoke all on function public\.consume_rate_limit\(text,text,integer,integer\) from public, anon, authenticated/i, 'rate-limit RPC denied to client roles'],
+  [rateLimitRpcHardening, /grant execute on function public\.consume_rate_limit\(text,text,integer,integer\) to service_role/i, 'rate-limit RPC granted only to service role'],
   [paymentEvents, /HMAC/, 'payment event signature validation'],
   [publicContent, /visibility.*public/, 'public content visibility enforcement'],
   [sermons, /sermons\.create/, 'sermon authorization'],
