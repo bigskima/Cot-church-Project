@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
-import { Avatar, Badge, Button, Chip, Icon, ScreenHeader, SectionHeader } from '@/components';
+import { Avatar, Badge, Button, Chip, Icon, ResourceError, ScreenHeader, SectionHeader, Skeleton } from '@/components';
 import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 
 type AiReadiness = {
@@ -18,7 +18,7 @@ type AiReadiness = {
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { mode, context, hasCapability, signOut, api } = useSession();
+  const { mode, context, contextStatus, contextError, refreshContext, hasCapability, signOut, api } = useSession();
   const { preference, setPreference, colors } = useTheme();
   const profile = context?.profile;
   const membershipOrganization = context?.organization ?? context?.organizations?.[0];
@@ -28,7 +28,7 @@ export default function ProfileScreen() {
   const hasOrganization = Boolean(membershipOrganization?.id);
 
   const expressionCreatorState = useResource<{ organizationId: string; authorized: boolean }>(
-    `profile:expression-creator:${context?.organization?.id ?? organization?.id ?? 'none'}`,
+    `profile:expression-creator:${contextStatus}:${context?.organization?.id ?? organization?.id ?? 'none'}`,
     (signal) => {
       const organizationId = context?.organization?.id ?? organization?.id;
       if (mode !== 'authenticated' || !organizationId) return Promise.resolve({ organizationId: '', authorized: false });
@@ -38,7 +38,7 @@ export default function ProfileScreen() {
   const isAuthorizedExpressionCreator = expressionCreatorState.data?.authorized === true;
 
   const aiReadiness = useResource<AiReadiness>(
-    `profile:assistant-readiness:${mode}:${membershipOrganization?.id ?? 'none'}:${expression?.id ?? 'general'}`,
+    `profile:assistant-readiness:${mode}:${contextStatus}:${membershipOrganization?.id ?? 'none'}:${expression?.id ?? 'general'}`,
     (signal) => {
     if (mode !== 'authenticated' || !hasOrganization) {
       return Promise.resolve({ capability: 'assistant.answer', ready: false, reason: 'active_membership_required' });
@@ -102,6 +102,13 @@ export default function ProfileScreen() {
             <Text style={[styles.visitorSubtitle, { color: colors.textSecondary }]}>Public COT stays open to browse. Sign in when you want to interact, join an Expression, receive invitations, or use member-only features.</Text>
             <Button label="Sign in or create account" onPress={() => router.push({ pathname: '/(auth)/login', params: { returnTo: '/(tabs)/profile' } } as any)} variant="primary" size="lg" style={{ width: '100%', marginTop: spacing.sm }} />
           </View>
+        ) : contextStatus === 'loading' && !context ? (
+          <View style={[styles.memberCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+            <Skeleton height={74} />
+            <Skeleton height={42} count={2} />
+          </View>
+        ) : contextStatus === 'error' && !context ? (
+          <ResourceError message={contextError || 'We couldn’t load your account access right now.'} retry={refreshContext} />
         ) : (
           <View style={[styles.memberCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
             <View style={styles.memberHeader}>
