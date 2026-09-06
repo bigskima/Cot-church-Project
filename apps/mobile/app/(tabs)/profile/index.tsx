@@ -18,7 +18,7 @@ type AiReadiness = {
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { mode, context, contextStatus, contextError, refreshContext, hasCapability, signOut, api } = useSession();
+  const { mode, context, contextStatus, contextError, refreshContext, hasCapability, hasPublicCapability, signOut, api } = useSession();
   const { preference, setPreference, colors } = useTheme();
   const profile = context?.profile;
   const membershipOrganization = context?.organization ?? context?.organizations?.[0];
@@ -53,6 +53,8 @@ export default function ProfileScreen() {
       ? 'Checking availability…'
       : 'Temporarily unavailable. Please try again later.';
 
+  const hasPublicBroadcastAccess = hasPublicCapability('public.live_stream.create');
+
   const hasPastoralLeadershipAccess =
     ((hasCapability('prayer.moderate') &&
       (hasCapability('prayer.pastoral.receive') || hasCapability('prayer.team.receive'))) ||
@@ -72,7 +74,7 @@ export default function ProfileScreen() {
     isAuthorizedExpressionCreator;
 
   const hasLeadershipAccess = mode === 'authenticated' && (
-    hasCapability('*') || hasOrganizationLeadershipAccess || hasExpressionLeadershipAccess
+    hasPublicBroadcastAccess || hasCapability('*') || hasOrganizationLeadershipAccess || hasExpressionLeadershipAccess
   );
 
   const serviceTile = (route: string, icon: string, title: string, subtitle: string, disabled = false) => (
