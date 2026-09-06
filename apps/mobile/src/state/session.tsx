@@ -15,7 +15,9 @@ type Value = {
   contextError: string;
   refreshContext: () => void;
   permissions: string[];
+  publicCapabilities: string[];
   hasCapability: (code: string) => boolean;
+  hasPublicCapability: (code: string) => boolean;
   updateContextProfile: (changes: Partial<MembershipContext['profile']>) => void;
   api: ApiClient;
   authenticate: (value: StoredAuth) => Promise<void>;
@@ -321,6 +323,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
   }, []);
 
   const permissions = useMemo(() => context?.effectivePermissions ?? [], [context]);
+  const publicCapabilities = useMemo(() => context?.publicCapabilities ?? [], [context]);
 
   const hasCapability = useCallback(
     (code: string) => {
@@ -328,6 +331,14 @@ export function SessionProvider({ children }: PropsWithChildren) {
       return permissions.includes(code) || permissions.includes('*');
     },
     [mode, permissions]
+  );
+
+  const hasPublicCapability = useCallback(
+    (code: string) => {
+      if (mode !== 'authenticated') return false;
+      return publicCapabilities.includes(code);
+    },
+    [mode, publicCapabilities],
   );
 
   const selectContext = async (organizationId: string, branchId?: string) => {
@@ -387,7 +398,9 @@ export function SessionProvider({ children }: PropsWithChildren) {
         contextError,
         refreshContext,
         permissions,
+        publicCapabilities,
         hasCapability,
+        hasPublicCapability,
         updateContextProfile,
         api,
         authenticate: persist,
