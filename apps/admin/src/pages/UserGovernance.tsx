@@ -141,7 +141,7 @@ export function UserGovernance({ api, canManage = false }: { api: ApiClient; can
     <div className="admin-page-stack">
       <Card
         title="Accounts & Access"
-        subtitle={`${total} account${total === 1 ? '' : 's'} · platform-level safety and access controls`}
+        subtitle={`${total} account${total === 1 ? '' : 's'} · account safety and access controls`}
         headerAction={
           <div className="admin-header-actions">
             <SearchBar value={search} onChange={setSearch} placeholder="Search name, email, or phone..." />
@@ -156,7 +156,7 @@ export function UserGovernance({ api, canManage = false }: { api: ApiClient; can
             {
               header: 'IDENTITY',
               accessor: (item) => {
-                const label = item.display_name?.trim() || item.email || item.phone || 'Platform account';
+                const label = item.display_name?.trim() || item.email || item.phone || 'COT account';
                 return (
                   <div className="admin-identity-cell">
                     <div className="admin-identity-avatar">{label[0]?.toUpperCase() ?? 'U'}</div>
@@ -176,7 +176,7 @@ export function UserGovernance({ api, canManage = false }: { api: ApiClient; can
               header: 'POSTING',
               accessor: (item) => <Badge label={item.posting_allowed === false ? 'RESTRICTED' : 'ALLOWED'} variant={item.posting_allowed === false ? 'suspended' : 'active'} />,
             },
-            { header: 'PLATFORM ROLE', accessor: (item) => item.platform_roles?.length ? item.platform_roles.join(', ') : '—' },
+            { header: 'ADMIN ROLE', accessor: (item) => item.platform_roles?.length ? item.platform_roles.join(', ') : '—' },
             { header: 'CHURCH MEMBERSHIPS', accessor: (item) => item.organization_memberships ?? 0 },
             {
               header: 'SAFETY',
@@ -207,7 +207,7 @@ export function UserGovernance({ api, canManage = false }: { api: ApiClient; can
       <Modal
         isOpen={!!selectedUser}
         onClose={() => setSelectedUser(null)}
-        title={selectedUser?.display_name || selectedUser?.email || 'Platform Account'}
+        title={selectedUser?.display_name || selectedUser?.email || 'COT Account'}
         subtitle={selectedUser ? `Account ID: ${selectedUser.id}` : undefined}
         footer={<Button variant="primary" size="md" onClick={() => setSelectedUser(null)}>Close</Button>}
       >
@@ -219,7 +219,7 @@ export function UserGovernance({ api, canManage = false }: { api: ApiClient; can
               <Metric label="EMAIL" value={selectedUser.email ?? 'Not supplied'} />
               <Metric label="PHONE" value={selectedUser.phone ?? 'Not supplied'} />
               <Metric label="CHURCH MEMBERSHIPS" value={String(selectedUser.organization_memberships ?? 0)} />
-              <Metric label="PLATFORM ROLES" value={selectedUser.platform_roles?.join(', ') || 'None'} />
+              <Metric label="ADMIN ROLES" value={selectedUser.platform_roles?.join(', ') || 'None'} />
             </div>
             {selectedUser.posting_allowed === false ? (
               <Card title="Posting restriction" subtitle="This is separate from an account ban.">
@@ -243,7 +243,7 @@ export function UserGovernance({ api, canManage = false }: { api: ApiClient; can
         onClose={() => { if (!actionBusy) setModerationUser(null); }}
         title={moderationType === 'posting'
           ? actionIsRestore ? 'Restore posting access' : 'Restrict posting access'
-          : actionIsRestore ? 'Restore platform account' : 'Ban platform account'}
+          : actionIsRestore ? 'Restore account' : 'Ban account'}
         subtitle={moderationUser?.display_name || moderationUser?.email || moderationUser?.id}
         footer={
           <div style={{ display: 'flex', gap: 12 }}>
@@ -258,15 +258,15 @@ export function UserGovernance({ api, canManage = false }: { api: ApiClient; can
           <p style={{ color: 'var(--text-secondary)', lineHeight: 1.65 }}>
             {moderationType === 'posting'
               ? 'Restoring posting allows this identity to publish again when normal church membership rules permit it.'
-              : 'Restoring the account removes the platform authentication ban. Church membership and role state remain separately governed.'}
+              : 'Restoring the account allows sign-in again. Church membership and assigned roles remain unchanged.'}
           </p>
         ) : (
           <InputField
-            label="Governance reason"
+            label="Reason for this action"
             value={moderationReason}
             onChange={(event) => setModerationReason(event.target.value)}
-            placeholder={moderationType === 'posting' ? 'Document the content or community guideline violation' : 'Document the abuse, safety, or credential-compromise reason'}
-            helperText="The action and reason are written to the immutable Level-1 audit trail."
+            placeholder={moderationType === 'posting' ? 'Document the content or community guideline violation' : 'Document the abuse, safety, or account-security reason'}
+            helperText="This action and its reason are recorded in protected administration history."
           />
         )}
       </Modal>
