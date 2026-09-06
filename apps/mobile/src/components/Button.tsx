@@ -70,7 +70,7 @@ export function Button({
       case 'outline':
         return {
           container: {
-            backgroundColor: 'transparent',
+            backgroundColor: colors.card,
             borderColor: colors.borderStrong,
             borderWidth: 1,
           },
@@ -107,7 +107,7 @@ export function Button({
             backgroundColor: colors.interactive,
             borderColor: colors.interactive,
             borderWidth: 1,
-            ...shadows.sm,
+            ...shadows.md,
           },
           text: { color: '#FFFFFF' },
           indicatorColor: '#FFFFFF',
@@ -136,7 +136,7 @@ export function Button({
             paddingVertical: 14,
             paddingHorizontal: spacing.xxl,
             minHeight: 54,
-            borderRadius: radius.lg,
+            borderRadius: radius.xl,
           },
           text: {
             ...typography.h3,
@@ -174,9 +174,14 @@ export function Button({
         fullWidth && styles.fullWidth,
         disabled && styles.disabled,
         pressed && !disabled && !loading && {
-          opacity: 0.9,
-          transform: [{ scale: 0.985 }],
-          backgroundColor: variant === 'primary' ? colors.interactiveHover : undefined,
+          opacity: 0.92,
+          transform: [{ scale: 0.98 }],
+          backgroundColor:
+            variant === 'primary' || variant === 'gold'
+              ? colors.interactiveHover
+              : variant === 'secondary' || variant === 'outline'
+                ? colors.pressed
+                : undefined,
         },
         style,
       ]}
@@ -295,5 +300,5 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
   },
-  disabled: { opacity: 0.42 },
+  disabled: { opacity: 0.48 },
 });
