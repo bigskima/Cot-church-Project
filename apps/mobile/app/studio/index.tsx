@@ -25,6 +25,11 @@ export default function CreatorStudioScreen() {
   const { api, context, hasCapability, hasPublicCapability } = useSession();
   const expression = context?.expression;
   const canPublishPosts = hasCapability('posts.create') || hasCapability('posts.publish') || hasCapability('*');
+  const expressionCreatorOrganizationId = context?.organization?.id ?? context?.creatorOrganizations?.[0]?.id ?? '';
+  const canCreateExpression = Boolean(
+    expressionCreatorOrganizationId &&
+    context?.creatorOrganizations?.some((item) => item.id === expressionCreatorOrganizationId),
+  );
   const { colors } = useTheme();
 
   const [activeModal, setActiveModal] = useState<'post' | null>(null);
@@ -133,7 +138,7 @@ export default function CreatorStudioScreen() {
       iconName: 'people-outline',
       badge: 'COMMUNITY',
       route: '/leadership/expressions',
-      enabled: hasCapability('branches.create') || hasCapability('*'),
+      enabled: canCreateExpression,
     },
     {
       title: 'Church Leadership',
