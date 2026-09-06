@@ -49,8 +49,12 @@ export default function LiveDiscoveryScreen() {
 
   const streams = resource.data?.streams ?? [];
   const liveStreams = streams.filter((item) => item.status === 'live');
-  const scheduledStreams = streams.filter((item) => item.status === 'scheduled' || item.status === 'ready');
-  const replays = streams.filter((item) => item.status === 'ended');
+  const scheduledStreams = streams.filter((item) =>
+    item.status === 'scheduled' || item.status === 'provisioning' || item.status === 'ready',
+  );
+  const replays = streams.filter((item) =>
+    item.status === 'ended' || item.status === 'processing' || item.status === 'replay_ready',
+  );
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -127,7 +131,7 @@ export default function LiveDiscoveryScreen() {
 
               {replays.length > 0 ? (
                 <View style={styles.sectionWrap}>
-                  <SectionHeader title="Recent Replays" badge={replays.length} />
+                  <SectionHeader title="Replays & recordings" badge={replays.length} subtitle="Ended services stay here while recordings finish processing." />
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
