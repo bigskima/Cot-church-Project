@@ -168,6 +168,8 @@ const invariants = [
   [signup, /client\.auth\.signUp/, 'Supabase Auth signup'],
   [signup, /assertNoUnknownFields/, 'strict signup validation'],
   [organizationContext, /effectivePermissions/, 'effective permission resolution'],
+  [organizationContext, /requestedMembership[\s\S]*memberships\[0\][\s\S]*requestedMembership\.id/, 'first-response role resolution before persisted church headers'],
+  [organizationContext, /creatorOrganizations/, 'Expression creator authority remains separate from membership permissions'],
   [organizationContext, /publicCapabilitiesResult[\s\S]*publicCapabilities/, 'public capability resolution independent of Expression roles'],
   [platformRolesAccess, /methods:\s*\["GET",\s*"PATCH"\]/, 'Roles & Access read/update methods'],
   [platformRolesAccess, /platform\.roles\.read/, 'Roles & Access read authority'],
