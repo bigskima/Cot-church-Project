@@ -215,6 +215,43 @@ const forbidden = [
 ];
 const presentForbidden = forbidden.filter(([source, pattern]) => pattern.test(source));
 
+async function collectSourceFiles(root) {
+  const entries = await readdir(root, { withFileTypes: true });
+  const paths = [];
+  for (const entry of entries) {
+    const path = `${root}/${entry.name}`;
+    if (entry.isDirectory()) paths.push(...await collectSourceFiles(path));
+    else if (/\.(?:ts|tsx)$/.test(entry.name)) paths.push(path);
+  }
+  return paths;
+}
+
+const clientSourceFiles = [
+  ...await collectSourceFiles('apps/mobile'),
+  ...await collectSourceFiles('apps/admin'),
+];
+const endpointReferences = new Map();
+const literalRequest = /\b(?:api|platformApi)\.request(?:<[^;]{0,500}?>)?\(\s*([\`'"])([^\`'"]+)\1/gms;
+for (const file of clientSourceFiles) {
+  const source = await readFile(file, 'utf8');
+  for (const match of source.matchAll(literalRequest)) {
+    const rawPath = match[2];
+    const slug = rawPath.split(/[?/$]/, 1)[0];
+    if (!slug || slug.includes('${')) continue;
+    const paths = endpointReferences.get(slug) ?? [];
+    paths.push(file);
+    endpointReferences.set(slug, paths);
+  }
+}
+const missingEndpointFunctions = [];
+for (const [slug, paths] of endpointReferences) {
+  try {
+    await access(`supabase/functions/${slug}/index.ts`);
+  } catch {
+    missingEndpointFunctions.push(`${slug} <- ${[...new Set(paths)].join(', ')}`);
+  }
+}
+
 const functionEntries = await readdir('supabase/functions', { withFileTypes: true });
 const publicHandlerFunctions = [];
 for (const entry of functionEntries) {
@@ -238,16 +275,17 @@ const gatewayMismatches = publicHandlerFunctions.filter((functionName) => {
   return !/verify_jwt\s*=\s*false/.test(section);
 });
 
-if (missing.length || gatewayMismatches.length || presentForbidden.length) {
+if (missing.length || gatewayMismatches.length || presentForbidden.length || missingEndpointFunctions.length) {
   const failures = [
     ...missing.map(([, , label]) => label),
     ...gatewayMismatches.map((name) => `gateway verify_jwt=false for ${name}`),
     ...presentForbidden.map(([, , label]) => `remove ${label}`),
+    ...missingEndpointFunctions.map((entry) => `missing Edge Function for client endpoint ${entry}`),
   ];
   console.error(`API check failed: ${failures.join(', ')}`);
   process.exitCode = 1;
 } else {
   console.log(
-    `API check passed (${requiredFiles.length} shared modules, ${invariants.length} invariants, ${publicHandlerFunctions.length} public/secret-verified gateway contracts).`,
+    `API check passed (${requiredFiles.length} shared modules, ${invariants.length} invariants, ${endpointReferences.size} client Edge Function contracts, ${publicHandlerFunctions.length} public/secret-verified gateway contracts).`,
   );
 }
