@@ -25,6 +25,8 @@ const migrationPaths = [
   'supabase/migrations/20260905102909_harden_analytics_default_partition.sql',
   'supabase/migrations/20260905103057_restore_privileged_rpc_execute_boundaries.sql',
   'supabase/migrations/20260905103708_restore_authenticated_interaction_rpc_boundaries.sql',
+  'supabase/migrations/20260906024715_content_moderation_report_integrity.sql',
+  'supabase/migrations/20260906024848_resolve_content_moderation_report.sql',
   'supabase/migrations/20260906025446_fix_platform_store_secret_conflict_target.sql',
   'supabase/migrations/20260906023038_member_onboarding_experience.sql',
 ];
@@ -96,6 +98,11 @@ const requiredPatterns = [
   /revoke all on function public\.comment_on_social_post\(uuid,text,uuid\) from public, anon/i,
   /grant execute on function public\.comment_on_social_post\(uuid,text,uuid\) to authenticated, service_role/i,
   /on conflict on constraint platform_secret_metadata_pkey do update/i,
+  /create policy moderation_reports_reporter_insert/i,
+  /create policy moderation_reports_moderator_update/i,
+  /Moderation report evidence is immutable/i,
+  /create or replace function public\.resolve_content_moderation_report/i,
+  /grant execute on function public\.resolve_content_moderation_report\(uuid,text,text\) to authenticated, service_role/i,
 ];
 
 const source = (await Promise.all(migrationPaths.map((path) => readFile(path, 'utf8')))).join('\n');
