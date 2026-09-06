@@ -69,7 +69,7 @@ export function AdminInvitations({ api }: { api: ApiClient }) {
         body: JSON.stringify({ email: email.trim(), roleCode, message: customMessage.trim() }),
       });
       setCreateOpen(false);
-      setSuccess(`Invitation sent to ${email.trim()} for the ${selectedRole?.name ?? roleCode} role. Authority starts only after acceptance.`);
+      setSuccess(`Invitation sent to ${email.trim()} for the ${selectedRole?.name ?? roleCode} role. Access begins only after acceptance.`);
       setEmail('');
       setCustomMessage('');
       await load();
@@ -145,8 +145,8 @@ export function AdminInvitations({ api }: { api: ApiClient }) {
       <Modal
         isOpen={createOpen}
         onClose={() => { if (!busy) setCreateOpen(false); }}
-        title="Invite Platform Administrator"
-        subtitle="Offer one specific platform role to an existing registered COT account."
+        title="Invite administrator"
+        subtitle="Choose the administration role this person should receive after accepting the invitation."
         maxWidth="md"
         footer={
           <>
