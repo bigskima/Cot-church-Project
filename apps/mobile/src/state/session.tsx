@@ -316,6 +316,21 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
   const refreshContext = useCallback(() => setContextVersion((value) => value + 1), []);
 
+  // Role/capability grants should appear without forcing a sign-out. Re-resolve
+  // access when the app returns to the foreground and periodically in the
+  // background. The context loader preserves already-resolved UI while this runs.
+  useEffect(() => {
+    if (mode !== 'authenticated' || !auth) return;
+    const interval = setInterval(refreshContext, 120_000);
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refreshContext();
+    });
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
+  }, [mode, auth?.session.accessToken, refreshContext]);
+
   const updateContextProfile = useCallback((changes: Partial<MembershipContext['profile']>) => {
     setContext((current) => current
       ? { ...current, profile: { ...current.profile, ...changes } }
