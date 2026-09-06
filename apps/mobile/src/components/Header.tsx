@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { useTheme } from '@/state/theme';
 import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 import { Icon } from './primitives/Icon';
+import { BrandMark } from './primitives/BrandMark';
 
 interface ScreenHeaderProps {
   title: string;
@@ -35,16 +36,29 @@ export function ScreenHeader({
   };
 
   return (
-    <View style={[styles.headerContainer, compact && styles.headerCompact, style]}>
-      {(showBack || rightAction || kicker) && (
-        <View style={styles.topRow}>
+    <View
+      style={[
+        styles.headerContainer,
+        compact && styles.headerCompact,
+        {
+          backgroundColor: colors.glass,
+          borderColor: colors.borderSubtle,
+        },
+        shadows.sm,
+        style,
+      ]}
+    >
+      <View pointerEvents="none" style={[styles.headerGlow, { backgroundColor: colors.primarySoft }]} />
+
+      <View style={styles.topRow}>
+        <View style={styles.headerIdentity}>
           {showBack ? (
             <Pressable
               onPress={handleBack}
               hitSlop={8}
               style={({ pressed }) => [
                 styles.backButton,
-                { backgroundColor: colors.card, borderColor: colors.borderSubtle },
+                { backgroundColor: colors.cardElevated, borderColor: colors.borderSubtle },
                 pressed && { backgroundColor: colors.pressed, transform: [{ scale: 0.96 }] },
               ]}
               accessibilityRole="button"
@@ -52,25 +66,33 @@ export function ScreenHeader({
             >
               <Icon name="chevron-back" size={21} color={colors.text} />
             </Pressable>
-          ) : kicker ? (
-            <View style={[styles.kickerPill, { backgroundColor: colors.primarySoft }]}>
-              <Text style={[styles.kickerText, { color: colors.interactive }]}>{kicker}</Text>
-            </View>
-          ) : (
-            <View style={styles.spacer} />
-          )}
+          ) : null}
 
-          <View style={styles.spacer} />
-          {rightAction && <View style={styles.rightActionContainer}>{rightAction}</View>}
+          <View style={[styles.brandShell, { backgroundColor: colors.cardElevated, borderColor: colors.borderSubtle }]}>
+            <BrandMark variant="header" size={30} />
+          </View>
+
+          <View style={styles.identityCopy}>
+            <Text style={[styles.identityLabel, { color: colors.textMuted }]}>CITY OF TRANSFORMATION</Text>
+            {kicker ? (
+              <View style={[styles.kickerPill, { backgroundColor: colors.primarySoft }]}>
+                <Text style={[styles.kickerText, { color: colors.interactive }]}>{kicker}</Text>
+              </View>
+            ) : null}
+          </View>
         </View>
-      )}
 
-      <Text style={[compact ? styles.compactTitle : styles.title, { color: colors.text }]} numberOfLines={2}>
-        {title}
-      </Text>
-      {subtitle ? (
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{subtitle}</Text>
-      ) : null}
+        {rightAction ? <View style={styles.rightActionContainer}>{rightAction}</View> : null}
+      </View>
+
+      <View style={styles.titleBlock}>
+        <Text style={[compact ? styles.compactTitle : styles.title, { color: colors.text }]} numberOfLines={2}>
+          {title}
+        </Text>
+        {subtitle ? (
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{subtitle}</Text>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -124,19 +146,64 @@ export function SectionHeader({ title, subtitle, badge, actionLabel, onAction, s
 
 const styles = StyleSheet.create({
   headerContainer: {
+    position: 'relative',
+    overflow: 'hidden',
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.lg,
+    borderWidth: 1,
+    borderRadius: radius.xxl,
   },
   headerCompact: {
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+  },
+  headerGlow: {
+    position: 'absolute',
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    right: -58,
+    top: -82,
+    opacity: 0.7,
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
     marginBottom: spacing.md,
-    minHeight: 40,
+    minHeight: 42,
+  },
+  headerIdentity: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  brandShell: {
+    width: 42,
+    height: 42,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  identityCopy: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'flex-start',
+    gap: 4,
+  },
+  identityLabel: {
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: '800',
+    letterSpacing: 0.85,
+  },
+  titleBlock: {
+    gap: 2,
   },
   backButton: {
     width: 40,
@@ -148,9 +215,9 @@ const styles = StyleSheet.create({
     ...shadows.sm,
   },
   kickerPill: {
-    minHeight: 28,
+    minHeight: 24,
     borderRadius: radius.pill,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -160,6 +227,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    zIndex: 2,
   },
   title: { ...typography.display },
   compactTitle: { ...typography.h1 },
