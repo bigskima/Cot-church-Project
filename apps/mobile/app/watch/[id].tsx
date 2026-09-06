@@ -49,10 +49,10 @@ export default function WatchDetailScreen() {
   const resource = useResource<Video>(`watch:detail:${expressionMode ? context?.expression?.id ?? 'none' : 'public'}:${id}`, async (signal) => {
     if (expressionMode) {
       if (mode === 'visitor' || !context?.expression?.id) throw new Error('Enter this Expression to view its internal video.');
-      const payload = await api.request<{ videos: Video[] }>(`home-feed?organizationId=${encodeURIComponent(organizationId)}&expressionId=${encodeURIComponent(context.expression.id)}`, { signal });
-      const match = payload.videos.find((video) => video.id === id);
-      if (!match) throw new Error('This video is not available in the active Expression.');
-      return match;
+      return api.request<Video>(
+        `content-media?action=video_detail&id=${encodeURIComponent(id)}`,
+        { signal, context: 'current' },
+      );
     }
     const suffix = organizationId ? `&organizationId=${encodeURIComponent(organizationId)}` : '';
     return api.request<Video>(`public-content?type=video&id=${encodeURIComponent(id)}${suffix}`, { signal, context: 'public' });
@@ -98,7 +98,14 @@ export default function WatchDetailScreen() {
 
   const videoUrl = playback.data?.renditions?.find((rendition) => rendition.kind === 'video_stream')?.playbackUrl;
   const posterUrl = video?.media_assets?.thumbnailUrl || video?.media_assets?.url;
-  const identity = (video?.content_items as any)?.expression?.name || (video?.content_items as any)?.organization?.name || context?.organization?.name || 'Church Community';
+  const contentIdentity = video?.content_items;
+  const sourceName =
+    contentIdentity?.expression?.name ||
+    contentIdentity?.organization?.name ||
+    context?.organization?.name ||
+    'City of Transformation';
+  const creatorName = contentIdentity?.author?.display_name || sourceName;
+  const creatorAvatar = contentIdentity?.author?.avatar_url ?? undefined;
 
   const handleLike = async () => {
     if (mode === 'visitor') { router.push({
@@ -151,7 +158,7 @@ export default function WatchDetailScreen() {
     if (!video || expressionMode) return;
     try {
       await Share.share({
-        message: `Watch "${video.title}" on ${identity}.`,
+        message: `Watch "${video.title}" on ${sourceName}.`,
       });
     } catch {
       // Ignored
@@ -206,13 +213,13 @@ export default function WatchDetailScreen() {
             <Text style={[styles.title, { color: colors.text }]}>{video.title}</Text>
 
             <View style={styles.authorRow}>
-              <Avatar name={identity} size="sm" />
+              <Avatar url={creatorAvatar} name={creatorName} size="sm" />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.authorName, { color: colors.text }]} numberOfLines={1}>
-                  {identity}
+                  {creatorName}
                 </Text>
-                <Text style={[styles.authorSub, { color: colors.textSecondary }]}>
-                  {video.category || 'Ministry Teaching'}
+                <Text style={[styles.authorSub, { color: colors.textSecondary }]} numberOfLines={1}>
+                  {sourceName}{video.category ? ` · ${video.category}` : ''}
                 </Text>
               </View>
             </View>
