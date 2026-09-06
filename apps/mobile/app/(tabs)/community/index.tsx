@@ -29,7 +29,7 @@ import {
   ResourceError,
   Skeleton,
 } from '@/components';
-import { radius, spacing } from '@/design-system/tokens';
+import { radius, shadows, spacing } from '@/design-system/tokens';
 import type { ContentComment, SocialPost } from '@/types/content';
 
 type FeedScope = 'general' | 'expression';
@@ -453,16 +453,45 @@ export default function CommunityScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <View style={[styles.headerBar, { paddingTop: insets.top + spacing.sm, backgroundColor: colors.glass, borderColor: colors.borderSubtle }]}>
+      <View
+        style={[
+          styles.headerBar,
+          {
+            paddingTop: insets.top + spacing.sm,
+            backgroundColor: colors.glass,
+            borderColor: colors.borderSubtle,
+          },
+          shadows.sm,
+        ]}
+      >
+        <View pointerEvents="none" style={[styles.headerGlow, { backgroundColor: colors.primarySoft }]} />
         <View style={styles.headerIdentity}>
-          <BrandMark variant="compact" size={30} />
-          <View>
+          <View style={[styles.headerBrandShell, { backgroundColor: colors.cardElevated, borderColor: colors.borderSubtle }]}>
+            <BrandMark variant="header" size={31} />
+          </View>
+          <View style={styles.headerCopy}>
+            <Text style={[styles.headerEyebrow, { color: colors.textMuted }]}>CITY OF TRANSFORMATION</Text>
             <Text style={[styles.headerTitle, { color: colors.text }]}>Community</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>Public fellowship and Expression conversations</Text>
+            <View style={[styles.headerScopePill, { backgroundColor: colors.primarySoft }]}>
+              <Icon name={expression?.id ? 'people-outline' : 'globe-outline'} size={11} color={colors.interactive} />
+              <Text style={[styles.headerScopeText, { color: colors.interactive }]} numberOfLines={1}>
+                {expression?.name || 'Public fellowship'}
+              </Text>
+            </View>
           </View>
         </View>
         {expression?.id ? (
-          <Pressable onPress={() => router.push('/(tabs)/community/leadership')} hitSlop={8} style={[styles.headerIconBtn, { backgroundColor: colors.bgSecondary }]} accessibilityRole="button" accessibilityLabel={`${expression.name} leadership`}>
+          <Pressable
+            onPress={() => router.push('/(tabs)/community/leadership')}
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.headerIconBtn,
+              { backgroundColor: colors.cardElevated, borderColor: colors.borderSubtle },
+              pressed && styles.composerPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={`${expression.name} leadership`}
+          >
             <Icon name="people-outline" size={18} color={colors.text} />
           </Pressable>
         ) : null}
@@ -493,16 +522,36 @@ export default function CommunityScreen() {
       ) : null}
 
       {canPostCurrent ? (
-        <Pressable onPress={openComposer} style={({ pressed }) => [styles.composerStrip, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, pressed && styles.composerPressed]}>
-          <Avatar url={context?.profile?.avatar_url} name={context?.profile?.display_name || 'Me'} size="sm" />
-          <View style={styles.composerCopy}>
-            <Text style={[styles.composerPrompt, { color: colors.text }]}>Share with the community</Text>
-            <Text style={[styles.composerPlaceholder, { color: colors.textMuted }]}>
-              {activeTab === 'general' && !elevatedGeneralPublisher ? 'Text, photos or short video' : 'Text, photos, video or audio'}
-            </Text>
+        <View style={[styles.composerSurface, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+          <Pressable onPress={openComposer} style={({ pressed }) => [styles.composerStrip, pressed && styles.composerPressed]}>
+            <Avatar url={context?.profile?.avatar_url} name={context?.profile?.display_name || 'Me'} size="sm" />
+            <View style={styles.composerCopy}>
+              <Text style={[styles.composerPrompt, { color: colors.text }]}>Share with the community</Text>
+              <Text style={[styles.composerPlaceholder, { color: colors.textMuted }]}>
+                {activeTab === 'general' && !elevatedGeneralPublisher ? 'Text, photos or short video' : 'Text, photos, video or audio'}
+              </Text>
+            </View>
+            <View style={[styles.composeActionIcon, { backgroundColor: colors.primarySoft }]}>
+              <Icon name="create-outline" size={18} color={colors.interactive} />
+            </View>
+          </Pressable>
+          <View style={[styles.quickCreateRow, { borderTopColor: colors.borderSubtle }]}>
+            <Pressable onPress={openComposer} style={({ pressed }) => [styles.quickCreateButton, pressed && styles.composerPressed]}>
+              <Icon name="chatbubble-ellipses-outline" size={15} color={colors.interactive} />
+              <Text style={[styles.quickCreateText, { color: colors.textSecondary }]}>Post</Text>
+            </Pressable>
+            <Pressable onPress={openComposer} style={({ pressed }) => [styles.quickCreateButton, pressed && styles.composerPressed]}>
+              <Icon name="images-outline" size={15} color={colors.interactive} />
+              <Text style={[styles.quickCreateText, { color: colors.textSecondary }]}>Photo / video</Text>
+            </Pressable>
+            {canCreateReel ? (
+              <Pressable onPress={() => router.push('/studio/reel' as any)} style={({ pressed }) => [styles.quickCreateButton, pressed && styles.composerPressed]}>
+                <Icon name="flash-outline" size={15} color={colors.interactive} />
+                <Text style={[styles.quickCreateText, { color: colors.textSecondary }]}>Reel</Text>
+              </Pressable>
+            ) : null}
           </View>
-          <Icon name="create-outline" size={20} color={colors.interactive} />
-        </Pressable>
+        </View>
       ) : null}
 
       {resource.loading && !resource.data ? (
@@ -665,18 +714,29 @@ export default function CommunityScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  headerBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: spacing.md, marginTop: spacing.xs, paddingHorizontal: spacing.md, paddingBottom: spacing.md, borderWidth: 1, borderRadius: radius.xl },
+  headerBar: { position: 'relative', overflow: 'hidden', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: spacing.md, marginTop: spacing.xs, paddingHorizontal: spacing.md, paddingBottom: spacing.md, borderWidth: 1, borderRadius: radius.xxl },
+  headerGlow: { position: 'absolute', width: 132, height: 132, borderRadius: 66, right: -48, top: -72, opacity: 0.72 },
   headerIdentity: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1, minWidth: 0 },
-  headerTitle: { fontSize: 21, fontWeight: '800', letterSpacing: -0.55 },
+  headerBrandShell: { width: 46, height: 46, borderRadius: radius.lg, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  headerCopy: { flex: 1, minWidth: 0, alignItems: 'flex-start' },
+  headerEyebrow: { fontSize: 8, lineHeight: 11, fontWeight: '800', letterSpacing: 0.8 },
+  headerTitle: { fontSize: 19, lineHeight: 23, fontWeight: '800', letterSpacing: -0.5, marginTop: 1 },
+  headerScopePill: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3, maxWidth: 190 },
+  headerScopeText: { fontSize: 10, fontWeight: '700', flexShrink: 1 },
   headerSubtitle: { fontSize: 11, lineHeight: 15, marginTop: 1 },
-  headerIconBtn: { width: 36, height: 36, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  headerIconBtn: { width: 38, height: 38, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   tabBar: { flexDirection: 'row', marginHorizontal: spacing.md, marginTop: spacing.sm, padding: 4, borderWidth: 1, borderRadius: radius.pill },
   tabItem: { flex: 1, alignItems: 'center', paddingVertical: 9, paddingHorizontal: spacing.sm, borderRadius: radius.pill },
   tabText: { fontSize: 14, fontWeight: '600' },
   tabTextActive: { fontWeight: '800' },
   feedError: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.md, marginTop: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderRadius: radius.lg },
   feedErrorText: { flex: 1, fontSize: 12, lineHeight: 17, fontWeight: '700' },
-  composerStrip: { flexDirection: 'row', alignItems: 'center', marginHorizontal: spacing.md, marginVertical: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderWidth: 1, borderRadius: radius.xl, gap: spacing.md },
+  composerSurface: { marginHorizontal: spacing.md, marginVertical: spacing.sm, borderWidth: 1, borderRadius: radius.xl, overflow: 'hidden' },
+  composerStrip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.md, gap: spacing.md },
+  composeActionIcon: { width: 34, height: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  quickCreateRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.sm, paddingVertical: 7, borderTopWidth: StyleSheet.hairlineWidth, gap: 2 },
+  quickCreateButton: { flex: 1, minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: radius.pill, paddingHorizontal: spacing.xs },
+  quickCreateText: { fontSize: 10.5, fontWeight: '700' },
   composerPressed: { opacity: 0.88, transform: [{ scale: 0.992 }] },
   composerCopy: { flex: 1, minWidth: 0 },
   composerPrompt: { fontSize: 14, fontWeight: '700', letterSpacing: -0.15 },
