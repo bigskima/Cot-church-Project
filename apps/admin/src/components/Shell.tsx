@@ -82,6 +82,7 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
     api.request<{
       profile?: { display_name?: string | null };
       roles?: Array<{ platform_roles?: { name?: string | null } | null; role_code?: string }>;
@@ -145,6 +146,17 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
     }
     return 'Platform Administration';
   };
+
+  if (loading) {
+    return (
+      <div className="admin-shell" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
+        <div className="admin-table-loading" style={{ padding: 80, minWidth: 280 }}>
+          <span className="admin-spinner" />
+          <p>Resolving Platform Administration access…</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="admin-shell">
@@ -221,7 +233,7 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
           </div>
         </header>
         <main className="admin-content-viewport">
-          {loading ? <div className="admin-table-loading" style={{ padding: 120 }}><span className="admin-spinner" /><p>Loading Platform Administration…</p></div> : renderContent()}
+          {renderContent()}
         </main>
       </div>
     </div>
