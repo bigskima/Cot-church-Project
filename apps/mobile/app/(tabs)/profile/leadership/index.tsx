@@ -10,7 +10,7 @@ import { useResource } from '@/hooks/use-resource';
 
 export default function LeadershipHubScreen() {
   const insets = useSafeAreaInsets();
-  const { hasCapability, context, api, mode } = useSession();
+  const { hasCapability, hasPublicCapability, context, api, mode } = useSession();
   const { colors } = useTheme();
 
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? context?.creatorOrganizations?.[0]?.id ?? '';
@@ -30,7 +30,7 @@ export default function LeadershipHubScreen() {
   );
   const isCurrentExpressionOwner = ownershipState.data?.isCurrentOwner === true;
 
-  const canManageMedia = hasCapability('streams.broadcast') || hasCapability('*');
+  const canManageMedia = hasPublicCapability('public.live_stream.create') || hasCapability('streams.broadcast') || hasCapability('*');
   const canModeratePrayer = (hasCapability('prayer.moderate') && (hasCapability('prayer.pastoral.receive') || hasCapability('prayer.team.receive'))) || hasCapability('*');
   const canReceivePastoralFollowups = hasCapability('pastoral.followups.receive') || hasCapability('*');
   const canPastoralTriage = canModeratePrayer || canReceivePastoralFollowups;
