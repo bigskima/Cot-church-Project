@@ -3500,3 +3500,174 @@ body {
     border-radius: 14px;
   }
 }
+
+
+/* -------------------------------------------------------------
+   ADMIN INTERACTION LAYER — MODALS & SEGMENTED TABS
+   ------------------------------------------------------------- */
+.admin-modal-overlay {
+  padding: 24px;
+}
+
+.admin-modal-backdrop {
+  border: 0;
+  cursor: default;
+  background:
+    radial-gradient(circle at 50% 15%, rgba(47, 111, 237, 0.14), transparent 32%),
+    rgba(2, 8, 23, 0.78);
+  backdrop-filter: blur(14px);
+}
+
+.admin-modal-dialog {
+  border-color: color-mix(in srgb, var(--border-strong) 80%, var(--blue));
+  border-radius: 24px;
+  background:
+    linear-gradient(160deg, color-mix(in srgb, var(--bg-card) 97%, #12345f), var(--bg-card));
+  box-shadow:
+    0 28px 90px rgba(0, 0, 0, 0.42),
+    0 0 0 1px rgba(255, 255, 255, 0.02);
+}
+
+.admin-modal-dialog:focus {
+  outline: none;
+}
+
+.admin-modal-header {
+  align-items: flex-start;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-elevated) 62%, transparent), transparent);
+}
+
+.admin-modal-close {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 38px;
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bg-elevated) 82%, transparent);
+  font-size: 22px;
+  line-height: 1;
+  transition:
+    transform 0.16s ease,
+    color 0.16s ease,
+    border-color 0.16s ease,
+    background-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.admin-modal-close:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-strong);
+  background: var(--bg-elevated);
+}
+
+.admin-modal-close:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.18);
+}
+
+.admin-modal-body {
+  scrollbar-gutter: stable;
+}
+
+.admin-modal-footer {
+  background: color-mix(in srgb, var(--bg-elevated) 52%, transparent);
+  backdrop-filter: blur(14px);
+}
+
+.admin-tabs-nav {
+  display: inline-flex;
+  max-width: 100%;
+  gap: 4px;
+  margin-bottom: 24px;
+  padding: 4px;
+  overflow-x: auto;
+  border: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--bg-input) 82%, transparent);
+  scrollbar-width: none;
+}
+
+.admin-tabs-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.admin-tab-btn {
+  min-height: 42px;
+  padding: 9px 14px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  white-space: nowrap;
+  transition:
+    color 0.16s ease,
+    border-color 0.16s ease,
+    background-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+.admin-tab-btn:hover {
+  transform: translateY(-1px);
+}
+
+.admin-tab-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.18);
+}
+
+.admin-tab-active {
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+  background: var(--bg-card);
+  box-shadow: 0 7px 18px rgba(0, 0, 0, 0.12);
+}
+
+.admin-tab-active .admin-tab-icon {
+  color: var(--gold-light);
+}
+
+.admin-tab-count {
+  min-width: 22px;
+  text-align: center;
+}
+
+.count-active {
+  background-color: rgba(47, 111, 237, 0.14);
+  color: var(--gold-light);
+}
+
+[data-theme="light"] .admin-modal-dialog {
+  background: linear-gradient(160deg, #FFFFFF, #F8FAFC);
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.18);
+}
+
+[data-theme="light"] .admin-tabs-nav {
+  background: #EEF3F9;
+}
+
+@media (max-width: 760px) {
+  .admin-modal-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .admin-modal-dialog {
+    width: 100%;
+    max-height: 92vh;
+    border-radius: 24px 24px 0 0;
+  }
+
+  .admin-tabs-nav {
+    display: flex;
+    width: 100%;
+  }
+
+  .admin-tab-btn {
+    flex: 1 0 auto;
+    justify-content: center;
+  }
+}
