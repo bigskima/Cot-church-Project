@@ -115,6 +115,7 @@ const publicIdentity = await readFile('supabase/functions/_shared/public-identit
 const engagement = await readFile('supabase/functions/engagement/index.ts', 'utf8');
 const homeFeed = await readFile('supabase/functions/home-feed/index.ts', 'utf8');
 const streamAccess = await readFile('supabase/functions/stream-access/index.ts', 'utf8');
+const contentMedia = await readFile('supabase/functions/content-media/index.ts', 'utf8');
 const feedRanking = await readFile('supabase/functions/_shared/feed-ranking.ts', 'utf8');
 const eventRegistrations = await readFile('supabase/functions/event-registrations/index.ts', 'utf8');
 const sermons = await readFile('supabase/functions/sermons/index.ts', 'utf8');
@@ -212,6 +213,10 @@ const invariants = [
   [streamAccess, /scheduled"[\s\S]*provisioning"[\s\S]*ready"[\s\S]*processing"[\s\S]*replay_ready"[\s\S]*failed"/, 'livestream detail lifecycle coverage'],
   [streamAccess, /playbackEligible[\s\S]*live"[\s\S]*ended"[\s\S]*processing"[\s\S]*replay_ready"/, 'livestream playback lifecycle gating'],
   [streamAccess, /giving_settings[\s\S]*givingEnabled/, 'live giving visibility follows scoped configuration'],
+  [publicContent, /type === "videos"[\s\S]*author_profile_id[\s\S]*enrichContentCreators/, 'public Watch lists include real creator attribution'],
+  [publicContent, /type === "streams"[\s\S]*provisioning[\s\S]*ready[\s\S]*processing[\s\S]*replay_ready/, 'public stream catalogue lifecycle coverage'],
+  [contentMedia, /action"\) === "video_detail"[\s\S]*content_items\.expression_id[\s\S]*auth\.branchId/, 'exact Expression Watch detail is scoped to active Expression'],
+  [contentMedia, /video_detail[\s\S]*enrichContentCreators/, 'exact Expression Watch detail includes creator attribution'],
   [feedRanking, /completedPenalty/, 'completed-content recommendation suppression'],
   [feedRanking, /diversifyFeed/, 'mixed-format feed diversification'],
   [engagement, /view.*state/, 'engagement viewer-state retrieval'],
