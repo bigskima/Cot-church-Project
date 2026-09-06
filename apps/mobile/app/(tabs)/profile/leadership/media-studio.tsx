@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
@@ -27,18 +27,29 @@ type StreamingReadiness = {
   signedPlaybackConfigured?: boolean;
 };
 
+type BroadcastScope = 'public' | 'expression';
+
 export default function MediaStudioScreen() {
   const insets = useSafeAreaInsets();
-  const { api, context } = useSession();
+  const { api, context, hasCapability, hasPublicCapability } = useSession();
   const { colors } = useTheme();
   const expression = context?.expression;
-  const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
+  const organizationId =
+    context?.organization?.id ??
+    context?.organizations?.[0]?.id ??
+    context?.creatorOrganizations?.[0]?.id ??
+    process.env.EXPO_PUBLIC_ORGANIZATION_ID ??
+    '';
 
+  const canPublicBroadcast = hasPublicCapability('public.live_stream.create');
+  const canExpressionBroadcast = Boolean(expression?.id) && (hasCapability('streams.broadcast') || hasCapability('*'));
+  const hasBroadcastAccess = canPublicBroadcast || canExpressionBroadcast;
+
+  const [broadcastScope, setBroadcastScope] = useState<BroadcastScope>(canExpressionBroadcast ? 'expression' : 'public');
   const [createOpen, setCreateOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [latencyMode, setLatencyMode] = useState<'standard' | 'reduced' | 'low'>('reduced');
-  const [visibility, setVisibility] = useState<'public' | 'branch'>(expression?.id ? 'branch' : 'public');
   const [creating, setCreating] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [createdIngest, setCreatedIngest] = useState<{ rtmpUrl: string; streamKey: string } | null>(null);
@@ -46,11 +57,43 @@ export default function MediaStudioScreen() {
   const [actionMsg, setActionMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  const readiness = useResource<StreamingReadiness>(`leadership:streaming-readiness:${organizationId || 'none'}:${expression?.id ?? 'general'}`, (signal) =>
-    api.request<StreamingReadiness>('streaming-broadcasts', { signal }),
+  useEffect(() => {
+    if (broadcastScope === 'expression' && !canExpressionBroadcast && canPublicBroadcast) {
+      setBroadcastScope('public');
+    }
+    if (broadcastScope === 'public' && !canPublicBroadcast && canExpressionBroadcast) {
+      setBroadcastScope('expression');
+    }
+  }, [broadcastScope, canExpressionBroadcast, canPublicBroadcast]);
+
+  const targetExpressionId = broadcastScope === 'expression' ? expression?.id : undefined;
+  const destinationName = broadcastScope === 'expression'
+    ? expression?.name ?? 'Expression'
+    : 'General Community';
+
+  const readiness = useResource<StreamingReadiness>(
+    `leadership:streaming-readiness:${broadcastScope}:${organizationId || 'auto'}:${targetExpressionId ?? 'none'}`,
+    (signal) => {
+      const allowed = broadcastScope === 'public' ? canPublicBroadcast : canExpressionBroadcast;
+      if (!allowed) return Promise.resolve({ ready: false, reason: 'permission_missing' });
+      const query = new URLSearchParams();
+      if (organizationId) query.set('organizationId', organizationId);
+      if (targetExpressionId) query.set('branchId', targetExpressionId);
+      return api.request<StreamingReadiness>(`streaming-broadcasts?${query.toString()}`, { signal, context: 'public' });
+    },
   );
-  const streams = useResource<LiveStream[]>(`leadership:streams:${expression?.id ?? 'none'}`, (signal) =>
-    expression?.id ? api.request<LiveStream[]>('live-streams?scope=expression', { signal }) : Promise.resolve([]),
+
+  const streams = useResource<LiveStream[]>(
+    `leadership:streams:${broadcastScope}:${organizationId || 'auto'}:${targetExpressionId ?? 'none'}`,
+    (signal) => {
+      const allowed = broadcastScope === 'public' ? canPublicBroadcast : canExpressionBroadcast;
+      if (!allowed) return Promise.resolve([]);
+      const query = new URLSearchParams();
+      query.set('scope', broadcastScope === 'public' ? 'church' : 'expression');
+      if (organizationId) query.set('organizationId', organizationId);
+      if (targetExpressionId) query.set('expressionId', targetExpressionId);
+      return api.request<LiveStream[]>(`live-streams?${query.toString()}`, { signal, context: 'public' });
+    },
   );
 
   const providerReady = readiness.data?.ready === true;
@@ -60,7 +103,6 @@ export default function MediaStudioScreen() {
     setTitle('');
     setDescription('');
     setLatencyMode('reduced');
-    setVisibility(expression?.id ? 'branch' : 'public');
     setCreatedIngest(null);
     setShowKey(false);
     setErrorMsg('');
@@ -71,9 +113,21 @@ export default function MediaStudioScreen() {
     setCreateOpen(true);
   };
 
+  const changeScope = (next: BroadcastScope) => {
+    if (creating) return;
+    if (next === 'public' && !canPublicBroadcast) return;
+    if (next === 'expression' && !canExpressionBroadcast) return;
+    setCreateOpen(false);
+    setBroadcastScope(next);
+    setActionMsg('');
+    setErrorMsg('');
+  };
+
   const handleCreateBroadcast = async () => {
+    const allowed = broadcastScope === 'public' ? canPublicBroadcast : canExpressionBroadcast;
+    if (!allowed) return setErrorMsg('This live broadcast role is not assigned to your account.');
     if (!providerReady) return setErrorMsg('Live broadcasting is temporarily unavailable.');
-    if (!expression?.id) return setErrorMsg('Enter an Expression before creating its broadcast.');
+    if (broadcastScope === 'expression' && !targetExpressionId) return setErrorMsg('Enter an Expression before creating its broadcast.');
     if (!title.trim()) return setErrorMsg('Enter a broadcast title.');
 
     setCreating(true);
@@ -82,17 +136,20 @@ export default function MediaStudioScreen() {
     try {
       const res = await api.request<{ stream: LiveStream; ingest: { rtmpUrl: string; streamKey: string } }>('streaming-broadcasts', {
         method: 'POST',
+        context: 'public',
         body: JSON.stringify({
+          organizationId: organizationId || undefined,
+          branchId: targetExpressionId,
           title: title.trim(),
           description: description.trim(),
-          visibility,
+          visibility: broadcastScope === 'public' ? 'public' : 'branch',
           latencyMode,
           record: true,
         }),
       });
       setCreatedIngest(res.ingest);
-      setActionMsg(`${res.stream.title} was created inside ${expression.name}.`);
-      await streams.refresh();
+      setActionMsg(`${res.stream.title} was created for ${destinationName}.`);
+      streams.refresh();
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Unable to create broadcast.');
     } finally {
@@ -107,10 +164,11 @@ export default function MediaStudioScreen() {
     try {
       const result = await api.request<{ id: string; status: string }>('streaming-broadcasts', {
         method: 'PATCH',
+        context: 'public',
         body: JSON.stringify({ id, action }),
       });
       setActionMsg(action === 'stop' ? 'Broadcast ended.' : `Broadcast status updated: ${result.status}.`);
-      await streams.refresh();
+      streams.refresh();
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Unable to operate broadcast.');
     } finally {
@@ -118,15 +176,15 @@ export default function MediaStudioScreen() {
     }
   };
 
-  if (!expression?.id) {
+  if (!hasBroadcastAccess) {
     return (
       <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top + spacing.sm }]}>
-        <ScreenHeader title="Live Media Studio" kicker="LEADERSHIP" showBack />
+        <ScreenHeader title="Live Media Studio" kicker="BROADCAST" showBack />
         <View style={styles.emptyPad}>
           <EmptyState
-            title="Enter an Expression first"
-            message="Expression broadcasts are created and operated from inside the Expression they belong to."
-            iconName="radio-outline"
+            title="No live broadcast role assigned"
+            message="Public live access is granted by Platform Administration. Expression live access is granted separately inside an Expression."
+            iconName="lock-closed-outline"
           />
         </View>
       </View>
@@ -146,13 +204,43 @@ export default function MediaStudioScreen() {
           <ScreenHeader
             title="Live Media Studio"
             kicker="BROADCAST"
-            subtitle={`Create and operate live broadcasts for ${expression.name}.`}
+            subtitle={broadcastScope === 'public'
+              ? 'Create public COT broadcasts for General Community.'
+              : `Create private broadcasts inside ${expression?.name ?? 'your Expression'}.`}
             showBack
             rightAction={providerReady ? <Button label="New broadcast" onPress={openCreate} size="sm" /> : undefined}
           />
         </View>
 
         <View style={styles.body}>
+          {canPublicBroadcast && canExpressionBroadcast ? (
+            <View style={[styles.scopeCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+              <View style={styles.flex}>
+                <Text style={[styles.cardTitle, { color: colors.text }]}>Broadcast destination</Text>
+                <Text style={[styles.helper, { color: colors.textSecondary }]}>Choose the space before creating or operating a stream.</Text>
+              </View>
+              <View style={styles.chipsRow}>
+                <Chip label="General Community" selected={broadcastScope === 'public'} onPress={() => changeScope('public')} />
+                <Chip label={expression?.name ?? 'Expression'} selected={broadcastScope === 'expression'} onPress={() => changeScope('expression')} />
+              </View>
+            </View>
+          ) : (
+            <View style={[styles.scopeCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+              <View style={[styles.scopeIcon, { backgroundColor: colors.primarySoft }]}>
+                <Icon name={broadcastScope === 'public' ? 'globe-outline' : 'people-outline'} size={20} color={colors.interactive} />
+              </View>
+              <View style={styles.flex}>
+                <Text style={[styles.cardTitle, { color: colors.text }]}>{destinationName}</Text>
+                <Text style={[styles.helper, { color: colors.textSecondary }]}>
+                  {broadcastScope === 'public'
+                    ? 'Your Platform role allows public COT livestream creation.'
+                    : 'Your Expression role allows livestream creation only inside this Expression.'}
+                </Text>
+              </View>
+              <Badge label={broadcastScope === 'public' ? 'PUBLIC ROLE' : 'EXPRESSION ROLE'} variant="primary" />
+            </View>
+          )}
+
           {actionMsg ? (
             <View style={[styles.banner, { backgroundColor: colors.successSoft, borderColor: colors.success }]}>
               <Icon name="checkmark-circle" size={18} color={colors.success} />
@@ -173,7 +261,7 @@ export default function MediaStudioScreen() {
             <View style={styles.flex}>
               <Text style={[styles.cardTitle, { color: colors.text }]}>Broadcast service</Text>
               <Text style={[styles.helper, { color: colors.textSecondary }]}>
-                {providerReady ? 'Ready to create a provider-backed live broadcast.' : 'Temporarily unavailable. Existing broadcasts remain visible.'}
+                {providerReady ? `Ready for ${destinationName}.` : 'Temporarily unavailable. Existing broadcasts remain visible.'}
               </Text>
             </View>
             <Badge label={providerReady ? 'READY' : 'OFFLINE'} variant={providerReady ? 'active' : 'neutral'} />
@@ -181,9 +269,9 @@ export default function MediaStudioScreen() {
 
           <View style={styles.listSection}>
             <SectionHeader
-              title="Broadcasts"
+              title={broadcastScope === 'public' ? 'Public broadcasts' : 'Expression broadcasts'}
               badge={streamList.length}
-              subtitle={`Streams belonging to ${expression.name}`}
+              subtitle={broadcastScope === 'public' ? 'General Community live operations' : `Streams belonging to ${expression?.name ?? 'this Expression'}`}
               actionLabel={providerReady ? 'Create' : undefined}
               onAction={providerReady ? openCreate : undefined}
             />
@@ -221,7 +309,7 @@ export default function MediaStudioScreen() {
             ) : (
               <EmptyState
                 title="No broadcasts yet"
-                message={providerReady ? 'Create the first live broadcast for this Expression.' : 'Broadcast creation will return when the streaming service is ready.'}
+                message={providerReady ? `Create the first broadcast for ${destinationName}.` : 'Broadcast creation will return when the streaming service is ready.'}
                 iconName="radio-outline"
                 actionLabel={providerReady ? 'Create broadcast' : undefined}
                 onAction={providerReady ? openCreate : undefined}
@@ -235,7 +323,7 @@ export default function MediaStudioScreen() {
         visible={createOpen}
         onClose={() => !creating && setCreateOpen(false)}
         title={createdIngest ? 'Encoder credentials' : 'Create live broadcast'}
-        subtitle={createdIngest ? 'Use these credentials only on the trusted broadcasting device.' : `Inside ${expression.name}`}
+        subtitle={createdIngest ? 'Use these credentials only on the trusted broadcasting device.' : `Destination: ${destinationName}`}
         maxHeightPercent={94}
       >
         {createdIngest ? (
@@ -267,14 +355,20 @@ export default function MediaStudioScreen() {
               </View>
             ) : null}
 
+            <View style={[styles.destinationNotice, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}>
+              <Icon name={broadcastScope === 'public' ? 'globe-outline' : 'people-outline'} size={19} color={colors.interactive} />
+              <View style={styles.flex}>
+                <Text style={[styles.destinationTitle, { color: colors.text }]}>{destinationName}</Text>
+                <Text style={[styles.helper, { color: colors.textSecondary }]}>
+                  {broadcastScope === 'public'
+                    ? 'This livestream is public COT content and may be viewed without Expression membership.'
+                    : 'This livestream remains scoped to the selected Expression. It is not automatically published to General Community.'}
+                </Text>
+              </View>
+            </View>
+
             <InputField label="Broadcast title" value={title} onChangeText={setTitle} placeholder="Sunday worship, conference, prayer meeting…" />
             <InputField label="Description" value={description} onChangeText={setDescription} multiline numberOfLines={3} placeholder="Theme, speaker or service notes…" />
-
-            <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>AUDIENCE</Text>
-            <View style={styles.chipsRow}>
-              <Chip label={expression.name} selected={visibility === 'branch'} onPress={() => setVisibility('branch')} />
-              <Chip label="Public" selected={visibility === 'public'} onPress={() => setVisibility('public')} />
-            </View>
 
             <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>LATENCY</Text>
             <View style={styles.chipsRow}>
@@ -299,6 +393,8 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: spacing.xl },
   emptyPad: { paddingHorizontal: spacing.md },
   flex: { flex: 1 },
+  scopeCard: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.xl, borderWidth: 1, gap: spacing.md, flexWrap: 'wrap' },
+  scopeIcon: { width: 44, height: 44, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
   banner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1 },
   bannerText: { fontSize: 13, fontWeight: '600', flex: 1 },
   readinessCard: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.xl, borderWidth: 1, gap: spacing.md },
@@ -316,6 +412,8 @@ const styles = StyleSheet.create({
   form: { gap: spacing.md },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   fieldLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.65 },
+  destinationNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1 },
+  destinationTitle: { fontSize: 14, fontWeight: '800', marginBottom: 2 },
   ingestSheet: { gap: spacing.md },
   securityNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg },
   ingestField: { gap: 5 },
