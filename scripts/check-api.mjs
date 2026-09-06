@@ -72,6 +72,7 @@ const requiredFiles = [
   'supabase/functions/platform-organizations/index.ts',
   'supabase/functions/platform-expressions/index.ts',
   'supabase/functions/platform-users/index.ts',
+  'supabase/functions/platform-roles-access/index.ts',
   'supabase/functions/platform-audit/index.ts',
   'supabase/functions/platform-streaming/index.ts',
   'supabase/functions/platform-ai/index.ts',
@@ -90,6 +91,9 @@ const authContext = await readFile('supabase/functions/_shared/context.ts', 'utf
 const response = await readFile('supabase/functions/_shared/response.ts', 'utf8');
 const signup = await readFile('supabase/functions/signup/index.ts', 'utf8');
 const organizationContext = await readFile('supabase/functions/organization-context/index.ts', 'utf8');
+const platformRolesAccess = await readFile('supabase/functions/platform-roles-access/index.ts', 'utf8');
+const streamingBroadcasts = await readFile('supabase/functions/streaming-broadcasts/index.ts', 'utf8');
+const liveStreams = await readFile('supabase/functions/live-streams/index.ts', 'utf8');
 const onboarding = await readFile('supabase/functions/onboarding/index.ts', 'utf8');
 const mobileOnboarding = await readFile('apps/mobile/app/onboarding.tsx', 'utf8');
 const onboardingGate = await readFile('apps/mobile/src/components/OnboardingGate.tsx', 'utf8');
@@ -162,6 +166,16 @@ const invariants = [
   [signup, /client\.auth\.signUp/, 'Supabase Auth signup'],
   [signup, /assertNoUnknownFields/, 'strict signup validation'],
   [organizationContext, /effectivePermissions/, 'effective permission resolution'],
+  [organizationContext, /publicCapabilitiesResult[\s\S]*publicCapabilities/, 'public capability resolution independent of Expression roles'],
+  [platformRolesAccess, /methods:\s*\["GET",\s*"PATCH"\]/, 'Roles & Access read/update methods'],
+  [platformRolesAccess, /platform\.roles\.read/, 'Roles & Access read authority'],
+  [platformRolesAccess, /platform\.roles\.manage/, 'Roles & Access mutation authority'],
+  [platformRolesAccess, /set_public_capability_assignment/, 'audited public capability assignment'],
+  [streamingBroadcasts, /organization:\s*"none"/, 'broadcast authority does not depend on stale membership headers'],
+  [streamingBroadcasts, /has_public_capability/, 'root public broadcast capability check'],
+  [streamingBroadcasts, /has_permission[\s\S]*streams\.broadcast/, 'Expression broadcast permission check'],
+  [streamingBroadcasts, /EXPRESSION_PUBLICATION_REQUIRES_SEPARATE_FLOW/, 'Expression livestreams cannot leak directly to General Community'],
+  [liveStreams, /PUBLIC_LIVE_PERMISSION_REQUIRED/, 'public broadcast management role boundary'],
   [onboarding, /methods:\s*\["GET",\s*"POST"\]/, 'onboarding read/update backend methods'],
   [onboarding, /authentication:\s*"required"/, 'onboarding requires an authenticated identity'],
   [onboarding, /action === "accept_policy"/, 'versioned onboarding policy acknowledgement'],
