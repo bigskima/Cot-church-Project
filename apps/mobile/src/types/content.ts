@@ -429,6 +429,7 @@ export type MembershipContext = {
   };
   effectivePermissions?: string[];
   organizationPermissions?: string[];
+  publicCapabilities?: string[];
   organization?: { id: string; name: string; slug: string };
   expression?: { id: string; name: string };
   expressions?: {
