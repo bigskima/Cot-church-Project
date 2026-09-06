@@ -91,6 +91,18 @@ export async function authorize(context: AuthContext, permission: string) {
   if (error || data !== true) throw new ApiError("PERMISSION_DENIED", "You do not have permission to perform this action", 403);
 }
 
+export async function authorizeOrganization(context: AuthContext, permission: string) {
+  if (!context.organizationId) throw new ApiError("ORGANIZATION_REQUIRED", "Organization context is required", 400);
+  const { data, error } = await context.client.rpc("has_permission", {
+    target_organization_id: context.organizationId,
+    requested_permission: permission,
+    target_branch_id: null,
+  });
+  if (error || data !== true) {
+    throw new ApiError("PERMISSION_DENIED", "You do not have permission to perform this church-wide action", 403);
+  }
+}
+
 export async function authorizePlatform(context: AuthContext, permission: string) {
   if (!permission.startsWith("platform.")) {
     throw new ApiError("INVALID_PLATFORM_PERMISSION", "Platform authorization requires a platform-scoped capability", 500, undefined, false);
