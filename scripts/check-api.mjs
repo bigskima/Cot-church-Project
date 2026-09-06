@@ -112,6 +112,11 @@ const platformStreaming = await readFile('supabase/functions/platform-streaming/
 const platformAi = await readFile('supabase/functions/platform-ai/index.ts', 'utf8');
 const platformFeatures = await readFile('supabase/functions/platform-features/index.ts', 'utf8');
 const platformIntegrations = await readFile('supabase/functions/platform-integrations/index.ts', 'utf8');
+const adminAiPage = await readFile('apps/admin/src/pages/AiInfrastructure.tsx', 'utf8');
+const adminStreamingPage = await readFile('apps/admin/src/pages/StreamingInfrastructure.tsx', 'utf8');
+const adminPaymentsPage = await readFile('apps/admin/src/pages/PaymentInfrastructure.tsx', 'utf8');
+const adminIntegrationsPage = await readFile('apps/admin/src/pages/IntegrationsJobs.tsx', 'utf8');
+const adminFeaturesPage = await readFile('apps/admin/src/pages/FeatureFlags.tsx', 'utf8');
 const gatewayConfig = await readFile('supabase/config.toml', 'utf8');
 const privilegedRpcGrantHardening = await readFile('supabase/migrations/20260905121228_harden_remaining_privileged_rpc_execute_grants.sql', 'utf8');
 const streamGrantHardening = await readFile('supabase/migrations/20260905121401_restore_stream_and_idempotency_execute_boundaries.sql', 'utf8');
@@ -193,6 +198,26 @@ const invariants = [
   [platformAi, /platform\.ai\./, 'Level-1 AI authority'],
   [platformFeatures, /platform\.features\./, 'Level-1 feature authority'],
   [platformIntegrations, /platform\.integrations\./, 'Level-1 integrations authority'],
+  [adminAiPage, /action:\s*'configure_provider'/, 'Admin AI configure-provider client action'],
+  [platformAi, /action === "configure_provider"/, 'Admin AI configure-provider backend action'],
+  [adminAiPage, /action:\s*'upsert_model'/, 'Admin AI model client action'],
+  [platformAi, /action === "upsert_model"/, 'Admin AI model backend action'],
+  [adminAiPage, /action:\s*'set_route'/, 'Admin AI route client action'],
+  [platformAi, /action === "set_route"/, 'Admin AI route backend action'],
+  [adminStreamingPage, /action:\s*'configure_global'/, 'Admin streaming configuration client action'],
+  [platformStreaming, /action === "configure_global"/, 'Admin streaming configuration backend action'],
+  [adminStreamingPage, /action:\s*'set_provider_active'/, 'Admin streaming provider-state client action'],
+  [platformStreaming, /action === "set_provider_active"/, 'Admin streaming provider-state backend action'],
+  [adminStreamingPage, /action:\s*'terminate_stream'/, 'Admin streaming termination client action'],
+  [platformStreaming, /action === "terminate_stream"/, 'Admin streaming termination backend action'],
+  [adminPaymentsPage, /action:\s*'upsert_provider_config'/, 'Admin payment configuration client action'],
+  [platformPayments, /action === "upsert_provider_config"/, 'Admin payment configuration backend action'],
+  [adminIntegrationsPage, /action:\s*'retry_job'/, 'Admin integration retry client action'],
+  [platformIntegrations, /action === "retry_job"/, 'Admin integration retry backend action'],
+  [adminIntegrationsPage, /action:\s*'set_connection_status'/, 'Admin integration state client action'],
+  [platformIntegrations, /action === "set_connection_status"/, 'Admin integration state backend action'],
+  [adminFeaturesPage, /action:\s*'set_global'/, 'Admin feature-control client action'],
+  [platformFeatures, /action === "set_global"/, 'Admin feature-control backend action'],
   [privilegedRpcGrantHardening, /platform_store_secret\(text,text,text,text,text\).*from public, anon/s, 'secret-store anonymous execute revocation'],
   [privilegedRpcGrantHardening, /resolve_runtime_secret\(text\).*from public, anon, authenticated/s, 'runtime-secret service-only execute boundary'],
   [privilegedRpcGrantHardening, /process_payment_result\(text,text,text,uuid,text,payment_attempt_status,jsonb,text\).*from public, anon, authenticated/s, 'payment-result service-only execute boundary'],
