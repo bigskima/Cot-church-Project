@@ -25,6 +25,7 @@ const migrationPaths = [
   'supabase/migrations/20260905102909_harden_analytics_default_partition.sql',
   'supabase/migrations/20260905103057_restore_privileged_rpc_execute_boundaries.sql',
   'supabase/migrations/20260905103708_restore_authenticated_interaction_rpc_boundaries.sql',
+  'supabase/migrations/20260906023038_member_onboarding_experience.sql',
 ];
 
 const requiredPatterns = [
@@ -48,6 +49,12 @@ const requiredPatterns = [
   /create table public\.conversations/i,
   /create function public\.claim_notification_outbox/i,
   /create table public\.membership_invitations/i,
+  /create table if not exists public\.onboarding_experiences/i,
+  /create table if not exists public\.profile_onboarding_progress/i,
+  /alter table public\.onboarding_experiences enable row level security/i,
+  /alter table public\.profile_onboarding_progress enable row level security/i,
+  /revoke all on table public\.onboarding_experiences from anon, authenticated/i,
+  /revoke all on table public\.profile_onboarding_progress from anon, authenticated/i,
   /create function public\.consume_rate_limit/i,
   /create table public\.api_idempotency_keys/i,
   /create table public\.payment_provider_events/i,

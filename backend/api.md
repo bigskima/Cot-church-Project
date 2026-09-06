@@ -22,6 +22,7 @@ Authenticated endpoints require `Authorization: Bearer <access-token>`. Tenant e
 | `verify-otp` | POST | Public | Verify an email or phone authentication code. |
 | `password-recovery` | POST | Public | Initiate an enumeration-resistant recovery flow. |
 | `profile` | GET, PATCH | Required (validated inside shared handler) | Read or update the authenticated profile. Gateway JWT verification is disabled so expired-token/CORS failures return the normal API envelope instead of a browser network error. |
+| `onboarding` | GET, POST | Required (validated inside shared handler) | Read the active versioned member onboarding policy/guide, record policy acknowledgement, and persist per-version completion. |
 
 ## Tenancy
 

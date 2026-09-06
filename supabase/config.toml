@@ -55,6 +55,9 @@ verify_jwt = false
 [functions.profile]
 verify_jwt = false
 
+[functions.onboarding]
+verify_jwt = false
+
 [functions.profile-avatar]
 verify_jwt = false
 

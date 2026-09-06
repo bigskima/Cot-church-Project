@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { SessionProvider } from '@/state/session';
 import { ThemeProvider, useTheme } from '@/state/theme';
 import { BrandingProvider } from '@/state/branding';
+import { OnboardingGate } from '@/components/OnboardingGate';
 import { fetchPlatformBranding } from '@/services/branding';
 import { palette, radius, spacing } from '@/design-system/tokens';
 
@@ -27,6 +28,7 @@ function AppContent() {
   return (
     <>
       <StatusBar style={isDark ? 'light' : 'dark'} />
+      <OnboardingGate />
       <Stack
         screenOptions={{
           headerShown: false,
@@ -35,6 +37,7 @@ function AppContent() {
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="onboarding" options={{ headerShown: false, animation: 'fade' }} />
         <Stack.Screen name="reels" options={{ headerShown: false, animation: 'fade' }} />
         <Stack.Screen name="live/index" options={{ headerShown: false }} />
         <Stack.Screen name="live/[id]" options={{ headerShown: false }} />

@@ -20,6 +20,7 @@ const requiredFiles = [
   'supabase/functions/profile/index.ts',
   'supabase/functions/verify-otp/index.ts',
   'supabase/functions/organization-context/index.ts',
+  'supabase/functions/onboarding/index.ts',
   'supabase/functions/organizations/index.ts',
   'supabase/functions/branches/index.ts',
   'supabase/functions/memberships/index.ts',
@@ -85,6 +86,9 @@ const handler = await readFile('supabase/functions/_shared/handler.ts', 'utf8');
 const response = await readFile('supabase/functions/_shared/response.ts', 'utf8');
 const signup = await readFile('supabase/functions/signup/index.ts', 'utf8');
 const organizationContext = await readFile('supabase/functions/organization-context/index.ts', 'utf8');
+const onboarding = await readFile('supabase/functions/onboarding/index.ts', 'utf8');
+const mobileOnboarding = await readFile('apps/mobile/app/onboarding.tsx', 'utf8');
+const onboardingGate = await readFile('apps/mobile/src/components/OnboardingGate.tsx', 'utf8');
 const login = await readFile('supabase/functions/login/index.ts', 'utf8');
 const refreshSession = await readFile('supabase/functions/refresh-session/index.ts', 'utf8');
 const passwordReset = await readFile('supabase/functions/password-reset/index.ts', 'utf8');
@@ -136,9 +140,16 @@ const invariants = [
   [handler, /api_request_failed/, 'structured failure logging'],
   [response, /requestId/, 'request IDs in response envelopes'],
   [response, /Cache-Control.*no-store/, 'no-store response caching'],
+  [gatewayConfig, /\[functions\.onboarding\][\s\S]*?verify_jwt\s*=\s*false/, 'onboarding gateway delegates authentication to shared handler'],
   [signup, /client\.auth\.signUp/, 'Supabase Auth signup'],
   [signup, /assertNoUnknownFields/, 'strict signup validation'],
   [organizationContext, /effectivePermissions/, 'effective permission resolution'],
+  [onboarding, /methods:\s*\["GET",\s*"POST"\]/, 'onboarding read/update backend methods'],
+  [onboarding, /authentication:\s*"required"/, 'onboarding requires an authenticated identity'],
+  [onboarding, /action === "accept_policy"/, 'versioned onboarding policy acknowledgement'],
+  [onboarding, /action === "complete"/, 'versioned onboarding completion'],
+  [mobileOnboarding, /api\.request<OnboardingPayload>\('onboarding'/, 'mobile onboarding API contract'],
+  [onboardingGate, /api[\s\S]*\.request<OnboardingStatus>\('onboarding'/, 'authenticated first-run onboarding gate'],
   [organizationContext, /expressionMemberships/, 'multiple Expression membership resolution'],
   [organizationContext, /requestedExpressionMembership/, 'deliberate exact Expression context resolution'],
   [expressionMemberships, /expression-invite-preview/, 'Expression invite preview rate limiting'],
