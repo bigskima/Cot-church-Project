@@ -1,10 +1,10 @@
 import React, { useEffect } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, type ErrorBoundaryProps } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { SessionProvider } from '@/state/session';
+import { SessionProvider, useSession } from '@/state/session';
 import { ThemeProvider, useTheme } from '@/state/theme';
 import { BrandingProvider } from '@/state/branding';
 import { OnboardingGate } from '@/components/OnboardingGate';
@@ -16,7 +16,11 @@ import { palette, radius, spacing } from '@/design-system/tokens';
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function AppContent() {
-  const { isDark } = useTheme();
+  const { isDark, colors } = useTheme();
+  const { mode, accessReady, contextStatus } = useSession();
+  const resolvingAccess =
+    mode === 'restoring' ||
+    (mode === 'authenticated' && !accessReady && contextStatus !== 'error');
 
   useEffect(() => {
     // Warm runtime branding in the background. The branding service owns its
@@ -24,6 +28,20 @@ function AppContent() {
     void fetchPlatformBranding();
     SplashScreen.hideAsync().catch(() => {});
   }, []);
+
+  if (resolvingAccess) {
+    return (
+      <View style={[styles.accessBootstrap, { backgroundColor: colors.bg }]}>
+        <View style={[styles.accessBootstrapCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+          <ActivityIndicator size="large" color={colors.interactive} />
+          <Text style={[styles.accessBootstrapTitle, { color: colors.text }]}>Loading your COT access</Text>
+          <Text style={[styles.accessBootstrapCopy, { color: colors.textSecondary }]}>
+            We’re resolving your church, Expression and role permissions before showing protected tools.
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <>
@@ -113,6 +131,36 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
+  accessBootstrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+  },
+  accessBootstrapCard: {
+    width: '100%',
+    maxWidth: 420,
+    minHeight: 180,
+    borderWidth: 1,
+    borderRadius: radius.xxl,
+    padding: spacing.xxl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  accessBootstrapTitle: {
+    marginTop: spacing.sm,
+    fontSize: 20,
+    fontWeight: '800',
+    textAlign: 'center',
+    letterSpacing: -0.35,
+  },
+  accessBootstrapCopy: {
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
+    maxWidth: 330,
+  },
   errorScreen: {
     flex: 1,
     backgroundColor: palette.darkBg,
