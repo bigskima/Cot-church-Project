@@ -3105,3 +3105,171 @@ body {
     padding: 0 3px;
   }
 }
+
+
+/* -------------------------------------------------------------
+   ADMIN SHELL IDENTITY REFINEMENT
+   ------------------------------------------------------------- */
+.admin-brand {
+  gap: 13px;
+  padding: 0 10px 22px;
+}
+
+.admin-brand-icon {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  overflow: hidden;
+  padding: 5px;
+  border: 1px solid rgba(130, 176, 255, 0.22);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+}
+
+.admin-brand-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.admin-brand-text {
+  min-width: 0;
+}
+
+.admin-brand-eyebrow {
+  display: block;
+  margin-bottom: 1px;
+  color: var(--text-muted);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.85px;
+}
+
+.admin-brand-text h1 {
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-brand-text p {
+  margin-top: 2px;
+  font-size: 9px;
+  letter-spacing: 0.65px;
+}
+
+.admin-topbar {
+  min-height: 76px;
+  height: auto;
+  padding: 10px 28px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-sidebar) 88%, transparent), color-mix(in srgb, var(--bg-main) 88%, transparent));
+}
+
+.admin-topbar-left {
+  min-width: 0;
+  gap: 12px;
+}
+
+.admin-topbar-brand {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.admin-topbar-brand-mark {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14);
+}
+
+.admin-topbar-brand-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.admin-page-heading {
+  min-width: 0;
+}
+
+.admin-topbar-kicker {
+  display: block;
+  overflow: hidden;
+  margin-bottom: 2px;
+  color: var(--text-muted);
+  font-size: 8.5px;
+  font-weight: 850;
+  letter-spacing: 0.65px;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.admin-topbar-title {
+  overflow: hidden;
+  font-size: 18px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-theme-toggle {
+  min-height: 38px;
+  border-radius: 12px;
+}
+
+@media (max-width: 760px) {
+  .admin-topbar {
+    min-height: 70px;
+    padding: 9px 13px;
+  }
+
+  .admin-topbar-left {
+    gap: 9px;
+  }
+
+  .admin-topbar-brand-mark {
+    width: 34px;
+    height: 34px;
+    border-radius: 11px;
+  }
+
+  .admin-topbar-kicker {
+    max-width: 210px;
+  }
+
+  .admin-topbar-title {
+    max-width: 220px;
+    font-size: 16px;
+  }
+
+  .admin-topbar-left > .admin-badge {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-topbar-brand-mark {
+    display: none;
+  }
+
+  .admin-topbar-kicker {
+    max-width: 150px;
+  }
+
+  .admin-topbar-title {
+    max-width: 170px;
+  }
+}
