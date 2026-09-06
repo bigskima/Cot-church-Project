@@ -129,7 +129,7 @@ Deno.serve(createHandler(
         .from("live_streams")
         .select("id,organization_id,branch_id,title,description,status,visibility,scheduled_start,started_at,ended_at,recording_url,thumbnail_url,viewer_count,playback_url,playback_token_required,created_at")
         .eq("organization_id", organizationId)
-        .in("status", ["scheduled", "live", "ended"])
+        .in("status", ["scheduled", "provisioning", "ready", "live", "ended", "processing", "replay_ready"])
         .order("scheduled_start", { ascending: false, nullsFirst: false })
         .limit(30),
       client
