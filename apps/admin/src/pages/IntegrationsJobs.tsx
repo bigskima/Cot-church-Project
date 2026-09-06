@@ -236,7 +236,7 @@ export function IntegrationsJobs({ api, canManage = false }: { api: ApiClient; c
 
   if (error && !telemetry) {
     return (
-      <Card title="System activity unavailable" subtitle="No runtime status is shown because current telemetry could not be loaded.">
+      <Card title="System activity unavailable" subtitle="Current system activity could not be loaded.">
         <div className="admin-inline-error" role="alert" style={{ marginBottom: 16 }}>{error}</div>
         <Button variant="primary" onClick={() => void load()}>Try again</Button>
       </Card>
@@ -259,9 +259,9 @@ export function IntegrationsJobs({ api, canManage = false }: { api: ApiClient; c
     <div className="admin-page-stack">
       <div className="admin-stats-grid" aria-busy={loading}>
         <StatWidget title="Queued / running" value={loading && !telemetry ? '—' : pendingTotal} subtitle="Current work across monitored queues" trend={{ value: pendingTotal > 0 ? 'WORK PENDING' : 'CLEAR', isPositive: pendingTotal === 0 }} />
-        <StatWidget title="Failed / dead letter" value={loading && !telemetry ? '—' : failedTotal} subtitle="Jobs requiring operator attention" trend={{ value: failedTotal > 0 ? 'ATTENTION' : 'CLEAR', isPositive: failedTotal === 0 }} variant={failedTotal > 0 ? 'live' : 'success'} />
+        <StatWidget title="Failed / needs review" value={loading && !telemetry ? '—' : failedTotal} subtitle="Background work requiring administrator attention" trend={{ value: failedTotal > 0 ? 'ATTENTION' : 'CLEAR', isPositive: failedTotal === 0 }} variant={failedTotal > 0 ? 'live' : 'success'} />
         <StatWidget title="Connections" value={loading && !telemetry ? '—' : telemetry?.connections.length ?? 0} subtitle="Configured integration connections" trend={{ value: `${telemetry?.connections.filter((item) => item.status === 'active').length ?? 0} ACTIVE`, isPositive: true }} />
-        <StatWidget title="Recent webhook events" value={loading && !telemetry ? '—' : webhookTotal} subtitle="Latest streaming and payment events" trend={{ value: 'LATEST 30 PER SOURCE', isPositive: true }} />
+        <StatWidget title="Recent service events" value={loading && !telemetry ? '—' : webhookTotal} subtitle="Latest streaming and payment events" trend={{ value: 'RECENT ACTIVITY', isPositive: true }} />
       </div>
 
       {error ? <div className="admin-inline-error" role="alert" style={{ marginBottom: 16 }}>{error}</div> : null}
@@ -269,17 +269,17 @@ export function IntegrationsJobs({ api, canManage = false }: { api: ApiClient; c
 
       <Card
         title="Background queues & integrations"
-        subtitle="Live platform telemetry; no health status is inferred by the client"
+        subtitle="Recent platform activity from background processing and connected services"
         headerAction={<Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>{loading ? 'Refreshing…' : 'Refresh'}</Button>}
       >
         <Tabs
           tabs={[
             { key: 'queues', label: 'Queues' },
             { key: 'notifications', label: 'Notifications', count: telemetry?.notifications.length ?? 0 },
-            { key: 'workflows', label: 'Workflows', count: telemetry?.workflows.length ?? 0 },
-            { key: 'deliveries', label: 'Deliveries', count: telemetry?.deliveries.length ?? 0 },
+            { key: 'workflows', label: 'Automated processes', count: telemetry?.workflows.length ?? 0 },
+            { key: 'deliveries', label: 'Service deliveries', count: telemetry?.deliveries.length ?? 0 },
             { key: 'connections', label: 'Connections', count: telemetry?.connections.length ?? 0 },
-            { key: 'webhooks', label: 'Webhooks', count: webhookTotal },
+            { key: 'webhooks', label: 'Service events', count: webhookTotal },
           ]}
           activeKey={activeTab}
           onChange={setActiveTab}
@@ -300,7 +300,7 @@ export function IntegrationsJobs({ api, canManage = false }: { api: ApiClient; c
           { header: 'CREATED', accessor: (item) => formatDate(item.created_at) },
           { header: 'LAST ERROR', accessor: (item) => errorSummary(item.last_error) },
           { header: 'ACTION', accessor: (item) => actionButton('notification', item.id, item.status) },
-        ]} data={telemetry?.notifications ?? []} keyExtractor={(item) => String(item.id)} emptyMessage="No recent notification jobs." /> : null}
+        ]} data={telemetry?.notifications ?? []} keyExtractor={(item) => String(item.id)} emptyMessage="No recent notification activity." /> : null}
 
         {activeTab === 'workflows' ? <Table columns={[
           { header: 'ORGANISATION', accessor: (item) => organizationName(item.organizations) },
@@ -310,7 +310,7 @@ export function IntegrationsJobs({ api, canManage = false }: { api: ApiClient; c
           { header: 'CREATED', accessor: (item) => formatDate(item.created_at) },
           { header: 'LAST ERROR', accessor: (item) => errorSummary(item.last_error) },
           { header: 'ACTION', accessor: (item) => actionButton('workflow', item.id, item.status) },
-        ]} data={telemetry?.workflows ?? []} keyExtractor={(item) => item.id} emptyMessage="No recent workflow runs." /> : null}
+        ]} data={telemetry?.workflows ?? []} keyExtractor={(item) => item.id} emptyMessage="No recent automated processes." /> : null}
 
         {activeTab === 'deliveries' ? <Table columns={[
           { header: 'ORGANISATION', accessor: (item) => organizationName(item.organizations) },
@@ -320,7 +320,7 @@ export function IntegrationsJobs({ api, canManage = false }: { api: ApiClient; c
           { header: 'RESPONSE', accessor: (item) => item.response_code ?? '—' },
           { header: 'LAST ERROR', accessor: (item) => errorSummary(item.last_error) },
           { header: 'ACTION', accessor: (item) => actionButton('integration', item.id, item.status) },
-        ]} data={telemetry?.deliveries ?? []} keyExtractor={(item) => String(item.id)} emptyMessage="No recent integration deliveries." /> : null}
+        ]} data={telemetry?.deliveries ?? []} keyExtractor={(item) => String(item.id)} emptyMessage="No recent service deliveries." /> : null}
 
         {activeTab === 'connections' ? <Table columns={[
           { header: 'ORGANISATION', accessor: (item) => organizationName(item.organizations) },
@@ -329,7 +329,7 @@ export function IntegrationsJobs({ api, canManage = false }: { api: ApiClient; c
           { header: 'LAST SUCCESS', accessor: (item) => formatDate(item.last_success_at) },
           { header: 'LAST ERROR', accessor: (item) => errorSummary(item.last_error) },
           { header: 'ACTION', accessor: (item) => canManage ? <Button variant={item.status === 'active' ? 'danger' : 'outline'} size="sm" loading={busyKey === `connection:${item.id}`} onClick={() => setConnectionStatus(item)}>{item.status === 'active' ? 'Disable' : 'Enable'}</Button> : <span style={{ color: 'var(--text-muted)' }}>Read only</span> },
-        ]} data={telemetry?.connections ?? []} keyExtractor={(item) => item.id} emptyMessage="No integration connections are configured." /> : null}
+        ]} data={telemetry?.connections ?? []} keyExtractor={(item) => item.id} emptyMessage="No connected services are configured." /> : null}
 
         {activeTab === 'webhooks' ? (
           <div style={{ display: 'grid', gap: 24 }}>
@@ -339,7 +339,7 @@ export function IntegrationsJobs({ api, canManage = false }: { api: ApiClient; c
               { header: 'RECEIVED', accessor: (item) => formatDate(item.received_at) },
               { header: 'PROCESSED', accessor: (item) => formatDate(item.processed_at) },
               { header: 'ERROR', accessor: (item) => errorSummary(item.processing_error) },
-            ]} data={telemetry?.liveWebhooks ?? []} keyExtractor={(item) => String(item.id)} emptyMessage="No recent streaming webhook events." />
+            ]} data={telemetry?.liveWebhooks ?? []} keyExtractor={(item) => String(item.id)} emptyMessage="No recent streaming service events." />
             <Table columns={[
               { header: 'PAYMENT EVENT', accessor: (item) => <span><strong>{item.event_type}</strong><small style={{ display: 'block', color: 'var(--text-muted)' }}>{item.provider}</small></span> },
               { header: 'PROVIDER ID', accessor: (item) => item.provider_event_id },
@@ -347,7 +347,7 @@ export function IntegrationsJobs({ api, canManage = false }: { api: ApiClient; c
               { header: 'RECEIVED', accessor: (item) => formatDate(item.received_at) },
               { header: 'PROCESSED', accessor: (item) => formatDate(item.processed_at) },
               { header: 'ERROR', accessor: (item) => errorSummary(item.processing_error) },
-            ]} data={telemetry?.paymentWebhooks ?? []} keyExtractor={(item) => String(item.id)} emptyMessage="No recent payment webhook events." />
+            ]} data={telemetry?.paymentWebhooks ?? []} keyExtractor={(item) => String(item.id)} emptyMessage="No recent payment service events." />
           </div>
         ) : null}
       </Card>
@@ -403,7 +403,7 @@ export function IntegrationsJobs({ api, canManage = false }: { api: ApiClient; c
             helperText="This reason is recorded with the operator action."
           />
         ) : (
-          <div className="admin-info-callout">Enabling the connection allows delivery attempts to resume. Existing credentials and routing remain unchanged.</div>
+          <div className="admin-info-callout">Enabling the connection allows delivery attempts to resume. Existing credentials and delivery settings remain unchanged.</div>
         )}
       </Modal>
     </div>
