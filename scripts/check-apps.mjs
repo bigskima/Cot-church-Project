@@ -127,6 +127,8 @@ const checks = [
   [/Registration Closed/, 'event registration closing state'],
   [/public-content\?type=video&id=/, 'exact public video detail request'],
   [/content-media\?action=video_detail&id=/, 'exact scoped Watch detail request'],
+  [/Video is being prepared/, 'Watch media processing state'],
+  [/More to watch/, 'neutral long-form related-content wording'],
   [/creatorAvatar[\s\S]*creatorName[\s\S]*sourceName/, 'real Watch creator and source attribution'],
   [/onBookmark \? \([\s\S]*Options for/, 'video options render only when an action exists'],
   [/view=state/, 'server-backed video engagement state'],
@@ -160,6 +162,10 @@ const forbiddenGivingPatterns = [
   [/\$\{?amount|\$20|\$50|\$100|\$250|\$500/, 'hardcoded dollar giving presentation'],
 ];
 
+const forbiddenWatchCopyPatterns = [
+  [/Related Teachings/, 'sermon-only Watch related-content wording'],
+];
+
 const forbiddenSocialCopyPatterns = [
   [/Join an active Expression before sharing a Reel into General Community/, 'stale Expression-membership Reel sharing guidance'],
 ];
@@ -186,16 +192,18 @@ const missing = checks.filter(([pattern]) => !pattern.test(joined));
 const forbidden = forbiddenGivingPatterns.filter(([pattern]) => pattern.test(givingUi));
 const forbiddenPrayer = forbiddenPrayerPatterns.filter(([pattern]) => pattern.test(prayerUi));
 const forbiddenSocialCopy = forbiddenSocialCopyPatterns.filter(([pattern]) => pattern.test(joined));
+const forbiddenWatchCopy = forbiddenWatchCopyPatterns.filter(([pattern]) => pattern.test(sources.get('apps/mobile/app/watch/[id].tsx') ?? ''));
 const forbiddenPlatformBoundaries = forbiddenPlatformBoundaryPatterns.filter(([pattern]) => pattern.test(platformShellUi));
 const forbiddenIntegrations = forbiddenIntegrationPatterns.filter(([pattern]) => pattern.test(integrationsUi));
 const missingPaymentCredentialChecks = paymentCredentialChecks.filter(([pattern]) => !pattern.test(paymentInfrastructureUi));
 
-if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenSocialCopy.length || forbiddenPlatformBoundaries.length || forbiddenIntegrations.length || missingPaymentCredentialChecks.length) {
+if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenSocialCopy.length || forbiddenWatchCopy.length || forbiddenPlatformBoundaries.length || forbiddenIntegrations.length || missingPaymentCredentialChecks.length) {
   const failures = [
     ...missing.map(([, name]) => name),
     ...forbidden.map(([, name]) => `remove ${name}`),
     ...forbiddenPrayer.map(([, name]) => `remove ${name}`),
     ...forbiddenSocialCopy.map(([, name]) => `remove ${name}`),
+    ...forbiddenWatchCopy.map(([, name]) => `remove ${name}`),
     ...forbiddenPlatformBoundaries.map(([, name]) => `remove ${name}`),
     ...forbiddenIntegrations.map(([, name]) => `remove ${name}`),
     ...missingPaymentCredentialChecks.map(([, name]) => name),
@@ -205,5 +213,5 @@ if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenSoc
 }
 
 console.log(
-  `Application check passed (${files.length} files, ${checks.length} production invariants, ${forbiddenGivingPatterns.length + forbiddenPrayerPatterns.length + forbiddenSocialCopyPatterns.length + forbiddenPlatformBoundaryPatterns.length + forbiddenIntegrationPatterns.length} anti-hardcode/boundary checks, ${paymentCredentialChecks.length} payment contract checks).`,
+  `Application check passed (${files.length} files, ${checks.length} production invariants, ${forbiddenGivingPatterns.length + forbiddenPrayerPatterns.length + forbiddenSocialCopyPatterns.length + forbiddenWatchCopyPatterns.length + forbiddenPlatformBoundaryPatterns.length + forbiddenIntegrationPatterns.length} anti-hardcode/boundary checks, ${paymentCredentialChecks.length} payment contract checks).`,
 );
