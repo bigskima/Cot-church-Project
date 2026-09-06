@@ -4,7 +4,7 @@ import { Badge, Button, Card, InputField, Modal, SelectField, Table } from '../c
 
 type Organization = { id: string; name: string; slug: string; status: string };
 type UserAccount = { id: string; email?: string | null; display_name?: string | null; account_status?: string };
-type Access = {
+type Authorization = {
   organization_id: string;
   profile_id: string;
   is_active: boolean;
@@ -24,7 +24,7 @@ export function ExpressionCreators({ api }: { api: ApiClient }) {
   const [authorizeOpen, setAuthorizeOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [matches, setMatches] = useState<UserAccount[]>([]);
-  const [accesss, setAccesss] = useState<Access[]>([]);
+  const [authorizations, setAuthorizations] = useState<Authorization[]>([]);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -37,13 +37,13 @@ export function ExpressionCreators({ api }: { api: ApiClient }) {
     setOrganizationId((current) => current || data.items?.find((item) => item.status === 'active')?.id || data.items?.[0]?.id || '');
   };
 
-  const loadAccesss = async (orgId = organizationId) => {
+  const loadAuthorizations = async (orgId = organizationId) => {
     if (!orgId) {
-      setAccesss([]);
+      setAuthorizations([]);
       return;
     }
     const data = await api.request<Access[]>(`expression-creators?organizationId=${encodeURIComponent(orgId)}`);
-    setAccesss(data ?? []);
+    setAuthorizations(data ?? []);
   };
 
   useEffect(() => {
@@ -57,7 +57,7 @@ export function ExpressionCreators({ api }: { api: ApiClient }) {
 
   useEffect(() => {
     if (!organizationId) return;
-    void loadAccesss(organizationId).catch((value) => setError(value instanceof Error ? value.message : 'Unable to load creator accesss.'));
+    void loadAuthorizations(organizationId).catch((value) => setError(value instanceof Error ? value.message : 'Unable to load creator access.'));
   }, [organizationId]);
 
   useEffect(() => {
@@ -116,7 +116,7 @@ export function ExpressionCreators({ api }: { api: ApiClient }) {
         setAuthorizeOpen(false);
         setEmail('');
       }
-      await loadAccesss(organizationId);
+      await loadAuthorizations(organizationId);
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to update Expression creation access.');
     } finally {
@@ -132,7 +132,7 @@ export function ExpressionCreators({ api }: { api: ApiClient }) {
       <Card
         title="Expression creation access"
         subtitle="Choose a church, then review who has permission to create new Expressions for it."
-        headerAction={<div className="admin-header-actions"><Button variant="outline" size="sm" loading={loading} onClick={() => void loadAccesss()}>Refresh</Button><Button variant="gold" size="sm" onClick={openAuthorize} disabled={!organizationId}>Grant creation access</Button></div>}
+        headerAction={<div className="admin-header-actions"><Button variant="outline" size="sm" loading={loading} onClick={() => void loadAuthorizations()}>Refresh</Button><Button variant="gold" size="sm" onClick={openAuthorize} disabled={!organizationId}>Grant creation access</Button></div>}
       >
         <div className="admin-filter-bar">
           <SelectField
@@ -144,7 +144,7 @@ export function ExpressionCreators({ api }: { api: ApiClient }) {
           <div className="admin-filter-summary">
             <span className="admin-filter-summary-label">Selected church</span>
             <strong>{selectedOrg?.name ?? 'No church selected'}</strong>
-            <span>{accesss.filter((item) => item.is_active).length} active creator access(s)</span>
+            <span>{authorizations.filter((item) => item.is_active).length} active creator access(s)</span>
           </div>
         </div>
 
@@ -161,7 +161,7 @@ export function ExpressionCreators({ api }: { api: ApiClient }) {
             },
             {
               header: 'ACCESS',
-              accessor: (item) => <Badge label={item.is_active ? 'AUTHORIZED' : 'REVOKED'} variant={item.is_active ? 'active' : 'neutral'} />,
+              accessor: (item) => <Badge label={item.is_active ? 'ALLOWED' : 'REVOKED'} variant={item.is_active ? 'active' : 'neutral'} />,
             },
             {
               header: 'UPDATED',
@@ -178,17 +178,17 @@ export function ExpressionCreators({ api }: { api: ApiClient }) {
                 : <span className="admin-row-meta">No action</span>,
             },
           ]}
-          data={accesss}
+          data={authorizations}
           keyExtractor={(item) => `${item.organization_id}:${item.profile_id}`}
           loading={loading}
-          emptyMessage="No Expression creation accesss are configured for this church."
+          emptyMessage="No one has Expression creation access for this church."
         />
       </Card>
 
       <Modal
         isOpen={authorizeOpen}
         onClose={() => { if (!busy) setAuthorizeOpen(false); }}
-        title="Authorize Expression creator"
+        title="Grant Expression creation access"
         subtitle={selectedOrg ? `For ${selectedOrg.name}` : 'Select a church first'}
         maxWidth="md"
         footer={
@@ -244,7 +244,7 @@ export function ExpressionCreators({ api }: { api: ApiClient }) {
 
           <div className="admin-info-callout">
             {exactMatch
-              ? `Ready to authorize ${exactMatch.display_name || exactMatch.email} to create an Expression for ${selectedOrg?.name ?? 'this church'}.`
+              ? `Ready to grant ${exactMatch.display_name || exactMatch.email} permission to create an Expression for ${selectedOrg?.name ?? 'this church'}.`
               : 'Select an exact registered email result before granting access.'}
           </div>
         </div>
