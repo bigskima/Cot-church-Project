@@ -63,7 +63,6 @@ export default function ProfileScreen() {
   );
   const hasOrganizationLeadershipAccess =
     hasCapability('organization.leadership.manage') ||
-    hasCapability('branches.create') ||
     hasCapability('giving.campaigns.manage') ||
     hasCapability('giving.finance.read') ||
     isAuthorizedExpressionCreator;
