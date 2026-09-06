@@ -111,18 +111,18 @@ export function BrandingAppearance({ api }: { api: ApiClient }) {
               {branding.primary_logo_url ? <img src={branding.primary_logo_url} alt="" /> : <span>COT</span>}
             </div>
             <div>
-              <div className="admin-row-meta">PLATFORM NAME</div>
+              <div className="admin-row-meta">COT PLATFORM NAME</div>
               <div className="admin-branding-name">{branding.platform_name || 'City of Transformation'}</div>
               <div className="admin-branding-meta">
                 <Badge label={`${configuredAssets.length}/${assets.length} ASSETS`} variant={configuredAssets.length === assets.length ? 'active' : 'neutral'} />
-                <span>Installed startup artwork remains bundled for reliable launch; runtime artwork can be changed here.</span>
+                <span>Built-in startup artwork remains available as a fallback; the images used by COT can be changed here.</span>
               </div>
             </div>
           </div>
         </div>
       </Card>
 
-      <Card title="Brand assets" subtitle="Current runtime image references. Missing assets fall back to the installed app defaults.">
+      <Card title="Brand assets" subtitle="Images currently used across COT. Missing images fall back to the built-in app artwork.">
         <div className="admin-brand-asset-grid">
           {assets.map(([label, url]) => (
             <div key={label} className="admin-brand-asset-card">
@@ -142,8 +142,8 @@ export function BrandingAppearance({ api }: { api: ApiClient }) {
       <Modal
         isOpen={editOpen}
         onClose={() => { if (!saving) setEditOpen(false); }}
-        title="Edit platform branding"
-        subtitle="Update runtime branding without changing the installed app bundle."
+        title="Edit COT branding"
+        subtitle="Update the branding used by COT without requiring a new app release."
         maxWidth="xl"
         footer={
           <>
