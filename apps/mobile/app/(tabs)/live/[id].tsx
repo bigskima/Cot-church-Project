@@ -53,6 +53,83 @@ const followUpOptions: Array<{ value: FollowUpType; label: string; description: 
   { value: 'membership_interest', label: 'Membership / next steps', description: 'Ask for help connecting more deeply with the church.' },
 ];
 
+function streamPresentation(stream: LiveStream) {
+  const scheduled = stream.scheduled_start
+    ? new Date(stream.scheduled_start).toLocaleString([], {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : null;
+
+  switch (stream.status) {
+    case 'scheduled':
+      return {
+        label: 'SCHEDULED',
+        variant: 'primary' as const,
+        icon: 'calendar-outline' as const,
+        message: scheduled ? `Scheduled for ${scheduled}.` : 'This broadcast is scheduled and will open when it begins.',
+      };
+    case 'provisioning':
+      return {
+        label: 'PREPARING',
+        variant: 'warning' as const,
+        icon: 'cloud-upload-outline' as const,
+        message: 'COT is preparing the broadcast service. You can remain on this page and try again shortly.',
+      };
+    case 'ready':
+      return {
+        label: 'READY',
+        variant: 'active' as const,
+        icon: 'radio-outline' as const,
+        message: scheduled ? `Broadcast setup is ready for ${scheduled}.` : 'Broadcast setup is ready. Video will begin when the service goes live.',
+      };
+    case 'live':
+      return {
+        label: 'LIVE',
+        variant: 'live' as const,
+        icon: 'radio' as const,
+        message: 'You are watching the live COT broadcast.',
+      };
+    case 'ended':
+      return {
+        label: 'ENDED',
+        variant: 'neutral' as const,
+        icon: 'time-outline' as const,
+        message: 'The live service has ended. Its replay will appear when recording preparation is complete.',
+      };
+    case 'processing':
+      return {
+        label: 'PROCESSING',
+        variant: 'warning' as const,
+        icon: 'hourglass-outline' as const,
+        message: 'The service has ended and its replay is being prepared.',
+      };
+    case 'replay_ready':
+      return {
+        label: 'REPLAY',
+        variant: 'primary' as const,
+        icon: 'play-circle-outline' as const,
+        message: 'The replay is ready to watch.',
+      };
+    case 'failed':
+      return {
+        label: 'UNAVAILABLE',
+        variant: 'neutral' as const,
+        icon: 'alert-circle-outline' as const,
+        message: 'This broadcast could not be completed. Please check back later or choose another service.',
+      };
+    default:
+      return {
+        label: stream.status.replace(/_/g, ' ').toUpperCase(),
+        variant: 'neutral' as const,
+        icon: 'radio-outline' as const,
+        message: 'This broadcast is not currently available for playback.',
+      };
+  }
+}
+
 export default function LivePlayerScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -100,7 +177,7 @@ export default function LivePlayerScreen() {
     return () => {
       isMounted = false;
     };
-  }, [api, id, mode, requestContext]);
+  }, [api, id, mode, requestContext, showFellowshipHistory]);
 
   const player = useVideoPlayer(access?.playbackUrl ?? '', (videoPlayer) => {
     videoPlayer.loop = false;
@@ -108,9 +185,11 @@ export default function LivePlayerScreen() {
   });
 
   const isLive = access?.stream.status === 'live';
+  const showFellowshipHistory = Boolean(access && ['live', 'ended', 'processing', 'replay_ready'].includes(access.stream.status));
+  const presentation = access ? streamPresentation(access.stream) : null;
 
   const loadChat = useCallback(async (showLoading = false) => {
-    if (mode !== 'authenticated' || !id) return;
+    if (mode !== 'authenticated' || !id || !showFellowshipHistory) return;
     if (showLoading) setChatLoading(true);
     try {
       const messages = await api.request<LiveChatMessage[]>(
@@ -128,7 +207,10 @@ export default function LivePlayerScreen() {
   }, [api, id, mode, requestContext]);
 
   useEffect(() => {
-    if (mode !== 'authenticated' || !access?.stream.id) return;
+    if (mode !== 'authenticated' || !access?.stream.id || !showFellowshipHistory) {
+      setChatLog([]);
+      return;
+    }
     void loadChat(true);
     if (!isLive) return;
 
@@ -137,7 +219,7 @@ export default function LivePlayerScreen() {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [access?.stream.id, isLive, loadChat, mode]);
+  }, [access?.stream.id, isLive, loadChat, mode, showFellowshipHistory]);
 
   useEffect(() => {
     const viewerSessionId = access?.viewerSessionId;
@@ -257,10 +339,11 @@ export default function LivePlayerScreen() {
           <VideoView player={player} style={styles.videoView} />
         ) : (
           <View style={styles.videoPlaceholder}>
-            <Icon name="radio" size={48} color="#168FF0" />
-            <Text style={styles.placeholderText}>
-              {isLive ? 'Connecting to the live video…' : 'This broadcast is currently offline.'}
-            </Text>
+            <View style={styles.placeholderIcon}>
+              <Icon name={presentation?.icon ?? 'radio-outline'} size={42} color="#168FF0" />
+            </View>
+            <Text style={styles.placeholderTitle}>{presentation?.label ?? 'BROADCAST'}</Text>
+            <Text style={styles.placeholderText}>{presentation?.message ?? 'This broadcast is currently unavailable.'}</Text>
           </View>
         )}
 
@@ -273,7 +356,11 @@ export default function LivePlayerScreen() {
           >
             <Icon name="chevron-down" size={22} color="#FFFFFF" />
           </Pressable>
-          <Badge label={isLive ? 'LIVE' : 'OFFLINE'} variant={isLive ? 'live' : 'neutral'} pulse={isLive} />
+          <Badge
+            label={presentation?.label ?? 'BROADCAST'}
+            variant={presentation?.variant ?? 'neutral'}
+            pulse={isLive}
+          />
         </View>
       </View>
 
@@ -282,6 +369,12 @@ export default function LivePlayerScreen() {
           <Text style={[styles.streamTitle, { color: colors.text }]} numberOfLines={2}>{access.stream.title}</Text>
           {access.stream.description ? (
             <Text style={[styles.streamDesc, { color: colors.textMuted }]} numberOfLines={2}>{access.stream.description}</Text>
+          ) : null}
+          {!isLive && presentation ? (
+            <View style={[styles.lifecycleRow, { backgroundColor: colors.bgSecondary }]}>
+              <Icon name={presentation.icon} size={14} color={colors.interactive} />
+              <Text style={[styles.lifecycleText, { color: colors.textSecondary }]}>{presentation.message}</Text>
+            </View>
           ) : null}
         </View>
 
@@ -342,10 +435,14 @@ export default function LivePlayerScreen() {
               <Icon name="chatbubbles-outline" size={24} color={colors.textMuted} />
               <Text style={[styles.chatEmptyText, { color: colors.textMuted }]}>
                 {mode === 'visitor'
-                  ? 'Sign in to see and participate in live fellowship chat.'
-                  : isLive
-                    ? 'No chat messages yet.'
-                    : 'No stored chat messages for this broadcast.'}
+                  ? isLive
+                    ? 'Sign in to see and participate in live fellowship chat.'
+                    : 'Sign in when you want to join live fellowship during a broadcast.'
+                  : !showFellowshipHistory
+                    ? 'Live fellowship opens when this broadcast begins.'
+                    : isLive
+                      ? 'No chat messages yet.'
+                      : 'No fellowship messages were saved for this broadcast.'}
               </Text>
             </View>
           )}
@@ -464,9 +561,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,
-    padding: spacing.md,
+    padding: spacing.xl,
   },
-  placeholderText: { color: '#CBD5E1', fontSize: 13, fontWeight: '600', textAlign: 'center' },
+  placeholderIcon: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: 'rgba(22,143,240,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(22,143,240,0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  placeholderTitle: { color: '#FFFFFF', fontSize: 12, fontWeight: '900', letterSpacing: 1 },
+  placeholderText: { color: '#CBD5E1', fontSize: 13, lineHeight: 19, fontWeight: '600', textAlign: 'center', maxWidth: 360 },
   playerTopBar: {
     position: 'absolute',
     top: spacing.sm,
@@ -500,6 +609,8 @@ const styles = StyleSheet.create({
   infoCol: { flex: 1, gap: 2 },
   streamTitle: { fontSize: 16, lineHeight: 21, fontWeight: '800', letterSpacing: -0.25 },
   streamDesc: { fontSize: 11, lineHeight: 16 },
+  lifecycleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, marginTop: spacing.xs, padding: spacing.sm, borderRadius: radius.md },
+  lifecycleText: { flex: 1, fontSize: 11, lineHeight: 16, fontWeight: '600' },
   actionPillsRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   actionPill: {
     flexDirection: 'row',
