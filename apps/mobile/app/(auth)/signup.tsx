@@ -7,6 +7,7 @@ import { useTheme } from '@/state/theme';
 import { BrandMark } from '@/components/primitives/BrandMark';
 import { Icon } from '@/components/primitives/Icon';
 import { Button } from '@/components/Button';
+import { InputField } from '@/components/Input';
 import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 
 type SignupStep = 'identity' | 'security';
@@ -33,6 +34,8 @@ export default function SignupScreen() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [verificationPending, setVerificationPending] = useState(false);
@@ -144,22 +147,32 @@ export default function SignupScreen() {
     onChangeText: (value: string) => void,
     placeholder: string,
     options: Partial<React.ComponentProps<typeof TextInput>> = {},
-  ) => (
-    <View style={styles.inputGroup}>
-      <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>{label}</Text>
-      <TextInput
+    rightIcon?: React.ReactNode,
+  ) => {
+    const leftIcon =
+      label === 'FULL NAME' ? <Icon name="person-outline" size={18} color={colors.textMuted} /> :
+      label === 'USERNAME' ? <Icon name="at-outline" size={18} color={colors.textMuted} /> :
+      label === 'BIRTHDAY' ? <Icon name="calendar-outline" size={18} color={colors.textMuted} /> :
+      label === 'EMAIL ADDRESS' ? <Icon name="mail-outline" size={18} color={colors.textMuted} /> :
+      label.startsWith('PHONE') ? <Icon name="call-outline" size={18} color={colors.textMuted} /> :
+      <Icon name="lock-closed-outline" size={18} color={colors.textMuted} />;
+
+    return (
+      <InputField
+        label={label}
         value={value}
         onChangeText={(next) => {
           onChangeText(next);
           if (errorMsg) setErrorMsg('');
         }}
         placeholder={placeholder}
-        placeholderTextColor={colors.textMuted}
-        style={[styles.input, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle, color: colors.text }]}
+        containerStyle={styles.sharedField}
+        leftIcon={leftIcon}
+        rightIcon={rightIcon}
         {...options}
       />
-    </View>
-  );
+    );
+  };
 
   const errorBanner = (message: string) => (
     <View style={[styles.errorBanner, { backgroundColor: colors.liveSoft }]}>
@@ -169,14 +182,48 @@ export default function SignupScreen() {
   );
 
   const stepHeader = (
-    <View style={styles.stepRow}>
-      <View style={[styles.stepPill, { backgroundColor: colors.primarySoft }]}>
-        <Text style={[styles.stepText, { color: colors.interactive }]}>
-          {step === 'identity' ? '1 of 2' : '2 of 2'}
-        </Text>
+    <View style={styles.stepWorkspace}>
+      <View style={styles.stepProgressRow}>
+        <View style={[styles.stepProgressItem, { backgroundColor: colors.primarySoft, borderColor: colors.primarySoftStrong }]}>
+          <View style={[styles.stepNumber, { backgroundColor: colors.interactive }]}>
+            <Text style={styles.stepNumberText}>1</Text>
+          </View>
+          <View style={styles.stepProgressCopy}>
+            <Text style={[styles.stepProgressTitle, { color: colors.text }]}>Identity</Text>
+            <Text style={[styles.stepProgressMeta, { color: colors.textMuted }]}>Name & profile</Text>
+          </View>
+        </View>
+        <View
+          style={[
+            styles.stepConnector,
+            { backgroundColor: step === 'security' ? colors.interactive : colors.borderSubtle },
+          ]}
+        />
+        <View
+          style={[
+            styles.stepProgressItem,
+            {
+              backgroundColor: step === 'security' ? colors.primarySoft : colors.bgSecondary,
+              borderColor: step === 'security' ? colors.primarySoftStrong : colors.borderSubtle,
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.stepNumber,
+              { backgroundColor: step === 'security' ? colors.interactive : colors.cardElevated },
+            ]}
+          >
+            <Text style={[styles.stepNumberText, step !== 'security' && { color: colors.textMuted }]}>2</Text>
+          </View>
+          <View style={styles.stepProgressCopy}>
+            <Text style={[styles.stepProgressTitle, { color: step === 'security' ? colors.text : colors.textSecondary }]}>Security</Text>
+            <Text style={[styles.stepProgressMeta, { color: colors.textMuted }]}>Contact & access</Text>
+          </View>
+        </View>
       </View>
       <Text style={[styles.stepLabel, { color: colors.textMuted }]}>
-        {step === 'identity' ? 'Your identity' : 'Contact & security'}
+        {step === 'identity' ? 'Start with the identity people will see around COT.' : 'Add your sign-in details. Password rules come from the live account security policy.'}
       </Text>
     </View>
   );
@@ -261,15 +308,43 @@ export default function SignupScreen() {
                     keyboardType: 'phone-pad',
                     textContentType: 'telephoneNumber',
                   })}
-                  {field('PASSWORD', password, setPassword, 'Create your password', {
-                    secureTextEntry: true,
-                    textContentType: 'newPassword',
-                  })}
+                  {field(
+                    'PASSWORD',
+                    password,
+                    setPassword,
+                    'Create your password',
+                    {
+                      secureTextEntry: !showPassword,
+                      textContentType: 'newPassword',
+                    },
+                    <Pressable
+                      onPress={() => setShowPassword((value) => !value)}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      <Icon name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={19} color={colors.textMuted} />
+                    </Pressable>,
+                  )}
                   <Text style={[styles.helper, { color: colors.textMuted }]}>Password acceptance follows the platform’s current Supabase/account security policy.</Text>
-                  {field('CONFIRM PASSWORD', confirmPassword, setConfirmPassword, 'Repeat password', {
-                    secureTextEntry: true,
-                    textContentType: 'newPassword',
-                  })}
+                  {field(
+                    'CONFIRM PASSWORD',
+                    confirmPassword,
+                    setConfirmPassword,
+                    'Repeat password',
+                    {
+                      secureTextEntry: !showConfirmPassword,
+                      textContentType: 'newPassword',
+                    },
+                    <Pressable
+                      onPress={() => setShowConfirmPassword((value) => !value)}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel={showConfirmPassword ? 'Hide confirmation password' : 'Show confirmation password'}
+                    >
+                      <Icon name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'} size={19} color={colors.textMuted} />
+                    </Pressable>,
+                  )}
 
                   <View style={styles.actionRow}>
                     <Button label="Back" onPress={() => { setErrorMsg(''); setStep('identity'); }} variant="outline" size="lg" style={styles.flexButton} />
@@ -300,17 +375,24 @@ const styles = StyleSheet.create({
   title: { ...typography.h1, textAlign: 'center' },
   subtitle: { ...typography.bodySmall, textAlign: 'center', marginTop: 6, lineHeight: 20 },
   authCard: { padding: spacing.lg, borderRadius: radius.xxl, borderWidth: 1 },
-  stepRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.lg },
-  stepPill: { borderRadius: radius.pill, paddingHorizontal: 9, paddingVertical: 5 },
-  stepText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.4 },
-  stepLabel: { fontSize: 12, fontWeight: '700' },
+  stepWorkspace: { gap: spacing.sm, marginBottom: spacing.lg },
+  stepProgressRow: { flexDirection: 'row', alignItems: 'center' },
+  stepProgressItem: { flex: 1, minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: spacing.sm },
+  stepConnector: { width: 12, height: 2 },
+  stepNumber: { width: 28, height: 28, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  stepNumberText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
+  stepProgressCopy: { flex: 1, minWidth: 0 },
+  stepProgressTitle: { fontSize: 11.5, fontWeight: '800' },
+  stepProgressMeta: { fontSize: 9.5, marginTop: 1 },
+  stepLabel: { fontSize: 11, lineHeight: 16, fontWeight: '600' },
   errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: spacing.md, borderRadius: radius.lg, marginBottom: spacing.md },
   errorText: { fontSize: 13, fontWeight: '600', flex: 1 },
-  form: { gap: spacing.md },
+  form: { gap: spacing.sm },
+  sharedField: { marginBottom: spacing.sm },
   inputGroup: { gap: 4 },
   inputLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   input: { minHeight: 50, borderRadius: radius.lg, borderWidth: 1, paddingHorizontal: spacing.md, fontSize: 15 },
-  helper: { fontSize: 11, lineHeight: 16, marginTop: -8 },
+  helper: { fontSize: 11, lineHeight: 16, marginTop: -4 },
   actionRow: { flexDirection: 'row', gap: spacing.sm },
   flexButton: { flex: 1 },
   otpInput: { height: 56, borderRadius: radius.lg, borderWidth: 1, paddingHorizontal: spacing.md, fontSize: 24, fontWeight: '700', textAlign: 'center', letterSpacing: 6 },
