@@ -20,9 +20,32 @@ export interface HeroLiveCardProps {
   style?: StyleProp<ViewStyle>;
 }
 
+function heroPresentation(status: LiveStream['status']) {
+  switch (status) {
+    case 'live':
+      return { label: 'LIVE NOW', variant: 'live' as const, icon: 'play' as const, cta: 'Watch live', pulse: true };
+    case 'scheduled':
+      return { label: 'UPCOMING', variant: 'primary' as const, icon: 'calendar-outline' as const, cta: 'View schedule', pulse: false };
+    case 'provisioning':
+      return { label: 'PREPARING', variant: 'warning' as const, icon: 'cloud-upload-outline' as const, cta: 'View details', pulse: false };
+    case 'ready':
+      return { label: 'READY', variant: 'active' as const, icon: 'radio-outline' as const, cta: 'View details', pulse: false };
+    case 'processing':
+      return { label: 'REPLAY PROCESSING', variant: 'warning' as const, icon: 'hourglass-outline' as const, cta: 'View status', pulse: false };
+    case 'replay_ready':
+      return { label: 'REPLAY READY', variant: 'primary' as const, icon: 'play-circle-outline' as const, cta: 'Watch replay', pulse: false };
+    case 'ended':
+      return { label: 'ENDED', variant: 'neutral' as const, icon: 'time-outline' as const, cta: 'View details', pulse: false };
+    case 'failed':
+      return { label: 'UNAVAILABLE', variant: 'neutral' as const, icon: 'alert-circle-outline' as const, cta: 'View status', pulse: false };
+    default:
+      return { label: status.replace(/_/g, ' ').toUpperCase(), variant: 'neutral' as const, icon: 'radio-outline' as const, cta: 'View details', pulse: false };
+  }
+}
+
 export function HeroLiveCard({ stream, onPress, style }: HeroLiveCardProps) {
   const isLive = stream.status === 'live';
-  const isScheduled = stream.status === 'scheduled' || stream.status === 'ready';
+  const presentation = heroPresentation(stream.status);
 
   return (
     <Pressable
@@ -52,9 +75,9 @@ export function HeroLiveCard({ stream, onPress, style }: HeroLiveCardProps) {
           {/* Top Status Bar */}
           <View style={styles.topRow}>
             <Badge
-              label={isLive ? 'LIVE NOW' : isScheduled ? 'UPCOMING SERVICE' : 'REPLAY'}
-              variant={isLive ? 'live' : 'primary'}
-              pulse={isLive}
+              label={presentation.label}
+              variant={presentation.variant}
+              pulse={presentation.pulse}
               size="md"
             />
             {stream.visibility && (
@@ -80,13 +103,13 @@ export function HeroLiveCard({ stream, onPress, style }: HeroLiveCardProps) {
             <View style={styles.ctaRow}>
               <View style={[styles.ctaButton, { backgroundColor: isLive ? '#F04452' : '#168FF0' }]}>
                 <Icon
-                  name={isLive ? 'play' : 'calendar-outline'}
+                  name={presentation.icon}
                   size={15}
                   color="#FFFFFF"
                   style={{ marginRight: 6 }}
                 />
                 <Text style={styles.ctaText}>
-                  {isLive ? 'Watch live' : 'View details'}
+                  {presentation.cta}
                 </Text>
               </View>
               {stream.viewer_count !== undefined && isLive ? (
