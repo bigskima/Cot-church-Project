@@ -25,7 +25,7 @@ Deno.serve(createHandler(
   async ({ auth }) => {
     if (!auth) throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication required", 401);
 
-    const [membershipsResult, expressionMembershipsResult, profileResult, creatorOrganizationsResult] = await Promise.all([
+    const [membershipsResult, expressionMembershipsResult, profileResult, creatorOrganizationsResult, publicCapabilitiesResult] = await Promise.all([
       auth.client
         .from("memberships")
         .select("id, status, joined_at, branch_id, organization:organizations(id, name, slug, status, timezone), branch:branches(id, name, code, timezone, is_active)")
@@ -48,6 +48,12 @@ Deno.serve(createHandler(
         .select("organization_id, organization:organizations(id,name,slug,status,timezone)")
         .eq("profile_id", auth.user.id)
         .eq("is_active", true),
+      auth.client
+        .from("public_capability_assignments")
+        .select("permission_code,expires_at,permission:permissions!inner(code,is_active)")
+        .eq("profile_id", auth.user.id)
+        .eq("is_active", true)
+        .eq("permission.is_active", true),
     ]);
 
     if (membershipsResult.error) {
@@ -59,6 +65,15 @@ Deno.serve(createHandler(
     if (profileResult.error) {
       throw new ApiError("CONTEXT_LOOKUP_FAILED", "Unable to resolve member profile", 500, undefined, false);
     }
+    if (publicCapabilitiesResult.error) {
+      throw new ApiError("CONTEXT_LOOKUP_FAILED", "Unable to resolve public COT permissions", 500, undefined, false);
+    }
+
+    const now = Date.now();
+    const publicCapabilities = [...new Set((publicCapabilitiesResult.data ?? [])
+      .filter((assignment: any) => !assignment.expires_at || Date.parse(assignment.expires_at) > now)
+      .map((assignment: any) => assignment.permission_code)
+      .filter(Boolean))].sort();
 
     const memberships = (membershipsResult.data ?? []) as unknown as MembershipRow[];
     const expressionMemberships = (expressionMembershipsResult.data ?? []) as unknown as ExpressionMembershipRow[];
@@ -85,7 +100,6 @@ Deno.serve(createHandler(
       if (permissionError) {
         throw new ApiError("CONTEXT_LOOKUP_FAILED", "Unable to resolve permissions", 500, undefined, false);
       }
-      const now = Date.now();
       const activeAssignments = (assignments ?? [])
         .filter((assignment) => !assignment.expires_at || Date.parse(assignment.expires_at) > now);
       const permissionsFor = (rows: typeof activeAssignments) => [...new Set(rows.flatMap((assignment) => {
@@ -183,6 +197,7 @@ Deno.serve(createHandler(
         expressions,
         organizationPermissions,
         effectivePermissions,
+        publicCapabilities,
       },
     };
   },
