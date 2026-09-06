@@ -34,6 +34,7 @@ const files = [
   'apps/admin/src/pages/IntegrationsJobs.tsx',
   'apps/admin/src/pages/PaymentInfrastructure.tsx',
   'apps/admin/src/api.ts',
+  'supabase/functions/streaming-broadcasts/index.ts',
   'supabase/functions/stream-access/index.ts',
   'supabase/functions/stream-presence/index.ts',
   'supabase/functions/live-interactions/index.ts',
