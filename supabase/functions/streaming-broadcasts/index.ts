@@ -8,16 +8,60 @@ import { defaultStreamingConfig, loadStreamingConfig } from "../_shared/streamin
 import { streamingProvider } from "../_shared/streaming/registry.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString, uuid } from "../_shared/validation.ts";
 
-const visibilities = new Set(["public", "organization", "branch", "group", "private"]);
+const visibilities = new Set(["public", "branch", "group", "private"]);
 const latencies = new Set(["standard", "reduced", "low"]);
 
-async function hasScopedPermission(auth: any, permission: string, branchId: string | null) {
+async function resolveOrganizationId(raw?: string | null) {
+  const admin = adminClient();
+  if (raw) {
+    const id = uuid(raw, "organizationId", true)!;
+    const { data, error } = await admin
+      .from("organizations")
+      .select("id,status")
+      .eq("id", id)
+      .eq("status", "active")
+      .maybeSingle();
+    if (error || !data) throw new ApiError("ORGANIZATION_NOT_FOUND", "This church community is not available", 404);
+    return id;
+  }
+
+  const { data, error } = await admin
+    .from("organizations")
+    .select("id")
+    .eq("status", "active")
+    .order("created_at", { ascending: true })
+    .limit(2);
+  if (error) throw new ApiError("ORGANIZATION_LOOKUP_FAILED", "Unable to resolve the church community", 500, undefined, false);
+  if ((data ?? []).length === 1) return data![0].id;
+  throw new ApiError("ORGANIZATION_REQUIRED", "Choose a church before operating a broadcast", 422);
+}
+
+async function hasScopedPermission(auth: any, organizationId: string, permission: string, branchId: string | null) {
   const { data, error } = await auth.client.rpc("has_permission", {
-    target_organization_id: auth.organizationId,
+    target_organization_id: organizationId,
     requested_permission: permission,
     target_branch_id: branchId,
   });
   return !error && data === true;
+}
+
+async function hasPublicCapability(auth: any, permission: string) {
+  const { data, error } = await auth.client.rpc("has_public_capability", {
+    requested_permission: permission,
+  });
+  return !error && data === true;
+}
+
+async function assertBroadcastAuthority(auth: any, organizationId: string, branchId: string | null) {
+  if (branchId) {
+    if (!(await hasScopedPermission(auth, organizationId, "streams.broadcast", branchId))) {
+      throw new ApiError("PERMISSION_DENIED", "You cannot operate live broadcasts in this Expression", 403);
+    }
+    return;
+  }
+  if (!(await hasPublicCapability(auth, "public.live_stream.create"))) {
+    throw new ApiError("PUBLIC_LIVE_PERMISSION_REQUIRED", "Public live broadcasting has not been assigned to this account", 403);
+  }
 }
 
 function reconnectWindow(value: unknown) {
@@ -78,15 +122,18 @@ async function streamingReadiness(organizationId: string) {
 }
 
 Deno.serve(createHandler(
-  { methods: ["GET", "POST", "PATCH"], authentication: "required", organization: "required" },
+  { methods: ["GET", "POST", "PATCH"], authentication: "required", organization: "none" },
   async ({ request, auth }) => {
-    if (!auth?.organizationId) throw new ApiError("ORGANIZATION_REQUIRED", "Organization context is required", 400);
+    if (!auth) throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication required", 401);
 
     if (request.method === "GET") {
-      if (!(await hasScopedPermission(auth, "streams.broadcast", auth.branchId))) {
-        throw new ApiError("PERMISSION_DENIED", "You cannot operate live broadcasts in this scope", 403);
-      }
-      return { data: await streamingReadiness(auth.organizationId) };
+      const url = new URL(request.url);
+      const organizationId = await resolveOrganizationId(url.searchParams.get("organizationId"));
+      const branchId = url.searchParams.get("branchId")
+        ? uuid(url.searchParams.get("branchId"), "branchId", true)!
+        : null;
+      await assertBroadcastAuthority(auth, organizationId, branchId);
+      return { data: await streamingReadiness(organizationId) };
     }
 
     const admin = adminClient();
@@ -94,36 +141,53 @@ Deno.serve(createHandler(
 
     if (request.method === "POST") {
       assertNoUnknownFields(body, [
-        "title", "description", "visibility", "branchId", "groupId", "eventId", "scheduledStart",
+        "organizationId", "title", "description", "visibility", "branchId", "groupId", "eventId", "scheduledStart",
         "latencyMode", "reconnectWindowSeconds", "record", "providerConfigId",
       ]);
 
-      const suppliedBranchId = body.branchId ? uuid(String(body.branchId), "branchId", true)! : null;
-      if (auth.branchId && suppliedBranchId && suppliedBranchId !== auth.branchId) {
-        throw new ApiError("EXPRESSION_SCOPE_DENIED", "A broadcast can only be created inside the selected Expression", 403);
-      }
-      const targetBranchId = auth.branchId ?? suppliedBranchId;
-      if (!(await hasScopedPermission(auth, "streams.broadcast", targetBranchId))) {
-        throw new ApiError("PERMISSION_DENIED", "You cannot create broadcasts in this scope", 403);
-      }
+      const organizationId = await resolveOrganizationId(body.organizationId ? String(body.organizationId) : null);
+      const targetBranchId = body.branchId ? uuid(String(body.branchId), "branchId", true)! : null;
+      await assertBroadcastAuthority(auth, organizationId, targetBranchId);
 
       const visibility = requiredString(body.visibility, "visibility", 20);
       const latencyMode = optionalString(body.latencyMode, "latencyMode", 20) ?? "reduced";
       if (!visibilities.has(visibility) || !latencies.has(latencyMode)) {
         throw new ApiError("VALIDATION_FAILED", "Invalid stream visibility or latency mode", 422);
       }
+
+      // Root public broadcasts belong to General Community. Expression streams
+      // stay inside their selected Expression unless a separate outward-publish
+      // workflow is introduced later.
+      if (!targetBranchId && visibility !== "public") {
+        throw new ApiError("PUBLIC_SCOPE_REQUIRED", "General Community broadcasts must use public visibility", 422);
+      }
+      if (targetBranchId && visibility === "public") {
+        throw new ApiError("EXPRESSION_PUBLICATION_REQUIRES_SEPARATE_FLOW", "Create public broadcasts from General Community, not from inside an Expression", 422);
+      }
       if (visibility === "branch" && !targetBranchId) {
         throw new ApiError("VALIDATION_FAILED", "Expression visibility requires an Expression-scoped broadcast", 422);
+      }
+
+      if (targetBranchId) {
+        const { data: branch, error: branchError } = await admin
+          .from("branches")
+          .select("id,is_active")
+          .eq("id", targetBranchId)
+          .eq("organization_id", organizationId)
+          .eq("is_active", true)
+          .maybeSingle();
+        if (branchError || !branch) throw new ApiError("EXPRESSION_NOT_FOUND", "This Expression is unavailable", 404);
       }
 
       const groupId = body.groupId ? uuid(String(body.groupId), "groupId", true)! : null;
       if (visibility === "group" && !groupId) throw new ApiError("VALIDATION_FAILED", "Group visibility requires a group", 422);
       if (groupId) {
+        if (!targetBranchId) throw new ApiError("VALIDATION_FAILED", "Group broadcasts must belong to an Expression", 422);
         const { data: group, error: groupError } = await admin
           .from("groups")
           .select("id,branch_id,is_active")
           .eq("id", groupId)
-          .eq("organization_id", auth.organizationId)
+          .eq("organization_id", organizationId)
           .maybeSingle();
         if (groupError || !group || !group.is_active) throw new ApiError("GROUP_NOT_FOUND", "Group is unavailable", 404);
         if (group.branch_id !== targetBranchId) throw new ApiError("EXPRESSION_SCOPE_DENIED", "The selected group is outside this broadcast scope", 403);
@@ -135,7 +199,7 @@ Deno.serve(createHandler(
           .from("events")
           .select("id,branch_id")
           .eq("id", eventId)
-          .eq("organization_id", auth.organizationId)
+          .eq("organization_id", organizationId)
           .maybeSingle();
         if (eventError || !event) throw new ApiError("EVENT_NOT_FOUND", "Event is unavailable", 404);
         if (event.branch_id !== null && event.branch_id !== targetBranchId) {
@@ -145,8 +209,8 @@ Deno.serve(createHandler(
 
       const loaded = body.providerConfigId
         ? await loadStreamingConfig(uuid(String(body.providerConfigId), "providerConfigId", true)!)
-        : await defaultStreamingConfig(auth.organizationId);
-      if (loaded.organizationId && loaded.organizationId !== auth.organizationId) throw new ApiError("PROVIDER_SCOPE_DENIED", "Provider configuration is outside this organization", 403);
+        : await defaultStreamingConfig(organizationId);
+      if (loaded.organizationId && loaded.organizationId !== organizationId) throw new ApiError("PROVIDER_SCOPE_DENIED", "Provider configuration is outside this organization", 403);
       if (!(await secretReady(loaded.provider.secretReference)) || !(await secretReady(loaded.provider.webhookSecretReference))) {
         throw new ApiError("STREAMING_NOT_READY", "The active streaming provider is missing required runtime secrets", 503, undefined, false);
       }
@@ -163,7 +227,7 @@ Deno.serve(createHandler(
       });
 
       const record = {
-        organization_id: auth.organizationId,
+        organization_id: organizationId,
         branch_id: targetBranchId,
         group_id: groupId,
         event_id: eventId,
@@ -197,15 +261,14 @@ Deno.serve(createHandler(
       .from("live_streams")
       .select("id,organization_id,branch_id,provider_config_id,provider_broadcast_id,provider_asset_id,status")
       .eq("id", id)
-      .eq("organization_id", auth.organizationId)
       .maybeSingle();
     if (error || !stream) throw new ApiError("STREAM_NOT_FOUND", "Broadcast not found", 404);
-    if (auth.branchId && stream.branch_id !== auth.branchId) throw new ApiError("EXPRESSION_SCOPE_DENIED", "This broadcast belongs to another Expression", 403);
-    if (!(await hasScopedPermission(auth, "streams.broadcast", stream.branch_id))) throw new ApiError("PERMISSION_DENIED", "You cannot operate this broadcast", 403);
+
+    await assertBroadcastAuthority(auth, stream.organization_id, stream.branch_id);
     if (!stream.provider_config_id || !stream.provider_broadcast_id) throw new ApiError("STREAM_PROVIDER_STATE_INVALID", "This broadcast is not linked to a real provider lifecycle", 409);
 
     const loaded = await loadStreamingConfig(stream.provider_config_id);
-    if (loaded.organizationId && loaded.organizationId !== auth.organizationId) throw new ApiError("PROVIDER_SCOPE_DENIED", "Broadcast provider configuration is outside this organization", 403);
+    if (loaded.organizationId && loaded.organizationId !== stream.organization_id) throw new ApiError("PROVIDER_SCOPE_DENIED", "Broadcast provider configuration is outside this organization", 403);
     const adapter = streamingProvider(loaded.provider.providerCode);
     const action = requiredString(body.action, "action", 30);
 
