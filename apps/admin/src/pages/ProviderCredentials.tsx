@@ -47,7 +47,7 @@ const categoryOptions = [
   { label: 'Livestream / Media', value: 'streaming' },
   { label: 'Payments', value: 'payments' },
   { label: 'Communications', value: 'communications' },
-  { label: 'Integrations / Webhooks', value: 'integration' },
+  { label: 'Connected services', value: 'integration' },
   { label: 'Other Provider', value: 'other' },
 ];
 
@@ -65,7 +65,7 @@ export function ProviderCredentials({ api }: { api: ApiClient }) {
   const [description, setDescription] = useState('');
   const [value, setValue] = useState('');
   const [showValue, setShowValue] = useState(false);
-  const [helper, setHelper] = useState('The credential is encrypted in Supabase Vault and cannot be read back from this UI.');
+  const [helper, setHelper] = useState('The credential is encrypted and protected. Its saved value cannot be displayed again.');
   const [checks, setChecks] = useState<Record<string, SecretCheck>>({});
 
   const load = async () => {
@@ -89,7 +89,7 @@ export function ProviderCredentials({ api }: { api: ApiClient }) {
     setDescription('');
     setValue('');
     setShowValue(false);
-    setHelper('The credential is encrypted in Supabase Vault and cannot be read back from this UI.');
+    setHelper('The credential is encrypted and protected. Its saved value cannot be displayed again.');
     setError('');
   };
 
@@ -154,7 +154,7 @@ export function ProviderCredentials({ api }: { api: ApiClient }) {
       setValue('');
       setShowValue(false);
       setEditorOpen(false);
-      setSuccess(`${normalized} was encrypted and stored. The value cannot be read back from Platform Administration.`);
+      setSuccess(`${normalized} was stored securely. The value cannot be displayed again in Platform Administration.`);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to store provider credential.');
@@ -187,7 +187,7 @@ export function ProviderCredentials({ api }: { api: ApiClient }) {
         method: 'POST',
         body: JSON.stringify({ action: 'delete', reference: secretReference }),
       });
-      setSuccess(`${secretReference} was removed from Platform Vault.`);
+      setSuccess(`${secretReference} was removed from secure credential storage.`);
       setChecks((current) => {
         const next = { ...current };
         delete next[secretReference];
@@ -213,17 +213,17 @@ export function ProviderCredentials({ api }: { api: ApiClient }) {
   return (
     <div className="admin-page-stack">
       <div className="admin-stats-grid">
-        <StatWidget title="Encrypted credentials" value={items.length} subtitle="Stored in Supabase Vault" trend={{ value: 'NO READBACK', isPositive: true }} icon="VAULT" variant="success" />
-        <StatWidget title="AI credentials" value={categoryCounts.ai ?? 0} subtitle="OpenAI, Gemini, Claude and future adapters" trend={{ value: 'PROVIDER NEUTRAL', isPositive: true }} icon="AI" />
-        <StatWidget title="Media & payment" value={(categoryCounts.streaming ?? 0) + (categoryCounts.payments ?? 0)} subtitle="Streaming and gateway infrastructure" trend={{ value: 'SERVER ONLY', isPositive: true }} icon="SEC" variant="gold" />
+        <StatWidget title="Secure credentials" value={items.length} subtitle="Encrypted and protected" trend={{ value: 'PROTECTED', isPositive: true }} icon="VAULT" variant="success" />
+        <StatWidget title="AI credentials" value={categoryCounts.ai ?? 0} subtitle="OpenAI, Gemini, Claude and future AI services" trend={{ value: 'MULTI-SERVICE READY', isPositive: true }} icon="AI" />
+        <StatWidget title="Media & payment credentials" value={(categoryCounts.streaming ?? 0) + (categoryCounts.payments ?? 0)} subtitle="Streaming and payment services" trend={{ value: 'PROTECTED', isPositive: true }} icon="SEC" variant="gold" />
       </div>
 
       {error && !editorOpen && !deleteTarget ? <div className="admin-inline-error" role="alert">{error}</div> : null}
       {success ? <div className="admin-status-message admin-status-success">{success}</div> : null}
 
       <Card
-        title="Provider credentials"
-        subtitle="Only metadata is displayed. Raw credential values are write-only and cannot be retrieved from this screen."
+        title="Service credentials"
+        subtitle="Only credential names and details are shown. Saved credential values are protected and cannot be displayed again."
         headerAction={<div className="admin-header-actions"><Button variant="outline" size="sm" onClick={() => void load()} loading={loading}>Refresh</Button><Button variant="gold" size="sm" onClick={openNew}>Add credential</Button></div>}
       >
         <div className="admin-preset-strip">
@@ -232,29 +232,29 @@ export function ProviderCredentials({ api }: { api: ApiClient }) {
 
         <Table
           columns={[
-            { header: 'REFERENCE', accessor: (item) => <div><strong className="admin-secret-reference">{item.secret_reference}</strong><div className="admin-row-meta">{item.description || 'No description'}</div></div> },
+            { header: 'CREDENTIAL NAME', accessor: (item) => <div><strong className="admin-secret-reference">{item.secret_reference}</strong><div className="admin-row-meta">{item.description || 'No description'}</div></div> },
             { header: 'CATEGORY', accessor: (item) => <Badge label={item.category.toUpperCase()} variant="neutral" /> },
-            { header: 'PROVIDER', accessor: (item) => item.provider_code || '—' },
-            { header: 'ROTATED', accessor: (item) => item.rotated_at ? new Date(item.rotated_at).toLocaleString() : '—' },
-            { header: 'RUNTIME', accessor: (item) => {
+            { header: 'SERVICE', accessor: (item) => item.provider_code || '—' },
+            { header: 'LAST UPDATED', accessor: (item) => item.rotated_at ? new Date(item.rotated_at).toLocaleString() : '—' },
+            { header: 'STATUS', accessor: (item) => {
               const state = checks[item.secret_reference];
               if (!state) return <Button variant="outline" size="sm" onClick={() => void check(item.secret_reference)}>Check</Button>;
-              return <Badge label={state.configured ? (state.source === 'platform_vault' ? 'VAULT READY' : 'ENV READY') : 'MISSING'} variant={state.configured ? 'active' : 'warning'} />;
+              return <Badge label={state.configured ? (state.source === 'platform_vault' ? 'READY' : 'READY (HOSTING)') : 'MISSING'} variant={state.configured ? 'active' : 'warning'} />;
             } },
             { header: 'ACTIONS', accessor: (item) => <div className="admin-table-actions"><Button variant="outline" size="sm" onClick={() => openRotate(item)}>Rotate</Button><Button variant="danger" size="sm" disabled={busy} onClick={() => { setError(''); setDeleteTarget(item); }}>Remove</Button></div> },
           ]}
           data={items}
           keyExtractor={(item) => item.secret_reference}
           loading={loading}
-          emptyMessage="No Platform Vault credentials have been stored yet. Deployment environment secrets can still operate until migrated here."
+          emptyMessage="No service credentials have been added here yet. Credentials supplied through secure hosting settings may still be in use."
         />
       </Card>
 
       <Modal
         isOpen={editorOpen}
         onClose={() => { if (!busy) setEditorOpen(false); }}
-        title={rotatingExisting ? 'Rotate provider credential' : 'Add provider credential'}
-        subtitle="The raw value is sent only to the authenticated server function and encrypted Vault write."
+        title={rotatingExisting ? 'Replace service credential' : 'Add service credential'}
+        subtitle="The value is sent securely, encrypted, and never displayed again after saving."
         maxWidth="lg"
         footer={
           <>
@@ -266,9 +266,9 @@ export function ProviderCredentials({ api }: { api: ApiClient }) {
         <div className="admin-modal-form">
           {error ? <div className="admin-inline-error" role="alert">{error}</div> : null}
           <div className="admin-form-grid-two">
-            <InputField label="Secret reference" value={reference} onChange={(event) => setReference(event.target.value.toUpperCase())} placeholder="AI_OPENAI_PRIMARY" autoComplete="off" helperText="Stable server-side reference." />
+            <InputField label="Credential name" value={reference} onChange={(event) => setReference(event.target.value.toUpperCase())} placeholder="AI_OPENAI_PRIMARY" autoComplete="off" helperText="A stable name COT uses to locate this protected credential." />
             <SelectField label="Category" value={category} onChange={(event) => setCategory(event.target.value as SecretCategory)} options={categoryOptions} />
-            <InputField label="Provider code" value={providerCode} onChange={(event) => setProviderCode(event.target.value.toLowerCase())} placeholder="openai, mux, paystack…" autoComplete="off" />
+            <InputField label="Service identifier" value={providerCode} onChange={(event) => setProviderCode(event.target.value.toLowerCase())} placeholder="openai, mux, paystack…" autoComplete="off" />
             <InputField label="Description" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="What this credential is used for" autoComplete="off" />
           </div>
           <InputField
@@ -289,7 +289,7 @@ export function ProviderCredentials({ api }: { api: ApiClient }) {
       <Modal
         isOpen={!!deleteTarget}
         onClose={() => { if (!busy) setDeleteTarget(null); }}
-        title="Remove provider credential"
+        title="Remove service credential"
         subtitle={deleteTarget?.secret_reference}
         maxWidth="sm"
         footer={
@@ -301,7 +301,7 @@ export function ProviderCredentials({ api }: { api: ApiClient }) {
       >
         {error ? <div className="admin-inline-error" role="alert">{error}</div> : null}
         <div className="admin-warning-callout">
-          Removing this Vault reference can stop provider features unless the same reference is supplied by the deployment environment.
+          Removing this credential may stop the connected service unless the same credential is supplied through secure hosting settings.
         </div>
       </Modal>
     </div>
