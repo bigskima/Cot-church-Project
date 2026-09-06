@@ -29,6 +29,7 @@ const migrationPaths = [
   'supabase/migrations/20260906024848_resolve_content_moderation_report.sql',
   'supabase/migrations/20260906025446_fix_platform_store_secret_conflict_target.sql',
   'supabase/migrations/20260906031630_platform_admin_ai_help.sql',
+  'supabase/migrations/20260906041250_public_profile_social_publishing_scope.sql',
   'supabase/migrations/20260906023038_member_onboarding_experience.sql',
 ];
 
@@ -66,6 +67,10 @@ const requiredPatterns = [
   /create table public\.receipts/i,
   /create table public\.live_streams/i,
   /create table public\.social_posts/i,
+  /social_posts_public_profile_author_scope_check/i,
+  /author_membership_id is not null[\s\S]*visibility = 'public'/i,
+  /create policy posts_author_update[\s\S]*author_profile_id/i,
+  /General Community posts belong to the public COT space/i,
   /create function public\.claim_workflow_runs/i,
   /create function public\.claim_integration_deliveries/i,
   /create function public\.organization_dashboard/i,
