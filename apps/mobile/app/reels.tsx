@@ -17,6 +17,8 @@ type ReelEngagementState = {
   reaction: string | null;
   bookmarked: boolean;
 };
+type PlaybackBatchEntry = PlaybackInfo & { contentId: string };
+type EngagementBatchEntry = ReelEngagementState & { contentId: string };
 type ReelWithViewerState = Reel & {
   viewerReaction?: string | null;
   viewerBookmarked?: boolean;
@@ -24,7 +26,7 @@ type ReelWithViewerState = Reel & {
 
 export default function FullScreenReelsScreen() {
   const insets = useSafeAreaInsets();
-  const { api, mode, context, hasCapability } = useSession();
+  const { api, mode, context } = useSession();
   const { reelId, context: requestedContext } = useLocalSearchParams<{ reelId?: string; context?: string }>();
   const { colors } = useTheme();
   const [activeIndex, setActiveIndex] = useState(0);
@@ -44,45 +46,48 @@ export default function FullScreenReelsScreen() {
     const reels = expressionId
       ? (await api.request<{ reels: Reel[] }>(`home-feed?organizationId=${encodeURIComponent(organizationId)}&expressionId=${encodeURIComponent(expressionId)}`, { signal })).reels
       : await api.request<Reel[]>(`public-content?type=reels${organizationId ? `&organizationId=${encodeURIComponent(organizationId)}` : ''}`, { signal });
-    return Promise.all(reels.map(async (reel) => {
+
+    const contentIds = reels.map((reel) => reel.content_items?.id).filter(Boolean) as string[];
+    if (!contentIds.length) return reels as ReelWithViewerState[];
+
+    const encodedIds = encodeURIComponent(contentIds.join(','));
+    const [playbackResult, engagementResult] = await Promise.allSettled([
+      api.request<PlaybackBatchEntry[]>(
+        `content-media?action=playback_batch&contentIds=${encodedIds}`,
+        { signal, context: expressionId ? 'current' : 'public' },
+      ),
+      mode === 'authenticated'
+        ? api.request<EngagementBatchEntry[]>(
+            `engagement?view=states&contentIds=${encodedIds}`,
+            { signal, context: expressionId ? 'current' : 'public' },
+          )
+        : Promise.resolve([] as EngagementBatchEntry[]),
+    ]);
+
+    const playbackMap = new Map(
+      (playbackResult.status === 'fulfilled' ? playbackResult.value : []).map((item) => [item.contentId, item]),
+    );
+    const engagementMap = new Map(
+      (engagementResult.status === 'fulfilled' ? engagementResult.value : []).map((item) => [item.contentId, item]),
+    );
+
+    return reels.map((reel) => {
       const contentId = reel.content_items?.id;
       if (!contentId) return reel as ReelWithViewerState;
 
-      const [playbackResult, engagementResult] = await Promise.allSettled([
-        api.request<PlaybackInfo>(
-          `content-media?action=playback&contentId=${encodeURIComponent(contentId)}`,
-          { signal, context: expressionId ? 'current' : 'public' },
-        ),
-        mode === 'authenticated'
-          ? api.request<ReelEngagementState>(
-              `engagement?contentId=${encodeURIComponent(contentId)}&view=state`,
-              { signal, context: expressionId ? 'current' : 'public' },
-            )
-          : Promise.resolve({ reaction: null, bookmarked: false }),
-      ]);
-
-      const playback = playbackResult.status === 'fulfilled' ? playbackResult.value : null;
-      const engagement = engagementResult.status === 'fulfilled' ? engagementResult.value : null;
+      const playback = playbackMap.get(contentId);
+      const engagement = engagementMap.get(contentId);
       const playbackUrl = playback?.renditions?.find((rendition) => rendition.kind === 'video_stream')?.playbackUrl;
-      const currentRenditions = reel.media_assets?.renditions ?? [];
 
       return {
         ...reel,
         viewerReaction: engagement?.reaction ?? null,
         viewerBookmarked: engagement?.bookmarked ?? false,
         media_assets: playbackUrl
-          ? {
-              ...(reel.media_assets ?? {}),
-              url: playbackUrl,
-              renditions: currentRenditions.map((rendition) =>
-                rendition.rendition_kind === 'video_stream'
-                  ? { ...rendition, storage_path: playbackUrl }
-                  : rendition,
-              ),
-            }
+          ? { ...(reel.media_assets ?? {}), url: playbackUrl }
           : reel.media_assets,
       } as ReelWithViewerState;
-    }));
+    });
   });
 
   const reels = reelsResource.data ?? [];
@@ -154,7 +159,7 @@ export default function FullScreenReelsScreen() {
         body: JSON.stringify(
           currentlyLiked
             ? { action: 'unreact', contentId }
-            : { action: 'react', contentId, reaction: 'amen' },
+            : { action: 'react', contentId, reaction: 'like' },
         ),
       });
       return !currentlyLiked;
