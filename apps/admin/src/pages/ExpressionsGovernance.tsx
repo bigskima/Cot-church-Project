@@ -58,7 +58,7 @@ export function ExpressionsGovernance({ api, canManage = false }: { api: ApiClie
     if (!canManage || !lifecycleExp) return;
     const isActive = !lifecycleExp.is_active;
     if (!isActive && !governanceReason.trim()) {
-      setError('A governance reason is required before disabling an expression.');
+      setError('Add a reason before making this Expression unavailable.');
       return;
     }
 
@@ -88,7 +88,7 @@ export function ExpressionsGovernance({ api, canManage = false }: { api: ApiClie
     <div className="admin-page-stack">
       <Card
         title="Expressions"
-        subtitle={`${total} expression${total === 1 ? '' : 's'} across the platform. Each church manages its own operations; Platform Administration can apply safety or lifecycle restrictions when necessary.`}
+        subtitle={`${total} expression${total === 1 ? '' : 's'} across COT. Each church manages its own ministry operations; Platform Administration can apply safety or access restrictions when necessary.`}
         headerAction={
           <div className="admin-header-actions">
             <SearchBar value={search} onChange={setSearch} placeholder="Search expression name or code..." />
@@ -133,7 +133,7 @@ export function ExpressionsGovernance({ api, canManage = false }: { api: ApiClie
             { header: 'TIMEZONE', accessor: (item) => item.timezone || 'UTC' },
             { header: 'CREATED', accessor: (item) => new Date(item.created_at).toLocaleDateString() },
             {
-              header: 'GOVERNANCE',
+              header: 'ADMIN ACTIONS',
               accessor: (item) => (
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <Button variant="outline" size="sm" onClick={() => setSelectedExp(item)}>Inspect</Button>
@@ -162,7 +162,7 @@ export function ExpressionsGovernance({ api, canManage = false }: { api: ApiClie
         isOpen={!!selectedExp}
         onClose={() => setSelectedExp(null)}
         title={selectedExp?.name ?? 'Expression details'}
-        subtitle={selectedExp ? `Expression ID: ${selectedExp.id}` : undefined}
+        subtitle={selectedExp ? `Expression reference: ${selectedExp.id}` : undefined}
         footer={<Button variant="primary" size="md" onClick={() => setSelectedExp(null)}>Close</Button>}
       >
         {selectedExp ? (
@@ -175,7 +175,7 @@ export function ExpressionsGovernance({ api, canManage = false }: { api: ApiClie
             </div>
             <Card title="Responsibility" subtitle="Church operations remain under the owning church.">
               <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.65 }}>
-                Platform Administration may restrict an Expression for safety, policy or security reasons. Ministries, roles, content, giving, departments and local settings remain under the owning church.
+                Platform Administration may restrict an Expression for safety, policy or security reasons. Ministry activity, roles, content, giving and local settings remain under the owning church.
               </p>
             </Card>
           </div>
@@ -205,15 +205,15 @@ export function ExpressionsGovernance({ api, canManage = false }: { api: ApiClie
       >
         {lifecycleExp?.is_active ? (
           <InputField
-            label="Governance reason"
+            label="Reason for this change"
             value={governanceReason}
             onChange={(event) => setGovernanceReason(event.target.value)}
             placeholder="Explain why this expression must be disabled"
-            helperText="The reason is written to the platform audit log."
+            helperText="The reason is recorded in protected administration history."
           />
         ) : (
           <p style={{ color: 'var(--text-secondary)', lineHeight: 1.65 }}>
-            Restoring the expression returns its platform lifecycle to active. Parent church permissions continue to determine what its leaders may do.
+            Restoring the Expression makes it available again. Parent church permissions continue to determine what its leaders may do.
           </p>
         )}
       </Modal>
