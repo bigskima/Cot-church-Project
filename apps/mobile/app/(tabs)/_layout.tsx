@@ -12,7 +12,7 @@ export default function TabLayout() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const bottomInset = Math.max(insets.bottom, Platform.OS === 'web' ? 10 : 8);
-  const barHeight = 62 + bottomInset;
+  const barHeight = 66 + bottomInset;
 
   const screenOptions = {
     headerShown: false,
@@ -37,7 +37,15 @@ export default function TabLayout() {
 
   const renderIcon = (filled: string, outline: string) =>
     ({ color, focused }: { color: ColorValue; focused: boolean }) => (
-      <View style={[styles.iconShell, focused && { backgroundColor: colors.primarySoft }]}>
+      <View
+        style={[
+          styles.iconShell,
+          {
+            backgroundColor: focused ? colors.primarySoft : 'transparent',
+            borderColor: focused ? colors.primarySoftStrong : 'transparent',
+          },
+        ]}
+      >
         <Icon name={focused ? filled : outline} size={TAB_ICON_SIZE} color={color as string} />
       </View>
     );
@@ -68,14 +76,24 @@ export default function TabLayout() {
           tabBarIcon: ({ color, focused }) => (
             <View
               style={[
-                styles.reelsButton,
+                styles.reelsHalo,
                 {
-                  backgroundColor: focused ? colors.interactive : colors.cardElevated,
-                  borderColor: focused ? colors.interactive : colors.border,
+                  backgroundColor: colors.bg,
+                  borderColor: focused ? colors.primarySoftStrong : colors.borderSubtle,
                 },
               ]}
             >
-              <Icon name={focused ? 'play' : 'play-outline'} size={22} color={focused ? '#FFFFFF' : (color as string)} />
+              <View
+                style={[
+                  styles.reelsButton,
+                  {
+                    backgroundColor: focused ? colors.interactive : colors.cardElevated,
+                    borderColor: focused ? colors.interactive : colors.border,
+                  },
+                ]}
+              >
+                <Icon name={focused ? 'play' : 'play-outline'} size={22} color={focused ? '#FFFFFF' : (color as string)} />
+              </View>
             </View>
           ),
         }}
@@ -105,22 +123,34 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   label: {
     fontWeight: '700',
-    fontSize: 10,
-    marginTop: 1,
-    lineHeight: 13,
+    fontSize: 9.5,
+    marginTop: 2,
+    lineHeight: 12,
+    letterSpacing: -0.1,
   },
   item: {
-    minHeight: 54,
+    minHeight: 56,
     paddingTop: 5,
   },
   icon: { marginTop: 0 },
   iconShell: {
-    minWidth: 38,
-    height: 30,
+    minWidth: 42,
+    height: 32,
     borderRadius: radius.pill,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: 9,
+  },
+  reelsHalo: {
+    width: 56,
+    height: 56,
+    borderRadius: 21,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -15,
+    ...shadows.floating,
   },
   reelsButton: {
     width: 46,
@@ -129,14 +159,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -10,
-    ...shadows.floating,
   },
   tabBar: {
     position: 'absolute',
-    left: 10,
-    right: 10,
-    bottom: 8,
+    left: 12,
+    right: 12,
+    bottom: 9,
     maxWidth: 720,
     alignSelf: 'center',
     borderTopWidth: 0,
