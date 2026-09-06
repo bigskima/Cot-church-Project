@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
   topBarBrandShell: { width: 46, height: 46, borderRadius: radius.lg, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   topBarBrandCopy: { flex: 1, minWidth: 0, alignItems: 'flex-start' },
   brandEyebrow: { fontSize: 8, lineHeight: 11, fontWeight: '800', letterSpacing: 0.8, marginBottom: 1 },
-  brandWordmark: { fontSize: 18, lineHeight: 22, fontWeight: '850', letterSpacing: -0.55, flexShrink: 1 },
+  brandWordmark: { fontSize: 18, lineHeight: 22, fontWeight: '800', letterSpacing: -0.55, flexShrink: 1 },
   campusPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, maxWidth: 170, marginTop: 3 },
   campusPillText: { fontSize: 12, fontWeight: '600', flexShrink: 1 },
   topBarRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
