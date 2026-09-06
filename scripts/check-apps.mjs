@@ -102,6 +102,7 @@ const checks = [
   [/isStoredAuth/, 'validated mobile stored session'],
   [/isAuthState/, 'validated admin stored session'],
   [/Join an Expression/, 'public Expression join entry point'],
+  [/creatorOrganizations[\s\S]*Create Expression/, 'authorized Expression creator direct entry'],
   [/enterExpression/, 'deliberate Expression entry'],
   [/leaveExpression/, 'deliberate Expression exit'],
   [/action: 'preview'/, 'invite-code preview flow'],
