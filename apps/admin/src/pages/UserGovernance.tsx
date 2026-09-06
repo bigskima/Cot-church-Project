@@ -257,7 +257,7 @@ export function UserGovernance({ api, canManage = false }: { api: ApiClient; can
         {actionIsRestore ? (
           <p style={{ color: 'var(--text-secondary)', lineHeight: 1.65 }}>
             {moderationType === 'posting'
-              ? 'Restoring posting allows this identity to publish again when normal church membership rules permit it.'
+              ? 'Restoring posting allows this identity to publish again wherever its selected public or Expression scope permits it.'
               : 'Restoring the account allows sign-in again. Church membership and assigned roles remain unchanged.'}
           </p>
         ) : (
