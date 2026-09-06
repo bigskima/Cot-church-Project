@@ -40,15 +40,25 @@ export function InputField({
 
   return (
     <View style={[styles.container, containerStyle]}>
-      {label ? <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text> : null}
+      {label ? (
+        <Text
+          style={[
+            styles.label,
+            { color: error ? colors.live : isFocused ? colors.interactive : colors.textSecondary },
+          ]}
+        >
+          {label}
+        </Text>
+      ) : null}
       <View
         style={[
           styles.inputWrapper,
           {
-            backgroundColor: colors.inputBg,
+            backgroundColor: isFocused ? colors.cardElevated : colors.inputBg,
             borderColor: error ? colors.live : isFocused ? colors.inputBorderFocus : colors.inputBorder,
+            borderWidth: isFocused ? 1.5 : 1,
           },
-          isFocused && styles.focusedInput,
+          isFocused && [styles.focusedInput, { shadowColor: colors.interactive }],
         ]}
       >
         {leftIcon ? <View style={styles.iconLeft}>{leftIcon}</View> : null}
@@ -112,14 +122,15 @@ export function SearchBar({
       style={[
         styles.searchContainer,
         {
-          backgroundColor: colors.card,
+          backgroundColor: focused ? colors.cardElevated : colors.card,
           borderColor: focused ? colors.inputBorderFocus : colors.borderSubtle,
+          borderWidth: focused ? 1.5 : 1,
         },
-        focused && styles.searchFocused,
+        focused && [styles.searchFocused, { shadowColor: colors.interactive }],
         style,
       ]}
     >
-      <View style={[styles.searchIconWrap, { backgroundColor: colors.bgSecondary }]}>
+      <View style={[styles.searchIconWrap, { backgroundColor: focused ? colors.primarySoft : colors.bgSecondary }]}>
         <Icon name="search" size={17} color={focused ? colors.interactive : colors.textMuted} />
       </View>
       <TextInput
@@ -140,7 +151,7 @@ export function SearchBar({
           hitSlop={8}
           style={({ pressed }) => [
             styles.clearButton,
-            { backgroundColor: colors.bgSecondary },
+            { backgroundColor: focused ? colors.primarySoft : colors.bgSecondary },
             pressed && { backgroundColor: colors.pressed },
           ]}
           accessibilityRole="button"
