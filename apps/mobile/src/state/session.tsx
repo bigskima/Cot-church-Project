@@ -16,8 +16,10 @@ type Value = {
   accessReady: boolean;
   refreshContext: () => void;
   permissions: string[];
+  organizationPermissions: string[];
   publicCapabilities: string[];
   hasCapability: (code: string) => boolean;
+  hasOrganizationCapability: (code: string) => boolean;
   hasPublicCapability: (code: string) => boolean;
   updateContextProfile: (changes: Partial<MembershipContext['profile']>) => void;
   api: ApiClient;
@@ -342,6 +344,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
   }, []);
 
   const permissions = useMemo(() => context?.effectivePermissions ?? [], [context]);
+  const organizationPermissions = useMemo(() => context?.organizationPermissions ?? [], [context]);
   const publicCapabilities = useMemo(() => context?.publicCapabilities ?? [], [context]);
   const accessReady = mode !== 'authenticated' || (contextStatus === 'ready' && context !== null);
 
@@ -351,6 +354,14 @@ export function SessionProvider({ children }: PropsWithChildren) {
       return permissions.includes(code) || permissions.includes('*');
     },
     [mode, accessReady, permissions]
+  );
+
+  const hasOrganizationCapability = useCallback(
+    (code: string) => {
+      if (mode !== 'authenticated' || !accessReady) return false;
+      return organizationPermissions.includes(code);
+    },
+    [mode, accessReady, organizationPermissions],
   );
 
   const hasPublicCapability = useCallback(
@@ -419,8 +430,10 @@ export function SessionProvider({ children }: PropsWithChildren) {
         accessReady,
         refreshContext,
         permissions,
+        organizationPermissions,
         publicCapabilities,
         hasCapability,
+        hasOrganizationCapability,
         hasPublicCapability,
         updateContextProfile,
         api,
