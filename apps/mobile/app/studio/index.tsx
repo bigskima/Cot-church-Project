@@ -22,14 +22,26 @@ import { radius, shadows, spacing } from '@/design-system/tokens';
 
 export default function CreatorStudioScreen() {
   const insets = useSafeAreaInsets();
-  const { api, context, hasCapability, hasPublicCapability } = useSession();
+  const { api, context, hasCapability, hasOrganizationCapability, hasPublicCapability } = useSession();
   const expression = context?.expression;
-  const canPublishPosts = hasCapability('posts.create') || hasCapability('posts.publish') || hasCapability('*');
+  const canPublishPosts = hasCapability('posts.create') || hasCapability('posts.publish');
   const expressionCreatorOrganizationId = context?.organization?.id ?? context?.creatorOrganizations?.[0]?.id ?? '';
   const canCreateExpression = Boolean(
     expressionCreatorOrganizationId &&
     context?.creatorOrganizations?.some((item) => item.id === expressionCreatorOrganizationId),
   );
+  const canModerateGeneralPrayer =
+    hasOrganizationCapability('prayer.moderate') &&
+    (hasOrganizationCapability('prayer.pastoral.receive') || hasOrganizationCapability('prayer.team.receive'));
+  const canModerateExpressionPrayer =
+    Boolean(expression?.id) &&
+    hasCapability('prayer.moderate') &&
+    (hasCapability('prayer.pastoral.receive') || hasCapability('prayer.team.receive'));
+  const canAccessPastoral =
+    canModerateGeneralPrayer ||
+    canModerateExpressionPrayer ||
+    hasOrganizationCapability('pastoral.followups.receive') ||
+    (Boolean(expression?.id) && hasCapability('pastoral.followups.receive'));
   const { colors } = useTheme();
 
   const [activeModal, setActiveModal] = useState<'post' | null>(null);
@@ -74,7 +86,7 @@ export default function CreatorStudioScreen() {
       iconName: 'flash-outline',
       badge: 'REELS',
       route: '/studio/reel',
-      enabled: (hasCapability('media.upload') && hasCapability('reels.publish')) || hasCapability('*'),
+      enabled: hasCapability('media.upload') && hasCapability('reels.publish'),
     },
     {
       title: 'Create Watch Video',
@@ -82,7 +94,7 @@ export default function CreatorStudioScreen() {
       iconName: 'videocam-outline',
       badge: 'WATCH',
       route: '/studio/video',
-      enabled: (hasCapability('media.upload') && hasCapability('videos.publish')) || hasCapability('*'),
+      enabled: hasCapability('media.upload') && hasCapability('videos.publish'),
     },
     {
       title: 'Sermons',
@@ -90,7 +102,7 @@ export default function CreatorStudioScreen() {
       iconName: 'book-outline',
       badge: 'MEDIA',
       route: '/leadership/sermons',
-      enabled: hasCapability('sermons.create') || hasCapability('sermons.manage') || hasCapability('*'),
+      enabled: hasCapability('sermons.create') || hasCapability('sermons.manage'),
     },
     {
       title: 'Events',
@@ -98,7 +110,7 @@ export default function CreatorStudioScreen() {
       iconName: 'calendar-outline',
       badge: 'EVENTS',
       route: '/leadership/events',
-      enabled: hasCapability('events.create') || hasCapability('events.update') || hasCapability('*'),
+      enabled: hasCapability('events.create') || hasCapability('events.update'),
     },
     {
       title: 'Live Media Studio',
@@ -106,7 +118,7 @@ export default function CreatorStudioScreen() {
       iconName: 'radio-outline',
       badge: 'BROADCAST',
       route: '/leadership/media-studio',
-      enabled: hasPublicCapability('public.live_stream.create') || hasCapability('streams.broadcast') || hasCapability('*'),
+      enabled: hasPublicCapability('public.live_stream.create') || (Boolean(expression?.id) && hasCapability('streams.broadcast')),
     },
     {
       title: 'Pastoral Care',
@@ -114,7 +126,7 @@ export default function CreatorStudioScreen() {
       iconName: 'heart-outline',
       badge: 'PASTORAL',
       route: '/leadership/pastoral-triage',
-      enabled: ((hasCapability('prayer.moderate') && (hasCapability('prayer.pastoral.receive') || hasCapability('prayer.team.receive'))) || hasCapability('pastoral.followups.receive') || hasCapability('*')),
+      enabled: canAccessPastoral,
     },
     {
       title: 'Giving Configuration',
@@ -122,7 +134,7 @@ export default function CreatorStudioScreen() {
       iconName: 'gift-outline',
       badge: 'GIVING',
       route: '/(tabs)/profile/leadership/giving-manage',
-      enabled: hasCapability('giving.campaigns.manage') || hasCapability('*'),
+      enabled: hasCapability('giving.campaigns.manage'),
     },
     {
       title: 'Giving Finance',
@@ -130,7 +142,7 @@ export default function CreatorStudioScreen() {
       iconName: 'analytics-outline',
       badge: 'FINANCE',
       route: '/(tabs)/profile/leadership/giving-finance',
-      enabled: hasCapability('giving.finance.read') || hasCapability('*'),
+      enabled: hasCapability('giving.finance.read'),
     },
     {
       title: 'Expressions',
@@ -146,7 +158,7 @@ export default function CreatorStudioScreen() {
       iconName: 'business-outline',
       badge: 'CHURCH',
       route: '/(tabs)/profile/leadership/church-leadership',
-      enabled: hasCapability('organization.leadership.manage') || hasCapability('*'),
+      enabled: hasOrganizationCapability('organization.leadership.manage'),
     },
     {
       title: 'Expression Leadership',
@@ -154,7 +166,7 @@ export default function CreatorStudioScreen() {
       iconName: 'people-circle-outline',
       badge: 'DIRECTORY',
       route: '/leadership/directory',
-      enabled: Boolean(expression?.id) && (hasCapability('expression.leadership.manage') || hasCapability('*')),
+      enabled: Boolean(expression?.id) && hasCapability('expression.leadership.manage'),
     },
   ].filter((module) => module.enabled);
 
