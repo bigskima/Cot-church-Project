@@ -14,6 +14,7 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import {
+  BrandMark,
   EmptyState,
   EventCard,
   HeroLiveCard,
@@ -166,11 +167,14 @@ export default function HomeScreen() {
         imageUrl: reel.media_assets?.thumbnailUrl,
         isLive: false,
         hasUnseen: false,
-        onPress: () => router.push('/reels'),
+        onPress: () => router.push({
+          pathname: '/reels',
+          params: expression?.id ? { reelId: reel.id } : { reelId: reel.id, context: 'public' },
+        } as any),
       });
     });
     return list;
-  }, [activeStream, reels]);
+  }, [activeStream, reels, expression?.id]);
 
   const canEngage = mode === 'authenticated';
   const reelWidth = Math.max(260, Math.min(width - spacing.lg * 2, 460));
@@ -253,18 +257,24 @@ export default function HomeScreen() {
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm, backgroundColor: colors.glass, borderColor: colors.borderSubtle }, shadows.sm]}>
         <View style={styles.topBarLeft}>
-          <Text style={[styles.brandWordmark, { color: colors.text }]} numberOfLines={1}>{organization?.name ?? 'Church Community'}</Text>
-          {expression?.name ? (
-            <View style={[styles.campusPill, { backgroundColor: colors.bgSecondary }]}>
-              <Icon name="people-outline" size={12} color={colors.interactive} />
-              <Text style={[styles.campusPillText, { color: colors.interactive }]} numberOfLines={1}>{expression.name}</Text>
-            </View>
-          ) : (
-            <View style={[styles.campusPill, { backgroundColor: colors.bgSecondary }]}>
-              <Icon name="globe-outline" size={12} color={colors.interactive} />
-              <Text style={[styles.campusPillText, { color: colors.interactive }]}>Public</Text>
-            </View>
-          )}
+          <View style={[styles.topBarBrandShell, { backgroundColor: colors.cardElevated, borderColor: colors.borderSubtle }]}>
+            <BrandMark variant="header" size={31} />
+          </View>
+          <View style={styles.topBarBrandCopy}>
+            <Text style={[styles.brandEyebrow, { color: colors.textMuted }]}>CITY OF TRANSFORMATION</Text>
+            <Text style={[styles.brandWordmark, { color: colors.text }]} numberOfLines={1}>{organization?.name ?? 'Church Community'}</Text>
+            {expression?.name ? (
+              <View style={[styles.campusPill, { backgroundColor: colors.primarySoft }]}>
+                <Icon name="people-outline" size={12} color={colors.interactive} />
+                <Text style={[styles.campusPillText, { color: colors.interactive }]} numberOfLines={1}>{expression.name}</Text>
+              </View>
+            ) : (
+              <View style={[styles.campusPill, { backgroundColor: colors.primarySoft }]}>
+                <Icon name="globe-outline" size={12} color={colors.interactive} />
+                <Text style={[styles.campusPillText, { color: colors.interactive }]}>Public COT</Text>
+              </View>
+            )}
+          </View>
         </View>
 
         <View style={styles.topBarRight}>
@@ -311,7 +321,14 @@ export default function HomeScreen() {
               return (
                 <View style={styles.feedCardWrap}>
                   <View style={styles.itemLabelRow}><Icon name="flash" size={16} color="#EF4444" /><Text style={[styles.itemLabel, { color: colors.textSecondary }]}>REEL</Text></View>
-                  <ReelCard reel={item.reel} width={reelWidth} onPress={() => router.push('/reels')} />
+                  <ReelCard
+                    reel={item.reel}
+                    width={reelWidth}
+                    onPress={() => router.push({
+                      pathname: '/reels',
+                      params: expression?.id ? { reelId: item.reel.id } : { reelId: item.reel.id, context: 'public' },
+                    } as any)}
+                  />
                 </View>
               );
             }
@@ -348,10 +365,13 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: spacing.md, marginTop: spacing.xs, paddingHorizontal: spacing.md, paddingBottom: spacing.md, borderWidth: 1, borderRadius: radius.xl },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: spacing.md, marginTop: spacing.xs, paddingHorizontal: spacing.md, paddingBottom: spacing.md, borderWidth: 1, borderRadius: radius.xxl },
   topBarLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1, minWidth: 0 },
-  brandWordmark: { fontSize: 21, fontWeight: '800', letterSpacing: -0.65, flexShrink: 1 },
-  campusPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, maxWidth: 150 },
+  topBarBrandShell: { width: 46, height: 46, borderRadius: radius.lg, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  topBarBrandCopy: { flex: 1, minWidth: 0, alignItems: 'flex-start' },
+  brandEyebrow: { fontSize: 8, lineHeight: 11, fontWeight: '800', letterSpacing: 0.8, marginBottom: 1 },
+  brandWordmark: { fontSize: 18, lineHeight: 22, fontWeight: '850', letterSpacing: -0.55, flexShrink: 1 },
+  campusPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, maxWidth: 170, marginTop: 3 },
   campusPillText: { fontSize: 12, fontWeight: '600', flexShrink: 1 },
   topBarRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   iconButton: { width: 38, height: 38, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
