@@ -16,13 +16,25 @@ async function enrichMembershipAuthors<T extends MembershipAuthoredRow>(rows: T[
   if (!rows.length) return rows;
   const admin = adminClient();
   const membershipIds = [...new Set(rows.map((row) => row.author_membership_id).filter(Boolean))] as string[];
-  if (!membershipIds.length) return rows;
+  const profileAuthoredIds = rows.filter((row) => !row.author_membership_id).map((row) => row.id).filter(Boolean) as string[];
 
-  const { data: memberships } = await admin.from("memberships").select("id,organization_id,branch_id,profile_id,status").in("id", membershipIds);
-  const activeMemberships = (memberships ?? []).filter((membership) => membership.status === "active");
-  const membershipMap = new Map(activeMemberships.map((membership) => [membership.id, membership]));
-  const profileIds = [...new Set(activeMemberships.map((membership) => membership.profile_id))];
-  const organizationIds = [...new Set(activeMemberships.map((membership) => membership.organization_id))];
+  const [membershipResult, profileAuthoredResult] = await Promise.all([
+    membershipIds.length
+      ? admin.from("memberships").select("id,organization_id,branch_id,profile_id,status").in("id", membershipIds)
+      : Promise.resolve({ data: [] as any[] }),
+    profileAuthoredIds.length
+      ? admin.from("content_items").select("id,author_profile_id").in("id", profileAuthoredIds)
+      : Promise.resolve({ data: [] as any[] }),
+  ]);
+
+  const activeMemberships = (membershipResult.data ?? []).filter((membership: any) => membership.status === "active");
+  const membershipMap = new Map(activeMemberships.map((membership: any) => [membership.id, membership]));
+  const profileAuthorMap = new Map((profileAuthoredResult.data ?? []).map((item: any) => [item.id, item.author_profile_id]));
+  const profileIds = [...new Set([
+    ...activeMemberships.map((membership: any) => membership.profile_id),
+    ...profileAuthorMap.values(),
+  ].filter(Boolean))] as string[];
+  const organizationIds = [...new Set(activeMemberships.map((membership: any) => membership.organization_id))] as string[];
   const branchIds = [...new Set(rows.map((row) => row.branch_id).filter(Boolean))] as string[];
 
   const [profilesResult, defaultsResult, assignmentsResult, branchesResult] = await Promise.all([
@@ -60,18 +72,20 @@ async function enrichMembershipAuthors<T extends MembershipAuthoredRow>(rows: T[
   });
 
   return rows.map((row) => {
-    const membership = row.author_membership_id ? membershipMap.get(row.author_membership_id) : null;
-    if (!membership) return row;
-    const profile = profileMap.get(membership.profile_id);
+    const membership: any = row.author_membership_id ? membershipMap.get(row.author_membership_id) : null;
+    const profileId = membership?.profile_id ?? profileAuthorMap.get(row.id);
+    const profile = profileId ? profileMap.get(profileId) : null;
     const badges: PublicBadge[] = [];
-    const membershipDefault = defaultByOrg.get(membership.organization_id);
-    if (row.branch_id && membershipDefault) badges.push(toBadge(membershipDefault));
-    for (const assignment of assignedByProfile.get(membership.profile_id) ?? []) {
-      if (assignment.branch_id !== row.branch_id) continue;
-      const definition = Array.isArray(assignment.identity_badge_definitions) ? assignment.identity_badge_definitions[0] : assignment.identity_badge_definitions;
-      if (definition) badges.push(toBadge(definition));
+    if (membership) {
+      const membershipDefault = defaultByOrg.get(membership.organization_id);
+      if (row.branch_id && membershipDefault) badges.push(toBadge(membershipDefault));
+      for (const assignment of assignedByProfile.get(membership.profile_id) ?? []) {
+        if (assignment.branch_id !== row.branch_id) continue;
+        const definition = Array.isArray(assignment.identity_badge_definitions) ? assignment.identity_badge_definitions[0] : assignment.identity_badge_definitions;
+        if (definition) badges.push(toBadge(definition));
+      }
+      badges.sort((a, b) => b.priority - a.priority);
     }
-    badges.sort((a, b) => b.priority - a.priority);
 
     return {
       ...row,
