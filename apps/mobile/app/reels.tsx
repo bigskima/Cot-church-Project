@@ -314,7 +314,7 @@ export default function FullScreenReelsScreen() {
                   fullWidth
                 />
               ) : (
-                <Text style={styles.shareHint}>Join an active Expression before sharing a Reel into General Community.</Text>
+                <Text style={styles.shareHint}>Choose a church community before sharing this Reel to General Community.</Text>
               )}
               <Button
                 label="Share externally"
