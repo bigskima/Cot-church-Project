@@ -1,7 +1,7 @@
 import type { ContentItemType, MediaAsset, PublicationStatus } from './media';
 
 export type ContentVisibility = "public" | "organization" | "branch" | "group" | "private";
-export type StreamStatus = "draft" | "scheduled" | "live" | "ended" | "cancelled" | "archived" | "provisioning" | "ready" | "failed";
+export type StreamStatus = "draft" | "scheduled" | "provisioning" | "ready" | "live" | "ended" | "processing" | "replay_ready" | "failed" | "cancelled" | "archived";
 
 export interface ContentItem {
   id: string;
