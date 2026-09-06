@@ -4,6 +4,7 @@ const files = [
   'apps/mobile/src/api.ts',
   'apps/mobile/src/state/session.tsx',
   'apps/mobile/src/hooks/use-resource.ts',
+  'apps/mobile/src/services/query-cache.ts',
   'apps/mobile/src/components/cards.tsx',
   'apps/mobile/app/(tabs)/home/index.tsx',
   'apps/mobile/app/(tabs)/discover/index.tsx',
@@ -57,6 +58,8 @@ const sessionUi = sources.get('apps/mobile/src/state/session.tsx') ?? '';
 const checks = [
   [/expo-secure-store/, 'secure session persistence'],
   [/AbortController/, 'cancelled obsolete queries'],
+  [/cacheSnapshot/, 'stale scoped cache visibility'],
+  [/stale: boolean/, 'resource stale-data state'],
   [/home.*discover.*live.*community.*profile/is, 'five product tabs'],
   [/LiveCard/, 'reusable live media'],
   [/VideoView/, 'native live player'],
