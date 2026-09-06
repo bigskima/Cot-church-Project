@@ -41,7 +41,7 @@ export interface LiveStream {
 export interface SocialPost {
   id: string;
   organization_id?: string;
-  author_membership_id: string;
+  author_membership_id: string | null;
   branch_id: string | null;
   expression_id?: string | null;
   group_id: string | null;
