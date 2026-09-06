@@ -114,6 +114,7 @@ const communityMedia = await readFile('supabase/functions/community-media/index.
 const publicIdentity = await readFile('supabase/functions/_shared/public-identity.ts', 'utf8');
 const engagement = await readFile('supabase/functions/engagement/index.ts', 'utf8');
 const homeFeed = await readFile('supabase/functions/home-feed/index.ts', 'utf8');
+const streamAccess = await readFile('supabase/functions/stream-access/index.ts', 'utf8');
 const feedRanking = await readFile('supabase/functions/_shared/feed-ranking.ts', 'utf8');
 const eventRegistrations = await readFile('supabase/functions/event-registrations/index.ts', 'utf8');
 const sermons = await readFile('supabase/functions/sermons/index.ts', 'utf8');
@@ -207,6 +208,10 @@ const invariants = [
   [homeFeed, /followedExpressionIds/, 'follow-driven public recommendations'],
   [homeFeed, /inProgressContentIds/, 'continue-watching recommendation signal'],
   [homeFeed, /value === selectedExpressionId/, 'exact Expression home isolation'],
+  [homeFeed, /scheduled"[\s\S]*provisioning"[\s\S]*ready"[\s\S]*processing"[\s\S]*replay_ready"/, 'public livestream feed lifecycle coverage'],
+  [streamAccess, /scheduled"[\s\S]*provisioning"[\s\S]*ready"[\s\S]*processing"[\s\S]*replay_ready"[\s\S]*failed"/, 'livestream detail lifecycle coverage'],
+  [streamAccess, /playbackEligible[\s\S]*live"[\s\S]*ended"[\s\S]*processing"[\s\S]*replay_ready"/, 'livestream playback lifecycle gating'],
+  [streamAccess, /giving_settings[\s\S]*givingEnabled/, 'live giving visibility follows scoped configuration'],
   [feedRanking, /completedPenalty/, 'completed-content recommendation suppression'],
   [feedRanking, /diversifyFeed/, 'mixed-format feed diversification'],
   [engagement, /view.*state/, 'engagement viewer-state retrieval'],
