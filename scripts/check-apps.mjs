@@ -66,6 +66,8 @@ const checks = [
   [/stale: boolean/, 'resource stale-data state'],
   [/contextStatus/, 'deterministic membership context state'],
   [/contextRefreshing/, 'background membership refresh state'],
+  [/setInterval\(refreshContext, 120_000\)/, 'role grants refresh without re-login'],
+  [/hasPublicCapability\('public\.live_stream\.create'\)[\s\S]*Go live/, 'assigned public broadcaster live entry point'],
   [/failed background refresh must not blank already-resolved context/, 'membership refresh preserves resolved context'],
   [/home.*discover.*live.*community.*profile/is, 'five product tabs'],
   [/LiveCard/, 'reusable live media'],
