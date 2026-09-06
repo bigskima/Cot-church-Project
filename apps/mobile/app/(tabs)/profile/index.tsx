@@ -18,7 +18,7 @@ type AiReadiness = {
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { mode, context, contextStatus, contextError, refreshContext, hasCapability, hasPublicCapability, signOut, api } = useSession();
+  const { mode, context, contextStatus, contextError, accessReady, refreshContext, hasCapability, hasPublicCapability, signOut, api } = useSession();
   const { preference, setPreference, colors } = useTheme();
   const profile = context?.profile;
   const membershipOrganization = context?.organization ?? context?.organizations?.[0];
@@ -27,15 +27,10 @@ export default function ProfileScreen() {
   const expression = context?.expression;
   const hasOrganization = Boolean(membershipOrganization?.id);
 
-  const expressionCreatorState = useResource<{ organizationId: string; authorized: boolean }>(
-    `profile:expression-creator:${contextStatus}:${context?.organization?.id ?? organization?.id ?? 'none'}`,
-    (signal) => {
-      const organizationId = context?.organization?.id ?? organization?.id;
-      if (mode !== 'authenticated' || !organizationId) return Promise.resolve({ organizationId: '', authorized: false });
-      return api.request(`expression-creators?mode=self&organizationId=${organizationId}`, { signal });
-    },
+  const isAuthorizedExpressionCreator = Boolean(
+    mode === 'authenticated' &&
+    context?.creatorOrganizations?.some((item) => item.id === organization?.id),
   );
-  const isAuthorizedExpressionCreator = expressionCreatorState.data?.authorized === true;
 
   const aiReadiness = useResource<AiReadiness>(
     `profile:assistant-readiness:${mode}:${contextStatus}:${membershipOrganization?.id ?? 'none'}:${expression?.id ?? 'general'}`,
@@ -73,7 +68,7 @@ export default function ProfileScreen() {
     hasCapability('giving.finance.read') ||
     isAuthorizedExpressionCreator;
 
-  const hasLeadershipAccess = mode === 'authenticated' && (
+  const hasLeadershipAccess = mode === 'authenticated' && accessReady && (
     hasPublicBroadcastAccess || hasCapability('*') || hasOrganizationLeadershipAccess || hasExpressionLeadershipAccess
   );
 
@@ -155,7 +150,12 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {hasLeadershipAccess && (
+        {mode === 'authenticated' && !accessReady ? (
+          <View style={styles.sectionWrap}>
+            <SectionHeader title="Ministry tools" subtitle="Checking the roles assigned to your account" />
+            <Skeleton height={92} />
+          </View>
+        ) : hasLeadershipAccess ? (
           <View style={styles.sectionWrap}>
             <SectionHeader title="Ministry tools" subtitle="Only capabilities assigned to your role appear here" />
             <Pressable onPress={() => router.push('/(tabs)/profile/leadership')} style={({ pressed }) => [styles.leadershipBanner, { backgroundColor: colors.card, borderColor: colors.interactive }, shadows.md, pressed && styles.pressed]}>
@@ -167,7 +167,7 @@ export default function ProfileScreen() {
               <Icon name="chevron-forward" size={18} color={colors.textMuted} />
             </Pressable>
           </View>
-        )}
+        ) : null}
 
         <View style={styles.sectionWrap}>
           <SectionHeader title="Appearance" subtitle="Choose how COT looks on this device" />
