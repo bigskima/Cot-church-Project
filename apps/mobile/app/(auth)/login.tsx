@@ -6,7 +6,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -17,6 +16,7 @@ import { useTheme } from '@/state/theme';
 import { BrandMark } from '@/components/primitives/BrandMark';
 import { Icon } from '@/components/primitives/Icon';
 import { Button } from '@/components/Button';
+import { InputField } from '@/components/Input';
 import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 
 function safeReturnTo(value?: string) {
@@ -124,10 +124,46 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>Welcome Back</Text>
+          <View style={[styles.authEyebrow, { backgroundColor: colors.primarySoft }]}>
+            <Text style={[styles.authEyebrowText, { color: colors.interactive }]}>COT ACCOUNT</Text>
+          </View>
+          <Text style={[styles.title, { color: colors.text }]}>Welcome back</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Sign in to interact, join your Expression, manage your account, and use member-only church features.
+            Sign in for member interactions and Expression access, or continue directly into the public COT experience.
           </Text>
+        </View>
+
+        <Pressable
+          onPress={() => void handleGuestEntry()}
+          disabled={loading || guestLoading}
+          style={({ pressed }) => [
+            styles.publicAccessCard,
+            { backgroundColor: colors.card, borderColor: colors.borderSubtle },
+            shadows.sm,
+            pressed && styles.publicAccessPressed,
+            (loading || guestLoading) && styles.publicAccessDisabled,
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Explore public City of Transformation"
+        >
+          <View style={[styles.publicAccessIcon, { backgroundColor: colors.primarySoft }]}>
+            <Icon name="globe-outline" size={21} color={colors.interactive} />
+          </View>
+          <View style={styles.publicAccessCopy}>
+            <Text style={[styles.publicAccessTitle, { color: colors.text }]}>
+              {guestLoading ? 'Opening public COT…' : 'Explore public COT'}
+            </Text>
+            <Text style={[styles.publicAccessText, { color: colors.textMuted }]}>
+              Browse public media, church information and community content without signing in.
+            </Text>
+          </View>
+          <Icon name="chevron-forward" size={18} color={colors.textMuted} />
+        </Pressable>
+
+        <View style={styles.signInDivider}>
+          <View style={[styles.dividerLine, { backgroundColor: colors.borderSubtle }]} />
+          <Text style={[styles.dividerText, { color: colors.textMuted }]}>MEMBER SIGN IN</Text>
+          <View style={[styles.dividerLine, { backgroundColor: colors.borderSubtle }]} />
         </View>
 
         <View style={[styles.authCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
@@ -148,72 +184,52 @@ export default function LoginScreen() {
         ) : null}
 
         <View style={styles.form}>
-          <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>EMAIL OR PHONE NUMBER</Text>
-            <TextInput
-              value={identifier}
-              onChangeText={(value) => {
-                setIdentifier(value);
-                if (errorMsg) setErrorMsg('');
-              }}
-              placeholder="name@example.com or +country code"
-              placeholderTextColor={colors.textMuted}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType={identifierKeyboard}
-              editable={!loading && !guestLoading}
-              returnKeyType="next"
-              style={[
-                styles.input,
-                {
-                  backgroundColor: colors.bgSecondary,
-                  borderColor: colors.borderSubtle,
-                  color: colors.text,
-                },
-              ]}
-            />
-          </View>
+          <InputField
+            label="Email or phone number"
+            value={identifier}
+            onChangeText={(value) => {
+              setIdentifier(value);
+              if (errorMsg) setErrorMsg('');
+            }}
+            placeholder="name@example.com or +country code"
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType={identifierKeyboard}
+            editable={!loading && !guestLoading}
+            returnKeyType="next"
+            containerStyle={styles.sharedField}
+            leftIcon={<Icon name="person-outline" size={18} color={colors.textMuted} />}
+          />
 
-          <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>PASSWORD</Text>
-            <View style={styles.passwordContainer}>
-              <TextInput
-                value={password}
-                onChangeText={(value) => {
-                  setPassword(value);
-                  if (errorMsg) setErrorMsg('');
-                }}
-                placeholder="Enter your password"
-                placeholderTextColor={colors.textMuted}
-                secureTextEntry={!showPassword}
-                editable={!loading && !guestLoading}
-                returnKeyType="done"
-                onSubmitEditing={() => void handleLogin()}
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: colors.bgSecondary,
-                    borderColor: colors.borderSubtle,
-                    color: colors.text,
-                    paddingRight: 44,
-                  },
-                ]}
-              />
+          <InputField
+            label="Password"
+            value={password}
+            onChangeText={(value) => {
+              setPassword(value);
+              if (errorMsg) setErrorMsg('');
+            }}
+            placeholder="Enter your password"
+            secureTextEntry={!showPassword}
+            editable={!loading && !guestLoading}
+            returnKeyType="done"
+            onSubmitEditing={() => void handleLogin()}
+            containerStyle={styles.sharedField}
+            leftIcon={<Icon name="lock-closed-outline" size={18} color={colors.textMuted} />}
+            rightIcon={(
               <Pressable
                 onPress={() => setShowPassword(!showPassword)}
-                style={styles.eyeBtn}
                 hitSlop={8}
                 accessibilityRole="button"
                 accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
               >
                 <Icon
                   name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                  size={20}
+                  size={19}
                   color={colors.textMuted}
                 />
               </Pressable>
-            </View>
-          </View>
+            )}
+          />
 
           <Pressable
             onPress={() => router.push('/(auth)/forgot-password')}
@@ -231,16 +247,8 @@ export default function LoginScreen() {
             disabled={guestLoading}
             variant="primary"
             size="lg"
-            style={{ marginTop: spacing.sm }}
-          />
-
-          <Button
-            label="Explore public COT"
-            onPress={handleGuestEntry}
-            loading={guestLoading}
-            disabled={loading}
-            variant="outline"
-            size="lg"
+            fullWidth
+            style={{ marginTop: spacing.xs }}
           />
         </View>
 
@@ -274,10 +282,75 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.md,
   },
+  authEyebrow: {
+    minHeight: 25,
+    borderRadius: radius.pill,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
+  },
+  authEyebrowText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
   authCard: {
     borderWidth: 1,
     borderRadius: radius.xxl,
     padding: spacing.lg,
+  },
+  publicAccessCard: {
+    minHeight: 82,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    borderWidth: 1,
+    borderRadius: radius.xl,
+    padding: spacing.md,
+  },
+  publicAccessPressed: {
+    opacity: 0.88,
+    transform: [{ scale: 0.99 }],
+  },
+  publicAccessDisabled: {
+    opacity: 0.55,
+  },
+  publicAccessIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  publicAccessCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  publicAccessTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: -0.15,
+  },
+  publicAccessText: {
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 3,
+  },
+  signInDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginVertical: spacing.lg,
+  },
+  dividerLine: {
+    height: StyleSheet.hairlineWidth,
+    flex: 1,
+  },
+  dividerText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.7,
   },
   header: {
     marginBottom: spacing.xl,
@@ -318,30 +391,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   form: {
-    gap: spacing.md,
+    gap: spacing.sm,
   },
-  inputGroup: {
-    gap: 4,
-  },
-  inputLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  input: {
-    height: 48,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    paddingHorizontal: spacing.md,
-    fontSize: 15,
-  },
-  passwordContainer: {
-    position: 'relative',
-  },
-  eyeBtn: {
-    position: 'absolute',
-    right: 12,
-    top: 14,
+  sharedField: {
+    marginBottom: spacing.sm,
   },
   forgotPassword: { alignSelf: 'flex-end', paddingVertical: spacing.xs },
   forgotPasswordText: { fontSize: 12, fontWeight: '700' },
