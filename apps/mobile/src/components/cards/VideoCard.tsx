@@ -33,6 +33,13 @@ export function VideoCard({ video, expressionName, onPress, onBookmark, style }:
 
   const thumbnailUrl = video.media_assets?.thumbnailUrl || video.media_assets?.url;
   const duration = formatDuration(video.media_assets?.duration_seconds);
+  const sourceName =
+    expressionName ||
+    video.content_items?.expression?.name ||
+    video.content_items?.organization?.name ||
+    'City of Transformation';
+  const creatorName = video.content_items?.author?.display_name || sourceName;
+  const creatorAvatar = video.content_items?.author?.avatar_url ?? undefined;
 
   const timeAgo = () => {
     const d = new Date(video.created_at);
@@ -74,24 +81,29 @@ export function VideoCard({ video, expressionName, onPress, onBookmark, style }:
       </View>
 
       <View style={styles.metaRow}>
-        <Avatar name={expressionName || 'Church'} size="sm" />
+        <Avatar url={creatorAvatar} name={creatorName} size="sm" />
 
         <View style={styles.textColumn}>
           <Text style={[styles.title, { color: colors.text }]} numberOfLines={2}>{video.title}</Text>
           <Text style={[styles.metaText, { color: colors.textSecondary }]} numberOfLines={1}>
-            {expressionName ? `${expressionName} · ` : ''}{formatViews(video.views_count)} · {timeAgo()}
+            {sourceName} · {formatViews(video.views_count)} · {timeAgo()}
           </Text>
         </View>
 
-        <Pressable
-          onPress={onBookmark}
-          hitSlop={8}
-          style={({ pressed }) => [styles.moreBtn, pressed && { backgroundColor: colors.bgSecondary }]}
-          accessibilityRole="button"
-          accessibilityLabel="Video options"
-        >
-          <Icon name="ellipsis-horizontal" size={19} color={colors.textMuted} />
-        </Pressable>
+        {onBookmark ? (
+          <Pressable
+            onPress={(event) => {
+              event.stopPropagation?.();
+              onBookmark();
+            }}
+            hitSlop={8}
+            style={({ pressed }) => [styles.moreBtn, pressed && { backgroundColor: colors.bgSecondary }]}
+            accessibilityRole="button"
+            accessibilityLabel={`Options for ${video.title}`}
+          >
+            <Icon name="ellipsis-horizontal" size={19} color={colors.textMuted} />
+          </Pressable>
+        ) : null}
       </View>
     </Pressable>
   );
