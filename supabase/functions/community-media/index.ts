@@ -46,11 +46,9 @@ function durationSeconds(value: unknown) {
 }
 
 Deno.serve(createHandler(
-  { methods: ["POST", "DELETE"], authentication: "required", organization: "required" },
+  { methods: ["POST", "DELETE"], authentication: "required", organization: "none" },
   async ({ request, auth }) => {
-    if (!auth?.user || !auth.organizationId || !auth.membershipId) {
-      throw new ApiError("MEMBERSHIP_REQUIRED", "Join an Expression before publishing community media", 403);
-    }
+    if (!auth?.user) throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication required", 401);
 
     const { data: postingAllowed, error: postingError } = await auth.client.rpc("can_profile_post", {
       target_profile_id: auth.user.id,
@@ -69,7 +67,6 @@ Deno.serve(createHandler(
         .from("social_media_uploads")
         .select("id,storage_path,status")
         .eq("id", uploadId)
-        .eq("organization_id", auth.organizationId)
         .eq("uploader_profile_id", auth.user.id)
         .maybeSingle();
       if (lookupError || !upload) throw new ApiError("UPLOAD_NOT_FOUND", "Media upload not found", 404);
@@ -87,7 +84,16 @@ Deno.serve(createHandler(
 
     const action = requiredString(body.action, "action", 32);
     if (action === "create_upload") {
-      assertNoUnknownFields(body, ["action", "mimeType", "fileName", "sizeBytes", "branchId", "durationSeconds"]);
+      assertNoUnknownFields(body, ["action", "organizationId", "mimeType", "fileName", "sizeBytes", "branchId", "durationSeconds"]);
+      const organizationId = uuid(requiredString(body.organizationId, "organizationId", 36), "organizationId", true)!;
+      const { data: organization, error: organizationError } = await admin
+        .from("organizations")
+        .select("id,status")
+        .eq("id", organizationId)
+        .eq("status", "active")
+        .maybeSingle();
+      if (organizationError || !organization) throw new ApiError("ORGANIZATION_NOT_FOUND", "This church community is not available", 404);
+
       const mimeType = requiredString(body.mimeType, "mimeType", 120).toLowerCase();
       const type = MIME_TYPES[mimeType];
       if (!type) throw new ApiError("UNSUPPORTED_MEDIA_TYPE", "This image, video, or audio format is not supported", 415);
@@ -95,12 +101,23 @@ Deno.serve(createHandler(
       const branchId = body.branchId ? uuid(String(body.branchId), "branchId", true)! : null;
       const declaredDurationSeconds = type.kind === "video" ? durationSeconds(body.durationSeconds) : null;
 
-      if (branchId && branchId !== auth.branchId) {
-        throw new ApiError("EXPRESSION_SCOPE_DENIED", "Media can only be uploaded for your selected Expression", 403);
+      if (branchId) {
+        const { data: expressionMembership, error: expressionMembershipError } = await admin
+          .from("expression_memberships")
+          .select("id,branch:branches!inner(id,is_active)")
+          .eq("organization_id", organizationId)
+          .eq("branch_id", branchId)
+          .eq("profile_id", auth.user.id)
+          .eq("status", "active")
+          .eq("branch.is_active", true)
+          .maybeSingle();
+        if (expressionMembershipError || !expressionMembership) {
+          throw new ApiError("EXPRESSION_MEMBERSHIP_REQUIRED", "Join this Expression before uploading media to it", 403);
+        }
       }
 
       const { data: elevatedPublisher, error: permissionError } = await auth.client.rpc("has_permission", {
-        target_organization_id: auth.organizationId,
+        target_organization_id: organizationId,
         requested_permission: "feed.post",
         target_branch_id: branchId,
       });
@@ -109,20 +126,6 @@ Deno.serve(createHandler(
       }
 
       if (!branchId && elevatedPublisher !== true) {
-        const { data: memberships, error: membershipError } = await admin
-          .from("expression_memberships")
-          .select("id,branch:branches!inner(is_active)")
-          .eq("organization_id", auth.organizationId)
-          .eq("profile_id", auth.user.id)
-          .eq("status", "active")
-          .eq("branch.is_active", true)
-          .limit(1);
-        if (membershipError) {
-          throw new ApiError("MEMBERSHIP_LOOKUP_FAILED", "Unable to validate Expression membership", 500, undefined, false);
-        }
-        if (!(memberships ?? []).length) {
-          throw new ApiError("GENERAL_POSTING_MEMBERSHIP_REQUIRED", "Join an active Expression before posting in General Community", 403);
-        }
         if (type.kind === "audio") {
           throw new ApiError(
             "GENERAL_MEDIA_RESTRICTED",
@@ -143,11 +146,11 @@ Deno.serve(createHandler(
       }
 
       const uploadId = crypto.randomUUID();
-      const storagePath = `orgs/${auth.organizationId}/social/${auth.user.id}/${uploadId}.${type.ext}`;
+      const storagePath = `orgs/${organizationId}/social/${auth.user.id}/${uploadId}.${type.ext}`;
       const { data: publicData } = admin.storage.from(BUCKET).getPublicUrl(storagePath);
       const { error: recordError } = await admin.from("social_media_uploads").insert({
         id: uploadId,
-        organization_id: auth.organizationId,
+        organization_id: organizationId,
         branch_id: branchId,
         uploader_profile_id: auth.user.id,
         media_kind: type.kind,
@@ -189,7 +192,6 @@ Deno.serve(createHandler(
         .from("social_media_uploads")
         .select("id,media_kind,mime_type,storage_path,public_url,original_filename,size_bytes,duration_seconds,status")
         .eq("id", uploadId)
-        .eq("organization_id", auth.organizationId)
         .eq("uploader_profile_id", auth.user.id)
         .maybeSingle();
       if (lookupError || !upload) throw new ApiError("UPLOAD_NOT_FOUND", "Media upload not found", 404);
