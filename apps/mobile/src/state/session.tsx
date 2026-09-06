@@ -13,6 +13,7 @@ type Value = {
   contextStatus: ContextStatus;
   contextRefreshing: boolean;
   contextError: string;
+  accessReady: boolean;
   refreshContext: () => void;
   permissions: string[];
   publicCapabilities: string[];
@@ -273,11 +274,14 @@ export function SessionProvider({ children }: PropsWithChildren) {
         }
 
         if (!auth.organizationId) {
-          const firstOrganization = value.organizations[0] ?? value.creatorOrganizations?.[0];
-          if (firstOrganization) {
+          // Request context must represent an active church membership. Expression
+          // creator authorization is account-level bootstrap authority and must not
+          // be persisted as an organization header before membership exists.
+          const firstMembershipOrganization = value.organizations[0];
+          if (firstMembershipOrganization) {
             await persist({
               ...auth,
-              organizationId: firstOrganization.id,
+              organizationId: firstMembershipOrganization.id,
               branchId: undefined,
             });
           }
@@ -339,21 +343,22 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
   const permissions = useMemo(() => context?.effectivePermissions ?? [], [context]);
   const publicCapabilities = useMemo(() => context?.publicCapabilities ?? [], [context]);
+  const accessReady = mode !== 'authenticated' || (contextStatus === 'ready' && context !== null);
 
   const hasCapability = useCallback(
     (code: string) => {
-      if (mode !== 'authenticated') return false;
+      if (mode !== 'authenticated' || !accessReady) return false;
       return permissions.includes(code) || permissions.includes('*');
     },
-    [mode, permissions]
+    [mode, accessReady, permissions]
   );
 
   const hasPublicCapability = useCallback(
     (code: string) => {
-      if (mode !== 'authenticated') return false;
+      if (mode !== 'authenticated' || !accessReady) return false;
       return publicCapabilities.includes(code);
     },
-    [mode, publicCapabilities],
+    [mode, accessReady, publicCapabilities],
   );
 
   const selectContext = async (organizationId: string, branchId?: string) => {
@@ -411,6 +416,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
         contextStatus,
         contextRefreshing,
         contextError,
+        accessReady,
         refreshContext,
         permissions,
         publicCapabilities,
