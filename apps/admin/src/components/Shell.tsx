@@ -151,7 +151,16 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
         aria-label="Close navigation"
       />
       <aside className={`admin-sidebar ${sidebarOpen ? 'open' : ''}`}>
-        <div className="admin-brand"><div className="admin-brand-icon">COT</div><div className="admin-brand-text"><h1>City of Transformation</h1><p>Platform Administration</p></div></div>
+        <div className="admin-brand">
+          <div className="admin-brand-icon">
+            <img src="/cot-family-logo.png" alt="City of Transformation" />
+          </div>
+          <div className="admin-brand-text">
+            <span className="admin-brand-eyebrow">COT PLATFORM</span>
+            <h1>City of Transformation</h1>
+            <p>Platform Administration</p>
+          </div>
+        </div>
         <nav className="admin-nav">
           {navSections.map((section) => (
             <div key={section.group} className="admin-nav-group">
@@ -183,11 +192,16 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
               <span />
               <span />
             </button>
-            <div className="admin-page-heading">
-              <span className="admin-topbar-kicker">Platform control</span>
-              <h2 className="admin-topbar-title">{getPageTitle()}</h2>
+            <div className="admin-topbar-brand">
+              <div className="admin-topbar-brand-mark" aria-hidden="true">
+                <img src="/cot-family-logo.png" alt="" />
+              </div>
+              <div className="admin-page-heading">
+                <span className="admin-topbar-kicker">City of Transformation · Platform control</span>
+                <h2 className="admin-topbar-title">{getPageTitle()}</h2>
+              </div>
             </div>
-            <Badge label="ADMIN" variant="gold" />
+            <Badge label={isSuperAdmin ? "SUPER ADMIN" : "ADMIN"} variant="gold" />
           </div>
           <div className="admin-topbar-right">
             <button
