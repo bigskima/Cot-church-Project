@@ -138,21 +138,15 @@ export default function CommunityScreen() {
     return api.request<CommunityPost[]>('social-feed?scope=expression', { signal });
   });
 
-  // General Community is public to read. Ordinary publishing is a separate
-  // member-social lane unlocked by active Expression membership. Ministry
-  // publishers use explicit feed / Reel / Watch / Sermon / Live capabilities.
-  const hasActiveExpressionMembership = Boolean(
-    organizationId &&
-    context?.expressions?.some(
-      (item) => item.status === 'active' && item.organizationId === organizationId,
-    ),
-  );
+  // General Community is a signed-in public participation surface. Expression
+  // membership is not required to publish there; account restrictions and the
+  // backend scope contract still apply. Expression publishing remains separate.
   const elevatedGeneralPublisher =
     context?.organizationPermissions?.includes('feed.post') === true ||
     context?.organizationPermissions?.includes('*') === true;
   const elevatedExpressionPublisher = hasCapability('feed.post') || hasCapability('*');
   const canPostGeneral =
-    mode === 'authenticated' && (hasActiveExpressionMembership || elevatedGeneralPublisher);
+    mode === 'authenticated' && Boolean(organizationId);
   const canPostExpression =
     mode === 'authenticated' && Boolean(expression?.id) && elevatedExpressionPublisher;
   const canPostCurrent = activeTab === 'general' ? canPostGeneral : canPostExpression;
@@ -168,6 +162,7 @@ export default function CommunityScreen() {
     if (!items.length) return;
     await Promise.allSettled(items.map((item) => api.request('community-media', {
       method: 'DELETE',
+      context: 'public',
       body: JSON.stringify({ uploadId: item.uploadId }),
     })));
   };
@@ -218,8 +213,10 @@ export default function CommunityScreen() {
     const branchId = postDestination === 'expression' ? expression?.id : undefined;
     const intent = await api.request<UploadIntent>('community-media', {
       method: 'POST',
+      context: 'public',
       body: JSON.stringify({
         action: 'create_upload',
+        organizationId,
         mimeType: media.mimeType,
         fileName: media.fileName ?? undefined,
         sizeBytes,
@@ -237,11 +234,13 @@ export default function CommunityScreen() {
       if (!uploaded.ok) throw new Error(`Media upload failed (${uploaded.status}).`);
       return await api.request<MediaAttachment>('community-media', {
         method: 'POST',
+        context: 'public',
         body: JSON.stringify({ action: 'complete_upload', uploadId: intent.uploadId }),
       });
     } catch (error) {
       await api.request('community-media', {
         method: 'DELETE',
+        context: 'public',
         body: JSON.stringify({ uploadId: intent.uploadId }),
       }).catch(() => undefined);
       throw error;
@@ -323,6 +322,7 @@ export default function CommunityScreen() {
     try {
       await api.request('community-media', {
         method: 'DELETE',
+        context: 'public',
         body: JSON.stringify({ uploadId: attachment.uploadId }),
       });
     } catch (error) {
@@ -342,7 +342,9 @@ export default function CommunityScreen() {
     try {
       await api.request('social-feed', {
         method: 'POST',
+        context: postDestination === 'general' ? 'public' : 'current',
         body: JSON.stringify({
+          organizationId,
           body: postText.trim(),
           visibility: postDestination === 'expression' ? 'branch' : 'public',
           branchId: postDestination === 'expression' ? expression!.id : undefined,
