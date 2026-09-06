@@ -116,6 +116,7 @@ const retiredSearch = await readFile('supabase/functions/search/index.ts', 'utf8
 const platformPayments = await readFile('supabase/functions/platform-payments/index.ts', 'utf8');
 const platformStreaming = await readFile('supabase/functions/platform-streaming/index.ts', 'utf8');
 const platformAi = await readFile('supabase/functions/platform-ai/index.ts', 'utf8');
+const platformSecrets = await readFile('supabase/functions/platform-secrets/index.ts', 'utf8');
 const platformFeatures = await readFile('supabase/functions/platform-features/index.ts', 'utf8');
 const platformIntegrations = await readFile('supabase/functions/platform-integrations/index.ts', 'utf8');
 const notifications = await readFile('supabase/functions/notifications/index.ts', 'utf8');
@@ -220,6 +221,7 @@ const invariants = [
   [platformPayments, /Deno\.env\.get\(config\.secret_reference\)/, 'runtime secret-reference validation before provider activation'],
   [platformStreaming, /platform\.streaming\./, 'Level-1 streaming authority'],
   [platformAi, /platform\.ai\./, 'Level-1 AI authority'],
+  [platformSecrets, /SECRET_STORE_FAILED", "Unable to store provider credential\. Please try again\."/ , 'secret storage hides raw database failures'],
   [platformFeatures, /platform\.features\./, 'Level-1 feature authority'],
   [platformIntegrations, /platform\.integrations\./, 'Level-1 integrations authority'],
   [mobileNotificationsPage, /api\.request\('notifications',\s*\{[\s\S]*?method:\s*'PATCH'[\s\S]*?JSON\.stringify\(\{\s*id:\s*item\.id,\s*read:\s*true\s*\}\)/, 'Mobile notification read client payload'],
@@ -243,6 +245,9 @@ const invariants = [
   [governanceInvitations, /new Set\(\[\s*"accept"\s*,\s*"decline"\s*\]\)/, 'Governance invitation decision values'],
   [adminAiPage, /action:\s*'configure_provider'/, 'Admin AI configure-provider client action'],
   [platformAi, /action === "configure_provider"/, 'Admin AI configure-provider backend action'],
+  [platformAi, /credential_configured/, 'Admin AI provider credential readiness state'],
+  [platformAi, /AI_PROVIDER_CREDENTIAL_MISSING/, 'AI provider activation requires a resolvable credential'],
+  [platformAi, /resolve_runtime_secret/, 'AI provider credential validation uses runtime secret resolver'],
   [adminAiPage, /action:\s*'upsert_model'/, 'Admin AI model client action'],
   [platformAi, /action === "upsert_model"/, 'Admin AI model backend action'],
   [adminAiPage, /action:\s*'set_route'/, 'Admin AI route client action'],
@@ -262,6 +267,7 @@ const invariants = [
   [adminFeaturesPage, /action:\s*'set_global'/, 'Admin feature-control client action'],
   [platformFeatures, /action === "set_global"/, 'Admin feature-control backend action'],
   [privilegedRpcGrantHardening, /platform_store_secret\(text,text,text,text,text\).*from public, anon/s, 'secret-store anonymous execute revocation'],
+  [platformAi, /Add this provider API key before activating it/, 'AI activation returns admin-safe credential guidance'],
   [privilegedRpcGrantHardening, /resolve_runtime_secret\(text\).*from public, anon, authenticated/s, 'runtime-secret service-only execute boundary'],
   [privilegedRpcGrantHardening, /process_payment_result\(text,text,text,uuid,text,payment_attempt_status,jsonb,text\).*from public, anon, authenticated/s, 'payment-result service-only execute boundary'],
   [privilegedRpcGrantHardening, /generate_expression_invite_code\(uuid,uuid,integer,integer\).*from public, anon/s, 'Expression invite anonymous execute revocation'],

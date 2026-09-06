@@ -44,7 +44,8 @@ Deno.serve(createHandler(
         target_description: description,
       });
       if (error?.code === "42501") throw new ApiError("PLATFORM_PERMISSION_DENIED", "You do not have permission to manage provider credentials", 403);
-      if (error) throw new ApiError("SECRET_STORE_FAILED", error.message || "Unable to store provider credential", 400);
+      if (error?.code === "22023") throw new ApiError("VALIDATION_FAILED", error.message || "Provider credential is invalid", 422);
+      if (error) throw new ApiError("SECRET_STORE_FAILED", "Unable to store provider credential. Please try again.", 500, undefined, false);
       return { data: Array.isArray(data) ? data[0] ?? null : data, status: 201 };
     }
 

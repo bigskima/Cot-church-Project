@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { ApiClient } from '../api';
 import { Badge, Button, Card, InputField, Modal, StatWidget, Table } from '../components/ui';
 
-interface AiProvider { id:string; code:string; name:string; adapter_version:string; status:'active'|'disabled'|'degraded'; secret_reference:string; configuration?:Record<string,unknown>; }
+interface AiProvider { id:string; code:string; name:string; adapter_version:string; status:'active'|'disabled'|'degraded'; secret_reference:string; credential_configured?:boolean; configuration?:Record<string,unknown>; }
 interface AiModel { id:string; provider_id:string; model_key:string; display_name:string; input_cost_per_million:number|string; output_cost_per_million:number|string; context_window?:number|null; is_active:boolean; configuration?:Record<string,unknown>; ai_providers?:{id:string;code:string;name:string;status:string}|null; }
 interface AiCapability { code:string; name:string; risk_level:'low'|'medium'|'high'|'pastoral'; requires_human_review:boolean; description:string; }
 interface AiRoute { id:string; capability_code:string; primary_model_id:string; fallback_model_ids:string[]; timeout_ms:number; max_retries:number; is_active:boolean; ai_models?:{id:string;provider_id:string;model_key:string;display_name:string;is_active:boolean}|null; }
@@ -26,7 +26,7 @@ export function AiInfrastructure({api,canManage=false,canManageSecrets=false}:{a
   const activeModels=data.models.filter(model=>model.is_active),recentFailures=data.recentRuns.filter(run=>run.status==='failed').length,awaitingReview=data.recentRuns.filter(run=>run.status==='requires_review').length;
 
   const closeProvider=()=>{setProviderModal(null);setProviderSecretValue('');setShowProviderSecret(false);setProviderReason('');};
-  const openProvider=(provider:AiProvider)=>{if(!canManage)return;setProviderModal(provider);setProviderStatus(provider.status);setProviderSecretRef(provider.secret_reference||defaultSecretReference[provider.code]||`AI_${provider.code.toUpperCase()}_PRIMARY`);setProviderSecretValue('');setShowProviderSecret(false);setProviderReason('');setSuccess('');setError('');};
+  const openProvider=(provider:AiProvider)=>{if(!canManage)return;setProviderModal(provider);setProviderStatus(provider.status==='disabled'?'active':provider.status);setProviderSecretRef(provider.secret_reference||defaultSecretReference[provider.code]||`AI_${provider.code.toUpperCase()}_PRIMARY`);setProviderSecretValue('');setShowProviderSecret(false);setProviderReason('');setSuccess('');setError('');};
 
   const saveProvider=async()=>{
     if(!canManage||!providerModal)return;
@@ -34,11 +34,12 @@ export function AiInfrastructure({api,canManage=false,canManageSecrets=false}:{a
     const reference=(providerSecretRef.trim()||defaultSecretReference[providerModal.code]||`AI_${providerModal.code.toUpperCase()}_PRIMARY`).toUpperCase();
     if(providerStatus!=='active'&&!providerReason.trim()){setError('A governance reason is required when degrading or disabling a provider.');return;}
     setBusy(true);setError('');setSuccess('');
+    let credentialStored=false;
     try{
-      if(providerSecretValue){await api.request('platform-secrets',{method:'POST',body:JSON.stringify({action:'store',reference,value:providerSecretValue,category:'ai',providerCode:providerModal.code,description:`${providerModal.name} API credential used by the AI gateway`})});}
+      if(providerSecretValue){await api.request('platform-secrets',{method:'POST',body:JSON.stringify({action:'store',reference,value:providerSecretValue,category:'ai',providerCode:providerModal.code,description:`${providerModal.name} API credential used by the AI gateway`})});credentialStored=true;}
       await api.request('platform-ai',{method:'PATCH',body:JSON.stringify({action:'configure_provider',providerId:providerModal.id,status:providerStatus,secretReference:reference,configuration:providerModal.configuration??{},reason:providerStatus==='active'?undefined:providerReason.trim()})});
       setProviderSecretValue('');setShowProviderSecret(false);setSuccess(`${providerModal.name} configuration saved${providerSecretValue?' and its API credential was encrypted in Platform Vault':''}.`);closeProvider();await load();
-    }catch(value){setError(value instanceof Error?value.message:'Unable to configure AI provider.');}finally{setBusy(false);}
+    }catch(value){const base=value instanceof Error?value.message:'Unable to configure AI provider.';setError(credentialStored?`API key was stored securely, but the provider configuration was not completed. ${base}`:base);if(credentialStored)await load();}finally{setBusy(false);}
   };
 
   const openRoute=(capability:AiCapability)=>{if(!canManage)return;const route=routeByCapability.get(capability.code);setRouteCapability(capability);setRoutePrimaryModel(route?.primary_model_id??activeModels[0]?.id??'');setRouteTimeout(String(route?.timeout_ms??30000));setRouteRetries(String(route?.max_retries??1));};
@@ -57,7 +58,7 @@ export function AiInfrastructure({api,canManage=false,canManageSecrets=false}:{a
     <Card title="AI provider adapters" subtitle="Paste API keys securely when configuring a provider. Raw values are encrypted in Platform Vault; routing stores only the stable secret reference." headerAction={<Button variant="outline" size="sm" onClick={()=>void load()} loading={loading}>Refresh</Button>}>
       <div className="admin-provider-grid">{data.providers.map(provider=><div key={provider.id} className="admin-provider-card">
         <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center',marginBottom:8}}><div><h4 style={{fontSize:16,fontWeight:900}}>{provider.name}</h4><p style={{fontSize:11,color:'var(--text-muted)'}}>{provider.code} · adapter {provider.adapter_version}</p></div><Badge label={provider.status.toUpperCase()} variant={provider.status==='active'?'active':provider.status==='degraded'?'warning':'suspended'} pulse={provider.status==='active'} /></div>
-        <p style={{fontSize:12,color:'var(--text-muted)',marginBottom:10}}>Credential ref: <code>{provider.secret_reference}</code></p>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:10}}><p style={{fontSize:12,color:'var(--text-muted)'}}>Credential ref: <code>{provider.secret_reference}</code></p><Badge label={provider.credential_configured?'CREDENTIAL READY':'ADD CREDENTIAL'} variant={provider.credential_configured?'healthy':'warning'} /></div>
         <div className="admin-capability-tags">{(modelsByProvider.get(provider.id)??[]).map(model=><span key={model.id} className={model.is_active?'active':''}>{model.model_key}</span>)}</div>
         {canManage?<Button variant="outline" size="sm" style={{width:'100%'}} onClick={()=>openProvider(provider)}>Configure provider{canManageSecrets?' & API key':''}</Button>:<div style={{fontSize:12,color:'var(--text-muted)'}}>Read only</div>}
       </div>)}</div>
@@ -74,6 +75,7 @@ export function AiInfrastructure({api,canManage=false,canManageSecrets=false}:{a
     <Modal isOpen={canManage&&!!providerModal} onClose={()=>{if(!busy)closeProvider();}} title={providerModal?`Configure ${providerModal.name}`:'Configure AI provider'} subtitle={canManageSecrets?'Add or rotate the API key securely, or leave it blank to reuse the stored credential reference.':'Update provider state and configuration while reusing the existing stored credential reference.'} footer={<div style={{display:'flex',gap:12}}><Button variant="outline" disabled={busy} onClick={closeProvider}>Cancel</Button><Button variant="gold" loading={busy} onClick={()=>void saveProvider()}>{canManageSecrets?'Encrypt key & save provider':'Save provider configuration'}</Button></div>}>
       <InputField label="Credential reference" value={providerSecretRef} onChange={event=>setProviderSecretRef(event.target.value.toUpperCase())} placeholder={providerModal?defaultSecretReference[providerModal.code]??`AI_${providerModal.code.toUpperCase()}_PRIMARY`:'AI_PROVIDER_PRIMARY'} helperText="Stable server-side reference; not the secret itself." />
       {canManageSecrets?<><InputField label="API key / credential" type={showProviderSecret?'text':'password'} value={providerSecretValue} onChange={event=>setProviderSecretValue(event.target.value)} placeholder="Paste API key to add or rotate" autoComplete="new-password" spellCheck={false} helperText="Leave blank to reuse the existing credential stored under this reference." /><Button variant="ghost" size="sm" type="button" onClick={()=>setShowProviderSecret(value=>!value)}>{showProviderSecret?'Hide key':'Show while entering'}</Button></>:<p style={{fontSize:12,color:'var(--text-muted)'}}>Your role can reuse the stored credential reference but cannot add or rotate API keys.</p>}
+      {providerStatus==='active'&&!providerSecretValue&&!providerModal?.credential_configured?<div className="admin-inline-warning">This provider has no confirmed credential yet. Paste its API key above, or use a reference that already exists in the deployment environment or Platform Vault.</div>:null}
       <label className="admin-form-group"><span className="admin-form-label">Provider status</span><select className="admin-form-select" value={providerStatus} onChange={event=>setProviderStatus(event.target.value as AiProvider['status'])}><option value="active">Active</option><option value="degraded">Degraded</option><option value="disabled">Disabled</option></select></label>
       {providerStatus!=='active'?<InputField label="Governance reason" value={providerReason} onChange={event=>setProviderReason(event.target.value)} placeholder="Provider incident, quota exhaustion, policy restriction..." />:null}
     </Modal>

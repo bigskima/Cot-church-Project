@@ -27,6 +27,14 @@ function nonNegativeNumber(value: unknown, field: string, fallback = 0) {
   return number;
 }
 
+async function credentialState(client: ReturnType<typeof adminClient>, reference: string | null | undefined) {
+  if (!reference) return { configured: false, error: null as unknown };
+  const environmentValue = Deno.env.get(reference);
+  if (environmentValue) return { configured: true, error: null as unknown };
+  const { data, error } = await client.rpc("resolve_runtime_secret", { target_reference: reference });
+  return { configured: typeof data === "string" && data.length > 0, error };
+}
+
 Deno.serve(
   createHandler(
     { methods: ["GET", "PATCH"], authentication: "required", organization: "none" },
@@ -47,9 +55,13 @@ Deno.serve(
         if (providersResult.error || modelsResult.error || capabilitiesResult.error || routesResult.error || limitsResult.error || recentRunsResult.error) {
           throw new ApiError("PLATFORM_AI_FAILED", "Unable to retrieve AI control-plane telemetry", 500, undefined, false);
         }
+        const providers = await Promise.all((providersResult.data ?? []).map(async (provider) => {
+          const state = await credentialState(admin, provider.secret_reference);
+          return { ...provider, credential_configured: state.configured };
+        }));
         return {
           data: {
-            providers: providersResult.data ?? [],
+            providers,
             models: modelsResult.data ?? [],
             capabilities: capabilitiesResult.data ?? [],
             globalRoutes: routesResult.data ?? [],
@@ -76,8 +88,20 @@ Deno.serve(
 
         const { data: current, error: currentError } = await admin.from("ai_providers").select("id,code,name,status,secret_reference,configuration").eq("id", providerId).maybeSingle();
         if (currentError || !current) throw new ApiError("AI_PROVIDER_NOT_FOUND", "AI provider not found", 404);
+        const nextSecretReference = body.secretReference !== undefined
+          ? secretReference(body.secretReference, "secretReference", true)
+          : current.secret_reference;
+        if (status === "active") {
+          const credential = await credentialState(admin, nextSecretReference);
+          if (credential.error) throw new ApiError("AI_PROVIDER_CREDENTIAL_CHECK_FAILED", "Unable to verify the provider credential", 500, undefined, false);
+          if (!credential.configured) {
+            throw new ApiError("AI_PROVIDER_CREDENTIAL_MISSING", "Add this provider API key before activating it", 409, {
+              secretReference: "A stored or deployment credential is required",
+            });
+          }
+        }
         const updates: Record<string, unknown> = { status };
-        if (body.secretReference !== undefined) updates.secret_reference = secretReference(body.secretReference, "secretReference", true);
+        if (body.secretReference !== undefined) updates.secret_reference = nextSecretReference;
         if (body.configuration !== undefined) updates.configuration = body.configuration;
         const { data: updated, error } = await admin.from("ai_providers").update(updates).eq("id", providerId).select("id,code,name,adapter_version,status,secret_reference,configuration,updated_at").single();
         if (error) throw new ApiError("AI_PROVIDER_UPDATE_FAILED", "Unable to update AI provider", 500, undefined, false);
