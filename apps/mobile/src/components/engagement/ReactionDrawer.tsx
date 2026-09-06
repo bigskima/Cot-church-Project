@@ -4,13 +4,13 @@ import { useTheme } from '@/state/theme';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { Icon } from '../primitives/Icon';
 
-// Keys match the backend reaction contract. Labels remain church-friendly presentation copy.
+// Keys are canonical backend values. Only the presentation labels are church-friendly.
 const reactions = [
   { key: 'like', label: 'Amen', icon: 'heart' },
   { key: 'pray', label: 'Pray', icon: 'hand-left-outline' },
   { key: 'celebrate', label: 'Praise', icon: 'sparkles-outline' },
   { key: 'support', label: 'Support', icon: 'people-outline' },
-];
+] as const;
 
 export interface ReactionDrawerProps {
   currentReaction?: string | null;
@@ -38,9 +38,26 @@ export function ReactionDrawer({ currentReaction, onReact }: ReactionDrawerProps
             ]}
             accessibilityRole="button"
             accessibilityLabel={`React ${reaction.label}`}
+            accessibilityState={{ selected: isSelected }}
           >
-            <Icon name={reaction.icon} size={15} color={isSelected ? colors.interactive : colors.textSecondary} />
-            <Text style={[styles.label, { color: isSelected ? colors.interactive : colors.textSecondary }]}>{reaction.label}</Text>
+            <View
+              style={[
+                styles.iconWrap,
+                {
+                  backgroundColor: isSelected ? colors.interactive : colors.cardElevated,
+                  borderColor: isSelected ? colors.interactive : colors.borderSubtle,
+                },
+              ]}
+            >
+              <Icon name={reaction.icon} size={15} color={isSelected ? '#FFFFFF' : colors.textSecondary} />
+            </View>
+            <Text
+              numberOfLines={1}
+              style={[styles.label, { color: isSelected ? colors.interactive : colors.textSecondary }]}
+            >
+              {reaction.label}
+            </Text>
+            {isSelected ? <View style={[styles.selectedDot, { backgroundColor: colors.interactive }]} /> : null}
           </Pressable>
         );
       })}
@@ -49,8 +66,52 @@ export function ReactionDrawer({ currentReaction, onReact }: ReactionDrawerProps
 }
 
 const styles = StyleSheet.create({
-  container: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 5, borderRadius: radius.xl, borderWidth: 1, gap: 4 },
-  pill: { flex: 1, minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 7, borderRadius: radius.lg, borderWidth: 1 },
-  label: { fontSize: 12, fontWeight: '700' },
-  pressed: { opacity: 0.88, transform: [{ scale: 0.97 }] },
+  container: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    justifyContent: 'space-between',
+    padding: 5,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    gap: 5,
+  },
+  pill: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 54,
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 6,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+  },
+  iconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  label: {
+    maxWidth: '100%',
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: '800',
+  },
+  selectedDot: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+  },
+  pressed: {
+    opacity: 0.9,
+    transform: [{ scale: 0.96 }],
+  },
 });
