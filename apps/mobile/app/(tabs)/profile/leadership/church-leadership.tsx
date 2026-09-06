@@ -23,10 +23,10 @@ import type { LeadershipProfile } from '@church/types';
 
 export default function ChurchLeadershipManageScreen() {
   const insets = useSafeAreaInsets();
-  const { api, context, hasCapability } = useSession();
+  const { api, context, hasOrganizationCapability } = useSession();
   const { colors } = useTheme();
   const organization = context?.organization ?? context?.organizations?.[0];
-  const canManage = hasCapability('organization.leadership.manage') || hasCapability('*');
+  const canManage = hasOrganizationCapability('organization.leadership.manage');
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingLeader, setEditingLeader] = useState<LeadershipProfile | null>(null);
