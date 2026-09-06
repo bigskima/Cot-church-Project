@@ -6,6 +6,7 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import {
+  Button,
   EmptyState,
   HeroLiveCard,
   LiveCard,
@@ -25,11 +26,14 @@ type LiveHomePayload = {
 
 export default function LiveDiscoveryScreen() {
   const insets = useSafeAreaInsets();
-  const { api, context } = useSession();
+  const { api, context, hasCapability, hasPublicCapability } = useSession();
   const { colors } = useTheme();
 
   const organization = context?.organization ?? context?.organizations?.[0];
   const expression = context?.expression;
+  const canOpenLiveStudio =
+    hasPublicCapability('public.live_stream.create') ||
+    (Boolean(expression?.id) && (hasCapability('streams.broadcast') || hasCapability('*')));
   const query = new URLSearchParams();
   if (organization?.id) query.set('organizationId', organization.id);
   if (expression?.id) query.set('expressionId', expression.id);
@@ -70,6 +74,13 @@ export default function LiveDiscoveryScreen() {
             kicker="BROADCASTS"
             subtitle={expression?.name ? `General Community + ${expression.name}` : 'Services, gatherings and replays from COT.'}
             showBack
+            rightAction={canOpenLiveStudio ? (
+              <Button
+                label={hasPublicCapability('public.live_stream.create') ? 'Go live' : 'Live studio'}
+                onPress={() => router.push('/(tabs)/profile/leadership/media-studio' as any)}
+                size="sm"
+              />
+            ) : undefined}
           />
         </View>
 
