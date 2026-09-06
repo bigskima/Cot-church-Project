@@ -37,8 +37,8 @@ export function VideoCard({ video, expressionName, onPress, onBookmark, style }:
     expressionName ||
     video.content_items?.expression?.name ||
     video.content_items?.organization?.name ||
-    'City of Transformation';
-  const creatorName = video.content_items?.author?.display_name || sourceName;
+    null;
+  const creatorName = video.content_items?.author?.display_name || sourceName || 'COT';
   const creatorAvatar = video.content_items?.author?.avatar_url ?? undefined;
 
   const timeAgo = () => {
@@ -86,7 +86,7 @@ export function VideoCard({ video, expressionName, onPress, onBookmark, style }:
         <View style={styles.textColumn}>
           <Text style={[styles.title, { color: colors.text }]} numberOfLines={2}>{video.title}</Text>
           <Text style={[styles.metaText, { color: colors.textSecondary }]} numberOfLines={1}>
-            {sourceName} · {formatViews(video.views_count)} · {timeAgo()}
+            {[sourceName, formatViews(video.views_count), timeAgo()].filter(Boolean).join(' · ')}
           </Text>
         </View>
 
