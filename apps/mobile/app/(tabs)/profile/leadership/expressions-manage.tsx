@@ -26,14 +26,9 @@ interface ExpressionItem {
   timezone?: string;
   is_active?: boolean;
 }
-interface CreatorState {
-  organizationId: string;
-  authorized: boolean;
-}
-
 export default function ExpressionsManageScreen() {
   const insets = useSafeAreaInsets();
-  const { api, context, selectContext } = useSession();
+  const { api, context, selectContext, accessReady } = useSession();
   const { colors } = useTheme();
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? context?.creatorOrganizations?.[0]?.id ?? '';
   const usingCreatorBootstrap = Boolean(
@@ -62,11 +57,10 @@ export default function ExpressionsManageScreen() {
       });
     },
   );
-  const creatorState = useResource<CreatorState>(`expression-creator:${organizationId}`, (signal) => {
-    if (!organizationId) return Promise.resolve({ organizationId: '', authorized: false });
-    return api.request<CreatorState>(`expression-creators?mode=self&organizationId=${organizationId}`, { signal });
-  });
-  const canCreateExpression = creatorState.data?.authorized === true;
+  const canCreateExpression = Boolean(
+    organizationId &&
+    context?.creatorOrganizations?.some((item) => item.id === organizationId),
+  );
   const list = expressions.data ?? [];
 
   const resetForm = () => {
@@ -114,6 +108,17 @@ export default function ExpressionsManageScreen() {
     }
   };
 
+  if (!accessReady) {
+    return (
+      <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top + spacing.sm }]}>
+        <ScreenHeader title="Expressions" kicker="LEADERSHIP" showBack />
+        <View style={styles.body}>
+          <Skeleton height={92} count={3} />
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ScrollView
@@ -141,9 +146,7 @@ export default function ExpressionsManageScreen() {
             </View>
           ) : null}
 
-          {creatorState.loading ? (
-            <Skeleton height={74} />
-          ) : canCreateExpression ? (
+          {canCreateExpression ? (
             <View style={[styles.creatorCard, { backgroundColor: colors.card, borderColor: colors.interactive }, shadows.sm]}>
               <View style={[styles.creatorIcon, { backgroundColor: colors.primarySoft }]}>
                 <Icon name="add-circle-outline" size={22} color={colors.interactive} />
