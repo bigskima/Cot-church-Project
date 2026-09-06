@@ -32,6 +32,7 @@ const migrationPaths = [
   'supabase/migrations/20260906041250_public_profile_social_publishing_scope.sql',
   'supabase/migrations/20260906042152_public_capability_assignments.sql',
   'supabase/migrations/20260906052752_public_stream_lifecycle_visibility.sql',
+  'supabase/migrations/20260906053920_stream_access_lifecycle_alignment.sql',
   'supabase/migrations/20260906023038_member_onboarding_experience.sql',
 ];
 
@@ -80,6 +81,8 @@ const requiredPatterns = [
   /public_capability\.granted/i,
   /grant execute on function public\.set_public_capability_assignment\(uuid,text,boolean,text\) to authenticated,service_role/i,
   /create policy streams_public_read[\s\S]*provisioning[\s\S]*ready[\s\S]*processing[\s\S]*replay_ready/i,
+  /create or replace function public\.can_access_stream[\s\S]*provisioning[\s\S]*ready[\s\S]*processing[\s\S]*replay_ready[\s\S]*failed/i,
+  /revoke all on function public\.can_access_stream\(uuid\) from public, anon/i,
   /create function public\.claim_workflow_runs/i,
   /create function public\.claim_integration_deliveries/i,
   /create function public\.organization_dashboard/i,
