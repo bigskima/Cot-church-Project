@@ -19,7 +19,7 @@ Deno.serve(createHandler(
 
     const { data: stream, error } = await admin
       .from("live_streams")
-      .select("id,organization_id,title,description,status,visibility,provider_config_id,provider_metadata,playback_url,recording_url,playback_token_required")
+      .select("id,organization_id,title,description,status,visibility,provider_config_id,provider_metadata,playback_url,recording_url,playback_token_required,scheduled_start,started_at,ended_at")
       .eq("id", id)
       .single();
     if (error || !stream) throw new ApiError("STREAM_NOT_FOUND", "Broadcast not found", 404);
@@ -33,7 +33,7 @@ Deno.serve(createHandler(
       throw new ApiError("STREAM_NOT_FOUND", "Broadcast not found", 404);
     }
 
-    if (!["scheduled", "live", "ended", "replay_ready"].includes(stream.status)) {
+    if (!["scheduled", "provisioning", "ready", "live", "ended", "processing", "replay_ready", "failed"].includes(stream.status)) {
       throw new ApiError("STREAM_NOT_FOUND", "Broadcast not found", 404);
     }
 
@@ -48,13 +48,13 @@ Deno.serve(createHandler(
       throw new ApiError("AUTHENTICATION_REQUIRED", "Sign in to access this broadcast", 401);
     }
 
-    let playbackUrl =
-      stream.status === "ended" || stream.status === "replay_ready"
-        ? stream.recording_url
-        : stream.playback_url;
-    let expiresAt = new Date(Date.now() + 300_000).toISOString();
+    const playbackEligible = ["live", "ended", "processing", "replay_ready"].includes(stream.status);
+    let playbackUrl = playbackEligible
+      ? (stream.status === "live" ? stream.playback_url : stream.recording_url)
+      : null;
+    let expiresAt: string | null = null;
 
-    if (stream.provider_config_id && stream.provider_metadata?.playbackId) {
+    if (playbackEligible && stream.provider_config_id && stream.provider_metadata?.playbackId) {
       const loaded = await loadStreamingConfig(stream.provider_config_id);
       const grant = await streamingProvider(loaded.provider.providerCode).createPlaybackToken(
         loaded.provider,
@@ -63,7 +63,7 @@ Deno.serve(createHandler(
       );
       playbackUrl = grant.url;
       expiresAt = grant.expiresAt;
-    } else if (stream.playback_token_required) {
+    } else if (playbackEligible && stream.playback_token_required && !playbackUrl) {
       // Never fall back to exposing a raw provider URL when the stream is
       // configured to require signed playback.
       throw new ApiError(
@@ -75,25 +75,29 @@ Deno.serve(createHandler(
       );
     }
 
-    const nonce = crypto.randomUUID();
-    const ip = request.headers.get("x-forwarded-for") ?? "unknown";
-    const userAgent = request.headers.get("user-agent") ?? "unknown";
-    const anonymousSessionHash = auth
-      ? null
-      : await hash(`public-stream:${id}:${nonce}:${ip}:${userAgent}`);
+    if (playbackUrl) {
+      const grantExpiry = expiresAt ?? new Date(Date.now() + 300_000).toISOString();
+      const nonce = crypto.randomUUID();
+      const ip = request.headers.get("x-forwarded-for") ?? "unknown";
+      const userAgent = request.headers.get("user-agent") ?? "unknown";
+      const anonymousSessionHash = auth
+        ? null
+        : await hash(`public-stream:${id}:${nonce}:${ip}:${userAgent}`);
 
-    const { error: grantError } = await admin.from("live_access_grants").insert({
-      organization_id: stream.organization_id,
-      stream_id: id,
-      profile_id: auth?.user.id ?? null,
-      anonymous_session_hash: anonymousSessionHash,
-      token_jti_hash: await hash(nonce),
-      expires_at: expiresAt,
-      ip_hash: await hash(ip),
-      user_agent_hash: await hash(userAgent),
-    });
-    if (grantError) {
-      throw new ApiError("PLAYBACK_GRANT_FAILED", "Unable to authorize playback", 503, undefined, false);
+      const { error: grantError } = await admin.from("live_access_grants").insert({
+        organization_id: stream.organization_id,
+        stream_id: id,
+        profile_id: auth?.user.id ?? null,
+        anonymous_session_hash: anonymousSessionHash,
+        token_jti_hash: await hash(nonce),
+        expires_at: grantExpiry,
+        ip_hash: await hash(ip),
+        user_agent_hash: await hash(userAgent),
+      });
+      if (grantError) {
+        throw new ApiError("PLAYBACK_GRANT_FAILED", "Unable to authorize playback", 503, undefined, false);
+      }
+      expiresAt = grantExpiry;
     }
 
     let viewerSessionId: string | null = null;
@@ -130,6 +134,9 @@ Deno.serve(createHandler(
           description: stream.description,
           status: stream.status,
           visibility: stream.visibility,
+          scheduled_start: stream.scheduled_start,
+          started_at: stream.started_at,
+          ended_at: stream.ended_at,
         },
         playbackUrl,
         playbackExpiresAt: expiresAt,
