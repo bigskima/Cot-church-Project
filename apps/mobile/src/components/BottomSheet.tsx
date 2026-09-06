@@ -60,10 +60,11 @@ export function BottomSheet({
             style,
           ]}
         >
+          <View pointerEvents="none" style={[styles.sheetGlow, { backgroundColor: colors.primarySoft }]} />
           <View style={[styles.handleBar, { backgroundColor: colors.borderStrong }]} />
 
           {(title || subtitle) ? (
-            <View style={styles.header}>
+            <View style={[styles.header, { borderBottomColor: colors.borderSubtle }]}>
               <View style={styles.headerCopy}>
                 {title ? <Text style={[styles.title, { color: colors.text }]}>{title}</Text> : null}
                 {subtitle ? <Text style={[styles.subtitle, { color: colors.textMuted }]}>{subtitle}</Text> : null}
@@ -73,7 +74,7 @@ export function BottomSheet({
                 hitSlop={8}
                 style={({ pressed }) => [
                   styles.closeButton,
-                  { backgroundColor: colors.bgSecondary },
+                  { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle },
                   pressed && { backgroundColor: colors.pressed },
                 ]}
                 accessibilityRole="button"
@@ -114,6 +115,15 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...shadows.floating,
   },
+  sheetGlow: {
+    position: 'absolute',
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    right: -68,
+    top: -96,
+    opacity: 0.65,
+  },
   handleBar: {
     width: 42,
     height: 5,
@@ -130,6 +140,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
     paddingBottom: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerCopy: { flex: 1, minWidth: 0 },
   title: { ...typography.h2 },
@@ -141,12 +152,13 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: radius.pill,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   contentContainer: {
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.sm,
+    paddingTop: spacing.md,
     paddingBottom: spacing.xxl,
   },
 });
