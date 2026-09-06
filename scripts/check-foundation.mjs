@@ -28,6 +28,7 @@ const migrationPaths = [
   'supabase/migrations/20260906024715_content_moderation_report_integrity.sql',
   'supabase/migrations/20260906024848_resolve_content_moderation_report.sql',
   'supabase/migrations/20260906025446_fix_platform_store_secret_conflict_target.sql',
+  'supabase/migrations/20260906031630_platform_admin_ai_help.sql',
   'supabase/migrations/20260906023038_member_onboarding_experience.sql',
 ];
 
@@ -103,6 +104,8 @@ const requiredPatterns = [
   /Moderation report evidence is immutable/i,
   /create or replace function public\.resolve_content_moderation_report/i,
   /grant execute on function public\.resolve_content_moderation_report\(uuid,text,text\) to authenticated, service_role/i,
+  /'admin\.help'[\s\S]*'Admin guidance'/i,
+  /organization_id is not distinct from target_organization_id/i,
 ];
 
 const source = (await Promise.all(migrationPaths.map((path) => readFile(path, 'utf8')))).join('\n');
