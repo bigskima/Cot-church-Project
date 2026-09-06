@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View, StyleProp, ViewStyle } from 'react-native';
 import { useTheme } from '@/state/theme';
-import { radius, spacing } from '@/design-system/tokens';
+import { radius, shadows, spacing } from '@/design-system/tokens';
 
 export interface ChipProps {
   label: string;
@@ -29,15 +29,17 @@ export function Chip({
       style={({ pressed }) => [
         styles.chip,
         {
-          backgroundColor: selected ? colors.primarySoftStrong : colors.bgSecondary,
+          backgroundColor: selected ? colors.primarySoft : colors.bgSecondary,
           borderColor: selected ? colors.interactive : colors.borderSubtle,
         },
+        selected && styles.selected,
         pressed && styles.pressed,
         style,
       ]}
       accessibilityRole="button"
       accessibilityState={{ selected }}
     >
+      {selected ? <View style={[styles.selectionDot, { backgroundColor: colors.interactive }]} /> : null}
       {icon && <View style={styles.iconSlot}>{icon}</View>}
       <Text
         style={[
@@ -78,16 +80,26 @@ const styles = StyleSheet.create({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 36,
-    paddingVertical: 7,
+    minHeight: 38,
+    paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: radius.pill,
     borderWidth: 1,
     alignSelf: 'flex-start',
   },
   label: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '700',
+    letterSpacing: -0.08,
+  },
+  selectionDot: {
+    width: 6,
+    height: 6,
+    borderRadius: radius.pill,
+    marginRight: 6,
+  },
+  selected: {
+    ...shadows.sm,
   },
   iconSlot: {
     marginRight: 6,
