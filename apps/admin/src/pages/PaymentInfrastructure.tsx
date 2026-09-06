@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ApiClient } from '../api';
-import { Badge, Button, Card, InputField, Modal, Table } from '../components/ui';
+import { Badge, Button, Card, InputField, Modal, StatWidget, Table } from '../components/ui';
 
 type ProviderStatus = 'active' | 'disabled' | 'degraded';
 
@@ -221,10 +221,37 @@ export function PaymentInfrastructure({ api, canManage = false, canManageSecrets
         headerAction={<Button variant="outline" size="sm" onClick={() => void load()} loading={loading}>Refresh</Button>}
       >
         <div className="admin-stats-grid">
-          <div className="admin-stat-card"><div className="admin-stat-title">Release State</div><div className="admin-stat-value">Unavailable</div><div className="admin-stat-subtitle">Manual transfer only</div></div>
-          <div className="admin-stat-card"><div className="admin-stat-title">Provider Adapters</div><div className="admin-stat-value">{data.providers.length}</div><div className="admin-stat-subtitle">Future infrastructure</div></div>
-          <div className="admin-stat-card"><div className="admin-stat-title">Prepared Configs</div><div className="admin-stat-value">{preparedConfigs}</div><div className="admin-stat-subtitle">Stored inactive</div></div>
-          <div className="admin-stat-card"><div className="admin-stat-title">Active Routes</div><div className="admin-stat-value">{data.summary.activeRoutes}</div><div className="admin-stat-subtitle">Must remain 0</div></div>
+          <StatWidget
+            title="Online Payments"
+            value="OFF"
+            subtitle="Manual bank transfer remains the production giving method"
+            icon="LOCK"
+            variant="gold"
+          />
+          <StatWidget
+            title="Provider Adapters"
+            value={data.providers.length}
+            subtitle="Installed for future verified rollout"
+            icon="ADAPTERS"
+          />
+          <StatWidget
+            title="Prepared Configs"
+            value={preparedConfigs}
+            subtitle="Stored safely and kept inactive"
+            icon="READY"
+            variant="success"
+          />
+          <StatWidget
+            title="Active Routes"
+            value={data.summary.activeRoutes}
+            subtitle={data.summary.activeRoutes === 0 ? 'Correct release-locked state' : 'Review immediately'}
+            trend={{
+              value: data.summary.activeRoutes === 0 ? 'No live provider routing' : 'Unexpected active routing',
+              isPositive: data.summary.activeRoutes === 0,
+            }}
+            icon="ROUTES"
+            variant={data.summary.activeRoutes === 0 ? 'default' : 'live'}
+          />
         </div>
       </Card>
 
