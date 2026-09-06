@@ -37,7 +37,7 @@ export function AuditSecurity({ api }: { api: ApiClient }) {
       setLogs(data.items ?? []);
       setTotal(data.total ?? 0);
     } catch (value) {
-      setError(value instanceof Error ? value.message : 'Unable to load platform audit records.');
+      setError(value instanceof Error ? value.message : 'Unable to load administration history.');
     } finally {
       setLoading(false);
     }
@@ -69,10 +69,10 @@ export function AuditSecurity({ api }: { api: ApiClient }) {
             <SearchBar
               value={search}
               onChange={setSearch}
-              placeholder="Filter action, target, actor, or request ID..."
+              placeholder="Search action, person, affected item, or reference..."
             />
             <Button variant="outline" size="md" onClick={() => void loadAudit()} loading={loading}>
-              Refresh Ledger
+              Refresh history
             </Button>
           </div>
         }
@@ -83,11 +83,11 @@ export function AuditSecurity({ api }: { api: ApiClient }) {
           columns={[
             { header: 'EVENT ACTION', accessor: (item) => <Badge label={item.action} variant="gold" /> },
             {
-              header: 'TARGET',
+              header: 'AFFECTED ITEM',
               accessor: (item) => (
                 <div>
                   <div className="admin-row-title">{item.target_type}</div>
-                  <div className="admin-row-meta">{item.target_id ? `ID: ${item.target_id}` : 'No target ID'}</div>
+                  <div className="admin-row-meta">{item.target_id ? `ID: ${item.target_id}` : 'No item reference'}</div>
                 </div>
               ),
             },
@@ -114,14 +114,14 @@ export function AuditSecurity({ api }: { api: ApiClient }) {
           data={filtered}
           keyExtractor={(item) => String(item.id)}
           loading={loading}
-          emptyMessage="No platform audit records match this filter."
+          emptyMessage="No administration history matches this search."
         />
       </Card>
 
       <Modal
         isOpen={!!selectedAudit}
         onClose={() => setSelectedAudit(null)}
-        title="Platform audit record"
+        title="Administration history detail"
         subtitle={selectedAudit ? `Event ID: ${selectedAudit.id}` : undefined}
         maxWidth="lg"
         footer={<Button variant="primary" size="md" onClick={() => setSelectedAudit(null)}>Close</Button>}
@@ -130,10 +130,10 @@ export function AuditSecurity({ api }: { api: ApiClient }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14 }}>
               <Metric label="ACTION" value={selectedAudit.action} />
-              <Metric label="TARGET TYPE" value={selectedAudit.target_type} />
-              <Metric label="TARGET ID" value={selectedAudit.target_id ?? 'None'} />
+              <Metric label="ITEM TYPE" value={selectedAudit.target_type} />
+              <Metric label="ITEM REFERENCE" value={selectedAudit.target_id ?? 'None'} />
               <Metric label="ACTOR" value={selectedAudit.profiles?.display_name ?? selectedAudit.actor_profile_id ?? 'system'} />
-              <Metric label="REQUEST ID" value={selectedAudit.request_id ?? 'None'} />
+              <Metric label="EVENT REFERENCE" value={selectedAudit.request_id ?? 'None'} />
               <div className="admin-metric-tile">
                 <div className="admin-metric-label">STORAGE GUARANTEE</div>
                 <div style={{ marginTop: 7 }}><Badge label="APPEND-ONLY" variant="healthy" /></div>
