@@ -8,12 +8,14 @@ const channels=new Set(["in_app","email","sms","push"]);
 Deno.serve(createHandler({methods:["GET","POST","PATCH"],authentication:"required",organization:"required"},async({request,auth})=>{if(!auth?.organizationId)throw new ApiError("ORGANIZATION_REQUIRED","Organization context is required",400);if(request.method==="GET"){
  const url=new URL(request.url);
  const requestedBranchId=url.searchParams.get("branchId");
+ const memberFeed=url.searchParams.get("view")==="feed";
  let query=auth.client.from("announcements").select("id,branch_id,title,body,status,audience,channels,scheduled_for,published_at,created_at,updated_at").eq("organization_id",auth.organizationId);
  if(requestedBranchId){
   const branchId=uuid(requestedBranchId,"branchId",true)!;
   if(!auth.branchId||auth.branchId!==branchId)throw new ApiError("EXPRESSION_CONTEXT_MISMATCH","Enter this exact Expression before reading its announcements",403);
   query=query.eq("branch_id",branchId);
  }
+ if(memberFeed)query=query.eq("status","published");
  const{data,error}=await query.order("created_at",{ascending:false}).limit(100);
  if(error)throw new ApiError("ANNOUNCEMENT_LIST_FAILED","Unable to retrieve announcements",500,undefined,false);
  return{data:data??[]};
