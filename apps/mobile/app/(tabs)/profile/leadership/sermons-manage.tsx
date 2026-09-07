@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -30,6 +30,8 @@ type BannerUploadIntent = { signedUploadUrl: string; publicUrl: string };
 
 export default function SermonsManageScreen() {
   const insets = useSafeAreaInsets();
+  const pathname = usePathname();
+  const expressionWorkspace = pathname.startsWith('/expressions/');
   const { api, context, hasCapability } = useSession();
   const { colors } = useTheme();
   const expression = context?.expression;
@@ -191,7 +193,7 @@ export default function SermonsManageScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 120 },
+          { paddingTop: expressionWorkspace ? spacing.md : insets.top + spacing.sm, paddingBottom: expressionWorkspace ? insets.bottom + spacing.xl : insets.bottom + 120 },
         ]}
       >
         <ScreenHeader
