@@ -151,7 +151,7 @@ export default function ExpressionProfileScreen() {
                     onPress={async () => {
                       if (context?.expression?.id === id) return;
                       await enterExpression(membership.organizationId, membership.id);
-                      router.replace('/(tabs)/home');
+                      router.replace(`/expressions/${membership.id}` as any);
                     }}
                     disabled={context?.expression?.id === id}
                     variant="outline"
