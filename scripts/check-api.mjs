@@ -87,6 +87,7 @@ const requiredFiles = [
 
 await Promise.all(requiredFiles.map((file) => access(file)));
 
+const supabaseConfig = await readFile('supabase/config.toml', 'utf8');
 const handler = await readFile('supabase/functions/_shared/handler.ts', 'utf8');
 const authContext = await readFile('supabase/functions/_shared/context.ts', 'utf8');
 const response = await readFile('supabase/functions/_shared/response.ts', 'utf8');
@@ -232,6 +233,7 @@ const invariants = [
   [engagement, /body\.action === "unreact"/, 'reaction removal contract'],
   [engagement, /assertContentAccess[\s\S]*visibility === "branch"[\s\S]*auth\.branchId !== data\.expression_id/, 'engagement requires the exact active Expression for Expression content'],
   [engagement, /await assertContentAccess\(auth, contentId\)[\s\S]*content_comments/, 'comment reads verify content visibility before returning a thread'],
+  [supabaseConfig, /\[functions\.engagement\][\s\S]*verify_jwt\s*=\s*false/, 'public comment threads can reach optional-auth engagement handler'],
   [publicContent, /content_items\.visibility.*public/s, 'public media visibility boundary'],
   [churchStory, /EXPRESSION_MEMBERSHIP_REQUIRED/, 'internal Expression leadership boundary'],
   [login, /signInWithPassword/, 'password login workflow'],
