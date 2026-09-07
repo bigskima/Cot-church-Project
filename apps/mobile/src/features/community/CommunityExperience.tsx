@@ -445,7 +445,7 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
           </View>
           {expression?.id ? (
             <Pressable
-              onPress={() => router.push('/(tabs)/community/leadership')}
+              onPress={() => expression?.id ? router.push(`/expressions/${expression.id}/leadership` as any) : undefined}
               hitSlop={8}
               style={({ pressed }) => [
                 styles.headerIconBtn,
