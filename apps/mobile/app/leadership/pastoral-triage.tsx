@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Redirect, usePathname } from 'expo-router';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
@@ -16,6 +17,7 @@ import {
 } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import type { LiveFollowUp, PrayerRequest } from '@/types/content';
+import { toUserFacingErrorMessage } from '@/api';
 
 type PrayerScope = 'general' | 'expression';
 type RoutedPrayer = PrayerRequest & {
@@ -35,6 +37,7 @@ type CareFollowUp = LiveFollowUp & {
 
 export default function PastoralTriageScreen() {
   const insets = useSafeAreaInsets();
+  const pathname = usePathname();
   const { api, context, hasCapability, hasOrganizationCapability } = useSession();
   const { colors } = useTheme();
   const expression = context?.expression;
@@ -105,6 +108,10 @@ export default function PastoralTriageScreen() {
     (signal) => canReceiveFollowups ? api.request<CareFollowUp[]>(followupPath, { signal }) : Promise.resolve([])
   );
 
+  if (pathname === '/leadership/pastoral-triage') {
+    return <Redirect href="/general/leadership/pastoral-triage" />;
+  }
+
   const updatePrayer = async (
     id: string,
     patch: { status?: 'praying' | 'answered' | 'archived'; approvePublic?: boolean }
@@ -118,7 +125,7 @@ export default function PastoralTriageScreen() {
       });
       prayers.refresh();
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : 'Unable to update this prayer request.');
+      setActionError(toUserFacingErrorMessage(error, 'We couldn’t update this prayer request. Please try again.'));
     } finally {
       setWorkingId(null);
     }
@@ -134,7 +141,7 @@ export default function PastoralTriageScreen() {
       });
       followups.refresh();
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : 'Unable to update this pastoral follow-up.');
+      setActionError(toUserFacingErrorMessage(error, 'We couldn’t update this care follow-up. Please try again.'));
     } finally {
       setWorkingId(null);
     }
@@ -143,8 +150,8 @@ export default function PastoralTriageScreen() {
   const prayerList = prayers.data ?? [];
   const careList = followups.data ?? [];
   const scopeTitle = ministryScope === 'expression' && expression?.name
-    ? `${expression.name} Prayer Queue`
-    : 'General Prayer Ministry Queue';
+    ? `${expression.name} Prayer Ministry`
+    : 'General Prayer Ministry';
 
   const scopeTabs = expression?.id && canUseGeneralScope && canUseExpressionScope ? (
     <View style={styles.scopeTabs}>
