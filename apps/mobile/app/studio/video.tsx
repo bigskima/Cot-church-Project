@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { router, useLocalSearchParams, usePathname } from 'expo-router';
+import { Redirect, router, useLocalSearchParams, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -87,6 +87,10 @@ export default function WatchVideoCreatorScreen() {
     if (scope === 'branch' && !canPublishExpression && canPublishPublic) setScope('public');
     if (scope === 'public' && !canPublishPublic && canPublishExpression) setScope('branch');
   }, [scope, canPublishExpression, canPublishPublic]);
+
+  if (!generalWorkspace && !expressionWorkspace) {
+    return <Redirect href={(expression?.id ? `/expressions/${expression.id}/manage/video` : '/general/studio/video') as any} />;
+  }
 
   const chooseVideo = async () => {
     if (!allowed || working) return;
