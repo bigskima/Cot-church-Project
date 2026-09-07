@@ -230,6 +230,8 @@ const invariants = [
   [feedRanking, /diversifyFeed/, 'mixed-format feed diversification'],
   [engagement, /view.*state/, 'engagement viewer-state retrieval'],
   [engagement, /body\.action === "unreact"/, 'reaction removal contract'],
+  [engagement, /assertContentAccess[\s\S]*visibility === "branch"[\s\S]*auth\.branchId !== data\.expression_id/, 'engagement requires the exact active Expression for Expression content'],
+  [engagement, /await assertContentAccess\(auth, contentId\)[\s\S]*content_comments/, 'comment reads verify content visibility before returning a thread'],
   [publicContent, /content_items\.visibility.*public/s, 'public media visibility boundary'],
   [churchStory, /EXPRESSION_MEMBERSHIP_REQUIRED/, 'internal Expression leadership boundary'],
   [login, /signInWithPassword/, 'password login workflow'],
