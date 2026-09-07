@@ -104,7 +104,7 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
   const insets = useSafeAreaInsets();
   const { api, context, mode, hasCapability, hasOrganizationCapability } = useSession();
   const { colors } = useTheme();
-  const expression = context?.expression;
+  const expression = scope === 'expression' ? context?.expression : undefined;
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
 
   const [activeTab, setActiveTab] = useState<FeedScope>(scope);
@@ -123,7 +123,7 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
   }, [activeTab, postDestination, scope]);
 
 
-  const feedKey = `mobile:community:${activeTab}:${organizationId || 'auto'}:${expression?.id ?? 'none'}:${mode}`;
+  const feedKey = `mobile:community:${activeTab}:${organizationId || 'auto'}:${activeTab === 'expression' ? expression?.id ?? 'none' : 'general'}:${mode}`;
   const resource = useResource<CommunityPost[]>(feedKey, (signal) => {
     if (activeTab === 'general') {
       const query = new URLSearchParams({ scope: 'church' });
@@ -526,8 +526,8 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
               expressionName={item.expression?.name}
               canEngage={canEngage}
               allowExternalShare={item.visibility === 'public'}
-              onPress={() => router.push({ pathname: '/post/[id]', params: { id: item.id, scope: activeTab } } as any)}
-              onReply={() => router.push({ pathname: '/post/[id]', params: { id: item.id, scope: activeTab, focus: 'comments' } } as any)}
+              onPress={() => router.push(activeTab === 'general' ? { pathname: '/general/post/[id]', params: { id: item.id } } as any : { pathname: '/post/[id]', params: { id: item.id, scope: 'expression' } } as any)}
+              onReply={() => router.push(activeTab === 'general' ? { pathname: '/general/post/[id]', params: { id: item.id, focus: 'comments' } } as any : { pathname: '/post/[id]', params: { id: item.id, scope: 'expression', focus: 'comments' } } as any)}
               onReact={canEngage ? (reaction) => reactToPost(item.id, reaction, activeTab) : undefined}
               onBookmark={canEngage ? (currentlySaved) => bookmarkPost(item.id, currentlySaved, activeTab) : undefined}
             />

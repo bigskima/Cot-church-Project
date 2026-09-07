@@ -103,7 +103,7 @@ export default function ForgotPasswordScreen() {
           )}
         </View>
 
-        <Pressable onPress={() => router.replace('/(tabs)/home')} hitSlop={8} style={styles.publicLink}>
+        <Pressable onPress={() => router.replace('/general')} hitSlop={8} style={styles.publicLink}>
           <Text style={[styles.publicLinkText, { color: colors.textSecondary }]}>Continue exploring public COT</Text>
         </Pressable>
       </ScrollView>

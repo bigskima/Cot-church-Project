@@ -12,6 +12,25 @@ const files = [
   'apps/mobile/app/(tabs)/home/index.tsx',
   'apps/mobile/app/(tabs)/_layout.tsx',
   'apps/mobile/app/general/index.tsx',
+  'apps/mobile/app/general/_layout.tsx',
+  'apps/mobile/app/general/explore.tsx',
+  'apps/mobile/app/general/community.tsx',
+  'apps/mobile/app/general/reels.tsx',
+  'apps/mobile/app/general/profile.tsx',
+  'apps/mobile/app/general/live/index.tsx',
+  'apps/mobile/app/general/live/[id].tsx',
+  'apps/mobile/app/general/watch/index.tsx',
+  'apps/mobile/app/general/watch/[id].tsx',
+  'apps/mobile/app/general/sermon/[id].tsx',
+  'apps/mobile/app/general/event/[id].tsx',
+  'apps/mobile/app/general/post/[id].tsx',
+  'apps/mobile/app/general/comments/[contentId].tsx',
+  'apps/mobile/app/general/giving.tsx',
+  'apps/mobile/app/general/prayer.tsx',
+  'apps/mobile/app/general/leadership/index.tsx',
+  'apps/mobile/app/general/studio/index.tsx',
+  'apps/mobile/app/index.tsx',
+  'apps/mobile/app/(auth)/login.tsx',
   'apps/mobile/app/expressions/[expressionId]/_layout.tsx',
   'apps/mobile/app/expressions/[expressionId]/index.tsx',
   'apps/mobile/src/components/expression/ExpressionRouteBoundary.tsx',
@@ -118,6 +137,11 @@ const platformShellUi = sources.get('apps/admin/src/components/Shell.tsx') ?? ''
 const paymentInfrastructureUi = sources.get('apps/admin/src/pages/PaymentInfrastructure.tsx') ?? '';
 const profileSettingsUi = sources.get('apps/mobile/app/(tabs)/profile/settings.tsx') ?? '';
 const sessionUi = sources.get('apps/mobile/src/state/session.tsx') ?? '';
+const generalShellUi = sources.get('apps/mobile/app/general/_layout.tsx') ?? '';
+const generalHomeUi = sources.get('apps/mobile/app/(tabs)/home/index.tsx') ?? '';
+const generalProfileUi = sources.get('apps/mobile/app/(tabs)/profile/index.tsx') ?? '';
+const generalGivingRouteUi = sources.get('apps/mobile/app/general/giving.tsx') ?? '';
+const generalStudioRouteUi = sources.get('apps/mobile/app/general/studio/index.tsx') ?? '';
 const commentProductUi = [
   sources.get('apps/mobile/app/(tabs)/community/index.tsx') ?? '',
   sources.get('apps/mobile/src/features/community/CommunityExperience.tsx') ?? '',
@@ -232,8 +256,26 @@ const checks = [
   [/const canPublicBroadcast = !expressionWorkspace/, 'Expression Live Studio cannot switch into public broadcast authority'],
   [/const canPublishPublic =[\s\S]*!expressionWorkspace/, 'Expression media creators cannot switch into public publishing'],
   [/const activeScope: GivingScope = expressionWorkspace && expression \? 'expression'/, 'Expression Giving management is locked to Expression scope'],
-  [/Redirect href=\{\`\/expressions\/\$\{context\.expression\.id\}\/manage\`/, 'legacy leadership hub canonicalizes active Expression management'],
+  [/Redirect href=\{\`\/expressions\/\$\{activeExpression!\.id\}\/manage\`/, 'legacy leadership hub canonicalizes active Expression management'],
   [/Redirect href=\{\`\/expressions\/\$\{expression\.id\}\/manage\/studio\`/, 'legacy Studio canonicalizes active Expression content creation'],
+  [/Tabs screenOptions=\{screenOptions\} backBehavior="history"/, 'General COT owns a dedicated tab shell'],
+  [/name="index"[\s\S]*name="explore"[\s\S]*name="reels"[\s\S]*name="community"[\s\S]*name="profile"/, 'General shell exposes five canonical product destinations'],
+  [/Opening General COT[\s\S]*Clearing the private Expression context/, 'General shell resolves the private-to-General boundary before rendering'],
+  [/leaveExpression\(\)/, 'General route explicitly clears active Expression context'],
+  [/mobile:home-feed:\$\{organizationId \|\| 'auto'\}:general/, 'General Home owns an Expression-independent resource identity'],
+  [/General COT\. Open My Expressions/, 'General Home presents a stable General identity'],
+  [/pathname: '\/general\/post\/\[id\]'/, 'General Home opens posts inside the General shell'],
+  [/\/general\/live\/\$\{activeStream\.id\}/, 'General Home opens live media inside the General shell'],
+  [/\/general\/watch\/\$\{item\.video\.id\}/, 'General Home opens Watch media inside the General shell'],
+  [/\/general\/sermon\/\$\{item\.sermon\.id\}/, 'General Home opens sermons inside the General shell'],
+  [/GivingScreen initialScope="church" lockedScope/, 'General Giving is locked to church-wide scope'],
+  [/const expression = scope === 'expression' \? context\?\.expression : undefined/, 'shared General features ignore stale Expression context'],
+  [/returnTo = expressionId \? `\/expressions\/\$\{expressionId\}\/reels` : '\/general\/reels'/, 'General Reels returns inside the General shell'],
+  [/CreatorStudioScreen forcedScope="general"/, 'General Ministry Studio is explicitly church-wide'],
+  [/const generalWorkspace = pathname\.startsWith\('\/general'\)/, 'shared leadership hub recognizes General workspace'],
+  [/serviceTile\('\/general\/giving'/, 'General Profile routes giving through General shell'],
+  [/returnTo: '\/general\/profile'/, 'General Profile authentication returns to canonical profile route'],
+  [/Redirect href="\/general"/, 'app entry defaults to canonical General COT'],
   [/action: 'preview'/, 'invite-code preview flow'],
   [/action: 'redeem'/, 'invite-code redemption flow'],
   [/action: 'generate'/, 'invite-code generation flow'],
@@ -302,6 +344,33 @@ const forbiddenExpressionRoutingPatterns = [
   [/enterExpression[\s\S]{0,500}router\.replace\(['"]\/\(tabs\)\/home['"]\)/, 'Expression entry routed back into the General tab shell'],
 ];
 
+
+const forbiddenGeneralHomePatterns = [
+  [/params\.set\('expressionId'/, 'Expression ID injection into General Home feed'],
+  [/hasCapability\(/, 'Expression-scoped capability checks in General Home'],
+  [/context\?\.expression/, 'active Expression personality in General Home'],
+  [/\/\(tabs\)\/live|pathname:\s*['"]\/reels['"]|router\.push\(\`\/watch\//, 'legacy media route from General Home'],
+];
+
+const forbiddenGeneralProfilePatterns = [
+  [/hasCapability\(/, 'Expression-scoped capability checks in General Profile'],
+  [/context\?\.expression|expression\?\./, 'active Expression personality in General Profile'],
+  [/Expression Groups|Expression Birthdays|Expression Invite Codes/, 'Expression operations surfaced in General Profile'],
+  [/\/\(tabs\)\/profile\/(?:saved|prayer|giving|leadership|settings|notifications)/, 'legacy profile navigation from General Profile'],
+];
+
+const forbiddenGeneralShellPatterns = [
+  [/\/\(tabs\)\//, 'legacy tab route inside canonical General shell'],
+];
+
+const forbiddenGeneralGivingRoutePatterns = [
+  [/scope="expression"|initialScope="expression"/, 'Expression giving destination in General Giving route'],
+];
+
+const forbiddenGeneralStudioRoutePatterns = [
+  [/forcedScope="expression"/, 'Expression creator scope in General Studio route'],
+];
+
 const forbiddenSocialCopyPatterns = [
   [/Join an active Expression before sharing a Reel into General Community/, 'stale Expression-membership Reel sharing guidance'],
 ];
@@ -333,6 +402,11 @@ const forbidden = forbiddenGivingPatterns.filter(([pattern]) => pattern.test(giv
 const forbiddenPrayer = forbiddenPrayerPatterns.filter(([pattern]) => pattern.test(prayerUi));
 const forbiddenPermissionGates = forbiddenPermissionGatePatterns.filter(([pattern]) => pattern.test(joined));
 const forbiddenExpressionRouting = forbiddenExpressionRoutingPatterns.filter(([pattern]) => pattern.test(joined));
+const forbiddenGeneralHome = forbiddenGeneralHomePatterns.filter(([pattern]) => pattern.test(generalHomeUi));
+const forbiddenGeneralProfile = forbiddenGeneralProfilePatterns.filter(([pattern]) => pattern.test(generalProfileUi));
+const forbiddenGeneralShell = forbiddenGeneralShellPatterns.filter(([pattern]) => pattern.test(generalShellUi));
+const forbiddenGeneralGivingRoute = forbiddenGeneralGivingRoutePatterns.filter(([pattern]) => pattern.test(generalGivingRouteUi));
+const forbiddenGeneralStudioRoute = forbiddenGeneralStudioRoutePatterns.filter(([pattern]) => pattern.test(generalStudioRouteUi));
 const forbiddenSocialCopy = forbiddenSocialCopyPatterns.filter(([pattern]) => pattern.test(joined));
 const forbiddenModalComments = forbiddenModalCommentPatterns.filter(([pattern]) => pattern.test(commentProductUi));
 const forbiddenWatchCopy = forbiddenWatchCopyPatterns.filter(([pattern]) => pattern.test(sources.get('apps/mobile/app/watch/[id].tsx') ?? ''));
@@ -340,13 +414,18 @@ const forbiddenPlatformBoundaries = forbiddenPlatformBoundaryPatterns.filter(([p
 const forbiddenIntegrations = forbiddenIntegrationPatterns.filter(([pattern]) => pattern.test(integrationsUi));
 const missingPaymentCredentialChecks = paymentCredentialChecks.filter(([pattern]) => !pattern.test(paymentInfrastructureUi));
 
-if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenPermissionGates.length || forbiddenExpressionRouting.length || forbiddenSocialCopy.length || forbiddenModalComments.length || forbiddenWatchCopy.length || forbiddenPlatformBoundaries.length || forbiddenIntegrations.length || missingPaymentCredentialChecks.length) {
+if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenPermissionGates.length || forbiddenExpressionRouting.length || forbiddenGeneralHome.length || forbiddenGeneralProfile.length || forbiddenGeneralShell.length || forbiddenGeneralGivingRoute.length || forbiddenGeneralStudioRoute.length || forbiddenSocialCopy.length || forbiddenModalComments.length || forbiddenWatchCopy.length || forbiddenPlatformBoundaries.length || forbiddenIntegrations.length || missingPaymentCredentialChecks.length) {
   const failures = [
     ...missing.map(([, name]) => name),
     ...forbidden.map(([, name]) => `remove ${name}`),
     ...forbiddenPrayer.map(([, name]) => `remove ${name}`),
     ...forbiddenPermissionGates.map(([, name]) => `remove ${name}`),
     ...forbiddenExpressionRouting.map(([, name]) => `remove ${name}`),
+    ...forbiddenGeneralHome.map(([, name]) => `remove ${name}`),
+    ...forbiddenGeneralProfile.map(([, name]) => `remove ${name}`),
+    ...forbiddenGeneralShell.map(([, name]) => `remove ${name}`),
+    ...forbiddenGeneralGivingRoute.map(([, name]) => `remove ${name}`),
+    ...forbiddenGeneralStudioRoute.map(([, name]) => `remove ${name}`),
     ...forbiddenSocialCopy.map(([, name]) => `remove ${name}`),
     ...forbiddenModalComments.map(([, name]) => `remove ${name}`),
     ...forbiddenWatchCopy.map(([, name]) => `remove ${name}`),
@@ -359,5 +438,5 @@ if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenPer
 }
 
 console.log(
-  `Application check passed (${files.length} files, ${checks.length} production invariants, ${forbiddenGivingPatterns.length + forbiddenPrayerPatterns.length + forbiddenPermissionGatePatterns.length + forbiddenExpressionRoutingPatterns.length + forbiddenSocialCopyPatterns.length + forbiddenModalCommentPatterns.length + forbiddenWatchCopyPatterns.length + forbiddenPlatformBoundaryPatterns.length + forbiddenIntegrationPatterns.length} anti-hardcode/boundary checks, ${paymentCredentialChecks.length} payment contract checks).`,
+  `Application check passed (${files.length} files, ${checks.length} production invariants, ${forbiddenGivingPatterns.length + forbiddenPrayerPatterns.length + forbiddenPermissionGatePatterns.length + forbiddenExpressionRoutingPatterns.length + forbiddenGeneralHomePatterns.length + forbiddenGeneralProfilePatterns.length + forbiddenGeneralShellPatterns.length + forbiddenGeneralGivingRoutePatterns.length + forbiddenGeneralStudioRoutePatterns.length + forbiddenSocialCopyPatterns.length + forbiddenModalCommentPatterns.length + forbiddenWatchCopyPatterns.length + forbiddenPlatformBoundaryPatterns.length + forbiddenIntegrationPatterns.length} anti-hardcode/boundary checks, ${paymentCredentialChecks.length} payment contract checks).`,
 );

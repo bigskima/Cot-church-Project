@@ -29,7 +29,7 @@ export default function NotFoundScreen() {
         <Text style={[styles.body, { color: colors.textSecondary }]}>
           The link may be outdated, private, or no longer available. Public COT content is still available from Home.
         </Text>
-        <Button label="Go to Home" onPress={() => router.replace('/(tabs)/home')} size="lg" fullWidth />
+        <Button label="Go to Home" onPress={() => router.replace('/general')} size="lg" fullWidth />
       </View>
     </View>
   );

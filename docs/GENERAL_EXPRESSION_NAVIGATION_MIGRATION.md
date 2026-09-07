@@ -228,7 +228,31 @@ Expression Settings uses the existing `branches.update` backend permission and e
 
 ### Phase 6 — General COT route migration
 
-Move existing church-wide routes under the General shell and remove remaining General screens that inspect `context.expression` to change personality.
+Implemented a dedicated General COT shell rooted at `/general`.
+
+Primary General destinations are now:
+
+- `/general` — church-wide Home
+- `/general/explore` — public discovery
+- `/general/reels` — public Reels
+- `/general/community` — General Community
+- `/general/profile` — account and church tools
+
+The General shell owns its own five-item responsive bottom navigation. Watch, Live, sermons, series, events, public Expression profiles, posts/comments, Prayer, Giving, Church Story, Saved Library, notifications, settings, the AI assistant, Ministry Studio and church-wide leadership operations now have canonical `/general/*` routes while remaining hidden from bottom navigation.
+
+Entering `/general` explicitly clears any active private Expression context before General content renders. App restart still preserves a deliberately active Expression by routing directly back into `/expressions/[expressionId]`; General is the default when no Expression is active.
+
+General Home no longer sends `expressionId` to `home-feed`, uses an Expression-independent cache identity, does not inspect Expression capabilities, and routes public media/details through `/general/*`. General Profile no longer shows Expression Groups, birthdays, invite-code administration or Expression management authority.
+
+Shared experiences remain reusable, but route scope is explicit:
+
+- General Community and Prayer ignore stale Expression context unless rendered with `scope="expression"`.
+- General Giving is locked to church-wide scope.
+- General Reels, Watch, Live, sermons, events and posts use public/church-wide routes and request context.
+- General Ministry Studio is explicitly forced to General scope.
+- The shared leadership hub recognizes `/general` and uses church/organization permissions and General operation routes; Expression leadership/access remains inside the Expression workspace.
+
+Legacy `/(tabs)/*`, root media/detail routes and older leadership paths remain compatibility surfaces until Phase 7 removes or redirects them. They are no longer the canonical app entry or General navigation model.
 
 ### Phase 7 — cleanup and hardening
 

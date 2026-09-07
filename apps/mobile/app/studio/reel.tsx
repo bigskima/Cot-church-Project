@@ -24,6 +24,7 @@ function inferVideoMime(asset: ImagePicker.ImagePickerAsset) {
 export default function ReelCreatorScreen() {
   const pathname = usePathname();
   const expressionWorkspace = pathname.startsWith('/expressions/');
+  const generalWorkspace = pathname.startsWith('/general/');
   const insets = useSafeAreaInsets();
   const { api, context, mode, hasCapability, hasOrganizationCapability } = useSession();
   const { colors } = useTheme();
@@ -35,6 +36,7 @@ export default function ReelCreatorScreen() {
     hasOrganizationCapability('media.upload') &&
     hasOrganizationCapability('reels.publish');
   const canPublishExpression =
+    !generalWorkspace &&
     mode === 'authenticated' &&
     Boolean(expression?.id) &&
     hasCapability('media.upload') &&
@@ -143,7 +145,7 @@ export default function ReelCreatorScreen() {
       });
       assetId = null;
       setStage('Published');
-      router.replace((expressionWorkspace && expression?.id ? `/expressions/${expression.id}/reels` : '/reels') as any);
+      router.replace((expressionWorkspace && expression?.id ? `/expressions/${expression.id}/reels` : generalWorkspace ? '/general/reels' : '/reels') as any);
     } catch (error) {
       if (assetId) await cancelAsset(assetId);
       setStage('');
@@ -157,7 +159,7 @@ export default function ReelCreatorScreen() {
     <KeyboardAvoidingView style={[styles.screen, { backgroundColor: colors.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: expressionWorkspace ? spacing.md : insets.top + spacing.sm, paddingBottom: expressionWorkspace ? insets.bottom + spacing.xl : insets.bottom + 130 }]}>
         <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
-          <ScreenHeader title="Create Reel" kicker="MEDIA STUDIO" subtitle={expressionWorkspace ? `Publish a vertical video inside ${expression?.name ?? 'this Expression'}.` : "Upload a vertical video and choose exactly where it should appear."} showBack />
+          <ScreenHeader title="Create Reel" kicker="MEDIA STUDIO" subtitle={expressionWorkspace ? `Publish a vertical video inside ${expression?.name ?? 'this Expression'}.` : generalWorkspace ? "Publish a vertical video to General COT." : "Upload a vertical video and choose exactly where it should appear."} showBack />
         </View>
         <View style={styles.body}>
           {errorMsg ? (

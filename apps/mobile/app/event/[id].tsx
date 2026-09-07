@@ -24,7 +24,7 @@ type EventRegistration = {
   registered_at: string;
 };
 
-export default function EventDetailScreen() {
+export default function EventDetailScreen({ forcedScope }: { forcedScope?: 'general' | 'expression' } = {}) {
   const { id, context: requestedContext } = useLocalSearchParams<{ id: string; context?: string }>();
   const insets = useSafeAreaInsets();
   const { api, mode, context } = useSession();
@@ -33,7 +33,7 @@ export default function EventDetailScreen() {
   const [registering, setRegistering] = useState(false);
   const [actionError, setActionError] = useState('');
   const [actionMessage, setActionMessage] = useState('');
-  const expressionMode = requestedContext === 'expression';
+  const expressionMode = forcedScope ? forcedScope === 'expression' : requestedContext === 'expression';
 
   const resource = useResource<Event>(`event:detail:${expressionMode ? context?.expression?.id ?? 'none' : 'public'}:${id}`, (signal) => {
     if (expressionMode) {
@@ -66,7 +66,7 @@ export default function EventDetailScreen() {
     if (mode === 'visitor') {
       router.push({
         pathname: '/(auth)/login',
-        params: { returnTo: `/event/${id}${expressionMode ? '?context=expression' : ''}` },
+        params: { returnTo: forcedScope === 'general' ? `/general/event/${id}` : `/event/${id}${expressionMode ? '?context=expression' : ''}` },
       } as any);
       return;
     }

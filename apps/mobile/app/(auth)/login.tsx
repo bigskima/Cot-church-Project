@@ -21,7 +21,7 @@ import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 
 function safeReturnTo(value?: string) {
   if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('://') || value.startsWith('/(auth)')) {
-    return '/(tabs)/home';
+    return '/general';
   }
   return value;
 }
@@ -96,7 +96,7 @@ export default function LoginScreen() {
     setGuestLoading(true);
     try {
       await enterAsVisitor();
-      router.replace('/(tabs)/home');
+      router.replace('/general');
     } catch {
       setErrorMsg('We couldn’t open guest access. Please try again.');
     } finally {

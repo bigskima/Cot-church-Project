@@ -37,7 +37,7 @@ type GuideStep = {
 
 function safeReturnTo(value?: string) {
   if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('://') || value.includes('onboarding') || value.includes('(auth)')) {
-    return '/(tabs)/home';
+    return '/general';
   }
   return value;
 }
@@ -134,7 +134,7 @@ export default function OnboardingScreen() {
 
   React.useEffect(() => {
     if (mode === 'visitor') {
-      router.replace('/(tabs)/home');
+      router.replace('/general');
       return;
     }
     if (mode === 'authenticated') void load();

@@ -38,7 +38,7 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
   const appliedDeepLinkRef = useRef<string | null>(null);
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
   const expressionId = scope === 'expression' ? context?.expression?.id : undefined;
-  const returnTo = expressionId ? `/expressions/${expressionId}/reels` : '/reels';
+  const returnTo = expressionId ? `/expressions/${expressionId}/reels` : '/general/reels';
 
   const reelsResource = useResource<ReelWithViewerState[]>(`reels:immersive:${expressionId ? `expression:${expressionId}` : `public:${organizationId || 'auto'}`}:${mode}`, async (signal) => {
     const reels = expressionId
@@ -114,10 +114,15 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
       setActionError('Comments are not available for this Reel yet.');
       return;
     }
-    router.push({
-      pathname: '/comments/[contentId]',
-      params: { contentId, context: expressionId ? 'expression' : 'public' },
-    } as any);
+    router.push(expressionId
+      ? {
+          pathname: '/comments/[contentId]',
+          params: { contentId, context: 'expression' },
+        } as any
+      : {
+          pathname: '/general/comments/[contentId]',
+          params: { contentId },
+        } as any);
   };
 
   const handleLikeReel = async (reel: ReelWithViewerState, currentlyLiked: boolean) => {

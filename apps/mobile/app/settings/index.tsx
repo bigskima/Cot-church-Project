@@ -22,7 +22,7 @@ export default function SettingsScreen() {
 
   const handleSignOut = async () => {
     await signOut();
-    router.replace('/(tabs)/home');
+    router.replace('/general');
   };
 
   return (

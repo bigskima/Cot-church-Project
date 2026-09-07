@@ -73,18 +73,18 @@ export default function SavedLibraryScreen() {
     }
     const contentContext = expressionOnly ? 'expression' : 'public';
     if (item.type === 'reel') {
-      router.push({ pathname: '/reels', params: { reelId: item.routeId, context: contentContext } } as any);
+      router.push(contentContext === 'expression' ? { pathname: '/reels', params: { reelId: item.routeId, context: 'expression' } } as any : { pathname: '/general/reels', params: { reelId: item.routeId } } as any);
       return;
     }
     if (item.type === 'video') {
-      router.push({ pathname: '/watch/[id]', params: { id: item.routeId, context: contentContext } } as any);
+      router.push(contentContext === 'expression' ? { pathname: '/watch/[id]', params: { id: item.routeId, context: 'expression' } } as any : { pathname: '/general/watch/[id]', params: { id: item.routeId } } as any);
       return;
     }
     if (item.type === 'sermon') {
-      router.push({ pathname: '/sermon/[id]', params: { id: item.routeId, context: contentContext } } as any);
+      router.push(contentContext === 'expression' ? { pathname: '/sermon/[id]', params: { id: item.routeId, context: 'expression' } } as any : { pathname: '/general/sermon/[id]', params: { id: item.routeId } } as any);
       return;
     }
-    router.push('/(tabs)/community');
+    router.push('/general/community');
   };
 
   const remove = async (item: SavedItem) => {

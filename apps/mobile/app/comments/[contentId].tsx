@@ -9,12 +9,12 @@ import { useTheme } from '@/state/theme';
 import { spacing } from '@/design-system/tokens';
 import type { ContentComment } from '@/types/content';
 
-export default function CommentsScreen() {
+export default function CommentsScreen({ forcedScope }: { forcedScope?: 'general' | 'expression' } = {}) {
   const { contentId, context: requestedContext } = useLocalSearchParams<{ contentId: string; context?: string }>();
   const insets = useSafeAreaInsets();
   const { api, mode, context } = useSession();
   const { colors } = useTheme();
-  const expressionMode = requestedContext === 'expression';
+  const expressionMode = forcedScope ? forcedScope === 'expression' : requestedContext === 'expression';
   const requestContext = expressionMode ? 'current' : 'public';
 
   const comments = useResource<ContentComment[]>(
@@ -31,7 +31,7 @@ export default function CommentsScreen() {
     },
   );
 
-  const returnTo = `/comments/${encodeURIComponent(contentId)}${expressionMode ? '?context=expression' : '?context=public'}`;
+  const returnTo = forcedScope === 'general' ? `/general/comments/${encodeURIComponent(contentId)}` : `/comments/${encodeURIComponent(contentId)}${expressionMode ? '?context=expression' : '?context=public'}`;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>

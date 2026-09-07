@@ -49,7 +49,7 @@ export function LiveDiscoveryExperience({ scope = 'general', embedded = false }:
 
   const openStream = (id: string) => expressionMode && expressionId
     ? router.push(`/expressions/${expressionId}/live/${id}` as any)
-    : router.push(`/(tabs)/live/${id}` as any);
+    : router.push(`/general/live/${id}` as any);
 
   const streams = resource.data?.streams ?? [];
   const liveStreams = streams.filter((item) => item.status === 'live');
