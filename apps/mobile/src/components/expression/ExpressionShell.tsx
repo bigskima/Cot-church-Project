@@ -93,17 +93,59 @@ function ExpressionNavigation({
       ? { id: expressionId, name: context.expression.name, code: undefined }
       : undefined);
 
-  const items = useMemo<NavItem[]>(
+  const basePath = `/expressions/${expressionId}`;
+  const overviewItems = useMemo<NavItem[]>(
     () => [
       {
         key: 'home',
         label: 'Home',
         icon: 'home-outline',
-        active: pathname === `/expressions/${expressionId}` || pathname === `/expressions/${expressionId}/`,
-        onPress: () => router.replace(`/expressions/${expressionId}` as any),
+        active: pathname === basePath || pathname === `${basePath}/`,
+        onPress: () => router.replace(basePath as any),
+      },
+      {
+        key: 'announcements',
+        label: 'Announcements',
+        icon: 'megaphone-outline',
+        active: pathname === `${basePath}/announcements`,
+        onPress: () => router.push(`${basePath}/announcements` as any),
       },
     ],
-    [expressionId, pathname],
+    [basePath, pathname],
+  );
+
+  const communityItems = useMemo<NavItem[]>(
+    () => [
+      {
+        key: 'feed',
+        label: 'Feed',
+        icon: 'chatbubbles-outline',
+        active: pathname === `${basePath}/feed`,
+        onPress: () => router.push(`${basePath}/feed` as any),
+      },
+      {
+        key: 'prayer',
+        label: 'Prayer',
+        icon: 'heart-outline',
+        active: pathname === `${basePath}/prayer`,
+        onPress: () => router.push(`${basePath}/prayer` as any),
+      },
+      {
+        key: 'events',
+        label: 'Events',
+        icon: 'calendar-outline',
+        active: pathname === `${basePath}/events`,
+        onPress: () => router.push(`${basePath}/events` as any),
+      },
+      {
+        key: 'birthdays',
+        label: 'Birthdays',
+        icon: 'gift-outline',
+        active: pathname === `${basePath}/birthdays`,
+        onPress: () => router.push(`${basePath}/birthdays` as any),
+      },
+    ],
+    [basePath, pathname],
   );
 
   return (
@@ -127,7 +169,12 @@ function ExpressionNavigation({
         contentContainerStyle={styles.navScrollContent}
       >
         <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>OVERVIEW</Text>
-        {items.map((item) => (
+        {overviewItems.map((item) => (
+          <NavButton key={item.key} item={item} onNavigate={onNavigate} />
+        ))}
+
+        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>COMMUNITY</Text>
+        {communityItems.map((item) => (
           <NavButton key={item.key} item={item} onNavigate={onNavigate} />
         ))}
 
