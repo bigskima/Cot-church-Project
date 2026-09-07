@@ -156,7 +156,7 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
       enabled: canAccessPastoral,
     },
     {
-      title: 'Giving Configuration',
+      title: 'Giving Setup',
       description: 'Manage giving destinations, purposes and transfer accounts.',
       iconName: 'gift-outline',
       badge: 'GIVING',
@@ -164,7 +164,7 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
       enabled: generalWorkspace ? hasOrganizationCapability('giving.campaigns.manage') : hasCapability('giving.campaigns.manage'),
     },
     {
-      title: 'Giving Finance',
+      title: 'Giving Reports',
       description: 'Review read-only giving totals and refunds by currency.',
       iconName: 'analytics-outline',
       badge: 'FINANCE',
