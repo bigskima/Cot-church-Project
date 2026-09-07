@@ -188,6 +188,7 @@ export default function GeneralLayout() {
       <Tabs.Screen name="notification-settings" options={{ href: null }} />
       <Tabs.Screen name="saved" options={{ href: null }} />
       <Tabs.Screen name="leadership" options={{ href: null }} />
+      <Tabs.Screen name="studio" options={{ href: null }} />
     </Tabs>
   );
 }
