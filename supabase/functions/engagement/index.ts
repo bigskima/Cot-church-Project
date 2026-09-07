@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { ApiError } from "../_shared/errors.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
+import { publicClient } from "../_shared/supabase.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString, uuid } from "../_shared/validation.ts";
 
 const allowedReactions = new Set(["like", "love", "pray", "celebrate", "amen", "support"]);
@@ -11,6 +12,36 @@ function requestedContentIds(value: string | null) {
   if (!ids.length) throw new ApiError("VALIDATION_FAILED", "At least one contentId is required", 400);
   if (ids.length > 30) throw new ApiError("VALIDATION_FAILED", "A maximum of 30 content activity states can be loaded at once", 422);
   return ids.map((id) => uuid(id, "contentId", true)!);
+}
+
+async function assertContentAccess(auth: any, contentId: string) {
+  const client = auth?.client ?? publicClient();
+  const { data, error } = await client
+    .from("content_items")
+    .select("id,organization_id,expression_id,group_id,author_profile_id,visibility,status")
+    .eq("id", contentId)
+    .maybeSingle();
+
+  if (error) throw new ApiError("CONTENT_ACCESS_CHECK_FAILED", "Unable to verify content access", 500, undefined, false);
+  if (!data || data.status !== "published") {
+    throw new ApiError("CONTENT_NOT_FOUND", "This content is unavailable", 404);
+  }
+
+  if (data.visibility === "public") return data;
+
+  if (!auth?.user) {
+    throw new ApiError("CONTENT_ACCESS_DENIED", "Sign in with access to this content to continue", 403);
+  }
+
+  if (!auth.organizationId || auth.organizationId !== data.organization_id) {
+    throw new ApiError("CONTENT_ACCESS_DENIED", "Enter the church space that owns this content", 403);
+  }
+
+  if ((data.visibility === "branch" || data.visibility === "group") && auth.branchId !== data.expression_id) {
+    throw new ApiError("EXPRESSION_CONTEXT_REQUIRED", "Enter this Expression to view or interact with its content", 403);
+  }
+
+  return data;
 }
 
 Deno.serve(createHandler(
@@ -160,7 +191,7 @@ Deno.serve(createHandler(
       const contentId = uuid(url.searchParams.get("contentId"), "contentId");
       if (!contentId) throw new ApiError("VALIDATION_FAILED", "contentId is required", 400);
 
-      const client = auth?.client ?? (await import("../_shared/supabase.ts")).publicClient();
+      const client = auth?.client ?? publicClient();
       if (url.searchParams.get("view") === "state") {
         if (!auth?.user) return { data: { reaction: null, bookmarked: false, progress: null } };
         const [reaction, bookmark, progress] = await Promise.all([
@@ -171,6 +202,7 @@ Deno.serve(createHandler(
         if (reaction.error || bookmark.error || progress.error) throw new ApiError("ENGAGEMENT_STATE_FAILED", "Unable to retrieve your content activity", 500, undefined, false);
         return { data: { reaction: reaction.data?.reaction ?? null, bookmarked: Boolean(bookmark.data), progress: progress.data ?? null } };
       }
+      await assertContentAccess(auth, contentId);
       const { data, error } = await client
         .from("content_comments")
         .select(`
@@ -203,6 +235,7 @@ Deno.serve(createHandler(
       assertNoUnknownFields(body, ["action", "contentId", "reaction"]);
       const contentId = uuid(requiredString(body.contentId, "contentId", 36), "contentId", true)!;
       const reaction = requiredString(body.reaction, "reaction", 20);
+      await assertContentAccess(auth, contentId);
 
       if (!allowedReactions.has(reaction)) {
         throw new ApiError("VALIDATION_FAILED", "Invalid reaction type", 422);
@@ -226,6 +259,7 @@ Deno.serve(createHandler(
     if (body.action === "unreact") {
       assertNoUnknownFields(body, ["action", "contentId"]);
       const contentId = uuid(requiredString(body.contentId, "contentId", 36), "contentId", true)!;
+      await assertContentAccess(auth, contentId);
       const { error } = await auth.client.from("content_reactions").delete().eq("content_item_id", contentId).eq("profile_id", auth.user.id);
       if (error) throw new ApiError("REACTION_FAILED", "Unable to remove reaction", 500, undefined, false);
       return { data: { reacted: false } };
@@ -237,6 +271,7 @@ Deno.serve(createHandler(
       const contentId = uuid(requiredString(body.contentId, "contentId", 36), "contentId", true)!;
       const commentBody = requiredString(body.body, "body", 3000);
       const parentId = body.parentCommentId ? uuid(String(body.parentCommentId), "parentCommentId", true) : null;
+      await assertContentAccess(auth, contentId);
 
       if (parentId) {
         const { data: parentComment, error: parentError } = await auth.client
@@ -276,6 +311,7 @@ Deno.serve(createHandler(
     if (body.action === "bookmark") {
       assertNoUnknownFields(body, ["action", "contentId"]);
       const contentId = uuid(requiredString(body.contentId, "contentId", 36), "contentId", true)!;
+      await assertContentAccess(auth, contentId);
 
       const { data: existing } = await auth.client
         .from("content_bookmarks")
@@ -308,6 +344,7 @@ Deno.serve(createHandler(
       const contentId = uuid(requiredString(body.contentId, "contentId", 36), "contentId", true)!;
       const progressSeconds = typeof body.progressSeconds === "number" ? Math.max(0, Math.floor(body.progressSeconds)) : 0;
       const durationSeconds = typeof body.durationSeconds === "number" ? Math.max(0, Math.floor(body.durationSeconds)) : 0;
+      await assertContentAccess(auth, contentId);
 
       const { data, error } = await auth.client.rpc("sync_content_playback", {
         p_content_id: contentId,
