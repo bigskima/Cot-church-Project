@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     lineHeight: 22,
-    fontWeight: '850',
+    fontWeight: '800',
     letterSpacing: -0.35,
   },
   sectionHint: {
