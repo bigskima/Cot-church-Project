@@ -3,9 +3,11 @@ import { ApiError } from "../_shared/errors.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString, uuid } from "../_shared/validation.ts";
+import { adminClient } from "../_shared/supabase.ts";
 
 const statuses = new Set(["draft", "review", "scheduled", "published", "archived"]);
 const visibilities = new Set(["public", "organization", "branch", "private"]);
+const BANNER_BUCKET = "sermon-banners";
 
 async function hasScopedPermission(auth: any, permission: string, branchId: string | null) {
   const { data, error } = await auth.client.rpc("has_permission", {
@@ -37,6 +39,18 @@ async function validateSeries(auth: any, seriesId: string | null, targetExpressi
   return data;
 }
 
+async function validateMediaAsset(auth: any, assetId: string | null, mediaType: "audio" | "video", expressionId: string | null) {
+  if (!assetId) return null;
+  const { data, error } = await adminClient().from("media_assets")
+    .select("id,organization_id,expression_id,media_type,processing_state")
+    .eq("id", assetId).eq("organization_id", auth.organizationId).maybeSingle();
+  if (error || !data || data.media_type !== mediaType || data.processing_state !== "ready") {
+    throw new ApiError("MEDIA_ASSET_INVALID", `Choose a completed ${mediaType} upload`, 422);
+  }
+  if ((data.expression_id ?? null) !== expressionId) throw new ApiError("MEDIA_SCOPE_DENIED", "Sermon media must belong to the same church or Expression", 403);
+  return data.id;
+}
+
 Deno.serve(createHandler(
   { methods: ["GET", "POST", "PATCH"], authentication: "optional", organization: "optional" },
   async ({ request, auth }) => {
@@ -64,7 +78,7 @@ Deno.serve(createHandler(
 
         let managementQuery = auth.client
           .from("sermons")
-          .select("id,organization_id,expression_id,series_id,recording_id,title,slug,preacher,sermon_date,scripture_references,topics,description,transcript,audio_url,video_url,thumbnail_url,duration_seconds,status,visibility,is_featured,play_count,published_at")
+          .select("id,organization_id,expression_id,series_id,recording_id,title,slug,preacher,sermon_date,scripture_references,topics,description,transcript,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,duration_seconds,status,visibility,is_featured,play_count,published_at")
           .eq("organization_id", auth.organizationId)
           .order("sermon_date", { ascending: false })
           .limit(200);
@@ -96,7 +110,7 @@ Deno.serve(createHandler(
 
       let query = client
         .from("sermons")
-        .select("id,organization_id,expression_id,series_id,recording_id,title,slug,preacher,sermon_date,scripture_references,topics,description,transcript,audio_url,video_url,thumbnail_url,duration_seconds,status,visibility,is_featured,play_count,published_at")
+        .select("id,organization_id,expression_id,series_id,recording_id,title,slug,preacher,sermon_date,scripture_references,topics,description,transcript,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,duration_seconds,status,visibility,is_featured,play_count,published_at")
         .eq("organization_id", organizationId);
 
       if (sermonId) {
@@ -121,6 +135,19 @@ Deno.serve(createHandler(
 
     const body = assertObject(await jsonBody(request));
 
+    if (request.method === "POST" && body.action === "create_banner_upload") {
+      assertNoUnknownFields(body, ["action", "mimeType"]);
+      await assertScopedPermission(auth, "sermons.create", auth.branchId ?? null, "You cannot upload sermon banners in this scope");
+      const mimeType = requiredString(body.mimeType, "mimeType", 80).toLowerCase();
+      const extension = mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : mimeType === "image/jpeg" ? "jpg" : null;
+      if (!extension) throw new ApiError("UNSUPPORTED_MEDIA_TYPE", "Choose a JPG, PNG, or WebP banner", 415);
+      const path = `orgs/${auth.organizationId}/${auth.user.id}/${crypto.randomUUID()}.${extension}`;
+      const admin = adminClient();
+      const { data, error } = await admin.storage.from(BANNER_BUCKET).createSignedUploadUrl(path, { upsert: false });
+      if (error || !data?.signedUrl) throw new ApiError("UPLOAD_SESSION_FAILED", "Unable to prepare the sermon banner upload", 500, undefined, false);
+      return { data: { signedUploadUrl: data.signedUrl, publicUrl: admin.storage.from(BANNER_BUCKET).getPublicUrl(path).data.publicUrl } };
+    }
+
     if (request.method === "POST" && body.action === "convert_recording") {
       assertNoUnknownFields(body, ["action", "recordingId", "title", "preacher", "description", "seriesId"]);
       const recordingId = uuid(requiredString(body.recordingId, "recordingId", 36), "recordingId", true)!;
@@ -141,7 +168,7 @@ Deno.serve(createHandler(
     }
 
     if (request.method === "POST") {
-      assertNoUnknownFields(body, ["title", "preacher", "sermonDate", "expressionId", "seriesId", "description", "transcript", "audioUrl", "videoUrl", "thumbnailUrl", "durationSeconds", "scriptures", "topics", "status", "visibility"]);
+      assertNoUnknownFields(body, ["title", "preacher", "sermonDate", "expressionId", "seriesId", "description", "transcript", "audioUrl", "videoUrl", "thumbnailUrl", "audioAssetId", "videoAssetId", "durationSeconds", "scriptures", "topics", "status", "visibility"]);
 
       const suppliedExpressionId = body.expressionId ? uuid(String(body.expressionId), "expressionId", true)! : null;
       if (auth.branchId && suppliedExpressionId && suppliedExpressionId !== auth.branchId) {
@@ -166,6 +193,12 @@ Deno.serve(createHandler(
       const duration = body.durationSeconds == null ? null : Number(body.durationSeconds);
       if (duration != null && (!Number.isFinite(duration) || duration < 0)) throw new ApiError("VALIDATION_FAILED", "durationSeconds must be zero or greater", 422);
 
+      const audioAssetId = await validateMediaAsset(auth, body.audioAssetId ? uuid(String(body.audioAssetId), "audioAssetId", true) : null, "audio", targetExpressionId);
+      const videoAssetId = await validateMediaAsset(auth, body.videoAssetId ? uuid(String(body.videoAssetId), "videoAssetId", true) : null, "video", targetExpressionId);
+      const description = optionalString(body.description, "description", 10000)?.trim() ?? "";
+      if (!description && !audioAssetId && !videoAssetId) throw new ApiError("SERMON_CONTENT_REQUIRED", "Add sermon text, audio, or video", 422);
+      const thumbnailUrl = optionalString(body.thumbnailUrl, "thumbnailUrl", 2000);
+      if (!thumbnailUrl) throw new ApiError("SERMON_BANNER_REQUIRED", "Add a sermon banner", 422);
       const record = {
         organization_id: auth.organizationId,
         expression_id: targetExpressionId,
@@ -174,11 +207,13 @@ Deno.serve(createHandler(
         slug,
         preacher,
         sermon_date: optionalString(body.sermonDate, "sermonDate", 20) ?? new Date().toISOString().slice(0, 10),
-        description: optionalString(body.description, "description", 10000)?.trim() ?? "",
+        description,
         transcript: optionalString(body.transcript, "transcript", 500000),
         audio_url: optionalString(body.audioUrl, "audioUrl", 2000),
         video_url: optionalString(body.videoUrl, "videoUrl", 2000),
-        thumbnail_url: optionalString(body.thumbnailUrl, "thumbnailUrl", 2000),
+        thumbnail_url: thumbnailUrl,
+        audio_asset_id: audioAssetId,
+        video_asset_id: videoAssetId,
         duration_seconds: duration,
         scripture_references: Array.isArray(body.scriptures) ? body.scriptures.map(String).slice(0, 100) : [],
         topics: Array.isArray(body.topics) ? body.topics.map(String).slice(0, 100) : [],
@@ -193,7 +228,7 @@ Deno.serve(createHandler(
       return { data, status: 201 };
     }
 
-    assertNoUnknownFields(body, ["id", "title", "preacher", "sermonDate", "description", "transcript", "audioUrl", "videoUrl", "thumbnailUrl", "durationSeconds", "scriptures", "topics", "status", "visibility", "isFeatured"]);
+    assertNoUnknownFields(body, ["id", "title", "preacher", "sermonDate", "description", "transcript", "audioUrl", "videoUrl", "thumbnailUrl", "audioAssetId", "videoAssetId", "durationSeconds", "scriptures", "topics", "status", "visibility", "isFeatured"]);
     const id = uuid(requiredString(body.id, "id", 36), "id", true)!;
     const { data: existing, error: existingError } = await auth.client
       .from("sermons")
@@ -214,6 +249,8 @@ Deno.serve(createHandler(
     if (body.audioUrl !== undefined) updates.audio_url = optionalString(body.audioUrl, "audioUrl", 2000);
     if (body.videoUrl !== undefined) updates.video_url = optionalString(body.videoUrl, "videoUrl", 2000);
     if (body.thumbnailUrl !== undefined) updates.thumbnail_url = optionalString(body.thumbnailUrl, "thumbnailUrl", 2000);
+    if (body.audioAssetId !== undefined) updates.audio_asset_id = await validateMediaAsset(auth, body.audioAssetId ? uuid(String(body.audioAssetId), "audioAssetId", true) : null, "audio", existing.expression_id);
+    if (body.videoAssetId !== undefined) updates.video_asset_id = await validateMediaAsset(auth, body.videoAssetId ? uuid(String(body.videoAssetId), "videoAssetId", true) : null, "video", existing.expression_id);
     if (body.durationSeconds !== undefined) {
       const duration = body.durationSeconds == null ? null : Number(body.durationSeconds);
       if (duration != null && (!Number.isFinite(duration) || duration < 0)) throw new ApiError("VALIDATION_FAILED", "durationSeconds must be zero or greater", 422);

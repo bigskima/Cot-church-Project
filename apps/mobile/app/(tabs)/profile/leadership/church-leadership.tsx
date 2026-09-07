@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -20,6 +21,9 @@ import {
 } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import type { LeadershipProfile } from '@church/types';
+import { putSignedUpload, type UploadFile } from '@/services/uploads';
+
+type ImageUploadIntent = { signedUploadUrl: string; publicUrl: string };
 
 export default function ChurchLeadershipManageScreen() {
   const insets = useSafeAreaInsets();
@@ -34,6 +38,8 @@ export default function ChurchLeadershipManageScreen() {
   const [roleTitle, setRoleTitle] = useState('');
   const [ministry, setMinistry] = useState('');
   const [shortBio, setShortBio] = useState('');
+  const [portraitUrl, setPortraitUrl] = useState('');
+  const [portrait, setPortrait] = useState<UploadFile | null>(null);
   const [featurePublicly, setFeaturePublicly] = useState(true);
   const [isFounder, setIsFounder] = useState(false);
   const [isActive, setIsActive] = useState(true);
@@ -55,6 +61,8 @@ export default function ChurchLeadershipManageScreen() {
     setRoleTitle('');
     setMinistry('');
     setShortBio('');
+    setPortraitUrl('');
+    setPortrait(null);
     setFeaturePublicly(true);
     setIsFounder(false);
     setIsActive(true);
@@ -75,12 +83,26 @@ export default function ChurchLeadershipManageScreen() {
     setRoleTitle(leader.role_title ?? '');
     setMinistry(leader.ministry ?? '');
     setShortBio(leader.short_bio ?? '');
+    setPortraitUrl(leader.portrait_url ?? '');
+    setPortrait(null);
     setFeaturePublicly(leader.is_featured_public === true);
     setIsFounder(leader.is_founder === true);
     setIsActive(leader.is_active !== false);
     setErrorMsg('');
     setSuccessMsg('');
     setEditorOpen(true);
+  };
+
+  const choosePortrait = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) return setErrorMsg('Allow photo-library access to choose a leader photo.');
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.9 });
+    const asset = result.canceled ? null : result.assets?.[0];
+    if (!asset) return;
+    const mimeType = asset.mimeType?.toLowerCase() || 'image/jpeg';
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(mimeType)) return setErrorMsg('Choose a JPG, PNG, or WebP photo.');
+    setPortrait({ uri: asset.uri, name: asset.fileName || `leader-${Date.now()}.jpg`, mimeType, size: asset.fileSize, file: (asset as any).file });
+    setErrorMsg('');
   };
 
   const saveLeader = async () => {
@@ -95,6 +117,12 @@ export default function ChurchLeadershipManageScreen() {
     setSuccessMsg('');
     try {
       const isEditing = Boolean(editingLeader);
+      let savedPortraitUrl = portraitUrl || null;
+      if (portrait) {
+        const intent = await api.request<ImageUploadIntent>('church-story', { method: 'POST', body: JSON.stringify({ action: 'create_portrait_upload', mimeType: portrait.mimeType }) });
+        await putSignedUpload(intent.signedUploadUrl, portrait);
+        savedPortraitUrl = intent.publicUrl;
+      }
       await api.request('church-story', {
         method: isEditing ? 'PATCH' : 'POST',
         body: JSON.stringify({
@@ -103,6 +131,7 @@ export default function ChurchLeadershipManageScreen() {
           roleTitle: roleTitle.trim(),
           ministry: ministry.trim() || null,
           shortBio: shortBio.trim() || '',
+          portraitUrl: savedPortraitUrl,
           isFounder,
           isFeaturedPublic: featurePublicly,
           ...(isEditing ? { isActive } : {}),
@@ -237,6 +266,16 @@ export default function ChurchLeadershipManageScreen() {
           <InputField label="Ministry (optional)" value={ministry} onChangeText={setMinistry} placeholder="Pastoral Care, Worship, Youth…" />
           <InputField label="Short biography" value={shortBio} onChangeText={setShortBio} multiline numberOfLines={4} placeholder="A short public introduction…" />
 
+          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>LEADER PHOTO</Text>
+          <Pressable onPress={() => void choosePortrait()} style={[styles.photoPicker, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+            {portrait?.uri || portraitUrl ? <Image source={{ uri: portrait?.uri || portraitUrl }} style={styles.photoPreview} /> : <Icon name="person-outline" size={30} color={colors.interactive} />}
+            <View style={styles.flex}>
+              <Text style={[styles.photoTitle, { color: colors.text }]}>{portrait || portraitUrl ? 'Change leader photo' : 'Upload leader photo'}</Text>
+              <Text style={[styles.photoHint, { color: colors.textSecondary }]}>JPG, PNG or WebP · square photo recommended</Text>
+            </View>
+            <Icon name="cloud-upload-outline" size={22} color={colors.interactive} />
+          </Pressable>
+
           <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>PUBLIC PRESENTATION</Text>
           <View style={styles.chips}>
             <Chip label="Feature publicly" selected={featurePublicly} onPress={() => setFeaturePublicly(true)} />
@@ -280,4 +319,8 @@ const styles = StyleSheet.create({
   form: { gap: spacing.md },
   fieldLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.65 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  photoPicker: { minHeight: 82, flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderWidth: 1, borderRadius: radius.xl },
+  photoPreview: { width: 56, height: 56, borderRadius: 28 },
+  photoTitle: { fontSize: 14, fontWeight: '700' },
+  photoHint: { fontSize: 11, marginTop: 3 },
 });

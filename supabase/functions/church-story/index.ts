@@ -4,7 +4,9 @@ import { authorize, authorizeOrganization } from "../_shared/context.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString, uuid } from "../_shared/validation.ts";
-import { publicClient } from "../_shared/supabase.ts";
+import { adminClient, publicClient } from "../_shared/supabase.ts";
+
+const PORTRAIT_BUCKET = "leadership-portraits";
 
 Deno.serve(
   createHandler(
@@ -87,6 +89,19 @@ Deno.serve(
       }
 
       const body = assertObject(await jsonBody(request));
+
+      if (request.method === "POST" && body.action === "create_portrait_upload") {
+        await authorizeOrganization(auth, "organization.leadership.manage");
+        assertNoUnknownFields(body, ["action", "mimeType"]);
+        const mimeType = requiredString(body.mimeType, "mimeType", 80).toLowerCase();
+        const extension = mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : mimeType === "image/jpeg" ? "jpg" : null;
+        if (!extension) throw new ApiError("UNSUPPORTED_MEDIA_TYPE", "Choose a JPG, PNG, or WebP portrait", 415);
+        const path = `orgs/${auth.organizationId}/${auth.user.id}/${crypto.randomUUID()}.${extension}`;
+        const admin = adminClient();
+        const { data, error } = await admin.storage.from(PORTRAIT_BUCKET).createSignedUploadUrl(path, { upsert: false });
+        if (error || !data?.signedUrl) throw new ApiError("UPLOAD_SESSION_FAILED", "Unable to prepare the leader photo upload", 500, undefined, false);
+        return { data: { signedUploadUrl: data.signedUrl, publicUrl: admin.storage.from(PORTRAIT_BUCKET).getPublicUrl(path).data.publicUrl } };
+      }
 
       if (request.method === "POST") {
         if (body.type === "story") {

@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
@@ -21,6 +23,10 @@ import {
 } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import type { Sermon } from '@/types/content';
+import { putSignedUpload, readUploadFile, type UploadFile } from '@/services/uploads';
+
+type ContentUploadIntent = { uploadSession: { assetId: string; signedUploadUrl: string } };
+type BannerUploadIntent = { signedUploadUrl: string; publicUrl: string };
 
 export default function SermonsManageScreen() {
   const insets = useSafeAreaInsets();
@@ -35,6 +41,8 @@ export default function SermonsManageScreen() {
   const [preacher, setPreacher] = useState('');
   const [scripture, setScripture] = useState('');
   const [description, setDescription] = useState('');
+  const [bannerFile, setBannerFile] = useState<UploadFile | null>(null);
+  const [audioFile, setAudioFile] = useState<UploadFile | null>(null);
   const [status, setStatus] = useState<Sermon['status']>('draft');
   const [creating, setCreating] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -56,8 +64,30 @@ export default function SermonsManageScreen() {
     setPreacher('');
     setScripture('');
     setDescription('');
+    setBannerFile(null);
+    setAudioFile(null);
     setStatus('draft');
     setErrorMsg('');
+  };
+
+  const chooseBanner = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) return setErrorMsg('Allow photo-library access to choose a sermon banner.');
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [16, 9], quality: 0.9 });
+    const asset = result.canceled ? null : result.assets?.[0];
+    if (!asset) return;
+    const mimeType = asset.mimeType?.toLowerCase() || 'image/jpeg';
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(mimeType)) return setErrorMsg('Choose a JPG, PNG, or WebP banner.');
+    setBannerFile({ uri: asset.uri, name: asset.fileName || `sermon-banner-${Date.now()}.jpg`, mimeType, size: asset.fileSize, file: (asset as any).file });
+  };
+
+  const chooseAudio = async () => {
+    const result = await DocumentPicker.getDocumentAsync({ type: ['audio/mpeg', 'audio/mp4', 'audio/aac', 'audio/ogg', 'audio/wav'], copyToCacheDirectory: true });
+    const asset = result.canceled ? null : result.assets?.[0];
+    if (!asset) return;
+    const mimeType = asset.mimeType?.toLowerCase() || (asset.name.toLowerCase().endsWith('.mp3') ? 'audio/mpeg' : 'audio/mp4');
+    if ((asset.size ?? 0) > 200 * 1024 * 1024) return setErrorMsg('Choose an audio recording that is 200 MB or smaller.');
+    setAudioFile({ uri: asset.uri, name: asset.name, mimeType, size: asset.size, file: (asset as any).file });
   };
 
   const openCreate = () => {
@@ -86,6 +116,8 @@ export default function SermonsManageScreen() {
       setErrorMsg('Enter both a sermon title and speaker.');
       return;
     }
+    if (!bannerFile && !editingSermon?.thumbnail_url) return setErrorMsg('Choose a 16:9 banner for this sermon.');
+    if (!description.trim() && !audioFile && !editingSermon?.audio_asset_id) return setErrorMsg('Add sermon text or attach an audio recording.');
     setCreating(true);
     setErrorMsg('');
     setSuccessMsg('');
@@ -100,11 +132,27 @@ export default function SermonsManageScreen() {
         setErrorMsg('Publishing sermons requires publish permission.');
         return;
       }
+      let thumbnailUrl = editingSermon?.thumbnail_url ?? null;
+      let audioAssetId = editingSermon?.audio_asset_id ?? null;
+      if (bannerFile) {
+        const intent = await api.request<BannerUploadIntent>('sermons', { method: 'POST', body: JSON.stringify({ action: 'create_banner_upload', mimeType: bannerFile.mimeType }) });
+        await putSignedUpload(intent.signedUploadUrl, bannerFile);
+        thumbnailUrl = intent.publicUrl;
+      }
+      if (audioFile) {
+        const audioBody = await readUploadFile(audioFile);
+        const intent = await api.request<ContentUploadIntent>('content-media', { method: 'POST', body: JSON.stringify({ action: 'create_upload_intent', mediaType: 'audio', mimeType: audioFile.mimeType, expressionId: expression?.id ?? null, fileSizeBytes: audioBody.size, fileName: audioFile.name }) });
+        await putSignedUpload(intent.uploadSession.signedUploadUrl, { ...audioFile, file: audioBody });
+        await api.request('content-media', { method: 'POST', body: JSON.stringify({ action: 'complete_upload', assetId: intent.uploadSession.assetId }) });
+        audioAssetId = intent.uploadSession.assetId;
+      }
       const basePayload = {
         title: title.trim(),
         preacher: preacher.trim(),
         scriptures,
         description: description.trim(),
+        thumbnailUrl,
+        audioAssetId,
       };
       await api.request('sermons', {
         method: isEditing ? 'PATCH' : 'POST',
@@ -239,6 +287,19 @@ export default function SermonsManageScreen() {
           <InputField label="Scripture references" value={scripture} onChangeText={setScripture} placeholder="Romans 8:28, Hebrews 11:1" helperText="Separate multiple passages with commas." />
           <InputField label="Notes / summary" value={description} onChangeText={setDescription} multiline numberOfLines={4} placeholder="Add sermon notes or a short summary…" />
 
+          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>SERMON BANNER (REQUIRED)</Text>
+          <Pressable onPress={() => void chooseBanner()} style={[styles.uploadCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+            {bannerFile?.uri || editingSermon?.thumbnail_url ? <Image source={{ uri: bannerFile?.uri || editingSermon?.thumbnail_url! }} style={styles.bannerPreview} /> : <Icon name="image-outline" size={28} color={colors.interactive} />}
+            <View style={styles.flex}><Text style={[styles.uploadTitle, { color: colors.text }]}>Choose 16:9 banner</Text><Text style={[styles.uploadHint, { color: colors.textSecondary }]}>Shown on sermon cards and sermon playback</Text></View>
+          </Pressable>
+
+          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>SERMON CONTENT</Text>
+          <View style={[styles.uploadCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+            <Icon name={audioFile || editingSermon?.audio_asset_id ? 'checkmark-circle' : 'document-text-outline'} size={24} color={colors.interactive} />
+            <View style={styles.flex}><Text style={[styles.uploadTitle, { color: colors.text }]}>{audioFile?.name || (editingSermon?.audio_asset_id ? 'Audio recording attached' : 'Text sermon')}</Text><Text style={[styles.uploadHint, { color: colors.textSecondary }]}>Notes are readable text; audio is an optional recording of this sermon.</Text></View>
+            <Button label={audioFile || editingSermon?.audio_asset_id ? 'Replace' : 'Add audio'} onPress={() => void chooseAudio()} variant="outline" size="sm" />
+          </View>
+
           <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>STATUS</Text>
           <View style={styles.chips}>
             <Chip label="Draft" selected={status === 'draft'} onPress={() => setStatus('draft')} />
@@ -287,4 +348,8 @@ const styles = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   infoCard: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, borderRadius: radius.lg, padding: spacing.md },
   infoText: { flex: 1, fontSize: 12, lineHeight: 17 },
+  uploadCard: { minHeight: 76, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderWidth: 1, borderRadius: radius.xl, overflow: 'hidden' },
+  bannerPreview: { width: 104, height: 59, borderRadius: radius.md },
+  uploadTitle: { fontSize: 13, fontWeight: '700' },
+  uploadHint: { fontSize: 11, lineHeight: 16, marginTop: 2 },
 });

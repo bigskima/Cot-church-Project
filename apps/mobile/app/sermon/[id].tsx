@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
@@ -117,6 +117,7 @@ export default function SermonDetailScreen() {
           <ResourceError message={resource.error} retry={resource.refresh} />
         ) : sermon ? (
           <View style={styles.body}>
+            {posterUrl ? <Image source={{ uri: posterUrl }} style={styles.sermonBanner} resizeMode="cover" accessibilityLabel={`${sermon.title} banner`} /> : null}
             {hasVideo && hasAudio ? (
               <View style={[styles.formatRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
                 <Chip
@@ -213,4 +214,5 @@ const styles = StyleSheet.create({
   scripturePill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill },
   scriptureText: { fontSize: 13, fontWeight: '600' },
   descriptionText: { fontSize: 14, lineHeight: 22 },
+  sermonBanner: { width: '100%', aspectRatio: 16 / 9, borderRadius: radius.xl, backgroundColor: '#111827' },
 });
