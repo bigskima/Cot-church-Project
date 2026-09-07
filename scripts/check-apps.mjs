@@ -14,6 +14,9 @@ const files = [
   'apps/mobile/app/(tabs)/live/index.tsx',
   'apps/mobile/app/(tabs)/live/[id].tsx',
   'apps/mobile/app/watch/[id].tsx',
+  'apps/mobile/app/post/[id].tsx',
+  'apps/mobile/app/comments/[contentId].tsx',
+  'apps/mobile/src/components/engagement/CommentsThread.tsx',
   'apps/mobile/src/components/cards/VideoCard.tsx',
   'apps/mobile/src/components/media/VideoPlayer.tsx',
   'apps/mobile/src/components/media/AudioPlayer.tsx',
@@ -62,6 +65,11 @@ const platformShellUi = sources.get('apps/admin/src/components/Shell.tsx') ?? ''
 const paymentInfrastructureUi = sources.get('apps/admin/src/pages/PaymentInfrastructure.tsx') ?? '';
 const profileSettingsUi = sources.get('apps/mobile/app/(tabs)/profile/settings.tsx') ?? '';
 const sessionUi = sources.get('apps/mobile/src/state/session.tsx') ?? '';
+const commentProductUi = [
+  sources.get('apps/mobile/app/(tabs)/community/index.tsx') ?? '',
+  sources.get('apps/mobile/app/watch/[id].tsx') ?? '',
+  sources.get('apps/mobile/app/reels.tsx') ?? '',
+].join('\n');
 
 const checks = [
   [/expo-secure-store/, 'secure session persistence'],
@@ -87,6 +95,10 @@ const checks = [
   [/Replays & recordings/, 'recording processing and replay discovery'],
   [/follow_up/, 'private live follow-up'],
   [/social-feed/, 'scoped social experience'],
+  [/pathname:\s*['\"]\/post\/\[id\]['\"]/, 'community cards open a dedicated post detail route'],
+  [/pathname:\s*['\"]\/comments\/\[contentId\]['\"]/, 'media comments open a dedicated full-screen route'],
+  [/CommentsThread/, 'shared full-screen comment thread surface'],
+  [/focusRequest/, 'post detail can focus the inline comment composer'],
   [/ResourceError/, 'section error states'],
   [/stream-access/, 'secure playback access'],
   [/public-giving/, 'tenant-safe giving resolver'],
@@ -183,6 +195,10 @@ const forbiddenSocialCopyPatterns = [
   [/Join an active Expression before sharing a Reel into General Community/, 'stale Expression-membership Reel sharing guidance'],
 ];
 
+const forbiddenModalCommentPatterns = [
+  [/CommentSheet/, 'bottom-sheet comments on Community, Watch, or Reels'],
+];
+
 const forbiddenPrayerPatterns = [
   [/onPray=\{\(\)\s*=>\s*\{\s*\}\}/, 'no-op prayer interaction'],
 ];
@@ -206,18 +222,20 @@ const forbidden = forbiddenGivingPatterns.filter(([pattern]) => pattern.test(giv
 const forbiddenPrayer = forbiddenPrayerPatterns.filter(([pattern]) => pattern.test(prayerUi));
 const forbiddenPermissionGates = forbiddenPermissionGatePatterns.filter(([pattern]) => pattern.test(joined));
 const forbiddenSocialCopy = forbiddenSocialCopyPatterns.filter(([pattern]) => pattern.test(joined));
+const forbiddenModalComments = forbiddenModalCommentPatterns.filter(([pattern]) => pattern.test(commentProductUi));
 const forbiddenWatchCopy = forbiddenWatchCopyPatterns.filter(([pattern]) => pattern.test(sources.get('apps/mobile/app/watch/[id].tsx') ?? ''));
 const forbiddenPlatformBoundaries = forbiddenPlatformBoundaryPatterns.filter(([pattern]) => pattern.test(platformShellUi));
 const forbiddenIntegrations = forbiddenIntegrationPatterns.filter(([pattern]) => pattern.test(integrationsUi));
 const missingPaymentCredentialChecks = paymentCredentialChecks.filter(([pattern]) => !pattern.test(paymentInfrastructureUi));
 
-if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenSocialCopy.length || forbiddenWatchCopy.length || forbiddenPlatformBoundaries.length || forbiddenIntegrations.length || missingPaymentCredentialChecks.length) {
+if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenPermissionGates.length || forbiddenSocialCopy.length || forbiddenModalComments.length || forbiddenWatchCopy.length || forbiddenPlatformBoundaries.length || forbiddenIntegrations.length || missingPaymentCredentialChecks.length) {
   const failures = [
     ...missing.map(([, name]) => name),
     ...forbidden.map(([, name]) => `remove ${name}`),
     ...forbiddenPrayer.map(([, name]) => `remove ${name}`),
     ...forbiddenPermissionGates.map(([, name]) => `remove ${name}`),
     ...forbiddenSocialCopy.map(([, name]) => `remove ${name}`),
+    ...forbiddenModalComments.map(([, name]) => `remove ${name}`),
     ...forbiddenWatchCopy.map(([, name]) => `remove ${name}`),
     ...forbiddenPlatformBoundaries.map(([, name]) => `remove ${name}`),
     ...forbiddenIntegrations.map(([, name]) => `remove ${name}`),
@@ -228,5 +246,5 @@ if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenSoc
 }
 
 console.log(
-  `Application check passed (${files.length} files, ${checks.length} production invariants, ${forbiddenGivingPatterns.length + forbiddenPrayerPatterns.length + forbiddenSocialCopyPatterns.length + forbiddenWatchCopyPatterns.length + forbiddenPlatformBoundaryPatterns.length + forbiddenIntegrationPatterns.length} anti-hardcode/boundary checks, ${paymentCredentialChecks.length} payment contract checks).`,
+  `Application check passed (${files.length} files, ${checks.length} production invariants, ${forbiddenGivingPatterns.length + forbiddenPrayerPatterns.length + forbiddenPermissionGatePatterns.length + forbiddenSocialCopyPatterns.length + forbiddenModalCommentPatterns.length + forbiddenWatchCopyPatterns.length + forbiddenPlatformBoundaryPatterns.length + forbiddenIntegrationPatterns.length} anti-hardcode/boundary checks, ${paymentCredentialChecks.length} payment contract checks).`,
 );
