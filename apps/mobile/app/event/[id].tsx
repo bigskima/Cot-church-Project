@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, Share } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
+import { Redirect, useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -24,7 +24,7 @@ type EventRegistration = {
   registered_at: string;
 };
 
-export default function EventDetailScreen({ forcedScope }: { forcedScope?: 'general' | 'expression' } = {}) {
+export function EventDetailScreen({ forcedScope }: { forcedScope?: 'general' | 'expression' } = {}) {
   const { id, context: requestedContext } = useLocalSearchParams<{ id: string; context?: string }>();
   const insets = useSafeAreaInsets();
   const { api, mode, context } = useSession();
@@ -215,6 +215,12 @@ export default function EventDetailScreen({ forcedScope }: { forcedScope?: 'gene
       </ScrollView>
     </View>
   );
+}
+
+export default function LegacyEventDetailRoute() {
+  const { id, context: requestedContext } = useLocalSearchParams<{ id?: string; context?: string }>();
+  if (requestedContext === 'expression') return <Redirect href="/expressions" />;
+  return <Redirect href={`/general/event/${typeof id === 'string' ? id : ''}` as any} />;
 }
 
 const styles = StyleSheet.create({
