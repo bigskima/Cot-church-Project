@@ -32,21 +32,15 @@ export default function WatchScreen() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
-  const expressionId = context?.expression?.id;
   type WatchPayload = { videos: Video[]; reels: Reel[]; sermons: Sermon[] };
   const catalogue = useResource<WatchPayload>(
-    `watch:catalogue:${expressionId ? `expression:${expressionId}` : `public:${organizationId || 'auto'}`}:${mode}`,
+    `watch:catalogue:public:${organizationId || 'auto'}:${mode}`,
     async (signal) => {
-      if (expressionId) {
-        const params = new URLSearchParams({ expressionId });
-        if (organizationId) params.set('organizationId', organizationId);
-        return api.request<WatchPayload>(`home-feed?${params.toString()}`, { signal });
-      }
       const suffix = organizationId ? `&organizationId=${encodeURIComponent(organizationId)}` : '';
       const [videos, reels, sermons] = await Promise.all([
-        api.request<Video[]>(`public-content?type=videos${suffix}`, { signal }),
-        api.request<Reel[]>(`public-content?type=reels${suffix}`, { signal }),
-        api.request<Sermon[]>(`public-content?type=sermons${suffix}`, { signal }),
+        api.request<Video[]>(`public-content?type=videos${suffix}`, { signal, context: 'public' }),
+        api.request<Reel[]>(`public-content?type=reels${suffix}`, { signal, context: 'public' }),
+        api.request<Sermon[]>(`public-content?type=sermons${suffix}`, { signal, context: 'public' }),
       ]);
       return { videos, reels, sermons };
     },
@@ -159,7 +153,7 @@ export default function WatchScreen() {
         renderItem={({ item }) => (
           <VideoCard
             video={item}
-            onPress={() => router.push(`/watch/${item.id}${expressionId ? '?context=expression' : ''}` as any)}
+            onPress={() => router.push(`/watch/${item.id}` as any)}
           />
         )}
         ListFooterComponent={
@@ -173,7 +167,7 @@ export default function WatchScreen() {
                   key={sermon.id}
                   sermon={sermon}
                   variant="row"
-                  onPress={() => router.push(`/sermon/${sermon.id}${expressionId ? '?context=expression' : ''}` as any)}
+                  onPress={() => router.push(`/sermon/${sermon.id}` as any)}
                 />
               ))}
             </View>

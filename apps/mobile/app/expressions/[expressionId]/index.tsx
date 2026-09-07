@@ -130,7 +130,7 @@ export default function ExpressionHomeScreen() {
           </View>
           <HeroLiveCard
             stream={activeStream}
-            onPress={() => router.push(`/live/${activeStream.id}?context=expression` as any)}
+            onPress={() => router.push(`/expressions/${id}/live/${activeStream.id}` as any)}
           />
         </View>
       ) : null}
@@ -203,7 +203,7 @@ export default function ExpressionHomeScreen() {
               <SermonCard
                 key={sermon.id}
                 sermon={sermon}
-                onPress={() => router.push(`/sermon/${sermon.id}?context=expression` as any)}
+                onPress={() => router.push(`/expressions/${id}/sermons/${sermon.id}` as any)}
               />
             ))}
           </View>

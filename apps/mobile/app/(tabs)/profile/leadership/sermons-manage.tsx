@@ -233,7 +233,7 @@ export default function SermonsManageScreen() {
                   <SermonCard
                     sermon={sermon}
                     variant="row"
-                    onPress={() => router.push(`/sermon/${sermon.id}${expression?.id ? '?context=expression' : ''}` as any)}
+                    onPress={() => router.push((expression?.id ? `/expressions/${expression.id}/sermons/${sermon.id}` : `/sermon/${sermon.id}`) as any)}
                   />
                   <View style={styles.statusRow}>
                     <View style={styles.statusMeta}>

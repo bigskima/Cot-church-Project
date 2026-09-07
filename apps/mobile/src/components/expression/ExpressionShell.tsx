@@ -148,6 +148,41 @@ function ExpressionNavigation({
     [basePath, pathname],
   );
 
+
+  const mediaItems = useMemo<NavItem[]>(
+    () => [
+      {
+        key: 'live',
+        label: 'Live',
+        icon: 'radio-outline',
+        active: pathname === `${basePath}/live` || pathname.startsWith(`${basePath}/live/`),
+        onPress: () => router.push(`${basePath}/live` as any),
+      },
+      {
+        key: 'sermons',
+        label: 'Sermons',
+        icon: 'mic-outline',
+        active: pathname === `${basePath}/sermons` || pathname.startsWith(`${basePath}/sermons/`),
+        onPress: () => router.push(`${basePath}/sermons` as any),
+      },
+      {
+        key: 'videos',
+        label: 'Videos',
+        icon: 'videocam-outline',
+        active: pathname === `${basePath}/videos` || pathname.startsWith(`${basePath}/videos/`),
+        onPress: () => router.push(`${basePath}/videos` as any),
+      },
+      {
+        key: 'reels',
+        label: 'Reels',
+        icon: 'flash-outline',
+        active: pathname === `${basePath}/reels`,
+        onPress: () => router.push(`${basePath}/reels` as any),
+      },
+    ],
+    [basePath, pathname],
+  );
+
   return (
     <View style={styles.navRoot}>
       <View style={[styles.identityCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
@@ -175,6 +210,11 @@ function ExpressionNavigation({
 
         <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>COMMUNITY</Text>
         {communityItems.map((item) => (
+          <NavButton key={item.key} item={item} onNavigate={onNavigate} />
+        ))}
+
+        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>MEDIA & LIVE</Text>
+        {mediaItems.map((item) => (
           <NavButton key={item.key} item={item} onNavigate={onNavigate} />
         ))}
 
