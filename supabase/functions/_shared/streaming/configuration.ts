@@ -35,28 +35,50 @@ export async function loadStreamingConfig(configId: string) {
   } as LoadedStreamingConfig;
 }
 
-export async function defaultStreamingConfig(organizationId: string) {
+async function scopedStreamingConfigId(organizationId: string | null) {
   const client = adminClient();
-
-  const { data: tenantConfig, error: tenantError } = await client
+  let query = client
     .from('streaming_provider_configs')
-    .select('id')
-    .eq('organization_id', organizationId)
-    .eq('is_active', true)
-    .eq('is_default', true)
-    .maybeSingle();
-  if (tenantError) throw new ApiError('STREAMING_CONFIG_LOOKUP_FAILED', 'Unable to resolve streaming provider configuration', 500, undefined, false);
-  if (tenantConfig?.id) return loadStreamingConfig(tenantConfig.id);
+    .select('id,is_default')
+    .eq('is_active', true);
 
-  const { data: globalConfig, error: globalError } = await client
-    .from('streaming_provider_configs')
-    .select('id')
-    .is('organization_id', null)
-    .eq('is_active', true)
-    .eq('is_default', true)
-    .maybeSingle();
-  if (globalError) throw new ApiError('STREAMING_CONFIG_LOOKUP_FAILED', 'Unable to resolve streaming provider configuration', 500, undefined, false);
-  if (!globalConfig?.id) throw new ApiError('STREAMING_NOT_CONFIGURED', 'No active streaming provider is configured', 503);
+  query = organizationId === null
+    ? query.is('organization_id', null)
+    : query.eq('organization_id', organizationId);
 
-  return loadStreamingConfig(globalConfig.id);
+  const { data, error } = await query
+    .order('is_default', { ascending: false })
+    .order('updated_at', { ascending: false })
+    .limit(2);
+
+  if (error) {
+    throw new ApiError('STREAMING_CONFIG_LOOKUP_FAILED', 'Unable to resolve streaming provider configuration', 500, undefined, false);
+  }
+
+  const rows = data ?? [];
+  const explicitDefaults = rows.filter((row) => row.is_default);
+
+  if (explicitDefaults.length === 1) return explicitDefaults[0].id;
+  if (explicitDefaults.length > 1) {
+    throw new ApiError('STREAMING_NOT_CONFIGURED', 'Multiple default streaming providers are configured for the same scope', 503, undefined, false);
+  }
+
+  // A single active configuration is unambiguous and should remain usable even
+  // when an older admin save omitted the default flag.
+  if (rows.length === 1) return rows[0].id;
+  if (rows.length > 1) {
+    throw new ApiError('STREAMING_NOT_CONFIGURED', 'Choose a default streaming provider before creating broadcasts', 503, undefined, false);
+  }
+
+  return null;
+}
+
+export async function defaultStreamingConfig(organizationId: string) {
+  const tenantConfigId = await scopedStreamingConfigId(organizationId);
+  if (tenantConfigId) return loadStreamingConfig(tenantConfigId);
+
+  const globalConfigId = await scopedStreamingConfigId(null);
+  if (!globalConfigId) throw new ApiError('STREAMING_NOT_CONFIGURED', 'No active streaming provider is configured', 503);
+
+  return loadStreamingConfig(globalConfigId);
 }

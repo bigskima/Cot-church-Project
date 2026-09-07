@@ -123,9 +123,9 @@ Deno.serve(
         if (body.configuration !== undefined && (!body.configuration || typeof body.configuration !== "object" || Array.isArray(body.configuration))) {
           throw new ApiError("VALIDATION_FAILED", "configuration must be an object", 422);
         }
-        const isDefault = body.isDefault === undefined ? false : body.isDefault;
+        const requestedDefault = body.isDefault === undefined ? false : body.isDefault;
         const isActive = body.isActive === undefined ? true : body.isActive;
-        if (typeof isDefault !== "boolean" || typeof isActive !== "boolean") {
+        if (typeof requestedDefault !== "boolean" || typeof isActive !== "boolean") {
           throw new ApiError("VALIDATION_FAILED", "isDefault and isActive must be booleans", 422);
         }
 
@@ -137,7 +137,25 @@ Deno.serve(
         if (providerError || !provider) throw new ApiError("STREAMING_PROVIDER_NOT_FOUND", "Streaming provider not found", 404);
         if (!provider.is_active && isActive) throw new ApiError("STREAMING_PROVIDER_DISABLED", "Enable the provider before activating its global configuration", 409);
 
-        if (isDefault) {
+        let effectiveDefault = requestedDefault && isActive;
+        if (isActive && !effectiveDefault) {
+          const { data: otherDefaults, error: defaultLookupError } = await admin
+            .from("streaming_provider_configs")
+            .select("id")
+            .is("organization_id", null)
+            .eq("is_active", true)
+            .eq("is_default", true)
+            .neq("provider_id", providerId)
+            .limit(1);
+          if (defaultLookupError) {
+            throw new ApiError("STREAMING_CONFIG_LOOKUP_FAILED", "Unable to resolve the current default streaming provider", 500, undefined, false);
+          }
+          // Never leave an active global streaming setup unroutable. If there is
+          // no other active default, the configured provider becomes the default.
+          effectiveDefault = (otherDefaults ?? []).length === 0;
+        }
+
+        if (effectiveDefault) {
           const { error } = await admin
             .from("streaming_provider_configs")
             .update({ is_default: false })
@@ -153,7 +171,7 @@ Deno.serve(
           webhook_secret_reference: webhookSecret,
           signing_key_reference: signingKey,
           configuration: body.configuration ?? {},
-          is_default: isDefault,
+          is_default: effectiveDefault,
           is_active: isActive,
         };
 
@@ -178,7 +196,7 @@ Deno.serve(
           target_type: "streaming_provider_config",
           target_id: saved.id,
           request_id: requestId,
-          metadata: { providerCode: provider.code, isDefault, isActive, secretReferencesOnly: true },
+          metadata: { providerCode: provider.code, requestedDefault, effectiveDefault, isActive, secretReferencesOnly: true },
         });
         return { data: saved };
       }
