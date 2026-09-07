@@ -172,8 +172,8 @@ export default function ProfileScreen() {
           <View style={styles.linksList}>
             {mode === 'authenticated' ? serviceTile('/(tabs)/profile/saved', 'bookmark-outline', 'Saved Library', 'Return to posts, Reels, Watch videos and sermons you kept for later') : null}
             {mode === 'authenticated' ? serviceTile('/expressions', 'business-outline', 'My Expressions', expression?.name ? `Inside ${expression.name} · change or leave this space` : 'Join with an invite code or enter one of your Expressions') : null}
-            {mode === 'authenticated' && expression?.id ? serviceTile('/(tabs)/community/groups', 'people-outline', 'Expression Groups', `Discover and join groups inside ${expression.name}`) : null}
-            {mode === 'authenticated' && expression?.id ? serviceTile('/(tabs)/community/birthdays', 'gift-outline', 'Expression Birthdays', 'Private upcoming birthday calendar with month/day only') : null}
+            {mode === 'authenticated' && expression?.id ? serviceTile(`/expressions/${expression.id}/groups`, 'people-outline', 'Expression Groups', `Discover and join groups inside ${expression.name}`) : null}
+            {mode === 'authenticated' && expression?.id ? serviceTile(`/expressions/${expression.id}/birthdays`, 'gift-outline', 'Expression Birthdays', 'Private upcoming birthday calendar with month/day only') : null}
             {mode === 'authenticated' && expression?.id && hasCapability('members.invite') ? serviceTile('/leadership/invite-codes', 'key-outline', 'Expression Invite Codes', `Invite and manage membership access for ${expression.name}`) : null}
             {serviceTile('/(tabs)/profile/prayer', 'heart-outline', 'Prayer Petitions & Wall', 'Submit private pastoral requests or view community prayer items')}
             {serviceTile('/(tabs)/profile/giving', 'gift-outline', 'Giving & Statements', 'View the configured church or Expression giving destinations and receipts')}

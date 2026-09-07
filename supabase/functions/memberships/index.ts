@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { ApiError } from "../_shared/errors.ts";
 import { authorize } from "../_shared/context.ts";
 import { createHandler } from "../_shared/handler.ts";
+import { adminClient } from "../_shared/supabase.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { assertNoUnknownFields, assertObject, requiredString, uuid } from "../_shared/validation.ts";
 
@@ -12,11 +13,52 @@ Deno.serve(createHandler(
   async ({ request, auth }) => {
     if (!auth?.organizationId) throw new ApiError("ORGANIZATION_REQUIRED", "Organization context is required", 400);
     if (request.method === "GET") {
-      await authorize(auth, "members.read");
       const url = new URL(request.url);
       const requestedLimit = Number(url.searchParams.get("limit") ?? 50);
       if (!Number.isInteger(requestedLimit) || requestedLimit < 1) throw new ApiError("VALIDATION_FAILED", "limit must be a positive integer", 422);
       const limit = Math.min(requestedLimit, 100);
+      const view = url.searchParams.get("view") ?? "manage";
+
+      if (view === "expression-directory") {
+        if (!auth.user || !auth.branchId) {
+          throw new ApiError("EXPRESSION_REQUIRED", "Enter an Expression to view its member directory", 400);
+        }
+
+        const requestedExpressionId = uuid(url.searchParams.get("expressionId"), "expressionId", true);
+        if (!requestedExpressionId || requestedExpressionId !== auth.branchId) {
+          throw new ApiError("EXPRESSION_CONTEXT_MISMATCH", "This member directory does not match the active Expression", 403);
+        }
+
+        const admin = adminClient();
+        const { data: exactMembership, error: exactMembershipError } = await admin
+          .from("expression_memberships")
+          .select("id")
+          .eq("organization_id", auth.organizationId)
+          .eq("branch_id", auth.branchId)
+          .eq("profile_id", auth.user.id)
+          .eq("status", "active")
+          .maybeSingle();
+
+        if (exactMembershipError || !exactMembership) {
+          throw new ApiError("EXPRESSION_MEMBERSHIP_REQUIRED", "Active membership in this Expression is required", 403);
+        }
+
+        const { data, error } = await admin
+          .from("expression_memberships")
+          .select("id,profile_id,joined_at,profile:profiles(id,display_name,username,avatar_url)")
+          .eq("organization_id", auth.organizationId)
+          .eq("branch_id", auth.branchId)
+          .eq("status", "active")
+          .order("joined_at", { ascending: true })
+          .limit(limit);
+
+        if (error) throw new ApiError("EXPRESSION_MEMBER_DIRECTORY_FAILED", "Unable to retrieve this Expression member directory", 500, undefined, false);
+        return { data: data ?? [], meta: { limit, view, expressionId: auth.branchId } };
+      }
+
+      if (view !== "manage") throw new ApiError("VALIDATION_FAILED", "Unsupported membership view", 422);
+
+      await authorize(auth, "members.read");
       const status = url.searchParams.get("status");
       if (status && !statuses.has(status)) throw new ApiError("VALIDATION_FAILED", "Invalid membership status", 422);
       let query = auth.client.from("memberships")
@@ -25,7 +67,7 @@ Deno.serve(createHandler(
       if (status) query = query.eq("status", status);
       const { data, error } = await query;
       if (error) throw new ApiError("MEMBERSHIP_LIST_FAILED", "Unable to list memberships", 500, undefined, false);
-      return { data: data ?? [], meta: { limit } };
+      return { data: data ?? [], meta: { limit, view } };
     }
     const body = assertObject(await jsonBody(request));
     assertNoUnknownFields(body, ["membershipId", "status", "branchId"]);

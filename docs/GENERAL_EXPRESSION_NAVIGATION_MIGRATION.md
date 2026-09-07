@@ -187,12 +187,18 @@ General Watch, General Reels and General Live are explicitly General-only. Legac
 
 ### Phase 4 — Groups and people
 
-Move:
+Implemented:
 
-- Groups
-- member directory
-- leadership directory
-- group-level navigation where authorized
+- `/expressions/[expressionId]/groups`
+- `/expressions/[expressionId]/groups/[groupId]`
+- `/expressions/[expressionId]/members`
+- `/expressions/[expressionId]/leadership`
+
+The Expression shell now owns Groups, Members and Leadership navigation. The existing Groups UI/API is reused through a scoped feature experience, including join requests, group creation and membership review where capabilities allow it. Group detail routes stay inside the same exact Expression boundary.
+
+The member directory extends the canonical `memberships` Edge Function with a member-facing `expression-directory` view rather than creating another membership system. The route Expression ID must match the authenticated active Expression, the caller must have an active `expression_memberships` row, and the response exposes only safe directory fields: display name, username, avatar and join date. Phone numbers and administration-only membership data remain outside this view.
+
+The existing Expression leadership directory remains backed by `church-story?view=leadership` and `leadership_profiles`, but now has a canonical Expression-owned route. Leadership management remains in the existing leadership area until Phase 5 moves Expression operations into the workspace.
 
 ### Phase 5 — Expression leadership
 

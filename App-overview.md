@@ -37,9 +37,10 @@
 | `/(tabs)/home` | Ranked home modules; reactions and resume state. | Child cards receive Home data from session/feed; `engagement` mutates reactions/progress. |
 | `/(tabs)/community` | General or Expression posts, composer, attachments, reactions. | `public-social-feed`/`social-feed`; `community-media` signed upload; `engagement`. Posts persist to `social_posts` and upload metadata to `social_media_uploads`. |
 | `/post/[id]`, `/comments/[contentId]` | Canonical post and comment/reaction thread. | `social-feed` or `public-social-feed`; `engagement` for comments/reactions. |
-| `/(tabs)/community/groups` | Expression groups. | `groups` → `groups`, `group_memberships`. |
-| `/(tabs)/community/birthdays` | Scoped birthday list. | `expression-birthdays` → profile/member birthday data. |
-| `/(tabs)/community/leadership` | Expression/public leader directory. | `church-story?view=leadership` → `leadership_profiles`. |
+| `/expressions/[expressionId]/groups`, `/expressions/[expressionId]/groups/[groupId]` | Canonical Expression group directory and group detail. Legacy Community route reuses the same feature. | `groups?scope=expression` → `groups`, `group_memberships`. |
+| `/expressions/[expressionId]/members` | Safe member-facing directory for the exact active Expression. | `memberships?view=expression-directory&expressionId=...` → `expression_memberships` + safe profile fields only. |
+| `/expressions/[expressionId]/birthdays` | Scoped birthday list. | `expression-birthdays` → profile/member birthday data. |
+| `/expressions/[expressionId]/leadership` | Canonical internal Expression leadership directory. Legacy Community route reuses the same feature. | `church-story?view=leadership&expressionId=...` → `leadership_profiles`. |
 | `/(tabs)/discover` | Published sermon/series discovery. | `public-content` → `sermons`, `sermon_series`. |
 | `/(tabs)/discover/church-story` | Published church story and featured leaders. | `church-story` → `church_story`, `leadership_profiles`. |
 | `/(tabs)/discover/sermon/[id]` | Compatibility route. | Redirects to `/sermon/[id]`. |

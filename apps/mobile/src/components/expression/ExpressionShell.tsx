@@ -183,6 +183,34 @@ function ExpressionNavigation({
     [basePath, pathname],
   );
 
+
+  const peopleItems = useMemo<NavItem[]>(
+    () => [
+      {
+        key: 'groups',
+        label: 'Groups',
+        icon: 'people-circle-outline',
+        active: pathname === `${basePath}/groups` || pathname.startsWith(`${basePath}/groups/`),
+        onPress: () => router.push(`${basePath}/groups` as any),
+      },
+      {
+        key: 'members',
+        label: 'Members',
+        icon: 'people-outline',
+        active: pathname === `${basePath}/members`,
+        onPress: () => router.push(`${basePath}/members` as any),
+      },
+      {
+        key: 'leadership',
+        label: 'Leadership',
+        icon: 'ribbon-outline',
+        active: pathname === `${basePath}/leadership`,
+        onPress: () => router.push(`${basePath}/leadership` as any),
+      },
+    ],
+    [basePath, pathname],
+  );
+
   return (
     <View style={styles.navRoot}>
       <View style={[styles.identityCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
@@ -215,6 +243,11 @@ function ExpressionNavigation({
 
         <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>MEDIA & LIVE</Text>
         {mediaItems.map((item) => (
+          <NavButton key={item.key} item={item} onNavigate={onNavigate} />
+        ))}
+
+        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>GROUPS & PEOPLE</Text>
+        {peopleItems.map((item) => (
           <NavButton key={item.key} item={item} onNavigate={onNavigate} />
         ))}
 
