@@ -18,7 +18,7 @@ export function ExpressionManagementGate({
   allowed,
   title,
   expressionId,
-  message = 'Your current Expression role does not grant access to this operation.',
+  message = 'This tool isn’t available for your account in this Expression.',
   children,
 }: Props) {
   const { colors } = useTheme();
@@ -27,9 +27,9 @@ export function ExpressionManagementGate({
     return (
       <View style={[styles.state, { backgroundColor: colors.bg }]}>
         <ActivityIndicator size="large" color={colors.interactive} />
-        <Text style={[styles.title, { color: colors.text }]}>Resolving Expression authority</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Checking your ministry tools</Text>
         <Text style={[styles.copy, { color: colors.textSecondary }]}>
-          COT is loading the permissions assigned to your role in this Expression.
+          Making sure this tool is available for you in this Expression.
         </Text>
       </View>
     );
@@ -45,7 +45,7 @@ export function ExpressionManagementGate({
         <Text style={[styles.copy, { color: colors.textSecondary }]}>{message}</Text>
         <View style={styles.actions}>
           <Button label="Expression Home" onPress={() => router.replace(`/expressions/${expressionId}` as any)} />
-          <Button label="Management" variant="outline" onPress={() => router.replace(`/expressions/${expressionId}/manage` as any)} />
+          <Button label="Back to tools" variant="outline" onPress={() => router.replace(`/expressions/${expressionId}/manage` as any)} />
         </View>
       </View>
     );
