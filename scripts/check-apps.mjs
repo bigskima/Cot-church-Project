@@ -2,6 +2,7 @@ import { access, readFile } from 'node:fs/promises';
 
 const files = [
   'apps/mobile/src/api.ts',
+  'apps/mobile/src/components/states.tsx',
   'apps/mobile/src/state/session.tsx',
   'apps/mobile/app/(tabs)/profile/leadership/expressions-manage.tsx',
   'apps/mobile/app/(tabs)/profile/leadership/index.tsx',
@@ -52,6 +53,9 @@ const files = [
   'apps/mobile/app/expressions/[expressionId]/sermons/index.tsx',
   'apps/mobile/app/expressions/[expressionId]/sermons/[sermonId].tsx',
   'apps/mobile/app/expressions/[expressionId]/reels.tsx',
+  'apps/mobile/app/expressions/[expressionId]/event/[id].tsx',
+  'apps/mobile/app/expressions/[expressionId]/post/[id].tsx',
+  'apps/mobile/app/expressions/[expressionId]/comments/[contentId].tsx',
   'apps/mobile/app/post/[id].tsx',
   'apps/mobile/app/comments/[contentId].tsx',
   'apps/mobile/src/components/engagement/CommentsThread.tsx',
@@ -93,6 +97,11 @@ const files = [
   'apps/mobile/app/expressions/[expressionId]/events.tsx',
   'apps/mobile/app/expressions/[expressionId]/birthdays.tsx',
   'apps/mobile/app/(tabs)/profile/index.tsx',
+  'apps/mobile/app/(tabs)/profile/saved.tsx',
+  'apps/mobile/app/(tabs)/profile/notifications.tsx',
+  'apps/mobile/app/(tabs)/profile/leadership/expression-governance.tsx',
+  'apps/mobile/app/(tabs)/profile/leadership/church-leadership.tsx',
+  'apps/mobile/app/(tabs)/profile/leadership/sermons-manage.tsx',
   'apps/mobile/app/(tabs)/profile/settings.tsx',
   'apps/mobile/app/expressions/index.tsx',
   'apps/mobile/app/leadership/invite-codes.tsx',
@@ -142,6 +151,32 @@ const generalHomeUi = sources.get('apps/mobile/app/(tabs)/home/index.tsx') ?? ''
 const generalProfileUi = sources.get('apps/mobile/app/(tabs)/profile/index.tsx') ?? '';
 const generalGivingRouteUi = sources.get('apps/mobile/app/general/giving.tsx') ?? '';
 const generalStudioRouteUi = sources.get('apps/mobile/app/general/studio/index.tsx') ?? '';
+const productionCopyUi = [
+  sources.get('apps/mobile/app/_layout.tsx') ?? '',
+  sources.get('apps/mobile/src/components/expression/ExpressionRouteBoundary.tsx') ?? '',
+  sources.get('apps/mobile/src/features/expression-management/ExpressionManagementGate.tsx') ?? '',
+  sources.get('apps/mobile/src/features/expression-management/ExpressionManagementHub.tsx') ?? '',
+  sources.get('apps/mobile/src/features/expression-management/ExpressionContentStudio.tsx') ?? '',
+  sources.get('apps/mobile/app/expressions/[expressionId]/manage/settings.tsx') ?? '',
+  sources.get('apps/mobile/app/(tabs)/profile/index.tsx') ?? '',
+  sources.get('apps/mobile/app/(tabs)/profile/leadership/media-studio.tsx') ?? '',
+  sources.get('apps/mobile/app/(tabs)/profile/leadership/expression-governance.tsx') ?? '',
+  sources.get('apps/mobile/app/(tabs)/profile/leadership/church-leadership.tsx') ?? '',
+  sources.get('apps/mobile/app/(tabs)/profile/leadership/sermons-manage.tsx') ?? '',
+  sources.get('apps/mobile/app/studio/index.tsx') ?? '',
+].join('\n');
+
+const expressionNavigationUi = [
+  sources.get('apps/mobile/app/expressions/[expressionId]/index.tsx') ?? '',
+  sources.get('apps/mobile/app/expressions/[expressionId]/events.tsx') ?? '',
+  sources.get('apps/mobile/src/features/community/CommunityExperience.tsx') ?? '',
+  sources.get('apps/mobile/src/features/media/WatchDetailExperience.tsx') ?? '',
+  sources.get('apps/mobile/src/features/media/ReelsExperience.tsx') ?? '',
+  sources.get('apps/mobile/app/(tabs)/profile/saved.tsx') ?? '',
+].join('\n');
+
+const legacyTabUi = sources.get('apps/mobile/app/(tabs)/_layout.tsx') ?? '';
+
 const commentProductUi = [
   sources.get('apps/mobile/app/(tabs)/community/index.tsx') ?? '',
   sources.get('apps/mobile/src/features/community/CommunityExperience.tsx') ?? '',
@@ -157,7 +192,7 @@ const checks = [
   [/contextStatus/, 'deterministic membership context state'],
   [/contextRefreshing/, 'background membership refresh state'],
   [/accessReady/, 'resolved access gate for permission-driven UI'],
-  [/Loading your COT access/, 'app shell waits for resolved role access'],
+  [/Getting COT ready/, 'app shell waits for resolved account context'],
   [/firstMembershipOrganization = value\.organizations\[0\]/, 'creator bootstrap authority is not persisted as membership context'],
   [/creatorOrganizations\?\.some/, 'Expression creator gating uses resolved membership context'],
   [/Resolving Platform Administration access/, 'admin shell waits for resolved platform authority'],
@@ -167,7 +202,7 @@ const checks = [
   [/setInterval\(refreshContext, 120_000\)/, 'role grants refresh without re-login'],
   [/hasPublicCapability\('public\.live_stream\.create'\)[\s\S]*Go live/, 'assigned public broadcaster live entry point'],
   [/failed background refresh must not blank already-resolved context/, 'membership refresh preserves resolved context'],
-  [/home.*discover.*live.*community.*profile/is, 'five product tabs'],
+  [/name="index"[\s\S]*name="explore"[\s\S]*name="reels"[\s\S]*name="community"[\s\S]*name="profile"/, 'five canonical General product tabs'],
   [/LiveCard/, 'reusable live media'],
   [/VideoView/, 'native live player'],
   [/viewerSessionId/, 'live attendance'],
@@ -176,9 +211,9 @@ const checks = [
   [/Replays & recordings/, 'recording processing and replay discovery'],
   [/follow_up/, 'private live follow-up'],
   [/social-feed/, 'scoped social experience'],
-  [/pathname:\s*['\"]\/post\/\[id\]['\"]/, 'community cards open a dedicated post detail route'],
+  [/pathname:\s*['\"]\/general\/post\/\[id\]['\"]/, 'General community cards open canonical post detail'],
   [/posts:\s*CommunityPost\[\][\s\S]*kind:\s*'post'[\s\S]*PostCard/, 'Home includes canonical social posts in the mixed feed'],
-  [/pathname:\s*['\"]\/comments\/\[contentId\]['\"]/, 'media comments open a dedicated full-screen route'],
+  [/\/general\/comments\/\[contentId\]|\/expressions\/\$\{expressionId\}\/comments\/\[contentId\]/, 'media comments open canonical full-screen routes'],
   [/CommentsThread/, 'shared full-screen comment thread surface'],
   [/focusRequest/, 'post detail can focus the inline comment composer'],
   [/ResourceError/, 'section error states'],
@@ -197,9 +232,9 @@ const checks = [
   [/canPublishExpressionReels[\s\S]*Boolean\(expression\?\.id\)[\s\S]*hasCapability\('reels\.publish'\)/, 'Expression Reel publishing requires active Expression authority'],
   [/canPublishPublicVideos[\s\S]*hasOrganizationCapability\('videos\.publish'\)/, 'Public Watch publishing uses organization-scoped authority'],
   [/canPublishExpressionVideos[\s\S]*Boolean\(expression\?\.id\)[\s\S]*hasCapability\('videos\.publish'\)/, 'Expression Watch publishing requires active Expression authority'],
-  [/General Community[\s\S]*Expression role/, 'public COT role is separate from Expression roles'],
+  [/canPostGeneral[\s\S]*canPostExpression/, 'General and Expression publishing remain separate lanes'],
   [/visibility: broadcastScope === 'public' \? 'public' : 'branch'/, 'live broadcast destination follows selected scope'],
-  [/This livestream remains scoped to the selected Expression/, 'Expression livestream privacy copy'],
+  [/This livestream will stay inside this Expression/, 'Expression livestream privacy copy'],
   [/Create public broadcasts from General Community/, 'backend-enforced public livestream separation'],
   [/platform-integrations/, 'real platform integration telemetry'],
   [/retry_job/, 'failed integration job retry'],
@@ -215,7 +250,7 @@ const checks = [
   [/creatorOrganizations[\s\S]*Create Expression/, 'authorized Expression creator direct entry'],
   [/enterExpression/, 'deliberate Expression entry'],
   [/leaveExpression/, 'deliberate Expression exit'],
-  [/Private Expression routes are bound to the Expression ID/, 'Expression routes enforce exact ID membership boundaries'],
+  [/item\.id === expressionId && item\.status === 'active'/, 'Expression routes require exact active membership'],
   [/Return to General COT/, 'Expression shell provides an explicit General COT exit'],
   [/ExpressionNavigation/, 'Expression workspace owns a dedicated navigation shell'],
   [/expression:workspace-home:/, 'Expression Home uses a dedicated scoped resource identity'],
@@ -243,15 +278,15 @@ const checks = [
   [/This directory shows only member-facing profile information/, 'Expression member directory communicates privacy boundary'],
   [/ExpressionLeadershipExperience embedded expressionId=\{id\}/, 'Expression leadership owns a dedicated workspace route'],
   [/MANAGE EXPRESSION/, 'Expression shell owns permission-gated management navigation'],
-  [/label: 'Management'[\s\S]*label: 'Content Studio'[\s\S]*label: 'Live Studio'[\s\S]*label: 'Roles & Ownership'[\s\S]*label: 'Expression Settings'/, 'Expression management navigation exposes canonical Phase 5 destinations'],
+  [/label: 'Tools'[\s\S]*label: 'Content Studio'[\s\S]*label: 'Live Studio'[\s\S]*label: 'Team Access & Ownership'[\s\S]*label: 'Expression Settings'/, 'Expression tools navigation exposes canonical management destinations'],
   [/useExpressionManagementAccess/, 'Expression operations share one capability resolver'],
   [/canManageSettings[\s\S]*branches\.update/, 'Expression Settings follows backend branches.update capability'],
-  [/Only tools granted by your role in this exact Expression are shown here/, 'Expression management hub explains scoped authority'],
-  [/Expression Studio never upgrades an Expression permission into a church-wide or public publishing permission/, 'Expression Content Studio preserves public boundary'],
+  [/Only the ministry tools available to you in this Expression are shown here/, 'Expression tools use member-facing ministry language'],
+  [/Content created here stays in this Expression\. General COT publishing is handled separately/, 'Expression Content Studio communicates product boundary'],
   [/ExpressionManagementGate[\s\S]*canManageLive/, 'Expression Live Studio route is client-gated by scoped authority'],
   [/ExpressionManagementGate[\s\S]*canManageAccess/, 'Expression governance route is client-gated by scoped authority'],
   [/branches\?id=\$\{encodeURIComponent\(id\)\}[\s\S]*method: 'PATCH'/, 'Expression Settings updates the exact active Expression'],
-  [/Platform lifecycle controls such as suspension or archival are intentionally not exposed here/, 'Expression Settings excludes platform lifecycle controls'],
+  [/This page updates the Expression name, member code and timezone/, 'Expression Settings stays focused on member-facing identity'],
   [/const expressionWorkspace = pathname\.startsWith\('\/expressions\/'\)/, 'Reusable management screens detect Expression workspace scope'],
   [/const canPublicBroadcast = !expressionWorkspace/, 'Expression Live Studio cannot switch into public broadcast authority'],
   [/const canPublishPublic =[\s\S]*!expressionWorkspace/, 'Expression media creators cannot switch into public publishing'],
@@ -276,7 +311,18 @@ const checks = [
   [/serviceTile\('\/general\/giving'/, 'General Profile routes giving through General shell'],
   [/returnTo: '\/general\/profile'/, 'General Profile authentication returns to canonical profile route'],
   [/Redirect href="\/general"/, 'app entry defaults to canonical General COT'],
-  [/action: 'preview'/, 'invite-code preview flow'],
+  [/toUserFacingErrorMessage/, 'shared user-facing error sanitizer'],
+  [/INTERNAL_COPY_PATTERN[\s\S]*permission[\s\S]*expression id/, 'technical error vocabulary is filtered before display'],
+  [/refreshContext\(\);[\s\S]*activeExpressionId === expressionId[\s\S]*!membership[\s\S]*leaveExpression\(\)/, 'Expression route revalidates membership and fails closed when access changes'],
+  [/\/expressions\/\$\{id\}\/event\/\$\{event\.id\}/, 'Expression event links carry exact Expression identity'],
+  [/\/expressions\/\$\{expressionId\}\/comments\/\[contentId\]/, 'Expression comment links carry exact Expression identity'],
+  [/\/expressions\/\$\{item\.expressionId\}\/videos\/\[videoId\]/, 'saved private videos use exact Expression identity'],
+  [/\/expressions\/\$\{item\.expressionId\}\/sermons\/\[sermonId\]/, 'saved private sermons use exact Expression identity'],
+  [/function generalTarget[\s\S]*LegacyTabRedirect[\s\S]*Redirect/, 'legacy tab tree is redirect-only'],
+  [/context === 'expression'\) return <Redirect href="\/expressions"/, 'legacy private media links fail closed instead of inferring Expression identity'],
+  [/Redirect href="\/general\/live"/, 'legacy Live root redirects to canonical General Live'],
+  [/Redirect href="\/general\/watch"/, 'legacy Watch root redirects to canonical General Watch'],
+    [/action: 'preview'/, 'invite-code preview flow'],
   [/action: 'redeem'/, 'invite-code redemption flow'],
   [/action: 'generate'/, 'invite-code generation flow'],
   [/codeId/, 'invite-code revocation flow'],
@@ -371,6 +417,25 @@ const forbiddenGeneralStudioRoutePatterns = [
   [/forcedScope="expression"/, 'Expression creator scope in General Studio route'],
 ];
 
+const forbiddenProductionCopyPatterns = [
+  [/Loading your COT access|Resolving Expression authority|permissions assigned to your role/i, 'developer access-loading language in member UI'],
+  [/No live broadcast role assigned|PUBLIC ROLE|EXPRESSION ROLE/i, 'implementation role labels in livestream UI'],
+  [/Platform Administration|Platform Authority/i, 'platform-admin implementation language in member UI'],
+  [/Expression ID in the URL|immutable Expression ID|Internal routing/i, 'route identity implementation language in member UI'],
+  [/validated media upload pipeline|management scope|current church scope/i, 'workflow/scope implementation language in member UI'],
+  [/required authority|assigned authority|publishing authority/i, 'authority implementation language in member UI'],
+  [/role does not include permission|requires publish permission|permission to manage giving|permission to view giving finance/i, 'permission-engine language in member UI'],
+  [/Platform lifecycle controls/i, 'platform lifecycle implementation language in Expression settings'],
+];
+
+const forbiddenLegacyExpressionLinkPatterns = [
+  [/\/event\/\$\{[^}]+\}\?context=expression/, 'generic Expression event deep link'],
+  [/pathname:\s*['"]\/post\/\[id\]['"][\s\S]{0,180}scope:\s*['"]expression['"]/, 'generic Expression post deep link'],
+  [/pathname:\s*['"]\/watch\/\[id\]['"][\s\S]{0,180}context:\s*['"]expression['"]/, 'generic Expression Watch deep link'],
+  [/pathname:\s*['"]\/comments\/\[contentId\]['"][\s\S]{0,180}context:\s*['"]expression['"]/, 'generic Expression comments deep link'],
+  [/pathname:\s*['"]\/reels['"][\s\S]{0,180}context:\s*['"]expression['"]/, 'generic Expression Reel deep link'],
+];
+
 const forbiddenSocialCopyPatterns = [
   [/Join an active Expression before sharing a Reel into General Community/, 'stale Expression-membership Reel sharing guidance'],
 ];
@@ -407,6 +472,8 @@ const forbiddenGeneralProfile = forbiddenGeneralProfilePatterns.filter(([pattern
 const forbiddenGeneralShell = forbiddenGeneralShellPatterns.filter(([pattern]) => pattern.test(generalShellUi));
 const forbiddenGeneralGivingRoute = forbiddenGeneralGivingRoutePatterns.filter(([pattern]) => pattern.test(generalGivingRouteUi));
 const forbiddenGeneralStudioRoute = forbiddenGeneralStudioRoutePatterns.filter(([pattern]) => pattern.test(generalStudioRouteUi));
+const forbiddenProductionCopy = forbiddenProductionCopyPatterns.filter(([pattern]) => pattern.test(productionCopyUi));
+const forbiddenLegacyExpressionLinks = forbiddenLegacyExpressionLinkPatterns.filter(([pattern]) => pattern.test(expressionNavigationUi));
 const forbiddenSocialCopy = forbiddenSocialCopyPatterns.filter(([pattern]) => pattern.test(joined));
 const forbiddenModalComments = forbiddenModalCommentPatterns.filter(([pattern]) => pattern.test(commentProductUi));
 const forbiddenWatchCopy = forbiddenWatchCopyPatterns.filter(([pattern]) => pattern.test(sources.get('apps/mobile/app/watch/[id].tsx') ?? ''));
@@ -414,7 +481,7 @@ const forbiddenPlatformBoundaries = forbiddenPlatformBoundaryPatterns.filter(([p
 const forbiddenIntegrations = forbiddenIntegrationPatterns.filter(([pattern]) => pattern.test(integrationsUi));
 const missingPaymentCredentialChecks = paymentCredentialChecks.filter(([pattern]) => !pattern.test(paymentInfrastructureUi));
 
-if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenPermissionGates.length || forbiddenExpressionRouting.length || forbiddenGeneralHome.length || forbiddenGeneralProfile.length || forbiddenGeneralShell.length || forbiddenGeneralGivingRoute.length || forbiddenGeneralStudioRoute.length || forbiddenSocialCopy.length || forbiddenModalComments.length || forbiddenWatchCopy.length || forbiddenPlatformBoundaries.length || forbiddenIntegrations.length || missingPaymentCredentialChecks.length) {
+if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenPermissionGates.length || forbiddenExpressionRouting.length || forbiddenGeneralHome.length || forbiddenGeneralProfile.length || forbiddenGeneralShell.length || forbiddenGeneralGivingRoute.length || forbiddenGeneralStudioRoute.length || forbiddenProductionCopy.length || forbiddenLegacyExpressionLinks.length || forbiddenSocialCopy.length || forbiddenModalComments.length || forbiddenWatchCopy.length || forbiddenPlatformBoundaries.length || forbiddenIntegrations.length || missingPaymentCredentialChecks.length) {
   const failures = [
     ...missing.map(([, name]) => name),
     ...forbidden.map(([, name]) => `remove ${name}`),
@@ -426,6 +493,8 @@ if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenPer
     ...forbiddenGeneralShell.map(([, name]) => `remove ${name}`),
     ...forbiddenGeneralGivingRoute.map(([, name]) => `remove ${name}`),
     ...forbiddenGeneralStudioRoute.map(([, name]) => `remove ${name}`),
+    ...forbiddenProductionCopy.map(([, name]) => `remove ${name}`),
+    ...forbiddenLegacyExpressionLinks.map(([, name]) => `remove ${name}`),
     ...forbiddenSocialCopy.map(([, name]) => `remove ${name}`),
     ...forbiddenModalComments.map(([, name]) => `remove ${name}`),
     ...forbiddenWatchCopy.map(([, name]) => `remove ${name}`),
@@ -438,5 +507,5 @@ if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenPer
 }
 
 console.log(
-  `Application check passed (${files.length} files, ${checks.length} production invariants, ${forbiddenGivingPatterns.length + forbiddenPrayerPatterns.length + forbiddenPermissionGatePatterns.length + forbiddenExpressionRoutingPatterns.length + forbiddenGeneralHomePatterns.length + forbiddenGeneralProfilePatterns.length + forbiddenGeneralShellPatterns.length + forbiddenGeneralGivingRoutePatterns.length + forbiddenGeneralStudioRoutePatterns.length + forbiddenSocialCopyPatterns.length + forbiddenModalCommentPatterns.length + forbiddenWatchCopyPatterns.length + forbiddenPlatformBoundaryPatterns.length + forbiddenIntegrationPatterns.length} anti-hardcode/boundary checks, ${paymentCredentialChecks.length} payment contract checks).`,
+  `Application check passed (${files.length} files, ${checks.length} production invariants, ${forbiddenGivingPatterns.length + forbiddenPrayerPatterns.length + forbiddenPermissionGatePatterns.length + forbiddenExpressionRoutingPatterns.length + forbiddenGeneralHomePatterns.length + forbiddenGeneralProfilePatterns.length + forbiddenGeneralShellPatterns.length + forbiddenGeneralGivingRoutePatterns.length + forbiddenGeneralStudioRoutePatterns.length + forbiddenProductionCopyPatterns.length + forbiddenLegacyExpressionLinkPatterns.length + forbiddenSocialCopyPatterns.length + forbiddenModalCommentPatterns.length + forbiddenWatchCopyPatterns.length + forbiddenPlatformBoundaryPatterns.length + forbiddenIntegrationPatterns.length} anti-hardcode/boundary checks, ${paymentCredentialChecks.length} payment contract checks).`,
 );
