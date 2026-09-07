@@ -50,6 +50,7 @@ const requiredFiles = [
   'supabase/functions/payment-events/index.ts',
   'supabase/functions/live-streams/index.ts',
   'supabase/functions/social-feed/index.ts',
+  'supabase/functions/public-social-feed/index.ts',
   'supabase/functions/community-media/index.ts',
   'supabase/functions/_shared/public-identity.ts',
   'supabase/functions/public-content/index.ts',
@@ -110,6 +111,7 @@ const rateLimit = await readFile('supabase/functions/_shared/rate-limit.ts', 'ut
 const paymentEvents = await readFile('supabase/functions/payment-events/index.ts', 'utf8');
 const publicContent = await readFile('supabase/functions/public-content/index.ts', 'utf8');
 const socialFeed = await readFile('supabase/functions/social-feed/index.ts', 'utf8');
+const publicSocialFeed = await readFile('supabase/functions/public-social-feed/index.ts', 'utf8');
 const communityMedia = await readFile('supabase/functions/community-media/index.ts', 'utf8');
 const publicIdentity = await readFile('supabase/functions/_shared/public-identity.ts', 'utf8');
 const engagement = await readFile('supabase/functions/engagement/index.ts', 'utf8');
@@ -195,6 +197,8 @@ const invariants = [
   [publicContent, /type === "expression"/, 'public Expression profile contract'],
   [socialFeed, /organization:\s*"optional"/, 'social publishing separates public and scoped membership context'],
   [socialFeed, /body\.organizationId[\s\S]*targetOrganizationId/, 'root General Community publishing accepts explicit church context'],
+  [socialFeed, /view === "post"[\s\S]*postId[\s\S]*scope === "expression"[\s\S]*auth\.branchId/, 'scoped post detail binds exact active Expression'],
+  [publicSocialFeed, /postId[\s\S]*query = query\.eq\("id", postId\)[\s\S]*POST_NOT_FOUND/, 'public post detail returns one published General Community post'],
   [communityMedia, /organization:\s*"none"/, 'community media ignores stale membership headers'],
   [communityMedia, /expression_memberships/, 'Expression media still validates exact membership'],
   [publicIdentity, /profileAuthorMap/, 'public profile-authored posts resolve identity without membership'],
