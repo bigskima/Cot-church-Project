@@ -86,7 +86,7 @@ export function ExpressionManagementHub() {
       {
         key: 'access',
         title: 'Roles & Ownership',
-        description: 'Invite people into scoped roles and manage accountable Expression ownership.',
+        description: 'Invite ministry leaders, manage team access and hand over Expression responsibility when needed.',
         iconName: 'shield-checkmark-outline',
         badge: 'ACCESS',
         route: `${base}/access`,
@@ -107,7 +107,7 @@ export function ExpressionManagementHub() {
       {
         key: 'giving',
         title: 'Giving Configuration',
-        description: 'Manage giving destinations, campaigns and transfer configuration in this Expression.',
+        description: 'Manage giving options, campaigns and bank details for this Expression.',
         iconName: 'gift-outline',
         badge: 'GIVING',
         route: `${base}/giving`,
@@ -156,7 +156,7 @@ export function ExpressionManagementHub() {
           <Icon name="settings-outline" size={24} color={colors.interactive} />
         </View>
         <View style={styles.heroCopy}>
-          <Text style={[styles.eyebrow, { color: colors.interactive }]}>EXPRESSION MANAGEMENT</Text>
+          <Text style={[styles.eyebrow, { color: colors.interactive }]}>EXPRESSION TOOLS</Text>
           <Text style={[styles.title, { color: colors.text }]}>Operate {expression?.name ?? 'this Expression'}</Text>
           <Text style={[styles.copy, { color: colors.textSecondary }]}>
             Only tools granted by your role in this exact Expression are shown here.
@@ -188,8 +188,8 @@ export function ExpressionManagementHub() {
         ))
       ) : (
         <EmptyState
-          title="No management tools assigned"
-          message="You can still use this Expression normally. Management tools appear only when a scoped role grants them."
+          title="No ministry tools available"
+          message="You can still enjoy everything available to members here. Ministry tools will appear if you’re added to an Expression team."
           iconName="lock-closed-outline"
         />
       )}
