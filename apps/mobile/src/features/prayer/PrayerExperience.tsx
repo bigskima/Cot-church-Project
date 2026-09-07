@@ -36,7 +36,7 @@ export function PrayerExperience({ scope = 'general', embedded = false }: { scop
   const insets = useSafeAreaInsets();
   const { api, mode, context } = useSession();
   const { colors } = useTheme();
-  const expression = context?.expression;
+  const expression = scope === 'expression' ? context?.expression : undefined;
 
   const organizationId =
     context?.organization?.id ??
