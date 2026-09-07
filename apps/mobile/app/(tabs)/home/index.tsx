@@ -19,6 +19,7 @@ import {
   EventCard,
   HeroLiveCard,
   Icon,
+  PostCard,
   ReelCard,
   ResourceError,
   SermonCard,
@@ -27,13 +28,14 @@ import {
   VideoCard,
 } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
-import type { Event, LiveStream, Reel, Sermon, Video } from '@/types/content';
+import type { Event, LiveStream, Reel, Sermon, SocialPost, Video } from '@/types/content';
 
 interface HomePayload {
   organization: { id: string; name: string; slug?: string };
   expression?: { id: string; name: string } | null;
   mode: 'general' | 'expression';
   streams: LiveStream[];
+  posts: CommunityPost[];
   reels: Reel[];
   sermons: Sermon[];
   videos: Video[];
@@ -42,8 +44,18 @@ interface HomePayload {
   rankingMode?: 'personalized' | 'recent' | 'expression';
 }
 
+type PublicBadge = { id?: string; code?: string; label: string; backgroundColor: string; textColor: string; priority?: number };
+type CommunityPost = SocialPost & {
+  author?: { id: string; displayName?: string; username?: string; avatarUrl?: string | null; bio?: string | null; badges?: PublicBadge[] } | null;
+  expression?: { id: string; name: string; code?: string } | null;
+  likes_count?: number;
+  comments_count?: number;
+  viewer_reaction?: string | null;
+  viewer_bookmarked?: boolean;
+};
 type Ranked = { feed_rank?: number; feed_reason?: 'following' | 'continue' | 'popular' | 'recent' };
 type HomeFeedUnit =
+  | { key: string; kind: 'post'; timestamp: number; rank: number; post: CommunityPost & Ranked }
   | { key: string; kind: 'reel'; timestamp: number; rank: number; reel: Reel & Ranked }
   | { key: string; kind: 'video'; timestamp: number; rank: number; video: Video & Ranked }
   | { key: string; kind: 'sermon'; timestamp: number; rank: number; sermon: Sermon & Ranked }
@@ -112,6 +124,7 @@ export default function HomeScreen() {
   const organization = resource.data?.organization ?? contextOrganization;
   const expression = resource.data?.expression ?? contextExpression;
   const streams = resource.data?.streams ?? [];
+  const posts = resource.data?.posts ?? [];
   const reels = resource.data?.reels ?? [];
   const videos = resource.data?.videos ?? [];
   const sermons = resource.data?.sermons ?? [];
@@ -126,6 +139,13 @@ export default function HomeScreen() {
 
   const feed = useMemo<HomeFeedUnit[]>(() => {
     const units: HomeFeedUnit[] = [
+      ...posts.map((post) => ({
+        key: `post:${post.id}`,
+        kind: 'post' as const,
+        timestamp: timeValue(post.published_at || (post as any).created_at),
+        rank: (post as CommunityPost & Ranked).feed_rank ?? 0,
+        post,
+      })),
       ...reels.map((reel) => ({
         key: `reel:${reel.id}`,
         kind: 'reel' as const,
@@ -156,7 +176,62 @@ export default function HomeScreen() {
       })),
     ];
     return units.sort((a, b) => b.rank - a.rank || b.timestamp - a.timestamp);
-  }, [reels, videos, sermons, events]);
+  }, [posts, reels, videos, sermons, events]);
+
+  const canEngage = mode === 'authenticated';
+  const postScope = expression?.id ? 'expression' : 'general';
+  const postRequestContext = expression?.id ? 'current' : 'public';
+
+  const openPost = (postId: string, focusComments = false) => {
+    router.push({
+      pathname: '/post/[id]',
+      params: {
+        id: postId,
+        scope: postScope,
+        ...(focusComments ? { focus: 'comments' } : {}),
+      },
+    } as any);
+  };
+
+  const reactToPost = async (postId: string, reaction: string | null) => {
+    if (!canEngage) {
+      openPost(postId, true);
+      return false;
+    }
+    try {
+      await api.request('engagement', {
+        method: 'POST',
+        context: postRequestContext,
+        body: JSON.stringify(
+          reaction
+            ? { action: 'react', contentId: postId, reaction }
+            : { action: 'unreact', contentId: postId },
+        ),
+      });
+      resource.refresh();
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const bookmarkPost = async (postId: string, currentlySaved: boolean) => {
+    if (!canEngage) {
+      openPost(postId);
+      return false;
+    }
+    try {
+      const result = await api.request<{ bookmarked: boolean }>('engagement', {
+        method: 'POST',
+        context: postRequestContext,
+        body: JSON.stringify({ action: 'bookmark', contentId: postId }),
+      });
+      resource.refresh();
+      return result.bookmarked === !currentlySaved;
+    } catch {
+      return false;
+    }
+  };
 
   const stories = useMemo(() => {
     const list: Array<{
@@ -294,6 +369,23 @@ export default function HomeScreen() {
           contentContainerStyle={{ paddingBottom: insets.bottom + 130 }}
           refreshControl={<RefreshControl refreshing={resource.refreshing} onRefresh={resource.refresh} tintColor={colors.interactive} />}
           renderItem={({ item }) => {
+            if (item.kind === 'post') {
+              return (
+                <View style={styles.feedCardWrap}>
+                  <PostCard
+                    post={item.post}
+                    expressionName={item.post.expression?.name}
+                    canEngage={canEngage}
+                    allowExternalShare={item.post.visibility === 'public'}
+                    onPress={() => openPost(item.post.id)}
+                    onReply={() => openPost(item.post.id, true)}
+                    onReact={canEngage ? (reaction) => reactToPost(item.post.id, reaction) : undefined}
+                    onBookmark={canEngage ? (currentlySaved) => bookmarkPost(item.post.id, currentlySaved) : undefined}
+                    style={styles.homePostCard}
+                  />
+                </View>
+              );
+            }
             if (item.kind === 'reel') {
               return (
                 <View style={styles.feedCardWrap}>
@@ -372,6 +464,7 @@ const styles = StyleSheet.create({
   timelineHeading: { paddingHorizontal: spacing.md, paddingTop: spacing.lg, paddingBottom: spacing.xs },
   timelineTitle: { fontSize: 18, fontWeight: '800', letterSpacing: -0.35 },
   feedCardWrap: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  homePostCard: { marginHorizontal: 0, marginVertical: 0 },
   itemLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.sm },
   itemLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
   loadingContainer: { padding: spacing.lg, gap: spacing.md },
