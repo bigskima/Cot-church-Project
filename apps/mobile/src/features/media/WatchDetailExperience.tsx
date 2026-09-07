@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
+import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -50,10 +50,15 @@ export function WatchDetailExperience({ videoId: id, scope = 'general' }: { vide
   const resource = useResource<Video>(`watch:detail:${expressionMode ? context?.expression?.id ?? 'none' : 'public'}:${id}`, async (signal) => {
     if (expressionMode) {
       if (mode === 'visitor' || !context?.expression?.id) throw new Error('Enter this Expression to view its internal video.');
-      return api.request<Video>(
+      const scopedVideo = await api.request<Video>(
         `content-media?action=video_detail&id=${encodeURIComponent(id)}`,
         { signal, context: 'current' },
       );
+      const videoExpressionId = scopedVideo.expression_id ?? scopedVideo.content_items?.expression_id ?? null;
+      if (videoExpressionId !== context.expression.id) {
+        throw new Error('This video is not part of this Expression.');
+      }
+      return scopedVideo;
     }
     const suffix = organizationId ? `&organizationId=${encodeURIComponent(organizationId)}` : '';
     return api.request<Video>(`public-content?type=video&id=${encodeURIComponent(id)}${suffix}`, { signal, context: 'public' });
