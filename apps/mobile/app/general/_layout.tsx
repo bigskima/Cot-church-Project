@@ -175,9 +175,19 @@ export default function GeneralLayout() {
 
       <Tabs.Screen name="watch" options={{ href: null }} />
       <Tabs.Screen name="live" options={{ href: null }} />
+      <Tabs.Screen name="sermon" options={{ href: null }} />
+      <Tabs.Screen name="series" options={{ href: null }} />
+      <Tabs.Screen name="event" options={{ href: null }} />
+      <Tabs.Screen name="post" options={{ href: null }} />
+      <Tabs.Screen name="comments" options={{ href: null }} />
       <Tabs.Screen name="giving" options={{ href: null }} />
       <Tabs.Screen name="prayer" options={{ href: null }} />
       <Tabs.Screen name="church-story" options={{ href: null }} />
+      <Tabs.Screen name="settings" options={{ href: null }} />
+      <Tabs.Screen name="notifications" options={{ href: null }} />
+      <Tabs.Screen name="notification-settings" options={{ href: null }} />
+      <Tabs.Screen name="saved" options={{ href: null }} />
+      <Tabs.Screen name="leadership" options={{ href: null }} />
     </Tabs>
   );
 }
