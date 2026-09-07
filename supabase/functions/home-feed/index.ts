@@ -4,7 +4,7 @@ import { createHandler } from "../_shared/handler.ts";
 import { adminClient, publicClient, userClient } from "../_shared/supabase.ts";
 import { uuid } from "../_shared/validation.ts";
 import { diversifyFeed, rankFeedCandidates, type FeedSignals } from "../_shared/feed-ranking.ts";
-import { enrichContentCreators } from "../_shared/public-identity.ts";
+import { enrichContentCreators, enrichContentEngagement, enrichSocialPosts } from "../_shared/public-identity.ts";
 
 function nestedItem(value: any) {
   return Array.isArray(value) ? value[0] ?? null : value ?? null;
@@ -124,7 +124,18 @@ Deno.serve(createHandler(
     const degraded: string[] = [];
     const recentEventCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-    const [streamsResult, reelsResult, videosResult, sermonsResult, eventsResult] = await Promise.all([
+    let postsQuery = client
+      .from("social_posts")
+      .select("id,organization_id,author_membership_id,branch_id,group_id,visibility,status,body,media,published_at,edited_at,created_at")
+      .eq("organization_id", organizationId)
+      .eq("status", "published")
+      .order("published_at", { ascending: false, nullsFirst: false })
+      .limit(40);
+    postsQuery = selectedExpressionId
+      ? postsQuery.eq("branch_id", selectedExpressionId)
+      : postsQuery.is("branch_id", null).eq("visibility", "public");
+
+    const [streamsResult, postsResult, reelsResult, videosResult, sermonsResult, eventsResult] = await Promise.all([
       client
         .from("live_streams")
         .select("id,organization_id,branch_id,title,description,status,visibility,scheduled_start,started_at,ended_at,recording_url,thumbnail_url,viewer_count,playback_url,playback_token_required,created_at")
@@ -132,6 +143,7 @@ Deno.serve(createHandler(
         .in("status", ["scheduled", "provisioning", "ready", "live", "ended", "processing", "replay_ready"])
         .order("scheduled_start", { ascending: false, nullsFirst: false })
         .limit(30),
+      postsQuery,
       client
         .from("reels")
         .select("id,organization_id,media_asset_id,caption,audio_title,audio_artist,views_count,likes_count,comments_count,shares_count,created_at,content_items!inner(id,organization_id,expression_id,author_profile_id,visibility,status,published_at),media_assets(id,media_type,processing_state,duration_seconds,aspect_ratio,media_renditions(id,rendition_kind,container,codec,width,height,storage_path,provider_playback_id),media_thumbnails(storage_path,is_primary))")
@@ -170,6 +182,13 @@ Deno.serve(createHandler(
         playback_url: stream.playback_token_required ? null : stream.playback_url,
         recording_url: stream.playback_token_required ? null : stream.recording_url,
       }));
+    let posts = resultData<any[]>(postsResult as any, "posts", degraded);
+    posts = await enrichSocialPosts(posts);
+    posts = await enrichContentEngagement(
+      posts,
+      authenticatedClient ?? client,
+      userId,
+    );
     let reels = resultData<any[]>(reelsResult as any, "reels", degraded)
       .filter((row) => inSelectedExperience(row, selectedExpressionId, "content_items"));
     let videos = resultData<any[]>(videosResult as any, "videos", degraded)
@@ -206,6 +225,7 @@ Deno.serve(createHandler(
         }
 
         const candidates = [
+          ...posts.map((row: any) => ({ key: `post:${row.id}`, kind: "post" as const, publishedAt: row.published_at ?? row.created_at, expressionId: row.branch_id, authorProfileId: row.author?.id ?? null, contentItemId: row.id, engagementCount: (row.likes_count ?? 0) + (row.comments_count ?? 0) })),
           ...reels.map((row: any) => { const item = nestedItem(row.content_items); return { key: `reel:${row.id}`, kind: "reel" as const, publishedAt: item?.published_at ?? row.created_at, expressionId: item?.expression_id, authorProfileId: item?.author_profile_id, contentItemId: item?.id, engagementCount: row.likes_count + row.comments_count + row.shares_count }; }),
           ...videos.map((row: any) => { const item = nestedItem(row.content_items); return { key: `video:${row.id}`, kind: "video" as const, publishedAt: item?.published_at ?? row.created_at, expressionId: item?.expression_id, authorProfileId: item?.author_profile_id, contentItemId: item?.id, engagementCount: row.likes_count + row.comments_count + row.shares_count }; }),
           ...sermons.map((row: any) => ({ key: `sermon:${row.id}`, kind: "sermon" as const, publishedAt: row.published_at ?? row.sermon_date, expressionId: row.expression_id, contentItemId: row.content_item_id, engagementCount: row.play_count })),
@@ -213,6 +233,7 @@ Deno.serve(createHandler(
         ];
         const ranked = diversifyFeed(rankFeedCandidates(candidates, organization.id, signals));
         const ranking = new Map(ranked.map((item, index) => [item.key, { feed_rank: ranked.length - index, feed_reason: item.reason }]));
+        posts.forEach((row: any) => Object.assign(row, ranking.get(`post:${row.id}`)));
         reels.forEach((row: any) => Object.assign(row, ranking.get(`reel:${row.id}`)));
         videos.forEach((row: any) => Object.assign(row, ranking.get(`video:${row.id}`)));
         sermons.forEach((row: any) => Object.assign(row, ranking.get(`sermon:${row.id}`)));
@@ -223,7 +244,7 @@ Deno.serve(createHandler(
       }
     }
 
-    if (["live", "reels", "videos", "sermons", "events"].every((section) => degraded.includes(section))) {
+    if (["live", "posts", "reels", "videos", "sermons", "events"].every((section) => degraded.includes(section))) {
       throw new ApiError("HOME_FEED_FAILED", "Home content is temporarily unavailable", 503, undefined, true);
     }
 
@@ -233,6 +254,7 @@ Deno.serve(createHandler(
         expression: selectedExpression,
         mode: selectedExpressionId ? "expression" : "general",
         streams,
+        posts,
         reels,
         videos,
         sermons,
