@@ -20,11 +20,14 @@ import {
 } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 
-export default function CreatorStudioScreen() {
+export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'general' } = {}) {
   const insets = useSafeAreaInsets();
   const { api, context, hasCapability, hasOrganizationCapability, hasPublicCapability } = useSession();
-  const expression = context?.expression;
-  const canPublishPosts = hasCapability('posts.create') || hasCapability('posts.publish');
+  const generalWorkspace = forcedScope === 'general';
+  const expression = generalWorkspace ? undefined : context?.expression;
+  const canPublishPosts = generalWorkspace
+    ? hasOrganizationCapability('posts.create') || hasOrganizationCapability('posts.publish')
+    : hasCapability('posts.create') || hasCapability('posts.publish');
   const canPublishPublicReels =
     hasOrganizationCapability('media.upload') &&
     hasOrganizationCapability('reels.publish');
@@ -64,7 +67,7 @@ export default function CreatorStudioScreen() {
   const [publishNotice, setPublishNotice] = useState('');
   const [publishError, setPublishError] = useState('');
 
-  if (expression?.id) {
+  if (!generalWorkspace && expression?.id) {
     return <Redirect href={`/expressions/${expression.id}/manage/studio` as any} />;
   }
 
@@ -97,13 +100,16 @@ export default function CreatorStudioScreen() {
     }
   };
 
+  const routeFor = (generalRoute: string, legacyRoute: string) =>
+    generalWorkspace ? generalRoute : legacyRoute;
+
   const leadershipModules = [
     {
       title: 'Create Reel',
-      description: 'Upload and publish a short vertical video to public COT or the active Expression.',
+      description: generalWorkspace ? 'Upload and publish a short vertical video to General COT.' : 'Upload and publish a short vertical video to public COT or the active Expression.',
       iconName: 'flash-outline',
       badge: 'REELS',
-      route: '/studio/reel',
+      route: routeFor('/general/studio/reel', '/studio/reel'),
       enabled: canPublishPublicReels || canPublishExpressionReels,
     },
     {
@@ -111,7 +117,7 @@ export default function CreatorStudioScreen() {
       description: 'Upload and publish long-form teachings, worship, testimonies and other video.',
       iconName: 'videocam-outline',
       badge: 'WATCH',
-      route: '/studio/video',
+      route: routeFor('/general/studio/video', '/studio/video'),
       enabled: canPublishPublicVideos || canPublishExpressionVideos,
     },
     {
@@ -119,23 +125,23 @@ export default function CreatorStudioScreen() {
       description: 'Create sermon drafts, manage teachings and publish when authorized.',
       iconName: 'book-outline',
       badge: 'MEDIA',
-      route: '/leadership/sermons',
-      enabled: hasCapability('sermons.create') || hasCapability('sermons.manage'),
+      route: routeFor('/general/leadership/sermons-manage', '/leadership/sermons'),
+      enabled: generalWorkspace ? (hasOrganizationCapability('sermons.create') || hasOrganizationCapability('sermons.manage')) : (hasCapability('sermons.create') || hasCapability('sermons.manage')),
     },
     {
       title: 'Events',
       description: 'Create and manage gatherings in your current church scope.',
       iconName: 'calendar-outline',
       badge: 'EVENTS',
-      route: '/leadership/events',
-      enabled: hasCapability('events.create') || hasCapability('events.update'),
+      route: routeFor('/general/leadership/events-manage', '/leadership/events'),
+      enabled: generalWorkspace ? (hasOrganizationCapability('events.create') || hasOrganizationCapability('events.update')) : (hasCapability('events.create') || hasCapability('events.update')),
     },
     {
       title: 'Live Media Studio',
       description: 'Operate broadcasts and monitor streams when your role allows it.',
       iconName: 'radio-outline',
       badge: 'BROADCAST',
-      route: '/leadership/media-studio',
+      route: routeFor('/general/leadership/media-studio', '/leadership/media-studio'),
       enabled: hasPublicCapability('public.live_stream.create') || (Boolean(expression?.id) && hasCapability('streams.broadcast')),
     },
     {
@@ -143,7 +149,7 @@ export default function CreatorStudioScreen() {
       description: 'Review confidential prayer requests and assigned follow-up.',
       iconName: 'heart-outline',
       badge: 'PASTORAL',
-      route: '/leadership/pastoral-triage',
+      route: routeFor('/general/leadership/pastoral-triage', '/leadership/pastoral-triage'),
       enabled: canAccessPastoral,
     },
     {
@@ -151,23 +157,23 @@ export default function CreatorStudioScreen() {
       description: 'Manage giving destinations, purposes and transfer accounts.',
       iconName: 'gift-outline',
       badge: 'GIVING',
-      route: '/(tabs)/profile/leadership/giving-manage',
-      enabled: hasCapability('giving.campaigns.manage'),
+      route: routeFor('/general/leadership/giving-manage', '/(tabs)/profile/leadership/giving-manage'),
+      enabled: generalWorkspace ? hasOrganizationCapability('giving.campaigns.manage') : hasCapability('giving.campaigns.manage'),
     },
     {
       title: 'Giving Finance',
       description: 'Review read-only giving totals and refunds by currency.',
       iconName: 'analytics-outline',
       badge: 'FINANCE',
-      route: '/(tabs)/profile/leadership/giving-finance',
-      enabled: hasCapability('giving.finance.read'),
+      route: routeFor('/general/leadership/giving-finance', '/(tabs)/profile/leadership/giving-finance'),
+      enabled: generalWorkspace ? hasOrganizationCapability('giving.finance.read') : hasCapability('giving.finance.read'),
     },
     {
       title: 'Expressions',
       description: 'Manage Expressions when your account has church-level authority.',
       iconName: 'people-outline',
       badge: 'COMMUNITY',
-      route: '/leadership/expressions',
+      route: routeFor('/general/leadership/expressions-manage', '/leadership/expressions'),
       enabled: canCreateExpression,
     },
     {
@@ -175,7 +181,7 @@ export default function CreatorStudioScreen() {
       description: 'Manage church-wide leaders and public leadership presentation.',
       iconName: 'business-outline',
       badge: 'CHURCH',
-      route: '/(tabs)/profile/leadership/church-leadership',
+      route: routeFor('/general/leadership/church-leadership', '/(tabs)/profile/leadership/church-leadership'),
       enabled: hasOrganizationCapability('organization.leadership.manage'),
     },
     {
@@ -184,7 +190,7 @@ export default function CreatorStudioScreen() {
       iconName: 'people-circle-outline',
       badge: 'DIRECTORY',
       route: '/leadership/directory',
-      enabled: Boolean(expression?.id) && hasCapability('expression.leadership.manage'),
+      enabled: !generalWorkspace && Boolean(expression?.id) && hasCapability('expression.leadership.manage'),
     },
   ].filter((module) => module.enabled);
 
