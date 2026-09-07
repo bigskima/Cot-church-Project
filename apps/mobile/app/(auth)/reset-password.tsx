@@ -146,7 +146,7 @@ export default function ResetPasswordScreen() {
                 Your password has been changed. Sign in again using the new password.
               </Text>
               <Button label="Sign in" onPress={() => router.replace('/(auth)/login')} size="lg" fullWidth />
-              <Pressable onPress={() => router.replace('/(tabs)/home')} hitSlop={8}>
+              <Pressable onPress={() => router.replace('/general')} hitSlop={8}>
                 <Text style={[styles.link, { color: colors.interactive }]}>Return to public COT</Text>
               </Pressable>
             </View>
