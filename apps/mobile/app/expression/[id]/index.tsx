@@ -147,13 +147,13 @@ export default function ExpressionProfileScreen() {
                 />
                 {membership ? (
                   <Button
-                    label={context?.expression?.id === id ? 'Inside Expression' : 'Enter Expression'}
+                    label={context?.expression?.id === id ? 'Open Expression' : 'Enter Expression'}
                     onPress={async () => {
-                      if (context?.expression?.id === id) return;
-                      await enterExpression(membership.organizationId, membership.id);
+                      if (context?.expression?.id !== id) {
+                        await enterExpression(membership.organizationId, membership.id);
+                      }
                       router.replace(`/expressions/${membership.id}` as any);
                     }}
-                    disabled={context?.expression?.id === id}
                     variant="outline"
                     size="md"
                   />
