@@ -195,65 +195,22 @@ export default function HomeScreen() {
     return list;
   }, [activeStream, reels, expression?.id]);
 
-  const canEngage = mode === 'authenticated';
   const reelWidth = Math.max(260, Math.min(width - spacing.lg * 2, 460));
 
   const listHeader = (
     <>
-      {mode === 'authenticated' && !expression?.id ? (
-        <View style={[styles.publicNotice, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
-          <Icon name="globe-outline" size={17} color={colors.interactive} />
-          <View style={styles.noticeCopy}>
-            <Text style={[styles.publicNoticeTitle, { color: colors.text }]}>Public COT Home</Text>
-            <Text style={[styles.publicNoticeText, { color: colors.textSecondary }]}>You’re in the public COT space. Enter an Expression when you want its private community.</Text>
-            <Pressable onPress={() => router.push('/expressions')} accessibilityRole="button" style={[styles.expressionAction, { borderColor: colors.interactive }]}>
-              <Text style={[styles.expressionActionText, { color: colors.interactive }]}>Join or enter an Expression</Text>
-              <Icon name="arrow-forward" size={14} color={colors.interactive} />
-            </Pressable>
-          </View>
-        </View>
-      ) : null}
-
-      {mode === 'authenticated' && expression?.id ? (
-        <View style={[styles.expressionNotice, { backgroundColor: colors.card, borderColor: colors.primarySoftStrong }, shadows.sm]}>
-          <Icon name="people" size={17} color={colors.interactive} />
-          <View style={styles.noticeCopy}>
-            <Text style={[styles.publicNoticeTitle, { color: colors.text }]}>Expression Space · {expression.name}</Text>
-            <Text style={[styles.publicNoticeText, { color: colors.textSecondary }]}>You’re inside this Expression. Switch spaces anytime from Expressions.</Text>
-          </View>
-          <Pressable onPress={() => router.push('/expressions')} accessibilityRole="button" accessibilityLabel="Change or leave Expression" hitSlop={8}>
-            <Icon name="swap-horizontal" size={20} color={colors.interactive} />
-          </Pressable>
-        </View>
-      ) : null}
-
       {degradedSections.length ? (
-        <View style={[styles.degradedBanner, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
-          <Icon name="alert-circle-outline" size={17} color={colors.textSecondary} />
-          <Text style={[styles.degradedText, { color: colors.textSecondary }]}>Some Home content is temporarily unavailable: {degradedSections.join(', ')}. The rest of Home is still available.</Text>
-        </View>
+        <Pressable
+          onPress={resource.refresh}
+          accessibilityRole="button"
+          accessibilityLabel="Retry loading Home"
+          style={[styles.degradedBanner, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}
+        >
+          <Icon name="alert-circle-outline" size={16} color={colors.textSecondary} />
+          <Text style={[styles.degradedText, { color: colors.textSecondary }]}>Some items couldn’t load. Tap to retry.</Text>
+          <Icon name="refresh-outline" size={15} color={colors.textMuted} />
+        </Pressable>
       ) : null}
-
-      <Pressable
-        onPress={() => router.push('/(tabs)/community')}
-        accessibilityRole="button"
-        accessibilityLabel="Open Community"
-        style={({ pressed }) => [
-          styles.communityShortcut,
-          { backgroundColor: colors.card, borderColor: colors.borderSubtle },
-          shadows.sm,
-          pressed && styles.shortcutPressed,
-        ]}
-      >
-        <View style={[styles.communityShortcutIcon, { backgroundColor: colors.primarySoft }]}>
-          <Icon name="chatbubbles-outline" size={19} color={colors.interactive} />
-        </View>
-        <View style={styles.noticeCopy}>
-          <Text style={[styles.publicNoticeTitle, { color: colors.text }]}>Community conversations</Text>
-          <Text style={[styles.publicNoticeText, { color: colors.textSecondary }]}>Public social posts and Expression conversations live in Community.</Text>
-        </View>
-        <Icon name="chevron-forward" size={18} color={colors.textMuted} />
-      </Pressable>
 
       {stories.length ? <StoriesTray stories={stories} /> : null}
 
@@ -265,8 +222,9 @@ export default function HomeScreen() {
 
       {feed.length ? (
         <View style={styles.timelineHeading}>
-          <Text style={[styles.timelineTitle, { color: colors.text }]}>{expression?.name ? `${expression.name} Home` : rankingMode === 'personalized' ? 'For You' : 'Latest from COT'}</Text>
-          <Text style={[styles.timelineSubtitle, { color: colors.textMuted }]}>Live, sermons, Reels, videos and upcoming gatherings.</Text>
+          <Text style={[styles.timelineTitle, { color: colors.text }]}>
+            {expression?.name || (rankingMode === 'personalized' ? 'For you' : 'Latest')}
+          </Text>
         </View>
       ) : null}
     </>
@@ -274,38 +232,38 @@ export default function HomeScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm, backgroundColor: colors.glass, borderColor: colors.borderSubtle }, shadows.sm]}>
+      <View style={[styles.topBar, { paddingTop: insets.top + spacing.xs, backgroundColor: colors.glass, borderColor: colors.borderSubtle }, shadows.sm]}>
+        <View pointerEvents="none" style={[styles.headerGlow, { backgroundColor: colors.primarySoft }]} />
         <View style={styles.topBarLeft}>
           <View style={[styles.topBarBrandShell, { backgroundColor: colors.cardElevated, borderColor: colors.borderSubtle }]}>
-            <BrandMark variant="header" size={31} />
+            <BrandMark variant="header" size={29} />
           </View>
           <View style={styles.topBarBrandCopy}>
-            <Text style={[styles.brandEyebrow, { color: colors.textMuted }]}>CITY OF TRANSFORMATION</Text>
-            <Text style={[styles.brandWordmark, { color: colors.text }]} numberOfLines={1}>{organization?.name ?? 'Church Community'}</Text>
-            {expression?.name ? (
-              <View style={[styles.campusPill, { backgroundColor: colors.primarySoft }]}>
-                <Icon name="people-outline" size={12} color={colors.interactive} />
-                <Text style={[styles.campusPillText, { color: colors.interactive }]} numberOfLines={1}>{expression.name}</Text>
-              </View>
-            ) : (
-              <View style={[styles.campusPill, { backgroundColor: colors.primarySoft }]}>
-                <Icon name="globe-outline" size={12} color={colors.interactive} />
-                <Text style={[styles.campusPillText, { color: colors.interactive }]}>Public COT</Text>
-              </View>
-            )}
+            <Text style={[styles.brandWordmark, { color: colors.text }]} numberOfLines={1}>{organization?.name ?? 'COT'}</Text>
+            <Pressable
+              onPress={() => mode === 'authenticated' && router.push('/expressions')}
+              disabled={mode !== 'authenticated'}
+              accessibilityRole="button"
+              accessibilityLabel={expression?.name ? `Current Expression: ${expression.name}. Change space` : 'Public COT. Change space'}
+              style={({ pressed }) => [styles.scopeControl, pressed && mode === 'authenticated' ? styles.iconPressed : null]}
+            >
+              <Icon name={expression?.name ? 'people-outline' : 'globe-outline'} size={12} color={colors.interactive} />
+              <Text style={[styles.scopeControlText, { color: colors.textSecondary }]} numberOfLines={1}>{expression?.name || 'Public'}</Text>
+              {mode === 'authenticated' ? <Icon name="chevron-down" size={12} color={colors.textMuted} /> : null}
+            </Pressable>
           </View>
         </View>
 
         <View style={styles.topBarRight}>
-          <Pressable onPress={() => router.push('/assistant')} hitSlop={8} style={[styles.iconButton, { backgroundColor: colors.bgSecondary }]} accessibilityRole="button" accessibilityLabel="Spiritual AI Assistant">
+          <Pressable onPress={() => router.push('/assistant')} hitSlop={8} style={({ pressed }) => [styles.iconButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.iconPressed]} accessibilityRole="button" accessibilityLabel="COT Assistant">
             <Icon name="sparkles" size={18} color={colors.interactive} />
           </Pressable>
           {hasAnyLeadershipCapability ? (
-            <Pressable onPress={() => router.push('/studio')} hitSlop={8} style={[styles.iconButton, { backgroundColor: colors.bgSecondary }]} accessibilityRole="button" accessibilityLabel="Ministry Studio">
-              <Icon name="grid-outline" size={18} color={colors.interactive} />
+            <Pressable onPress={() => router.push('/studio')} hitSlop={8} style={({ pressed }) => [styles.iconButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.iconPressed]} accessibilityRole="button" accessibilityLabel="Ministry Studio">
+              <Icon name="grid-outline" size={18} color={colors.text} />
             </Pressable>
           ) : null}
-          <Pressable onPress={() => router.push('/(tabs)/live' as any)} hitSlop={8} style={[styles.iconButton, { backgroundColor: colors.bgSecondary }]} accessibilityRole="button" accessibilityLabel="Live Broadcasts">
+          <Pressable onPress={() => router.push('/(tabs)/live' as any)} hitSlop={8} style={({ pressed }) => [styles.iconButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.iconPressed]} accessibilityRole="button" accessibilityLabel="Live">
             <Icon name="radio" size={18} color={activeStream?.status === 'live' ? '#EF4444' : colors.text} />
           </Pressable>
         </View>
@@ -384,32 +342,35 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: spacing.md, marginTop: spacing.xs, paddingHorizontal: spacing.md, paddingBottom: spacing.md, borderWidth: 1, borderRadius: radius.xxl },
+  topBar: {
+    position: 'relative',
+    overflow: 'hidden',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: spacing.md,
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingBottom: spacing.sm,
+    borderWidth: 1,
+    borderRadius: radius.xxl,
+    minHeight: 66,
+  },
+  headerGlow: { position: 'absolute', width: 120, height: 120, borderRadius: 60, right: -44, top: -74, opacity: 0.7 },
   topBarLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1, minWidth: 0 },
-  topBarBrandShell: { width: 46, height: 46, borderRadius: radius.lg, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  topBarBrandCopy: { flex: 1, minWidth: 0, alignItems: 'flex-start' },
-  brandEyebrow: { fontSize: 8, lineHeight: 11, fontWeight: '800', letterSpacing: 0.8, marginBottom: 1 },
-  brandWordmark: { fontSize: 18, lineHeight: 22, fontWeight: '800', letterSpacing: -0.55, flexShrink: 1 },
-  campusPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, maxWidth: 170, marginTop: 3 },
-  campusPillText: { fontSize: 12, fontWeight: '600', flexShrink: 1 },
-  topBarRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  iconButton: { width: 38, height: 38, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  publicNotice: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start', marginHorizontal: spacing.md, marginTop: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderWidth: 1, borderRadius: radius.xl },
-  expressionNotice: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start', marginHorizontal: spacing.md, marginTop: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderWidth: 1, borderRadius: radius.xl },
-  noticeCopy: { flex: 1 },
-  publicNoticeTitle: { fontSize: 13, fontWeight: '800', marginBottom: 2 },
-  publicNoticeText: { fontSize: 11, lineHeight: 16 },
-  expressionAction: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 4, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 6, marginTop: spacing.sm },
-  expressionActionText: { fontSize: 12, fontWeight: '700' },
-  communityShortcut: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginHorizontal: spacing.md, marginTop: spacing.sm, padding: spacing.md, borderWidth: 1, borderRadius: radius.xl },
-  communityShortcutIcon: { width: 42, height: 42, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
-  shortcutPressed: { opacity: 0.9, transform: [{ scale: 0.994 }] },
-  degradedBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, margin: spacing.lg, marginBottom: 0, padding: spacing.md, borderWidth: 1, borderRadius: radius.md },
-  degradedText: { flex: 1, fontSize: 11, lineHeight: 16 },
+  topBarBrandShell: { width: 42, height: 42, borderRadius: radius.lg, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  topBarBrandCopy: { flex: 1, minWidth: 0, justifyContent: 'center' },
+  brandWordmark: { fontSize: 16, lineHeight: 20, fontWeight: '850', letterSpacing: -0.45, flexShrink: 1 },
+  scopeControl: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2, minHeight: 22, borderRadius: radius.pill, paddingRight: 4 },
+  scopeControlText: { fontSize: 11, lineHeight: 15, fontWeight: '650', maxWidth: 150 },
+  topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 6, zIndex: 2 },
+  iconButton: { width: 36, height: 36, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  iconPressed: { opacity: 0.82, transform: [{ scale: 0.96 }] },
+  degradedBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.md, marginTop: spacing.sm, paddingHorizontal: spacing.md, minHeight: 42, borderWidth: 1, borderRadius: radius.lg },
+  degradedText: { flex: 1, fontSize: 11, lineHeight: 16, fontWeight: '600' },
   heroSection: { paddingHorizontal: spacing.md, paddingTop: spacing.md },
-  timelineHeading: { paddingHorizontal: spacing.md, paddingTop: spacing.xl, paddingBottom: spacing.sm },
-  timelineTitle: { fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
-  timelineSubtitle: { fontSize: 11, lineHeight: 16, marginTop: 2 },
+  timelineHeading: { paddingHorizontal: spacing.md, paddingTop: spacing.lg, paddingBottom: spacing.xs },
+  timelineTitle: { fontSize: 18, fontWeight: '850', letterSpacing: -0.35 },
   feedCardWrap: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   itemLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.sm },
   itemLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
