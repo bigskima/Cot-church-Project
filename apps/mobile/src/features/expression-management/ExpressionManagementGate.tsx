@@ -9,6 +9,7 @@ type Props = PropsWithChildren<{
   ready: boolean;
   allowed: boolean;
   title: string;
+  expressionId: string;
   message?: string;
 }>;
 
@@ -16,6 +17,7 @@ export function ExpressionManagementGate({
   ready,
   allowed,
   title,
+  expressionId,
   message = 'Your current Expression role does not grant access to this operation.',
   children,
 }: Props) {
@@ -42,8 +44,8 @@ export function ExpressionManagementGate({
         <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
         <Text style={[styles.copy, { color: colors.textSecondary }]}>{message}</Text>
         <View style={styles.actions}>
-          <Button label="Expression Home" onPress={() => router.replace('../' as any)} />
-          <Button label="Management" variant="outline" onPress={() => router.replace('./' as any)} />
+          <Button label="Expression Home" onPress={() => router.replace(`/expressions/${expressionId}` as any)} />
+          <Button label="Management" variant="outline" onPress={() => router.replace(`/expressions/${expressionId}/manage` as any)} />
         </View>
       </View>
     );
