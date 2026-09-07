@@ -1,6 +1,6 @@
 import React from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -58,6 +58,10 @@ export default function LeadershipHubScreen() {
     (isCurrentExpressionOwner ||
       (hasCapability('members.invite') && hasCapability('roles.assign')));
   const canManageExpressions = isAuthorizedExpressionCreator;
+
+  if (hasExpression && context?.expression?.id) {
+    return <Redirect href={`/expressions/${context.expression.id}/manage` as any} />;
+  }
 
   const tools = [
     { title: 'Live Media Studio', description: 'Create live broadcasts, retrieve ingest details, and monitor stream health.', iconName: 'radio-outline', badge: 'LIVE OPS', route: '/(tabs)/profile/leadership/media-studio', enabled: canManageMedia },
