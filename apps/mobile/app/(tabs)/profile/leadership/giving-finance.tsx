@@ -43,7 +43,7 @@ export default function GivingFinanceScreen() {
   const { colors } = useTheme();
   const organization = context?.organization ?? context?.organizations?.[0];
   const expression = context?.expression;
-  const canReadFinance = hasCapability('giving.finance.read') || hasCapability('*');
+  const canReadFinance = hasCapability('giving.finance.read');
 
   const period = useMemo(() => {
     const end = new Date();
