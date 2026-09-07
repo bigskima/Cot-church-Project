@@ -1,6 +1,6 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EmptyState, ResourceError, ScreenHeader, SectionHeader, SermonCard, Skeleton } from '@/components';
 import { radius, shadows, spacing, typography } from '@/design-system/tokens';
@@ -13,6 +13,8 @@ type SeriesPayload = { series: SermonSeries; sermons: Sermon[] };
 
 export default function PublicSeriesScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const pathname = usePathname();
+  const generalWorkspace = pathname.startsWith('/general/');
   const insets = useSafeAreaInsets();
   const { api, context } = useSession();
   const { colors } = useTheme();
@@ -70,7 +72,7 @@ export default function PublicSeriesScreen() {
                     <SermonCard
                       key={sermon.id}
                       sermon={sermon}
-                      onPress={() => router.push(`/sermon/${sermon.id}` as any)}
+                      onPress={() => router.push((generalWorkspace ? `/general/sermon/${sermon.id}` : `/sermon/${sermon.id}`) as any)}
                     />
                   ))
                 ) : (
