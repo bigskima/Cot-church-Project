@@ -10,7 +10,7 @@ type OnboardingStatus = {
 
 function safeReturnPath(pathname: string) {
   if (!pathname || pathname.includes('login') || pathname.includes('signup') || pathname.includes('onboarding')) {
-    return '/(tabs)/home';
+    return '/general';
   }
   return pathname;
 }
