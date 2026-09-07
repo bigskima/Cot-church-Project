@@ -29,6 +29,14 @@ const files = [
   'apps/mobile/app/sermon/[id].tsx',
   'apps/mobile/app/series/[id].tsx',
   'apps/mobile/app/(tabs)/community/index.tsx',
+  'apps/mobile/src/features/community/CommunityExperience.tsx',
+  'apps/mobile/src/features/prayer/PrayerExperience.tsx',
+  'apps/mobile/src/features/expression/ExpressionBirthdaysExperience.tsx',
+  'apps/mobile/app/expressions/[expressionId]/feed.tsx',
+  'apps/mobile/app/expressions/[expressionId]/announcements.tsx',
+  'apps/mobile/app/expressions/[expressionId]/prayer.tsx',
+  'apps/mobile/app/expressions/[expressionId]/events.tsx',
+  'apps/mobile/app/expressions/[expressionId]/birthdays.tsx',
   'apps/mobile/app/(tabs)/profile/index.tsx',
   'apps/mobile/app/(tabs)/profile/settings.tsx',
   'apps/mobile/app/expressions/index.tsx',
@@ -66,6 +74,7 @@ const givingUi = [
 ].join('\n');
 const prayerUi = [
   sources.get('apps/mobile/app/prayer/index.tsx') ?? '',
+  sources.get('apps/mobile/src/features/prayer/PrayerExperience.tsx') ?? '',
   sources.get('apps/mobile/src/components/prayer/PrayerCard.tsx') ?? '',
 ].join('\n');
 const integrationsUi = sources.get('apps/admin/src/pages/IntegrationsJobs.tsx') ?? '';
@@ -75,6 +84,7 @@ const profileSettingsUi = sources.get('apps/mobile/app/(tabs)/profile/settings.t
 const sessionUi = sources.get('apps/mobile/src/state/session.tsx') ?? '';
 const commentProductUi = [
   sources.get('apps/mobile/app/(tabs)/community/index.tsx') ?? '',
+  sources.get('apps/mobile/src/features/community/CommunityExperience.tsx') ?? '',
   sources.get('apps/mobile/app/watch/[id].tsx') ?? '',
   sources.get('apps/mobile/app/reels.tsx') ?? '',
 ].join('\n');
@@ -150,6 +160,12 @@ const checks = [
   [/ExpressionNavigation/, 'Expression workspace owns a dedicated navigation shell'],
   [/expression:workspace-home:/, 'Expression Home uses a dedicated scoped resource identity'],
   [/context\?\.expression\?\.id[\s\S]*Redirect[\s\S]*\/expressions\//, 'General tabs cannot render while an Expression context is active'],
+  [/label: 'Announcements'[\s\S]*label: 'Feed'[\s\S]*label: 'Prayer'[\s\S]*label: 'Events'[\s\S]*label: 'Birthdays'/, 'Expression shell exposes Phase 2 community destinations'],
+  [/CommunityExperience scope="expression" embedded/, 'Expression feed owns a dedicated scoped route'],
+  [/PrayerExperience scope="expression" embedded/, 'Expression prayer owns a dedicated scoped route'],
+  [/announcements\?view=feed&branchId=/, 'Expression announcement feed requests exact Expression scope'],
+  [/expression:events:[\s\S]*expressionId/, 'Expression events use exact scoped home data'],
+  [/ExpressionBirthdaysExperience embedded/, 'Expression birthdays reuse a dedicated Expression experience'],
   [/action: 'preview'/, 'invite-code preview flow'],
   [/action: 'redeem'/, 'invite-code redemption flow'],
   [/action: 'generate'/, 'invite-code generation flow'],
