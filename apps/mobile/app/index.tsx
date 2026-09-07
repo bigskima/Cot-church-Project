@@ -5,10 +5,10 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 
 export default function Index() {
-  const { mode } = useSession();
+  const { mode, accessReady, context } = useSession();
   const { colors } = useTheme();
 
-  if (mode === 'restoring') {
+  if (mode === 'restoring' || (mode === 'authenticated' && !accessReady)) {
     return (
       <View style={[styles.loading, { backgroundColor: colors.bg }]}>
         <ActivityIndicator size="large" color={colors.interactive} />
@@ -16,8 +16,12 @@ export default function Index() {
     );
   }
 
-  // Public COT content is the default app entry. Authentication is requested
-  // only when a visitor attempts a protected interaction or member operation.
+  // Preserve a deliberately active private Expression across app restart.
+  // General COT remains the default only when no Expression context is active.
+  if (mode === 'authenticated' && context?.expression?.id) {
+    return <Redirect href={`/expressions/${context.expression.id}` as any} />;
+  }
+
   return <Redirect href="/general" />;
 }
 
