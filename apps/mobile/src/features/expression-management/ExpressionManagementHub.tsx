@@ -56,7 +56,7 @@ export function ExpressionManagementHub() {
       {
         key: 'live',
         title: 'Live Studio',
-        description: 'Create and operate Expression broadcasts and inspect stream health.',
+        description: 'Create and manage live broadcasts for this Expression.',
         iconName: 'radio-outline',
         badge: 'LIVE',
         route: `${base}/live`,
@@ -85,7 +85,7 @@ export function ExpressionManagementHub() {
       },
       {
         key: 'access',
-        title: 'Roles & Ownership',
+        title: 'Team Access & Ownership',
         description: 'Invite ministry leaders, manage team access and hand over Expression responsibility when needed.',
         iconName: 'shield-checkmark-outline',
         badge: 'ACCESS',
@@ -106,7 +106,7 @@ export function ExpressionManagementHub() {
     const finance: Tool[] = [
       {
         key: 'giving',
-        title: 'Giving Configuration',
+        title: 'Giving Setup',
         description: 'Manage giving options, campaigns and bank details for this Expression.',
         iconName: 'gift-outline',
         badge: 'GIVING',
@@ -115,7 +115,7 @@ export function ExpressionManagementHub() {
       },
       {
         key: 'finance',
-        title: 'Giving Finance',
+        title: 'Giving Reports',
         description: 'Review Expression giving totals, refunds and net amounts by currency.',
         iconName: 'analytics-outline',
         badge: 'FINANCE',
@@ -159,7 +159,7 @@ export function ExpressionManagementHub() {
           <Text style={[styles.eyebrow, { color: colors.interactive }]}>EXPRESSION TOOLS</Text>
           <Text style={[styles.title, { color: colors.text }]}>Operate {expression?.name ?? 'this Expression'}</Text>
           <Text style={[styles.copy, { color: colors.textSecondary }]}>
-            Only tools granted by your role in this exact Expression are shown here.
+            Only the ministry tools available to you in this Expression are shown here.
           </Text>
         </View>
       </View>
@@ -197,7 +197,7 @@ export function ExpressionManagementHub() {
       <View style={[styles.boundary, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
         <Icon name="shield-checkmark-outline" size={18} color={colors.interactive} />
         <Text style={[styles.boundaryText, { color: colors.textSecondary }]}>
-          These controls are scoped to the Expression in the URL and active session. Church-wide administration remains separate.
+          These tools affect only this Expression. Church-wide ministry tools remain separate.
         </Text>
       </View>
     </ScrollView>
