@@ -3,7 +3,7 @@ import { ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Redirect, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ApiError } from '@/api';
+import { toUserFacingErrorMessage } from '@/api';
 import {
   Badge,
   BottomSheet,
@@ -95,7 +95,7 @@ export default function ExpressionInviteCodesScreen() {
       <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top + spacing.sm }]}>
         <ScreenHeader title="Invite codes" kicker="EXPRESSION" showBack />
         <View style={styles.emptyPad}>
-          <EmptyState title="Invite access is not assigned" message="The members.invite capability is required in this Expression." iconName="lock-closed-outline" />
+          <EmptyState title="Invitations aren’t available for this account" message="You can still use this Expression normally. Invitation tools appear for the people responsible for welcoming new members." iconName="lock-closed-outline" />
         </View>
       </View>
     );
@@ -125,7 +125,7 @@ export default function ExpressionInviteCodesScreen() {
       setMessage('This full code is shown only now. Copy or share it before closing.');
       await resource.refresh();
     } catch (value) {
-      setError(value instanceof ApiError ? value.message : 'Unable to generate an invite code.');
+      setError(toUserFacingErrorMessage(value, 'We couldn’t create an invite code. Please try again.'));
     } finally {
       setBusy(false);
     }
@@ -152,7 +152,7 @@ export default function ExpressionInviteCodesScreen() {
       if (generated?.id === id) setGenerated(null);
       await resource.refresh();
     } catch (value) {
-      setError(value instanceof ApiError ? value.message : 'Unable to revoke this invite code.');
+      setError(toUserFacingErrorMessage(value, 'We couldn’t deactivate this invite code. Please try again.'));
     } finally {
       setBusyId('');
     }
@@ -173,7 +173,7 @@ export default function ExpressionInviteCodesScreen() {
           <ScreenHeader
             title="Invite codes"
             kicker="EXPRESSION"
-            subtitle={`Invite-only membership for ${expression.name}.`}
+            subtitle={`Invite people to join ${expression.name}.`}
             showBack
             rightAction={<Button label="New code" onPress={openCreate} size="sm" />}
           />
@@ -199,7 +199,7 @@ export default function ExpressionInviteCodesScreen() {
             </View>
             <View style={styles.flex}>
               <Text style={[styles.securityTitle, { color: colors.text }]}>Secure, revocable access</Text>
-              <Text style={[styles.securityCopy, { color: colors.textSecondary }]}>Codes can expire, have usage limits and be revoked without changing membership already accepted.</Text>
+              <Text style={[styles.securityCopy, { color: colors.textSecondary }]}>Invite codes can expire, have usage limits and be turned off later without removing people who already joined.</Text>
             </View>
           </View>
 
