@@ -20,12 +20,12 @@ type CommunityPost = SocialPost & {
   viewer_bookmarked?: boolean;
 };
 
-export default function CommunityPostScreen() {
+export default function CommunityPostScreen({ forcedScope }: { forcedScope?: FeedScope } = {}) {
   const { id, scope: requestedScope, focus } = useLocalSearchParams<{ id: string; scope?: string; focus?: string }>();
   const insets = useSafeAreaInsets();
   const { api, context, mode } = useSession();
   const { colors } = useTheme();
-  const scope: FeedScope = requestedScope === 'expression' ? 'expression' : 'general';
+  const scope: FeedScope = forcedScope ?? (requestedScope === 'expression' ? 'expression' : 'general');
   const expressionMode = scope === 'expression';
   const requestContext = expressionMode ? 'current' : 'public';
   const organizationId =
@@ -71,7 +71,7 @@ export default function CommunityPostScreen() {
 
   const openLogin = () => router.push({
     pathname: '/(auth)/login',
-    params: { returnTo: `/post/${id}?scope=${scope}&focus=comments` },
+    params: { returnTo: forcedScope === 'general' ? `/general/post/${id}?focus=comments` : `/post/${id}?scope=${scope}&focus=comments` },
   } as any);
 
   const reactToPost = async (reaction: string | null) => {
