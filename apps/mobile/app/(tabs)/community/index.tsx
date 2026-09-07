@@ -106,7 +106,7 @@ async function readUploadBody(media: UploadableMedia) {
 
 export default function CommunityScreen() {
   const insets = useSafeAreaInsets();
-  const { api, context, mode, hasCapability } = useSession();
+  const { api, context, mode, hasCapability, hasOrganizationCapability } = useSession();
   const { colors } = useTheme();
   const expression = context?.expression;
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
@@ -141,8 +141,7 @@ export default function CommunityScreen() {
   // General Community is a signed-in public participation surface. Expression
   // membership is not required to publish there; account restrictions and the
   // backend scope contract still apply. Expression publishing remains separate.
-  const elevatedGeneralPublisher =
-    context?.organizationPermissions?.includes('feed.post') === true;
+  const elevatedGeneralPublisher = hasOrganizationCapability('feed.post');
   const canPostGeneral =
     mode === 'authenticated' && Boolean(organizationId);
   const canPostExpression =
