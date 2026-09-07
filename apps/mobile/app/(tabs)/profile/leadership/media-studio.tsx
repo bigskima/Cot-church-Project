@@ -129,7 +129,7 @@ export default function MediaStudioScreen() {
 
   const handleCreateBroadcast = async () => {
     const allowed = broadcastScope === 'public' ? canPublicBroadcast : canExpressionBroadcast;
-    if (!allowed) return setErrorMsg('This live broadcast role is not assigned to your account.');
+    if (!allowed) return setErrorMsg('Live broadcasting isn’t available for this account.');
     if (!providerReady) return setErrorMsg('Live broadcasting is temporarily unavailable.');
     if (broadcastScope === 'expression' && !targetExpressionId) return setErrorMsg('Enter an Expression before creating its broadcast.');
     if (!title.trim()) return setErrorMsg('Enter a broadcast title.');
