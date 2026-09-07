@@ -23,7 +23,7 @@ type RedeemResult = {
 export default function ExpressionsScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
-  const { api, auth, context, mode, enterExpression, leaveExpression, selectContext } = useSession();
+  const { api, auth, context, mode, enterExpression, selectContext } = useSession();
   const [code, setCode] = useState('');
   const [preview, setPreview] = useState<InvitePreview | null>(null);
   const [loading, setLoading] = useState(false);
