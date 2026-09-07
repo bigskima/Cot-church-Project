@@ -44,7 +44,7 @@ export default function ExpressionInviteCodesScreen() {
   const { colors } = useTheme();
   const { api, context, hasCapability } = useSession();
   const expression = context?.expression;
-  const canManage = Boolean(expression?.id) && (hasCapability('members.invite') || hasCapability('*'));
+  const canManage = Boolean(expression?.id) && hasCapability('members.invite');
 
   const [createOpen, setCreateOpen] = useState(false);
   const [validityHours, setValidityHours] = useState('168');
