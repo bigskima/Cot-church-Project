@@ -110,7 +110,8 @@ export function StreamingInfrastructure({ api, canManage = false, canManageSecre
     setSecretReference(config?.secret_reference ?? (provider.code === 'mux' ? 'STREAMING_MUX_PRIMARY' : `STREAMING_${provider.code.toUpperCase()}_PRIMARY`));
     setWebhookSecretReference(config?.webhook_secret_reference ?? (provider.code === 'mux' ? 'STREAMING_MUX_WEBHOOK_PRIMARY' : `STREAMING_${provider.code.toUpperCase()}_WEBHOOK`));
     setSigningKeyReference(config?.signing_key_reference ?? (provider.code === 'mux' ? 'STREAMING_MUX_SIGNING_PRIMARY' : ''));
-    setMakeDefault(Boolean(config?.is_default));
+    const hasActiveDefault = data.globalConfigs.some((item) => item.is_active && item.is_default);
+    setMakeDefault(Boolean(config?.is_default) || !hasActiveDefault);
     clearSecretInputs();
     setError('');
     setSuccess('');
