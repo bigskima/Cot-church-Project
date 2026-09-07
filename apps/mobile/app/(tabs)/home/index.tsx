@@ -163,7 +163,7 @@ export default function HomeScreen() {
 
   const openPost = (postId: string, focusComments = false) => {
     router.push({
-      pathname: '/post/[id]',
+      pathname: '/general/post/[id]',
       params: {
         id: postId,
         scope: postScope,
@@ -309,7 +309,7 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.topBarRight}>
-          <Pressable onPress={() => router.push('/assistant')} hitSlop={8} style={({ pressed }) => [styles.iconButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.iconPressed]} accessibilityRole="button" accessibilityLabel="COT Assistant">
+          <Pressable onPress={() => router.push('/general/assistant')} hitSlop={8} style={({ pressed }) => [styles.iconButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.iconPressed]} accessibilityRole="button" accessibilityLabel="COT Assistant">
             <Icon name="sparkles" size={18} color={colors.interactive} />
           </Pressable>
           {hasGeneralLeadershipCapability ? (
