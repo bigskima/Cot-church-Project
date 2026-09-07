@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CommentsThread, PostCard, ResourceError, ScreenHeader, Skeleton } from '@/components';
 import { useResource } from '@/hooks/use-resource';
@@ -20,7 +20,7 @@ type CommunityPost = SocialPost & {
   viewer_bookmarked?: boolean;
 };
 
-export default function CommunityPostScreen({ forcedScope }: { forcedScope?: FeedScope } = {}) {
+export function CommunityPostScreen({ forcedScope }: { forcedScope?: FeedScope } = {}) {
   const { id, scope: requestedScope, focus } = useLocalSearchParams<{ id: string; scope?: string; focus?: string }>();
   const insets = useSafeAreaInsets();
   const { api, context, mode } = useSession();
@@ -178,6 +178,22 @@ export default function CommunityPostScreen({ forcedScope }: { forcedScope?: Fee
         </KeyboardAvoidingView>
       ) : null}
     </View>
+  );
+}
+
+export default function LegacyPostDetailRoute() {
+  const { id, scope, focus } = useLocalSearchParams<{ id?: string; scope?: string; focus?: string }>();
+  if (scope === 'expression') return <Redirect href="/expressions" />;
+  return (
+    <Redirect
+      href={{
+        pathname: '/general/post/[id]',
+        params: {
+          id: typeof id === 'string' ? id : '',
+          ...(focus === 'comments' ? { focus: 'comments' } : {}),
+        },
+      } as any}
+    />
   );
 }
 
