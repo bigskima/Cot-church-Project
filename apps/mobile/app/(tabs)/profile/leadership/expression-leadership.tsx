@@ -169,7 +169,7 @@ export default function ExpressionLeadershipManage() {
             <SectionHeader
               title="Leadership directory"
               badge={leaderList.length}
-              subtitle="Expression leadership remains private to this scope unless explicitly featured publicly"
+              subtitle="Leaders stay visible inside this Expression unless you choose to feature them publicly"
               actionLabel={canManage ? 'Add' : undefined}
               onAction={canManage ? openCreate : undefined}
             />
@@ -186,7 +186,7 @@ export default function ExpressionLeadershipManage() {
               ))
             ) : (
               <EmptyState
-                title="No leaders configured"
+                title="No leaders listed yet"
                 message="Add the pastoral and ministry team serving this Expression."
                 iconName="people-outline"
                 actionLabel={canManage ? 'Add leader' : undefined}
