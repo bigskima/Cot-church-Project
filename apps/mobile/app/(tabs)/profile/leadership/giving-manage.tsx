@@ -320,7 +320,7 @@ export default function ExpressionGivingManageScreen() {
       <View style={[styles.screen, styles.center, { backgroundColor: colors.bg }]}>
         <EmptyState
           title="Giving access unavailable"
-          message="Your current role does not include permission to manage giving."
+          message="Giving setup isn’t available for this account."
           iconName="lock-closed-outline"
         />
       </View>
