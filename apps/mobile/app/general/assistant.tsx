@@ -1,1 +1,1 @@
-export { default } from '../assistant';
+export { AssistantScreen as default } from '../assistant';
