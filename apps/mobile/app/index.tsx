@@ -18,7 +18,7 @@ export default function Index() {
 
   // Public COT content is the default app entry. Authentication is requested
   // only when a visitor attempts a protected interaction or member operation.
-  return <Redirect href="/(tabs)/home" />;
+  return <Redirect href="/general" />;
 }
 
 const styles = StyleSheet.create({
