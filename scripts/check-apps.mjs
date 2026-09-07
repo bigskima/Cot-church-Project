@@ -10,6 +10,12 @@ const files = [
   'apps/mobile/src/services/query-cache.ts',
   'apps/mobile/src/components/cards.tsx',
   'apps/mobile/app/(tabs)/home/index.tsx',
+  'apps/mobile/app/(tabs)/_layout.tsx',
+  'apps/mobile/app/general/index.tsx',
+  'apps/mobile/app/expressions/[expressionId]/_layout.tsx',
+  'apps/mobile/app/expressions/[expressionId]/index.tsx',
+  'apps/mobile/src/components/expression/ExpressionRouteBoundary.tsx',
+  'apps/mobile/src/components/expression/ExpressionShell.tsx',
   'apps/mobile/app/(tabs)/discover/index.tsx',
   'apps/mobile/app/(tabs)/live/index.tsx',
   'apps/mobile/app/(tabs)/live/[id].tsx',
@@ -139,6 +145,11 @@ const checks = [
   [/creatorOrganizations[\s\S]*Create Expression/, 'authorized Expression creator direct entry'],
   [/enterExpression/, 'deliberate Expression entry'],
   [/leaveExpression/, 'deliberate Expression exit'],
+  [/Private Expression routes are bound to the Expression ID/, 'Expression routes enforce exact ID membership boundaries'],
+  [/Return to General COT/, 'Expression shell provides an explicit General COT exit'],
+  [/ExpressionNavigation/, 'Expression workspace owns a dedicated navigation shell'],
+  [/expression:workspace-home:/, 'Expression Home uses a dedicated scoped resource identity'],
+  [/context\?\.expression\?\.id[\s\S]*Redirect[\s\S]*\/expressions\//, 'General tabs cannot render while an Expression context is active'],
   [/action: 'preview'/, 'invite-code preview flow'],
   [/action: 'redeem'/, 'invite-code redemption flow'],
   [/action: 'generate'/, 'invite-code generation flow'],
@@ -203,6 +214,10 @@ const forbiddenPermissionGatePatterns = [
   [/hasCapability\(['"]\*['"]\)/, 'wildcard capability fallback'],
 ];
 
+const forbiddenExpressionRoutingPatterns = [
+  [/enterExpression[\s\S]{0,500}router\.replace\(['"]\/\(tabs\)\/home['"]\)/, 'Expression entry routed back into the General tab shell'],
+];
+
 const forbiddenSocialCopyPatterns = [
   [/Join an active Expression before sharing a Reel into General Community/, 'stale Expression-membership Reel sharing guidance'],
 ];
@@ -233,6 +248,7 @@ const missing = checks.filter(([pattern]) => !pattern.test(joined));
 const forbidden = forbiddenGivingPatterns.filter(([pattern]) => pattern.test(givingUi));
 const forbiddenPrayer = forbiddenPrayerPatterns.filter(([pattern]) => pattern.test(prayerUi));
 const forbiddenPermissionGates = forbiddenPermissionGatePatterns.filter(([pattern]) => pattern.test(joined));
+const forbiddenExpressionRouting = forbiddenExpressionRoutingPatterns.filter(([pattern]) => pattern.test(joined));
 const forbiddenSocialCopy = forbiddenSocialCopyPatterns.filter(([pattern]) => pattern.test(joined));
 const forbiddenModalComments = forbiddenModalCommentPatterns.filter(([pattern]) => pattern.test(commentProductUi));
 const forbiddenWatchCopy = forbiddenWatchCopyPatterns.filter(([pattern]) => pattern.test(sources.get('apps/mobile/app/watch/[id].tsx') ?? ''));
@@ -240,12 +256,13 @@ const forbiddenPlatformBoundaries = forbiddenPlatformBoundaryPatterns.filter(([p
 const forbiddenIntegrations = forbiddenIntegrationPatterns.filter(([pattern]) => pattern.test(integrationsUi));
 const missingPaymentCredentialChecks = paymentCredentialChecks.filter(([pattern]) => !pattern.test(paymentInfrastructureUi));
 
-if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenPermissionGates.length || forbiddenSocialCopy.length || forbiddenModalComments.length || forbiddenWatchCopy.length || forbiddenPlatformBoundaries.length || forbiddenIntegrations.length || missingPaymentCredentialChecks.length) {
+if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenPermissionGates.length || forbiddenExpressionRouting.length || forbiddenSocialCopy.length || forbiddenModalComments.length || forbiddenWatchCopy.length || forbiddenPlatformBoundaries.length || forbiddenIntegrations.length || missingPaymentCredentialChecks.length) {
   const failures = [
     ...missing.map(([, name]) => name),
     ...forbidden.map(([, name]) => `remove ${name}`),
     ...forbiddenPrayer.map(([, name]) => `remove ${name}`),
     ...forbiddenPermissionGates.map(([, name]) => `remove ${name}`),
+    ...forbiddenExpressionRouting.map(([, name]) => `remove ${name}`),
     ...forbiddenSocialCopy.map(([, name]) => `remove ${name}`),
     ...forbiddenModalComments.map(([, name]) => `remove ${name}`),
     ...forbiddenWatchCopy.map(([, name]) => `remove ${name}`),
@@ -258,5 +275,5 @@ if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenPer
 }
 
 console.log(
-  `Application check passed (${files.length} files, ${checks.length} production invariants, ${forbiddenGivingPatterns.length + forbiddenPrayerPatterns.length + forbiddenPermissionGatePatterns.length + forbiddenSocialCopyPatterns.length + forbiddenModalCommentPatterns.length + forbiddenWatchCopyPatterns.length + forbiddenPlatformBoundaryPatterns.length + forbiddenIntegrationPatterns.length} anti-hardcode/boundary checks, ${paymentCredentialChecks.length} payment contract checks).`,
+  `Application check passed (${files.length} files, ${checks.length} production invariants, ${forbiddenGivingPatterns.length + forbiddenPrayerPatterns.length + forbiddenPermissionGatePatterns.length + forbiddenExpressionRoutingPatterns.length + forbiddenSocialCopyPatterns.length + forbiddenModalCommentPatterns.length + forbiddenWatchCopyPatterns.length + forbiddenPlatformBoundaryPatterns.length + forbiddenIntegrationPatterns.length} anti-hardcode/boundary checks, ${paymentCredentialChecks.length} payment contract checks).`,
 );

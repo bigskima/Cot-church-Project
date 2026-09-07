@@ -54,6 +54,8 @@ function AppContent() {
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="general" options={{ headerShown: false }} />
+        <Stack.Screen name="expressions/[expressionId]" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false, animation: 'fade' }} />
         <Stack.Screen name="reels" options={{ headerShown: false, animation: 'fade' }} />
