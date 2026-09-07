@@ -44,6 +44,28 @@ Deno.serve(createHandler(
       if (!auth.organizationId) throw new ApiError("ORGANIZATION_REQUIRED", "Choose a church community first", 400);
       const url = new URL(request.url);
       const postId = uuid(url.searchParams.get("postId"), "postId");
+      const view = url.searchParams.get("view");
+      if (view === "post") {
+        if (!postId) throw new ApiError("VALIDATION_FAILED", "postId is required", 422);
+        const scope = url.searchParams.get("scope") ?? "all";
+        if (!scopes.has(scope)) throw new ApiError("VALIDATION_FAILED", "Invalid community feed scope", 422);
+        let postQuery = auth.client.from("social_posts")
+          .select("id,organization_id,author_membership_id,branch_id,group_id,visibility,status,body,media,published_at,edited_at,created_at")
+          .eq("organization_id", auth.organizationId)
+          .eq("id", postId)
+          .eq("status", "published");
+        if (scope === "church") postQuery = postQuery.is("branch_id", null).eq("visibility", "public");
+        if (scope === "expression") {
+          if (!auth.branchId) throw new ApiError("EXPRESSION_REQUIRED", "Enter an Expression to view this post", 403);
+          postQuery = postQuery.eq("branch_id", auth.branchId);
+        }
+        const { data: rows, error: postError } = await postQuery.limit(1);
+        if (postError) throw new ApiError("POST_READ_FAILED", "Unable to retrieve this post", 500, undefined, false);
+        if (!(rows ?? []).length) throw new ApiError("POST_NOT_FOUND", "This post is no longer available", 404);
+        const identified = await enrichSocialPosts(rows ?? []);
+        const engaged = await enrichContentEngagement(identified, auth.client, auth.user.id);
+        return { data: engaged[0] };
+      }
       if (postId) {
         const { data, error } = await auth.client
           .from("content_comments")
