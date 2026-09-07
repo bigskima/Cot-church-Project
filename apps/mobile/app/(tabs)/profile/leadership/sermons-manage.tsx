@@ -40,9 +40,9 @@ export default function SermonsManageScreen() {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  const canCreate = hasCapability('sermons.create') || hasCapability('*');
-  const canManage = hasCapability('sermons.manage') || hasCapability('*');
-  const canPublish = hasCapability('sermons.publish') || hasCapability('*');
+  const canCreate = hasCapability('sermons.create');
+  const canManage = hasCapability('sermons.manage');
+  const canPublish = hasCapability('sermons.publish');
   const sermons = useResource<Sermon[]>(`leadership:sermons:${organizationId || 'none'}:${expression?.id ?? 'general'}`, (signal) =>
     api.request<Sermon[]>('sermons?view=manage', { signal })
   );
