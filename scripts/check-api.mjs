@@ -212,6 +212,8 @@ const invariants = [
   [eventRegistrations, /cancel_event_registration/, 'event registration cancellation'],
   [eventRegistrations, /REGISTRATION_ACCESS_DENIED/, 'event eligibility error mapping'],
   [homeFeed, /rankFeedCandidates/, 'public feed personalization pipeline'],
+  [homeFeed, /from\("social_posts"\)[\s\S]*?is\("branch_id", null\)\.eq\("visibility", "public"\)/, 'General Home social posts exclude Expression-scoped posts'],
+  [homeFeed, /kind: "post" as const[\s\S]*?posts\.forEach/, 'Home social posts participate in canonical feed ranking'],
   [homeFeed, /followedExpressionIds/, 'follow-driven public recommendations'],
   [homeFeed, /inProgressContentIds/, 'continue-watching recommendation signal'],
   [homeFeed, /value === selectedExpressionId/, 'exact Expression home isolation'],
