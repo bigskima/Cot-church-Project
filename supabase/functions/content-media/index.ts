@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.57.4";
 import { ApiError } from "../_shared/errors.ts";
-import { authorize } from "../_shared/context.ts";
+import { authorize, authorizeOrganization } from "../_shared/context.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { enrichContentCreators } from "../_shared/public-identity.ts";
@@ -127,17 +127,21 @@ Deno.serve(createHandler(
 
     if (action === "create_upload_intent") {
       assertNoUnknownFields(body, ["action", "mediaType", "mimeType", "expressionId", "durationSeconds", "aspectRatio", "fileSizeBytes", "fileName"]);
-      await authorize(auth, "media.upload");
+      const expressionId = body.expressionId ? uuid(String(body.expressionId), "expressionId", true) : null;
+      if (expressionId) {
+        if (expressionId !== auth.branchId) {
+          throw new ApiError("EXPRESSION_SCOPE_DENIED", "Media can only be uploaded for your selected Expression", 403);
+        }
+        await authorize(auth, "media.upload");
+      } else {
+        await authorizeOrganization(auth, "media.upload");
+      }
 
       const mediaType = requiredString(body.mediaType, "mediaType", 20) as "video" | "audio" | "image";
       const mimeType = requiredString(body.mimeType, "mimeType", 120).toLowerCase();
       const mime = MIME_TYPES[mimeType];
       if (!mime || mime.mediaType !== mediaType) throw new ApiError("UNSUPPORTED_MEDIA_TYPE", "This media format is not supported", 415);
       const fileSizeBytes = validateSize(body.fileSizeBytes);
-      const expressionId = body.expressionId ? uuid(String(body.expressionId), "expressionId", true) : null;
-      if (expressionId && expressionId !== auth.branchId) {
-        throw new ApiError("EXPRESSION_SCOPE_DENIED", "Media can only be uploaded for your selected Expression", 403);
-      }
       const durationSeconds = typeof body.durationSeconds === "number" && Number.isFinite(body.durationSeconds) && body.durationSeconds >= 0
         ? Math.round(body.durationSeconds)
         : null;
