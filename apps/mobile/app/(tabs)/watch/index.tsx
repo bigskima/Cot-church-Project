@@ -65,7 +65,7 @@ export default function WatchScreen() {
     { value: 'documentary', label: 'Documentary' },
   ];
 
-  const openReels = () => router.push('/reels');
+  const openReels = () => router.push('/general/reels');
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -153,7 +153,7 @@ export default function WatchScreen() {
         renderItem={({ item }) => (
           <VideoCard
             video={item}
-            onPress={() => router.push(`/watch/${item.id}` as any)}
+            onPress={() => router.push(`/general/watch/${item.id}` as any)}
           />
         )}
         ListFooterComponent={
@@ -167,7 +167,7 @@ export default function WatchScreen() {
                   key={sermon.id}
                   sermon={sermon}
                   variant="row"
-                  onPress={() => router.push(`/sermon/${sermon.id}` as any)}
+                  onPress={() => router.push(`/general/sermon/${sermon.id}` as any)}
                 />
               ))}
             </View>
