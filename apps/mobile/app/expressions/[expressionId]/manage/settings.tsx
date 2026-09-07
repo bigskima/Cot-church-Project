@@ -5,6 +5,7 @@ import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
+import { toUserFacingErrorMessage } from '@/api';
 import { ExpressionManagementGate } from '@/features/expression-management/ExpressionManagementGate';
 import { useExpressionManagementAccess } from '@/features/expression-management/useExpressionManagementAccess';
 
@@ -86,7 +87,7 @@ export default function ExpressionSettingsScreen() {
       await records.refresh();
       refreshContext();
     } catch (value) {
-      setError(value instanceof Error ? value.message : 'Unable to update Expression settings.');
+      setError(toUserFacingErrorMessage(value, 'We couldn’t save these Expression settings. Please try again.'));
     } finally {
       setSaving(false);
     }
@@ -138,7 +139,7 @@ export default function ExpressionSettingsScreen() {
         ) : !current ? (
           <EmptyState
             title="Expression settings unavailable"
-            message="The active Expression could not be resolved from your permitted church context."
+            message="We couldn’t load this Expression’s settings. Return to the Expression and try again."
             iconName="alert-circle-outline"
           />
         ) : (
@@ -181,7 +182,7 @@ export default function ExpressionSettingsScreen() {
             <View style={[styles.boundary, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
               <Icon name="shield-checkmark-outline" size={18} color={colors.interactive} />
               <Text style={[styles.boundaryText, { color: colors.textSecondary }]}>
-                Platform lifecycle controls such as suspension or archival are intentionally not exposed here. This screen changes only day-to-day Expression identity.
+                This page updates the Expression name, member code and timezone. Other church controls are managed separately.
               </Text>
             </View>
           </>
