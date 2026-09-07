@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import { usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiError } from '@/api';
 import {
@@ -41,6 +42,8 @@ type GeneratedCode = {
 
 export default function ExpressionInviteCodesScreen() {
   const insets = useSafeAreaInsets();
+  const pathname = usePathname();
+  const expressionWorkspace = pathname.startsWith('/expressions/');
   const { colors } = useTheme();
   const { api, context, hasCapability } = useSession();
   const expression = context?.expression;
@@ -159,7 +162,7 @@ export default function ExpressionInviteCodesScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 120 },
+          { paddingTop: expressionWorkspace ? spacing.md : insets.top + spacing.sm, paddingBottom: expressionWorkspace ? insets.bottom + spacing.xl : insets.bottom + 120 },
         ]}
       >
         <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
