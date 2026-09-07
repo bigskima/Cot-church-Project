@@ -97,7 +97,7 @@ export function ExpressionContentStudio() {
       <View style={[styles.note, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
         <Icon name="shield-checkmark-outline" size={18} color={colors.interactive} />
         <Text style={[styles.noteText, { color: colors.textSecondary }]}>
-          Expression Studio never upgrades an Expression permission into a church-wide or public publishing permission.
+          Content created here stays in this Expression. General COT publishing is handled separately.
         </Text>
       </View>
     </ScrollView>
