@@ -149,7 +149,7 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
     },
     {
       title: 'Pastoral Care',
-      description: 'Review confidential prayer requests and assigned follow-up.',
+      description: 'Review confidential prayer requests and care follow-ups.',
       iconName: 'heart-outline',
       badge: 'PASTORAL',
       route: routeFor('/general/leadership/pastoral-triage', '/leadership/pastoral-triage'),
