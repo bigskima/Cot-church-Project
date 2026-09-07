@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -35,11 +35,30 @@ function inferVideoMime(asset: ImagePicker.ImagePickerAsset) {
 
 export default function WatchVideoCreatorScreen() {
   const insets = useSafeAreaInsets();
-  const { api, context, mode, hasCapability } = useSession();
+  const { api, context, mode, hasCapability, hasOrganizationCapability } = useSession();
   const { colors } = useTheme();
   const expression = context?.expression;
+  const { scope: requestedScope } = useLocalSearchParams<{ scope?: string }>();
+  const canPublishPublic =
+    mode === 'authenticated' &&
+    hasOrganizationCapability('media.upload') &&
+    hasOrganizationCapability('videos.publish');
+  const canPublishExpression =
+    mode === 'authenticated' &&
+    Boolean(expression?.id) &&
+    hasCapability('media.upload') &&
+    hasCapability('videos.publish');
+  const allowed = canPublishPublic || canPublishExpression;
 
-  const [scope, setScope] = useState<VideoScope>(expression?.id ? 'branch' : 'public');
+  const [scope, setScope] = useState<VideoScope>(
+    requestedScope === 'public' && canPublishPublic
+      ? 'public'
+      : requestedScope === 'branch' && canPublishExpression
+        ? 'branch'
+        : canPublishExpression
+          ? 'branch'
+          : 'public',
+  );
   const [category, setCategory] = useState<VideoCategory>('general');
   const [video, setVideo] = useState<SelectedVideo | null>(null);
   const [title, setTitle] = useState('');
@@ -48,24 +67,21 @@ export default function WatchVideoCreatorScreen() {
   const [stage, setStage] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  const allowed =
-    mode === 'authenticated' &&
-    hasCapability('media.upload') &&
-    hasCapability('videos.publish');
   const selectedExpressionId = scope === 'branch' ? expression?.id ?? null : null;
+  const canPublishInScope = scope === 'public' ? canPublishPublic : canPublishExpression;
   const canPublish = useMemo(
     () =>
-      allowed &&
-      (scope !== 'branch' || Boolean(expression?.id)) &&
+      canPublishInScope &&
       Boolean(video) &&
       Boolean(title.trim()) &&
       !working,
-    [allowed, scope, expression?.id, video, title, working],
+    [canPublishInScope, video, title, working],
   );
 
   useEffect(() => {
-    if (!expression?.id && scope === 'branch') setScope('public');
-  }, [expression?.id, scope]);
+    if (scope === 'branch' && !canPublishExpression && canPublishPublic) setScope('public');
+    if (scope === 'public' && !canPublishPublic && canPublishExpression) setScope('branch');
+  }, [scope, canPublishExpression, canPublishPublic]);
 
   const chooseVideo = async () => {
     if (!allowed || working) return;
@@ -225,7 +241,7 @@ export default function WatchVideoCreatorScreen() {
               <View style={styles.noticeCopy}>
                 <Text style={[styles.noticeTitle, { color: colors.text }]}>Watch publishing is role-scoped</Text>
                 <Text style={[styles.noticeText, { color: colors.textSecondary }]}>
-                  Your role must grant both media upload and Watch-video publishing authority in this church scope.
+                  Your role does not currently grant Watch publishing in Public COT or the active Expression.
                 </Text>
               </View>
             </View>
@@ -234,8 +250,8 @@ export default function WatchVideoCreatorScreen() {
               <View style={styles.scopeBlock}>
                 <Text style={[styles.label, { color: colors.textSecondary }]}>PUBLISHING SCOPE</Text>
                 <View style={styles.chipRow}>
-                  <Chip label="Public Watch" selected={scope === 'public'} onPress={() => setScope('public')} />
-                  {expression?.id ? (
+                  {canPublishPublic ? <Chip label="Public Watch" selected={scope === 'public'} onPress={() => setScope('public')} /> : null}
+                  {canPublishExpression && expression?.id ? (
                     <Chip label={expression.name} selected={scope === 'branch'} onPress={() => setScope('branch')} />
                   ) : null}
                 </View>

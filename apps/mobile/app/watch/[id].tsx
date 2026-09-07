@@ -17,7 +17,6 @@ import {
   Avatar,
   Badge,
   Button,
-  CommentSheet,
   Icon,
   ResourceError,
   ScreenHeader,
@@ -27,7 +26,6 @@ import {
 } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import type { Video } from '@/types/content';
-import type { ContentComment } from '@/types/content';
 
 type EngagementState = { reaction: string | null; bookmarked: boolean; progress: { progress_seconds: number; duration_seconds: number; completed: boolean } | null };
 type PlaybackInfo = {
@@ -45,7 +43,6 @@ export default function WatchDetailScreen() {
 
   const [isLiked, setIsLiked] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
-  const [commentsOpen, setCommentsOpen] = useState(false);
   const [actionError, setActionError] = useState('');
   const lastSyncedSecond = useRef(0);
   const expressionMode = requestedContext === 'expression';
@@ -79,15 +76,6 @@ export default function WatchDetailScreen() {
           { signal, context: expressionMode ? 'current' : 'public' },
         )
       : Promise.resolve({ reaction: null, bookmarked: false, progress: null }),
-  );
-  const comments = useResource<ContentComment[]>(
-    `watch:comments:${contentId ?? 'pending'}`,
-    (signal) => contentId
-      ? api.request<ContentComment[]>(
-          `engagement?contentId=${encodeURIComponent(contentId)}`,
-          { signal, context: expressionMode ? 'current' : 'public' },
-        )
-      : Promise.resolve([]),
   );
   const playback = useResource<PlaybackInfo>(
     `watch:playback:${expressionMode ? context?.expression?.id ?? 'none' : 'public'}:${contentId ?? 'pending'}`,
@@ -288,12 +276,23 @@ export default function WatchDetailScreen() {
                 </Pressable>
               ) : null}
 
-              <Pressable onPress={() => mode === 'visitor' ? router.push({
-      pathname: '/(auth)/login',
-      params: { returnTo: `/watch/${id}${expressionMode ? '?context=expression' : ''}` },
-    } as any) : setCommentsOpen(true)} style={styles.actionBtn}>
+              <Pressable
+                onPress={() => {
+                  if (!contentId) {
+                    setActionError('Comments are not available for this video yet.');
+                    return;
+                  }
+                  router.push({
+                    pathname: '/comments/[contentId]',
+                    params: { contentId, context: expressionMode ? 'expression' : 'public' },
+                  } as any);
+                }}
+                style={styles.actionBtn}
+              >
                 <Icon name="chatbubble-ellipses-outline" size={20} color={colors.text} />
-                <Text style={[styles.actionBtnText, { color: colors.text }]}>Comments</Text>
+                <Text style={[styles.actionBtnText, { color: colors.text }]}>
+                  {video.comments_count > 0 ? `Comments ${video.comments_count}` : 'Comments'}
+                </Text>
               </Pressable>
             </ScrollView>
 
@@ -323,27 +322,6 @@ export default function WatchDetailScreen() {
         </ScrollView>
       ) : null}
 
-      {/* Comments Sheet */}
-      <CommentSheet
-        visible={commentsOpen}
-        onClose={() => setCommentsOpen(false)}
-        comments={comments.data ?? []}
-        loading={comments.loading}
-        onSubmitComment={async (body, parentCommentId) => {
-          if (!contentId) throw new Error('This video is missing its engagement identity.');
-          await api.request('engagement', {
-            method: 'POST',
-            context: expressionMode ? 'current' : 'public',
-            body: JSON.stringify({
-              action: 'comment',
-              contentId,
-              body,
-              parentCommentId,
-            }),
-          });
-          await comments.refresh();
-        }}
-      />
     </View>
   );
 }

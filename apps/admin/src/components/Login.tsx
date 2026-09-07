@@ -197,8 +197,8 @@ export function Login({
             <div className="platform-login-form-footer">
               <span className="platform-login-lock" aria-hidden="true">◆</span>
               <p>
-                Your session lasts only for this browser session. Administration access
-                are resolved again after sign-in.
+                Your session stays protected in this browser. Administration access
+                is checked again after sign-in and while you work.
               </p>
             </div>
           </Card>

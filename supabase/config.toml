@@ -76,6 +76,12 @@ verify_jwt = false
 [functions.home-feed]
 verify_jwt = false
 
+# Public post/media threads are readable before sign-in. Engagement mutations
+# still require a verified user inside the function, and scoped content access
+# is checked before comments, reactions, bookmarks, or playback are accepted.
+[functions.engagement]
+verify_jwt = false
+
 [functions.public-birthdays]
 verify_jwt = false
 

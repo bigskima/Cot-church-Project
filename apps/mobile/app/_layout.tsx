@@ -61,6 +61,8 @@ function AppContent() {
         <Stack.Screen name="live/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="watch/index" options={{ headerShown: false }} />
         <Stack.Screen name="watch/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="post/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="comments/[contentId]" options={{ headerShown: false }} />
         <Stack.Screen name="sermon/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="series/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="event/[id]" options={{ headerShown: false }} />

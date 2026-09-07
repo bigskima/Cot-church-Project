@@ -25,6 +25,20 @@ export default function CreatorStudioScreen() {
   const { api, context, hasCapability, hasOrganizationCapability, hasPublicCapability } = useSession();
   const expression = context?.expression;
   const canPublishPosts = hasCapability('posts.create') || hasCapability('posts.publish');
+  const canPublishPublicReels =
+    hasOrganizationCapability('media.upload') &&
+    hasOrganizationCapability('reels.publish');
+  const canPublishExpressionReels =
+    Boolean(expression?.id) &&
+    hasCapability('media.upload') &&
+    hasCapability('reels.publish');
+  const canPublishPublicVideos =
+    hasOrganizationCapability('media.upload') &&
+    hasOrganizationCapability('videos.publish');
+  const canPublishExpressionVideos =
+    Boolean(expression?.id) &&
+    hasCapability('media.upload') &&
+    hasCapability('videos.publish');
   const expressionCreatorOrganizationId = context?.organization?.id ?? context?.creatorOrganizations?.[0]?.id ?? '';
   const canCreateExpression = Boolean(
     expressionCreatorOrganizationId &&
@@ -86,7 +100,7 @@ export default function CreatorStudioScreen() {
       iconName: 'flash-outline',
       badge: 'REELS',
       route: '/studio/reel',
-      enabled: hasCapability('media.upload') && hasCapability('reels.publish'),
+      enabled: canPublishPublicReels || canPublishExpressionReels,
     },
     {
       title: 'Create Watch Video',
@@ -94,7 +108,7 @@ export default function CreatorStudioScreen() {
       iconName: 'videocam-outline',
       badge: 'WATCH',
       route: '/studio/video',
-      enabled: hasCapability('media.upload') && hasCapability('videos.publish'),
+      enabled: canPublishPublicVideos || canPublishExpressionVideos,
     },
     {
       title: 'Sermons',

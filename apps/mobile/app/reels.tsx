@@ -5,8 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
-import { BottomSheet, Button, CommentSheet, Icon, ReelPlayer, ResourceError, Skeleton } from '@/components';
-import type { ContentComment, Reel } from '@/types/content';
+import { BottomSheet, Button, Icon, ReelPlayer, ResourceError, Skeleton } from '@/components';
+import type { Reel } from '@/types/content';
 
 const { height: windowHeight } = Dimensions.get('window');
 type PlaybackInfo = {
@@ -30,9 +30,6 @@ export default function FullScreenReelsScreen() {
   const { reelId, context: requestedContext } = useLocalSearchParams<{ reelId?: string; context?: string }>();
   const { colors } = useTheme();
   const [activeIndex, setActiveIndex] = useState(0);
-  const [activeReelForComments, setActiveReelForComments] = useState<Reel | null>(null);
-  const [comments, setComments] = useState<ContentComment[]>([]);
-  const [commentLoading, setCommentLoading] = useState(false);
   const [actionError, setActionError] = useState('');
   const [shareTarget, setShareTarget] = useState<ReelWithViewerState | null>(null);
   const [shareBusy, setShareBusy] = useState(false);
@@ -110,38 +107,16 @@ export default function FullScreenReelsScreen() {
   }).current;
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 70 }).current;
 
-  const handleOpenComments = async (reel: Reel) => {
-    if (mode === 'visitor') {
-      router.push({ pathname: '/(auth)/login', params: { returnTo: '/reels' } } as any);
+  const handleOpenComments = (reel: Reel) => {
+    const contentId = reel.content_items?.id;
+    if (!contentId) {
+      setActionError('Comments are not available for this Reel yet.');
       return;
     }
-    setActiveReelForComments(reel);
-    setCommentLoading(true);
-    setActionError('');
-    try {
-      const contentId = reel.content_items?.id;
-      if (!contentId) throw new Error('This Reel is missing its engagement identity.');
-      const res = await api.request<ContentComment[]>(`engagement?contentId=${contentId}`, { context: expressionId ? 'current' : 'public' });
-      setComments(res ?? []);
-    } catch (value) {
-      setComments([]);
-      setActionError(value instanceof Error ? value.message : 'Unable to load comments for this Reel.');
-    } finally {
-      setCommentLoading(false);
-    }
-  };
-
-  const handleSendComment = async (body: string, parentCommentId?: string | null) => {
-    if (!activeReelForComments) return;
-    const contentId = activeReelForComments.content_items?.id;
-    if (!contentId) throw new Error('This Reel is missing its engagement identity.');
-    setActionError('');
-    const res = await api.request<ContentComment>('engagement', {
-      method: 'POST',
-      context: expressionId ? 'current' : 'public',
-      body: JSON.stringify({ action: 'comment', contentId, body, parentCommentId }),
-    });
-    if (res) setComments((prev) => [...prev, res]);
+    router.push({
+      pathname: '/comments/[contentId]',
+      params: { contentId, context: expressionId ? 'expression' : 'public' },
+    } as any);
   };
 
   const handleLikeReel = async (reel: ReelWithViewerState, currentlyLiked: boolean) => {
@@ -339,13 +314,6 @@ export default function FullScreenReelsScreen() {
         </View>
       </BottomSheet>
 
-      <CommentSheet
-        visible={!!activeReelForComments}
-        onClose={() => setActiveReelForComments(null)}
-        comments={comments}
-        onSubmitComment={handleSendComment}
-        loading={commentLoading}
-      />
     </View>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type { ApiClient, AuthState } from '../api';
+import { ApiError, type ApiClient, type AuthState } from '../api';
 import { Badge } from './ui';
 import { AdminGuide } from './AdminGuide';
 import { PlatformOverview } from '../pages/PlatformOverview';
@@ -56,6 +56,8 @@ type PlatformAuthority = { displayName: string; roleName: string; roleCode: stri
 export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthState; updateAuth: (auth: AuthState | null) => void }) {
   const [page, setPage] = useState<string>('overview');
   const [loading, setLoading] = useState(true);
+  const [authorityError, setAuthorityError] = useState('');
+  const [authorityReloadKey, setAuthorityReloadKey] = useState(0);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [effectivePermissions, setEffectivePermissions] = useState<string[]>([]);
@@ -82,27 +84,66 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    api.request<{
-      profile?: { display_name?: string | null };
-      roles?: Array<{ platform_roles?: { name?: string | null } | null; role_code?: string }>;
-      effectivePermissions?: string[];
-    }>('platform-context')
-      .then((data) => {
+    let requestInFlight = false;
+
+    const refreshAuthority = async (initial = false) => {
+      if (requestInFlight) return;
+      requestInFlight = true;
+      if (initial) {
+        setLoading(true);
+        setAuthorityError('');
+      }
+      try {
+        const data = await api.request<{
+          profile?: { display_name?: string | null };
+          roles?: Array<{ platform_roles?: { name?: string | null } | null; role_code?: string }>;
+          effectivePermissions?: string[];
+        }>('platform-context');
         if (!active) return;
         const sortedRoles = [...(data.roles ?? [])].sort((a, b) => (a.role_code === 'super_admin' ? -1 : b.role_code === 'super_admin' ? 1 : 0));
         const firstRole = sortedRoles[0];
         setEffectivePermissions(data.effectivePermissions ?? []);
+        setAuthorityError('');
         setAuthority({
           displayName: data.profile?.display_name?.trim() || 'Administrator',
           roleName: firstRole?.platform_roles?.name?.trim() || firstRole?.role_code?.replaceAll('_', ' ') || 'Platform Administrator',
           roleCode: firstRole?.role_code ?? '',
         });
-      })
-      .catch(() => { if (active) updateAuth(null); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [api, updateAuth, auth.accessToken]);
+      } catch (value) {
+        if (!active) return;
+        const accessRevoked =
+          value instanceof ApiError &&
+          (value.status === 401 || value.status === 403 || value.code === 'PLATFORM_PERMISSION_DENIED');
+        if (accessRevoked) {
+          updateAuth(null);
+          return;
+        }
+        if (initial) {
+          setAuthorityError('We couldn’t confirm your administration access. Check your connection and try again.');
+        }
+        // A transient background refresh must not blank already-resolved
+        // administration access. The next successful refresh replaces it.
+      } finally {
+        requestInFlight = false;
+        if (initial && active) setLoading(false);
+      }
+    };
+
+    void refreshAuthority(true);
+    const interval = window.setInterval(() => void refreshAuthority(false), 120_000);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void refreshAuthority(false);
+    };
+    window.addEventListener('focus', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [api, updateAuth, auth.accessToken, authorityReloadKey]);
 
   useEffect(() => {
     if (!loading && !allowedPageKeys.has(page)) setPage('overview');
@@ -153,6 +194,26 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
         <div className="admin-table-loading" style={{ padding: 80, minWidth: 280 }}>
           <span className="admin-spinner" />
           <p>Resolving Platform Administration access…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (authorityError) {
+    return (
+      <div className="admin-shell" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24 }}>
+        <div className="admin-card" style={{ maxWidth: 520, width: '100%', padding: 32 }}>
+          <span className="admin-kicker">PLATFORM ADMINISTRATION</span>
+          <h2 style={{ marginTop: 10 }}>Access check interrupted</h2>
+          <p className="admin-muted" style={{ marginTop: 10 }}>{authorityError}</p>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 22 }}>
+            <button type="button" className="admin-btn admin-btn-primary" onClick={() => setAuthorityReloadKey((value) => value + 1)}>
+              Try again
+            </button>
+            <button type="button" className="admin-btn admin-btn-ghost" onClick={() => updateAuth(null)}>
+              Sign out
+            </button>
+          </div>
         </div>
       </div>
     );

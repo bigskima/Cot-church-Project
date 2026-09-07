@@ -50,6 +50,7 @@ const requiredFiles = [
   'supabase/functions/payment-events/index.ts',
   'supabase/functions/live-streams/index.ts',
   'supabase/functions/social-feed/index.ts',
+  'supabase/functions/public-social-feed/index.ts',
   'supabase/functions/community-media/index.ts',
   'supabase/functions/_shared/public-identity.ts',
   'supabase/functions/public-content/index.ts',
@@ -86,6 +87,7 @@ const requiredFiles = [
 
 await Promise.all(requiredFiles.map((file) => access(file)));
 
+const supabaseConfig = await readFile('supabase/config.toml', 'utf8');
 const handler = await readFile('supabase/functions/_shared/handler.ts', 'utf8');
 const authContext = await readFile('supabase/functions/_shared/context.ts', 'utf8');
 const response = await readFile('supabase/functions/_shared/response.ts', 'utf8');
@@ -110,6 +112,7 @@ const rateLimit = await readFile('supabase/functions/_shared/rate-limit.ts', 'ut
 const paymentEvents = await readFile('supabase/functions/payment-events/index.ts', 'utf8');
 const publicContent = await readFile('supabase/functions/public-content/index.ts', 'utf8');
 const socialFeed = await readFile('supabase/functions/social-feed/index.ts', 'utf8');
+const publicSocialFeed = await readFile('supabase/functions/public-social-feed/index.ts', 'utf8');
 const communityMedia = await readFile('supabase/functions/community-media/index.ts', 'utf8');
 const publicIdentity = await readFile('supabase/functions/_shared/public-identity.ts', 'utf8');
 const engagement = await readFile('supabase/functions/engagement/index.ts', 'utf8');
@@ -195,6 +198,8 @@ const invariants = [
   [publicContent, /type === "expression"/, 'public Expression profile contract'],
   [socialFeed, /organization:\s*"optional"/, 'social publishing separates public and scoped membership context'],
   [socialFeed, /body\.organizationId[\s\S]*targetOrganizationId/, 'root General Community publishing accepts explicit church context'],
+  [socialFeed, /view === "post"[\s\S]*postId[\s\S]*scope === "expression"[\s\S]*auth\.branchId/, 'scoped post detail binds exact active Expression'],
+  [publicSocialFeed, /postId[\s\S]*query = query\.eq\("id", postId\)[\s\S]*POST_NOT_FOUND/, 'public post detail returns one published General Community post'],
   [communityMedia, /organization:\s*"none"/, 'community media ignores stale membership headers'],
   [communityMedia, /expression_memberships/, 'Expression media still validates exact membership'],
   [publicIdentity, /profileAuthorMap/, 'public profile-authored posts resolve identity without membership'],
@@ -208,6 +213,8 @@ const invariants = [
   [eventRegistrations, /cancel_event_registration/, 'event registration cancellation'],
   [eventRegistrations, /REGISTRATION_ACCESS_DENIED/, 'event eligibility error mapping'],
   [homeFeed, /rankFeedCandidates/, 'public feed personalization pipeline'],
+  [homeFeed, /from\("social_posts"\)[\s\S]*?is\("branch_id", null\)\.eq\("visibility", "public"\)/, 'General Home social posts exclude Expression-scoped posts'],
+  [homeFeed, /kind: "post" as const[\s\S]*?posts\.forEach/, 'Home social posts participate in canonical feed ranking'],
   [homeFeed, /followedExpressionIds/, 'follow-driven public recommendations'],
   [homeFeed, /inProgressContentIds/, 'continue-watching recommendation signal'],
   [homeFeed, /value === selectedExpressionId/, 'exact Expression home isolation'],
@@ -219,10 +226,14 @@ const invariants = [
   [publicContent, /type === "streams"[\s\S]*provisioning[\s\S]*ready[\s\S]*processing[\s\S]*replay_ready/, 'public stream catalogue lifecycle coverage'],
   [contentMedia, /action"\) === "video_detail"[\s\S]*content_items\.expression_id[\s\S]*auth\.branchId/, 'exact Expression Watch detail is scoped to active Expression'],
   [contentMedia, /video_detail[\s\S]*enrichContentCreators/, 'exact Expression Watch detail includes creator attribution'],
+  [contentMedia, /expressionId[\s\S]*expressionId !== auth\.branchId[\s\S]*authorize\(auth, "media\.upload"\)[\s\S]*authorizeOrganization\(auth, "media\.upload"\)/, 'media upload permission follows exact Public or Expression target scope'],
   [feedRanking, /completedPenalty/, 'completed-content recommendation suppression'],
   [feedRanking, /diversifyFeed/, 'mixed-format feed diversification'],
   [engagement, /view.*state/, 'engagement viewer-state retrieval'],
   [engagement, /body\.action === "unreact"/, 'reaction removal contract'],
+  [engagement, /assertContentAccess[\s\S]*visibility === "branch"[\s\S]*auth\.branchId !== data\.expression_id/, 'engagement requires the exact active Expression for Expression content'],
+  [engagement, /await assertContentAccess\(auth, contentId\)[\s\S]*content_comments/, 'comment reads verify content visibility before returning a thread'],
+  [supabaseConfig, /\[functions\.engagement\][\s\S]*verify_jwt\s*=\s*false/, 'public comment threads can reach optional-auth engagement handler'],
   [publicContent, /content_items\.visibility.*public/s, 'public media visibility boundary'],
   [churchStory, /EXPRESSION_MEMBERSHIP_REQUIRED/, 'internal Expression leadership boundary'],
   [login, /signInWithPassword/, 'password login workflow'],

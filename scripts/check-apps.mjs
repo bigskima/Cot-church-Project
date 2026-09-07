@@ -14,6 +14,9 @@ const files = [
   'apps/mobile/app/(tabs)/live/index.tsx',
   'apps/mobile/app/(tabs)/live/[id].tsx',
   'apps/mobile/app/watch/[id].tsx',
+  'apps/mobile/app/post/[id].tsx',
+  'apps/mobile/app/comments/[contentId].tsx',
+  'apps/mobile/src/components/engagement/CommentsThread.tsx',
   'apps/mobile/src/components/cards/VideoCard.tsx',
   'apps/mobile/src/components/media/VideoPlayer.tsx',
   'apps/mobile/src/components/media/AudioPlayer.tsx',
@@ -33,6 +36,8 @@ const files = [
   'apps/mobile/app/(tabs)/profile/leadership/giving-manage.tsx',
   'apps/mobile/app/(tabs)/profile/leadership/media-studio.tsx',
   'apps/mobile/app/studio/index.tsx',
+  'apps/mobile/app/studio/reel.tsx',
+  'apps/mobile/app/studio/video.tsx',
   'apps/admin/src/pages/RolesAccess.tsx',
   'apps/admin/src/components/Shell.tsx',
   'apps/admin/src/pages/IntegrationsJobs.tsx',
@@ -62,6 +67,11 @@ const platformShellUi = sources.get('apps/admin/src/components/Shell.tsx') ?? ''
 const paymentInfrastructureUi = sources.get('apps/admin/src/pages/PaymentInfrastructure.tsx') ?? '';
 const profileSettingsUi = sources.get('apps/mobile/app/(tabs)/profile/settings.tsx') ?? '';
 const sessionUi = sources.get('apps/mobile/src/state/session.tsx') ?? '';
+const commentProductUi = [
+  sources.get('apps/mobile/app/(tabs)/community/index.tsx') ?? '',
+  sources.get('apps/mobile/app/watch/[id].tsx') ?? '',
+  sources.get('apps/mobile/app/reels.tsx') ?? '',
+].join('\n');
 
 const checks = [
   [/expo-secure-store/, 'secure session persistence'],
@@ -75,6 +85,9 @@ const checks = [
   [/firstMembershipOrganization = value\.organizations\[0\]/, 'creator bootstrap authority is not persisted as membership context'],
   [/creatorOrganizations\?\.some/, 'Expression creator gating uses resolved membership context'],
   [/Resolving Platform Administration access/, 'admin shell waits for resolved platform authority'],
+  [/window\.setInterval\(\(\) => void refreshAuthority\(false\), 120_000\)/, 'Platform Administration authority refreshes without re-login'],
+  [/visibilitychange[\s\S]*refreshAuthority\(false\)/, 'Platform Administration revalidates authority when returning to the app'],
+  [/transient background refresh must not blank already-resolved/, 'Platform Administration preserves resolved access during transient refresh failures'],
   [/setInterval\(refreshContext, 120_000\)/, 'role grants refresh without re-login'],
   [/hasPublicCapability\('public\.live_stream\.create'\)[\s\S]*Go live/, 'assigned public broadcaster live entry point'],
   [/failed background refresh must not blank already-resolved context/, 'membership refresh preserves resolved context'],
@@ -87,6 +100,11 @@ const checks = [
   [/Replays & recordings/, 'recording processing and replay discovery'],
   [/follow_up/, 'private live follow-up'],
   [/social-feed/, 'scoped social experience'],
+  [/pathname:\s*['\"]\/post\/\[id\]['\"]/, 'community cards open a dedicated post detail route'],
+  [/posts:\s*CommunityPost\[\][\s\S]*kind:\s*'post'[\s\S]*PostCard/, 'Home includes canonical social posts in the mixed feed'],
+  [/pathname:\s*['\"]\/comments\/\[contentId\]['\"]/, 'media comments open a dedicated full-screen route'],
+  [/CommentsThread/, 'shared full-screen comment thread surface'],
+  [/focusRequest/, 'post detail can focus the inline comment composer'],
   [/ResourceError/, 'section error states'],
   [/stream-access/, 'secure playback access'],
   [/public-giving/, 'tenant-safe giving resolver'],
@@ -99,6 +117,10 @@ const checks = [
   [/Roles & Access/, 'Platform Administration Roles & Access workspace'],
   [/public\.live_stream\.create/, 'public livestream capability UI'],
   [/hasPublicCapability/, 'public capability helper separate from Expression permissions'],
+  [/canPublishPublicReels[\s\S]*hasOrganizationCapability\('media\.upload'\)[\s\S]*hasOrganizationCapability\('reels\.publish'\)/, 'Public Reel publishing uses organization-scoped authority'],
+  [/canPublishExpressionReels[\s\S]*Boolean\(expression\?\.id\)[\s\S]*hasCapability\('reels\.publish'\)/, 'Expression Reel publishing requires active Expression authority'],
+  [/canPublishPublicVideos[\s\S]*hasOrganizationCapability\('videos\.publish'\)/, 'Public Watch publishing uses organization-scoped authority'],
+  [/canPublishExpressionVideos[\s\S]*Boolean\(expression\?\.id\)[\s\S]*hasCapability\('videos\.publish'\)/, 'Expression Watch publishing requires active Expression authority'],
   [/General Community[\s\S]*Expression role/, 'public COT role is separate from Expression roles'],
   [/visibility: broadcastScope === 'public' \? 'public' : 'branch'/, 'live broadcast destination follows selected scope'],
   [/This livestream remains scoped to the selected Expression/, 'Expression livestream privacy copy'],
@@ -177,10 +199,16 @@ const forbiddenWatchCopyPatterns = [
 const forbiddenPermissionGatePatterns = [
   [/expression-creators\?mode=self/, 'duplicate Expression creator self-fetch in role-gated UI'],
   [/hasCapability\(['"]branches\.create['"]\)/, 'legacy branches.create client gate for canonical Expression creation'],
+  [/permissions\.includes\(['"]\*['"]\)/, 'wildcard permission fallback'],
+  [/hasCapability\(['"]\*['"]\)/, 'wildcard capability fallback'],
 ];
 
 const forbiddenSocialCopyPatterns = [
   [/Join an active Expression before sharing a Reel into General Community/, 'stale Expression-membership Reel sharing guidance'],
+];
+
+const forbiddenModalCommentPatterns = [
+  [/CommentSheet/, 'bottom-sheet comments on Community, Watch, or Reels'],
 ];
 
 const forbiddenPrayerPatterns = [
@@ -206,18 +234,20 @@ const forbidden = forbiddenGivingPatterns.filter(([pattern]) => pattern.test(giv
 const forbiddenPrayer = forbiddenPrayerPatterns.filter(([pattern]) => pattern.test(prayerUi));
 const forbiddenPermissionGates = forbiddenPermissionGatePatterns.filter(([pattern]) => pattern.test(joined));
 const forbiddenSocialCopy = forbiddenSocialCopyPatterns.filter(([pattern]) => pattern.test(joined));
+const forbiddenModalComments = forbiddenModalCommentPatterns.filter(([pattern]) => pattern.test(commentProductUi));
 const forbiddenWatchCopy = forbiddenWatchCopyPatterns.filter(([pattern]) => pattern.test(sources.get('apps/mobile/app/watch/[id].tsx') ?? ''));
 const forbiddenPlatformBoundaries = forbiddenPlatformBoundaryPatterns.filter(([pattern]) => pattern.test(platformShellUi));
 const forbiddenIntegrations = forbiddenIntegrationPatterns.filter(([pattern]) => pattern.test(integrationsUi));
 const missingPaymentCredentialChecks = paymentCredentialChecks.filter(([pattern]) => !pattern.test(paymentInfrastructureUi));
 
-if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenSocialCopy.length || forbiddenWatchCopy.length || forbiddenPlatformBoundaries.length || forbiddenIntegrations.length || missingPaymentCredentialChecks.length) {
+if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenPermissionGates.length || forbiddenSocialCopy.length || forbiddenModalComments.length || forbiddenWatchCopy.length || forbiddenPlatformBoundaries.length || forbiddenIntegrations.length || missingPaymentCredentialChecks.length) {
   const failures = [
     ...missing.map(([, name]) => name),
     ...forbidden.map(([, name]) => `remove ${name}`),
     ...forbiddenPrayer.map(([, name]) => `remove ${name}`),
     ...forbiddenPermissionGates.map(([, name]) => `remove ${name}`),
     ...forbiddenSocialCopy.map(([, name]) => `remove ${name}`),
+    ...forbiddenModalComments.map(([, name]) => `remove ${name}`),
     ...forbiddenWatchCopy.map(([, name]) => `remove ${name}`),
     ...forbiddenPlatformBoundaries.map(([, name]) => `remove ${name}`),
     ...forbiddenIntegrations.map(([, name]) => `remove ${name}`),
@@ -228,5 +258,5 @@ if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenSoc
 }
 
 console.log(
-  `Application check passed (${files.length} files, ${checks.length} production invariants, ${forbiddenGivingPatterns.length + forbiddenPrayerPatterns.length + forbiddenSocialCopyPatterns.length + forbiddenWatchCopyPatterns.length + forbiddenPlatformBoundaryPatterns.length + forbiddenIntegrationPatterns.length} anti-hardcode/boundary checks, ${paymentCredentialChecks.length} payment contract checks).`,
+  `Application check passed (${files.length} files, ${checks.length} production invariants, ${forbiddenGivingPatterns.length + forbiddenPrayerPatterns.length + forbiddenPermissionGatePatterns.length + forbiddenSocialCopyPatterns.length + forbiddenModalCommentPatterns.length + forbiddenWatchCopyPatterns.length + forbiddenPlatformBoundaryPatterns.length + forbiddenIntegrationPatterns.length} anti-hardcode/boundary checks, ${paymentCredentialChecks.length} payment contract checks).`,
 );
