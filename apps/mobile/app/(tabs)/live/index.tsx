@@ -33,7 +33,7 @@ export default function LiveDiscoveryScreen() {
   const expression = context?.expression;
   const canOpenLiveStudio =
     hasPublicCapability('public.live_stream.create') ||
-    (Boolean(expression?.id) && (hasCapability('streams.broadcast') || hasCapability('*')));
+    (Boolean(expression?.id) && hasCapability('streams.broadcast'));
   const query = new URLSearchParams();
   if (organization?.id) query.set('organizationId', organization.id);
   if (expression?.id) query.set('expressionId', expression.id);
