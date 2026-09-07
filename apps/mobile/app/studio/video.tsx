@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -34,12 +34,15 @@ function inferVideoMime(asset: ImagePicker.ImagePickerAsset) {
 }
 
 export default function WatchVideoCreatorScreen() {
+  const pathname = usePathname();
+  const expressionWorkspace = pathname.startsWith('/expressions/');
   const insets = useSafeAreaInsets();
   const { api, context, mode, hasCapability, hasOrganizationCapability } = useSession();
   const { colors } = useTheme();
   const expression = context?.expression;
   const { scope: requestedScope } = useLocalSearchParams<{ scope?: string }>();
   const canPublishPublic =
+    !expressionWorkspace &&
     mode === 'authenticated' &&
     hasOrganizationCapability('media.upload') &&
     hasOrganizationCapability('videos.publish');
@@ -190,7 +193,7 @@ export default function WatchVideoCreatorScreen() {
 
       assetId = null;
       setStage('Published');
-      router.replace('/watch');
+      router.replace((expressionWorkspace && expression?.id ? `/expressions/${expression.id}/videos` : '/watch') as any);
     } catch (error) {
       if (assetId) await cancelAsset(assetId);
       setStage('');
@@ -209,14 +212,14 @@ export default function WatchVideoCreatorScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 130 },
+          { paddingTop: expressionWorkspace ? spacing.md : insets.top + spacing.sm, paddingBottom: expressionWorkspace ? insets.bottom + spacing.xl : insets.bottom + 130 },
         ]}
       >
         <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
           <ScreenHeader
             title="Create Watch Video"
             kicker="MEDIA STUDIO"
-            subtitle="Upload a long-form video and choose exactly where it should appear."
+            subtitle={expressionWorkspace ? `Publish a long-form video inside ${expression?.name ?? 'this Expression'}.` : "Upload a long-form video and choose exactly where it should appear."}
             showBack
           />
         </View>
