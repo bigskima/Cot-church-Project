@@ -142,9 +142,8 @@ export default function CommunityScreen() {
   // membership is not required to publish there; account restrictions and the
   // backend scope contract still apply. Expression publishing remains separate.
   const elevatedGeneralPublisher =
-    context?.organizationPermissions?.includes('feed.post') === true ||
-    context?.organizationPermissions?.includes('*') === true;
-  const elevatedExpressionPublisher = hasCapability('feed.post') || hasCapability('*');
+    context?.organizationPermissions?.includes('feed.post') === true;
+  const elevatedExpressionPublisher = hasCapability('feed.post');
   const canPostGeneral =
     mode === 'authenticated' && Boolean(organizationId);
   const canPostExpression =
