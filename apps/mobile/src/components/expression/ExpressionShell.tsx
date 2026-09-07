@@ -283,6 +283,14 @@ function ExpressionNavigation({
           enabled: management.canManageAccess,
         },
         {
+          key: 'manage-settings',
+          label: 'Expression Settings',
+          icon: 'settings-outline',
+          active: pathname === `${manageBase}/settings`,
+          onPress: () => router.push(`${manageBase}/settings` as any),
+          enabled: management.canManageSettings,
+        },
+        {
           key: 'manage-giving',
           label: 'Giving Setup',
           icon: 'gift-outline',
@@ -310,6 +318,7 @@ function ExpressionNavigation({
       management.canManageGiving,
       management.canManageInviteCodes,
       management.canManageLeadership,
+      management.canManageSettings,
       management.canManageLive,
       management.canManageSermons,
       management.canReadGivingFinance,
