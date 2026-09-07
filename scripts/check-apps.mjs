@@ -189,6 +189,8 @@ const forbiddenWatchCopyPatterns = [
 const forbiddenPermissionGatePatterns = [
   [/expression-creators\?mode=self/, 'duplicate Expression creator self-fetch in role-gated UI'],
   [/hasCapability\(['"]branches\.create['"]\)/, 'legacy branches.create client gate for canonical Expression creation'],
+  [/permissions\.includes\(['"]\*['"]\)/, 'wildcard permission fallback'],
+  [/hasCapability\(['"]\*['"]\)/, 'wildcard capability fallback'],
 ];
 
 const forbiddenSocialCopyPatterns = [
