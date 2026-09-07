@@ -80,7 +80,7 @@ export default function GivingFinanceScreen() {
       <View style={[styles.screen, styles.center, { backgroundColor: colors.bg }]}>
         <EmptyState
           title="Finance access unavailable"
-          message="Your current role does not include permission to view giving finance."
+          message="Giving reports aren’t available for this account."
           iconName="lock-closed-outline"
         />
       </View>
@@ -175,7 +175,7 @@ export default function GivingFinanceScreen() {
           ) : (
             <EmptyState
               title="No giving activity in this period"
-              message="Successful donations in the selected church scope will appear here."
+              message="Completed donations for this church space will appear here."
               iconName="analytics-outline"
             />
           )}
