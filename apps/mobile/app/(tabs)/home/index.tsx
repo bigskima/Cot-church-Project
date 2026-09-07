@@ -313,7 +313,7 @@ export default function HomeScreen() {
             <Icon name="sparkles" size={18} color={colors.interactive} />
           </Pressable>
           {hasGeneralLeadershipCapability ? (
-            <Pressable onPress={() => router.push('/studio')} hitSlop={8} style={({ pressed }) => [styles.iconButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.iconPressed]} accessibilityRole="button" accessibilityLabel="Ministry Studio">
+            <Pressable onPress={() => router.push('/general/studio')} hitSlop={8} style={({ pressed }) => [styles.iconButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.iconPressed]} accessibilityRole="button" accessibilityLabel="Ministry Studio">
               <Icon name="grid-outline" size={18} color={colors.text} />
             </Pressable>
           ) : null}
