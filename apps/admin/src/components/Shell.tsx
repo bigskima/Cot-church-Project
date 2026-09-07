@@ -82,13 +82,18 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    api.request<{
-      profile?: { display_name?: string | null };
-      roles?: Array<{ platform_roles?: { name?: string | null } | null; role_code?: string }>;
-      effectivePermissions?: string[];
-    }>('platform-context')
-      .then((data) => {
+    let requestInFlight = false;
+
+    const refreshAuthority = async (initial = false) => {
+      if (requestInFlight) return;
+      requestInFlight = true;
+      if (initial) setLoading(true);
+      try {
+        const data = await api.request<{
+          profile?: { display_name?: string | null };
+          roles?: Array<{ platform_roles?: { name?: string | null } | null; role_code?: string }>;
+          effectivePermissions?: string[];
+        }>('platform-context');
         if (!active) return;
         const sortedRoles = [...(data.roles ?? [])].sort((a, b) => (a.role_code === 'super_admin' ? -1 : b.role_code === 'super_admin' ? 1 : 0));
         const firstRole = sortedRoles[0];
@@ -98,10 +103,30 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
           roleName: firstRole?.platform_roles?.name?.trim() || firstRole?.role_code?.replaceAll('_', ' ') || 'Platform Administrator',
           roleCode: firstRole?.role_code ?? '',
         });
-      })
-      .catch(() => { if (active) updateAuth(null); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+      } catch {
+        if (initial && active) updateAuth(null);
+        // A transient background refresh must not blank already-resolved
+        // administration access. The next protected request still revalidates it.
+      } finally {
+        requestInFlight = false;
+        if (initial && active) setLoading(false);
+      }
+    };
+
+    void refreshAuthority(true);
+    const interval = window.setInterval(() => void refreshAuthority(false), 120_000);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void refreshAuthority(false);
+    };
+    window.addEventListener('focus', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
   }, [api, updateAuth, auth.accessToken]);
 
   useEffect(() => {
