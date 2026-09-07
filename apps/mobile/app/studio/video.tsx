@@ -36,6 +36,7 @@ function inferVideoMime(asset: ImagePicker.ImagePickerAsset) {
 export default function WatchVideoCreatorScreen() {
   const pathname = usePathname();
   const expressionWorkspace = pathname.startsWith('/expressions/');
+  const generalWorkspace = pathname.startsWith('/general/');
   const insets = useSafeAreaInsets();
   const { api, context, mode, hasCapability, hasOrganizationCapability } = useSession();
   const { colors } = useTheme();
@@ -47,6 +48,7 @@ export default function WatchVideoCreatorScreen() {
     hasOrganizationCapability('media.upload') &&
     hasOrganizationCapability('videos.publish');
   const canPublishExpression =
+    !generalWorkspace &&
     mode === 'authenticated' &&
     Boolean(expression?.id) &&
     hasCapability('media.upload') &&
@@ -193,7 +195,7 @@ export default function WatchVideoCreatorScreen() {
 
       assetId = null;
       setStage('Published');
-      router.replace((expressionWorkspace && expression?.id ? `/expressions/${expression.id}/videos` : '/watch') as any);
+      router.replace((expressionWorkspace && expression?.id ? `/expressions/${expression.id}/videos` : generalWorkspace ? '/general/watch' : '/watch') as any);
     } catch (error) {
       if (assetId) await cancelAsset(assetId);
       setStage('');
@@ -219,7 +221,7 @@ export default function WatchVideoCreatorScreen() {
           <ScreenHeader
             title="Create Watch Video"
             kicker="MEDIA STUDIO"
-            subtitle={expressionWorkspace ? `Publish a long-form video inside ${expression?.name ?? 'this Expression'}.` : "Upload a long-form video and choose exactly where it should appear."}
+            subtitle={expressionWorkspace ? `Publish a long-form video inside ${expression?.name ?? 'this Expression'}.` : generalWorkspace ? "Publish a long-form video to General COT." : "Upload a long-form video and choose exactly where it should appear."}
             showBack
           />
         </View>
