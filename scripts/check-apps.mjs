@@ -256,7 +256,7 @@ const checks = [
   [/const canPublicBroadcast = !expressionWorkspace/, 'Expression Live Studio cannot switch into public broadcast authority'],
   [/const canPublishPublic =[\s\S]*!expressionWorkspace/, 'Expression media creators cannot switch into public publishing'],
   [/const activeScope: GivingScope = expressionWorkspace && expression \? 'expression'/, 'Expression Giving management is locked to Expression scope'],
-  [/Redirect href=\{\`\/expressions\/\$\{context\.expression\.id\}\/manage\`/, 'legacy leadership hub canonicalizes active Expression management'],
+  [/Redirect href=\{\`\/expressions\/\$\{activeExpression!\.id\}\/manage\`/, 'legacy leadership hub canonicalizes active Expression management'],
   [/Redirect href=\{\`\/expressions\/\$\{expression\.id\}\/manage\/studio\`/, 'legacy Studio canonicalizes active Expression content creation'],
   [/Tabs screenOptions=\{screenOptions\} backBehavior="history"/, 'General COT owns a dedicated tab shell'],
   [/name="index"[\s\S]*name="explore"[\s\S]*name="reels"[\s\S]*name="community"[\s\S]*name="profile"/, 'General shell exposes five canonical product destinations'],
