@@ -22,7 +22,6 @@ import {
   Avatar,
   BottomSheet,
   BrandMark,
-  CommentSheet,
   EmptyState,
   Icon,
   PostCard,
@@ -30,7 +29,7 @@ import {
   Skeleton,
 } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
-import type { ContentComment, SocialPost } from '@/types/content';
+import type { SocialPost } from '@/types/content';
 
 type FeedScope = 'general' | 'expression';
 type PublicBadge = { id?: string; code?: string; label: string; backgroundColor: string; textColor: string; priority?: number };
@@ -41,9 +40,6 @@ type CommunityPost = SocialPost & {
   comments_count?: number;
   viewer_reaction?: string | null;
   viewer_bookmarked?: boolean;
-};
-type CommunityComment = ContentComment & {
-  author?: { id: string; displayName?: string; username?: string; avatarUrl?: string | null; badges?: PublicBadge[] } | null;
 };
 type MediaAttachment = {
   uploadId: string;
@@ -119,9 +115,6 @@ export default function CommunityScreen() {
   const [mediaUploading, setMediaUploading] = useState(false);
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState('');
-  const [commentTarget, setCommentTarget] = useState<{ postId: string; scope: FeedScope } | null>(null);
-  const [comments, setComments] = useState<CommunityComment[]>([]);
-  const [commentsLoading, setCommentsLoading] = useState(false);
   const [interactionError, setInteractionError] = useState('');
 
   useEffect(() => {
@@ -153,7 +146,7 @@ export default function CommunityScreen() {
   const postTextLimit = ordinaryGeneralMemberLane ? 2200 : 10000;
   const canAttachAudio = !ordinaryGeneralMemberLane;
   const canEngage = mode === 'authenticated';
-  const canCreateReel = mode === 'authenticated' && hasCapability('media.upload') && hasCapability('reels.publish');
+  const canCreateReel = mode === 'authenticated' && Boolean(expression?.id) && hasCapability('media.upload') && hasCapability('reels.publish');
 
   const cleanupAttachments = async (items = attachments) => {
     if (!items.length) return;
@@ -360,48 +353,6 @@ export default function CommunityScreen() {
     }
   };
 
-  useEffect(() => {
-    if (!commentTarget || !canEngage) {
-      setComments([]);
-      return;
-    }
-    let active = true;
-    setCommentsLoading(true);
-    const requestContext = commentTarget.scope === 'general' ? 'public' : 'current';
-    api.request<CommunityComment[]>(
-      `engagement?contentId=${encodeURIComponent(commentTarget.postId)}`,
-      { context: requestContext },
-    )
-      .then((items) => {
-        if (!active) return;
-        setComments(items);
-        setInteractionError('');
-      })
-      .catch((value) => {
-        if (!active) return;
-        setComments([]);
-        setInteractionError(value instanceof Error ? value.message : 'Unable to load comments.');
-      })
-      .finally(() => { if (active) setCommentsLoading(false); });
-    return () => { active = false; };
-  }, [api, commentTarget, canEngage]);
-
-  const submitComment = async (body: string, parentCommentId?: string | null) => {
-    if (!commentTarget || !canEngage) return;
-    const requestContext = commentTarget.scope === 'general' ? 'public' : 'current';
-    const created = await api.request<CommunityComment>('engagement', {
-      method: 'POST',
-      context: requestContext,
-      body: JSON.stringify({
-        action: 'comment',
-        contentId: commentTarget.postId,
-        body,
-        parentCommentId: parentCommentId ?? undefined,
-      }),
-    });
-    if (created) setComments((current) => [...current, created]);
-    void resource.refresh();
-  };
 
   const reactToPost = async (postId: string, reaction: string | null, scope: FeedScope) => {
     if (!canEngage) return false;
@@ -570,7 +521,8 @@ export default function CommunityScreen() {
               expressionName={item.expression?.name}
               canEngage={canEngage}
               allowExternalShare={item.visibility === 'public'}
-              onReply={canEngage ? () => setCommentTarget({ postId: item.id, scope: activeTab }) : undefined}
+              onPress={() => router.push({ pathname: '/post/[id]', params: { id: item.id, scope: activeTab } } as any)}
+              onReply={() => router.push({ pathname: '/post/[id]', params: { id: item.id, scope: activeTab, focus: 'comments' } } as any)}
               onReact={canEngage ? (reaction) => reactToPost(item.id, reaction, activeTab) : undefined}
               onBookmark={canEngage ? (currentlySaved) => bookmarkPost(item.id, currentlySaved, activeTab) : undefined}
             />
@@ -698,15 +650,6 @@ export default function CommunityScreen() {
         </KeyboardAvoidingView>
       </BottomSheet>
 
-      {commentTarget ? (
-        <CommentSheet
-          visible
-          onClose={() => setCommentTarget(null)}
-          comments={comments}
-          loading={commentsLoading}
-          onSubmitComment={submitComment}
-        />
-      ) : null}
     </View>
   );
 }
