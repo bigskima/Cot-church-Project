@@ -146,7 +146,17 @@ export default function CommunityScreen() {
   const postTextLimit = ordinaryGeneralMemberLane ? 2200 : 10000;
   const canAttachAudio = !ordinaryGeneralMemberLane;
   const canEngage = mode === 'authenticated';
-  const canCreateReel = mode === 'authenticated' && Boolean(expression?.id) && hasCapability('media.upload') && hasCapability('reels.publish');
+  const canCreatePublicReel =
+    mode === 'authenticated' &&
+    hasOrganizationCapability('media.upload') &&
+    hasOrganizationCapability('reels.publish');
+  const canCreateExpressionReel =
+    mode === 'authenticated' &&
+    Boolean(expression?.id) &&
+    hasCapability('media.upload') &&
+    hasCapability('reels.publish');
+  const canCreateReel =
+    postDestination === 'general' ? canCreatePublicReel : canCreateExpressionReel;
 
   const cleanupAttachments = async (items = attachments) => {
     if (!items.length) return;
@@ -595,7 +605,14 @@ export default function CommunityScreen() {
               </Pressable>
             ) : null}
             {canCreateReel ? (
-              <Pressable onPress={() => { closeComposer(); router.push('/studio/reel' as any); }} style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
+              <Pressable
+                onPress={() => {
+                  const targetScope = postDestination === 'expression' ? 'branch' : 'public';
+                  closeComposer();
+                  router.push({ pathname: '/studio/reel', params: { scope: targetScope } } as any);
+                }}
+                style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}
+              >
                 <Icon name="flash-outline" size={18} color={colors.interactive} />
                 <Text style={[styles.mediaButtonText, { color: colors.text }]}>Create Reel</Text>
               </Pressable>
