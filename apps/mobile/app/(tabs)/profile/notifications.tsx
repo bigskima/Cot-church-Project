@@ -124,7 +124,7 @@ export default function NotificationsScreen() {
           rightAction={
             mode === 'authenticated' && context?.organization?.id ? (
               <Pressable
-                onPress={() => router.push('/(tabs)/profile/notification-settings')}
+                onPress={() => router.push('/general/notification-settings')}
                 style={({ pressed }) => [
                   styles.headerSettingsButton,
                   { backgroundColor: colors.cardElevated, borderColor: colors.borderSubtle },
