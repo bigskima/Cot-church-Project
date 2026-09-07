@@ -26,7 +26,7 @@ export default function ExpressionLeadershipManage() {
   const { colors } = useTheme();
   const expression = context?.expression;
   const branchId = expression?.id;
-  const canManage = Boolean(branchId) && (hasCapability('expression.leadership.manage') || hasCapability('*'));
+  const canManage = Boolean(branchId) && hasCapability('expression.leadership.manage');
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editingLeader, setEditingLeader] = useState<LeadershipProfile | null>(null);
