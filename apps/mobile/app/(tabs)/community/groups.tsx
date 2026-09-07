@@ -52,8 +52,8 @@ export default function ExpressionGroupsScreen() {
   const { api, context, mode, hasCapability } = useSession();
   const { colors } = useTheme();
   const expression = context?.expression;
-  const canManageGroups = hasCapability('groups.manage') || hasCapability('*');
-  const canManageMembers = hasCapability('groups.members.manage') || hasCapability('*');
+  const canManageGroups = hasCapability('groups.manage');
+  const canManageMembers = hasCapability('groups.members.manage');
   const includeManagement = canManageMembers ? '&includeManagement=true' : '';
 
   const resource = useResource<GroupPayload>(
