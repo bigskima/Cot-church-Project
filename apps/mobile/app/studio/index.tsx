@@ -70,6 +70,9 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
   if (!generalWorkspace && expression?.id) {
     return <Redirect href={`/expressions/${expression.id}/manage/studio` as any} />;
   }
+  if (!generalWorkspace && !forcedScope) {
+    return <Redirect href="/general/studio" />;
+  }
 
   const handlePublishPost = async () => {
     if (!postBody.trim()) return;
@@ -94,7 +97,7 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
           : 'Your announcement is live in the General Community.',
       );
     } catch (err: unknown) {
-      setPublishError(err instanceof Error ? err.message : 'Unable to publish this announcement.');
+      setPublishError('We couldn’t publish this announcement. Please try again.');
     } finally {
       setSubmitting(false);
     }
