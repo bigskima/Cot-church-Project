@@ -14,7 +14,7 @@ type SignupStep = 'identity' | 'security';
 
 function safeReturnTo(value?: string) {
   if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('://') || value.startsWith('/(auth)')) {
-    return '/(tabs)/home';
+    return '/general';
   }
   return value;
 }
