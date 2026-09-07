@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -72,6 +73,8 @@ function ToggleRow({
 
 export default function ExpressionGivingManageScreen() {
   const insets = useSafeAreaInsets();
+  const pathname = usePathname();
+  const expressionWorkspace = pathname.startsWith('/expressions/');
   const { api, context } = useSession();
   const { colors } = useTheme();
   const organization = context?.organization ?? context?.organizations?.[0];
@@ -92,7 +95,7 @@ export default function ExpressionGivingManageScreen() {
       : Promise.resolve({ organization: false, expression: false, expressionId: null }),
   );
 
-  const activeScope: GivingScope = givingScope === 'expression' && expression ? 'expression' : 'organization';
+  const activeScope: GivingScope = expressionWorkspace && expression ? 'expression' : givingScope === 'expression' && expression ? 'expression' : 'organization';
   const givingPath = `giving?scope=${activeScope}`;
   const configuration = useResource<ExpressionGivingConfiguration>(
     `giving-configuration:${organization?.id ?? 'none'}:${expression?.id ?? 'none'}:${activeScope}`,
@@ -125,13 +128,17 @@ export default function ExpressionGivingManageScreen() {
   const [referencePrefix, setReferencePrefix] = useState('');
 
   useEffect(() => {
+    if (expressionWorkspace && expression) {
+      if (givingScope !== 'expression') setGivingScope('expression');
+      return;
+    }
     if (scopeAccess.loading || !scopeAccess.data) return;
     if (givingScope === 'organization' && !scopeAccess.data.organization && scopeAccess.data.expression && expression) {
       setGivingScope('expression');
     } else if (givingScope === 'expression' && (!expression || !scopeAccess.data.expression) && scopeAccess.data.organization) {
       setGivingScope('organization');
     }
-  }, [scopeAccess.loading, scopeAccess.data?.organization, scopeAccess.data?.expression, expression?.id, givingScope]);
+  }, [expressionWorkspace, scopeAccess.loading, scopeAccess.data?.organization, scopeAccess.data?.expression, expression?.id, givingScope]);
 
   useEffect(() => {
     const settings = configuration.data?.settings;
@@ -327,7 +334,7 @@ export default function ExpressionGivingManageScreen() {
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 120 }}
+        contentContainerStyle={{ paddingTop: expressionWorkspace ? spacing.md : insets.top + spacing.sm, paddingBottom: expressionWorkspace ? insets.bottom + spacing.xl : insets.bottom + 120 }}
       >
         <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
           <ScreenHeader
@@ -348,9 +355,9 @@ export default function ExpressionGivingManageScreen() {
         </View>
 
         <View style={styles.body}>
-          {scopeAccess.loading ? (
+          {!expressionWorkspace && scopeAccess.loading ? (
             <Skeleton height={44} />
-          ) : scopeAccess.data?.organization && scopeAccess.data?.expression && expression ? (
+          ) : !expressionWorkspace && scopeAccess.data?.organization && scopeAccess.data?.expression && expression ? (
             <View style={[styles.scopeTabs, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
               <Chip label="Church-wide" selected={activeScope === 'organization'} onPress={() => setGivingScope('organization')} />
               <Chip label={expression.name} selected={activeScope === 'expression'} onPress={() => setGivingScope('expression')} />
