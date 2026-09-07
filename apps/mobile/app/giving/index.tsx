@@ -1,1 +1,6 @@
-export { GivingScreen as default } from '@/features/giving/GivingScreen';
+import React from 'react';
+import { Redirect } from 'expo-router';
+
+export default function LegacyGivingRoute() {
+  return <Redirect href="/general/giving" />;
+}
