@@ -96,6 +96,7 @@ const checks = [
   [/follow_up/, 'private live follow-up'],
   [/social-feed/, 'scoped social experience'],
   [/pathname:\s*['\"]\/post\/\[id\]['\"]/, 'community cards open a dedicated post detail route'],
+  [/posts:\s*CommunityPost\[\][\s\S]*kind:\s*'post'[\s\S]*PostCard/, 'Home includes canonical social posts in the mixed feed'],
   [/pathname:\s*['\"]\/comments\/\[contentId\]['\"]/, 'media comments open a dedicated full-screen route'],
   [/CommentsThread/, 'shared full-screen comment thread surface'],
   [/focusRequest/, 'post detail can focus the inline comment composer'],
