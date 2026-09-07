@@ -27,6 +27,5 @@ export * from './media/MediaPlayer';
 export * from './media/ReelPlayer';
 export * from './cards/VideoCard';
 export * from './cards/ReelCard';
-export * from './engagement/CommentSheet';
 export * from './engagement/CommentsThread';
 export * from './engagement/ReactionDrawer';
