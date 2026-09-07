@@ -68,20 +68,25 @@ export default function SavedLibraryScreen() {
   const openItem = (item: SavedItem) => {
     const expressionOnly = item.visibility !== 'public' && Boolean(item.expressionId);
     if (expressionOnly && context?.expression?.id !== item.expressionId) {
-      setMessage('Enter the Expression where this was published before opening it.');
+      setMessage('Open the Expression where this was shared before viewing it.');
       return;
     }
-    const contentContext = expressionOnly ? 'expression' : 'public';
     if (item.type === 'reel') {
-      router.push(contentContext === 'expression' ? { pathname: '/reels', params: { reelId: item.routeId, context: 'expression' } } as any : { pathname: '/general/reels', params: { reelId: item.routeId } } as any);
+      router.push(expressionOnly && item.expressionId
+        ? ({ pathname: `/expressions/${item.expressionId}/reels`, params: { reelId: item.routeId } } as any)
+        : ({ pathname: '/general/reels', params: { reelId: item.routeId } } as any));
       return;
     }
     if (item.type === 'video') {
-      router.push(contentContext === 'expression' ? { pathname: '/watch/[id]', params: { id: item.routeId, context: 'expression' } } as any : { pathname: '/general/watch/[id]', params: { id: item.routeId } } as any);
+      router.push(expressionOnly && item.expressionId
+        ? ({ pathname: `/expressions/${item.expressionId}/videos/[videoId]`, params: { videoId: item.routeId } } as any)
+        : ({ pathname: '/general/watch/[id]', params: { id: item.routeId } } as any));
       return;
     }
     if (item.type === 'sermon') {
-      router.push(contentContext === 'expression' ? { pathname: '/sermon/[id]', params: { id: item.routeId, context: 'expression' } } as any : { pathname: '/general/sermon/[id]', params: { id: item.routeId } } as any);
+      router.push(expressionOnly && item.expressionId
+        ? ({ pathname: `/expressions/${item.expressionId}/sermons/[sermonId]`, params: { sermonId: item.routeId } } as any)
+        : ({ pathname: '/general/sermon/[id]', params: { id: item.routeId } } as any));
       return;
     }
     router.push('/general/community');
