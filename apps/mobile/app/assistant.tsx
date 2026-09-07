@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -40,7 +40,7 @@ const suggestedPrompts = [
   'How do I submit a confidential prayer request?',
 ];
 
-export default function AssistantScreen() {
+export function AssistantScreen() {
   const insets = useSafeAreaInsets();
   const { api, mode } = useSession();
   const { colors } = useTheme();
@@ -222,6 +222,10 @@ export default function AssistantScreen() {
       </View>
     </KeyboardAvoidingView>
   );
+}
+
+export default function LegacyAssistantRoute() {
+  return <Redirect href="/general/assistant" />;
 }
 
 const styles = StyleSheet.create({
