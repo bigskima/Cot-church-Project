@@ -1,6 +1,6 @@
 import React from 'react';
-import { PrayerExperience } from '@/features/prayer/PrayerExperience';
+import { Redirect } from 'expo-router';
 
-export default function GeneralPrayerScreen() {
-  return <PrayerExperience scope="general" />;
+export default function LegacyPrayerRoute() {
+  return <Redirect href="/general/prayer" />;
 }
