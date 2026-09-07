@@ -174,7 +174,8 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: {
   }
 
   const groups = resource.data?.groups ?? [];
-  const visibleGroups = focusGroupId ? groups.filter((group) => group.id === focusGroupId) : groups;
+  const focusedGroup = focusGroupId ? groups.find((group) => group.id === focusGroupId) ?? null : null;
+  const visibleGroups = focusGroupId ? (focusedGroup ? [focusedGroup] : []) : groups;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -184,11 +185,11 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: {
         contentContainerStyle={{ paddingTop: embedded ? spacing.md : insets.top + spacing.sm, paddingBottom: embedded ? insets.bottom + spacing.xl : insets.bottom + 130 }}
       >
         {!embedded ? (
-          <ScreenHeader title={focusGroupId ? "Group" : "Groups"} kicker={expression.name.toUpperCase()} subtitle={focusGroupId ? "A smaller community inside this Expression." : "Smaller communities inside this Expression."} showBack />
+          <ScreenHeader title={focusedGroup?.name ?? (focusGroupId ? "Group" : "Groups")} kicker={expression.name.toUpperCase()} subtitle={focusGroupId ? "A smaller community inside this Expression." : "Smaller communities inside this Expression."} showBack />
         ) : (
           <View style={styles.embeddedIntro}>
             <Text style={[styles.embeddedEyebrow, { color: colors.interactive }]}>EXPRESSION COMMUNITY</Text>
-            <Text style={[styles.embeddedTitle, { color: colors.text }]}>{focusGroupId ? 'Group' : 'Groups'}</Text>
+            <Text style={[styles.embeddedTitle, { color: colors.text }]}>{focusedGroup?.name ?? (focusGroupId ? 'Group' : 'Groups')}</Text>
             <Text style={[styles.embeddedCopy, { color: colors.textSecondary }]}>
               {focusGroupId ? 'Group details, membership and leadership actions.' : `Smaller communities inside ${expression.name}.`}
             </Text>
@@ -204,7 +205,11 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: {
               badge={focusGroupId ? undefined : groups.length}
               subtitle={focusGroupId ? "Membership, meeting details and requests" : "Join conversations and fellowship spaces"}
             />
-            {canManageGroups ? <Button label="New group" onPress={() => setCreateOpen(true)} variant="primary" size="sm" /> : null}
+            {focusGroupId ? (
+              <Button label="All groups" onPress={() => router.replace(`/expressions/${expression.id}/groups` as any)} variant="ghost" size="sm" />
+            ) : canManageGroups ? (
+              <Button label="New group" onPress={() => setCreateOpen(true)} variant="primary" size="sm" />
+            ) : null}
           </View>
 
           {resource.loading && !resource.data ? (
