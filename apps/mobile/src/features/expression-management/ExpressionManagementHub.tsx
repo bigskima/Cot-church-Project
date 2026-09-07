@@ -92,6 +92,15 @@ export function ExpressionManagementHub() {
         route: `${base}/access`,
         enabled: access.canManageAccess,
       },
+      {
+        key: 'settings',
+        title: 'Expression Settings',
+        description: 'Update the name, code and timezone used by this Expression.',
+        iconName: 'settings-outline',
+        badge: 'SETTINGS',
+        route: `${base}/settings`,
+        enabled: access.canManageSettings,
+      },
     ];
 
     const finance: Tool[] = [
@@ -126,6 +135,7 @@ export function ExpressionManagementHub() {
     access.canManageGiving,
     access.canManageInviteCodes,
     access.canManageLeadership,
+    access.canManageSettings,
     access.canManageLive,
     access.canManageSermons,
     access.canReadGivingFinance,
