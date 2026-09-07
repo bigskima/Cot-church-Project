@@ -111,7 +111,7 @@ export default function ProfileScreen() {
             <Skeleton height={42} count={2} />
           </View>
         ) : contextStatus === 'error' && !context ? (
-          <ResourceError message={contextError || 'We couldn’t load your account access right now.'} retry={refreshContext} />
+          <ResourceError message={contextError || 'We couldn’t load your account right now.'} retry={refreshContext} />
         ) : (
           <View style={[styles.memberCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
             <View style={styles.memberHeader}>
@@ -155,17 +155,17 @@ export default function ProfileScreen() {
 
         {mode === 'authenticated' && !accessReady ? (
           <View style={styles.sectionWrap}>
-            <SectionHeader title="Ministry tools" subtitle="Checking the roles assigned to your account" />
+            <SectionHeader title="Ministry tools" subtitle="Getting your ministry tools ready" />
             <Skeleton height={92} />
           </View>
         ) : hasLeadershipAccess ? (
           <View style={styles.sectionWrap}>
-            <SectionHeader title="Ministry tools" subtitle="Only capabilities assigned to your role appear here" />
+            <SectionHeader title="Ministry tools" subtitle="Only the ministry tools available to you appear here" />
             <Pressable onPress={() => router.push('/general/leadership')} style={({ pressed }) => [styles.leadershipBanner, { backgroundColor: colors.card, borderColor: colors.interactive }, shadows.md, pressed && styles.pressed]}>
               <View style={[styles.leadershipIconWrap, { backgroundColor: colors.primarySoft }]}><Icon name="construct-outline" size={22} color={colors.interactive} /></View>
               <View style={styles.leadershipContent}>
                 <View style={styles.leadershipTitleRow}><Text style={[styles.leadershipTitle, { color: colors.text }]}>Leadership tools</Text><Badge label="MINISTRY" variant="primary" /></View>
-                <Text style={[styles.leadershipSub, { color: colors.textSecondary }]}>Open only the church-wide ministry tools assigned to your role</Text>
+                <Text style={[styles.leadershipSub, { color: colors.textSecondary }]}>Open your church-wide ministry tools</Text>
               </View>
               <Icon name="chevron-forward" size={18} color={colors.textMuted} />
             </Pressable>
