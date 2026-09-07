@@ -59,16 +59,44 @@ export default function ProfileScreen() {
       (hasOrganizationCapability('prayer.pastoral.receive') || hasOrganizationCapability('prayer.team.receive'))) ||
       hasOrganizationCapability('pastoral.followups.receive'));
 
+  const hasOrganizationCreatorAccess =
+    hasOrganizationCapability('posts.create') ||
+    hasOrganizationCapability('posts.publish') ||
+    (hasOrganizationCapability('media.upload') &&
+      (hasOrganizationCapability('reels.publish') || hasOrganizationCapability('videos.publish')));
+  const hasOrganizationContentLeadershipAccess =
+    hasOrganizationCreatorAccess ||
+    hasOrganizationCapability('sermons.create') ||
+    hasOrganizationCapability('sermons.manage') ||
+    hasOrganizationCapability('events.create') ||
+    hasOrganizationCapability('events.update');
+
+  const hasExpressionCreatorAccess = Boolean(expression?.id) && (
+    hasCapability('posts.create') ||
+    hasCapability('posts.publish') ||
+    (hasCapability('media.upload') &&
+      (hasCapability('reels.publish') || hasCapability('videos.publish')))
+  );
   const hasExpressionLeadershipAccess = Boolean(expression?.id) && (
-    hasCapability('posts.create') || hasCapability('reels.create') || hasCapability('videos.create') || hasCapability('media.upload') || hasCapability('studio.access') || hasCapability('streams.broadcast') ||
-    hasCapability('sermons.create') || hasCapability('sermons.manage') || hasCapability('events.create') ||
-    hasCapability('events.update') || hasCurrentPastoralLeadershipAccess || hasCapability('members.invite') ||
-    hasCapability('roles.assign') || hasCapability('expression.leadership.manage')
+    hasExpressionCreatorAccess ||
+    hasCapability('streams.broadcast') ||
+    hasCapability('sermons.create') ||
+    hasCapability('sermons.manage') ||
+    hasCapability('events.create') ||
+    hasCapability('events.update') ||
+    hasCurrentPastoralLeadershipAccess ||
+    hasCapability('giving.campaigns.manage') ||
+    hasCapability('giving.finance.read') ||
+    hasCapability('members.invite') ||
+    hasCapability('roles.assign') ||
+    hasCapability('expression.leadership.manage')
   );
   const hasOrganizationLeadershipAccess =
     hasOrganizationCapability('organization.leadership.manage') ||
+    hasOrganizationContentLeadershipAccess ||
     hasOrganizationPastoralLeadershipAccess ||
-    (!expression?.id && (hasCapability('giving.campaigns.manage') || hasCapability('giving.finance.read'))) ||
+    hasOrganizationCapability('giving.campaigns.manage') ||
+    hasOrganizationCapability('giving.finance.read') ||
     isAuthorizedExpressionCreator;
 
   const hasLeadershipAccess = mode === 'authenticated' && accessReady && (
