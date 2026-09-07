@@ -143,11 +143,10 @@ export default function CommunityScreen() {
   // backend scope contract still apply. Expression publishing remains separate.
   const elevatedGeneralPublisher =
     context?.organizationPermissions?.includes('feed.post') === true;
-  const elevatedExpressionPublisher = hasCapability('feed.post');
   const canPostGeneral =
     mode === 'authenticated' && Boolean(organizationId);
   const canPostExpression =
-    mode === 'authenticated' && Boolean(expression?.id) && elevatedExpressionPublisher;
+    mode === 'authenticated' && Boolean(expression?.id);
   const canPostCurrent = activeTab === 'general' ? canPostGeneral : canPostExpression;
   const canPostDestination = postDestination === 'general' ? canPostGeneral : canPostExpression;
   const ordinaryGeneralMemberLane = postDestination === 'general' && !elevatedGeneralPublisher;
