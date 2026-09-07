@@ -39,6 +39,7 @@ Deno.serve(createHandler(
     const organizationId = await resolveOrganizationId(url.searchParams.get("organizationId"));
     const expressionParam = url.searchParams.get("expressionId");
     const expressionId = expressionParam ? uuid(expressionParam, "expressionId", true) : null;
+    const postId = uuid(url.searchParams.get("postId"), "postId");
     const scope = url.searchParams.get("scope") ?? "all";
 
     if (!scopes.has(scope)) throw new ApiError("VALIDATION_FAILED", "Invalid community feed scope", 422);
@@ -69,6 +70,7 @@ Deno.serve(createHandler(
 
     if (scope === "church") query = query.is("branch_id", null);
     if (scope === "expression") query = query.eq("branch_id", expressionId!);
+    if (postId) query = query.eq("id", postId);
 
     const { data, error } = await query;
     if (error) throw new ApiError("PUBLIC_FEED_FAILED", "Unable to retrieve public community posts", 500, undefined, false);
@@ -78,6 +80,10 @@ Deno.serve(createHandler(
       auth?.client ?? publicDb,
       auth?.user.id,
     );
+    if (postId) {
+      if (!engaged.length) throw new ApiError("POST_NOT_FOUND", "This post is no longer available", 404);
+      return { data: engaged[0] };
+    }
     return { data: engaged };
   },
 ));
