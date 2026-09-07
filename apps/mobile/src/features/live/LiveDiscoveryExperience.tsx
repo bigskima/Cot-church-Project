@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
@@ -40,8 +40,8 @@ export function LiveDiscoveryExperience({ scope = 'general', embedded = false }:
   if (organization?.id) query.set('organizationId', organization.id);
   if (expressionId) query.set('expressionId', expressionId);
 
-  // Use the same scope resolver as Home. General live content is always retained;
-  // selecting an active Expression adds that Expression's permitted broadcasts.
+  // The route owns the experience scope. General Live stays church-wide, while
+  // Expression Live requests only the exact active Expression.
   const resource = useResource<LiveHomePayload>(
     `live:discovery:${organization?.id ?? 'default'}:${expressionId ?? 'general'}:${scope}`,
     (signal) => api.request<LiveHomePayload>(`home-feed${query.size ? `?${query.toString()}` : ''}`, { signal })
