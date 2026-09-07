@@ -24,6 +24,11 @@ Deno.serve(createHandler(
           throw new ApiError("EXPRESSION_REQUIRED", "Enter an Expression to view its member directory", 400);
         }
 
+        const requestedExpressionId = uuid(url.searchParams.get("expressionId"), "expressionId", true);
+        if (!requestedExpressionId || requestedExpressionId !== auth.branchId) {
+          throw new ApiError("EXPRESSION_CONTEXT_MISMATCH", "This member directory does not match the active Expression", 403);
+        }
+
         const admin = adminClient();
         const { data: exactMembership, error: exactMembershipError } = await admin
           .from("expression_memberships")
