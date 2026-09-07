@@ -202,17 +202,29 @@ The existing Expression leadership directory remains backed by `church-story?vie
 
 ### Phase 5 — Expression leadership
 
-Move Expression-owned management out of General Profile:
+Implemented canonical Expression management routes:
 
-- Expression leadership overview
-- roles and invitations
-- content studio
-- live studio
-- events management
-- giving
-- settings/governance
+- `/expressions/[expressionId]/manage`
+- `/expressions/[expressionId]/manage/studio`
+- `/expressions/[expressionId]/manage/reel`
+- `/expressions/[expressionId]/manage/video`
+- `/expressions/[expressionId]/manage/sermons`
+- `/expressions/[expressionId]/manage/live`
+- `/expressions/[expressionId]/manage/events`
+- `/expressions/[expressionId]/manage/leadership`
+- `/expressions/[expressionId]/manage/invite-codes`
+- `/expressions/[expressionId]/manage/access`
+- `/expressions/[expressionId]/manage/settings`
+- `/expressions/[expressionId]/manage/giving`
+- `/expressions/[expressionId]/manage/finance`
 
-Leadership items are generated from resolved backend permissions.
+All management navigation is generated from one shared `useExpressionManagementAccess` capability resolver. The resolver consumes the already-resolved Expression permissions plus accountable ownership state, so sidebar visibility, the management hub and route gates use the same authority model.
+
+Existing leadership, studio, live, sermon, event, giving, role/invitation and ownership implementations remain canonical underneath; Phase 5 changes their route ownership and presentation rather than creating duplicate operational systems. The old Profile Leadership and Studio hubs canonicalize an active Expression back into its workspace, while legacy deep links remain compatibility paths until Phase 7 cleanup.
+
+Expression Content Studio, Reel, Watch, Live Studio and Giving configuration are locked to the active Expression when rendered below `/expressions/[expressionId]/manage`. A user who separately has public/church-wide authority cannot use an Expression management route to switch destination scope.
+
+Expression Settings uses the existing `branches.update` backend permission and exposes only day-to-day identity fields (name, member-facing code and timezone). Immutable route identity remains the Expression UUID, and platform lifecycle controls such as suspension/archive are intentionally excluded.
 
 ### Phase 6 — General COT route migration
 

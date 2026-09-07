@@ -15,6 +15,7 @@ import { Icon } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
+import { useExpressionManagementAccess } from '@/features/expression-management/useExpressionManagementAccess';
 
 type Props = PropsWithChildren<{
   expressionId: string;
@@ -88,6 +89,7 @@ function ExpressionNavigation({
   const { colors } = useTheme();
   const { context } = useSession();
   const pathname = usePathname();
+  const management = useExpressionManagementAccess();
   const expression = context?.expressions?.find((item) => item.id === expressionId)
     ?? (context?.expression?.id === expressionId
       ? { id: expressionId, name: context.expression.name, code: undefined }
@@ -211,6 +213,120 @@ function ExpressionNavigation({
     [basePath, pathname],
   );
 
+
+  const managementItems = useMemo<NavItem[]>(
+    () => {
+      const manageBase = `${basePath}/manage`;
+      return [
+        {
+          key: 'manage',
+          label: 'Management',
+          icon: 'settings-outline',
+          active: pathname === manageBase,
+          onPress: () => router.push(manageBase as any),
+          enabled: management.canManageAny,
+        },
+        {
+          key: 'manage-studio',
+          label: 'Content Studio',
+          icon: 'color-wand-outline',
+          active: pathname === `${manageBase}/studio` || pathname === `${manageBase}/reel` || pathname === `${manageBase}/video`,
+          onPress: () => router.push(`${manageBase}/studio` as any),
+          enabled: management.canUseContentStudio,
+        },
+        {
+          key: 'manage-live',
+          label: 'Live Studio',
+          icon: 'radio-outline',
+          active: pathname === `${manageBase}/live`,
+          onPress: () => router.push(`${manageBase}/live` as any),
+          enabled: management.canManageLive,
+        },
+        {
+          key: 'manage-sermons',
+          label: 'Manage Sermons',
+          icon: 'book-outline',
+          active: pathname === `${manageBase}/sermons`,
+          onPress: () => router.push(`${manageBase}/sermons` as any),
+          enabled: management.canManageSermons,
+        },
+        {
+          key: 'manage-events',
+          label: 'Manage Events',
+          icon: 'calendar-outline',
+          active: pathname === `${manageBase}/events`,
+          onPress: () => router.push(`${manageBase}/events` as any),
+          enabled: management.canManageEvents,
+        },
+        {
+          key: 'manage-leadership',
+          label: 'Manage Leadership',
+          icon: 'people-circle-outline',
+          active: pathname === `${manageBase}/leadership`,
+          onPress: () => router.push(`${manageBase}/leadership` as any),
+          enabled: management.canManageLeadership,
+        },
+        {
+          key: 'manage-invite-codes',
+          label: 'Invite Codes',
+          icon: 'key-outline',
+          active: pathname === `${manageBase}/invite-codes`,
+          onPress: () => router.push(`${manageBase}/invite-codes` as any),
+          enabled: management.canManageInviteCodes,
+        },
+        {
+          key: 'manage-access',
+          label: 'Roles & Ownership',
+          icon: 'shield-checkmark-outline',
+          active: pathname === `${manageBase}/access`,
+          onPress: () => router.push(`${manageBase}/access` as any),
+          enabled: management.canManageAccess,
+        },
+        {
+          key: 'manage-settings',
+          label: 'Expression Settings',
+          icon: 'settings-outline',
+          active: pathname === `${manageBase}/settings`,
+          onPress: () => router.push(`${manageBase}/settings` as any),
+          enabled: management.canManageSettings,
+        },
+        {
+          key: 'manage-giving',
+          label: 'Giving Setup',
+          icon: 'gift-outline',
+          active: pathname === `${manageBase}/giving`,
+          onPress: () => router.push(`${manageBase}/giving` as any),
+          enabled: management.canManageGiving,
+        },
+        {
+          key: 'manage-finance',
+          label: 'Giving Finance',
+          icon: 'analytics-outline',
+          active: pathname === `${manageBase}/finance`,
+          onPress: () => router.push(`${manageBase}/finance` as any),
+          enabled: management.canReadGivingFinance,
+        },
+      ]
+        .filter((item) => item.enabled)
+        .map(({ enabled: _enabled, ...item }) => item as NavItem);
+    },
+    [
+      basePath,
+      management.canManageAccess,
+      management.canManageAny,
+      management.canManageEvents,
+      management.canManageGiving,
+      management.canManageInviteCodes,
+      management.canManageLeadership,
+      management.canManageSettings,
+      management.canManageLive,
+      management.canManageSermons,
+      management.canReadGivingFinance,
+      management.canUseContentStudio,
+      pathname,
+    ],
+  );
+
   return (
     <View style={styles.navRoot}>
       <View style={[styles.identityCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
@@ -250,6 +366,15 @@ function ExpressionNavigation({
         {peopleItems.map((item) => (
           <NavButton key={item.key} item={item} onNavigate={onNavigate} />
         ))}
+
+        {management.ready && managementItems.length ? (
+          <>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>MANAGE EXPRESSION</Text>
+            {managementItems.map((item) => (
+              <NavButton key={item.key} item={item} onNavigate={onNavigate} />
+            ))}
+          </>
+        ) : null}
 
         <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>SPACE</Text>
         <NavButton

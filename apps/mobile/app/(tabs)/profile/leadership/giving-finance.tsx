@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -39,6 +40,8 @@ function money(amountMinor: number | string, currency: string) {
 
 export default function GivingFinanceScreen() {
   const insets = useSafeAreaInsets();
+  const pathname = usePathname();
+  const expressionWorkspace = pathname.startsWith('/expressions/');
   const { api, context, hasCapability } = useSession();
   const { colors } = useTheme();
   const organization = context?.organization ?? context?.organizations?.[0];
@@ -93,7 +96,7 @@ export default function GivingFinanceScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 120 },
+          { paddingTop: expressionWorkspace ? spacing.md : insets.top + spacing.sm, paddingBottom: expressionWorkspace ? insets.bottom + spacing.xl : insets.bottom + 120 },
         ]}
       >
         <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>

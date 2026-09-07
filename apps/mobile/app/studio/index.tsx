@@ -5,7 +5,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -63,6 +63,10 @@ export default function CreatorStudioScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [publishNotice, setPublishNotice] = useState('');
   const [publishError, setPublishError] = useState('');
+
+  if (expression?.id) {
+    return <Redirect href={`/expressions/${expression.id}/manage/studio` as any} />;
+  }
 
   const handlePublishPost = async () => {
     if (!postBody.trim()) return;
