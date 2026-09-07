@@ -351,7 +351,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
   const hasCapability = useCallback(
     (code: string) => {
       if (mode !== 'authenticated' || !accessReady) return false;
-      return permissions.includes(code) || permissions.includes('*');
+      return permissions.includes(code);
     },
     [mode, accessReady, permissions]
   );
