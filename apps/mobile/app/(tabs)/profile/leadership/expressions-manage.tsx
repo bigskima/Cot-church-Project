@@ -165,7 +165,7 @@ export default function ExpressionsManageScreen() {
                 <Icon name="shield-checkmark-outline" size={22} color={colors.textMuted} />
               </View>
               <View style={styles.flex}>
-                <Text style={[styles.creatorTitle, { color: colors.text }]}>Creation is controlled by Platform Authority</Text>
+                <Text style={[styles.creatorTitle, { color: colors.text }]}>Expression creation is available by invitation</Text>
                 <Text style={[styles.creatorCopy, { color: colors.textSecondary }]}>
                   You can view Expressions here. The Create action appears automatically when your account is authorized.
                 </Text>
