@@ -49,8 +49,8 @@ export default function EventsManageScreen() {
   const { colors } = useTheme();
   const expression = context?.expression;
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
-  const canCreate = hasCapability('events.create') || hasCapability('*');
-  const canUpdate = hasCapability('events.update') || hasCapability('*');
+  const canCreate = hasCapability('events.create');
+  const canUpdate = hasCapability('events.update');
 
   const [composerOpen, setComposerOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
