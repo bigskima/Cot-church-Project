@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { usePathname } from 'expo-router';
+import { Redirect, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiError } from '@/api';
 import {
@@ -44,6 +44,10 @@ export default function ExpressionInviteCodesScreen() {
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const expressionWorkspace = pathname.startsWith('/expressions/');
+
+  if (!expressionWorkspace) {
+    return <Redirect href="/expressions" />;
+  }
   const { colors } = useTheme();
   const { api, context, hasCapability } = useSession();
   const expression = context?.expression;
@@ -80,7 +84,7 @@ export default function ExpressionInviteCodesScreen() {
       <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top + spacing.sm }]}>
         <ScreenHeader title="Invite codes" kicker="EXPRESSION" showBack />
         <View style={styles.emptyPad}>
-          <EmptyState title="Enter an Expression first" message="Invite codes belong to one contained Expression and are never managed from public context." iconName="people-outline" />
+          <EmptyState title="Enter an Expression first" message="Enter the Expression you want to invite people to." iconName="people-outline" />
         </View>
       </View>
     );
