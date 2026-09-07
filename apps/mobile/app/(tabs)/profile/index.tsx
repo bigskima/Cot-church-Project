@@ -18,13 +18,12 @@ type AiReadiness = {
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { mode, context, contextStatus, contextError, accessReady, refreshContext, hasCapability, hasOrganizationCapability, hasPublicCapability, signOut, api } = useSession();
+  const { mode, context, contextStatus, contextError, accessReady, refreshContext, hasOrganizationCapability, hasPublicCapability, signOut, api } = useSession();
   const { preference, setPreference, colors } = useTheme();
   const profile = context?.profile;
   const membershipOrganization = context?.organization ?? context?.organizations?.[0];
   const creatorOrganization = context?.creatorOrganizations?.[0];
   const organization = membershipOrganization ?? creatorOrganization;
-  const expression = context?.expression;
   const hasOrganization = Boolean(membershipOrganization?.id);
 
   const isAuthorizedExpressionCreator = Boolean(
@@ -33,7 +32,7 @@ export default function ProfileScreen() {
   );
 
   const aiReadiness = useResource<AiReadiness>(
-    `profile:assistant-readiness:${mode}:${contextStatus}:${membershipOrganization?.id ?? 'none'}:${expression?.id ?? 'general'}`,
+    `profile:assistant-readiness:${mode}:${contextStatus}:${membershipOrganization?.id ?? 'none'}:general`,
     (signal) => {
     if (mode !== 'authenticated' || !hasOrganization) {
       return Promise.resolve({ capability: 'assistant.answer', ready: false, reason: 'active_membership_required' });
@@ -50,10 +49,6 @@ export default function ProfileScreen() {
 
   const hasPublicBroadcastAccess = hasPublicCapability('public.live_stream.create');
 
-  const hasCurrentPastoralLeadershipAccess =
-    ((hasCapability('prayer.moderate') &&
-      (hasCapability('prayer.pastoral.receive') || hasCapability('prayer.team.receive'))) ||
-      hasCapability('pastoral.followups.receive'));
   const hasOrganizationPastoralLeadershipAccess =
     ((hasOrganizationCapability('prayer.moderate') &&
       (hasOrganizationCapability('prayer.pastoral.receive') || hasOrganizationCapability('prayer.team.receive'))) ||
@@ -71,26 +66,6 @@ export default function ProfileScreen() {
     hasOrganizationCapability('events.create') ||
     hasOrganizationCapability('events.update');
 
-  const hasExpressionCreatorAccess = Boolean(expression?.id) && (
-    hasCapability('posts.create') ||
-    hasCapability('posts.publish') ||
-    (hasCapability('media.upload') &&
-      (hasCapability('reels.publish') || hasCapability('videos.publish')))
-  );
-  const hasExpressionLeadershipAccess = Boolean(expression?.id) && (
-    hasExpressionCreatorAccess ||
-    hasCapability('streams.broadcast') ||
-    hasCapability('sermons.create') ||
-    hasCapability('sermons.manage') ||
-    hasCapability('events.create') ||
-    hasCapability('events.update') ||
-    hasCurrentPastoralLeadershipAccess ||
-    hasCapability('giving.campaigns.manage') ||
-    hasCapability('giving.finance.read') ||
-    hasCapability('members.invite') ||
-    hasCapability('roles.assign') ||
-    hasCapability('expression.leadership.manage')
-  );
   const hasOrganizationLeadershipAccess =
     hasOrganizationCapability('organization.leadership.manage') ||
     hasOrganizationContentLeadershipAccess ||
@@ -100,7 +75,7 @@ export default function ProfileScreen() {
     isAuthorizedExpressionCreator;
 
   const hasLeadershipAccess = mode === 'authenticated' && accessReady && (
-    hasPublicBroadcastAccess || hasOrganizationLeadershipAccess || hasExpressionLeadershipAccess
+    hasPublicBroadcastAccess || hasOrganizationLeadershipAccess
   );
 
   const serviceTile = (route: string, icon: string, title: string, subtitle: string, disabled = false) => (
@@ -128,7 +103,7 @@ export default function ProfileScreen() {
             <View style={[styles.visitorIconWrap, { backgroundColor: colors.primarySoft }]}><Icon name="person-add" size={28} color={colors.interactive} /></View>
             <Text style={[styles.visitorTitle, { color: colors.text }]}>Your COT account</Text>
             <Text style={[styles.visitorSubtitle, { color: colors.textSecondary }]}>Public COT stays open to browse. Sign in when you want to interact, join an Expression, receive invitations, or use member-only features.</Text>
-            <Button label="Sign in or create account" onPress={() => router.push({ pathname: '/(auth)/login', params: { returnTo: '/(tabs)/profile' } } as any)} variant="primary" size="lg" style={{ width: '100%', marginTop: spacing.sm }} />
+            <Button label="Sign in or create account" onPress={() => router.push({ pathname: '/(auth)/login', params: { returnTo: '/general/profile' } } as any)} variant="primary" size="lg" style={{ width: '100%', marginTop: spacing.sm }} />
           </View>
         ) : contextStatus === 'loading' && !context ? (
           <View style={[styles.memberCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
@@ -148,18 +123,18 @@ export default function ProfileScreen() {
                 {profile?.email ? <Text style={[styles.memberEmail, { color: colors.textSecondary }]} numberOfLines={1}>{profile.email}</Text> : null}
                 {organization?.name ? (
                   <View style={styles.memberContextRow}>
-                    <Icon name={expression?.id ? "people-outline" : "business-outline"} size={13} color={colors.interactive} />
-                    <Text style={[styles.memberOrg, { color: colors.interactive }]} numberOfLines={1}>{organization.name}{expression?.name ? ` · ${expression.name}` : ''}</Text>
+                    <Icon name="business-outline" size={13} color={colors.interactive} />
+                    <Text style={[styles.memberOrg, { color: colors.interactive }]} numberOfLines={1}>{organization.name}</Text>
                   </View>
                 ) : null}
               </View>
             </View>
             <View style={styles.profileQuickActions}>
-              <Pressable onPress={() => router.push('/(tabs)/profile/settings')} style={({ pressed }) => [styles.profileQuickAction, { backgroundColor: colors.bgSecondary }, pressed && styles.pressed]}>
+              <Pressable onPress={() => router.push('/general/settings')} style={({ pressed }) => [styles.profileQuickAction, { backgroundColor: colors.bgSecondary }, pressed && styles.pressed]}>
                 <Icon name="create-outline" size={16} color={colors.text} />
                 <Text style={[styles.profileQuickActionText, { color: colors.text }]}>Edit profile</Text>
               </Pressable>
-              <Pressable onPress={() => router.push('/(tabs)/profile/notifications')} style={({ pressed }) => [styles.profileQuickAction, { backgroundColor: colors.bgSecondary }, pressed && styles.pressed]}>
+              <Pressable onPress={() => router.push('/general/notifications')} style={({ pressed }) => [styles.profileQuickAction, { backgroundColor: colors.bgSecondary }, pressed && styles.pressed]}>
                 <Icon name="notifications-outline" size={16} color={colors.text} />
                 <Text style={[styles.profileQuickActionText, { color: colors.text }]}>Notifications</Text>
               </Pressable>
@@ -170,13 +145,10 @@ export default function ProfileScreen() {
         <View style={styles.sectionWrap}>
           <SectionHeader title="Your church" subtitle="Community, Expressions and personal services" />
           <View style={styles.linksList}>
-            {mode === 'authenticated' ? serviceTile('/(tabs)/profile/saved', 'bookmark-outline', 'Saved Library', 'Return to posts, Reels, Watch videos and sermons you kept for later') : null}
-            {mode === 'authenticated' ? serviceTile('/expressions', 'business-outline', 'My Expressions', expression?.name ? `Inside ${expression.name} · change or leave this space` : 'Join with an invite code or enter one of your Expressions') : null}
-            {mode === 'authenticated' && expression?.id ? serviceTile(`/expressions/${expression.id}/groups`, 'people-outline', 'Expression Groups', `Discover and join groups inside ${expression.name}`) : null}
-            {mode === 'authenticated' && expression?.id ? serviceTile(`/expressions/${expression.id}/birthdays`, 'gift-outline', 'Expression Birthdays', 'Private upcoming birthday calendar with month/day only') : null}
-            {mode === 'authenticated' && expression?.id && hasCapability('members.invite') ? serviceTile(`/expressions/${expression.id}/manage/invite-codes`, 'key-outline', 'Expression Invite Codes', `Invite and manage membership access for ${expression.name}`) : null}
-            {serviceTile('/(tabs)/profile/prayer', 'heart-outline', 'Prayer Petitions & Wall', 'Submit private pastoral requests or view community prayer items')}
-            {serviceTile('/(tabs)/profile/giving', 'gift-outline', 'Giving & Statements', 'View the configured church or Expression giving destinations and receipts')}
+            {mode === 'authenticated' ? serviceTile('/general/saved', 'bookmark-outline', 'Saved Library', 'Return to posts, Reels, Watch videos and sermons you kept for later') : null}
+            {mode === 'authenticated' ? serviceTile('/expressions', 'business-outline', 'My Expressions', 'Join with an invite code or enter one of your Expressions') : null}
+            {serviceTile('/general/prayer', 'heart-outline', 'Prayer Petitions & Wall', 'Submit private pastoral requests or view community prayer items')}
+            {serviceTile('/general/giving', 'gift-outline', 'Giving & Statements', 'View church-wide giving destinations and your receipts')}
             {mode === 'authenticated' ? serviceTile('/assistant', 'sparkles', 'AI Spiritual Assistant', aiSubtitle, !aiReady) : null}
           </View>
         </View>
@@ -189,11 +161,11 @@ export default function ProfileScreen() {
         ) : hasLeadershipAccess ? (
           <View style={styles.sectionWrap}>
             <SectionHeader title="Ministry tools" subtitle="Only capabilities assigned to your role appear here" />
-            <Pressable onPress={() => router.push('/(tabs)/profile/leadership')} style={({ pressed }) => [styles.leadershipBanner, { backgroundColor: colors.card, borderColor: colors.interactive }, shadows.md, pressed && styles.pressed]}>
+            <Pressable onPress={() => router.push('/general/leadership')} style={({ pressed }) => [styles.leadershipBanner, { backgroundColor: colors.card, borderColor: colors.interactive }, shadows.md, pressed && styles.pressed]}>
               <View style={[styles.leadershipIconWrap, { backgroundColor: colors.primarySoft }]}><Icon name="construct-outline" size={22} color={colors.interactive} /></View>
               <View style={styles.leadershipContent}>
                 <View style={styles.leadershipTitleRow}><Text style={[styles.leadershipTitle, { color: colors.text }]}>Leadership tools</Text><Badge label="MINISTRY" variant="primary" /></View>
-                <Text style={[styles.leadershipSub, { color: colors.textSecondary }]}>Open only the church and Expression tools assigned to your role</Text>
+                <Text style={[styles.leadershipSub, { color: colors.textSecondary }]}>Open only the church-wide ministry tools assigned to your role</Text>
               </View>
               <Icon name="chevron-forward" size={18} color={colors.textMuted} />
             </Pressable>
