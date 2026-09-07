@@ -1,1 +1,1 @@
-export { default } from '../../../series/[id]';
+export { default } from '../../series/[id]';
