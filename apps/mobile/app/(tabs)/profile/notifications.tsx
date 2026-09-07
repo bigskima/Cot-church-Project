@@ -245,7 +245,7 @@ export default function NotificationsScreen() {
 
           {activeView === 'actions' ? (
             <View style={styles.section}>
-              <SectionHeader title="Actions waiting for you" badge={pending.length} subtitle="Accept or decline role invitations without leaving this inbox." />
+              <SectionHeader title="Actions waiting for you" badge={pending.length} subtitle="Accept or decline ministry invitations without leaving this inbox." />
               {invitations.loading ? <Skeleton height={148} count={2} /> : invitations.error && !invitations.data ? (
                 <ResourceError message={invitations.error} retry={invitations.refresh} />
               ) : pending.length ? pending.map((invite) => (
@@ -296,7 +296,7 @@ export default function NotificationsScreen() {
               )) : (
                 <EmptyState
                   title="Nothing needs your decision"
-                  message="New role and administration invitations will appear here when they need your action."
+                  message="New ministry and Expression invitations will appear here when they need your response."
                   iconName="checkmark-circle-outline"
                 />
               )}
@@ -373,7 +373,7 @@ export default function NotificationsScreen() {
                   </View>
                   <View style={styles.historyCopy}>
                     <Text style={[styles.title, { color: colors.text }]}>{invite.role?.name ?? 'Invitation'}</Text>
-                    <Text style={[styles.meta, { color: colors.textMuted }]}>{invite.expression?.name ?? 'Platform'}</Text>
+                    <Text style={[styles.meta, { color: colors.textMuted }]}>{invite.expression?.name ?? 'COT'}</Text>
                   </View>
                   <Badge label={invite.status.toUpperCase()} variant={invite.status === 'accepted' ? 'success' : 'neutral'} />
                 </View>
