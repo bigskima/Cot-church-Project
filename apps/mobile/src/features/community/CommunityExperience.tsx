@@ -526,8 +526,8 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
               expressionName={item.expression?.name}
               canEngage={canEngage}
               allowExternalShare={item.visibility === 'public'}
-              onPress={() => router.push({ pathname: '/post/[id]', params: { id: item.id, scope: activeTab } } as any)}
-              onReply={() => router.push({ pathname: '/post/[id]', params: { id: item.id, scope: activeTab, focus: 'comments' } } as any)}
+              onPress={() => router.push(activeTab === 'general' ? { pathname: '/general/post/[id]', params: { id: item.id } } as any : { pathname: '/post/[id]', params: { id: item.id, scope: 'expression' } } as any)}
+              onReply={() => router.push(activeTab === 'general' ? { pathname: '/general/post/[id]', params: { id: item.id, focus: 'comments' } } as any : { pathname: '/post/[id]', params: { id: item.id, scope: 'expression', focus: 'comments' } } as any)}
               onReact={canEngage ? (reaction) => reactToPost(item.id, reaction, activeTab) : undefined}
               onBookmark={canEngage ? (currentlySaved) => bookmarkPost(item.id, currentlySaved, activeTab) : undefined}
             />
