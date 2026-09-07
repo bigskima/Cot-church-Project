@@ -171,15 +171,19 @@ No General route should be used as the Expression destination after each area is
 
 ### Phase 3 — Expression media and live
 
-Move:
+Implemented:
 
-- Live
-- Sermons
-- Videos
-- Reels
-- media catalogue/discovery
+- `/expressions/[expressionId]/live`
+- `/expressions/[expressionId]/live/[streamId]`
+- `/expressions/[expressionId]/sermons`
+- `/expressions/[expressionId]/sermons/[sermonId]`
+- `/expressions/[expressionId]/videos`
+- `/expressions/[expressionId]/videos/[videoId]`
+- `/expressions/[expressionId]/reels`
 
-Keep shared players and cards.
+The Expression shell now owns Live, Sermons, Videos and Reels navigation. Shared players, cards, playback, engagement, Mux runtime and media services remain canonical; only route-level information architecture is separated.
+
+General Watch, General Reels and General Live are explicitly General-only. Legacy Expression media links redirect into the canonical exact-ID Expression workspace where practical. Expression media detail views verify that the resolved video, sermon or broadcast belongs to the exact active Expression before rendering it.
 
 ### Phase 4 — Groups and people
 
