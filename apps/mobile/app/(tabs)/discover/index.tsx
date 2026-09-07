@@ -145,7 +145,7 @@ export default function DiscoverScreen() {
             <Chip label="Events" selected={activeFilter === 'events'} onPress={() => setActiveFilter('events')} count={filteredEvents.length} />
             <Chip
               label="Our Story"
-              onPress={() => router.push('/(tabs)/discover/church-story' as any)}
+              onPress={() => router.push('/general/church-story' as any)}
               icon={<Icon name="library-outline" size={13} color={colors.textSecondary} />}
             />
           </View>
@@ -164,8 +164,8 @@ export default function DiscoverScreen() {
                 <SectionHeader title="Search results" subtitle="Across public COT content" />
                 {search.loading && !search.data ? <Skeleton height={58} count={3} /> : search.error ? <ResourceError message={search.error} retry={search.refresh} /> : (
                   <>
-                    {(search.data?.videos ?? []).map((video) => <Pressable key={`video-${video.id}`} accessibilityRole="button" onPress={() => router.push(`/watch/${video.id}` as any)} style={({ pressed }) => [styles.searchRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}><Icon name="play-circle-outline" size={20} color={colors.interactive} /><View style={styles.searchCopy}><Text style={[styles.searchTitle, { color: colors.text }]}>{video.title}</Text><Text style={[styles.searchMeta, { color: colors.textMuted }]}>VIDEO · {video.category}</Text></View><Icon name="chevron-forward" size={17} color={colors.textMuted} /></Pressable>)}
-                    {(search.data?.reels ?? []).map((reel) => <Pressable key={`reel-${reel.id}`} accessibilityRole="button" onPress={() => router.push({ pathname: '/reels', params: { reelId: reel.id, context: 'public' } } as any)} style={({ pressed }) => [styles.searchRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}><Icon name="flash-outline" size={20} color={colors.interactive} /><View style={styles.searchCopy}><Text numberOfLines={2} style={[styles.searchTitle, { color: colors.text }]}>{reel.caption}</Text><Text style={[styles.searchMeta, { color: colors.textMuted }]}>REEL</Text></View><Icon name="chevron-forward" size={17} color={colors.textMuted} /></Pressable>)}
+                    {(search.data?.videos ?? []).map((video) => <Pressable key={`video-${video.id}`} accessibilityRole="button" onPress={() => router.push(`/general/watch/${video.id}` as any)} style={({ pressed }) => [styles.searchRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}><Icon name="play-circle-outline" size={20} color={colors.interactive} /><View style={styles.searchCopy}><Text style={[styles.searchTitle, { color: colors.text }]}>{video.title}</Text><Text style={[styles.searchMeta, { color: colors.textMuted }]}>VIDEO · {video.category}</Text></View><Icon name="chevron-forward" size={17} color={colors.textMuted} /></Pressable>)}
+                    {(search.data?.reels ?? []).map((reel) => <Pressable key={`reel-${reel.id}`} accessibilityRole="button" onPress={() => router.push({ pathname: '/general/reels', params: { reelId: reel.id } } as any)} style={({ pressed }) => [styles.searchRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}><Icon name="flash-outline" size={20} color={colors.interactive} /><View style={styles.searchCopy}><Text numberOfLines={2} style={[styles.searchTitle, { color: colors.text }]}>{reel.caption}</Text><Text style={[styles.searchMeta, { color: colors.textMuted }]}>REEL</Text></View><Icon name="chevron-forward" size={17} color={colors.textMuted} /></Pressable>)}
                     {(search.data?.expressions ?? []).map((expression) => <Pressable key={`expression-${expression.id}`} accessibilityRole="button" onPress={() => router.push(`/expression/${expression.id}` as any)} style={({ pressed }) => [styles.searchRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}><Icon name="business-outline" size={20} color={colors.interactive} /><View style={styles.searchCopy}><Text style={[styles.searchTitle, { color: colors.text }]}>{expression.name}</Text><Text style={[styles.searchMeta, { color: colors.textMuted }]}>PUBLIC EXPRESSION PROFILE</Text></View><Icon name="chevron-forward" size={17} color={colors.textMuted} /></Pressable>)}
                     {(search.data?.leaders ?? []).map((leader) => <View key={`leader-${leader.id}`} style={[styles.searchRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}><Icon name="person-outline" size={20} color={colors.interactive} /><View style={styles.searchCopy}><Text style={[styles.searchTitle, { color: colors.text }]}>{leader.name ?? (leader as any).display_name}</Text><Text style={[styles.searchMeta, { color: colors.textMuted }]}>{leader.role_title || 'PUBLIC LEADER'}</Text></View></View>)}
                     {!(search.data?.videos.length || search.data?.reels.length || search.data?.expressions.length || search.data?.leaders.length) ? <Text style={[styles.noExtraResults, { color: colors.textMuted }]}>No additional public videos, Reels, Expressions, or leaders match this search.</Text> : null}
@@ -177,7 +177,7 @@ export default function DiscoverScreen() {
               <View style={styles.sectionWrap}>
                 <SectionHeader title="Sermons" badge={filteredSermons.length} />
                 {filteredSermons.length > 0 ? filteredSermons.map((sermon) => (
-                  <SermonCard key={sermon.id} sermon={sermon} onPress={() => router.push(`/sermon/${sermon.id}` as any)} />
+                  <SermonCard key={sermon.id} sermon={sermon} onPress={() => router.push(`/general/sermon/${sermon.id}` as any)} />
                 )) : (
                   <EmptyState
                     title="No Sermons Found"
@@ -192,7 +192,7 @@ export default function DiscoverScreen() {
               <View style={styles.sectionWrap}>
                 <SectionHeader title="Series" badge={filteredSeries.length} />
                 {filteredSeries.map((item) => (
-                  <Pressable key={item.id} accessibilityRole="button" onPress={() => router.push(`/series/${item.id}` as any)} style={({ pressed }) => [styles.seriesRow, { borderColor: colors.borderSubtle, backgroundColor: colors.card }, shadows.sm, pressed && styles.pressed]}>
+                  <Pressable key={item.id} accessibilityRole="button" onPress={() => router.push(`/general/series/${item.id}` as any)} style={({ pressed }) => [styles.seriesRow, { borderColor: colors.borderSubtle, backgroundColor: colors.card }, shadows.sm, pressed && styles.pressed]}>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.seriesTitle, { color: colors.text }]}>{item.title}</Text>
                       {item.description ? <Text style={[styles.seriesDescription, { color: colors.textSecondary }]} numberOfLines={2}>{item.description}</Text> : null}
@@ -207,7 +207,7 @@ export default function DiscoverScreen() {
               <View style={styles.sectionWrap}>
                 <SectionHeader title="Upcoming Gatherings" badge={filteredEvents.length} />
                 {filteredEvents.length > 0 ? filteredEvents.map((event) => (
-                  <EventCard key={event.id} event={event} onPress={() => router.push(`/event/${event.id}` as any)} />
+                  <EventCard key={event.id} event={event} onPress={() => router.push(`/general/event/${event.id}` as any)} />
                 )) : (
                   <EmptyState
                     title="No Upcoming Events"
