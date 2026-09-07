@@ -34,7 +34,8 @@ export function ExpressionRouteBoundary({ expressionId, children }: Props) {
       !accessReady ||
       !membership ||
       activeExpressionId === expressionId ||
-      syncing
+      syncing ||
+      Boolean(syncError)
     ) {
       return;
     }
@@ -64,6 +65,7 @@ export function ExpressionRouteBoundary({ expressionId, children }: Props) {
     membership,
     mode,
     syncing,
+    syncError,
   ]);
 
   if (mode === 'visitor') {
@@ -74,6 +76,24 @@ export function ExpressionRouteBoundary({ expressionId, children }: Props) {
           params: { returnTo: `/expressions/${expressionId}` },
         } as any}
       />
+    );
+  }
+
+  if (syncError) {
+    return (
+      <View style={[styles.stateScreen, { backgroundColor: colors.bg }]}>
+        <View style={[styles.stateCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+          <View style={[styles.stateIcon, { backgroundColor: colors.primarySoft }]}>
+            <Icon name="alert-circle-outline" size={24} color={colors.interactive} />
+          </View>
+          <Text style={[styles.stateTitle, { color: colors.text }]}>We couldn’t open this Expression</Text>
+          <Text style={[styles.stateCopy, { color: colors.textSecondary }]}>{syncError}</Text>
+          <View style={styles.actions}>
+            <Button label="Try again" onPress={() => setSyncError('')} />
+            <Button label="My Expressions" variant="outline" onPress={() => router.replace('/expressions')} />
+          </View>
+        </View>
+      </View>
     );
   }
 
@@ -105,30 +125,6 @@ export function ExpressionRouteBoundary({ expressionId, children }: Props) {
           <View style={styles.actions}>
             <Button label="My Expressions" onPress={() => router.replace('/expressions')} />
             <Button label="General COT" variant="outline" onPress={() => router.replace('/general')} />
-          </View>
-        </View>
-      </View>
-    );
-  }
-
-  if (syncError) {
-    return (
-      <View style={[styles.stateScreen, { backgroundColor: colors.bg }]}>
-        <View style={[styles.stateCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
-          <View style={[styles.stateIcon, { backgroundColor: colors.primarySoft }]}>
-            <Icon name="alert-circle-outline" size={24} color={colors.interactive} />
-          </View>
-          <Text style={[styles.stateTitle, { color: colors.text }]}>We couldn’t open this Expression</Text>
-          <Text style={[styles.stateCopy, { color: colors.textSecondary }]}>{syncError}</Text>
-          <View style={styles.actions}>
-            <Button
-              label="Try again"
-              onPress={() => {
-                setSyncError('');
-                setSyncing(false);
-              }}
-            />
-            <Button label="My Expressions" variant="outline" onPress={() => router.replace('/expressions')} />
           </View>
         </View>
       </View>
