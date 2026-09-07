@@ -42,7 +42,7 @@ export default function MediaStudioScreen() {
     '';
 
   const canPublicBroadcast = hasPublicCapability('public.live_stream.create');
-  const canExpressionBroadcast = Boolean(expression?.id) && (hasCapability('streams.broadcast') || hasCapability('*'));
+  const canExpressionBroadcast = Boolean(expression?.id) && hasCapability('streams.broadcast');
   const hasBroadcastAccess = canPublicBroadcast || canExpressionBroadcast;
 
   const [broadcastScope, setBroadcastScope] = useState<BroadcastScope>(canExpressionBroadcast ? 'expression' : 'public');
