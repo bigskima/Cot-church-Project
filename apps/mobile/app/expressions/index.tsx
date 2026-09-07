@@ -33,13 +33,13 @@ export default function ExpressionsScreen() {
   const expressions = useMemo(() => context?.expressions ?? [], [context?.expressions]);
   const activeExpressionId = context?.expression?.id;
   const canCreateExpression = Boolean(context?.creatorOrganizations?.length);
-  const openExpressionCreation = () => router.push('/leadership/expressions' as any);
+  const openExpressionCreation = () => router.push('/general/leadership/expressions-manage' as any);
 
   if (mode === 'visitor') {
     return (
       <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
         <ScreenHeader title="My Expressions" showBack />
-        <EmptyState title="Sign in to join an Expression" message="Public content remains available without an account. Expression membership and entry require authentication." iconName="lock-closed-outline" actionLabel="Sign In" onAction={() => router.push({ pathname: '/(auth)/login', params: { returnTo: '/expressions' } } as any)} />
+        <EmptyState title="Sign in to join an Expression" message="You can explore General COT without signing in. Sign in when you want to join or enter an Expression." iconName="lock-closed-outline" actionLabel="Sign In" onAction={() => router.push({ pathname: '/(auth)/login', params: { returnTo: '/expressions' } } as any)} />
       </View>
     );
   }
@@ -113,7 +113,7 @@ export default function ExpressionsScreen() {
         ) : null}
 
         <View style={styles.section}>
-          <Text style={[styles.heading, { color: colors.text }]}>Your memberships</Text>
+          <Text style={[styles.heading, { color: colors.text }]}>Your Expressions</Text>
           {expressions.length ? expressions.map((expression) => (
             <View key={expression.membershipId} style={[styles.membershipCard, { backgroundColor: colors.card, borderColor: activeExpressionId === expression.id ? colors.interactive : colors.borderSubtle }, shadows.sm]}>
               <View style={[styles.expressionIcon, { backgroundColor: colors.primarySoft }]}><Icon name="people-outline" size={22} color={colors.interactive} /></View>
@@ -135,7 +135,7 @@ export default function ExpressionsScreen() {
             </View>
           )) : (
             <EmptyState
-              title="No Expression memberships yet"
+              title="No Expressions yet"
               message={canCreateExpression
                 ? 'Your account can create an Expression, or you can join one with an invite code.'
                 : 'Use an invite code from an authorized Expression leader to join.'}
