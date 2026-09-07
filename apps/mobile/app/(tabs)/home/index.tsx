@@ -70,7 +70,7 @@ function timeValue(value?: string | null) {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { api, context, mode, hasCapability, hasOrganizationCapability, hasPublicCapability } = useSession();
+  const { api, context, mode, hasOrganizationCapability, hasPublicCapability } = useSession();
   const { colors } = useTheme();
 
   const hasPublicBroadcastAccess = hasPublicCapability('public.live_stream.create');
@@ -85,44 +85,23 @@ export default function HomeScreen() {
     hasOrganizationCapability('giving.finance.read') ||
     hasGeneralPastoralAccess ||
     Boolean(context?.creatorOrganizations?.length);
-  const hasExpressionLeadershipCapability = Boolean(context?.expression?.id) && (
-    hasCapability('posts.create') ||
-    hasCapability('posts.publish') ||
-    (hasCapability('media.upload') && hasCapability('reels.publish')) ||
-    (hasCapability('media.upload') && hasCapability('videos.publish')) ||
-    hasCapability('streams.broadcast') ||
-    hasCapability('sermons.create') ||
-    hasCapability('sermons.manage') ||
-    hasCapability('events.create') ||
-    hasCapability('events.update') ||
-    hasCapability('studio.access') ||
-    hasCapability('prayer.moderate') ||
-    hasCapability('pastoral.followups.receive') ||
-    hasCapability('giving.campaigns.manage') ||
-    hasCapability('giving.finance.read') ||
-    hasCapability('expression.leadership.manage') ||
-    hasCapability('members.invite') ||
-    hasCapability('roles.assign')
-  );
-  const hasAnyLeadershipCapability = hasGeneralLeadershipCapability || hasExpressionLeadershipCapability;
 
   const contextOrganization = context?.organization ?? context?.organizations?.[0];
-  const contextExpression = context?.expression;
   const organizationId = contextOrganization?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
 
+  // General Home is always church-wide. Private Expression ranking and content
+  // are owned by /expressions/[expressionId], never by this route.
   const query = useMemo(() => {
     const params = new URLSearchParams();
     if (organizationId) params.set('organizationId', organizationId);
-    if (contextExpression?.id) params.set('expressionId', contextExpression.id);
     const suffix = params.toString();
     return `home-feed${suffix ? `?${suffix}` : ''}`;
-  }, [organizationId, contextExpression?.id]);
+  }, [organizationId]);
 
-  const resourceKey = `mobile:home-feed:${organizationId || 'auto'}:${contextExpression?.id ?? 'general'}:${mode}`;
+  const resourceKey = `mobile:home-feed:${organizationId || 'auto'}:general:${mode}`;
   const resource = useResource<HomePayload>(resourceKey, (signal) => api.request<HomePayload>(query, { signal }));
 
   const organization = resource.data?.organization ?? contextOrganization;
-  const expression = resource.data?.expression ?? contextExpression;
   const streams = resource.data?.streams ?? [];
   const posts = resource.data?.posts ?? [];
   const reels = resource.data?.reels ?? [];
@@ -130,7 +109,7 @@ export default function HomeScreen() {
   const sermons = resource.data?.sermons ?? [];
   const events = resource.data?.events ?? [];
   const degradedSections = resource.data?.degradedSections ?? [];
-  const rankingMode = resource.data?.rankingMode ?? (expression?.id ? 'expression' : 'recent');
+  const rankingMode = resource.data?.rankingMode === 'personalized' ? 'personalized' : 'recent';
 
   const activeStream = useMemo(
     () => streams.find((stream) => stream.status === 'live') ?? streams.find((stream) => stream.status === 'scheduled'),
@@ -179,8 +158,8 @@ export default function HomeScreen() {
   }, [posts, reels, videos, sermons, events]);
 
   const canEngage = mode === 'authenticated';
-  const postScope = expression?.id ? 'expression' : 'general';
-  const postRequestContext = expression?.id ? 'current' : 'public';
+  const postScope = 'general' as const;
+  const postRequestContext = 'public' as const;
 
   const openPost = (postId: string, focusComments = false) => {
     router.push({
@@ -250,7 +229,7 @@ export default function HomeScreen() {
         imageUrl: activeStream.thumbnail_url,
         isLive: activeStream.status === 'live',
         hasUnseen: false,
-        onPress: () => router.push(`/(tabs)/live/${activeStream.id}` as any),
+        onPress: () => router.push(`/general/live/${activeStream.id}` as any),
       });
     }
 
@@ -262,13 +241,13 @@ export default function HomeScreen() {
         isLive: false,
         hasUnseen: false,
         onPress: () => router.push({
-          pathname: '/reels',
-          params: expression?.id ? { reelId: reel.id } : { reelId: reel.id, context: 'public' },
+          pathname: '/general/reels',
+          params: { reelId: reel.id },
         } as any),
       });
     });
     return list;
-  }, [activeStream, reels, expression?.id]);
+  }, [activeStream, reels]);
 
   const reelWidth = Math.max(260, Math.min(width - spacing.lg * 2, 460));
 
@@ -291,14 +270,14 @@ export default function HomeScreen() {
 
       {activeStream ? (
         <View style={styles.heroSection}>
-          <HeroLiveCard stream={activeStream} onPress={() => router.push(`/(tabs)/live/${activeStream.id}` as any)} />
+          <HeroLiveCard stream={activeStream} onPress={() => router.push(`/general/live/${activeStream.id}` as any)} />
         </View>
       ) : null}
 
       {feed.length ? (
         <View style={styles.timelineHeading}>
           <Text style={[styles.timelineTitle, { color: colors.text }]}>
-            {expression?.name || (rankingMode === 'personalized' ? 'For you' : 'Latest')}
+            {rankingMode === 'personalized' ? 'For you' : 'Latest'}
           </Text>
         </View>
       ) : null}
@@ -319,11 +298,11 @@ export default function HomeScreen() {
               onPress={() => mode === 'authenticated' && router.push('/expressions')}
               disabled={mode !== 'authenticated'}
               accessibilityRole="button"
-              accessibilityLabel={expression?.name ? `Current Expression: ${expression.name}. Change space` : 'Public COT. Change space'}
+              accessibilityLabel="General COT. Open My Expressions"
               style={({ pressed }) => [styles.scopeControl, pressed && mode === 'authenticated' ? styles.iconPressed : null]}
             >
-              <Icon name={expression?.name ? 'people-outline' : 'globe-outline'} size={12} color={colors.interactive} />
-              <Text style={[styles.scopeControlText, { color: colors.textSecondary }]} numberOfLines={1}>{expression?.name || 'Public'}</Text>
+              <Icon name="globe-outline" size={12} color={colors.interactive} />
+              <Text style={[styles.scopeControlText, { color: colors.textSecondary }]} numberOfLines={1}>General COT</Text>
               {mode === 'authenticated' ? <Icon name="chevron-down" size={12} color={colors.textMuted} /> : null}
             </Pressable>
           </View>
@@ -333,12 +312,12 @@ export default function HomeScreen() {
           <Pressable onPress={() => router.push('/assistant')} hitSlop={8} style={({ pressed }) => [styles.iconButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.iconPressed]} accessibilityRole="button" accessibilityLabel="COT Assistant">
             <Icon name="sparkles" size={18} color={colors.interactive} />
           </Pressable>
-          {hasAnyLeadershipCapability ? (
+          {hasGeneralLeadershipCapability ? (
             <Pressable onPress={() => router.push('/studio')} hitSlop={8} style={({ pressed }) => [styles.iconButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.iconPressed]} accessibilityRole="button" accessibilityLabel="Ministry Studio">
               <Icon name="grid-outline" size={18} color={colors.text} />
             </Pressable>
           ) : null}
-          <Pressable onPress={() => router.push('/(tabs)/live' as any)} hitSlop={8} style={({ pressed }) => [styles.iconButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.iconPressed]} accessibilityRole="button" accessibilityLabel="Live">
+          <Pressable onPress={() => router.push('/general/live' as any)} hitSlop={8} style={({ pressed }) => [styles.iconButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.iconPressed]} accessibilityRole="button" accessibilityLabel="Live">
             <Icon name="radio" size={18} color={activeStream?.status === 'live' ? '#EF4444' : colors.text} />
           </Pressable>
         </View>
@@ -361,7 +340,7 @@ export default function HomeScreen() {
             <View style={styles.emptyHome}>
               <EmptyState
                 title="Your Home feed is ready"
-                message={expression?.name ? 'Published media and events for this Expression will appear here.' : 'Published sermons, Reels, videos, live broadcasts and events will appear here.'}
+                message="Published sermons, Reels, videos, live broadcasts and events will appear here."
                 iconName="home-outline"
               />
             </View>
@@ -394,8 +373,8 @@ export default function HomeScreen() {
                     reel={item.reel}
                     width={reelWidth}
                     onPress={() => router.push({
-                      pathname: '/reels',
-                      params: expression?.id ? { reelId: item.reel.id } : { reelId: item.reel.id, context: 'public' },
+                      pathname: '/general/reels',
+                      params: { reelId: item.reel.id },
                     } as any)}
                   />
                 </View>
@@ -405,7 +384,7 @@ export default function HomeScreen() {
               return (
                 <View style={styles.feedCardWrap}>
                   <View style={styles.itemLabelRow}><Icon name="play-circle-outline" size={16} color={colors.interactive} /><Text style={[styles.itemLabel, { color: colors.textSecondary }]}>WATCH</Text></View>
-                  <VideoCard video={item.video} expressionName={expression?.name} onPress={() => router.push(`/watch/${item.video.id}${expression?.id ? '?context=expression' : ''}` as any)} />
+                  <VideoCard video={item.video} onPress={() => router.push(`/general/watch/${item.video.id}` as any)} />
                 </View>
               );
             }
@@ -415,14 +394,14 @@ export default function HomeScreen() {
               return (
                 <View style={styles.feedCardWrap}>
                   <View style={styles.itemLabelRow}><Icon name={hasAudio && !hasVideo ? 'headset-outline' : 'book-outline'} size={16} color={colors.interactive} /><Text style={[styles.itemLabel, { color: colors.textSecondary }]}>{hasAudio && !hasVideo ? 'AUDIO TEACHING' : 'SERMON / TEACHING'}</Text></View>
-                  <SermonCard sermon={item.sermon} onPress={() => router.push(`/sermon/${item.sermon.id}${expression?.id ? '?context=expression' : ''}` as any)} />
+                  <SermonCard sermon={item.sermon} onPress={() => router.push(`/general/sermon/${item.sermon.id}` as any)} />
                 </View>
               );
             }
             return (
               <View style={styles.feedCardWrap}>
                 <View style={styles.itemLabelRow}><Icon name="calendar-outline" size={16} color={colors.interactive} /><Text style={[styles.itemLabel, { color: colors.textSecondary }]}>UPCOMING</Text></View>
-                <EventCard event={item.event} onPress={() => router.push(`/event/${item.event.id}${expression?.id ? '?context=expression' : ''}` as any)} />
+                <EventCard event={item.event} onPress={() => router.push(`/general/event/${item.event.id}` as any)} />
               </View>
             );
           }}
