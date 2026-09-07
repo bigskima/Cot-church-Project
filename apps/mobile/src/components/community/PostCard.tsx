@@ -7,6 +7,7 @@ import { Avatar } from '../primitives/Avatar';
 import { Icon } from '../primitives/Icon';
 import { AudioPlayer } from '../media/AudioPlayer';
 import { VideoPlayer } from '../media/VideoPlayer';
+import { MediaPreviewModal, type PreviewableMedia } from '../media/MediaPreviewModal';
 import type { MediaAsset, Post, SocialPost } from '@/types/content';
 
 type PublicIdentityBadge = {
@@ -39,7 +40,7 @@ export interface PostCardProps {
   dark?: boolean;
 }
 
-function mediaKind(media: MediaAsset) {
+function mediaKind(media: MediaAsset): string | undefined {
   return media.type ?? media.media_type;
 }
 
@@ -81,6 +82,7 @@ export function PostCard({
   const [hasLiked, setHasLiked] = useState(Boolean(postAsAny.viewer_reaction));
   const [likeCount, setLikeCount] = useState(postAsAny.likes_count ?? (post.social_reactions?.length || 0));
   const [hasSaved, setHasSaved] = useState(Boolean(postAsAny.viewer_bookmarked));
+  const [preview, setPreview] = useState<PreviewableMedia | null>(null);
 
   useEffect(() => {
     setHasLiked(Boolean(postAsAny.viewer_reaction));
@@ -142,15 +144,16 @@ export function PostCard({
   const media = Array.isArray(post.media) ? post.media.filter((item) => Boolean(item?.url) || mediaKind(item) === 'reel_reference') : [];
 
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.container,
-        { backgroundColor: colors.card, borderColor: colors.borderSubtle },
-        pressed && onPress ? { backgroundColor: colors.pressed } : null,
-        style,
-      ]}
-    >
+    <>
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.container,
+          { backgroundColor: colors.card, borderColor: colors.borderSubtle },
+          pressed && onPress ? { backgroundColor: colors.pressed } : null,
+          style,
+        ]}
+      >
       <View style={styles.headerRow}>
         <Pressable onPress={onPressAuthor || onPress} hitSlop={4}>
           <Avatar name={displayName} url={avatarUrl} size="md" />
@@ -236,25 +239,68 @@ export function PostCard({
                     posterUrl={item.thumbnailUrl}
                     durationSeconds={item.duration_seconds}
                   />
+                  <Pressable
+                    onPress={(event) => {
+                      event.stopPropagation();
+                      setPreview({ url: item.url!, type: 'video', title: mediaTitle(item, 'Community video'), posterUrl: item.thumbnailUrl, durationSeconds: item.duration_seconds });
+                    }}
+                    style={styles.expandButton}
+                    accessibilityLabel="Open video full screen"
+                  >
+                    <Icon name="expand-outline" size={19} color="#FFFFFF" />
+                  </Pressable>
                 </View>
               );
             }
             if (kind === 'audio') {
               return (
-                <AudioPlayer
+                <View key={key} style={styles.audioWrap}>
+                  <AudioPlayer title={mediaTitle(item, 'Community audio')} speaker={displayName} sourceUrl={item.url} durationSeconds={item.duration_seconds} style={styles.audioPlayer} />
+                  <Pressable
+                    onPress={(event) => {
+                      event.stopPropagation();
+                      setPreview({ url: item.url!, type: 'audio', title: mediaTitle(item, 'Community audio'), durationSeconds: item.duration_seconds });
+                    }}
+                    style={[styles.audioExpand, { backgroundColor: colors.primarySoft }]}
+                    accessibilityLabel="Open audio preview"
+                  >
+                    <Icon name="expand-outline" size={17} color={colors.interactive} />
+                  </Pressable>
+                </View>
+              );
+            }
+            if (kind === 'document' || kind === 'file') {
+              return (
+                <Pressable
                   key={key}
-                  title={mediaTitle(item, 'Community audio')}
-                  speaker={displayName}
-                  sourceUrl={item.url}
-                  durationSeconds={item.duration_seconds}
-                  style={styles.audioPlayer}
-                />
+                  onPress={(event) => {
+                    event.stopPropagation();
+                    setPreview({ url: item.url!, type: 'document', title: mediaTitle(item, 'Attached file'), mimeType: (item as any).mimeType || (item as any).mime_type });
+                  }}
+                  style={[styles.fileCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open ${mediaTitle(item, 'attached file')}`}
+                >
+                  <Icon name="document-text-outline" size={28} color={colors.interactive} />
+                  <View style={styles.fileCopy}><Text numberOfLines={1} style={[styles.fileTitle, { color: colors.text }]}>{mediaTitle(item, 'Attached file')}</Text><Text style={[styles.fileHint, { color: colors.textMuted }]}>Tap to preview or open</Text></View>
+                  <Icon name="expand-outline" size={19} color={colors.interactive} />
+                </Pressable>
               );
             }
             return (
-              <View key={key} style={[styles.mediaFrame, { backgroundColor: colors.bgSecondary }]}>
+              <Pressable
+                key={key}
+                onPress={(event) => {
+                  event.stopPropagation();
+                  setPreview({ url: item.url!, type: 'image', title: mediaTitle(item, 'Community image') });
+                }}
+                style={[styles.mediaFrame, { backgroundColor: colors.bgSecondary }]}
+                accessibilityRole="button"
+                accessibilityLabel="View full image"
+              >
                 <Image source={{ uri: item.url! }} style={styles.mediaImage} resizeMode="cover" accessibilityLabel={item.alt || 'Community post image'} />
-              </View>
+                <View style={styles.expandButton}><Icon name="expand-outline" size={19} color="#FFFFFF" /></View>
+              </Pressable>
             );
           })}
         </View>
@@ -286,7 +332,9 @@ export function PostCard({
           </Pressable>
         ) : null}
       </View>
-    </Pressable>
+      </Pressable>
+      <MediaPreviewModal media={preview} visible={Boolean(preview)} onClose={() => setPreview(null)} />
+    </>
   );
 }
 
@@ -317,7 +365,14 @@ const styles = StyleSheet.create({
   mediaList: { gap: spacing.sm, marginTop: spacing.md },
   mediaFrame: { width: '100%', aspectRatio: 16 / 10, borderRadius: radius.lg, overflow: 'hidden' },
   mediaImage: { width: '100%', height: '100%' },
-  richMediaFrame: { width: '100%', overflow: 'hidden', borderRadius: radius.lg, borderWidth: 1 },
+  richMediaFrame: { width: '100%', overflow: 'hidden', borderRadius: radius.lg, borderWidth: 1, position: 'relative' },
+  expandButton: { position: 'absolute', right: 8, top: 8, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.62)' },
+  audioWrap: { position: 'relative' },
+  audioExpand: { position: 'absolute', right: 8, top: 8, width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  fileCard: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderWidth: 1, borderRadius: radius.lg },
+  fileCopy: { flex: 1, minWidth: 0 },
+  fileTitle: { fontSize: 13, fontWeight: '700' },
+  fileHint: { fontSize: 11, marginTop: 2 },
   reelReference: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md },
   reelReferenceIcon: { width: 44, height: 44, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
   reelReferenceCopy: { flex: 1, minWidth: 0 },

@@ -86,7 +86,7 @@ const checks = [
   [/creatorOrganizations\?\.some/, 'Expression creator gating uses resolved membership context'],
   [/Resolving Platform Administration access/, 'admin shell waits for resolved platform authority'],
   [/window\.setInterval\(\(\) => void refreshAuthority\(false\), 120_000\)/, 'Platform Administration authority refreshes without re-login'],
-  [/visibilitychange[\s\S]*refreshAuthority\(false\)/, 'Platform Administration revalidates authority when returning to the app'],
+  [/refreshWhenVisible[\s\S]*refreshAuthority\(false\)[\s\S]*visibilitychange/, 'Platform Administration revalidates authority when returning to the app'],
   [/transient background refresh must not blank already-resolved/, 'Platform Administration preserves resolved access during transient refresh failures'],
   [/setInterval\(refreshContext, 120_000\)/, 'role grants refresh without re-login'],
   [/hasPublicCapability\('public\.live_stream\.create'\)[\s\S]*Go live/, 'assigned public broadcaster live entry point'],

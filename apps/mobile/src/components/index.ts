@@ -24,6 +24,7 @@ export * from './media/StoriesTray';
 export * from './media/AudioPlayer';
 export * from './media/VideoPlayer';
 export * from './media/MediaPlayer';
+export * from './media/MediaPreviewModal';
 export * from './media/ReelPlayer';
 export * from './cards/VideoCard';
 export * from './cards/ReelCard';

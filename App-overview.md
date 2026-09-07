@@ -10,6 +10,21 @@
 4. The Edge Function authenticates and authorizes the exact organization/Expression capability, then reads or mutates PostgreSQL through Supabase. Storage uploads use a server-issued one-use signed URL, a direct byte upload, then a verification/finalization call.
 5. The screen refreshes its resource. Public mutations display wherever the same table is read (for example a published sermon appears in Discover, Home and its detail route; a featured leader appears in Church Story).
 
+<<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
+=======
+`MediaPreviewModal` is the shared, context-free full-file viewer. Public, church and Expression screens can pass it an image, video, audio recording, or document URL without changing organization context. Community attachments, sermon banners, and leader portraits open independently from their parent content; the modal also offers **Open original** for viewing, downloading, or handing a file to another compatible app.
+
+>>>>>>> theirs
+=======
+`MediaPreviewModal` is the shared, context-free full-file viewer. Public, church and Expression screens can pass it an image, video, audio recording, or document URL without changing organization context. Community attachments, sermon banners, and leader portraits open independently from their parent content; the modal also offers **Open original** for viewing, downloading, or handing a file to another compatible app.
+
+>>>>>>> theirs
+=======
+`MediaPreviewModal` is the shared, context-free full-file viewer. Public, church and Expression screens can pass it an image, video, audio recording, or document URL without changing organization context. Community attachments, sermon banners, and leader portraits open independently from their parent content; the modal also offers **Open original** for viewing, downloading, or handing a file to another compatible app.
+
+>>>>>>> theirs
 ## Screen-by-screen connection map
 
 | Screen(s) | Purpose and principal functions | API / destination |
@@ -70,6 +85,21 @@
 
 All new mobile uploads use `src/services/uploads.ts`: picker asset → Blob → API upload intent → signed `PUT` (without an app authorization header) → server completion/verification → parent record mutation. Never store a device `file://` URI in PostgreSQL. If an upload fails, check the Function response first, then bucket migration, MIME allow-list, file size, selected organization/Expression and the caller’s `media.upload` or leadership/sermon capability. The UI preserves the selected file and shows a retryable error rather than silently publishing a disconnected record.
 
+<<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
+=======
+The `NOTICE ... policy ... does not exist, skipping` messages printed on the migration's first deployment are expected: each policy is dropped with `IF EXISTS` before it is created, which makes the migration safe across fresh and previously configured environments. `Finished supabase db push` confirms that both buckets and their read policies were applied.
+
+>>>>>>> theirs
+=======
+The `NOTICE ... policy ... does not exist, skipping` messages printed on the migration's first deployment are expected: each policy is dropped with `IF EXISTS` before it is created, which makes the migration safe across fresh and previously configured environments. `Finished supabase db push` confirms that both buckets and their read policies were applied.
+
+>>>>>>> theirs
+=======
+The `NOTICE ... policy ... does not exist, skipping` messages printed on the migration's first deployment are expected: each policy is dropped with `IF EXISTS` before it is created, which makes the migration safe across fresh and previously configured environments. `Finished supabase db push` confirms that both buckets and their read policies were applied.
+
+>>>>>>> theirs
 ## Change propagation checklist
 
 - Sermon draft: leadership list only. Published public sermon: Discover/Home/series/detail. Published Expression sermon: that Expression’s scoped surfaces.
