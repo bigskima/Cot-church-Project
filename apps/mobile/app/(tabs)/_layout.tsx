@@ -1,8 +1,9 @@
 import React from 'react';
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { Platform, StyleSheet, View, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/state/theme';
+import { useSession } from '@/state/session';
 import { Icon } from '@/components/primitives/Icon';
 import { radius, shadows } from '@/design-system/tokens';
 
@@ -10,6 +11,7 @@ const TAB_ICON_SIZE = 23;
 
 export default function TabLayout() {
   const { colors } = useTheme();
+  const { mode, accessReady, context } = useSession();
   const insets = useSafeAreaInsets();
   const bottomInset = Math.max(insets.bottom, Platform.OS === 'web' ? 10 : 8);
   const barHeight = 66 + bottomInset;
@@ -34,6 +36,10 @@ export default function TabLayout() {
     tabBarIconStyle: styles.icon,
     sceneStyle: { backgroundColor: colors.bg } as any,
   };
+
+  if (mode === 'authenticated' && accessReady && context?.expression?.id) {
+    return <Redirect href={`/expressions/${context.expression.id}` as any} />;
+  }
 
   const renderIcon = (filled: string, outline: string) =>
     ({ color, focused }: { color: ColorValue; focused: boolean }) => (
