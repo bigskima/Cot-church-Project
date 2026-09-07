@@ -225,6 +225,7 @@ const invariants = [
   [publicContent, /type === "streams"[\s\S]*provisioning[\s\S]*ready[\s\S]*processing[\s\S]*replay_ready/, 'public stream catalogue lifecycle coverage'],
   [contentMedia, /action"\) === "video_detail"[\s\S]*content_items\.expression_id[\s\S]*auth\.branchId/, 'exact Expression Watch detail is scoped to active Expression'],
   [contentMedia, /video_detail[\s\S]*enrichContentCreators/, 'exact Expression Watch detail includes creator attribution'],
+  [contentMedia, /expressionId[\s\S]*expressionId !== auth\.branchId[\s\S]*authorize\(auth, "media\.upload"\)[\s\S]*authorizeOrganization\(auth, "media\.upload"\)/, 'media upload permission follows exact Public or Expression target scope'],
   [feedRanking, /completedPenalty/, 'completed-content recommendation suppression'],
   [feedRanking, /diversifyFeed/, 'mixed-format feed diversification'],
   [engagement, /view.*state/, 'engagement viewer-state retrieval'],
