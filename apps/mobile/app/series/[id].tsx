@@ -1,6 +1,6 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { router, useLocalSearchParams, usePathname } from 'expo-router';
+import { Redirect, router, useLocalSearchParams, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EmptyState, ResourceError, ScreenHeader, SectionHeader, SermonCard, Skeleton } from '@/components';
 import { radius, shadows, spacing, typography } from '@/design-system/tokens';
@@ -11,7 +11,7 @@ import type { Sermon, SermonSeries } from '@/types/content';
 
 type SeriesPayload = { series: SermonSeries; sermons: Sermon[] };
 
-export default function PublicSeriesScreen() {
+export function PublicSeriesScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const pathname = usePathname();
   const generalWorkspace = pathname.startsWith('/general/');
@@ -85,6 +85,11 @@ export default function PublicSeriesScreen() {
       </ScrollView>
     </View>
   );
+}
+
+export default function LegacySeriesRoute() {
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  return <Redirect href={`/general/series/${typeof id === 'string' ? id : ''}` as any} />;
 }
 
 const styles = StyleSheet.create({
