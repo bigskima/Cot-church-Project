@@ -1,6 +1,6 @@
 import React from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CommentsThread, ResourceError, ScreenHeader } from '@/components';
 import { useResource } from '@/hooks/use-resource';
@@ -9,7 +9,7 @@ import { useTheme } from '@/state/theme';
 import { spacing } from '@/design-system/tokens';
 import type { ContentComment } from '@/types/content';
 
-export default function CommentsScreen({ forcedScope }: { forcedScope?: 'general' | 'expression' } = {}) {
+export function CommentsScreen({ forcedScope }: { forcedScope?: 'general' | 'expression' } = {}) {
   const { contentId, context: requestedContext } = useLocalSearchParams<{ contentId: string; context?: string }>();
   const insets = useSafeAreaInsets();
   const { api, mode, context } = useSession();
@@ -79,6 +79,12 @@ export default function CommentsScreen({ forcedScope }: { forcedScope?: 'general
       )}
     </View>
   );
+}
+
+export default function LegacyCommentsRoute() {
+  const { contentId, context: requestedContext } = useLocalSearchParams<{ contentId?: string; context?: string }>();
+  if (requestedContext === 'expression') return <Redirect href="/expressions" />;
+  return <Redirect href={`/general/comments/${typeof contentId === 'string' ? contentId : ''}` as any} />;
 }
 
 const styles = StyleSheet.create({
