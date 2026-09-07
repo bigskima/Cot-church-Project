@@ -197,13 +197,13 @@ export default function EventsManageScreen() {
             </View>
             <View style={styles.flex}>
               <Text style={[styles.summaryValue, { color: colors.text }]}>{upcomingCount}</Text>
-              <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Upcoming in this scope</Text>
+              <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Upcoming events</Text>
             </View>
 {canCreate ? <Button label="Create" onPress={openCreate} variant="secondary" size="sm" /> : null}
           </View>
 
           <View style={styles.listSection}>
-            <SectionHeader title="Calendar" badge={list.length} subtitle="Events visible in your current church scope" />
+            <SectionHeader title="Calendar" badge={list.length} subtitle="Gatherings and events in this space" />
             {events.loading ? (
               <Skeleton height={110} count={3} />
             ) : events.error && !events.data ? (
@@ -213,7 +213,7 @@ export default function EventsManageScreen() {
                 <View key={event.id} style={styles.eventWrap}>
                   <EventCard
                     event={event}
-                    onPress={() => router.push(`/event/${event.id}${expression?.id ? '?context=expression' : ''}` as any)}
+                    onPress={() => router.push((expression?.id ? `/expressions/${expression.id}/event/${event.id}` : `/general/event/${event.id}`) as any)}
                   />
                   <View style={styles.statusRow}>
                     <View style={styles.statusMeta}>
@@ -229,7 +229,7 @@ export default function EventsManageScreen() {
             ) : (
               <EmptyState
                 title="No events yet"
-                message={canCreate ? 'Create a gathering when your church or Expression is ready.' : 'Events will appear here when they are created in this scope.'}
+                message={canCreate ? 'Create a gathering when your church or Expression is ready.' : 'Events will appear here when they’re created.'}
                 iconName="calendar-outline"
                 actionLabel={canCreate ? 'Create event' : undefined}
                 onAction={canCreate ? openCreate : undefined}
