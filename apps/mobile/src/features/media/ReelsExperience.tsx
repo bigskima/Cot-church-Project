@@ -27,9 +27,8 @@ type ReelWithViewerState = Reel & {
 export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { scope?: 'general' | 'expression'; reelId?: string }) {
   const insets = useSafeAreaInsets();
   const { api, mode, context } = useSession();
-  const routeParams = useLocalSearchParams<{ reelId?: string; context?: string }>();
+  const routeParams = useLocalSearchParams<{ reelId?: string }>();
   const reelId = forcedReelId ?? routeParams.reelId;
-  const requestedContext = routeParams.context;
   const { colors } = useTheme();
   const [activeIndex, setActiveIndex] = useState(0);
   const [actionError, setActionError] = useState('');
@@ -38,8 +37,7 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
   const listRef = useRef<FlatList<ReelWithViewerState>>(null);
   const appliedDeepLinkRef = useRef<string | null>(null);
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
-  const forcePublic = scope === 'general' || requestedContext === 'public';
-  const expressionId = scope === 'expression' && !forcePublic ? context?.expression?.id : undefined;
+  const expressionId = scope === 'expression' ? context?.expression?.id : undefined;
   const returnTo = expressionId ? `/expressions/${expressionId}/reels` : '/reels';
 
   const reelsResource = useResource<ReelWithViewerState[]>(`reels:immersive:${expressionId ? `expression:${expressionId}` : `public:${organizationId || 'auto'}`}:${mode}`, async (signal) => {
