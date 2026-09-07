@@ -34,32 +34,22 @@
 | `/(auth)/signup` | Create account and verify code. | `signup`, `verify-otp`. |
 | `/(auth)/forgot-password`, `/reset-password` | Recovery request and password replacement. | `password-recovery`, `password-reset`. |
 | `/onboarding` | Saves identity, preferences, church and Expression selection. | `onboarding`; updates `profiles`, preferences and memberships, then reloads session context. |
-| `/(tabs)/home` | Ranked home modules; reactions and resume state. | Child cards receive Home data from session/feed; `engagement` mutates reactions/progress. |
-| `/(tabs)/community` | General or Expression posts, composer, attachments, reactions. | `public-social-feed`/`social-feed`; `community-media` signed upload; `engagement`. Posts persist to `social_posts` and upload metadata to `social_media_uploads`. |
-| `/post/[id]`, `/comments/[contentId]` | Canonical post and comment/reaction thread. | `social-feed` or `public-social-feed`; `engagement` for comments/reactions. |
-| `/expressions/[expressionId]/groups`, `/expressions/[expressionId]/groups/[groupId]` | Canonical Expression group directory and group detail. Legacy Community route reuses the same feature. | `groups?scope=expression` → `groups`, `group_memberships`. |
-| `/expressions/[expressionId]/members` | Safe member-facing directory for the exact active Expression. | `memberships?view=expression-directory&expressionId=...` → `expression_memberships` + safe profile fields only. |
-| `/expressions/[expressionId]/birthdays` | Scoped birthday list. | `expression-birthdays` → profile/member birthday data. |
-| `/expressions/[expressionId]/leadership` | Canonical internal Expression leadership directory. Legacy Community route reuses the same feature. | `church-story?view=leadership&expressionId=...` → `leadership_profiles`. |
-| `/(tabs)/discover` | Published sermon/series discovery. | `public-content` → `sermons`, `sermon_series`. |
-| `/(tabs)/discover/church-story` | Published church story and featured leaders. | `church-story` → `church_story`, `leadership_profiles`. |
-| `/(tabs)/discover/sermon/[id]` | Compatibility route. | Redirects to `/sermon/[id]`. |
-| `/sermon/[id]` | Banner, text notes/scripture, optional video/audio playback and progress. | `public-content` or scoped `sermons`; `sermon-playback` resolves safe media URLs; `engagement` syncs progress. |
-| `/series/[id]` | Series metadata and sermons. | `public-content` → `sermon_series`, `sermons`. |
-| `/(tabs)/watch`, `/watch/[id]` | Long-form video feed/detail and engagement. | `home-feed`, `public-content`, `content-media` playback, `engagement`. |
-| `/(tabs)/reels`, `/reels` | Reel feed/player, reactions and reference shares. | `home-feed`, `public-content`, `content-media`, `engagement`, `social-feed`. |
-| `/(tabs)/live`, `/(tabs)/live/[id]` | Live directory and player/interactions. | `home-feed`; `stream-access`, `live-interactions`, `stream-presence` → `live_streams` and live interaction tables. |
-| `/event/[id]` | Public/scoped event and registration lifecycle. | `events`/`public-content`; `event-registrations` → `events`, `event_registrations`. |
-| `/expression/[id]`, `/expressions` | Public Expression profile, follow/join. | `public-content`, `follows`, `expression-memberships` → `branches`, follows/memberships. |
-| `/giving`, `/(tabs)/profile/giving` | Giving destination and checkout UI. | Shared `GivingScreen` → `public-giving`, `giving`, `payment-checkout`; donation/payment tables. |
-| `/prayer`, `/(tabs)/profile/prayer` | Submit and review own prayers. | `prayer-requests` → `prayer_requests`; route wrappers share canonical implementation. |
-| `/(tabs)/profile` | Profile hub, capabilities and assistant entry. | Session context; `ai-gateway` where assistant prompt is used. |
-| `/assistant` | Church-aware AI assistant. | `ai-gateway`; provider selection/usage recorded server-side. |
-| `/(tabs)/profile/notifications` | Inbox and governance invitation responses. | `notifications`, `governance-invitations`. |
-| `/(tabs)/profile/notification-settings` | Delivery preferences. | `notification-settings` → `notification_preferences`. |
-| `/(tabs)/profile/saved` | Saved content list. | `engagement?view=saved`. |
-| `/(tabs)/profile/settings` | Profile edit and avatar. | `profile`; multipart `profile-avatar` → `profiles`, `profile-avatars` bucket. |
-| `/studio`, `/studio/reel`, `/studio/video` | Creator library and reel/video uploads. | `creator-studio`; `content-media` intent/direct upload/complete → `media_assets`, `media_renditions`, `reels`, `videos`. |
+| `/general` | Canonical church-wide Home. Never requests private Expression ranking; an explicit General entry clears active Expression context before rendering. | `home-feed` without `expressionId`; `engagement` for public interactions. |
+| `/general/explore` | Canonical public discovery for sermons, series, events, Watch, Reels, leaders and public Expression profiles. | `public-content`, `church-story`. |
+| `/general/community`, `/general/post/[id]`, `/general/comments/[contentId]` | General Community feed, post detail and comments. | `public-social-feed?scope=church`; `community-media`; `engagement` in public context. |
+| `/general/reels` | Canonical General Reels player and engagement. | `public-content`, `content-media`, `engagement`. |
+| `/general/watch`, `/general/watch/[id]` | Canonical General long-form video catalogue and detail. | `public-content`, `content-media`, `engagement`. |
+| `/general/live`, `/general/live/[id]` | Canonical General livestream directory/player. | `home-feed` without Expression scope; `stream-access`, `live-interactions`, `stream-presence`. |
+| `/general/sermon/[id]`, `/general/series/[id]` | Public sermon and series detail inside the General shell. | `public-content`, `sermon-playback`, `engagement`. |
+| `/general/event/[id]` | Public event detail and registration inside General. | `public-content`; `event-registrations`. |
+| `/general/expression/[id]`, `/expressions` | Public Expression profile followed by deliberate entry to a private Expression workspace. | `public-content`, `follows`, `expression-memberships`. |
+| `/general/giving` | Church-wide giving destination and receipts; Expression scope is unavailable from this route. | Shared `GivingScreen` locked to church scope → `public-giving`, `giving`, `payment-checkout`. |
+| `/general/prayer` | General prayer wall and church/pastoral request submission. | `prayer-requests` in General scope. |
+| `/general/profile`, `settings`, `notifications`, `notification-settings`, `saved` | General account hub and personal services. Expression operations are not surfaced here. | Session context, `profile`, `profile-avatar`, `notifications`, `engagement?view=saved`. |
+| `/general/assistant` | General church-aware AI assistant. | `ai-gateway`. |
+| `/general/studio`, `/general/studio/reel`, `/general/studio/video` | Church-wide creator studio. Expression publishing is unavailable from these General routes. | `creator-studio`, `content-media`; organization/public capabilities. |
+| `/general/leadership/*` | Church-wide ministry operations: live, pastoral care, church leadership, giving, finance, sermons, events and Expression creation authority. | Existing production leadership screens/APIs, forced through organization/public scope by the General workspace. |
+| Legacy `/(tabs)/*`, root media/detail routes and `/leadership/*` | Compatibility paths retained until Phase 7. | Reuse the same implementations; canonical General navigation no longer points to them. |
 | `/expressions/[expressionId]/manage` | Canonical permission-filtered Expression operations hub. | Shared Expression capability resolver + `expression-ownership`; links only to operations granted in the active Expression. |
 | `/expressions/[expressionId]/manage/studio`, `reel`, `video` | Expression-only content creation. Public publishing is disabled inside these workspace routes. | Existing community/creator studio and `content-media` / `creator-studio` contracts are reused with active Expression scope. |
 | `/expressions/[expressionId]/manage/sermons`, `live`, `events` | Expression sermon, livestream and event operations. | Existing `sermons`, `streaming-broadcasts` / `live-streams`, and `events` APIs remain server-authoritative and branch-scoped. |
