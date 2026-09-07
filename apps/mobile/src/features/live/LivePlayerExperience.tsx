@@ -130,7 +130,7 @@ function streamPresentation(stream: LiveStream) {
   }
 }
 
-export function LivePlayerExperience({ streamId: id, scope = 'general' }: { streamId: string; scope?: 'general' | 'expression' }) {
+export function LivePlayerExperience({ streamId: id, scope = 'general', embedded = false }: { streamId: string; scope?: 'general' | 'expression'; embedded?: boolean }) {
   const insets = useSafeAreaInsets();
   const { api, mode, context } = useSession();
   const { colors } = useTheme();
@@ -148,6 +148,7 @@ export function LivePlayerExperience({ streamId: id, scope = 'general' }: { stre
   const [interactionError, setInteractionError] = useState('');
 
   const expressionMode = scope === 'expression';
+  const topInset = embedded ? 0 : insets.top;
   const activeExpressionId = expressionMode ? context?.expression?.id : undefined;
   const requestContext = expressionMode ? 'current' : 'public';
   const returnTo = expressionMode && activeExpressionId ? `/expressions/${activeExpressionId}/live/${id}` : `/live/${id}`;
@@ -315,7 +316,7 @@ export function LivePlayerExperience({ streamId: id, scope = 'general' }: { stre
 
   if (loading) {
     return (
-      <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
+      <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: topInset }]}>
         <Skeleton height={240} />
         <View style={styles.loadingBody}>
           <Skeleton height={28} width="60%" />
@@ -328,7 +329,7 @@ export function LivePlayerExperience({ streamId: id, scope = 'general' }: { stre
 
   if (error || !access) {
     return (
-      <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
+      <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: topInset }]}>
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
           <Icon name="arrow-back" size={20} color={colors.text} />
           <Text style={[styles.backText, { color: colors.text }]}>Back to Live</Text>
@@ -345,7 +346,7 @@ export function LivePlayerExperience({ streamId: id, scope = 'general' }: { stre
       style={[styles.screen, { backgroundColor: colors.bg }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={[styles.videoContainer, { marginTop: insets.top }]}>
+      <View style={[styles.videoContainer, { marginTop: topInset }]}>
         {access.playbackUrl ? (
           <VideoView player={player} style={styles.videoView} />
         ) : (
