@@ -149,7 +149,7 @@ export default function ProfileScreen() {
             {mode === 'authenticated' ? serviceTile('/expressions', 'business-outline', 'My Expressions', 'Join with an invite code or enter one of your Expressions') : null}
             {serviceTile('/general/prayer', 'heart-outline', 'Prayer Petitions & Wall', 'Submit private pastoral requests or view community prayer items')}
             {serviceTile('/general/giving', 'gift-outline', 'Giving & Statements', 'View church-wide giving destinations and your receipts')}
-            {mode === 'authenticated' ? serviceTile('/assistant', 'sparkles', 'AI Spiritual Assistant', aiSubtitle, !aiReady) : null}
+            {mode === 'authenticated' ? serviceTile('/general/assistant', 'sparkles', 'AI Spiritual Assistant', aiSubtitle, !aiReady) : null}
           </View>
         </View>
 
