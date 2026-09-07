@@ -220,7 +220,7 @@ function ExpressionNavigation({
       return [
         {
           key: 'manage',
-          label: 'Management',
+          label: 'Tools',
           icon: 'settings-outline',
           active: pathname === manageBase,
           onPress: () => router.push(manageBase as any),
@@ -276,7 +276,7 @@ function ExpressionNavigation({
         },
         {
           key: 'manage-access',
-          label: 'Roles & Ownership',
+          label: 'Team Access & Ownership',
           icon: 'shield-checkmark-outline',
           active: pathname === `${manageBase}/access`,
           onPress: () => router.push(`${manageBase}/access` as any),
@@ -300,7 +300,7 @@ function ExpressionNavigation({
         },
         {
           key: 'manage-finance',
-          label: 'Giving Finance',
+          label: 'Giving Reports',
           icon: 'analytics-outline',
           active: pathname === `${manageBase}/finance`,
           onPress: () => router.push(`${manageBase}/finance` as any),
