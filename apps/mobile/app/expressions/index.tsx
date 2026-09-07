@@ -33,7 +33,7 @@ export default function ExpressionsScreen() {
   const expressions = useMemo(() => context?.expressions ?? [], [context?.expressions]);
   const activeExpressionId = context?.expression?.id;
   const canCreateExpression = Boolean(context?.creatorOrganizations?.length);
-  const openExpressionCreation = () => router.push('/(tabs)/profile/leadership/expressions-manage' as any);
+  const openExpressionCreation = () => router.push('/leadership/expressions' as any);
 
   if (mode === 'visitor') {
     return (
@@ -108,7 +108,7 @@ export default function ExpressionsScreen() {
               </View>
               <Badge label="ACTIVE" variant="active" />
             </View>
-            <Button label="Leave Expression" variant="outline" onPress={async () => { await leaveExpression(); router.replace('/(tabs)/home'); }} />
+            <Button label="Return to General COT" variant="outline" onPress={() => router.replace('/general')} />
           </View>
         ) : null}
 
@@ -122,11 +122,15 @@ export default function ExpressionsScreen() {
                 <Text style={[styles.copy, { color: colors.textSecondary }]}>{expression.code || 'Expression member'}</Text>
               </View>
               <Button
-                label={activeExpressionId === expression.id ? 'Entered' : 'Enter'}
+                label={activeExpressionId === expression.id ? 'Open' : 'Enter'}
                 size="sm"
                 variant={activeExpressionId === expression.id ? 'outline' : 'primary'}
-                disabled={activeExpressionId === expression.id}
-                onPress={async () => { await enterExpression(expression.organizationId, expression.id); router.replace('/(tabs)/home'); }}
+                onPress={async () => {
+                  if (activeExpressionId !== expression.id) {
+                    await enterExpression(expression.organizationId, expression.id);
+                  }
+                  router.replace(`/expressions/${expression.id}` as any);
+                }}
               />
             </View>
           )) : (
