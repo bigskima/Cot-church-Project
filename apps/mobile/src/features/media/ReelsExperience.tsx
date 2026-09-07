@@ -116,8 +116,8 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
     }
     router.push(expressionId
       ? {
-          pathname: '/comments/[contentId]',
-          params: { contentId, context: 'expression' },
+          pathname: `/expressions/${expressionId}/comments/[contentId]`,
+          params: { contentId },
         } as any
       : {
           pathname: '/general/comments/[contentId]',
