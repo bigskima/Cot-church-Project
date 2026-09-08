@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   Image,
@@ -20,7 +20,7 @@ import {
   useAudioRecorder,
   useAudioRecorderState,
 } from 'expo-audio';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -125,12 +125,24 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
   const [recordingAction, setRecordingAction] = useState(false);
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(audioRecorder, 250);
+  const { compose, intentId } = useLocalSearchParams<{ compose?: string; intentId?: string }>();
+  const handledComposeIntent = useRef<string | null>(null);
 
   useEffect(() => {
     if (activeTab !== scope) setActiveTab(scope);
     if (postDestination !== scope) setPostDestination(scope);
   }, [activeTab, postDestination, scope]);
 
+
+  useEffect(() => {
+    if (scope !== 'general' || mode !== 'authenticated' || !compose) return;
+    const key = `${compose}:${intentId ?? 'direct'}`;
+    if (handledComposeIntent.current === key) return;
+    handledComposeIntent.current = key;
+    setPostDestination('general');
+    setPostError('');
+    setComposerOpen(true);
+  }, [compose, intentId, mode, scope]);
 
   const feedKey = `mobile:community:${activeTab}:${organizationId || 'auto'}:${activeTab === 'expression' ? expression?.id ?? 'none' : 'general'}:${mode}`;
   const resource = useResource<CommunityPost[]>(feedKey, (signal) => {
@@ -615,7 +627,12 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
         />
       )}
 
-      <BottomSheet visible={composerOpen} onClose={closeComposer} title="Create post" subtitle="Share something meaningful with your community.">
+      <BottomSheet
+        visible={composerOpen}
+        onClose={closeComposer}
+        title={compose === 'audio' && scope === 'general' ? 'Record a voice post' : 'Create post'}
+        subtitle={compose === 'audio' && scope === 'general' ? 'Record from your microphone or attach an existing audio file.' : 'Share something meaningful with your community.'}
+      >
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.composerBody}>
           <View style={styles.destinationBlock}>
             <Text style={[styles.destinationLabel, { color: colors.textSecondary }]}>POST TO</Text>
@@ -680,8 +697,7 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
                 <Pressable
                   onPress={() => void chooseAudio()}
                   disabled={mediaUploading || recordingAction || recorderState.isRecording || attachments.length >= attachmentLimit}
-                  disabled={recorderState.isRecording || recordingAction}
-                style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}
+                  style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}
                 >
                   <Icon name="musical-notes-outline" size={18} color={colors.interactive} />
                   <Text style={[styles.mediaButtonText, { color: colors.text }]}>Upload audio</Text>
@@ -699,6 +715,7 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
                       : ({ pathname: '/general/studio/reel', params: { scope: targetScope } } as any),
                   );
                 }}
+                disabled={recorderState.isRecording || recordingAction}
                 style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}
               >
                 <Icon name="flash-outline" size={18} color={colors.interactive} />
