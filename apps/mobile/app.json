@@ -28,7 +28,7 @@
           "microphonePermission": "Allow City of Transformation to record audio that you choose to share.",
           "recordAudioAndroid": true,
           "enableBackgroundRecording": false,
-          "enableBackgroundPlayback": true
+          "enableBackgroundPlayback": false
         }
       ],
       [
