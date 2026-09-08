@@ -5,7 +5,7 @@ export interface ProvisionedBroadcast{providerBroadcastId:string;ingest:{protoco
 export interface PlaybackGrant{url:string;token?:string;expiresAt:string}
 export interface ProviderWebhook{eventId:string;eventType:string;providerBroadcastId?:string;providerAssetId?:string;lifecycle?:StreamLifecycle;recording?:{providerAssetId:string;playbackId?:string;status:'preparing'|'ready'|'errored';durationSeconds?:number};raw:Record<string,unknown>}
 export interface StreamingProvider{
- readonly code:string;createBroadcast(config:ProviderConfiguration,request:BroadcastRequest):Promise<ProvisionedBroadcast>;
+ readonly code:string;healthCheck?(config:ProviderConfiguration):Promise<boolean>;createBroadcast(config:ProviderConfiguration,request:BroadcastRequest):Promise<ProvisionedBroadcast>;
  createIngestEndpoint(config:ProviderConfiguration,broadcastId:string):Promise<ProvisionedBroadcast['ingest']>;getStreamStatus(config:ProviderConfiguration,broadcastId:string):Promise<StreamLifecycle>;
  startBroadcast(config:ProviderConfiguration,broadcastId:string):Promise<void>;stopBroadcast(config:ProviderConfiguration,broadcastId:string):Promise<void>;
  createPlaybackToken(config:ProviderConfiguration,playbackId:string,ttlSeconds:number):Promise<PlaybackGrant>;
