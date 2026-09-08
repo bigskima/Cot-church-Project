@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { Icon } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useTheme } from '@/state/theme';
+import { useExpressionManagementAccess } from '@/features/expression-management/useExpressionManagementAccess';
 
 export type ExpressionManagementSection =
   | 'tools'
@@ -70,6 +71,20 @@ export function ExpressionManagementHeader({
   onAction,
 }: Props) {
   const { colors } = useTheme();
+  const access = useExpressionManagementAccess();
+  const visibleTabs = tabs.filter((tab) => {
+    if (tab.key === 'tools') return access.canManageAny;
+    if (tab.key === 'studio') return access.canUseContentStudio;
+    if (tab.key === 'live') return access.canManageLive;
+    if (tab.key === 'sermons') return access.canManageSermons;
+    if (tab.key === 'events') return access.canManageEvents;
+    if (tab.key === 'leadership') return access.canManageLeadership;
+    if (tab.key === 'invites') return access.canManageInviteCodes;
+    if (tab.key === 'access') return access.canManageAccess;
+    if (tab.key === 'giving') return access.canManageGiving;
+    if (tab.key === 'finance') return access.canReadGivingFinance;
+    return access.canManageSettings;
+  });
 
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
@@ -122,7 +137,7 @@ export function ExpressionManagementHeader({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.tabs}
       >
-        {tabs.map((tab) => {
+        {visibleTabs.map((tab) => {
           const selected = tab.key === active;
           return (
             <Pressable
