@@ -256,10 +256,10 @@ export default function NotificationsScreen() {
                     </View>
                     <View style={styles.cardHeaderText}>
                       <Text style={[styles.title, { color: colors.text }]}>
-                        {invite.kind === 'platform_role' ? 'Platform administration invitation' : 'Expression role invitation'}
+                        {invite.kind === 'platform_role' ? 'COT administration invitation' : 'Expression ministry invitation'}
                       </Text>
                       <Text style={[styles.meta, { color: colors.textSecondary }]}>
-                        {invite.role?.name ?? 'Role invitation'}{invite.expression?.name ? ` · ${invite.expression.name}` : ''}
+                        {invite.role?.name ?? 'Ministry invitation'}{invite.expression?.name ? ` · ${invite.expression.name}` : ''}
                       </Text>
                     </View>
                     <Badge label="PENDING" variant="primary" />
