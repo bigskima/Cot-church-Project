@@ -22,22 +22,19 @@ import { radius, shadows, spacing } from '@/design-system/tokens';
 
 export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'general' } = {}) {
   const insets = useSafeAreaInsets();
-  const { api, context, hasCapability, hasOrganizationCapability, hasPublicCapability } = useSession();
+  const { api, context, mode, hasCapability, hasOrganizationCapability, hasPublicCapability } = useSession();
   const generalWorkspace = forcedScope === 'general';
   const expression = generalWorkspace ? undefined : context?.expression;
+  const signedIn = mode === 'authenticated';
   const canPublishPosts = generalWorkspace
-    ? hasOrganizationCapability('posts.create') || hasOrganizationCapability('posts.publish')
+    ? signedIn
     : hasCapability('posts.create') || hasCapability('posts.publish');
-  const canPublishPublicReels =
-    hasOrganizationCapability('media.upload') &&
-    hasOrganizationCapability('reels.publish');
+  const canPublishPublicReels = generalWorkspace && signedIn;
   const canPublishExpressionReels =
     Boolean(expression?.id) &&
     hasCapability('media.upload') &&
     hasCapability('reels.publish');
-  const canPublishPublicVideos =
-    hasOrganizationCapability('media.upload') &&
-    hasOrganizationCapability('videos.publish');
+  const canPublishPublicVideos = generalWorkspace && signedIn;
   const canPublishExpressionVideos =
     Boolean(expression?.id) &&
     hasCapability('media.upload') &&
@@ -80,15 +77,27 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
     setPublishError('');
     setPublishNotice('');
     try {
-      await api.request('creator-studio', {
-        method: 'POST',
-        body: JSON.stringify({
-          action: 'publish_post',
-          expressionId: expression?.id ?? null,
-          visibility: expression?.id ? 'branch' : 'public',
-          body: postBody.trim(),
-        }),
-      });
+      if (generalWorkspace) {
+        await api.request('social-feed', {
+          method: 'POST',
+          context: 'public',
+          body: JSON.stringify({
+            body: postBody.trim(),
+            visibility: 'public',
+            mediaUploadIds: [],
+          }),
+        });
+      } else {
+        await api.request('creator-studio', {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'publish_post',
+            expressionId: expression?.id ?? null,
+            visibility: expression?.id ? 'branch' : 'public',
+            body: postBody.trim(),
+          }),
+        });
+      }
       setPostBody('');
       setActiveModal(null);
       setPublishNotice(
@@ -207,9 +216,9 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
         ]}
       >
         <ScreenHeader
-          title="Ministry Studio"
-          kicker="LEADERSHIP"
-          subtitle="Create, publish and manage your ministry content in one place."
+          title={generalWorkspace ? 'Create' : 'Ministry Studio'}
+          kicker={generalWorkspace ? 'GENERAL COT' : 'LEADERSHIP'}
+          subtitle={generalWorkspace ? 'Share posts, Reels and videos with the public COT community.' : 'Create, publish and manage your ministry content in one place.'}
           showBack
         />
 
@@ -224,15 +233,15 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
           <View style={[styles.quickPostCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
             <View style={styles.quickPostHeader}>
               <Icon name="create-outline" size={20} color={colors.interactive} />
-              <Text style={[styles.quickPostTitle, { color: colors.text }]}>Quick Community Announcement</Text>
+              <Text style={[styles.quickPostTitle, { color: colors.text }]}>Quick Public Post</Text>
             </View>
             <Text style={[styles.quickPostSub, { color: colors.textSecondary }]}>
               {expression?.name
                 ? `Share an encouragement or update inside ${expression.name}.`
-                : 'Share an encouragement or ministry update with the General Community.'}
+                : 'Share a thought, update or encouragement with the General Community.'}
             </Text>
             <Button
-              label="Compose Announcement"
+              label="Write a post"
               onPress={() => setActiveModal('post')}
               variant="primary"
               size="md"
@@ -243,7 +252,7 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
 
           {/* Operational Leadership Modules Grid */}
           <View style={styles.modulesSection}>
-            <SectionHeader title="Your tools" badge={leadershipModules.length} subtitle="Only the tools available to you are shown" />
+            <SectionHeader title={generalWorkspace ? "Create & manage" : "Your tools"} badge={leadershipModules.length} subtitle={generalWorkspace ? "Public creation is available to every signed-in account; ministry tools appear only when available to you." : "Only the tools available to you are shown"} />
             {leadershipModules.map((module, idx) => (
               <LeadershipModuleCard
                 key={idx}
@@ -266,7 +275,7 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
             setPublishError('');
           }
         }}
-        title="Publish announcement"
+        title={generalWorkspace ? "Create public post" : "Publish announcement"}
         subtitle={expression?.name ? `Share inside ${expression.name}.` : 'Share with the General Community.'}
       >
         {publishError ? (
@@ -281,7 +290,7 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
           onChangeText={setPostBody}
           multiline
           numberOfLines={5}
-          placeholder="Write your pastoral announcement or encouragement..."
+          placeholder="What would you like to share?"
         />
         <View style={styles.modalActions}>
           <Button label="Cancel" onPress={() => { setActiveModal(null); setPublishError(''); }} variant="outline" size="md" disabled={submitting} />
