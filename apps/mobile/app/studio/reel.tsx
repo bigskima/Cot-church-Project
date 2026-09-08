@@ -26,15 +26,12 @@ export default function ReelCreatorScreen() {
   const expressionWorkspace = pathname.startsWith('/expressions/');
   const generalWorkspace = pathname.startsWith('/general/');
   const insets = useSafeAreaInsets();
-  const { api, context, mode, hasCapability, hasOrganizationCapability } = useSession();
+  const { api, context, mode, hasCapability } = useSession();
   const { colors } = useTheme();
   const expression = context?.expression;
+  const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
   const { scope: requestedScope } = useLocalSearchParams<{ scope?: string }>();
-  const canPublishPublic =
-    !expressionWorkspace &&
-    mode === 'authenticated' &&
-    hasOrganizationCapability('media.upload') &&
-    hasOrganizationCapability('reels.publish');
+  const canPublishPublic = generalWorkspace && mode === 'authenticated';
   const canPublishExpression =
     !generalWorkspace &&
     mode === 'authenticated' &&
@@ -115,7 +112,11 @@ export default function ReelCreatorScreen() {
   };
 
   const cancelAsset = async (assetId: string) => {
-    await api.request('content-media', { method: 'POST', body: JSON.stringify({ action: 'cancel_upload', assetId }) }).catch(() => undefined);
+    await api.request('content-media', {
+      method: 'POST',
+      context: generalWorkspace ? 'public' : 'current',
+      body: JSON.stringify({ action: 'cancel_upload', assetId }),
+    }).catch(() => undefined);
   };
 
   const publishReel = async () => {
@@ -127,10 +128,17 @@ export default function ReelCreatorScreen() {
       setStage('Preparing secure upload…');
       const intent = await api.request<UploadIntent>('content-media', {
         method: 'POST',
+        context: generalWorkspace ? 'public' : 'current',
         body: JSON.stringify({
-          action: 'create_upload_intent', mediaType: 'video', mimeType: video.mimeType,
-          expressionId: selectedExpressionId, durationSeconds: video.durationSeconds, aspectRatio: '9:16',
-          fileSizeBytes: video.sizeBytes, fileName: video.fileName,
+          action: 'create_upload_intent',
+          organizationId: generalWorkspace ? organizationId || undefined : undefined,
+          mediaType: 'video',
+          mimeType: video.mimeType,
+          expressionId: selectedExpressionId,
+          durationSeconds: video.durationSeconds,
+          aspectRatio: '9:16',
+          fileSizeBytes: video.sizeBytes,
+          fileName: video.fileName,
         }),
       });
       assetId = intent.uploadSession.assetId;
@@ -138,13 +146,24 @@ export default function ReelCreatorScreen() {
       const uploaded = await fetch(intent.uploadSession.signedUploadUrl, { method: 'PUT', headers: { 'Content-Type': video.mimeType }, body: video.body });
       if (!uploaded.ok) throw new Error(`Video upload failed (${uploaded.status}).`);
       setStage('Verifying upload…');
-      await api.request('content-media', { method: 'POST', body: JSON.stringify({ action: 'complete_upload', assetId }) });
+      await api.request('content-media', {
+        method: 'POST',
+        context: generalWorkspace ? 'public' : 'current',
+        body: JSON.stringify({ action: 'complete_upload', assetId }),
+      });
       setStage('Publishing Reel…');
       await api.request('creator-studio', {
         method: 'POST',
+        context: generalWorkspace ? 'public' : 'current',
         body: JSON.stringify({
-          action: 'publish_reel', expressionId: selectedExpressionId, visibility: scope, mediaAssetId: assetId,
-          caption: caption.trim(), audioTitle: audioTitle.trim() || undefined, audioArtist: audioArtist.trim() || undefined,
+          action: 'publish_reel',
+          organizationId: generalWorkspace ? organizationId || undefined : undefined,
+          expressionId: selectedExpressionId,
+          visibility: scope,
+          mediaAssetId: assetId,
+          caption: caption.trim(),
+          audioTitle: audioTitle.trim() || undefined,
+          audioArtist: audioArtist.trim() || undefined,
         }),
       });
       assetId = null;
@@ -164,7 +183,7 @@ export default function ReelCreatorScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: expressionWorkspace ? spacing.md : insets.top + spacing.sm, paddingBottom: expressionWorkspace ? insets.bottom + spacing.xl : insets.bottom + 130 }]}>
         {!expressionWorkspace ? (
           <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
-            <ScreenHeader title="Create Reel" kicker="MEDIA STUDIO" subtitle={expressionWorkspace ? `Publish a vertical video inside ${expression?.name ?? 'this Expression'}.` : generalWorkspace ? "Publish a vertical video to General COT." : "Upload a vertical video and choose exactly where it should appear."} showBack />
+            <ScreenHeader title="Create Reel" kicker={generalWorkspace ? "GENERAL COT" : "MEDIA STUDIO"} subtitle={expressionWorkspace ? `Publish a vertical video inside ${expression?.name ?? 'this Expression'}.` : generalWorkspace ? "Publish a vertical video to General COT." : "Upload a vertical video and choose exactly where it should appear."} showBack />
           </View>
         ) : null}
 
@@ -192,7 +211,7 @@ export default function ReelCreatorScreen() {
           ) : (
             <>
               <View style={styles.scopeBlock}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>PUBLISHING SCOPE</Text>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>PUBLISH TO</Text>
                 <View style={styles.chipRow}>
                   {canPublishPublic ? <Chip label="Public Reels" selected={scope === 'public'} onPress={() => setScope('public')} /> : null}
                   {canPublishExpression && expression?.id ? <Chip label={expression.name} selected={scope === 'branch'} onPress={() => setScope('branch')} /> : null}
