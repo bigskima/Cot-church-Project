@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import {
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -33,6 +34,39 @@ type ExpressionHomePayload = {
   events: Event[];
   degradedSections?: string[];
 };
+
+type QuickLinkProps = {
+  label: string;
+  hint: string;
+  icon: string;
+  onPress: () => void;
+};
+
+function QuickLink({ label, hint, icon, onPress }: QuickLinkProps) {
+  const { colors } = useTheme();
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => [
+        styles.quickLink,
+        { backgroundColor: colors.card, borderColor: colors.borderSubtle },
+        pressed ? { opacity: 0.86, transform: [{ scale: 0.985 }] } : null,
+      ]}
+    >
+      <View style={[styles.quickIcon, { backgroundColor: colors.primarySoft }]}>
+        <Icon name={icon as any} size={19} color={colors.interactive} />
+      </View>
+      <View style={styles.quickCopy}>
+        <Text style={[styles.quickLabel, { color: colors.text }]} numberOfLines={1}>{label}</Text>
+        <Text style={[styles.quickHint, { color: colors.textMuted }]} numberOfLines={1}>{hint}</Text>
+      </View>
+      <Icon name="chevron-forward" size={15} color={colors.textMuted} />
+    </Pressable>
+  );
+}
 
 export default function ExpressionHomeScreen() {
   const { expressionId } = useLocalSearchParams<{ expressionId: string }>();
@@ -68,8 +102,8 @@ export default function ExpressionHomeScreen() {
   if (resource.loading && !resource.data) {
     return (
       <View style={[styles.stateWrap, { backgroundColor: colors.bg }]}>
-        <Skeleton height={150} borderRadius={radius.xl} />
-        <Skeleton height={92} count={3} />
+        <Skeleton height={180} borderRadius={radius.xl} />
+        <Skeleton height={78} count={4} />
       </View>
     );
   }
@@ -102,31 +136,77 @@ export default function ExpressionHomeScreen() {
           shadows.md,
         ]}
       >
-        <View style={[styles.heroIcon, { backgroundColor: colors.primarySoft }]}>
-          <Icon name="home-outline" size={22} color={colors.interactive} />
+        <View pointerEvents="none" style={[styles.heroGlow, { backgroundColor: colors.primarySoft }]} />
+        <View style={styles.heroTopRow}>
+          <View style={[styles.heroIcon, { backgroundColor: colors.primarySoft }]}>
+            <Icon name="people" size={22} color={colors.interactive} />
+          </View>
+          <View style={[styles.privatePill, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+            <Icon name="lock-closed" size={12} color={colors.interactive} />
+            <Text style={[styles.privatePillText, { color: colors.textSecondary }]}>Members only</Text>
+          </View>
         </View>
-        <View style={styles.heroCopy}>
-          <Text style={[styles.kicker, { color: colors.interactive }]}>EXPRESSION HOME</Text>
-          <Text style={[styles.title, { color: colors.text }]}>{expression?.name ?? 'Your Expression'}</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Your private community home. General COT content stays outside this space unless it is deliberately published here.
-          </Text>
+        <Text style={[styles.kicker, { color: colors.interactive }]}>YOUR EXPRESSION</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{expression?.name ?? 'Your Expression'}</Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+          A focused community space for conversations, prayer, gatherings, teaching and live moments shared with this Expression.
+        </Text>
+        <View style={styles.heroActions}>
+          <Pressable
+            onPress={() => router.push(`/expressions/${id}/feed` as any)}
+            style={({ pressed }) => [
+              styles.primaryAction,
+              { backgroundColor: colors.interactive },
+              pressed ? styles.pressed : null,
+            ]}
+          >
+            <Icon name="chatbubbles" size={17} color="#FFFFFF" />
+            <Text style={styles.primaryActionText}>Open feed</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.replace('/general')}
+            style={({ pressed }) => [
+              styles.secondaryAction,
+              { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle },
+              pressed ? styles.pressed : null,
+            ]}
+          >
+            <Icon name="globe-outline" size={17} color={colors.text} />
+            <Text style={[styles.secondaryActionText, { color: colors.text }]}>General COT</Text>
+          </Pressable>
         </View>
       </View>
 
+      <View style={styles.quickGrid}>
+        <QuickLink label="Announcements" hint="Important updates" icon="megaphone-outline" onPress={() => router.push(`/expressions/${id}/announcements` as any)} />
+        <QuickLink label="Prayer" hint="Pray together" icon="heart-outline" onPress={() => router.push(`/expressions/${id}/prayer` as any)} />
+        <QuickLink label="Events" hint="Gatherings" icon="calendar-outline" onPress={() => router.push(`/expressions/${id}/events` as any)} />
+        <QuickLink label="Groups" hint="Smaller circles" icon="people-circle-outline" onPress={() => router.push(`/expressions/${id}/groups` as any)} />
+      </View>
+
       {resource.data?.degradedSections?.length ? (
-        <View style={[styles.notice, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+        <Pressable
+          onPress={resource.refresh}
+          style={[styles.notice, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}
+        >
           <Icon name="alert-circle-outline" size={17} color={colors.textSecondary} />
           <Text style={[styles.noticeText, { color: colors.textSecondary }]}>
-            Some Expression sections are still loading. Pull down to refresh.
+            Some Expression sections are still loading. Tap to retry.
           </Text>
-        </View>
+          <Icon name="refresh-outline" size={15} color={colors.textMuted} />
+        </Pressable>
       ) : null}
 
       {activeStream ? (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Live in this Expression</Text>
+            <View>
+              <Text style={[styles.sectionEyebrow, { color: colors.interactive }]}>LIVE</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Happening in your Expression</Text>
+            </View>
+            <Pressable onPress={() => router.push(`/expressions/${id}/live` as any)}>
+              <Text style={[styles.sectionLink, { color: colors.interactive }]}>See all</Text>
+            </Pressable>
           </View>
           <HeroLiveCard
             stream={activeStream}
@@ -138,9 +218,13 @@ export default function ExpressionHomeScreen() {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <View>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Community feed</Text>
-            <Text style={[styles.sectionHint, { color: colors.textMuted }]}>Recent posts inside this Expression</Text>
+            <Text style={[styles.sectionEyebrow, { color: colors.interactive }]}>COMMUNITY</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>From your people</Text>
+            <Text style={[styles.sectionHint, { color: colors.textMuted }]}>Recent conversations inside this Expression</Text>
           </View>
+          <Pressable onPress={() => router.push(`/expressions/${id}/feed` as any)}>
+            <Text style={[styles.sectionLink, { color: colors.interactive }]}>See all</Text>
+          </Pressable>
         </View>
         {posts.length ? (
           <View style={styles.stack}>
@@ -148,6 +232,7 @@ export default function ExpressionHomeScreen() {
               <PostCard
                 key={post.id}
                 post={post}
+                expressionName={expression?.name}
                 canEngage={mode === 'authenticated'}
                 allowExternalShare={false}
                 onPress={() => router.push({
@@ -174,9 +259,13 @@ export default function ExpressionHomeScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Upcoming</Text>
+              <Text style={[styles.sectionEyebrow, { color: colors.interactive }]}>CALENDAR</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Coming up</Text>
               <Text style={[styles.sectionHint, { color: colors.textMuted }]}>Expression gatherings and activities</Text>
             </View>
+            <Pressable onPress={() => router.push(`/expressions/${id}/events` as any)}>
+              <Text style={[styles.sectionLink, { color: colors.interactive }]}>See all</Text>
+            </Pressable>
           </View>
           <View style={styles.stack}>
             {events.slice(0, 3).map((event) => (
@@ -194,9 +283,13 @@ export default function ExpressionHomeScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent teachings</Text>
-              <Text style={[styles.sectionHint, { color: colors.textMuted }]}>Media published for this Expression</Text>
+              <Text style={[styles.sectionEyebrow, { color: colors.interactive }]}>TEACHING</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent messages</Text>
+              <Text style={[styles.sectionHint, { color: colors.textMuted }]}>Teaching selected for this Expression</Text>
             </View>
+            <Pressable onPress={() => router.push(`/expressions/${id}/sermons` as any)}>
+              <Text style={[styles.sectionLink, { color: colors.interactive }]}>See all</Text>
+            </Pressable>
           </View>
           <View style={styles.stack}>
             {sermons.slice(0, 3).map((sermon) => (
@@ -211,11 +304,13 @@ export default function ExpressionHomeScreen() {
       ) : null}
 
       <View style={[styles.boundaryCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
-        <Icon name="shield-checkmark-outline" size={20} color={colors.interactive} />
+        <View style={[styles.boundaryIcon, { backgroundColor: colors.primarySoft }]}>
+          <Icon name="shield-checkmark-outline" size={20} color={colors.interactive} />
+        </View>
         <View style={styles.boundaryCopy}>
-          <Text style={[styles.boundaryTitle, { color: colors.text }]}>Private Expression</Text>
+          <Text style={[styles.boundaryTitle, { color: colors.text }]}>This is a private Expression</Text>
           <Text style={[styles.boundaryText, { color: colors.textSecondary }]}>
-            Content here is for members of this Expression. Return to General COT whenever you want to leave this private space.
+            Expression conversations stay in this space. General COT remains the church-wide public experience and is presented separately.
           </Text>
         </View>
       </View>
@@ -229,7 +324,7 @@ const styles = StyleSheet.create({
     maxWidth: 980,
     alignSelf: 'center',
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.lg,
+    paddingTop: spacing.md,
     paddingBottom: 120,
   },
   stateWrap: {
@@ -238,12 +333,26 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   hero: {
+    position: 'relative',
+    overflow: 'hidden',
     borderWidth: 1,
     borderRadius: radius.xxl,
     padding: spacing.xl,
+  },
+  heroGlow: {
+    position: 'absolute',
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    top: -84,
+    right: -54,
+    opacity: 0.9,
+  },
+  heroTopRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.lg,
   },
   heroIcon: {
     width: 48,
@@ -252,25 +361,101 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroCopy: {
-    flex: 1,
-    minWidth: 0,
+  privatePill: {
+    minHeight: 30,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    paddingHorizontal: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  privatePillText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   kicker: {
     fontSize: 10,
     lineHeight: 14,
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 1.1,
     marginBottom: 4,
   },
   title: {
     ...typography.h1,
+    maxWidth: 720,
   },
   subtitle: {
     fontSize: 13,
     lineHeight: 20,
     marginTop: spacing.xs,
     maxWidth: 650,
+  },
+  heroActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+  primaryAction: {
+    minHeight: 44,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  primaryActionText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  secondaryAction: {
+    minHeight: 44,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    paddingHorizontal: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  secondaryActionText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  quickGrid: {
+    marginTop: spacing.md,
+    gap: spacing.sm,
+  },
+  quickLink: {
+    minHeight: 62,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  quickIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  quickLabel: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  quickHint: {
+    fontSize: 10,
+    marginTop: 2,
   },
   notice: {
     marginTop: spacing.md,
@@ -292,25 +477,38 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
   },
   sectionHeader: {
-    minHeight: 42,
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'space-between',
+    gap: spacing.md,
     marginBottom: spacing.sm,
   },
+  sectionEyebrow: {
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
+    marginBottom: 2,
+  },
   sectionTitle: {
-    fontSize: 18,
-    lineHeight: 22,
-    fontWeight: '800',
-    letterSpacing: -0.35,
+    fontSize: 20,
+    lineHeight: 24,
+    fontWeight: '900',
+    letterSpacing: -0.45,
   },
   sectionHint: {
     fontSize: 11,
     lineHeight: 15,
     marginTop: 2,
   },
+  sectionLink: {
+    fontSize: 12,
+    fontWeight: '800',
+    paddingBottom: 2,
+  },
   stack: {
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   boundaryCard: {
     marginTop: spacing.xl,
@@ -320,6 +518,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing.sm,
+  },
+  boundaryIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   boundaryCopy: {
     flex: 1,
@@ -333,5 +538,8 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 17,
     marginTop: 2,
+  },
+  pressed: {
+    opacity: 0.84,
   },
 });
