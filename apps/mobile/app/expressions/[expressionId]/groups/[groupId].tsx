@@ -3,7 +3,8 @@ import { useLocalSearchParams } from 'expo-router';
 import { ExpressionGroupsExperience } from '@/features/expression/ExpressionGroupsExperience';
 
 export default function ExpressionGroupDetailScreen() {
-  const { groupId } = useLocalSearchParams<{ groupId: string }>();
-  const id = typeof groupId === 'string' ? groupId : '';
-  return <ExpressionGroupsExperience embedded focusGroupId={id} />;
+  const { expressionId, groupId } = useLocalSearchParams<{ expressionId?: string; groupId?: string }>();
+  const expression = typeof expressionId === 'string' ? expressionId : '';
+  const group = typeof groupId === 'string' ? groupId : '';
+  return <ExpressionGroupsExperience embedded expressionId={expression} focusGroupId={group} />;
 }
