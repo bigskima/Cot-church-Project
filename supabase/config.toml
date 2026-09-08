@@ -125,3 +125,6 @@ verify_jwt = false
 
 [functions.platform-admin-guide]
 verify_jwt = true
+
+[functions.platform-moderation]
+verify_jwt = true
