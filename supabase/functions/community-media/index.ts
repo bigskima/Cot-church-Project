@@ -7,7 +7,6 @@ import { assertNoUnknownFields, assertObject, requiredString, uuid } from "../_s
 
 const BUCKET = "community-public-media";
 const MAX_BYTES = 50 * 1024 * 1024;
-const MAX_MEMBER_PUBLIC_VIDEO_SECONDS = 180;
 const MIME_TYPES: Record<string, { kind: "image" | "video" | "audio"; ext: string }> = {
   "image/jpeg": { kind: "image", ext: "jpg" },
   "image/png": { kind: "image", ext: "png" },
@@ -113,35 +112,6 @@ Deno.serve(createHandler(
           .maybeSingle();
         if (expressionMembershipError || !expressionMembership) {
           throw new ApiError("EXPRESSION_MEMBERSHIP_REQUIRED", "Join this Expression before uploading media to it", 403);
-        }
-      }
-
-      const { data: elevatedPublisher, error: permissionError } = await auth.client.rpc("has_permission", {
-        target_organization_id: organizationId,
-        requested_permission: "feed.post",
-        target_branch_id: branchId,
-      });
-      if (permissionError) {
-        throw new ApiError("PERMISSION_CHECK_FAILED", "Unable to validate community publishing access", 500, undefined, false);
-      }
-
-      if (!branchId && elevatedPublisher !== true) {
-        if (type.kind === "audio") {
-          throw new ApiError(
-            "GENERAL_MEDIA_RESTRICTED",
-            "General Community member posts support text, images and short videos. Audio ministry content requires an authorized publishing workflow.",
-            403,
-          );
-        }
-        if (
-          type.kind === "video" &&
-          (!declaredDurationSeconds || declaredDurationSeconds > MAX_MEMBER_PUBLIC_VIDEO_SECONDS)
-        ) {
-          throw new ApiError(
-            "GENERAL_VIDEO_TOO_LONG",
-            "General Community member videos must be 3 minutes or shorter",
-            422,
-          );
         }
       }
 
