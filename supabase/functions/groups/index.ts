@@ -18,6 +18,29 @@ async function hasScopedPermission(auth: any, permission: string, branchId: stri
   return !error && data === true;
 }
 
+async function assertExpressionMembership(auth: any, branchId: string) {
+  const [{ data: branch, error: branchError }, { data: membership, error: membershipError }] = await Promise.all([
+    auth.client
+      .from("branches")
+      .select("id,is_active")
+      .eq("id", branchId)
+      .eq("organization_id", auth.organizationId)
+      .eq("is_active", true)
+      .maybeSingle(),
+    auth.client
+      .from("expression_memberships")
+      .select("id,status")
+      .eq("organization_id", auth.organizationId)
+      .eq("branch_id", branchId)
+      .eq("profile_id", auth.user.id)
+      .eq("status", "active")
+      .maybeSingle(),
+  ]);
+  if (branchError || !branch || membershipError || !membership) {
+    throw new ApiError("EXPRESSION_MEMBERSHIP_REQUIRED", "Join this Expression before opening its groups", 403);
+  }
+}
+
 function capacityValue(value: unknown) {
   if (value === undefined) return undefined;
   if (value === null || value === "") return null;
@@ -47,8 +70,11 @@ Deno.serve(createHandler(
       const url = new URL(request.url);
       const requestedScope = url.searchParams.get("scope") ?? (auth.branchId ? "expression" : "church");
       if (!scopes.has(requestedScope)) throw new ApiError("VALIDATION_FAILED", "Invalid group scope", 422);
-      if (requestedScope === "expression" && !auth.branchId) {
-        throw new ApiError("EXPRESSION_REQUIRED", "Select or join an Expression to view its groups", 400);
+      const requestedBranchId = requestedScope === "expression"
+        ? uuid(url.searchParams.get("branchId") ?? auth.branchId, "branchId", true)!
+        : null;
+      if (requestedScope === "expression") {
+        await assertExpressionMembership(auth, requestedBranchId);
       }
 
       let query = auth.client
@@ -57,7 +83,7 @@ Deno.serve(createHandler(
         .eq("organization_id", auth.organizationId)
         .eq("is_active", true)
         .order("name");
-      if (requestedScope === "expression") query = query.eq("branch_id", auth.branchId!);
+      if (requestedScope === "expression") query = query.eq("branch_id", requestedBranchId!);
       if (requestedScope === "church") query = query.is("branch_id", null);
 
       const { data: groups, error } = await query;
@@ -78,7 +104,7 @@ Deno.serve(createHandler(
       let pendingRequests: any[] = [];
       const includeManagement = url.searchParams.get("includeManagement") === "true";
       if (includeManagement && groupIds.length) {
-        const targetBranch = requestedScope === "expression" ? auth.branchId : null;
+        const targetBranch = requestedScope === "expression" ? requestedBranchId : null;
         if (!(await hasScopedPermission(auth, "groups.members.manage", targetBranch))) {
           throw new ApiError("PERMISSION_DENIED", "You do not have permission to manage group memberships in this scope", 403);
         }
@@ -151,10 +177,8 @@ Deno.serve(createHandler(
     let targetBranchId: string | null;
     if (request.method === "POST") {
       const suppliedBranch = body.branchId === undefined || body.branchId === null ? null : uuid(String(body.branchId), "branchId", true)!;
-      if (auth.branchId && suppliedBranch && suppliedBranch !== auth.branchId) {
-        throw new ApiError("EXPRESSION_SCOPE_DENIED", "Create this group only inside the currently selected Expression", 403);
-      }
-      targetBranchId = auth.branchId ?? suppliedBranch;
+      targetBranchId = suppliedBranch ?? auth.branchId;
+      if (targetBranchId) await assertExpressionMembership(auth, targetBranchId);
     } else {
       const id = uuid(requiredString(body.id, "id", 36), "id", true)!;
       const { data: existing, error: existingError } = await auth.client
@@ -164,10 +188,8 @@ Deno.serve(createHandler(
         .eq("organization_id", auth.organizationId)
         .maybeSingle();
       if (existingError || !existing) throw new ApiError("GROUP_NOT_FOUND", "Group not found in your permitted scope", 404);
-      if (auth.branchId && existing.branch_id !== auth.branchId) {
-        throw new ApiError("EXPRESSION_SCOPE_DENIED", "This group belongs to another scope", 403);
-      }
       targetBranchId = existing.branch_id;
+      if (targetBranchId) await assertExpressionMembership(auth, targetBranchId);
       if (body.branchId !== undefined) {
         const suppliedBranch = body.branchId === null ? null : uuid(String(body.branchId), "branchId", true)!;
         if (suppliedBranch !== targetBranchId) throw new ApiError("GROUP_SCOPE_IMMUTABLE", "Move a group by creating it in the new scope instead", 409);
@@ -199,13 +221,13 @@ Deno.serve(createHandler(
 
     if (request.method === "POST") {
       Object.assign(record, { organization_id: auth.organizationId, created_by: auth.user.id });
-      const { data, error } = await auth.client.from("groups").insert(record).select().single();
+      const { data, error } = await adminClient().from("groups").insert(record).select().single();
       if (error) throw new ApiError("GROUP_CREATE_FAILED", "Unable to create group", 500, undefined, false);
       return { data, status: 201 };
     }
 
     const id = uuid(requiredString(body.id, "id", 36), "id", true)!;
-    const { data, error } = await auth.client
+    const { data, error } = await adminClient()
       .from("groups")
       .update(record)
       .eq("id", id)
