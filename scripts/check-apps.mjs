@@ -12,12 +12,13 @@ const files = [
   'apps/mobile/src/components/cards.tsx',
   'apps/mobile/app/(tabs)/home/index.tsx',
   'apps/mobile/app/(tabs)/_layout.tsx',
-  'apps/mobile/app/general/index.tsx',
+  'apps/mobile/app/general/(main)/index.tsx',
   'apps/mobile/app/general/_layout.tsx',
-  'apps/mobile/app/general/explore.tsx',
-  'apps/mobile/app/general/community.tsx',
-  'apps/mobile/app/general/reels.tsx',
-  'apps/mobile/app/general/profile.tsx',
+  'apps/mobile/app/general/(main)/_layout.tsx',
+  'apps/mobile/app/general/(main)/explore.tsx',
+  'apps/mobile/app/general/(main)/community.tsx',
+  'apps/mobile/app/general/(main)/reels.tsx',
+  'apps/mobile/app/general/(main)/profile.tsx',
   'apps/mobile/app/general/live/index.tsx',
   'apps/mobile/app/general/live/[id].tsx',
   'apps/mobile/app/general/watch/index.tsx',
@@ -123,6 +124,10 @@ const files = [
   'apps/admin/src/pages/IntegrationsJobs.tsx',
   'apps/admin/src/pages/PaymentInfrastructure.tsx',
   'apps/admin/src/api.ts',
+  'supabase/functions/groups/index.ts',
+  'supabase/functions/platform-ai/index.ts',
+  'supabase/functions/_shared/streaming/types.ts',
+  'supabase/functions/_shared/streaming/mux.ts',
   'supabase/functions/streaming-broadcasts/index.ts',
   'supabase/functions/stream-access/index.ts',
   'supabase/functions/stream-presence/index.ts',
@@ -149,6 +154,7 @@ const paymentInfrastructureUi = sources.get('apps/admin/src/pages/PaymentInfrast
 const profileSettingsUi = sources.get('apps/mobile/app/(tabs)/profile/settings.tsx') ?? '';
 const sessionUi = sources.get('apps/mobile/src/state/session.tsx') ?? '';
 const generalShellUi = sources.get('apps/mobile/app/general/_layout.tsx') ?? '';
+const generalTabsUi = sources.get('apps/mobile/app/general/(main)/_layout.tsx') ?? '';
 const generalHomeUi = sources.get('apps/mobile/app/(tabs)/home/index.tsx') ?? '';
 const generalProfileUi = sources.get('apps/mobile/app/(tabs)/profile/index.tsx') ?? '';
 const generalGivingRouteUi = sources.get('apps/mobile/app/general/giving.tsx') ?? '';
@@ -295,8 +301,14 @@ const checks = [
   [/const activeScope: GivingScope = expressionWorkspace && expression \? 'expression'/, 'Expression Giving management is locked to Expression scope'],
   [/Redirect href=\{\`\/expressions\/\$\{activeExpression!\.id\}\/manage\`/, 'legacy leadership hub canonicalizes active Expression management'],
   [/Redirect href=\{\`\/expressions\/\$\{expression\.id\}\/manage\/studio\`/, 'legacy Studio canonicalizes active Expression content creation'],
-  [/Tabs screenOptions=\{screenOptions\} backBehavior="history"/, 'General COT owns a dedicated tab shell'],
+  [/Stack screenOptions=\{\{ headerShown: false/, 'General COT root owns a stack boundary'],
+  [/Tabs[\s\S]*name="index"[\s\S]*name="explore"[\s\S]*name="reels"[\s\S]*name="community"[\s\S]*name="profile"/, 'General COT owns a dedicated five-route tab shell'],
   [/name="index"[\s\S]*name="explore"[\s\S]*name="reels"[\s\S]*name="community"[\s\S]*name="profile"/, 'General shell exposes five canonical product destinations'],
+  [/branchId: targetExpressionId[\s\S]*groups\?\$\{query\.toString\(\)\}/, 'Expression Groups requests carry exact route Expression identity'],
+  [/assertExpressionMembership[\s\S]*expression_memberships/, 'Groups backend verifies exact active Expression membership'],
+  [/healthCheck\?\(config:ProviderConfiguration\)/, 'streaming provider contract supports credential readiness probes'],
+  [/await adapter\.healthCheck\(loaded\.provider\)/, 'Live readiness verifies the configured provider can be reached'],
+  [/ensureProviderRuntime[\s\S]*defaultModelKey/, 'AI provider activation bootstraps a configured runtime model'],
   [/Opening General COT[\s\S]*Clearing the private Expression context/, 'General shell resolves the private-to-General boundary before rendering'],
   [/leaveExpression\(\)/, 'General route explicitly clears active Expression context'],
   [/mobile:home-feed:\$\{organizationId \|\| 'auto'\}:general/, 'General Home owns an Expression-independent resource identity'],
@@ -411,6 +423,10 @@ const forbiddenGeneralShellPatterns = [
   [/\/\(tabs\)\//, 'legacy tab route inside canonical General shell'],
 ];
 
+const forbiddenGeneralTabOverflowPatterns = [
+  [/<Tabs\.Screen\s+name="(?:watch|live|sermon|series|event|post|comments|giving|prayer|settings|notifications|saved|leadership|studio|assistant|expression)"/, 'utility or detail route registered in General bottom navigation'],
+];
+
 const forbiddenGeneralGivingRoutePatterns = [
   [/scope="expression"|initialScope="expression"/, 'Expression giving destination in General Giving route'],
 ];
@@ -471,7 +487,8 @@ const forbiddenPermissionGates = forbiddenPermissionGatePatterns.filter(([patter
 const forbiddenExpressionRouting = forbiddenExpressionRoutingPatterns.filter(([pattern]) => pattern.test(joined));
 const forbiddenGeneralHome = forbiddenGeneralHomePatterns.filter(([pattern]) => pattern.test(generalHomeUi));
 const forbiddenGeneralProfile = forbiddenGeneralProfilePatterns.filter(([pattern]) => pattern.test(generalProfileUi));
-const forbiddenGeneralShell = forbiddenGeneralShellPatterns.filter(([pattern]) => pattern.test(generalShellUi));
+const forbiddenGeneralShell = forbiddenGeneralShellPatterns.filter(([pattern]) => pattern.test(`${generalShellUi}\n${generalTabsUi}`));
+const forbiddenGeneralTabOverflow = forbiddenGeneralTabOverflowPatterns.filter(([pattern]) => pattern.test(generalTabsUi));
 const forbiddenGeneralGivingRoute = forbiddenGeneralGivingRoutePatterns.filter(([pattern]) => pattern.test(generalGivingRouteUi));
 const forbiddenGeneralStudioRoute = forbiddenGeneralStudioRoutePatterns.filter(([pattern]) => pattern.test(generalStudioRouteUi));
 const forbiddenProductionCopy = forbiddenProductionCopyPatterns.filter(([pattern]) => pattern.test(productionCopyUi));
@@ -483,7 +500,7 @@ const forbiddenPlatformBoundaries = forbiddenPlatformBoundaryPatterns.filter(([p
 const forbiddenIntegrations = forbiddenIntegrationPatterns.filter(([pattern]) => pattern.test(integrationsUi));
 const missingPaymentCredentialChecks = paymentCredentialChecks.filter(([pattern]) => !pattern.test(paymentInfrastructureUi));
 
-if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenPermissionGates.length || forbiddenExpressionRouting.length || forbiddenGeneralHome.length || forbiddenGeneralProfile.length || forbiddenGeneralShell.length || forbiddenGeneralGivingRoute.length || forbiddenGeneralStudioRoute.length || forbiddenProductionCopy.length || forbiddenLegacyExpressionLinks.length || forbiddenSocialCopy.length || forbiddenModalComments.length || forbiddenWatchCopy.length || forbiddenPlatformBoundaries.length || forbiddenIntegrations.length || missingPaymentCredentialChecks.length) {
+if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenPermissionGates.length || forbiddenExpressionRouting.length || forbiddenGeneralHome.length || forbiddenGeneralProfile.length || forbiddenGeneralShell.length || forbiddenGeneralTabOverflow.length || forbiddenGeneralGivingRoute.length || forbiddenGeneralStudioRoute.length || forbiddenProductionCopy.length || forbiddenLegacyExpressionLinks.length || forbiddenSocialCopy.length || forbiddenModalComments.length || forbiddenWatchCopy.length || forbiddenPlatformBoundaries.length || forbiddenIntegrations.length || missingPaymentCredentialChecks.length) {
   const failures = [
     ...missing.map(([, name]) => name),
     ...forbidden.map(([, name]) => `remove ${name}`),
@@ -493,6 +510,7 @@ if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenPer
     ...forbiddenGeneralHome.map(([, name]) => `remove ${name}`),
     ...forbiddenGeneralProfile.map(([, name]) => `remove ${name}`),
     ...forbiddenGeneralShell.map(([, name]) => `remove ${name}`),
+    ...forbiddenGeneralTabOverflow.map(([, name]) => `remove ${name}`),
     ...forbiddenGeneralGivingRoute.map(([, name]) => `remove ${name}`),
     ...forbiddenGeneralStudioRoute.map(([, name]) => `remove ${name}`),
     ...forbiddenProductionCopy.map(([, name]) => `remove ${name}`),
@@ -509,5 +527,5 @@ if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenPer
 }
 
 console.log(
-  `Application check passed (${files.length} files, ${checks.length} production invariants, ${forbiddenGivingPatterns.length + forbiddenPrayerPatterns.length + forbiddenPermissionGatePatterns.length + forbiddenExpressionRoutingPatterns.length + forbiddenGeneralHomePatterns.length + forbiddenGeneralProfilePatterns.length + forbiddenGeneralShellPatterns.length + forbiddenGeneralGivingRoutePatterns.length + forbiddenGeneralStudioRoutePatterns.length + forbiddenProductionCopyPatterns.length + forbiddenLegacyExpressionLinkPatterns.length + forbiddenSocialCopyPatterns.length + forbiddenModalCommentPatterns.length + forbiddenWatchCopyPatterns.length + forbiddenPlatformBoundaryPatterns.length + forbiddenIntegrationPatterns.length} anti-hardcode/boundary checks, ${paymentCredentialChecks.length} payment contract checks).`,
+  `Application check passed (${files.length} files, ${checks.length} production invariants, ${forbiddenGivingPatterns.length + forbiddenPrayerPatterns.length + forbiddenPermissionGatePatterns.length + forbiddenExpressionRoutingPatterns.length + forbiddenGeneralHomePatterns.length + forbiddenGeneralProfilePatterns.length + forbiddenGeneralShellPatterns.length + forbiddenGeneralTabOverflowPatterns.length + forbiddenGeneralGivingRoutePatterns.length + forbiddenGeneralStudioRoutePatterns.length + forbiddenProductionCopyPatterns.length + forbiddenLegacyExpressionLinkPatterns.length + forbiddenSocialCopyPatterns.length + forbiddenModalCommentPatterns.length + forbiddenWatchCopyPatterns.length + forbiddenPlatformBoundaryPatterns.length + forbiddenIntegrationPatterns.length} anti-hardcode/boundary checks, ${paymentCredentialChecks.length} payment contract checks).`,
 );
