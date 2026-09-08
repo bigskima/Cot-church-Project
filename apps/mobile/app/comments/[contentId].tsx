@@ -55,6 +55,8 @@ export function CommentsScreen({ forcedScope }: { forcedScope?: 'general' | 'exp
               comments={comments.data ?? []}
               loading={comments.loading}
               canComment={mode === 'authenticated'}
+              canReport={mode === 'authenticated'}
+              reportContext={requestContext}
               onRequireSignIn={() => router.push({
                 pathname: '/(auth)/login',
                 params: { returnTo },
