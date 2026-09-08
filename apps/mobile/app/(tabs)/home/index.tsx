@@ -148,6 +148,13 @@ export default function HomeScreen() {
   const postScope = 'general' as const;
   const postRequestContext = 'public' as const;
 
+  const openGeneralComposer = (compose: 'post' | 'audio') => {
+    router.push({
+      pathname: '/general/community',
+      params: { compose, intentId: String(Date.now()) },
+    } as any);
+  };
+
   const openPost = (postId: string, focusComments = false) => {
     router.push({
       pathname: '/general/post/[id]',
@@ -240,6 +247,44 @@ export default function HomeScreen() {
 
   const listHeader = (
     <>
+      {mode === 'authenticated' ? (
+        <View style={[styles.createDeck, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+          <View style={styles.createDeckHeader}>
+            <View>
+              <Text style={[styles.createDeckKicker, { color: colors.interactive }]}>CREATE IN GENERAL COT</Text>
+              <Text style={[styles.createDeckTitle, { color: colors.text }]}>Share something with everyone</Text>
+            </View>
+            <Pressable
+              onPress={() => router.push('/general/studio')}
+              hitSlop={8}
+              style={({ pressed }) => [styles.createDeckMore, { backgroundColor: colors.bgSecondary }, pressed && styles.iconPressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Open all creation tools"
+            >
+              <Icon name="grid-outline" size={16} color={colors.textSecondary} />
+            </Pressable>
+          </View>
+          <View style={styles.createDeckActions}>
+            <Pressable onPress={() => openGeneralComposer('post')} style={({ pressed }) => [styles.createDeckAction, { backgroundColor: colors.primarySoft }, pressed && styles.iconPressed]}>
+              <Icon name="create-outline" size={19} color={colors.interactive} />
+              <Text style={[styles.createDeckActionText, { color: colors.text }]}>Post</Text>
+            </Pressable>
+            <Pressable onPress={() => openGeneralComposer('audio')} style={({ pressed }) => [styles.createDeckAction, { backgroundColor: colors.bgSecondary }, pressed && styles.iconPressed]}>
+              <Icon name="mic-outline" size={19} color={colors.interactive} />
+              <Text style={[styles.createDeckActionText, { color: colors.text }]}>Voice</Text>
+            </Pressable>
+            <Pressable onPress={() => router.push('/general/studio/reel')} style={({ pressed }) => [styles.createDeckAction, { backgroundColor: colors.bgSecondary }, pressed && styles.iconPressed]}>
+              <Icon name="flash-outline" size={19} color={colors.live} />
+              <Text style={[styles.createDeckActionText, { color: colors.text }]}>Reel</Text>
+            </Pressable>
+            <Pressable onPress={() => router.push('/general/studio/video')} style={({ pressed }) => [styles.createDeckAction, { backgroundColor: colors.bgSecondary }, pressed && styles.iconPressed]}>
+              <Icon name="videocam-outline" size={19} color={colors.interactive} />
+              <Text style={[styles.createDeckActionText, { color: colors.text }]}>Video</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+
       {degradedSections.length ? (
         <Pressable
           onPress={resource.refresh}
@@ -264,7 +309,7 @@ export default function HomeScreen() {
       {feed.length ? (
         <View style={styles.timelineHeading}>
           <Text style={[styles.timelineTitle, { color: colors.text }]}>
-            {rankingMode === 'personalized' ? 'For you' : 'Latest'}
+            {rankingMode === 'personalized' ? 'For you' : 'Latest from COT'}
           </Text>
         </View>
       ) : null}
@@ -424,6 +469,14 @@ const styles = StyleSheet.create({
   topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 6, zIndex: 2 },
   iconButton: { width: 36, height: 36, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   iconPressed: { opacity: 0.82, transform: [{ scale: 0.96 }] },
+  createDeck: { marginHorizontal: spacing.md, marginTop: spacing.sm, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.md },
+  createDeckHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  createDeckKicker: { fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 0.8 },
+  createDeckTitle: { fontSize: 16, lineHeight: 21, fontWeight: '800', letterSpacing: -0.35, marginTop: 2 },
+  createDeckMore: { width: 34, height: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  createDeckActions: { flexDirection: 'row', gap: spacing.xs },
+  createDeckAction: { flex: 1, minHeight: 58, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: spacing.xs },
+  createDeckActionText: { fontSize: 10.5, fontWeight: '800' },
   degradedBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.md, marginTop: spacing.sm, paddingHorizontal: spacing.md, minHeight: 42, borderWidth: 1, borderRadius: radius.lg },
   degradedText: { flex: 1, fontSize: 11, lineHeight: 16, fontWeight: '600' },
   heroSection: { paddingHorizontal: spacing.md, paddingTop: spacing.md },
