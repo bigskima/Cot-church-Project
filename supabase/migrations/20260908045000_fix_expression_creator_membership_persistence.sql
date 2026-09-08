@@ -172,3 +172,30 @@ begin
   return created_branch;
 end;
 $function$;
+
+
+-- repair-existing-expression-owners
+insert into public.expression_memberships(
+  organization_id,branch_id,membership_id,profile_id,status,joined_at,left_at
+)
+select
+  b.organization_id,
+  b.id,
+  m.id,
+  eo.owner_profile_id,
+  'active',
+  now(),
+  null
+from public.expression_ownerships eo
+join public.branches b on b.id=eo.branch_id and b.is_active
+join public.memberships m
+  on m.organization_id=b.organization_id
+ and m.profile_id=eo.owner_profile_id
+ and m.status='active'
+on conflict(branch_id,profile_id)
+do update set
+  organization_id=excluded.organization_id,
+  membership_id=excluded.membership_id,
+  status='active',
+  joined_at=coalesce(public.expression_memberships.joined_at,excluded.joined_at),
+  left_at=null;
