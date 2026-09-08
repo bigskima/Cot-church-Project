@@ -139,11 +139,11 @@ Deno.serve(createHandler(
         }
         await authorize(auth, "media.upload");
       } else {
-        const { data: postingAllowed, error: postingError } = await auth.client.rpc("can_profile_post", {
+        const { data: postingAllowed, error: postingError } = await auth.client.rpc("can_profile_post_publicly", {
           target_profile_id: auth.user.id,
         });
         if (postingError || postingAllowed !== true) {
-          throw new ApiError("POSTING_RESTRICTED", "Your posting access is currently restricted", 403);
+          throw new ApiError("PUBLIC_POSTING_UNAVAILABLE", "Public posting is currently unavailable for this account", 403);
         }
       }
 
