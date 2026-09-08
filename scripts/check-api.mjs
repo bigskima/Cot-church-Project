@@ -232,7 +232,7 @@ const invariants = [
   [contentMedia, /video_detail[\s\S]*enrichContentCreators/, 'exact Expression Watch detail includes creator attribution'],
   [contentMedia, /expressionId[\s\S]*auth\.branchId[\s\S]*authorize\(auth, "media\.upload"\)[\s\S]*can_profile_post/, 'media upload separates Expression authority from authenticated General creation'],
   [contentMedia, /resolveActiveOrganizationId[\s\S]*organizationId/, 'General content media resolves the active church without membership context'],
-  [communityMedia, /audio\/mpeg[\s\S]*audio\/wav[\s\S]*can_profile_post/, 'General post media is restriction-aware and supports audio'],
+  [communityMedia, /audio\/mpeg[\s\S]*audio\/webm[\s\S]*audio\/wav[\s\S]*can_profile_post/, 'General post media is restriction-aware and supports native and web audio'],
   [publicOrganization, /limit\(2\)[\s\S]*ORGANIZATION_REQUIRED/, 'public organization resolver fails closed when General context is ambiguous'],
   [creatorStudio, /organization:\s*"optional"[\s\S]*can_profile_post[\s\S]*publish_typed_reel[\s\S]*publish_typed_video/, 'General creator studio supports authenticated public Reel and Watch publishing'],
   [generalPublicCreationMigration, /publish_social_post_with_uploads[\s\S]*media_kind[\s\S]*publish_typed_reel[\s\S]*can_profile_post[\s\S]*publish_typed_video[\s\S]*created_by <> auth\.uid\(\)/, 'General publishing migration keeps multimedia creation authenticated and owner-scoped'],
