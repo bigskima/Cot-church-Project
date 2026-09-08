@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,10 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import {
-  BottomSheet,
-  Button,
   Icon,
-  InputField,
   LeadershipModuleCard,
   ScreenHeader,
   SectionHeader,
@@ -22,23 +20,10 @@ import { radius, shadows, spacing } from '@/design-system/tokens';
 
 export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'general' } = {}) {
   const insets = useSafeAreaInsets();
-  const { api, context, mode, hasCapability, hasOrganizationCapability, hasPublicCapability } = useSession();
+  const { context, mode, hasCapability, hasOrganizationCapability, hasPublicCapability } = useSession();
   const generalWorkspace = forcedScope === 'general';
   const expression = generalWorkspace ? undefined : context?.expression;
   const signedIn = mode === 'authenticated';
-  const canPublishPosts = generalWorkspace
-    ? signedIn
-    : hasCapability('posts.create') || hasCapability('posts.publish');
-  const canPublishPublicReels = generalWorkspace && signedIn;
-  const canPublishExpressionReels =
-    Boolean(expression?.id) &&
-    hasCapability('media.upload') &&
-    hasCapability('reels.publish');
-  const canPublishPublicVideos = generalWorkspace && signedIn;
-  const canPublishExpressionVideos =
-    Boolean(expression?.id) &&
-    hasCapability('media.upload') &&
-    hasCapability('videos.publish');
   const expressionCreatorOrganizationId = context?.organization?.id ?? context?.creatorOrganizations?.[0]?.id ?? '';
   const canCreateExpression = Boolean(
     expressionCreatorOrganizationId &&
@@ -58,12 +43,6 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
     (Boolean(expression?.id) && hasCapability('pastoral.followups.receive'));
   const { colors } = useTheme();
 
-  const [activeModal, setActiveModal] = useState<'post' | null>(null);
-  const [postBody, setPostBody] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [publishNotice, setPublishNotice] = useState('');
-  const [publishError, setPublishError] = useState('');
-
   if (!generalWorkspace && expression?.id) {
     return <Redirect href={`/expressions/${expression.id}/manage/studio` as any} />;
   }
@@ -71,67 +50,44 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
     return <Redirect href="/general/studio" />;
   }
 
-  const handlePublishPost = async () => {
-    if (!postBody.trim()) return;
-    setSubmitting(true);
-    setPublishError('');
-    setPublishNotice('');
-    try {
-      if (generalWorkspace) {
-        await api.request('social-feed', {
-          method: 'POST',
-          context: 'public',
-          body: JSON.stringify({
-            body: postBody.trim(),
-            visibility: 'public',
-            mediaUploadIds: [],
-          }),
-        });
-      } else {
-        await api.request('creator-studio', {
-          method: 'POST',
-          body: JSON.stringify({
-            action: 'publish_post',
-            expressionId: expression?.id ?? null,
-            visibility: expression?.id ? 'branch' : 'public',
-            body: postBody.trim(),
-          }),
-        });
-      }
-      setPostBody('');
-      setActiveModal(null);
-      setPublishNotice(
-        expression?.name
-          ? `Your announcement is live inside ${expression.name}.`
-          : 'Your announcement is live in the General Community.',
-      );
-    } catch (err: unknown) {
-      setPublishError('We couldn’t publish this announcement. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   const routeFor = (generalRoute: string, legacyRoute: string) =>
     generalWorkspace ? generalRoute : legacyRoute;
 
-  const leadershipModules = [
+  const openComposer = (compose: 'post' | 'audio') => {
+    router.push({
+      pathname: '/general/community',
+      params: { compose, intentId: String(Date.now()) },
+    } as any);
+  };
+
+  const creationActions = signedIn ? [
     {
-      title: 'Create Reel',
-      description: generalWorkspace ? 'Upload and publish a short vertical video to General COT.' : 'Upload and publish a short vertical video to public COT or the active Expression.',
+      title: 'Post',
+      description: 'Text, photos, video or uploaded audio.',
+      iconName: 'create-outline',
+      action: () => openComposer('post'),
+    },
+    {
+      title: 'Voice',
+      description: 'Record from your microphone and publish the audio.',
+      iconName: 'mic-outline',
+      action: () => openComposer('audio'),
+    },
+    {
+      title: 'Reel',
+      description: 'Create a vertical video for public discovery.',
       iconName: 'flash-outline',
-      badge: 'REELS',
-      route: routeFor('/general/studio/reel', '/studio/reel'),
-      enabled: canPublishPublicReels || canPublishExpressionReels,
+      action: () => router.push('/general/studio/reel' as any),
     },
     {
-      title: 'Create Watch Video',
-      description: 'Upload and publish long-form teachings, worship, testimonies and other video.',
+      title: 'Video',
+      description: 'Publish a long-form Watch video.',
       iconName: 'videocam-outline',
-      badge: 'WATCH',
-      route: routeFor('/general/studio/video', '/studio/video'),
-      enabled: canPublishPublicVideos || canPublishExpressionVideos,
+      action: () => router.push('/general/studio/video' as any),
     },
+  ] : [];
+
+  const leadershipModules = [
     {
       title: 'Sermons',
       description: 'Create sermon drafts, manage teachings and publish when ready.',
@@ -174,7 +130,7 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
     },
     {
       title: 'Giving Reports',
-      description: 'Review read-only giving totals and refunds by currency.',
+      description: 'Review giving totals and refunds by currency.',
       iconName: 'analytics-outline',
       badge: 'FINANCE',
       route: routeFor('/general/leadership/giving-finance', '/(tabs)/profile/leadership/giving-finance'),
@@ -196,14 +152,6 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
       route: routeFor('/general/leadership/church-leadership', '/(tabs)/profile/leadership/church-leadership'),
       enabled: hasOrganizationCapability('organization.leadership.manage'),
     },
-    {
-      title: 'Expression Leadership',
-      description: 'Manage leaders and ministry teams in this Expression.',
-      iconName: 'people-circle-outline',
-      badge: 'DIRECTORY',
-      route: '/leadership/directory',
-      enabled: !generalWorkspace && Boolean(expression?.id) && hasCapability('expression.leadership.manage'),
-    },
   ].filter((module) => module.enabled);
 
   return (
@@ -216,142 +164,117 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
         ]}
       >
         <ScreenHeader
-          title={generalWorkspace ? 'Create' : 'Ministry Studio'}
-          kicker={generalWorkspace ? 'GENERAL COT' : 'LEADERSHIP'}
-          subtitle={generalWorkspace ? 'Share posts, Reels and videos with the public COT community.' : 'Create, publish and manage your ministry content in one place.'}
+          title="Create"
+          kicker="GENERAL COT"
+          subtitle="Publish to the church-wide public community."
           showBack
         />
 
         <View style={styles.body}>
-          {publishNotice ? (
-            <View style={[styles.banner, { backgroundColor: colors.successSoft, borderColor: colors.success }]}>
-              <Icon name="checkmark-circle" size={17} color={colors.success} />
-              <Text style={[styles.bannerText, { color: colors.success }]}>{publishNotice}</Text>
+          <View style={[styles.publicNotice, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}>
+            <View style={[styles.publicNoticeIcon, { backgroundColor: colors.card }]}>
+              <Icon name="globe-outline" size={20} color={colors.interactive} />
             </View>
-          ) : null}
-          {canPublishPosts ? (
-          <View style={[styles.quickPostCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
-            <View style={styles.quickPostHeader}>
-              <Icon name="create-outline" size={20} color={colors.interactive} />
-              <Text style={[styles.quickPostTitle, { color: colors.text }]}>Quick Public Post</Text>
+            <View style={styles.publicNoticeCopy}>
+              <Text style={[styles.publicNoticeTitle, { color: colors.text }]}>General COT is public</Text>
+              <Text style={[styles.publicNoticeText, { color: colors.textSecondary }]}>
+                Posts, Reels, videos and voice recordings created here can be seen across the public COT experience.
+              </Text>
             </View>
-            <Text style={[styles.quickPostSub, { color: colors.textSecondary }]}>
-              {expression?.name
-                ? `Share an encouragement or update inside ${expression.name}.`
-                : 'Share a thought, update or encouragement with the General Community.'}
-            </Text>
-            <Button
-              label="Write a post"
-              onPress={() => setActiveModal('post')}
-              variant="primary"
-              size="md"
-              style={{ marginTop: spacing.xs }}
-            />
           </View>
-          ) : null}
 
-          {/* Operational Leadership Modules Grid */}
-          <View style={styles.modulesSection}>
-            <SectionHeader title={generalWorkspace ? "Create & manage" : "Your tools"} badge={leadershipModules.length} subtitle={generalWorkspace ? "Public creation is available to every signed-in account; ministry tools appear only when available to you." : "Only the tools available to you are shown"} />
-            {leadershipModules.map((module, idx) => (
-              <LeadershipModuleCard
-                key={idx}
-                title={module.title}
-                description={module.description}
-                iconName={module.iconName}
-                badge={module.badge}
-                onPress={() => router.push(module.route as any)}
+          {signedIn ? (
+            <View style={styles.createSection}>
+              <SectionHeader title="Create something" subtitle="Choose a format — no ministry role is required." />
+              <View style={styles.createGrid}>
+                {creationActions.map((item) => (
+                  <Pressable
+                    key={item.title}
+                    onPress={item.action}
+                    style={({ pressed }) => [
+                      styles.createCard,
+                      { backgroundColor: colors.card, borderColor: colors.borderSubtle },
+                      shadows.sm,
+                      pressed && styles.pressed,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Create ${item.title}`}
+                  >
+                    <View style={[styles.createIcon, { backgroundColor: item.title === 'Reel' ? colors.liveSoft : colors.primarySoft }]}>
+                      <Icon name={item.iconName} size={24} color={item.title === 'Reel' ? colors.live : colors.interactive} />
+                    </View>
+                    <Text style={[styles.createTitle, { color: colors.text }]}>{item.title}</Text>
+                    <Text style={[styles.createDescription, { color: colors.textMuted }]}>{item.description}</Text>
+                    <View style={styles.createArrow}>
+                      <Icon name="arrow-forward" size={15} color={colors.textMuted} />
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ) : (
+            <Pressable
+              onPress={() => router.push({ pathname: '/(auth)/login', params: { returnTo: '/general/studio' } } as any)}
+              style={({ pressed }) => [
+                styles.signInCard,
+                { backgroundColor: colors.card, borderColor: colors.borderSubtle },
+                pressed && styles.pressed,
+              ]}
+            >
+              <Icon name="person-circle-outline" size={28} color={colors.interactive} />
+              <View style={styles.signInCopy}>
+                <Text style={[styles.signInTitle, { color: colors.text }]}>Sign in to create</Text>
+                <Text style={[styles.signInText, { color: colors.textMuted }]}>Public content creation is available to every signed-in account.</Text>
+              </View>
+              <Icon name="chevron-forward" size={18} color={colors.textMuted} />
+            </Pressable>
+          )}
+
+          {leadershipModules.length ? (
+            <View style={styles.modulesSection}>
+              <SectionHeader
+                title="More tools"
+                badge={leadershipModules.length}
+                subtitle="Ministry tools appear only when they are available to your account."
               />
-            ))}
-          </View>
+              {leadershipModules.map((module) => (
+                <LeadershipModuleCard
+                  key={module.title}
+                  title={module.title}
+                  description={module.description}
+                  iconName={module.iconName}
+                  badge={module.badge}
+                  onPress={() => router.push(module.route as any)}
+                />
+              ))}
+            </View>
+          ) : null}
         </View>
       </ScrollView>
-
-      <BottomSheet
-        visible={activeModal === 'post'}
-        onClose={() => {
-          if (!submitting) {
-            setActiveModal(null);
-            setPublishError('');
-          }
-        }}
-        title={generalWorkspace ? "Create public post" : "Publish announcement"}
-        subtitle={expression?.name ? `Share inside ${expression.name}.` : 'Share with the General Community.'}
-      >
-        {publishError ? (
-          <View style={[styles.banner, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}>
-            <Icon name="alert-circle" size={17} color={colors.live} />
-            <Text style={[styles.bannerText, { color: colors.live }]}>{publishError}</Text>
-          </View>
-        ) : null}
-        <InputField
-          label="Announcement"
-          value={postBody}
-          onChangeText={setPostBody}
-          multiline
-          numberOfLines={5}
-          placeholder="What would you like to share?"
-        />
-        <View style={styles.modalActions}>
-          <Button label="Cancel" onPress={() => { setActiveModal(null); setPublishError(''); }} variant="outline" size="md" disabled={submitting} />
-          <Button label="Publish" onPress={handlePublishPost} loading={submitting} variant="primary" size="md" />
-        </View>
-      </BottomSheet>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  content: {
-    flexGrow: 1,
-  },
-  body: {
-    paddingHorizontal: spacing.md,
-    gap: spacing.lg,
-  },
-  banner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    borderWidth: 1,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-  },
-  bannerText: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '600',
-    lineHeight: 18,
-  },
-  quickPostCard: {
-    padding: spacing.lg,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    gap: spacing.xs,
-  },
-  quickPostHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  quickPostTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  quickPostSub: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  modulesSection: {
-    gap: spacing.xs,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: spacing.sm,
-    marginTop: spacing.xs,
-  },
+  screen: { flex: 1 },
+  content: { flexGrow: 1 },
+  body: { paddingHorizontal: spacing.md, gap: spacing.xl },
+  publicNotice: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md },
+  publicNoticeIcon: { width: 44, height: 44, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
+  publicNoticeCopy: { flex: 1, gap: 2 },
+  publicNoticeTitle: { fontSize: 14, fontWeight: '800' },
+  publicNoticeText: { fontSize: 11.5, lineHeight: 17 },
+  createSection: { gap: spacing.sm },
+  createGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  createCard: { width: '48.5%', minHeight: 174, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.xs, position: 'relative' },
+  createIcon: { width: 46, height: 46, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xs },
+  createTitle: { fontSize: 17, lineHeight: 22, fontWeight: '800', letterSpacing: -0.35 },
+  createDescription: { fontSize: 11.5, lineHeight: 17, paddingRight: spacing.sm },
+  createArrow: { position: 'absolute', right: spacing.md, bottom: spacing.md },
+  modulesSection: { gap: spacing.xs },
+  signInCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderRadius: radius.xl, padding: spacing.lg },
+  signInCopy: { flex: 1, gap: 2 },
+  signInTitle: { fontSize: 15, fontWeight: '800' },
+  signInText: { fontSize: 12, lineHeight: 17 },
+  pressed: { opacity: 0.88, transform: [{ scale: 0.992 }] },
 });
