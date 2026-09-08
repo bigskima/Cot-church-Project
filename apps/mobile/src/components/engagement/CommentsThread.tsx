@@ -5,6 +5,7 @@ import { radius, shadows, spacing } from '@/design-system/tokens';
 import type { ContentComment } from '@/types/content';
 import { Avatar } from '../primitives/Avatar';
 import { Icon } from '../primitives/Icon';
+import { ContentReportSheet, type ContentReportContext } from './ContentReportSheet';
 
 const MAX_COMMENT_LENGTH = 3000;
 
@@ -15,6 +16,8 @@ export interface CommentsThreadProps {
   focusRequest?: number;
   onRequireSignIn?: () => void;
   onSubmitComment: (body: string, parentCommentId?: string | null) => Promise<void>;
+  canReport?: boolean;
+  reportContext?: ContentReportContext;
 }
 
 function commentIdentity(item: ContentComment) {
@@ -46,6 +49,8 @@ export function CommentsThread({
   focusRequest = 0,
   onRequireSignIn,
   onSubmitComment,
+  canReport = canComment,
+  reportContext = 'public',
 }: CommentsThreadProps) {
   const { colors } = useTheme();
   const inputRef = useRef<TextInput>(null);
@@ -54,6 +59,7 @@ export function CommentsThread({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [composerFocused, setComposerFocused] = useState(false);
+  const [reportTarget, setReportTarget] = useState<ContentComment | null>(null);
 
   const roots = useMemo(() => comments.filter((item) => !item.parent_comment_id), [comments]);
   const repliesByParent = useMemo(() => {
@@ -84,6 +90,14 @@ export function CommentsThread({
     setReplyingTo(comment);
     setSubmitError('');
     requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
+  const startReport = (comment: ContentComment) => {
+    if (!canReport) {
+      onRequireSignIn?.();
+      return;
+    }
+    setReportTarget(comment);
   };
 
   const send = async () => {
@@ -141,16 +155,28 @@ export function CommentsThread({
 
           <Text style={[styles.bodyText, { color: colors.text }]}>{item.body}</Text>
 
-          <Pressable
-            onPress={() => startReply(item)}
-            hitSlop={6}
-            accessibilityRole="button"
-            accessibilityLabel={`Reply to ${identity.displayName}`}
-            style={({ pressed }) => [styles.replyAction, pressed && styles.pressed]}
-          >
-            <Icon name="arrow-undo-outline" size={13} color={colors.textMuted} />
-            <Text style={[styles.replyActionText, { color: colors.textSecondary }]}>Reply</Text>
-          </Pressable>
+          <View style={styles.commentActions}>
+            <Pressable
+              onPress={() => startReply(item)}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={`Reply to ${identity.displayName}`}
+              style={({ pressed }) => [styles.replyAction, pressed && styles.pressed]}
+            >
+              <Icon name="arrow-undo-outline" size={13} color={colors.textMuted} />
+              <Text style={[styles.replyActionText, { color: colors.textSecondary }]}>Reply</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => startReport(item)}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={`Report comment by ${identity.displayName}`}
+              style={({ pressed }) => [styles.replyAction, pressed && styles.pressed]}
+            >
+              <Icon name="flag-outline" size={13} color={colors.textMuted} />
+              <Text style={[styles.replyActionText, { color: colors.textSecondary }]}>Report</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
     );
@@ -270,6 +296,15 @@ export function CommentsThread({
           </Pressable>
         )}
       </View>
+
+      <ContentReportSheet
+        target={reportTarget ? {
+          commentId: reportTarget.id,
+          context: reportContext,
+          label: `Report comment by ${commentIdentity(reportTarget).displayName}`,
+        } : null}
+        onClose={() => setReportTarget(null)}
+      />
     </View>
   );
 }
@@ -285,6 +320,7 @@ const styles = StyleSheet.create({
   stateTitle: { fontSize: 14, fontWeight: '800' },
   stateCopy: { fontSize: 11, lineHeight: 16, textAlign: 'center' },
   thread: { gap: spacing.md },
+  commentActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   threadGroup: { gap: spacing.sm },
   comment: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md },
   reply: { marginLeft: 34, borderRadius: radius.lg },
