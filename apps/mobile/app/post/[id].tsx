@@ -110,7 +110,9 @@ export function CommunityPostScreen({ forcedScope }: { forcedScope?: FeedScope }
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <View style={{ paddingTop: insets.top }}>
         <ScreenHeader
-          title={expressionMode ? context?.expression?.name || 'Expression post' : 'Post'}
+          title={expressionMode ? context?.expression?.name || 'Expression post' : 'General conversation'}
+          subtitle={expressionMode ? 'Private Expression post and replies.' : 'Public COT post, reactions and replies in one thread.'}
+          kicker={expressionMode ? 'EXPRESSION' : 'COMMUNITY'}
           showBack
         />
       </View>
@@ -151,8 +153,8 @@ export function CommunityPostScreen({ forcedScope }: { forcedScope?: FeedScope }
                   comments={comments.data ?? []}
                   loading={comments.loading}
                   canComment={mode === 'authenticated'}
-              canReport={mode === 'authenticated'}
-              reportContext={requestContext}
+                  canReport={mode === 'authenticated'}
+                  reportContext={requestContext}
                   focusRequest={commentFocus}
                   onRequireSignIn={openLogin}
                   onSubmitComment={async (body, parentCommentId) => {

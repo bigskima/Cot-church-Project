@@ -88,6 +88,11 @@ export default function DiscoverScreen() {
     return e.title.toLowerCase().includes(q) || e.location?.name?.toLowerCase().includes(q);
   }) ?? [];
 
+  const compactAll = activeFilter === 'all' && !query.trim();
+  const visibleSermons = compactAll ? filteredSermons.slice(0, 3) : filteredSermons;
+  const visibleSeries = compactAll ? filteredSeries.slice(0, 3) : filteredSeries;
+  const visibleEvents = compactAll ? filteredEvents.slice(0, 3) : filteredEvents;
+
   const currentChurchName = selectedChurch?.name ?? contextualOrganization?.name;
   const initialLoading = sermons.loading && !sermons.data;
   const primaryError = sermons.error || events.error || series.error;
@@ -151,6 +156,37 @@ export default function DiscoverScreen() {
           </View>
         </View>
 
+        <View style={styles.discoveryDeck}>
+          <Pressable onPress={() => router.push('/general/watch')} style={({ pressed }) => [styles.discoveryTile, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}>
+            <View style={[styles.discoveryIcon, { backgroundColor: colors.primarySoft }]}>
+              <Icon name="play-circle-outline" size={21} color={colors.interactive} />
+            </View>
+            <Text style={[styles.discoveryTitle, { color: colors.text }]}>Watch</Text>
+            <Text style={[styles.discoveryMeta, { color: colors.textMuted }]}>Long-form media</Text>
+          </Pressable>
+          <Pressable onPress={() => router.push('/general/reels')} style={({ pressed }) => [styles.discoveryTile, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}>
+            <View style={[styles.discoveryIcon, { backgroundColor: colors.liveSoft }]}>
+              <Icon name="flash-outline" size={21} color={colors.live} />
+            </View>
+            <Text style={[styles.discoveryTitle, { color: colors.text }]}>Reels</Text>
+            <Text style={[styles.discoveryMeta, { color: colors.textMuted }]}>Quick discovery</Text>
+          </Pressable>
+          <Pressable onPress={() => router.push('/general/community')} style={({ pressed }) => [styles.discoveryTile, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}>
+            <View style={[styles.discoveryIcon, { backgroundColor: colors.primarySoft }]}>
+              <Icon name="people-outline" size={21} color={colors.interactive} />
+            </View>
+            <Text style={[styles.discoveryTitle, { color: colors.text }]}>Community</Text>
+            <Text style={[styles.discoveryMeta, { color: colors.textMuted }]}>Public conversations</Text>
+          </Pressable>
+          <Pressable onPress={() => router.push('/general/church-story' as any)} style={({ pressed }) => [styles.discoveryTile, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}>
+            <View style={[styles.discoveryIcon, { backgroundColor: colors.bgSecondary }]}>
+              <Icon name="library-outline" size={21} color={colors.interactive} />
+            </View>
+            <Text style={[styles.discoveryTitle, { color: colors.text }]}>Our Story</Text>
+            <Text style={[styles.discoveryMeta, { color: colors.textMuted }]}>Church & leaders</Text>
+          </Pressable>
+        </View>
+
         {initialLoading ? (
           <View style={styles.body}><Skeleton height={140} count={3} /></View>
         ) : primaryError && !sermons.data && !events.data && !series.data ? (
@@ -175,8 +211,13 @@ export default function DiscoverScreen() {
             ) : null}
             {(activeFilter === 'all' || activeFilter === 'sermons') && (
               <View style={styles.sectionWrap}>
-                <SectionHeader title="Sermons" badge={filteredSermons.length} />
-                {filteredSermons.length > 0 ? filteredSermons.map((sermon) => (
+                <SectionHeader
+                  title={activeFilter === 'all' ? 'Latest sermons' : 'Sermons'}
+                  badge={filteredSermons.length}
+                  actionLabel={activeFilter === 'all' && filteredSermons.length > visibleSermons.length ? 'View all' : undefined}
+                  onAction={activeFilter === 'all' ? () => setActiveFilter('sermons') : undefined}
+                />
+                {visibleSermons.length > 0 ? visibleSermons.map((sermon) => (
                   <SermonCard key={sermon.id} sermon={sermon} onPress={() => router.push(`/general/sermon/${sermon.id}` as any)} />
                 )) : (
                   <EmptyState
@@ -190,8 +231,13 @@ export default function DiscoverScreen() {
 
             {(activeFilter === 'all' || activeFilter === 'series') && filteredSeries.length > 0 ? (
               <View style={styles.sectionWrap}>
-                <SectionHeader title="Series" badge={filteredSeries.length} />
-                {filteredSeries.map((item) => (
+                <SectionHeader
+                  title={activeFilter === 'all' ? 'Featured series' : 'Series'}
+                  badge={filteredSeries.length}
+                  actionLabel={activeFilter === 'all' && filteredSeries.length > visibleSeries.length ? 'View all' : undefined}
+                  onAction={activeFilter === 'all' ? () => setActiveFilter('series') : undefined}
+                />
+                {visibleSeries.map((item) => (
                   <Pressable key={item.id} accessibilityRole="button" onPress={() => router.push(`/general/series/${item.id}` as any)} style={({ pressed }) => [styles.seriesRow, { borderColor: colors.borderSubtle, backgroundColor: colors.card }, shadows.sm, pressed && styles.pressed]}>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.seriesTitle, { color: colors.text }]}>{item.title}</Text>
@@ -205,8 +251,13 @@ export default function DiscoverScreen() {
 
             {(activeFilter === 'all' || activeFilter === 'events') && (
               <View style={styles.sectionWrap}>
-                <SectionHeader title="Upcoming Gatherings" badge={filteredEvents.length} />
-                {filteredEvents.length > 0 ? filteredEvents.map((event) => (
+                <SectionHeader
+                  title="Upcoming gatherings"
+                  badge={filteredEvents.length}
+                  actionLabel={activeFilter === 'all' && filteredEvents.length > visibleEvents.length ? 'View all' : undefined}
+                  onAction={activeFilter === 'all' ? () => setActiveFilter('events') : undefined}
+                />
+                {visibleEvents.length > 0 ? visibleEvents.map((event) => (
                   <EventCard key={event.id} event={event} onPress={() => router.push(`/general/event/${event.id}` as any)} />
                 )) : (
                   <EmptyState
@@ -252,6 +303,11 @@ const styles = StyleSheet.create({
   churchSelectorText: { fontSize: 12, fontWeight: '600', flex: 1 },
   chipsRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm, flexWrap: 'wrap' },
   body: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
+  discoveryDeck: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingHorizontal: spacing.md, paddingTop: spacing.sm },
+  discoveryTile: { width: '48.5%', minHeight: 116, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: 3 },
+  discoveryIcon: { width: 38, height: 38, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xs },
+  discoveryTitle: { fontSize: 14, lineHeight: 18, fontWeight: '800', letterSpacing: -0.2 },
+  discoveryMeta: { fontSize: 10.5, lineHeight: 15 },
   sectionWrap: { marginBottom: spacing.lg, gap: spacing.xs },
   seriesRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.sm },
   seriesTitle: { fontSize: 15, fontWeight: '700' },
