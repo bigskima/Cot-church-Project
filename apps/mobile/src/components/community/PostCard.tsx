@@ -8,6 +8,7 @@ import { Icon } from '../primitives/Icon';
 import { AudioPlayer } from '../media/AudioPlayer';
 import { VideoPlayer } from '../media/VideoPlayer';
 import { MediaPreviewModal, type PreviewableMedia } from '../media/MediaPreviewModal';
+import { ContentReportSheet } from '../engagement/ContentReportSheet';
 import type { MediaAsset, Post, SocialPost } from '@/types/content';
 
 type PublicIdentityBadge = {
@@ -90,6 +91,7 @@ export function PostCard({
   const [likeCount, setLikeCount] = useState(postAsAny.likes_count ?? (post.social_reactions?.length || 0));
   const [hasSaved, setHasSaved] = useState(Boolean(postAsAny.viewer_bookmarked));
   const [preview, setPreview] = useState<PreviewableMedia | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
 
   useEffect(() => {
     setHasLiked(Boolean(postAsAny.viewer_reaction));
@@ -209,13 +211,13 @@ export function PostCard({
             ) : null}
           </View>
 
-          {onMore ? (
+          {onMore || canEngage ? (
             <Pressable
-              onPress={onMore}
+              onPress={onMore ?? (() => setReportOpen(true))}
               hitSlop={8}
               style={({ pressed }) => [styles.moreButton, pressed ? { backgroundColor: colors.bgSecondary } : null]}
               accessibilityRole="button"
-              accessibilityLabel="More post actions"
+              accessibilityLabel={onMore ? 'More post actions' : 'Report post'}
             >
               <Icon name="ellipsis-horizontal" size={19} color={colors.textMuted} />
             </Pressable>
@@ -435,6 +437,14 @@ export function PostCard({
         </View>
       </Pressable>
       <MediaPreviewModal media={preview} visible={Boolean(preview)} onClose={() => setPreview(null)} />
+      <ContentReportSheet
+        target={reportOpen ? {
+          contentId: post.id,
+          context: isExpressionPost ? 'current' : 'public',
+          label: isExpressionPost ? `Report post in ${expressionLabel || 'this Expression'}` : 'Report this General COT post',
+        } : null}
+        onClose={() => setReportOpen(false)}
+      />
     </>
   );
 }
