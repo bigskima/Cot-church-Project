@@ -182,15 +182,17 @@ export default function ExpressionGovernanceScreen() {
           { paddingTop: expressionWorkspace ? spacing.md : insets.top + spacing.sm, paddingBottom: expressionWorkspace ? insets.bottom + spacing.xl : insets.bottom + 120 },
         ]}
       >
-        <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
-          <ScreenHeader
-            title="Access & ownership"
-            kicker="EXPRESSION GOVERNANCE"
-            subtitle={`Ministry access, invitations and ownership for ${expressionName}.`}
-            showBack
-            rightAction={canInviteRoles ? <Button label="Invite" onPress={openInvite} size="sm" /> : undefined}
-          />
-        </View>
+        {!expressionWorkspace ? (
+          <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+            <ScreenHeader
+              title="Access & ownership"
+              kicker="EXPRESSION GOVERNANCE"
+              subtitle={`Ministry access, invitations and ownership for ${expressionName}.`}
+              showBack
+              rightAction={canInviteRoles ? <Button label="Invite" onPress={openInvite} size="sm" /> : undefined}
+            />
+          </View>
+        ) : null}
 
         <View style={styles.body}>
           {feedback ? (
