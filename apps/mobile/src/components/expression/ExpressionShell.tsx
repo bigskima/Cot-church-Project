@@ -54,6 +54,7 @@ function NavButton({
         pressed ? styles.pressed : null,
       ]}
     >
+      {item.active ? <View style={[styles.activeRail, { backgroundColor: colors.interactive }]} /> : null}
       <View
         style={[
           styles.navIcon,
@@ -74,7 +75,7 @@ function NavButton({
       >
         {item.label}
       </Text>
-      <Icon name="chevron-forward" size={14} color={colors.textMuted} />
+      {item.active ? <View style={[styles.activeDot, { backgroundColor: colors.interactive }]} /> : null}
     </Pressable>
   );
 }
@@ -329,17 +330,23 @@ function ExpressionNavigation({
 
   return (
     <View style={styles.navRoot}>
-      <View style={[styles.identityCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
-        <View style={[styles.identityMark, { backgroundColor: colors.primarySoft }]}>
-          <Icon name="people" size={22} color={colors.interactive} />
+      <View style={[styles.identityCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+        <View pointerEvents="none" style={[styles.identityGlow, { backgroundColor: colors.primarySoft }]} />
+        <View style={[styles.identityMark, { backgroundColor: colors.primarySoft, borderColor: colors.primarySoftStrong }]}>
+          <Icon name="people" size={23} color={colors.interactive} />
         </View>
         <View style={styles.identityCopy}>
+          <Text style={[styles.identityEyebrow, { color: colors.interactive }]}>YOUR EXPRESSION</Text>
           <Text style={[styles.identityName, { color: colors.text }]} numberOfLines={2}>
             {expression?.name ?? 'Expression'}
           </Text>
           <Text style={[styles.identityMeta, { color: colors.textMuted }]} numberOfLines={1}>
-            {expression?.code || 'Private COT community'}
+            {expression?.code || 'Private community'}
           </Text>
+        </View>
+        <View style={[styles.privatePill, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+          <Icon name="lock-closed" size={10} color={colors.textMuted} />
+          <Text style={[styles.privatePillText, { color: colors.textMuted }]}>PRIVATE</Text>
         </View>
       </View>
 
@@ -460,13 +467,10 @@ export function ExpressionShell({ expressionId, children }: Props) {
           <Icon name="menu" size={21} color={colors.text} />
         </Pressable>
         <View style={styles.headerCopy}>
+          <Text style={[styles.headerEyebrow, { color: colors.interactive }]}>EXPRESSION</Text>
           <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
             {expressionName}
           </Text>
-          <View style={styles.headerMetaRow}>
-            <Icon name="people-outline" size={12} color={colors.interactive} />
-            <Text style={[styles.headerMeta, { color: colors.textSecondary }]}>Expression</Text>
-          </View>
         </View>
         <Pressable
           onPress={() => router.push('/expressions')}
@@ -510,7 +514,10 @@ export function ExpressionShell({ expressionId, children }: Props) {
             ]}
           >
             <View style={styles.drawerHeader}>
-              <Text style={[styles.drawerEyebrow, { color: colors.textMuted }]}>COT EXPRESSION</Text>
+              <View>
+                <Text style={[styles.drawerEyebrow, { color: colors.interactive }]}>CITY OF TRANSFORMATION</Text>
+                <Text style={[styles.drawerTitle, { color: colors.text }]}>Expression menu</Text>
+              </View>
               <Pressable
                 onPress={() => setDrawerOpen(false)}
                 accessibilityRole="button"
@@ -541,7 +548,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   desktopSidebar: {
-    width: 280,
+    width: 292,
     borderRightWidth: 1,
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.lg,
@@ -554,13 +561,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   mobileHeader: {
-    minHeight: 68,
+    minHeight: 62,
     marginHorizontal: spacing.sm,
     marginTop: Platform.OS === 'web' ? spacing.xs : 0,
     paddingHorizontal: spacing.sm,
-    paddingBottom: spacing.sm,
+    paddingBottom: 8,
     borderWidth: 1,
-    borderRadius: radius.xxl,
+    borderRadius: 22,
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: spacing.sm,
@@ -570,8 +577,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerButton: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
     borderRadius: radius.pill,
     borderWidth: 1,
     alignItems: 'center',
@@ -581,41 +588,49 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     justifyContent: 'center',
-    paddingBottom: 2,
+    paddingBottom: 1,
+  },
+  headerEyebrow: {
+    fontSize: 8,
+    lineHeight: 10,
+    fontWeight: '900',
+    letterSpacing: 1.1,
   },
   headerTitle: {
-    fontSize: 16,
-    lineHeight: 20,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-  },
-  headerMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-  },
-  headerMeta: {
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '700',
+    fontSize: 17,
+    lineHeight: 21,
+    fontWeight: '900',
+    letterSpacing: -0.4,
+    marginTop: 1,
   },
   navRoot: {
     flex: 1,
   },
   identityCard: {
+    position: 'relative',
+    overflow: 'hidden',
     borderWidth: 1,
-    borderRadius: radius.xl,
+    borderRadius: radius.xxl,
     padding: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  identityGlow: {
+    position: 'absolute',
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    right: -65,
+    top: -90,
+    opacity: 0.9,
   },
   identityMark: {
-    width: 44,
-    height: 44,
-    borderRadius: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 17,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -623,16 +638,37 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
+  identityEyebrow: {
+    fontSize: 8,
+    lineHeight: 11,
+    fontWeight: '900',
+    letterSpacing: 0.9,
+  },
   identityName: {
-    fontSize: 15,
-    lineHeight: 19,
-    fontWeight: '800',
-    letterSpacing: -0.2,
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: '900',
+    letterSpacing: -0.35,
   },
   identityMeta: {
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 10.5,
+    lineHeight: 14,
     marginTop: 2,
+  },
+  privatePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderRadius: radius.pill,
+    paddingHorizontal: 7,
+    paddingVertical: 5,
+  },
+  privatePillText: {
+    fontSize: 8,
+    lineHeight: 10,
+    fontWeight: '900',
+    letterSpacing: 0.7,
   },
   navScrollContent: {
     paddingBottom: spacing.xl,
@@ -647,14 +683,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
   },
   navItem: {
-    minHeight: 48,
+    position: 'relative',
+    minHeight: 46,
     borderWidth: 1,
-    borderRadius: radius.lg,
+    borderRadius: 15,
     paddingHorizontal: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    marginBottom: 4,
+    marginBottom: 3,
+    overflow: 'hidden',
+  },
+  activeRail: {
+    position: 'absolute',
+    left: 0,
+    top: 9,
+    bottom: 9,
+    width: 3,
+    borderRadius: radius.pill,
+  },
+  activeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 3,
   },
   navIcon: {
     width: 32,
@@ -667,7 +719,8 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     lineHeight: 18,
-    fontWeight: '700',
+    fontWeight: '750' as any,
+    letterSpacing: -0.12,
   },
   pressed: {
     opacity: 0.82,
@@ -686,8 +739,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.48)',
   },
   drawer: {
-    width: '84%',
-    maxWidth: 360,
+    width: '88%',
+    maxWidth: 390,
     height: '100%',
     borderRightWidth: 1,
     paddingHorizontal: spacing.md,
@@ -700,9 +753,17 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   drawerEyebrow: {
-    fontSize: 10,
+    fontSize: 8,
+    lineHeight: 11,
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 1.05,
+  },
+  drawerTitle: {
+    fontSize: 20,
+    lineHeight: 25,
+    fontWeight: '900',
+    letterSpacing: -0.45,
+    marginTop: 2,
   },
   closeButton: {
     width: 36,
