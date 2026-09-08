@@ -94,6 +94,7 @@ function inferAudioMime(name: string, supplied?: string | null) {
   const value = name.toLowerCase();
   if (value.endsWith('.m4a') || value.endsWith('.mp4')) return 'audio/mp4';
   if (value.endsWith('.aac')) return 'audio/aac';
+  if (value.endsWith('.webm')) return 'audio/webm';
   if (value.endsWith('.ogg') || value.endsWith('.oga')) return 'audio/ogg';
   if (value.endsWith('.wav')) return 'audio/wav';
   return 'audio/mpeg';
@@ -243,10 +244,12 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
       await finishRecordingSession();
       if (!attach) return;
       if (!uri) throw new Error('The recording could not be prepared.');
+      const recordedMimeType = Platform.OS === 'web' ? 'audio/webm' : 'audio/mp4';
+      const recordedExtension = Platform.OS === 'web' ? 'webm' : 'm4a';
       await appendUploads([{
         uri,
-        fileName: `voice-note-${Date.now()}.m4a`,
-        mimeType: 'audio/mp4',
+        fileName: `voice-note-${Date.now()}.${recordedExtension}`,
+        mimeType: recordedMimeType,
         durationSeconds,
       }]);
     } catch (error) {
