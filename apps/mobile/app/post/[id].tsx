@@ -151,6 +151,8 @@ export function CommunityPostScreen({ forcedScope }: { forcedScope?: FeedScope }
                   comments={comments.data ?? []}
                   loading={comments.loading}
                   canComment={mode === 'authenticated'}
+              canReport={mode === 'authenticated'}
+              reportContext={requestContext}
                   focusRequest={commentFocus}
                   onRequireSignIn={openLogin}
                   onSubmitComment={async (body, parentCommentId) => {
