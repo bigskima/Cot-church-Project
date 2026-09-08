@@ -31,7 +31,8 @@
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
     "react-native-safe-area-context": "latest",
-    "react-native-web": "~0.21.0"
+    "react-native-web": "~0.21.0",
+    "expo-audio": "~57.0.4"
   },
   "devDependencies": {
     "@types/react": "latest",
