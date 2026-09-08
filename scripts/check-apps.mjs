@@ -38,6 +38,8 @@ const files = [
   'apps/mobile/src/components/expression/ExpressionShell.tsx',
   'apps/mobile/app/(tabs)/discover/index.tsx',
   'apps/mobile/app/(tabs)/live/index.tsx',
+  'apps/mobile/app/live/index.tsx',
+  'apps/mobile/app/watch/index.tsx',
   'apps/mobile/app/(tabs)/live/[id].tsx',
   'apps/mobile/app/(tabs)/watch/index.tsx',
   'apps/mobile/app/watch/[id].tsx',
