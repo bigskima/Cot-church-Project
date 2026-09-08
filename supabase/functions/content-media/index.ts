@@ -146,7 +146,7 @@ Deno.serve(createHandler(
         }
         await authorize(auth, "media.upload");
       } else {
-        const { data: publicPostingAllowed, error: publicPostingError } = await auth.client.rpc("can_profile_post_publicly", {
+        const { data: publicPostingAllowed, error: publicPostingError } = await admin.rpc("can_profile_post_publicly", {
           target_profile_id: auth.user.id,
         });
         if (publicPostingError || publicPostingAllowed !== true) {
