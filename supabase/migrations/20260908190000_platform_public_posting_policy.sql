@@ -50,6 +50,26 @@ for each row execute function public.set_updated_at();
 alter table public.platform_public_posting_policy enable row level security;
 alter table public.platform_public_posting_exemptions enable row level security;
 
+create policy platform_public_posting_policy_no_client_access
+on public.platform_public_posting_policy
+for all to anon, authenticated
+using (false)
+with check (false);
+
+create policy platform_public_posting_exemptions_no_client_access
+on public.platform_public_posting_exemptions
+for all to anon, authenticated
+using (false)
+with check (false);
+
+create index if not exists platform_public_posting_policy_updated_by_idx
+on public.platform_public_posting_policy(updated_by)
+where updated_by is not null;
+
+create index if not exists platform_public_posting_exemptions_granted_by_idx
+on public.platform_public_posting_exemptions(granted_by)
+where granted_by is not null;
+
 revoke all on table public.platform_public_posting_policy from public, anon, authenticated;
 revoke all on table public.platform_public_posting_exemptions from public, anon, authenticated;
 grant select, insert, update, delete on table public.platform_public_posting_policy to service_role;
@@ -144,8 +164,8 @@ $function$;
 
 revoke all on function public.can_profile_post(uuid) from public, anon;
 grant execute on function public.can_profile_post(uuid) to authenticated, service_role;
-revoke all on function public.can_profile_post_publicly(uuid) from public, anon;
-grant execute on function public.can_profile_post_publicly(uuid) to authenticated, service_role;
+revoke all on function public.can_profile_post_publicly(uuid) from public, anon, authenticated;
+grant execute on function public.can_profile_post_publicly(uuid) to service_role;
 
 create or replace function public.publish_social_post(
   target_organization_id uuid,
