@@ -65,6 +65,8 @@ export interface ContentModerationReport {
   expression_id?: string | null;
   content_item_id?: string | null;
   comment_id?: string | null;
+  deleted_target_type?: 'content' | 'comment' | null;
+  deleted_target_id?: string | null;
   reporter_profile_id: string;
   reason: string;
   details: string;
