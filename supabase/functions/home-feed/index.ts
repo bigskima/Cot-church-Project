@@ -5,6 +5,7 @@ import { adminClient, publicClient, userClient } from "../_shared/supabase.ts";
 import { uuid } from "../_shared/validation.ts";
 import { diversifyFeed, rankFeedCandidates, type FeedSignals } from "../_shared/feed-ranking.ts";
 import { enrichContentCreators, enrichContentEngagement, enrichSocialPosts } from "../_shared/public-identity.ts";
+import { filterByAuthor, loadSafetyProfileSets } from "../_shared/safety.ts";
 
 function nestedItem(value: any) {
   return Array.isArray(value) ? value[0] ?? null : value ?? null;
@@ -121,6 +122,7 @@ Deno.serve(createHandler(
     // present, so it can never leak member-only rows. Expression mode uses the caller's
     // JWT, with the exact membership check above and RLS remaining authoritative.
     const client = selectedExpressionId ? authenticatedClient! : publicClient();
+    const safety = await loadSafetyProfileSets(admin, userId);
     const degraded: string[] = [];
     const recentEventCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
@@ -184,6 +186,7 @@ Deno.serve(createHandler(
       }));
     let posts = resultData<any[]>(postsResult as any, "posts", degraded);
     posts = await enrichSocialPosts(posts);
+    posts = filterByAuthor(posts, safety.hiddenFromFeed, (post: any) => post.author?.id);
     posts = await enrichContentEngagement(
       posts,
       authenticatedClient ?? client,
@@ -191,14 +194,36 @@ Deno.serve(createHandler(
     );
     let reels = resultData<any[]>(reelsResult as any, "reels", degraded)
       .filter((row) => inSelectedExperience(row, selectedExpressionId, "content_items"));
+    reels = filterByAuthor(reels, safety.hiddenFromFeed, (row: any) => nestedItem(row.content_items)?.author_profile_id);
     let videos = resultData<any[]>(videosResult as any, "videos", degraded)
       .filter((row) => inSelectedExperience(row, selectedExpressionId, "content_items"));
+    videos = filterByAuthor(videos, safety.hiddenFromFeed, (row: any) => nestedItem(row.content_items)?.author_profile_id);
     [reels, videos] = await Promise.all([
       enrichContentCreators(reels),
       enrichContentCreators(videos),
     ]);
-    const sermons = resultData<any[]>(sermonsResult as any, "sermons", degraded)
+    let sermons = resultData<any[]>(sermonsResult as any, "sermons", degraded)
       .filter((row) => inSelectedExperience(row, selectedExpressionId, "expression_id"));
+
+    if (safety.hiddenFromFeed.size) {
+      const sermonContentIds = sermons.map((row: any) => row.content_item_id).filter(Boolean);
+      if (sermonContentIds.length) {
+        const { data: sermonContent, error: sermonContentError } = await admin
+          .from("content_items")
+          .select("id,author_profile_id")
+          .in("id", sermonContentIds);
+        if (sermonContentError) {
+          degraded.push("sermon safety");
+        } else {
+          const sermonAuthorMap = new Map((sermonContent ?? []).map((row: any) => [row.id, row.author_profile_id]));
+          sermons = filterByAuthor(
+            sermons,
+            safety.hiddenFromFeed,
+            (row: any) => row.content_item_id ? sermonAuthorMap.get(row.content_item_id) : null,
+          );
+        }
+      }
+    }
     const events = resultData<any[]>(eventsResult as any, "events", degraded)
       .filter((row) => inSelectedExperience(row, selectedExpressionId, "branch_id"));
     let rankingMode: "personalized" | "recent" | "expression" = selectedExpressionId ? "expression" : "recent";

@@ -3,6 +3,7 @@ import { ApiError } from "../_shared/errors.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { enrichContentEngagement, enrichSocialPosts } from "../_shared/public-identity.ts";
 import { adminClient, publicClient } from "../_shared/supabase.ts";
+import { filterByAuthor, loadSafetyProfileSets } from "../_shared/safety.ts";
 import { uuid } from "../_shared/validation.ts";
 
 const scopes = new Set(["all", "church", "expression"]);
@@ -75,8 +76,14 @@ Deno.serve(createHandler(
     const { data, error } = await query;
     if (error) throw new ApiError("PUBLIC_FEED_FAILED", "Unable to retrieve public community posts", 500, undefined, false);
     const identified = await enrichSocialPosts(data ?? []);
-    const engaged = await enrichContentEngagement(
+    const safety = await loadSafetyProfileSets(adminClient(), auth?.user.id);
+    const visible = filterByAuthor(
       identified,
+      postId ? safety.blockedProfiles : safety.hiddenFromFeed,
+      (post: any) => post.author?.id,
+    );
+    const engaged = await enrichContentEngagement(
+      visible,
       auth?.client ?? publicDb,
       auth?.user.id,
     );

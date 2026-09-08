@@ -5,6 +5,7 @@ import { jsonBody } from "../_shared/request.ts";
 import { enrichContentEngagement, enrichSocialPosts } from "../_shared/public-identity.ts";
 import { resolveActiveOrganizationId } from "../_shared/public-organization.ts";
 import { adminClient } from "../_shared/supabase.ts";
+import { filterByAuthor, loadSafetyProfileSets } from "../_shared/safety.ts";
 import { assertNoUnknownFields, assertObject, requiredString, uuid } from "../_shared/validation.ts";
 
 const visibilities = new Set(["public", "organization", "branch", "group", "private"]);
@@ -65,7 +66,10 @@ Deno.serve(createHandler(
         if (postError) throw new ApiError("POST_READ_FAILED", "Unable to retrieve this post", 500, undefined, false);
         if (!(rows ?? []).length) throw new ApiError("POST_NOT_FOUND", "This post is no longer available", 404);
         const identified = await enrichSocialPosts(rows ?? []);
-        const engaged = await enrichContentEngagement(identified, auth.client, auth.user.id);
+        const safety = await loadSafetyProfileSets(adminClient(), auth.user.id);
+        const visible = filterByAuthor(identified, safety.blockedProfiles, (post: any) => post.author?.id);
+        if (!visible.length) throw new ApiError("POST_NOT_FOUND", "This post is no longer available", 404);
+        const engaged = await enrichContentEngagement(visible, auth.client, auth.user.id);
         return { data: engaged[0] };
       }
       if (postId) {
@@ -77,7 +81,10 @@ Deno.serve(createHandler(
           .order("created_at")
           .limit(200);
         if (error) throw new ApiError("COMMENT_LIST_FAILED", "Unable to retrieve comments", 500, undefined, false);
-        return { data: data ?? [] };
+        const safety = await loadSafetyProfileSets(adminClient(), auth.user.id);
+        return {
+          data: filterByAuthor(data ?? [], safety.hiddenFromFeed, (comment: any) => comment.author_profile_id),
+        };
       }
 
       const scope = url.searchParams.get("scope") ?? "all";
@@ -96,8 +103,10 @@ Deno.serve(createHandler(
       const { data, error } = await query;
       if (error) throw new ApiError("FEED_READ_FAILED", "Unable to retrieve community feed", 500, undefined, false);
       const identified = await enrichSocialPosts(data ?? []);
+      const safety = await loadSafetyProfileSets(adminClient(), auth.user.id);
+      const visible = filterByAuthor(identified, safety.hiddenFromFeed, (post: any) => post.author?.id);
       return {
-        data: await enrichContentEngagement(identified, auth.client, auth.user.id),
+        data: await enrichContentEngagement(visible, auth.client, auth.user.id),
       };
     }
 

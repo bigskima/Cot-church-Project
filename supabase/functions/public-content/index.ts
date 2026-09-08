@@ -2,12 +2,30 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { ApiError } from "../_shared/errors.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { adminClient, publicClient } from "../_shared/supabase.ts";
-import { enrichContentCreators } from "../_shared/public-identity.ts";
+import { enrichContentCreators, enrichSocialPosts } from "../_shared/public-identity.ts";
+import { assertProfilesMayInteract, filterByAuthor, loadSafetyProfileSets } from "../_shared/safety.ts";
 import { uuid } from "../_shared/validation.ts";
 
+function nestedItem(value: any) {
+  return Array.isArray(value) ? value[0] ?? null : value ?? null;
+}
+
+async function filterSermonsBySafety(admin: ReturnType<typeof adminClient>, rows: any[], hiddenProfileIds: Set<string>) {
+  if (!hiddenProfileIds.size || !rows.length) return rows;
+  const contentIds = rows.map((row) => row.content_item_id).filter(Boolean);
+  if (!contentIds.length) return rows;
+  const { data, error } = await admin
+    .from("content_items")
+    .select("id,author_profile_id")
+    .in("id", contentIds);
+  if (error) throw new ApiError("SAFETY_CONTEXT_FAILED", "Unable to apply your safety preferences", 500, undefined, false);
+  const authorMap = new Map((data ?? []).map((row: any) => [row.id, row.author_profile_id]));
+  return filterByAuthor(rows, hiddenProfileIds, (row: any) => row.content_item_id ? authorMap.get(row.content_item_id) : null);
+}
+
 Deno.serve(createHandler(
-  { methods: ["GET"], authentication: "none", organization: "none" },
-  async ({ request }) => {
+  { methods: ["GET"], authentication: "optional", organization: "none" },
+  async ({ request, auth }) => {
     const url = new URL(request.url);
     const orgParam = url.searchParams.get("organizationId");
     const organizationId = orgParam ? uuid(orgParam, "organizationId", true) : null;
@@ -15,6 +33,8 @@ Deno.serve(createHandler(
     const expressionId = expressionParam ? uuid(expressionParam, "expressionId", true) : null;
     const type = url.searchParams.get("type") ?? "feed";
     const client = publicClient();
+    const admin = adminClient();
+    const safety = await loadSafetyProfileSets(admin, auth?.user.id);
 
     if (type === "event") {
       const eventId = uuid(url.searchParams.get("id"), "id", true);
@@ -41,6 +61,10 @@ Deno.serve(createHandler(
       const { data, error } = await query.maybeSingle();
       if (error) throw new ApiError("PUBLIC_VIDEO_FAILED", "Unable to retrieve this video", 500, undefined, false);
       if (!data) throw new ApiError("VIDEO_NOT_FOUND", "This video is not available", 404);
+      const item = nestedItem((data as any).content_items);
+      if (auth?.user && item?.author_profile_id) {
+        await assertProfilesMayInteract(admin, auth.user.id, item.author_profile_id);
+      }
       const [enriched] = await enrichContentCreators([data]);
       return { data: enriched };
     }
@@ -54,6 +78,15 @@ Deno.serve(createHandler(
       const { data, error } = await query.maybeSingle();
       if (error) throw new ApiError("PUBLIC_SERMON_FAILED", "Unable to retrieve this sermon", 500, undefined, false);
       if (!data) throw new ApiError("SERMON_NOT_FOUND", "This sermon is not available", 404);
+      if (auth?.user && data.content_item_id) {
+        const { data: item, error: itemError } = await admin
+          .from("content_items")
+          .select("author_profile_id")
+          .eq("id", data.content_item_id)
+          .maybeSingle();
+        if (itemError) throw new ApiError("SAFETY_CONTEXT_FAILED", "Unable to apply your safety preferences", 500, undefined, false);
+        if (item?.author_profile_id) await assertProfilesMayInteract(admin, auth.user.id, item.author_profile_id);
+      }
       return { data };
     }
 
@@ -72,7 +105,6 @@ Deno.serve(createHandler(
 
     if (type === "expression") {
       if (!expressionId) throw new ApiError("VALIDATION_FAILED", "expressionId is required", 422);
-      const admin = adminClient();
       const { data: expression, error: expressionError } = await admin
         .from("branches")
         .select("id,organization_id,name,code,timezone,address,is_active,organization:organizations!inner(id,name,slug,status)")
@@ -94,14 +126,18 @@ Deno.serve(createHandler(
       if ([sermons, videos, reels, events, leaders].some((result) => result.error)) {
         throw new ApiError("PUBLIC_EXPRESSION_FAILED", "Unable to retrieve this Expression", 500, undefined, false);
       }
+      const visibleExpressionSermons = await filterSermonsBySafety(admin, sermons.data ?? [], safety.hiddenFromFeed);
+      const visibleExpressionVideos = filterByAuthor(videos.data ?? [], safety.hiddenFromFeed, (row: any) => nestedItem(row.content_items)?.author_profile_id);
+      const visibleExpressionReels = filterByAuthor(reels.data ?? [], safety.hiddenFromFeed, (row: any) => nestedItem(row.content_items)?.author_profile_id);
+      const visibleExpressionLeaders = filterByAuthor(leaders.data ?? [], safety.hiddenFromFeed, (row: any) => row.profile_id);
       return {
         data: {
           expression,
-          sermons: sermons.data ?? [],
-          videos: await enrichContentCreators(videos.data ?? []),
-          reels: await enrichContentCreators(reels.data ?? []),
+          sermons: visibleExpressionSermons,
+          videos: await enrichContentCreators(visibleExpressionVideos),
+          reels: await enrichContentCreators(visibleExpressionReels),
           events: events.data ?? [],
-          leaders: (leaders.data ?? []).map((leader) => ({
+          leaders: visibleExpressionLeaders.map((leader) => ({
             id: leader.id,
             organization_id: leader.organization_id,
             expression_id: leader.expression_id,
@@ -137,7 +173,8 @@ Deno.serve(createHandler(
       if (expressionId) query = query.eq("content_items.expression_id", expressionId);
       const { data, error } = await query;
       if (error) throw new ApiError("PUBLIC_REELS_FAILED", "Unable to retrieve public reels", 500, undefined, false);
-      return { data: await enrichContentCreators(data ?? []) };
+      const visible = filterByAuthor(data ?? [], safety.hiddenFromFeed, (row: any) => nestedItem(row.content_items)?.author_profile_id);
+      return { data: await enrichContentCreators(visible) };
     }
 
     if (type === "videos") {
@@ -159,13 +196,14 @@ Deno.serve(createHandler(
       if (expressionId) query = query.eq("content_items.expression_id", expressionId);
       const { data, error } = await query;
       if (error) throw new ApiError("PUBLIC_VIDEOS_FAILED", "Unable to retrieve public videos", 500, undefined, false);
-      return { data: await enrichContentCreators(data ?? []) };
+      const visible = filterByAuthor(data ?? [], safety.hiddenFromFeed, (row: any) => nestedItem(row.content_items)?.author_profile_id);
+      return { data: await enrichContentCreators(visible) };
     }
 
     if (type === "sermons") {
       let query = client
         .from("sermons")
-        .select("id,organization_id,expression_id,series_id,title,slug,preacher,sermon_date,scripture_references,topics,description,transcript,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,chapters,duration_seconds,status,visibility,is_featured,play_count,published_at")
+        .select("id,organization_id,expression_id,content_item_id,series_id,title,slug,preacher,sermon_date,scripture_references,topics,description,transcript,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,chapters,duration_seconds,status,visibility,is_featured,play_count,published_at")
         .eq("visibility", "public")
         .eq("status", "published")
         .order("sermon_date", { ascending: false })
@@ -174,7 +212,7 @@ Deno.serve(createHandler(
       if (expressionId) query = query.eq("expression_id", expressionId);
       const { data, error } = await query;
       if (error) throw new ApiError("PUBLIC_SERMONS_FAILED", "Unable to retrieve public sermons", 500, undefined, false);
-      return { data: data ?? [] };
+      return { data: await filterSermonsBySafety(admin, data ?? [], safety.hiddenFromFeed) };
     }
 
     if (type === "series") {
@@ -205,8 +243,9 @@ Deno.serve(createHandler(
       if (organizationId) query = query.eq("organization_id", organizationId);
       const { data, error } = await query;
       if (error) throw new ApiError("PUBLIC_LEADERS_FAILED", "Unable to retrieve public church leadership", 500, undefined, false);
+      const visibleLeaders = filterByAuthor(data ?? [], safety.hiddenFromFeed, (leader: any) => leader.profile_id);
       return {
-        data: (data ?? []).map((leader) => ({
+        data: visibleLeaders.map((leader) => ({
           id: leader.id,
           organization_id: leader.organization_id,
           expression_id: null,
@@ -232,21 +271,21 @@ Deno.serve(createHandler(
 
       let sermonsQuery = client
         .from("sermons")
-        .select("id,organization_id,title,preacher,sermon_date,thumbnail_url,duration_seconds")
+        .select("id,organization_id,content_item_id,title,preacher,sermon_date,thumbnail_url,duration_seconds")
         .eq("visibility", "public")
         .eq("status", "published")
         .ilike("title", `%${term}%`)
         .limit(10);
       let videosQuery = client
         .from("videos")
-        .select("id,organization_id,title,slug,category,views_count,created_at,content_items!inner(visibility,status)")
+        .select("id,organization_id,title,slug,category,views_count,created_at,content_items!inner(author_profile_id,visibility,status)")
         .eq("content_items.visibility", "public")
         .eq("content_items.status", "published")
         .ilike("title", `%${term}%`)
         .limit(10);
       let reelsQuery = client
         .from("reels")
-        .select("id,organization_id,caption,audio_title,views_count,created_at,content_items!inner(visibility,status)")
+        .select("id,organization_id,caption,audio_title,views_count,created_at,content_items!inner(author_profile_id,visibility,status)")
         .eq("content_items.visibility", "public")
         .eq("content_items.status", "published")
         .ilike("caption", `%${term}%`)
@@ -259,7 +298,7 @@ Deno.serve(createHandler(
         .limit(10);
       let leadersQuery = client
         .from("leadership_profiles")
-        .select("id,organization_id,display_name,role_title,portrait_url,is_founder")
+        .select("id,organization_id,profile_id,display_name,role_title,portrait_url,is_founder")
         .is("expression_id", null)
         .eq("is_active", true)
         .eq("is_featured_public", true)
@@ -275,13 +314,17 @@ Deno.serve(createHandler(
       const [sermonsRes, videosRes, reelsRes, expressionsRes, leadersRes] = await Promise.all([
         sermonsQuery, videosQuery, reelsQuery, expressionsQuery, leadersQuery,
       ]);
+      const visibleSermons = await filterSermonsBySafety(admin, sermonsRes.data ?? [], safety.hiddenFromFeed);
+      const visibleVideos = filterByAuthor(videosRes.data ?? [], safety.hiddenFromFeed, (row: any) => nestedItem(row.content_items)?.author_profile_id);
+      const visibleReels = filterByAuthor(reelsRes.data ?? [], safety.hiddenFromFeed, (row: any) => nestedItem(row.content_items)?.author_profile_id);
+      const visibleLeaders = filterByAuthor(leadersRes.data ?? [], safety.hiddenFromFeed, (row: any) => row.profile_id);
       return {
         data: {
-          sermons: sermonsRes.data ?? [],
-          videos: videosRes.data ?? [],
-          reels: reelsRes.data ?? [],
+          sermons: visibleSermons,
+          videos: visibleVideos,
+          reels: visibleReels,
           expressions: expressionsRes.data ?? [],
-          leaders: (leadersRes.data ?? []).map((leader) => ({
+          leaders: visibleLeaders.map((leader) => ({
             id: leader.id,
             organization_id: leader.organization_id,
             name: leader.display_name,
@@ -395,7 +438,7 @@ Deno.serve(createHandler(
 
     let feedQuery = client
       .from("social_posts")
-      .select("id,organization_id,body,media,published_at,visibility")
+      .select("id,organization_id,author_membership_id,branch_id,group_id,body,media,published_at,visibility,status,created_at")
       .eq("visibility", "public")
       .eq("status", "published")
       .order("published_at", { ascending: false })
@@ -403,6 +446,7 @@ Deno.serve(createHandler(
     if (organizationId) feedQuery = feedQuery.eq("organization_id", organizationId);
     const { data, error } = await feedQuery;
     if (error) throw new ApiError("PUBLIC_FEED_FAILED", "Unable to retrieve public feed", 500, undefined, false);
-    return { data: data ?? [] };
+    const identified = await enrichSocialPosts(data ?? []);
+    return { data: filterByAuthor(identified, safety.hiddenFromFeed, (post: any) => post.author?.id) };
   },
 ));

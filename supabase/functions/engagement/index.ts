@@ -2,7 +2,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { ApiError } from "../_shared/errors.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
-import { publicClient } from "../_shared/supabase.ts";
+import { adminClient, publicClient } from "../_shared/supabase.ts";
+import { assertProfilesMayInteract, filterByAuthor, loadSafetyProfileSets } from "../_shared/safety.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString, uuid } from "../_shared/validation.ts";
 
 const allowedReactions = new Set(["like", "love", "pray", "celebrate", "amen", "support"]);
@@ -25,6 +26,10 @@ async function assertContentAccess(auth: any, contentId: string) {
   if (error) throw new ApiError("CONTENT_ACCESS_CHECK_FAILED", "Unable to verify content access", 500, undefined, false);
   if (!data || data.status !== "published") {
     throw new ApiError("CONTENT_NOT_FOUND", "This content is unavailable", 404);
+  }
+
+  if (auth?.user && data.author_profile_id) {
+    await assertProfilesMayInteract(adminClient(), auth.user.id, data.author_profile_id);
   }
 
   if (data.visibility === "public") return data;
@@ -220,7 +225,11 @@ Deno.serve(createHandler(
         .limit(100);
 
       if (error) throw new ApiError("COMMENTS_FETCH_FAILED", "Unable to retrieve comments", 500, undefined, false);
-      return { data: data ?? [] };
+      if (!auth?.user) return { data: data ?? [] };
+      const safety = await loadSafetyProfileSets(adminClient(), auth.user.id);
+      return {
+        data: filterByAuthor(data ?? [], safety.hiddenFromFeed, (comment: any) => comment.author_profile_id),
+      };
     }
 
     // POST Actions require authentication
@@ -276,12 +285,13 @@ Deno.serve(createHandler(
       if (parentId) {
         const { data: parentComment, error: parentError } = await auth.client
           .from("content_comments")
-          .select("id")
+          .select("id,author_profile_id")
           .eq("id", parentId)
           .eq("content_item_id", contentId)
           .maybeSingle();
         if (parentError) throw new ApiError("COMMENT_PARENT_CHECK_FAILED", "Unable to validate the reply target", 500, undefined, false);
         if (!parentComment) throw new ApiError("INVALID_PARENT_COMMENT", "Reply target does not belong to this post", 422);
+        await assertProfilesMayInteract(adminClient(), auth.user.id, parentComment.author_profile_id);
       }
 
       const { data, error } = await auth.client
