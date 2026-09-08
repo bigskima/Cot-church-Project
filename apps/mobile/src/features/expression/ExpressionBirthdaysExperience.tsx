@@ -5,6 +5,7 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import { Avatar, Badge, EmptyState, Icon, ResourceError, ScreenHeader, SectionHeader, Skeleton } from '@/components';
+import { ExpressionPeopleHeader } from '@/components/expression/ExpressionPeopleHeader';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 
 type BirthdayEntry = {
@@ -50,14 +51,27 @@ export function ExpressionBirthdaysExperience({ embedded = false }: { embedded?:
   const entries = resource.data ?? [];
   const today = entries.filter((entry) => entry.days_until === 0);
   const upcoming = entries.filter((entry) => entry.days_until > 0);
+  const soon = upcoming.filter((entry) => entry.days_until <= 14);
+  const later = upcoming.filter((entry) => entry.days_until > 14);
 
-  const birthdayCard = (entry: BirthdayEntry) => (
-    <View key={entry.profile_id} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+  const birthdayCard = (entry: BirthdayEntry, emphasized = false) => (
+    <View
+      key={entry.profile_id}
+      style={[
+        styles.card,
+        {
+          backgroundColor: emphasized ? colors.primarySoft : colors.card,
+          borderColor: emphasized ? colors.interactive : colors.borderSubtle,
+        },
+        shadows.sm,
+      ]}
+    >
       <Avatar url={entry.avatar_url} name={entry.display_name} size="md" />
       <View style={styles.cardBody}>
         <View style={styles.nameRow}>
           <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>{entry.display_name}</Text>
           {entry.days_until === 0 ? <Badge label="TODAY" variant="primary" /> : null}
+          {entry.days_until === 1 ? <Badge label="TOMORROW" variant="active" /> : null}
         </View>
         {entry.username ? <Text style={[styles.username, { color: colors.textMuted }]}>@{entry.username}</Text> : null}
         <View style={styles.dateRow}>
@@ -71,38 +85,61 @@ export function ExpressionBirthdaysExperience({ embedded = false }: { embedded?:
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+      {embedded ? (
+        <ExpressionPeopleHeader
+          expressionId={expression.id}
+          expressionName={expression.name}
+          active="birthdays"
+          title="Birthdays"
+          subtitle="Celebrate the people in this Expression without exposing anyone’s birth year."
+          icon="gift-outline"
+        />
+      ) : null}
+
       <ScrollView
+        style={styles.scroll}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={resource.refreshing} onRefresh={resource.refresh} tintColor={colors.interactive} />}
-        contentContainerStyle={{ paddingTop: embedded ? spacing.md : insets.top + spacing.sm, paddingBottom: embedded ? insets.bottom + spacing.xl : insets.bottom + 120 }}
+        contentContainerStyle={{ paddingTop: embedded ? spacing.sm : insets.top + spacing.sm, paddingBottom: embedded ? insets.bottom + spacing.xl : insets.bottom + 120 }}
       >
         {!embedded ? (
           <ScreenHeader title="Birthdays" subtitle={`Upcoming birthdays shared inside ${expression.name}. Birth years are never shown.`} showBack />
-        ) : (
-          <View style={styles.embeddedIntro}>
-            <Text style={[styles.embeddedEyebrow, { color: colors.interactive }]}>EXPRESSION COMMUNITY</Text>
-            <Text style={[styles.embeddedTitle, { color: colors.text }]}>Birthdays</Text>
-            <Text style={[styles.embeddedCopy, { color: colors.textSecondary }]}>
-              Upcoming birthdays shared inside {expression.name}. Birth years are never shown.
-            </Text>
-          </View>
-        )}
+        ) : null}
+
         <View style={styles.body}>
-          <View style={[styles.privacyCard, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}> 
-            <Icon name="shield-checkmark-outline" size={18} color={colors.interactive} />
-            <Text style={[styles.privacyText, { color: colors.textSecondary }]}>Only active members of this Expression can see this calendar. Each person controls birthday visibility from Account Settings.</Text>
+          <View style={[styles.privacyCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}> 
+            <View style={[styles.privacyIcon, { backgroundColor: colors.primarySoft }]}>
+              <Icon name="shield-checkmark-outline" size={17} color={colors.interactive} />
+            </View>
+            <View style={styles.flex}>
+              <Text style={[styles.privacyTitle, { color: colors.text }]}>Shared by members</Text>
+              <Text style={[styles.privacyText, { color: colors.textSecondary }]}>Only active members of this Expression can see this calendar. Each person controls birthday visibility from Account Settings.</Text>
+            </View>
           </View>
 
           {resource.loading && !resource.data ? (
-            <Skeleton height={78} count={5} />
+            <Skeleton height={76} count={5} />
           ) : resource.error && !resource.data ? (
             <ResourceError message={resource.error} retry={resource.refresh} />
           ) : entries.length ? (
             <>
-              {today.length ? <View style={styles.section}><SectionHeader title="Celebrating today" badge={today.length} />{today.map(birthdayCard)}</View> : null}
+              {today.length ? (
+                <View style={styles.section}>
+                  <SectionHeader title="Celebrating today" badge={today.length} subtitle="Make today feel special" />
+                  {today.map((entry) => birthdayCard(entry, true))}
+                </View>
+              ) : null}
+
+              {soon.length ? (
+                <View style={styles.section}>
+                  <SectionHeader title="Coming soon" badge={soon.length} subtitle="Next 14 days" />
+                  {soon.map((entry) => birthdayCard(entry, entry.days_until <= 1))}
+                </View>
+              ) : null}
+
               <View style={styles.section}>
-                <SectionHeader title="Upcoming · next 120 days" badge={upcoming.length} />
-                {upcoming.length ? upcoming.map(birthdayCard) : <Text style={[styles.emptyLine, { color: colors.textMuted }]}>No other shared birthdays in the next 120 days.</Text>}
+                <SectionHeader title="Later" badge={later.length} subtitle="Within the next 120 days" />
+                {later.length ? later.map((entry) => birthdayCard(entry)) : <Text style={[styles.emptyLine, { color: colors.textMuted }]}>No other shared birthdays in the next 120 days.</Text>}
               </View>
             </>
           ) : (
@@ -119,14 +156,14 @@ export default function ExpressionBirthdaysRouteExperience() {
 }
 
 const styles = StyleSheet.create({
-  embeddedIntro: { marginHorizontal: spacing.md, marginBottom: spacing.md },
-  embeddedEyebrow: { fontSize: 10, lineHeight: 14, fontWeight: '900', letterSpacing: 0.9 },
-  embeddedTitle: { fontSize: 20, lineHeight: 25, fontWeight: '800' },
-  embeddedCopy: { fontSize: 12, lineHeight: 18, marginTop: 3 },
   screen: { flex: 1 },
+  scroll: { flex: 1 },
   body: { paddingHorizontal: spacing.md, gap: spacing.lg },
+  flex: { flex: 1, minWidth: 0 },
   privacyCard: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md },
-  privacyText: { flex: 1, fontSize: 12, lineHeight: 18 },
+  privacyIcon: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  privacyTitle: { fontSize: 12, lineHeight: 16, fontWeight: '800' },
+  privacyText: { fontSize: 11, lineHeight: 17, marginTop: 2 },
   section: { gap: spacing.sm },
   card: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md },
   cardBody: { flex: 1, gap: 3 },
