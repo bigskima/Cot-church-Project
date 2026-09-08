@@ -87,8 +87,9 @@ async function streamingReadiness(organizationId: string) {
     if (loaded.organizationId && loaded.organizationId !== organizationId) {
       return { ready: false, reason: "provider_scope_invalid" as const };
     }
+    let adapter;
     try {
-      streamingProvider(loaded.provider.providerCode);
+      adapter = streamingProvider(loaded.provider.providerCode);
     } catch {
       return { ready: false, reason: "adapter_unavailable" as const, providerCode: loaded.provider.providerCode };
     }
@@ -106,6 +107,18 @@ async function streamingReadiness(organizationId: string) {
         webhookSecretReady,
         signedPlaybackConfigured: signingSecretReady,
       };
+    }
+    if (adapter.healthCheck) {
+      try {
+        await adapter.healthCheck(loaded.provider);
+      } catch {
+        return {
+          ready: false,
+          reason: "provider_credentials_rejected" as const,
+          providerCode: loaded.provider.providerCode,
+          signedPlaybackConfigured: signingSecretReady,
+        };
+      }
     }
     return {
       ready: true,
