@@ -3,6 +3,7 @@ import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
+import { toUserFacingErrorMessage } from '@/api';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import { Badge, BottomSheet, Button, Chip, EmptyState, Icon, InputField, ResourceError, ScreenHeader, SectionHeader, Skeleton } from '@/components';
@@ -101,7 +102,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId, exp
       setFeedback('Membership request sent to the group leaders.');
       resource.refresh();
     } catch (value) {
-      setActionError(value instanceof Error ? value.message : 'Unable to request group membership.');
+      setActionError(toUserFacingErrorMessage(value, 'We couldn’t send your request. Please try again.'));
     } finally {
       setBusyId(null);
     }
@@ -119,7 +120,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId, exp
       setFeedback(approved ? 'Group membership approved.' : 'Group membership declined.');
       resource.refresh();
     } catch (value) {
-      setActionError(value instanceof Error ? value.message : 'Unable to review the membership request.');
+      setActionError(toUserFacingErrorMessage(value, 'We couldn’t update this request. Please try again.'));
     } finally {
       setBusyId(null);
     }
@@ -160,7 +161,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId, exp
       setFeedback(`Group created inside ${expression?.name ?? 'this Expression'}.`);
       resource.refresh();
     } catch (value) {
-      setActionError(value instanceof Error ? value.message : 'We couldn’t create this group. Please try again.');
+      setActionError(toUserFacingErrorMessage(value, 'We couldn’t create this group. Please try again.'));
     } finally {
       setSaving(false);
     }
@@ -189,14 +190,23 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId, exp
         contentContainerStyle={{ paddingTop: embedded ? spacing.md : insets.top + spacing.sm, paddingBottom: embedded ? insets.bottom + spacing.xl : insets.bottom + 130 }}
       >
         {!embedded ? (
-          <ScreenHeader title={focusedGroup?.name ?? (focusGroupId ? "Group" : "Groups")} kicker={expression.name.toUpperCase()} subtitle={focusGroupId ? "A smaller community inside this Expression." : "Smaller communities inside this Expression."} showBack />
+          <ScreenHeader title={focusedGroup?.name ?? (focusGroupId ? "Group" : "Groups")} kicker={(expression?.name ?? 'this Expression').toUpperCase()} subtitle={focusGroupId ? "A smaller community inside this Expression." : "Smaller communities inside this Expression."} showBack />
         ) : (
-          <View style={styles.embeddedIntro}>
-            <Text style={[styles.embeddedEyebrow, { color: colors.interactive }]}>EXPRESSION COMMUNITY</Text>
-            <Text style={[styles.embeddedTitle, { color: colors.text }]}>{focusedGroup?.name ?? (focusGroupId ? 'Group' : 'Groups')}</Text>
-            <Text style={[styles.embeddedCopy, { color: colors.textSecondary }]}>
-              {focusGroupId ? 'Group details, membership and leadership actions.' : `Smaller communities inside ${expression.name}.`}
-            </Text>
+          <View style={[styles.embeddedIntro, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+            <View pointerEvents="none" style={[styles.introGlow, { backgroundColor: colors.primarySoft }]} />
+            <View style={[styles.introIcon, { backgroundColor: colors.primarySoft }]}>
+              <Icon name={focusGroupId ? 'people-circle' : 'people-outline'} size={23} color={colors.interactive} />
+            </View>
+            <View style={styles.introCopy}>
+              <Text style={[styles.embeddedEyebrow, { color: colors.interactive }]}>COMMUNITY SPACES</Text>
+              <Text style={[styles.embeddedTitle, { color: colors.text }]}>{focusedGroup?.name ?? (focusGroupId ? 'Group' : 'Groups')}</Text>
+              <Text style={[styles.embeddedCopy, { color: colors.textSecondary }]}>
+                {focusGroupId ? 'Conversation, fellowship and group activity in one place.' : `Find smaller communities inside ${(expression?.name ?? 'this Expression')}.`}
+              </Text>
+            </View>
+            {!focusGroupId && canManageGroups ? (
+              <Button label="New group" onPress={() => setCreateOpen(true)} size="sm" />
+            ) : null}
           </View>
         )}
         <View style={styles.body}>
@@ -204,28 +214,30 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId, exp
           {actionError ? <View style={[styles.banner, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}><Icon name="alert-circle" size={18} color={colors.live} /><Text style={[styles.bannerText, { color: colors.live }]}>{actionError}</Text></View> : null}
 
           <View style={styles.sectionHeaderRow}>
-            <SectionHeader
-              title={focusGroupId ? "Group space" : "Your groups"}
-              badge={focusGroupId ? undefined : groups.length}
-              subtitle={focusGroupId ? "Membership, meeting details and requests" : "Join conversations and fellowship spaces"}
-            />
+            <View style={styles.sectionCopy}>
+              <View style={styles.sectionTitleLine}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>{focusGroupId ? 'Group space' : 'Your groups'}</Text>
+                {!focusGroupId ? <Badge label={String(groups.length)} variant="neutral" /> : null}
+              </View>
+              <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
+                {focusGroupId ? 'Membership, meeting details and requests' : 'Conversations and fellowship spaces you can enter'}
+              </Text>
+            </View>
             {focusGroupId ? (
-              <Button label="All groups" onPress={() => router.replace(`/expressions/${expression.id}/groups` as any)} variant="ghost" size="sm" />
-            ) : canManageGroups ? (
-              <Button label="New group" onPress={() => setCreateOpen(true)} variant="primary" size="sm" />
+              <Button label="All groups" onPress={() => router.replace(`/expressions/${targetExpressionId}/groups` as any)} variant="outline" size="sm" />
             ) : null}
           </View>
 
           {resource.loading && !resource.data ? (
             <Skeleton height={130} count={3} />
           ) : resource.error && !resource.data ? (
-            <ResourceError message={resource.error} retry={resource.refresh} />
+            <ResourceError message={resource.error} retry={resource.refresh} compact />
           ) : visibleGroups.length ? visibleGroups.map((group) => {
             const membership = group.myMembership;
             const meetingSummary = typeof group.meeting_schedule?.summary === 'string' ? group.meeting_schedule.summary : null;
             const requests = pendingByGroup.get(group.id) ?? [];
             return (
-              <View key={group.id} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+              <View key={group.id} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
                 <View style={styles.cardTop}>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.groupName, { color: colors.text }]}>{group.name}</Text>
@@ -235,7 +247,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId, exp
                       {membership?.status === 'requested' ? <Badge label="REQUEST PENDING" variant="neutral" /> : null}
                     </View>
                   </View>
-                  <Icon name="people-outline" size={22} color={colors.interactive} />
+                  <View style={[styles.groupIcon, { backgroundColor: colors.primarySoft }]}><Icon name="people-outline" size={20} color={colors.interactive} /></View>
                 </View>
 
                 {group.description ? <Text style={[styles.description, { color: colors.textSecondary }]}>{group.description}</Text> : null}
@@ -247,7 +259,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId, exp
                 {!focusGroupId ? (
                   <Button
                     label="Open group"
-                    onPress={() => router.push(`/expressions/${expression.id}/groups/${group.id}` as any)}
+                    onPress={() => router.push(`/expressions/${targetExpressionId}/groups/${group.id}` as any)}
                     variant="ghost"
                     size="sm"
                   />
@@ -279,12 +291,13 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId, exp
               title={focusGroupId ? "Group unavailable" : "No groups yet"}
               message={focusGroupId ? "This group does not belong to the active Expression or is no longer available." : canManageGroups ? 'Create the first group for this Expression.' : 'Expression leaders have not published any member groups yet.'}
               iconName="people-outline"
+              style={styles.emptyCompact}
             />
           )}
         </View>
       </ScrollView>
 
-      <BottomSheet visible={createOpen} onClose={() => !saving && setCreateOpen(false)} title="Create group" subtitle={`Inside ${expression.name}`}>
+      <BottomSheet visible={createOpen} onClose={() => !saving && setCreateOpen(false)} title="Create group" subtitle={`Inside ${(expression?.name ?? 'this Expression')}`}>
         <View style={styles.form}>
           <Text style={[styles.helper, { color: colors.textSecondary }]}>This group will be permanently scoped to the currently selected Expression.</Text>
           <InputField label="Group Name" value={name} onChangeText={setName} placeholder="e.g. Young Adults Fellowship" />
@@ -305,18 +318,38 @@ export default function ExpressionGroupsRouteExperience() {
 }
 
 const styles = StyleSheet.create({
-  embeddedIntro: { marginHorizontal: spacing.md, marginBottom: spacing.md },
-  embeddedEyebrow: { fontSize: 10, lineHeight: 14, fontWeight: '900', letterSpacing: 0.9 },
-  embeddedTitle: { fontSize: 22, lineHeight: 28, fontWeight: '800' },
+  embeddedIntro: {
+    position: 'relative',
+    overflow: 'hidden',
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderRadius: radius.xxl,
+    padding: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  introGlow: { position: 'absolute', width: 160, height: 160, borderRadius: 80, right: -70, top: -90, opacity: 0.8 },
+  introIcon: { width: 48, height: 48, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  introCopy: { flex: 1, minWidth: 0 },
+  embeddedEyebrow: { fontSize: 9, lineHeight: 13, fontWeight: '900', letterSpacing: 1 },
+  embeddedTitle: { fontSize: 24, lineHeight: 29, fontWeight: '900', letterSpacing: -0.6, marginTop: 1 },
   embeddedCopy: { fontSize: 12, lineHeight: 18, marginTop: 3 },
   screen: { flex: 1 },
   body: { paddingHorizontal: spacing.md, gap: spacing.md },
+  emptyCompact: { minHeight: 180, marginTop: spacing.xs },
   banner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.md, padding: spacing.md },
   bannerText: { flex: 1, fontSize: 12, fontWeight: '600' },
-  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  card: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.lg, gap: spacing.sm },
-  cardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  groupName: { fontSize: 16, fontWeight: '800' },
+  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingVertical: spacing.xs },
+  sectionCopy: { flex: 1, minWidth: 0 },
+  sectionTitleLine: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  sectionTitle: { fontSize: 20, lineHeight: 25, fontWeight: '900', letterSpacing: -0.45 },
+  sectionSubtitle: { fontSize: 11.5, lineHeight: 17, marginTop: 2 },
+  card: { borderWidth: 1, borderRadius: radius.xxl, padding: spacing.lg, gap: spacing.md },
+  cardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  groupIcon: { width: 42, height: 42, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  groupName: { fontSize: 17, lineHeight: 22, fontWeight: '900', letterSpacing: -0.3 },
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 5 },
   description: { fontSize: 13, lineHeight: 19 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
