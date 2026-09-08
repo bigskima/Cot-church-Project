@@ -50,8 +50,8 @@ for each row execute function public.set_updated_at();
 alter table public.platform_public_posting_policy enable row level security;
 alter table public.platform_public_posting_exemptions enable row level security;
 
-revoke all on table public.platform_public_posting_policy from anon, authenticated;
-revoke all on table public.platform_public_posting_exemptions from anon, authenticated;
+revoke all on table public.platform_public_posting_policy from public, anon, authenticated;
+revoke all on table public.platform_public_posting_exemptions from public, anon, authenticated;
 grant select, insert, update, delete on table public.platform_public_posting_policy to service_role;
 grant select, insert, update, delete on table public.platform_public_posting_exemptions to service_role;
 
@@ -170,6 +170,10 @@ declare
 begin
   if auth.uid() is null then
     raise exception using errcode='42501', message='Authentication required';
+  end if;
+
+  if not public.can_profile_post(auth.uid()) then
+    raise exception using errcode='42501', message='Posting is currently restricted for this account';
   end if;
 
   if target_visibility = 'public'
@@ -362,6 +366,10 @@ begin
     raise exception using errcode='42501', message='Authentication required';
   end if;
 
+  if not public.can_profile_post(auth.uid()) then
+    raise exception using errcode='42501', message='Posting is currently restricted for this account';
+  end if;
+
   if not exists (
     select 1
     from public.organizations o
@@ -460,6 +468,10 @@ begin
     raise exception using errcode='42501', message='Authentication required';
   end if;
 
+  if not public.can_profile_post(auth.uid()) then
+    raise exception using errcode='42501', message='Posting is currently restricted for this account';
+  end if;
+
   if not exists (
     select 1
     from public.organizations o
@@ -540,6 +552,72 @@ begin
   );
 end
 $function$;
+
+
+create or replace function public.publish_typed_post(
+  p_org_id uuid,
+  p_expression_id uuid,
+  p_group_id uuid,
+  p_visibility public.content_visibility,
+  p_body text,
+  p_media_json jsonb default '[]'::jsonb
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_content_id uuid;
+  v_author_membership public.memberships;
+begin
+  if auth.uid() is null then
+    raise exception using errcode='42501', message='Authentication required';
+  end if;
+
+  if not public.can_profile_post(auth.uid()) then
+    raise exception using errcode='42501', message='Posting is currently restricted for this account';
+  end if;
+
+  select * into v_author_membership
+  from public.memberships
+  where organization_id = p_org_id
+    and profile_id = auth.uid()
+    and status = 'active';
+
+  if not found then
+    raise exception using errcode='42501', message='Active organization membership required';
+  end if;
+
+  if not (
+    public.has_permission(p_org_id, 'posts.publish', p_expression_id)
+    or public.has_permission(p_org_id, 'posts.create', p_expression_id)
+  ) then
+    raise exception using errcode='42501', message='Permission denied to create posts in this expression';
+  end if;
+
+  insert into public.content_items (
+    organization_id, expression_id, group_id, author_profile_id,
+    content_type, visibility, status, published_at
+  ) values (
+    p_org_id, p_expression_id, p_group_id, auth.uid(),
+    'post', p_visibility, 'published', now()
+  ) returning id into v_content_id;
+
+  insert into public.social_posts (
+    id, organization_id, author_membership_id, branch_id, group_id,
+    visibility, status, body, media, published_at
+  ) values (
+    v_content_id, p_org_id, v_author_membership.id, p_expression_id, p_group_id,
+    p_visibility, 'published', trim(p_body), p_media_json, now()
+  );
+
+  return jsonb_build_object('id', v_content_id, 'status', 'published');
+end
+$function$;
+
+revoke all on function public.publish_typed_post(uuid, uuid, uuid, public.content_visibility, text, jsonb) from public, anon;
+grant execute on function public.publish_typed_post(uuid, uuid, uuid, public.content_visibility, text, jsonb) to authenticated, service_role;
 
 revoke all on function public.publish_social_post_with_uploads(uuid, public.content_visibility, text, uuid, uuid, uuid[]) from public, anon;
 grant execute on function public.publish_social_post_with_uploads(uuid, public.content_visibility, text, uuid, uuid, uuid[]) to authenticated, service_role;
