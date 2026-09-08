@@ -226,6 +226,27 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
 
   return (
     <View style={styles.screen}>
+      {expressionId ? (
+        <View style={[styles.expressionScope, { top: insets.top + 8 }]}>
+          <View style={styles.expressionScopePill}>
+            <Icon name="lock-closed-outline" size={12} color="#FFFFFF" />
+            <View style={styles.expressionScopeCopy}>
+              <Text style={styles.expressionScopeLabel}>EXPRESSION REELS</Text>
+              <Text style={styles.expressionScopeName} numberOfLines={1}>{expressionName ?? 'Members only'}</Text>
+            </View>
+          </View>
+          <Pressable
+            onPress={() => router.push(`/expressions/${expressionId}/videos` as any)}
+            style={({ pressed }) => [styles.mediaLibraryButton, pressed ? styles.overlayPressed : null]}
+            accessibilityRole="button"
+            accessibilityLabel="Open Expression media library"
+          >
+            <Icon name="grid-outline" size={15} color="#FFFFFF" />
+            <Text style={styles.mediaLibraryText}>Media</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
       <View style={[styles.closeButton, { top: insets.top + 8 }]}>
         <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close Reels" style={styles.closeBtnInner}>
           <Icon name="close" size={22} color="#FFFFFF" />
@@ -330,6 +351,14 @@ export default function GeneralReelsExperience() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#000000' },
+  expressionScope: { position: 'absolute', left: 16, right: 68, zIndex: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  expressionScopePill: { minHeight: 42, maxWidth: '72%', flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.52)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
+  expressionScopeCopy: { flex: 1, minWidth: 0 },
+  expressionScopeLabel: { color: '#FFFFFF', fontSize: 8, lineHeight: 10, fontWeight: '900', letterSpacing: 0.8 },
+  expressionScopeName: { color: 'rgba(255,255,255,0.72)', fontSize: 10, lineHeight: 14, fontWeight: '700', marginTop: 1 },
+  mediaLibraryButton: { minHeight: 42, borderRadius: 16, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.52)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
+  mediaLibraryText: { color: '#FFFFFF', fontSize: 9, fontWeight: '800' },
+  overlayPressed: { opacity: 0.72, transform: [{ scale: 0.98 }] },
   closeButton: { position: 'absolute', right: 16, zIndex: 10 },
   closeBtnInner: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.48)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
   errorToast: { position: 'absolute', left: 16, right: 68, zIndex: 20, minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 16, backgroundColor: 'rgba(180,35,24,0.92)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },

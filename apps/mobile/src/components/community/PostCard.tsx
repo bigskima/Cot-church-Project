@@ -73,6 +73,12 @@ export function PostCard({
   const author = postAsAny.author ?? {};
   const expressionLabel = expressionName || postAsAny.expression?.name || undefined;
   const isExpressionPost = post.visibility === 'branch' || postAsAny.scope === 'expression';
+  const postExpressionId =
+    postAsAny.expression_id ||
+    postAsAny.branch_id ||
+    postAsAny.content_items?.expression_id ||
+    postAsAny.expression?.id ||
+    undefined;
 
   const displayName = authorName || author.displayName || author.display_name || postAsAny.author_name || 'Church Member';
   const handle = authorHandle || author.username || author.handle || postAsAny.author_handle || undefined;
@@ -241,7 +247,12 @@ export function PostCard({
                 return (
                   <Pressable
                     key={key}
-                    onPress={() => reference.reelId && router.push({ pathname: '/general/reels', params: { reelId: reference.reelId } } as any)}
+                    onPress={() => {
+                      if (!reference.reelId) return;
+                      router.push((isExpressionPost && postExpressionId
+                        ? { pathname: `/expressions/${postExpressionId}/reels`, params: { reelId: reference.reelId } }
+                        : { pathname: '/general/reels', params: { reelId: reference.reelId } }) as any);
+                    }}
                     style={({ pressed }) => [
                       styles.reelReference,
                       { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle },
