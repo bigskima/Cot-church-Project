@@ -97,6 +97,7 @@ const organizationContext = await readFile('supabase/functions/organization-cont
 const platformRolesAccess = await readFile('supabase/functions/platform-roles-access/index.ts', 'utf8');
 const platformModeration = await readFile('supabase/functions/platform-moderation/index.ts', 'utf8');
 const publicPostingPolicyMigration = await readFile('supabase/migrations/20260908190000_platform_public_posting_policy.sql', 'utf8');
+const publicPostingPolicyHardening = await readFile('supabase/migrations/20260908191000_platform_public_posting_policy_hardening.sql', 'utf8');
 const streamingBroadcasts = await readFile('supabase/functions/streaming-broadcasts/index.ts', 'utf8');
 const liveStreams = await readFile('supabase/functions/live-streams/index.ts', 'utf8');
 const onboarding = await readFile('supabase/functions/onboarding/index.ts', 'utf8');
@@ -233,12 +234,12 @@ const invariants = [
   [publicContent, /type === "streams"[\s\S]*provisioning[\s\S]*ready[\s\S]*processing[\s\S]*replay_ready/, 'public stream catalogue lifecycle coverage'],
   [contentMedia, /action"\) === "video_detail"[\s\S]*content_items\.expression_id[\s\S]*auth\.branchId/, 'exact Expression Watch detail is scoped to active Expression'],
   [contentMedia, /video_detail[\s\S]*enrichContentCreators/, 'exact Expression Watch detail includes creator attribution'],
-  [contentMedia, /can_profile_post[\s\S]*expressionId[\s\S]*auth\.branchId[\s\S]*authorize\(auth, "media\.upload"\)[\s\S]*can_profile_post_publicly/, 'media upload keeps individual restrictions while applying global policy only to General creation'],
+  [contentMedia, /can_profile_post[\s\S]*expressionId[\s\S]*auth\.branchId[\s\S]*authorize\(auth, "media\.upload"\)[\s\S]*admin\.rpc\("can_profile_post_publicly"/, 'media upload keeps individual restrictions while applying global policy only to General creation'],
   [contentMedia, /resolveActiveOrganizationId[\s\S]*organizationId/, 'General content media resolves the active church without membership context'],
-  [communityMedia, /can_profile_post[\s\S]*const action[\s\S]*branchId[\s\S]*can_profile_post_publicly/, 'community media keeps account restrictions and applies public policy only to General uploads'],
+  [communityMedia, /can_profile_post[\s\S]*const action[\s\S]*branchId[\s\S]*admin\.rpc\("can_profile_post_publicly"/, 'community media keeps account restrictions and applies public policy only to General uploads'],
   [communityMedia, /audio\/webm/, 'community media accepts browser voice recordings'],
   [publicOrganization, /limit\(2\)[\s\S]*ORGANIZATION_REQUIRED/, 'public organization resolver fails closed when General context is ambiguous'],
-  [creatorStudio, /organization:\s*"optional"[\s\S]*can_profile_post_publicly[\s\S]*publish_typed_reel[\s\S]*publish_typed_video/, 'General creator studio obeys the platform public posting policy'],
+  [creatorStudio, /organization:\s*"optional"[\s\S]*admin\.rpc\("can_profile_post_publicly"[\s\S]*publish_typed_reel[\s\S]*publish_typed_video/, 'General creator studio obeys the platform public posting policy'],
   [generalPublicCreationMigration, /publish_social_post_with_uploads[\s\S]*media_kind[\s\S]*publish_typed_reel[\s\S]*can_profile_post[\s\S]*publish_typed_video[\s\S]*created_by <> auth\.uid\(\)/, 'General publishing migration keeps multimedia creation authenticated and owner-scoped'],
   [publicPostingPolicyMigration, /platform_public_posting_policy[\s\S]*mode in \('open', 'closed', 'allowlist'\)[\s\S]*platform_public_posting_exemptions/, 'platform public posting policy supports open, paused, and approved-only modes'],
   [publicPostingPolicyMigration, /can_profile_post[\s\S]*profile_posting_controls[\s\S]*platform_user_restrictions/, 'individual posting checks combine legacy profile controls with platform restrictions'],
@@ -250,6 +251,9 @@ const invariants = [
   [publicPostingPolicyMigration, /publish_typed_video[\s\S]*can_profile_post\(auth\.uid\(\)\)/, 'individual posting restrictions remain effective for scoped Watch publishing'],
   [publicPostingPolicyMigration, /publish_typed_post[\s\S]*can_profile_post\(auth\.uid\(\)\)/, 'individual posting restrictions remain effective for scoped post publishing'],
   [publicPostingPolicyMigration, /alter table public\.platform_public_posting_policy enable row level security[\s\S]*alter table public\.platform_public_posting_exemptions enable row level security[\s\S]*revoke all on table public\.platform_public_posting_policy from public, anon, authenticated/, 'public posting governance tables are protected from direct client access'],
+  [publicPostingPolicyMigration, /platform_public_posting_policy_no_client_access[\s\S]*using \(false\)[\s\S]*platform_public_posting_exemptions_no_client_access[\s\S]*using \(false\)/, 'public posting governance tables explicitly deny client row access'],
+  [publicPostingPolicyMigration, /revoke all on function public\.can_profile_post_publicly\(uuid\)[\s\S]*authenticated[\s\S]*grant execute on function public\.can_profile_post_publicly\(uuid\)[\s\S]*service_role/, 'public posting policy helper is service-only at the API boundary'],
+  [publicPostingPolicyHardening, /platform_public_posting_policy_updated_by_idx[\s\S]*platform_public_posting_exemptions_granted_by_idx[\s\S]*revoke all on function public\.can_profile_post_publicly\(uuid\)[\s\S]*authenticated/, 'production follow-up removes new advisor findings and direct helper execution'],
   [platformModeration, /platform\.moderation\.read[\s\S]*platform\.moderation\.manage/, 'moderation API uses dedicated platform capabilities'],
   [platformModeration, /set_public_posting_policy[\s\S]*add_public_posting_exemption[\s\S]*remove_public_posting_exemption/, 'moderation API manages global mode and approved accounts'],
   [platformModeration, /moderation\.public_posting_policy_changed[\s\S]*moderation\.public_posting_exemption_added[\s\S]*moderation\.public_posting_exemption_removed/, 'posting policy and exemption changes are audited'],
