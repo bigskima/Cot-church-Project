@@ -97,7 +97,7 @@ Deno.serve(createHandler(
       const sizeBytes = positiveSize(body.sizeBytes);
       const branchId = body.branchId ? uuid(String(body.branchId), "branchId", true)! : null;
       if (!branchId) {
-        const { data: publicPostingAllowed, error: publicPostingError } = await auth.client.rpc("can_profile_post_publicly", {
+        const { data: publicPostingAllowed, error: publicPostingError } = await admin.rpc("can_profile_post_publicly", {
           target_profile_id: auth.user.id,
         });
         if (publicPostingError || publicPostingAllowed !== true) {
@@ -174,7 +174,7 @@ Deno.serve(createHandler(
         .maybeSingle();
       if (lookupError || !upload) throw new ApiError("UPLOAD_NOT_FOUND", "Media upload not found", 404);
       if (!upload.branch_id) {
-        const { data: publicPostingAllowed, error: publicPostingError } = await auth.client.rpc("can_profile_post_publicly", {
+        const { data: publicPostingAllowed, error: publicPostingError } = await admin.rpc("can_profile_post_publicly", {
           target_profile_id: auth.user.id,
         });
         if (publicPostingError || publicPostingAllowed !== true) {
