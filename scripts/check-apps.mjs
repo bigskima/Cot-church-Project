@@ -292,6 +292,7 @@ const checks = [
   [/Only the ministry tools available to you in this Expression are shown here/, 'Expression tools use member-facing ministry language'],
   [/key: 'tools'[\s\S]*key: 'studio'[\s\S]*key: 'live'[\s\S]*key: 'sermons'[\s\S]*key: 'events'[\s\S]*key: 'access'[\s\S]*key: 'settings'/, 'Expression operations header connects layered management destinations'],
   [/EXPRESSION OPERATIONS/, 'Expression operations header communicates the private management boundary'],
+  [/visibleTabs = tabs\.filter[\s\S]*canUseContentStudio[\s\S]*canManageLive[\s\S]*canManageAccess[\s\S]*canManageSettings/, 'Expression operations tabs follow canonical scoped capabilities'],
   [/ExpressionManagementWorkspace[\s\S]*active="live"[\s\S]*ExpressionManagementWorkspace[\s\S]*active="sermons"[\s\S]*ExpressionManagementWorkspace[\s\S]*active="events"/, 'Expression operational routes share the management workspace frame'],
   [/ExpressionReelCreatorScreen[\s\S]*ExpressionManagementWorkspace[\s\S]*active="studio"[\s\S]*ExpressionWatchCreatorScreen[\s\S]*ExpressionManagementWorkspace[\s\S]*active="studio"/, 'Expression media creators stay inside Content Studio operations'],
   [/!expressionWorkspace \? \([\s\S]*ScreenHeader/, 'Reusable leadership screens suppress standalone headers inside Expression operations'],
