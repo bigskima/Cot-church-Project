@@ -308,6 +308,7 @@ export interface ResourceErrorProps {
   message?: string;
   retry?: () => void;
   offline?: boolean;
+  compact?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -315,6 +316,7 @@ export function ResourceError({
   message,
   retry,
   offline = false,
+  compact = false,
   style,
 }: ResourceErrorProps) {
   const { colors } = useTheme();
@@ -323,24 +325,25 @@ export function ResourceError({
     <View
       style={[
         styles.errorContainer,
+        compact && styles.errorCompact,
         {
-          backgroundColor: colors.card,
-          borderColor: colors.border,
+          backgroundColor: compact ? colors.bgSecondary : colors.card,
+          borderColor: compact ? colors.borderSubtle : colors.border,
         },
         style,
       ]}
     >
-      <View style={[styles.iconCircle, { backgroundColor: colors.bgSecondary }]}>
+      <View style={[styles.iconCircle, compact && styles.iconCircleCompact, { backgroundColor: compact ? colors.cardElevated : colors.bgSecondary }]}>
         <Icon
           name={offline ? 'cloud-offline-outline' : 'alert-circle-outline'}
-          size={28}
+          size={compact ? 20 : 28}
           color={offline ? colors.textMuted : colors.live}
         />
       </View>
-      <Text style={[styles.errorTitle, { color: colors.text }]}>
+      <Text style={[styles.errorTitle, compact && styles.errorTitleCompact, { color: colors.text }]}>
         {offline ? 'You are currently offline' : 'Unable to load content'}
       </Text>
-      <Text style={[styles.errorMessage, { color: colors.textSecondary }]}>
+      <Text style={[styles.errorMessage, compact && styles.errorMessageCompact, { color: colors.textSecondary }]}>
         {toUserFacingErrorMessage(message, offline ? 'Check your internet connection and try again.' : 'Please try again in a moment.')}
       </Text>
       {retry ? (
@@ -349,7 +352,7 @@ export function ResourceError({
           onPress={retry}
           variant="primary"
           size="sm"
-          style={{ marginTop: spacing.md }}
+          style={{ marginTop: compact ? spacing.sm : spacing.md }}
           icon={<Icon name="refresh" size={14} color={colors.textInverse} />}
         />
       ) : null}
@@ -426,6 +429,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginVertical: spacing.md,
   },
+  errorCompact: {
+    minHeight: 0,
+    padding: spacing.md,
+    borderRadius: radius.xl,
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginVertical: spacing.xs,
+  },
   iconCircle: {
     width: 56,
     height: 56,
@@ -433,6 +446,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
+  },
+  iconCircleCompact: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginBottom: 0,
+    flexShrink: 0,
   },
   emptyTitle: {
     ...typography.h3,
@@ -449,12 +469,23 @@ const styles = StyleSheet.create({
     ...typography.h3,
     textAlign: 'center',
   },
+  errorTitleCompact: {
+    display: 'none',
+  },
   errorMessage: {
     ...typography.bodySmall,
     textAlign: 'center',
     marginTop: 4,
     lineHeight: 18,
     maxWidth: 300,
+  },
+  errorMessageCompact: {
+    flex: 1,
+    textAlign: 'left',
+    marginTop: 0,
+    maxWidth: undefined,
+    lineHeight: 17,
+    fontWeight: '600',
   },
   loadingContainer: {
     padding: spacing.xxl,
