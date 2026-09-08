@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
   featuredCard: { borderWidth: 1.5, borderRadius: radius.xl, padding: spacing.lg, gap: spacing.md },
   featuredTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   smallIcon: { width: 36, height: 36, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  cardTitle: { fontSize: 15, lineHeight: 20, fontWeight: '850' },
+  cardTitle: { fontSize: 15, lineHeight: 20, fontWeight: '800' },
   meta: { fontSize: 10, lineHeight: 14, marginTop: 2 },
   newPill: { borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 5 },
   newPillText: { fontSize: 8, lineHeight: 10, fontWeight: '900', letterSpacing: 0.7 },
