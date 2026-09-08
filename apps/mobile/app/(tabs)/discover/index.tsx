@@ -88,9 +88,10 @@ export default function DiscoverScreen() {
     return e.title.toLowerCase().includes(q) || e.location?.name?.toLowerCase().includes(q);
   }) ?? [];
 
-  const visibleSermons = activeFilter === 'all' ? filteredSermons.slice(0, 3) : filteredSermons;
-  const visibleSeries = activeFilter === 'all' ? filteredSeries.slice(0, 3) : filteredSeries;
-  const visibleEvents = activeFilter === 'all' ? filteredEvents.slice(0, 3) : filteredEvents;
+  const compactAll = activeFilter === 'all' && !query.trim();
+  const visibleSermons = compactAll ? filteredSermons.slice(0, 3) : filteredSermons;
+  const visibleSeries = compactAll ? filteredSeries.slice(0, 3) : filteredSeries;
+  const visibleEvents = compactAll ? filteredEvents.slice(0, 3) : filteredEvents;
 
   const currentChurchName = selectedChurch?.name ?? contextualOrganization?.name;
   const initialLoading = sermons.loading && !sermons.data;
