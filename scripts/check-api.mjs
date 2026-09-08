@@ -100,6 +100,7 @@ const publicPostingPolicyMigration = await readFile('supabase/migrations/2026090
 const publicPostingPolicyHardening = await readFile('supabase/migrations/20260908191000_platform_public_posting_policy_hardening.sql', 'utf8');
 const platformExpressions = await readFile('supabase/functions/platform-expressions/index.ts', 'utf8');
 const destructiveModerationMigration = await readFile('supabase/migrations/20260908200800_platform_destructive_moderation.sql', 'utf8');
+const destructiveModerationAdvisorHardening = await readFile('supabase/migrations/20260908202000_platform_destructive_moderation_advisor_hardening.sql', 'utf8');
 const streamingBroadcasts = await readFile('supabase/functions/streaming-broadcasts/index.ts', 'utf8');
 const liveStreams = await readFile('supabase/functions/live-streams/index.ts', 'utf8');
 const onboarding = await readFile('supabase/functions/onboarding/index.ts', 'utf8');
@@ -275,6 +276,7 @@ const invariants = [
   [destructiveModerationMigration, /not exists\(select 1 from public\.reels[\s\S]*not exists\(select 1 from public\.videos[\s\S]*not exists\(select 1 from public\.sermons/, 'shared media assets are retained while still referenced'],
   [destructiveModerationMigration, /expression_invite_codes[\s\S]*status='revoked'[\s\S]*is_active=false[\s\S]*deleted_at=now\(\)/, 'Expression deletion revokes invites and tombstones member-facing access'],
   [destructiveModerationMigration, /preservedHistoricalData[\s\S]*true/, 'Expression deletion explicitly records historical-data preservation'],
+  [destructiveModerationAdvisorHardening, /platform_moderation_deletions_organization_idx[\s\S]*organization_id/, 'destructive moderation deletion evidence covers organization foreign-key lookups'],
   [destructiveModerationMigration, /content_type='post'[\s\S]*content_type='reel'[\s\S]*content_type='video'[\s\S]*content_type='sermon'[\s\S]*dedicated moderation workflow/, 'canonical deletion is limited to supported content types and excludes live streams'],
   [destructiveModerationMigration, /protect_content_moderation_report_evidence[\s\S]*platform_moderation_deletions[\s\S]*target_type='content'[\s\S]*target_type='comment'/, 'reported target references may null only when protected platform deletion evidence exists'],
   [destructiveModerationMigration, /cascadeFromContent[\s\S]*content_comments[\s\S]*cascadeFromComment/, 'cascaded comment removals preserve per-comment evidence before foreign-key cleanup'],
