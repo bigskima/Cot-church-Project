@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  FlatList,
-  Image,
-  Pressable,
+    Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -49,7 +47,7 @@ export default function ExpressionProfileScreen() {
   const { api, mode, context, enterExpression } = useSession();
   const { colors } = useTheme();
 
-  const [activeTab, setActiveTab] = useState<'sermons' | 'watch' | 'reels' | 'events' | 'leaders'>('sermons');
+  const [activeTab, setActiveTab] = useState<'overview' | 'sermons' | 'watch' | 'reels' | 'events' | 'leaders'>('overview');
   const [isFollowing, setIsFollowing] = useState(false);
   const [followingLoading, setFollowingLoading] = useState(false);
   const [followError, setFollowError] = useState('');
@@ -82,7 +80,7 @@ export default function ExpressionProfileScreen() {
 
   const handleToggleFollow = async () => {
     if (mode === 'visitor') {
-      router.push({ pathname: '/(auth)/login', params: { returnTo: `/expression/${id}` } } as any);
+      router.push({ pathname: '/(auth)/login', params: { returnTo: `/general/expression/${id}` } } as any);
       return;
     }
     setFollowingLoading(true);
@@ -105,7 +103,13 @@ export default function ExpressionProfileScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <ScreenHeader title="Expression" showBack style={{ backgroundColor: 'transparent' }} />
+      <ScreenHeader
+        title={expression?.name || 'Expression'}
+        subtitle="Public profile and public ministry content. Private community spaces stay separate."
+        kicker="GENERAL COT"
+        showBack
+        style={{ backgroundColor: 'transparent' }}
+      />
 
       {resource.loading ? (
         <ExpressionSkeleton />
@@ -162,7 +166,7 @@ export default function ExpressionProfileScreen() {
                 ) : (
                   <Button
                     label="Sign in to join"
-                    onPress={() => router.push({ pathname: '/(auth)/login', params: { returnTo: `/expression/${id}` } } as any)}
+                    onPress={() => router.push({ pathname: '/(auth)/login', params: { returnTo: `/general/expression/${id}` } } as any)}
                     variant="outline"
                     size="md"
                   />
@@ -172,9 +176,45 @@ export default function ExpressionProfileScreen() {
             </View>
           </View>
 
+          <View style={[styles.publicBoundary, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}>
+            <View style={[styles.publicBoundaryIcon, { backgroundColor: colors.card }]}>
+              <Icon name="globe-outline" size={20} color={colors.interactive} />
+            </View>
+            <View style={styles.publicBoundaryCopy}>
+              <Text style={[styles.publicBoundaryTitle, { color: colors.text }]}>Public Expression profile</Text>
+              <Text style={[styles.publicBoundaryText, { color: colors.textSecondary }]}>
+                Only content intentionally published to General COT appears here. Members, groups, internal announcements and management tools remain private.
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.statsRow}>
+            <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+              <Text style={[styles.statValue, { color: colors.text }]}>{sermons.length}</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>Sermons</Text>
+            </View>
+            <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+              <Text style={[styles.statValue, { color: colors.text }]}>{videos.length + reels.length}</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>Media</Text>
+            </View>
+            <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+              <Text style={[styles.statValue, { color: colors.text }]}>{events.length}</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>Events</Text>
+            </View>
+            <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+              <Text style={[styles.statValue, { color: colors.text }]}>{leaders.length}</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>Leaders</Text>
+            </View>
+          </View>
+
           {/* Navigation Filter Tabs */}
           <View style={[styles.tabsBar, { borderBottomColor: colors.borderSubtle }]}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsRow}>
+              <Chip
+                label="Overview"
+                selected={activeTab === 'overview'}
+                onPress={() => setActiveTab('overview')}
+              />
               <Chip
                 label="Sermons"
                 selected={activeTab === 'sermons'}
@@ -210,6 +250,36 @@ export default function ExpressionProfileScreen() {
 
           {/* Tab Content Display */}
           <View style={styles.tabContentArea}>
+            {activeTab === 'overview' ? (
+              <View style={styles.overviewStack}>
+                {events[0] ? (
+                  <View style={styles.overviewSection}>
+                    <Text style={[styles.overviewKicker, { color: colors.interactive }]}>NEXT GATHERING</Text>
+                    <EventCard event={events[0]} onPress={() => router.push(`/general/event/${events[0].id}` as any)} />
+                  </View>
+                ) : null}
+                {sermons[0] ? (
+                  <View style={styles.overviewSection}>
+                    <Text style={[styles.overviewKicker, { color: colors.interactive }]}>LATEST MESSAGE</Text>
+                    <SermonCard sermon={sermons[0]} onPress={() => router.push(`/general/sermon/${sermons[0].id}` as any)} />
+                  </View>
+                ) : null}
+                {videos[0] ? (
+                  <View style={styles.overviewSection}>
+                    <Text style={[styles.overviewKicker, { color: colors.interactive }]}>LATEST VIDEO</Text>
+                    <VideoCard video={videos[0]} onPress={() => router.push(`/general/watch/${videos[0].id}` as any)} />
+                  </View>
+                ) : null}
+                {!events.length && !sermons.length && !videos.length && !reels.length && !leaders.length ? (
+                  <EmptyState
+                    title="Public profile is ready"
+                    message="Public sermons, media, events and featured leaders from this Expression will appear here."
+                    iconName="globe-outline"
+                  />
+                ) : null}
+              </View>
+            ) : null}
+
             {activeTab === 'sermons' && (
               sermons.length > 0 ? (
                 <View style={styles.cardStack}>
@@ -351,6 +421,15 @@ const styles = StyleSheet.create({
   locationText: {
     fontSize: 13,
   },
+  publicBoundary: { marginHorizontal: spacing.md, marginTop: spacing.sm, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  publicBoundaryIcon: { width: 42, height: 42, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
+  publicBoundaryCopy: { flex: 1, gap: 2 },
+  publicBoundaryTitle: { fontSize: 13.5, lineHeight: 18, fontWeight: '800' },
+  publicBoundaryText: { fontSize: 11.5, lineHeight: 17 },
+  statsRow: { flexDirection: 'row', gap: spacing.xs, marginHorizontal: spacing.md, marginTop: spacing.sm },
+  statCard: { flex: 1, minHeight: 58, borderWidth: 1, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
+  statValue: { fontSize: 17, lineHeight: 21, fontWeight: '900' },
+  statLabel: { fontSize: 9.5, lineHeight: 13, fontWeight: '700', marginTop: 1 },
   actionRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -375,6 +454,9 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     paddingBottom: spacing.lg,
   },
+  overviewStack: { gap: spacing.lg },
+  overviewSection: { gap: spacing.sm },
+  overviewKicker: { fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 0.8 },
   cardStack: {
     gap: spacing.md,
   },
