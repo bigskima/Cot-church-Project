@@ -184,7 +184,7 @@ export default function ExpressionMembersScreen() {
           <View style={styles.privacyCopy}>
             <Text style={[styles.privacyTitle, { color: colors.text }]}>Member-safe directory</Text>
             <Text style={[styles.privacyText, { color: colors.textSecondary }]}>
-              Only profile information intended for other members is shown here. Private contact details and administration data stay protected.
+              This directory shows only member-facing profile information. Private contact details and administration data stay protected.
             </Text>
           </View>
         </View>
