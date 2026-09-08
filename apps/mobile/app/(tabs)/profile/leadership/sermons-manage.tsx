@@ -196,13 +196,15 @@ export default function SermonsManageScreen() {
           { paddingTop: expressionWorkspace ? spacing.md : insets.top + spacing.sm, paddingBottom: expressionWorkspace ? insets.bottom + spacing.xl : insets.bottom + 120 },
         ]}
       >
-        <ScreenHeader
-          title="Sermons"
-          kicker="LEADERSHIP"
-          subtitle={expression?.name ? `Sermon library for ${expression.name}.` : 'Church sermon library and publishing.'}
-          showBack
-          rightAction={canCreate ? <Button label="New sermon" onPress={openCreate} size="sm" /> : undefined}
-        />
+        {!expressionWorkspace ? (
+          <ScreenHeader
+            title="Sermons"
+            kicker="LEADERSHIP"
+            subtitle={expression?.name ? `Sermon library for ${expression.name}.` : 'Church sermon library and publishing.'}
+            showBack
+            rightAction={canCreate ? <Button label="New sermon" onPress={openCreate} size="sm" /> : undefined}
+          />
+        ) : null}
 
         <View style={styles.body}>
           {successMsg ? (
