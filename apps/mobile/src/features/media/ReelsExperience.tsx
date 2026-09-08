@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
-import { BottomSheet, Button, Icon, ReelPlayer, ResourceError, Skeleton } from '@/components';
+import { BottomSheet, Button, ContentReportSheet, Icon, ReelPlayer, ResourceError, Skeleton } from '@/components';
 import type { Reel } from '@/types/content';
 
 const { height: windowHeight } = Dimensions.get('window');
@@ -33,6 +33,7 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
   const [activeIndex, setActiveIndex] = useState(0);
   const [actionError, setActionError] = useState('');
   const [shareTarget, setShareTarget] = useState<ReelWithViewerState | null>(null);
+  const [reportTarget, setReportTarget] = useState<ReelWithViewerState | null>(null);
   const [shareBusy, setShareBusy] = useState(false);
   const listRef = useRef<FlatList<ReelWithViewerState>>(null);
   const appliedDeepLinkRef = useRef<string | null>(null);
@@ -179,6 +180,19 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
     setShareTarget(reel);
   };
 
+  const handleReportReel = (reel: ReelWithViewerState) => {
+    if (mode === 'visitor') {
+      router.push({ pathname: '/(auth)/login', params: { returnTo } } as any);
+      return;
+    }
+    if (!reel.content_items?.id) {
+      setActionError('This Reel is not ready to report yet.');
+      return;
+    }
+    setActionError('');
+    setReportTarget(reel);
+  };
+
   const shareReelToGeneral = async () => {
     if (!shareTarget || !canShareToGeneral) return;
     const isPublic = shareTarget.content_items?.visibility === 'public';
@@ -323,6 +337,7 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
               onSave={(currentlySaved) => handleSaveReel(item, currentlySaved)}
               onOpenComments={() => handleOpenComments(item)}
               onShare={() => handleShareReel(item)}
+              onReport={() => handleReportReel(item)}
             />
           )}
         />
@@ -364,6 +379,15 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
           )}
         </View>
       </BottomSheet>
+
+      <ContentReportSheet
+        target={reportTarget?.content_items?.id ? {
+          contentId: reportTarget.content_items.id,
+          context: expressionId ? 'current' : 'public',
+          label: reportTarget.caption ? `Report Reel: ${reportTarget.caption}` : 'Report this Reel',
+        } : null}
+        onClose={() => setReportTarget(null)}
+      />
 
     </View>
   );
