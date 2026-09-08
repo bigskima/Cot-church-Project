@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { ApiError } from "../_shared/errors.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { adminClient } from "../_shared/supabase.ts";
+import { resolveActiveOrganizationId } from "../_shared/public-organization.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString, uuid } from "../_shared/validation.ts";
 
@@ -57,22 +58,11 @@ Deno.serve(createHandler(
 
     if (request.method === "POST") {
       const body = assertObject(await jsonBody(request));
-      const targetOrganizationId = body.organizationId
+      const requestedOrganizationId = body.organizationId
         ? uuid(String(body.organizationId), "organizationId", true)!
         : auth.organizationId;
-      if (!targetOrganizationId) {
-        throw new ApiError("ORGANIZATION_REQUIRED", "Choose a church community before publishing", 422);
-      }
       const admin = adminClient();
-      const { data: organization, error: organizationError } = await admin
-        .from("organizations")
-        .select("id,status")
-        .eq("id", targetOrganizationId)
-        .eq("status", "active")
-        .maybeSingle();
-      if (organizationError || !organization) {
-        throw new ApiError("ORGANIZATION_NOT_FOUND", "This church community is not available", 404);
-      }
+      const targetOrganizationId = await resolveActiveOrganizationId(admin, requestedOrganizationId);
 
       const ensurePublicPublishing = async () => {
         const { data: postingAllowed, error: postingError } = await auth.client.rpc("can_profile_post", {
