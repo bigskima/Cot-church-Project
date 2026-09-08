@@ -56,7 +56,7 @@ export function ExpressionManagementHub() {
       {
         key: 'live',
         title: 'Live Studio',
-        description: 'Create and operate Expression broadcasts and inspect stream health.',
+        description: 'Create and manage live broadcasts for this Expression.',
         iconName: 'radio-outline',
         badge: 'LIVE',
         route: `${base}/live`,
@@ -85,8 +85,8 @@ export function ExpressionManagementHub() {
       },
       {
         key: 'access',
-        title: 'Roles & Ownership',
-        description: 'Invite people into scoped roles and manage accountable Expression ownership.',
+        title: 'Team Access & Ownership',
+        description: 'Invite ministry leaders, manage team access and hand over Expression responsibility when needed.',
         iconName: 'shield-checkmark-outline',
         badge: 'ACCESS',
         route: `${base}/access`,
@@ -106,8 +106,8 @@ export function ExpressionManagementHub() {
     const finance: Tool[] = [
       {
         key: 'giving',
-        title: 'Giving Configuration',
-        description: 'Manage giving destinations, campaigns and transfer configuration in this Expression.',
+        title: 'Giving Setup',
+        description: 'Manage giving options, campaigns and bank details for this Expression.',
         iconName: 'gift-outline',
         badge: 'GIVING',
         route: `${base}/giving`,
@@ -115,7 +115,7 @@ export function ExpressionManagementHub() {
       },
       {
         key: 'finance',
-        title: 'Giving Finance',
+        title: 'Giving Reports',
         description: 'Review Expression giving totals, refunds and net amounts by currency.',
         iconName: 'analytics-outline',
         badge: 'FINANCE',
@@ -156,10 +156,10 @@ export function ExpressionManagementHub() {
           <Icon name="settings-outline" size={24} color={colors.interactive} />
         </View>
         <View style={styles.heroCopy}>
-          <Text style={[styles.eyebrow, { color: colors.interactive }]}>EXPRESSION MANAGEMENT</Text>
+          <Text style={[styles.eyebrow, { color: colors.interactive }]}>EXPRESSION TOOLS</Text>
           <Text style={[styles.title, { color: colors.text }]}>Operate {expression?.name ?? 'this Expression'}</Text>
           <Text style={[styles.copy, { color: colors.textSecondary }]}>
-            Only tools granted by your role in this exact Expression are shown here.
+            Only the ministry tools available to you in this Expression are shown here.
           </Text>
         </View>
       </View>
@@ -188,8 +188,8 @@ export function ExpressionManagementHub() {
         ))
       ) : (
         <EmptyState
-          title="No management tools assigned"
-          message="You can still use this Expression normally. Management tools appear only when a scoped role grants them."
+          title="No ministry tools available"
+          message="You can still enjoy everything available to members here. Ministry tools will appear if you’re added to an Expression team."
           iconName="lock-closed-outline"
         />
       )}
@@ -197,7 +197,7 @@ export function ExpressionManagementHub() {
       <View style={[styles.boundary, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
         <Icon name="shield-checkmark-outline" size={18} color={colors.interactive} />
         <Text style={[styles.boundaryText, { color: colors.textSecondary }]}>
-          These controls are scoped to the Expression in the URL and active session. Church-wide administration remains separate.
+          These tools affect only this Expression. Church-wide ministry tools remain separate.
         </Text>
       </View>
     </ScrollView>

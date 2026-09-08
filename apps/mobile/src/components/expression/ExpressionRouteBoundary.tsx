@@ -4,6 +4,7 @@ import { Redirect, router } from 'expo-router';
 import { Button, Icon } from '@/components';
 import { radius, spacing, typography } from '@/design-system/tokens';
 import { useSession } from '@/state/session';
+import { toUserFacingErrorMessage } from '@/api';
 import { useTheme } from '@/state/theme';
 
 type Props = PropsWithChildren<{
@@ -17,6 +18,8 @@ export function ExpressionRouteBoundary({ expressionId, children }: Props) {
     accessReady,
     context,
     enterExpression,
+    leaveExpression,
+    refreshContext,
   } = useSession();
   const [syncError, setSyncError] = useState('');
   const [syncing, setSyncing] = useState(false);
@@ -27,6 +30,21 @@ export function ExpressionRouteBoundary({ expressionId, children }: Props) {
   );
 
   const activeExpressionId = context?.expression?.id;
+
+  useEffect(() => {
+    refreshContext();
+  }, [expressionId, refreshContext]);
+
+  useEffect(() => {
+    if (
+      mode === 'authenticated' &&
+      accessReady &&
+      activeExpressionId === expressionId &&
+      !membership
+    ) {
+      void leaveExpression().catch(() => {});
+    }
+  }, [accessReady, activeExpressionId, expressionId, leaveExpression, membership, mode]);
 
   useEffect(() => {
     if (
@@ -47,7 +65,7 @@ export function ExpressionRouteBoundary({ expressionId, children }: Props) {
     enterExpression(membership.organizationId, membership.id)
       .catch((value) => {
         if (!cancelled) {
-          setSyncError(value instanceof Error ? value.message : 'Unable to enter this Expression.');
+          setSyncError(toUserFacingErrorMessage(value, 'We couldn’t open this Expression. Please try again.'));
         }
       })
       .finally(() => {
@@ -104,7 +122,7 @@ export function ExpressionRouteBoundary({ expressionId, children }: Props) {
           <ActivityIndicator size="large" color={colors.interactive} />
           <Text style={[styles.stateTitle, { color: colors.text }]}>Entering your Expression</Text>
           <Text style={[styles.stateCopy, { color: colors.textSecondary }]}>
-            COT is loading the exact membership, roles and private space for this Expression.
+            Getting your private community ready.
           </Text>
         </View>
       </View>
@@ -118,9 +136,9 @@ export function ExpressionRouteBoundary({ expressionId, children }: Props) {
           <View style={[styles.stateIcon, { backgroundColor: colors.primarySoft }]}>
             <Icon name="lock-closed-outline" size={24} color={colors.interactive} />
           </View>
-          <Text style={[styles.stateTitle, { color: colors.text }]}>This Expression is not in your memberships</Text>
+          <Text style={[styles.stateTitle, { color: colors.text }]}>This Expression isn’t available to you</Text>
           <Text style={[styles.stateCopy, { color: colors.textSecondary }]}>
-            Private Expression routes are bound to the Expression ID in the URL. Join this Expression first, or choose one you already belong to.
+            Join this Expression first, or choose another Expression you’re already part of.
           </Text>
           <View style={styles.actions}>
             <Button label="My Expressions" onPress={() => router.replace('/expressions')} />

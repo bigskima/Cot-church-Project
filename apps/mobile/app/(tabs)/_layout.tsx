@@ -1,182 +1,110 @@
 import React from 'react';
-import { Redirect, Tabs } from 'expo-router';
-import { Platform, StyleSheet, View, type ColorValue } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme } from '@/state/theme';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { Redirect, usePathname } from 'expo-router';
 import { useSession } from '@/state/session';
-import { Icon } from '@/components/primitives/Icon';
-import { radius, shadows } from '@/design-system/tokens';
+import { useTheme } from '@/state/theme';
 
-const TAB_ICON_SIZE = 23;
+function generalTarget(pathname: string) {
+  if (pathname === '/' || pathname === '/home') return '/general';
+  if (pathname === '/discover') return '/general/explore';
+  if (pathname === '/discover/church-story') return '/general/church-story';
+  if (pathname.startsWith('/discover/sermon/')) return pathname.replace('/discover/sermon/', '/general/sermon/');
+  if (pathname === '/reels') return '/general/reels';
+  if (pathname === '/community') return '/general/community';
+  if (pathname === '/live') return '/general/live';
+  if (pathname.startsWith('/live/')) return `/general${pathname}`;
+  if (pathname === '/watch') return '/general/watch';
+  if (pathname.startsWith('/watch/')) return `/general${pathname}`;
+  if (pathname === '/profile') return '/general/profile';
+  if (pathname === '/profile/settings') return '/general/settings';
+  if (pathname === '/profile/notifications') return '/general/notifications';
+  if (pathname === '/profile/notification-settings') return '/general/notification-settings';
+  if (pathname === '/profile/saved') return '/general/saved';
+  if (pathname === '/profile/prayer') return '/general/prayer';
+  if (pathname === '/profile/giving') return '/general/giving';
+  if (pathname === '/profile/leadership') return '/general/leadership';
 
-export default function TabLayout() {
-  const { colors } = useTheme();
-  const { mode, accessReady, context } = useSession();
-  const insets = useSafeAreaInsets();
-  const bottomInset = Math.max(insets.bottom, Platform.OS === 'web' ? 10 : 8);
-  const barHeight = 66 + bottomInset;
-
-  const screenOptions = {
-    headerShown: false,
-    lazy: true,
-    tabBarActiveTintColor: colors.interactive,
-    tabBarInactiveTintColor: colors.textMuted,
-    tabBarLabelStyle: styles.label,
-    tabBarHideOnKeyboard: true,
-    tabBarStyle: [
-      styles.tabBar,
-      {
-        backgroundColor: colors.glass,
-        borderColor: colors.borderSubtle,
-        height: barHeight,
-        paddingBottom: bottomInset,
-      },
-    ] as any,
-    tabBarItemStyle: styles.item,
-    tabBarIconStyle: styles.icon,
-    sceneStyle: { backgroundColor: colors.bg } as any,
-  };
-
-  if (mode === 'authenticated' && accessReady && context?.expression?.id) {
-    return <Redirect href={`/expressions/${context.expression.id}` as any} />;
+  const leadership = pathname.match(/^\/profile\/leadership\/(.+)$/)?.[1];
+  if (leadership) {
+    const map: Record<string, string> = {
+      'media-studio': 'media-studio',
+      'pastoral-triage': 'pastoral-triage',
+      'church-leadership': 'church-leadership',
+      'giving-manage': 'giving-manage',
+      'giving-finance': 'giving-finance',
+      'sermons-manage': 'sermons-manage',
+      'events-manage': 'events-manage',
+      'expressions-manage': 'expressions-manage',
+    };
+    const destination = map[leadership];
+    if (destination) return `/general/leadership/${destination}`;
+    return '/general/leadership';
   }
 
-  const renderIcon = (filled: string, outline: string) =>
-    ({ color, focused }: { color: ColorValue; focused: boolean }) => (
-      <View
-        style={[
-          styles.iconShell,
-          {
-            backgroundColor: focused ? colors.primarySoft : 'transparent',
-            borderColor: focused ? colors.primarySoftStrong : 'transparent',
-          },
-        ]}
-      >
-        <Icon name={focused ? filled : outline} size={TAB_ICON_SIZE} color={color as string} />
+  return '/general';
+}
+
+function expressionCompatibilityTarget(pathname: string, expressionId: string) {
+  if (pathname === '/community/groups') return `/expressions/${expressionId}/groups`;
+  if (pathname === '/community/birthdays') return `/expressions/${expressionId}/birthdays`;
+  if (pathname === '/community/leadership') return `/expressions/${expressionId}/leadership`;
+
+  if (pathname.startsWith('/profile/leadership/')) {
+    const tool = pathname.split('/').pop() ?? '';
+    const map: Record<string, string> = {
+      'media-studio': 'live',
+      'sermons-manage': 'sermons',
+      'events-manage': 'events',
+      'expression-leadership': 'leadership',
+      'expression-governance': 'access',
+      'giving-manage': 'giving',
+      'giving-finance': 'finance',
+    };
+    const destination = map[tool];
+    if (destination) return `/expressions/${expressionId}/manage/${destination}`;
+    return `/expressions/${expressionId}/manage`;
+  }
+
+  return null;
+}
+
+/**
+ * Phase 7 compatibility boundary.
+ *
+ * The old tab tree no longer owns product navigation. Existing browser history,
+ * bookmarks and older app links are forwarded into the canonical General COT or
+ * exact Expression workspace so there is only one navigation model to maintain.
+ */
+export default function LegacyTabRedirect() {
+  const pathname = usePathname();
+  const { colors } = useTheme();
+  const { mode, accessReady, context } = useSession();
+
+  if (mode === 'restoring' || (mode === 'authenticated' && !accessReady)) {
+    return (
+      <View style={[styles.loading, { backgroundColor: colors.bg }]}>
+        <ActivityIndicator size="large" color={colors.interactive} />
       </View>
     );
+  }
 
-  return (
-    <Tabs screenOptions={screenOptions} backBehavior="history">
-      <Tabs.Screen
-        name="home"
-        options={{
-          title: 'Home',
-          tabBarAccessibilityLabel: 'Home',
-          tabBarIcon: renderIcon('home', 'home-outline'),
-        }}
-      />
-      <Tabs.Screen
-        name="discover"
-        options={{
-          title: 'Explore',
-          tabBarAccessibilityLabel: 'Explore',
-          tabBarIcon: renderIcon('compass', 'compass-outline'),
-        }}
-      />
-      <Tabs.Screen
-        name="reels"
-        options={{
-          title: 'Reels',
-          tabBarAccessibilityLabel: 'Reels',
-          tabBarIcon: ({ color, focused }) => (
-            <View
-              style={[
-                styles.reelsHalo,
-                {
-                  backgroundColor: colors.bg,
-                  borderColor: focused ? colors.primarySoftStrong : colors.borderSubtle,
-                },
-              ]}
-            >
-              <View
-                style={[
-                  styles.reelsButton,
-                  {
-                    backgroundColor: focused ? colors.interactive : colors.cardElevated,
-                    borderColor: focused ? colors.interactive : colors.border,
-                  },
-                ]}
-              >
-                <Icon name={focused ? 'play' : 'play-outline'} size={22} color={focused ? '#FFFFFF' : (color as string)} />
-              </View>
-            </View>
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="community"
-        options={{
-          title: 'Community',
-          tabBarAccessibilityLabel: 'Community',
-          tabBarIcon: renderIcon('people', 'people-outline'),
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'You',
-          tabBarAccessibilityLabel: 'Your profile',
-          tabBarIcon: renderIcon('person', 'person-outline'),
-        }}
-      />
-      <Tabs.Screen name="live" options={{ href: null }} />
-      <Tabs.Screen name="watch" options={{ href: null }} />
-    </Tabs>
-  );
+  const expressionId = context?.expression?.id;
+  if (expressionId) {
+    const exactExpressionTarget = expressionCompatibilityTarget(pathname, expressionId);
+    if (exactExpressionTarget) return <Redirect href={exactExpressionTarget as any} />;
+  }
+
+  if (pathname === '/community/groups' || pathname === '/community/birthdays' || pathname === '/community/leadership') {
+    return <Redirect href="/expressions" />;
+  }
+
+  return <Redirect href={generalTarget(pathname) as any} />;
 }
 
 const styles = StyleSheet.create({
-  label: {
-    fontWeight: '700',
-    fontSize: 9.5,
-    marginTop: 2,
-    lineHeight: 12,
-    letterSpacing: -0.1,
-  },
-  item: {
-    minHeight: 56,
-    paddingTop: 5,
-  },
-  icon: { marginTop: 0 },
-  iconShell: {
-    minWidth: 42,
-    height: 32,
-    borderRadius: radius.pill,
-    borderWidth: 1,
+  loading: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 9,
-  },
-  reelsHalo: {
-    width: 56,
-    height: 56,
-    borderRadius: 21,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: -15,
-    ...shadows.floating,
-  },
-  reelsButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 17,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabBar: {
-    position: 'absolute',
-    left: 12,
-    right: 12,
-    bottom: 9,
-    maxWidth: 720,
-    alignSelf: 'center',
-    borderTopWidth: 0,
-    borderWidth: 1,
-    borderRadius: radius.xxl,
-    overflow: 'visible',
-    ...shadows.floating,
   },
 });

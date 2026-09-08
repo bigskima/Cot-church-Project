@@ -256,16 +256,41 @@ Legacy `/(tabs)/*`, root media/detail routes and older leadership paths remain c
 
 ### Phase 7 — cleanup and hardening
 
-- remove compatibility routes
-- update deep links
-- verify browser refresh behavior
-- verify multiple-Expression switching
-- verify join/leave lifecycle
-- verify expired/suspended membership handling
-- verify role changes while inside an Expression
-- verify private content never appears in General COT
-- verify mobile, tablet and web navigation history
-- verify old saved links fail closed or redirect safely
+Implemented the production cleanup and boundary hardening pass.
+
+#### Canonical navigation and compatibility cleanup
+
+- The legacy `/(tabs)` shell is now redirect-only. It no longer renders a second bottom-navigation product.
+- Old General URLs for Live, Watch, Reels, sermons, series, Giving, Prayer, Church Story, Settings, Assistant and legacy leadership entry points redirect to canonical `/general/*` routes.
+- Old private URLs that contain only `context=expression` but no Expression ID fail closed to `/expressions` instead of guessing from the selected session.
+- Expression events, posts, comments, Watch videos, sermons, Reels and saved private media now use exact `/expressions/[expressionId]/*` links.
+- Root creator URLs no longer choose General versus Expression publishing from session state. Canonical General and Expression studio routes determine the destination.
+
+#### Membership and access lifecycle hardening
+
+- Every private Expression route refreshes membership context on entry.
+- The route boundary accepts only an active membership whose ID exactly matches the route Expression ID.
+- If a previously active Expression disappears from the refreshed membership list, the selected private context is cleared before private children render.
+- Existing session foreground refresh and two-minute refresh continue to pick up membership and role changes without requiring sign-out.
+- Switching directly from one Expression URL to another re-resolves the exact active membership before scoped content renders.
+- General COT continues to clear private Expression context before rendering General content.
+
+#### Production-language cleanup
+
+Member-facing screens no longer explain implementation details such as permissions, capabilities, provider/configuration state, Platform Administration, routing IDs, internal scope names or backend setup.
+
+A shared error sanitizer now prevents technical server messages and symbolic error codes from being rendered through common resource error states. Key workflow errors use user-facing fallback messages.
+
+Examples of the new product language include:
+
+- “Getting your private community ready.”
+- “This Expression isn’t available to you.”
+- “This tool isn’t available for your account in this Expression.”
+- “Live broadcasting isn’t available for this account.”
+- “Only the ministry tools available to you appear here.”
+- “Giving Setup” and “Giving Reports” rather than configuration/finance implementation labels.
+
+CI now contains positive boundary checks plus forbidden-copy checks so old developer wording and generic private deep links cannot be reintroduced unnoticed.
 
 ## Non-negotiable security invariant
 

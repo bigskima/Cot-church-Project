@@ -500,7 +500,7 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
               <Text style={[styles.quickCreateText, { color: colors.textSecondary }]}>Photo / video</Text>
             </Pressable>
             {canCreateReel ? (
-              <Pressable onPress={() => router.push('/studio/reel' as any)} style={({ pressed }) => [styles.quickCreateButton, pressed && styles.composerPressed]}>
+              <Pressable onPress={() => router.push((scope === 'expression' && expression?.id ? `/expressions/${expression.id}/manage/reel` : '/general/studio/reel') as any)} style={({ pressed }) => [styles.quickCreateButton, pressed && styles.composerPressed]}>
                 <Icon name="flash-outline" size={15} color={colors.interactive} />
                 <Text style={[styles.quickCreateText, { color: colors.textSecondary }]}>Reel</Text>
               </Pressable>
@@ -526,8 +526,8 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
               expressionName={item.expression?.name}
               canEngage={canEngage}
               allowExternalShare={item.visibility === 'public'}
-              onPress={() => router.push(activeTab === 'general' ? { pathname: '/general/post/[id]', params: { id: item.id } } as any : { pathname: '/post/[id]', params: { id: item.id, scope: 'expression' } } as any)}
-              onReply={() => router.push(activeTab === 'general' ? { pathname: '/general/post/[id]', params: { id: item.id, focus: 'comments' } } as any : { pathname: '/post/[id]', params: { id: item.id, scope: 'expression', focus: 'comments' } } as any)}
+              onPress={() => router.push(activeTab === 'general' ? { pathname: '/general/post/[id]', params: { id: item.id } } as any : { pathname: `/expressions/${expression?.id}/post/[id]`, params: { id: item.id } } as any)}
+              onReply={() => router.push(activeTab === 'general' ? { pathname: '/general/post/[id]', params: { id: item.id, focus: 'comments' } } as any : { pathname: `/expressions/${expression?.id}/post/[id]`, params: { id: item.id, focus: 'comments' } } as any)}
               onReact={canEngage ? (reaction) => reactToPost(item.id, reaction, activeTab) : undefined}
               onBookmark={canEngage ? (currentlySaved) => bookmarkPost(item.id, currentlySaved, activeTab) : undefined}
             />
@@ -604,7 +604,11 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
                 onPress={() => {
                   const targetScope = postDestination === 'expression' ? 'branch' : 'public';
                   closeComposer();
-                  router.push({ pathname: '/studio/reel', params: { scope: targetScope } } as any);
+                  router.push(
+                    postDestination === 'expression' && expression?.id
+                      ? ({ pathname: `/expressions/${expression.id}/manage/reel`, params: { scope: targetScope } } as any)
+                      : ({ pathname: '/general/studio/reel', params: { scope: targetScope } } as any),
+                  );
                 }}
                 style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}
               >
@@ -615,8 +619,8 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
           </View>
           <Text style={[styles.mediaHelp, { color: colors.textMuted }]}>
             {ordinaryGeneralMemberLane
-              ? 'General member post · up to 2,200 characters · 4 attachments · 50 MB each · videos must be 3 minutes or shorter.'
-              : `Up to ${attachmentLimit} attachments · 50 MB each · validated media upload pipeline.`}
+              ? 'General post · up to 2,200 characters · 4 attachments · videos up to 3 minutes.'
+              : `Up to ${attachmentLimit} attachments · 50 MB each.`}
           </Text>
 
           {mediaUploading ? (

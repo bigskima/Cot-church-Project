@@ -77,7 +77,7 @@ export default function ExpressionEventsScreen() {
             <EventCard
               key={event.id}
               event={event}
-              onPress={() => router.push(`/event/${event.id}?context=expression` as any)}
+              onPress={() => router.push(`/expressions/${id}/event/${event.id}` as any)}
             />
           ))}
         </View>

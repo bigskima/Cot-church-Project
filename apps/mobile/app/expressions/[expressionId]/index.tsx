@@ -151,12 +151,12 @@ export default function ExpressionHomeScreen() {
                 canEngage={mode === 'authenticated'}
                 allowExternalShare={false}
                 onPress={() => router.push({
-                  pathname: '/post/[id]',
-                  params: { id: post.id, scope: 'expression' },
+                  pathname: `/expressions/${id}/post/[id]`,
+                  params: { id: post.id },
                 } as any)}
                 onReply={() => router.push({
-                  pathname: '/post/[id]',
-                  params: { id: post.id, scope: 'expression', focus: 'comments' },
+                  pathname: `/expressions/${id}/post/[id]`,
+                  params: { id: post.id, focus: 'comments' },
                 } as any)}
               />
             ))}
@@ -183,7 +183,7 @@ export default function ExpressionHomeScreen() {
               <EventCard
                 key={event.id}
                 event={event}
-                onPress={() => router.push(`/event/${event.id}?context=expression` as any)}
+                onPress={() => router.push(`/expressions/${id}/event/${event.id}` as any)}
               />
             ))}
           </View>
@@ -213,9 +213,9 @@ export default function ExpressionHomeScreen() {
       <View style={[styles.boundaryCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
         <Icon name="shield-checkmark-outline" size={20} color={colors.interactive} />
         <View style={styles.boundaryCopy}>
-          <Text style={[styles.boundaryTitle, { color: colors.text }]}>Expression boundary active</Text>
+          <Text style={[styles.boundaryTitle, { color: colors.text }]}>Private Expression</Text>
           <Text style={[styles.boundaryText, { color: colors.textSecondary }]}>
-            This workspace is tied to the Expression ID in the route and your active membership. Returning to General COT exits the private Expression context.
+            Content here is for members of this Expression. Return to General COT whenever you want to leave this private space.
           </Text>
         </View>
       </View>

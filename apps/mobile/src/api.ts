@@ -88,7 +88,7 @@ export class ApiError extends Error {
   }
 }
 
-const INTERNAL_COPY_PATTERN = /\b(api|webhook|runtime|secret|provider|adapter|configuration|configured|backend|platform authority|control plane|rls|jwt|supabase)\b/i;
+const INTERNAL_COPY_PATTERN = /\b(api|webhook|runtime|secret|provider|adapter|configuration|configured|backend|platform authority|control plane|rls|jwt|supabase|permission|permissions|capability|capabilities|scope|route|routing|organization id|branch id|expression id|membership id)\b/i;
 
 function userFacingApiMessage(code: string, status: number, serverMessage?: string) {
   const known: Record<string, string> = {
@@ -103,15 +103,15 @@ function userFacingApiMessage(code: string, status: number, serverMessage?: stri
     INVALID_ACCESS_TOKEN: 'Your session has expired. Please sign in again.',
     INVALID_REFRESH_SESSION: 'Your session has expired. Please sign in again.',
     REFRESH_TOKEN_MISSING: 'Your session has expired. Please sign in again.',
-    PERMISSION_DENIED: 'You don’t have access to this action.',
-    PLATFORM_PERMISSION_DENIED: 'You don’t have access to this action.',
+    PERMISSION_DENIED: 'This action isn’t available for your account.',
+    PLATFORM_PERMISSION_DENIED: 'This action isn’t available for your account.',
     EXPRESSION_REQUIRED: 'Enter an Expression to continue.',
     ORGANIZATION_ACCESS_DENIED: 'This church context is no longer available. You can continue in General Community or choose another church.',
     EXPRESSION_MEMBERSHIP_REQUIRED: 'Join this Expression before accessing its private space.',
     GENERAL_POSTING_MEMBERSHIP_REQUIRED: 'Join an active Expression before posting in General Community.',
     GENERAL_MEDIA_RESTRICTED: 'General Community member posts support text, photos and short videos only.',
     GENERAL_VIDEO_TOO_LONG: 'General Community videos must be 3 minutes or shorter.',
-    EXPRESSION_ACCESS_DENIED: 'You don’t have access to this Expression.',
+    EXPRESSION_ACCESS_DENIED: 'This Expression isn’t available for your account.',
     EXPRESSION_INVITE_INVALID: 'That invite code is invalid or no longer available.',
     EXPRESSION_INVITE_UNAVAILABLE: 'That invite code has expired or reached its usage limit.',
     REGISTRATION_ACCESS_DENIED: 'You are not eligible to register for this event.',
@@ -123,6 +123,10 @@ function userFacingApiMessage(code: string, status: number, serverMessage?: stri
     AI_ASSISTANT_NOT_READY: 'The church assistant is temporarily unavailable. Please try again later.',
     STREAMING_CONFIGURATION_MISSING: 'Live broadcasting is temporarily unavailable. Please try again later.',
     STREAM_PROVIDER_NOT_CONFIGURED: 'Live broadcasting is temporarily unavailable. Please try again later.',
+    STREAMING_NOT_CONFIGURED: 'Live broadcasting is temporarily unavailable. Please try again later.',
+    STREAMING_RUNTIME_SECRETS_MISSING: 'Live broadcasting is temporarily unavailable. Please try again later.',
+    STREAMING_PROVIDER_SCOPE_INVALID: 'Live broadcasting is temporarily unavailable. Please try again later.',
+    STREAMING_ADAPTER_UNAVAILABLE: 'Live broadcasting is temporarily unavailable. Please try again later.',
   };
 
   if (known[code]) return known[code];
@@ -132,10 +136,26 @@ function userFacingApiMessage(code: string, status: number, serverMessage?: stri
     : 'The requested item could not be found.';
   if (status === 403) return serverMessage && !INTERNAL_COPY_PATTERN.test(serverMessage)
     ? serverMessage
-    : 'You don’t have access to this action.';
+    : 'This action isn’t available for your account.';
   if (status === 401) return 'Please sign in again to continue.';
   if (serverMessage && !INTERNAL_COPY_PATTERN.test(serverMessage)) return serverMessage;
   return 'We couldn’t complete this request. Please try again.';
+}
+
+export function toUserFacingErrorMessage(
+  value: unknown,
+  fallback = 'We couldn’t complete this request. Please try again.',
+) {
+  const message =
+    typeof value === 'string'
+      ? value
+      : value instanceof Error
+        ? value.message
+        : '';
+
+  if (!message.trim()) return fallback;
+  if (INTERNAL_COPY_PATTERN.test(message) || /\b[A-Z][A-Z0-9_]{3,}\b/.test(message)) return fallback;
+  return message;
 }
 
 export class ApiClient {

@@ -12,6 +12,7 @@ import { useTheme } from '@/state/theme';
 import { radius, spacing, typography } from '@/design-system/tokens';
 import { Button } from './Button';
 import { Icon } from './primitives/Icon';
+import { toUserFacingErrorMessage } from '@/api';
 
 export interface SkeletonProps {
   height?: number | string;
@@ -340,7 +341,7 @@ export function ResourceError({
         {offline ? 'You are currently offline' : 'Unable to load content'}
       </Text>
       <Text style={[styles.errorMessage, { color: colors.textSecondary }]}>
-        {message || 'Please check your internet connection and try again.'}
+        {toUserFacingErrorMessage(message, offline ? 'Check your internet connection and try again.' : 'Please try again in a moment.')}
       </Text>
       {retry ? (
         <Button

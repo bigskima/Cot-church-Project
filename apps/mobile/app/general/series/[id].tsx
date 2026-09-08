@@ -1,1 +1,1 @@
-export { default } from '../../series/[id]';
+export { PublicSeriesScreen as default } from '../../series/[id]';

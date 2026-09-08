@@ -73,7 +73,7 @@ export function ExpressionContentStudio() {
       </View>
 
       <View style={styles.section}>
-        <SectionHeader title="Create & publish" badge={access.ready ? tools.length : undefined} subtitle="Tools shown from your Expression role" />
+        <SectionHeader title="Create & publish" badge={access.ready ? tools.length : undefined} subtitle="Create with the tools available to you here" />
         {access.ready && tools.length ? (
           tools.map((tool) => (
             <LeadershipModuleCard
@@ -87,8 +87,8 @@ export function ExpressionContentStudio() {
           ))
         ) : access.ready ? (
           <EmptyState
-            title="No publishing tools assigned"
-            message="Your current Expression role does not include publishing authority."
+            title="No publishing tools available"
+            message="You can still participate in this Expression. Publishing tools will appear if you’re added to its content team."
             iconName="lock-closed-outline"
           />
         ) : null}
@@ -97,7 +97,7 @@ export function ExpressionContentStudio() {
       <View style={[styles.note, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
         <Icon name="shield-checkmark-outline" size={18} color={colors.interactive} />
         <Text style={[styles.noteText, { color: colors.textSecondary }]}>
-          Expression Studio never upgrades an Expression permission into a church-wide or public publishing permission.
+          Content created here stays in this Expression. General COT publishing is handled separately.
         </Text>
       </View>
     </ScrollView>

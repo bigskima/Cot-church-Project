@@ -70,6 +70,9 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
   if (!generalWorkspace && expression?.id) {
     return <Redirect href={`/expressions/${expression.id}/manage/studio` as any} />;
   }
+  if (!generalWorkspace && !forcedScope) {
+    return <Redirect href="/general/studio" />;
+  }
 
   const handlePublishPost = async () => {
     if (!postBody.trim()) return;
@@ -94,7 +97,7 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
           : 'Your announcement is live in the General Community.',
       );
     } catch (err: unknown) {
-      setPublishError(err instanceof Error ? err.message : 'Unable to publish this announcement.');
+      setPublishError('We couldn’t publish this announcement. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -122,7 +125,7 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
     },
     {
       title: 'Sermons',
-      description: 'Create sermon drafts, manage teachings and publish when authorized.',
+      description: 'Create sermon drafts, manage teachings and publish when ready.',
       iconName: 'book-outline',
       badge: 'MEDIA',
       route: routeFor('/general/leadership/sermons-manage', '/leadership/sermons'),
@@ -130,7 +133,7 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
     },
     {
       title: 'Events',
-      description: 'Create and manage gatherings in your current church scope.',
+      description: 'Create and manage church gatherings and events.',
       iconName: 'calendar-outline',
       badge: 'EVENTS',
       route: routeFor('/general/leadership/events-manage', '/leadership/events'),
@@ -138,7 +141,7 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
     },
     {
       title: 'Live Media Studio',
-      description: 'Operate broadcasts and monitor streams when your role allows it.',
+      description: 'Create and manage live broadcasts available to you.',
       iconName: 'radio-outline',
       badge: 'BROADCAST',
       route: routeFor('/general/leadership/media-studio', '/leadership/media-studio'),
@@ -146,14 +149,14 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
     },
     {
       title: 'Pastoral Care',
-      description: 'Review confidential prayer requests and assigned follow-up.',
+      description: 'Review confidential prayer requests and care follow-ups.',
       iconName: 'heart-outline',
       badge: 'PASTORAL',
       route: routeFor('/general/leadership/pastoral-triage', '/leadership/pastoral-triage'),
       enabled: canAccessPastoral,
     },
     {
-      title: 'Giving Configuration',
+      title: 'Giving Setup',
       description: 'Manage giving destinations, purposes and transfer accounts.',
       iconName: 'gift-outline',
       badge: 'GIVING',
@@ -161,7 +164,7 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
       enabled: generalWorkspace ? hasOrganizationCapability('giving.campaigns.manage') : hasCapability('giving.campaigns.manage'),
     },
     {
-      title: 'Giving Finance',
+      title: 'Giving Reports',
       description: 'Review read-only giving totals and refunds by currency.',
       iconName: 'analytics-outline',
       badge: 'FINANCE',
@@ -170,7 +173,7 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
     },
     {
       title: 'Expressions',
-      description: 'Manage Expressions when your account has church-level authority.',
+      description: 'Create and manage Expressions available to your account.',
       iconName: 'people-outline',
       badge: 'COMMUNITY',
       route: routeFor('/general/leadership/expressions-manage', '/leadership/expressions'),
@@ -186,7 +189,7 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
     },
     {
       title: 'Expression Leadership',
-      description: 'Manage leaders and ministry roles in the active Expression.',
+      description: 'Manage leaders and ministry teams in this Expression.',
       iconName: 'people-circle-outline',
       badge: 'DIRECTORY',
       route: '/leadership/directory',
@@ -206,7 +209,7 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
         <ScreenHeader
           title="Ministry Studio"
           kicker="LEADERSHIP"
-          subtitle="Create, publish and manage only the ministry tools assigned to your role."
+          subtitle="Create, publish and manage your ministry content in one place."
           showBack
         />
 
@@ -240,7 +243,7 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
 
           {/* Operational Leadership Modules Grid */}
           <View style={styles.modulesSection}>
-            <SectionHeader title="Your tools" badge={leadershipModules.length} subtitle="Only operations assigned to your role are shown" />
+            <SectionHeader title="Your tools" badge={leadershipModules.length} subtitle="Only the tools available to you are shown" />
             {leadershipModules.map((module, idx) => (
               <LeadershipModuleCard
                 key={idx}

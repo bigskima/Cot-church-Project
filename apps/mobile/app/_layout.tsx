@@ -34,9 +34,9 @@ function AppContent() {
       <View style={[styles.accessBootstrap, { backgroundColor: colors.bg }]}>
         <View style={[styles.accessBootstrapCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
           <ActivityIndicator size="large" color={colors.interactive} />
-          <Text style={[styles.accessBootstrapTitle, { color: colors.text }]}>Loading your COT access</Text>
+          <Text style={[styles.accessBootstrapTitle, { color: colors.text }]}>Getting COT ready</Text>
           <Text style={[styles.accessBootstrapCopy, { color: colors.textSecondary }]}>
-            We’re resolving your church, Expression and role permissions before showing protected tools.
+            Loading your church, Expressions and personal tools.
           </Text>
         </View>
       </View>

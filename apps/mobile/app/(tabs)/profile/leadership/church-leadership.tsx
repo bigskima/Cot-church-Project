@@ -161,7 +161,7 @@ export default function ChurchLeadershipManageScreen() {
       <View style={[styles.screen, styles.center, { backgroundColor: colors.bg }]}>
         <EmptyState
           title="Church leadership access unavailable"
-          message="Your current role does not include church-wide leadership management."
+          message="Church leadership editing isn’t available for this account."
           iconName="lock-closed-outline"
         />
       </View>
@@ -222,7 +222,7 @@ export default function ChurchLeadershipManageScreen() {
                   <LeaderCard leader={leader} variant="standard" />
                   <View style={styles.badges}>
                     <Badge label={leader.is_active ? 'ACTIVE' : 'INACTIVE'} variant={leader.is_active ? 'active' : 'neutral'} />
-                    <Badge label={leader.is_featured_public ? 'PUBLIC' : 'INTERNAL'} variant={leader.is_featured_public ? 'primary' : 'neutral'} />
+                    <Badge label={leader.is_featured_public ? 'PUBLIC' : 'CHURCH ONLY'} variant={leader.is_featured_public ? 'primary' : 'neutral'} />
                     {leader.is_founder ? <Badge label="FOUNDER" variant="warning" /> : null}
                   </View>
                 </View>
@@ -231,7 +231,7 @@ export default function ChurchLeadershipManageScreen() {
             ))
           ) : (
             <EmptyState
-              title="No church leaders configured"
+              title="No church leaders listed yet"
               message="Add the church-wide leadership team and choose who should appear publicly."
               iconName="people-outline"
               actionLabel="Add leader"
@@ -279,7 +279,7 @@ export default function ChurchLeadershipManageScreen() {
           <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>PUBLIC PRESENTATION</Text>
           <View style={styles.chips}>
             <Chip label="Feature publicly" selected={featurePublicly} onPress={() => setFeaturePublicly(true)} />
-            <Chip label="Keep internal" selected={!featurePublicly} onPress={() => setFeaturePublicly(false)} />
+            <Chip label="Keep church-only" selected={!featurePublicly} onPress={() => setFeaturePublicly(false)} />
           </View>
 
           <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>FOUNDER</Text>

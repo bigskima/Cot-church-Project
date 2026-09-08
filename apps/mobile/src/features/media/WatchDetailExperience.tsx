@@ -11,6 +11,7 @@ import {
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
+import { toUserFacingErrorMessage } from '@/api';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import {
@@ -56,7 +57,7 @@ export function WatchDetailExperience({ videoId: id, scope = 'general' }: { vide
       );
       const videoExpressionId = scopedVideo.expression_id ?? scopedVideo.content_items?.expression_id ?? null;
       if (videoExpressionId !== context.expression.id) {
-        throw new Error('This video is not part of this Expression.');
+        throw new Error('This video isn’t available in this Expression.');
       }
       return scopedVideo;
     }
@@ -107,9 +108,9 @@ export function WatchDetailExperience({ videoId: id, scope = 'general' }: { vide
   const handleLike = async () => {
     if (mode === 'visitor') { router.push({
       pathname: '/(auth)/login',
-      params: { returnTo: expressionMode && context?.expression?.id ? `/expressions/${context.expression.id}/videos/${id}` : `/watch/${id}` },
+      params: { returnTo: expressionMode && context?.expression?.id ? `/expressions/${context.expression.id}/videos/${id}` : `/general/watch/${id}` },
     } as any); return; }
-    if (!contentId) { setActionError('This video is missing its engagement identity.'); return; }
+    if (!contentId) { setActionError('This video isn’t ready for interactions yet.'); return; }
     setActionError('');
     try {
       await api.request('engagement', {
@@ -124,16 +125,16 @@ export function WatchDetailExperience({ videoId: id, scope = 'general' }: { vide
       setIsLiked(!isLiked);
       engagement.refresh();
     } catch (value) {
-      setActionError(value instanceof Error ? value.message : 'Unable to update your reaction.');
+      setActionError(toUserFacingErrorMessage(value, 'We couldn’t update your reaction. Please try again.'));
     }
   };
 
   const handleSave = async () => {
     if (mode === 'visitor') { router.push({
       pathname: '/(auth)/login',
-      params: { returnTo: expressionMode && context?.expression?.id ? `/expressions/${context.expression.id}/videos/${id}` : `/watch/${id}` },
+      params: { returnTo: expressionMode && context?.expression?.id ? `/expressions/${context.expression.id}/videos/${id}` : `/general/watch/${id}` },
     } as any); return; }
-    if (!contentId) { setActionError('This video is missing its engagement identity.'); return; }
+    if (!contentId) { setActionError('This video isn’t ready for interactions yet.'); return; }
     setActionError('');
     try {
       const result = await api.request<{ bookmarked: boolean }>('engagement', {
@@ -147,7 +148,7 @@ export function WatchDetailExperience({ videoId: id, scope = 'general' }: { vide
       setIsSaved(result.bookmarked);
       engagement.refresh();
     } catch (value) {
-      setActionError(value instanceof Error ? value.message : 'Unable to update your saved videos.');
+      setActionError(toUserFacingErrorMessage(value, 'We couldn’t update your saved videos. Please try again.'));
     }
   };
 
@@ -286,10 +287,11 @@ export function WatchDetailExperience({ videoId: id, scope = 'general' }: { vide
                     setActionError('Comments are not available for this video yet.');
                     return;
                   }
-                  router.push({
-                    pathname: '/comments/[contentId]',
-                    params: { contentId, context: expressionMode ? 'expression' : 'public' },
-                  } as any);
+                  router.push(
+                    expressionMode && context?.expression?.id
+                      ? ({ pathname: `/expressions/${context.expression.id}/comments/[contentId]`, params: { contentId } } as any)
+                      : ({ pathname: '/general/comments/[contentId]', params: { contentId } } as any),
+                  );
                 }}
                 style={styles.actionBtn}
               >
@@ -316,7 +318,7 @@ export function WatchDetailExperience({ videoId: id, scope = 'general' }: { vide
                     <VideoCard
                       key={v.id}
                       video={v}
-                      onPress={() => router.push(`/watch/${v.id}${expressionMode ? '?context=expression' : ''}` as any)}
+                      onPress={() => router.push((expressionMode && context?.expression?.id ? `/expressions/${context.expression.id}/videos/${v.id}` : `/general/watch/${v.id}`) as any)}
                     />
                   ))}
                 </View>

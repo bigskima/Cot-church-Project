@@ -49,14 +49,14 @@
 | `/general/assistant` | General church-aware AI assistant. | `ai-gateway`. |
 | `/general/studio`, `/general/studio/reel`, `/general/studio/video` | Church-wide creator studio. Expression publishing is unavailable from these General routes. | `creator-studio`, `content-media`; organization/public capabilities. |
 | `/general/leadership/*` | Church-wide ministry operations: live, pastoral care, church leadership, giving, finance, sermons, events and Expression creation authority. | Existing production leadership screens/APIs, forced through organization/public scope by the General workspace. |
-| Legacy `/(tabs)/*`, root media/detail routes and `/leadership/*` | Compatibility paths retained until Phase 7. | Reuse the same implementations; canonical General navigation no longer points to them. |
+| Legacy `/(tabs)/*`, root media/detail routes and simple `/leadership/*` aliases | Redirect-only compatibility paths for old browser history, bookmarks and previous app links. Private legacy links without an exact Expression ID fail closed. | Forward to canonical `/general/*`, `/expressions/[expressionId]/*`, or `/expressions`; they no longer own a navigation shell. |
 | `/expressions/[expressionId]/manage` | Canonical permission-filtered Expression operations hub. | Shared Expression capability resolver + `expression-ownership`; links only to operations granted in the active Expression. |
 | `/expressions/[expressionId]/manage/studio`, `reel`, `video` | Expression-only content creation. Public publishing is disabled inside these workspace routes. | Existing community/creator studio and `content-media` / `creator-studio` contracts are reused with active Expression scope. |
 | `/expressions/[expressionId]/manage/sermons`, `live`, `events` | Expression sermon, livestream and event operations. | Existing `sermons`, `streaming-broadcasts` / `live-streams`, and `events` APIs remain server-authoritative and branch-scoped. |
 | `/expressions/[expressionId]/manage/leadership`, `invite-codes`, `access` | Expression leadership directory management, member access, scoped role invitations and ownership. | Existing `church-story`, invite-code APIs, `expression-role-invitations`, and `expression-ownership`. |
 | `/expressions/[expressionId]/manage/settings` | Day-to-day Expression identity settings (name, member-facing code, timezone). | `branches?id=...` PATCH guarded by `branches.update`; route identity remains the immutable Expression UUID. |
 | `/expressions/[expressionId]/manage/giving`, `finance` | Expression-only giving setup and scoped finance reporting. | Existing `giving` and `finance` APIs use the active branch context; church-wide scope is unavailable from the Expression workspace. |
-| `/(tabs)/profile/leadership` | Church-wide ministry console when no Expression is active; an active Expression redirects to its canonical `/expressions/[expressionId]/manage` workspace. | Session capability map; `expression-ownership`. |
+| `/general/leadership` | Canonical church-wide ministry console. | Organization/public capability map; Expression operations live under `/expressions/[expressionId]/manage`. |
 | `.../leadership/sermons-manage` | Creates/edits **sermons as text with optional audio**, requires a banner, uploads audio, publishes. | `sermons`; banner signed upload to `sermon-banners`; `content-media` audio to `content-media`; writes `sermons.thumbnail_url` and `audio_asset_id`. Result appears in Discover/Home/sermon detail according to status and visibility. |
 | `.../leadership/church-leadership` | Church leader CRUD and portrait upload. | `church-story`; signed upload to `leadership-portraits`; writes `leadership_profiles.portrait_url`. Featured active leaders appear in public Church Story. |
 | `.../leadership/expression-leadership` | Expression leader CRUD. | `church-story` → Expression-scoped `leadership_profiles`. |
@@ -66,7 +66,7 @@
 | `.../leadership/giving-manage`, `giving-finance` | Giving designation setup and scoped finance reporting. | `giving`, `finance` → funds/designations/donations/ledger views. |
 | `.../leadership/media-studio` | Start/manage live broadcasts. | `streaming-broadcasts`, `live-streams`. |
 | `.../leadership/pastoral-triage` | Wrapper for pastoral work queue. | Canonical `/leadership/pastoral-triage`: `prayer-requests`, `pastoral-followups`. |
-| `/leadership/*` legacy routes | Backward-compatible URLs for directory, events, expressions, giving, media, sermons and invitations. | Redirect to the corresponding `/(tabs)/profile/leadership/*` screen; no duplicate database logic. |
+| `/leadership/*` legacy routes | Compatibility entry points only. Simple aliases redirect to `/general/leadership/*`; Expression-only aliases fail closed or render only when imported below an exact Expression boundary. | No private data is authorized from a legacy route identity alone. |
 | `+not-found` | Invalid-route recovery. | Navigation only. |
 
 ## Core database and storage map

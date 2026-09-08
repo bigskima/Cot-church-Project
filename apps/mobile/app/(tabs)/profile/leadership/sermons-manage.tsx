@@ -131,7 +131,7 @@ export default function SermonsManageScreen() {
 
       const isEditing = Boolean(editingSermon);
       if ((status === 'published' || status === 'scheduled') && !canPublish) {
-        setErrorMsg('Publishing sermons requires publish permission.');
+        setErrorMsg('Publishing isn’t available for this account.');
         return;
       }
       let thumbnailUrl = editingSermon?.thumbnail_url ?? null;
@@ -218,13 +218,13 @@ export default function SermonsManageScreen() {
             </View>
             <View style={styles.flex}>
               <Text style={[styles.summaryValue, { color: colors.text }]}>{publishedCount}</Text>
-              <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Published in this scope</Text>
+              <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Published here</Text>
             </View>
 {canCreate ? <Button label="Create" onPress={openCreate} variant="secondary" size="sm" /> : null}
           </View>
 
           <View style={styles.listSection}>
-            <SectionHeader title="Sermon library" badge={list.length} subtitle={expression?.name ? 'Expression-scoped teachings' : 'Church-wide teachings'} />
+            <SectionHeader title="Sermon library" badge={list.length} subtitle={expression?.name ? 'Teachings in this Expression' : 'Church-wide teachings'} />
             {sermons.loading ? (
               <Skeleton height={100} count={3} />
             ) : sermons.error && !sermons.data ? (
@@ -254,7 +254,7 @@ export default function SermonsManageScreen() {
             ) : (
               <EmptyState
                 title="No sermons yet"
-                message={canCreate ? 'Create a sermon draft and attach or process its media through the ministry media workflow.' : 'Sermons in this management scope will appear here.'}
+                message={canCreate ? 'Create a sermon draft and add its banner, audio or video.' : 'Sermons created here will appear in this library.'}
                 iconName="book-outline"
                 actionLabel={canCreate ? 'Create sermon' : undefined}
                 onAction={canCreate ? openCreate : undefined}
@@ -312,7 +312,7 @@ export default function SermonsManageScreen() {
           {!canPublish ? (
             <View style={[styles.infoCard, { backgroundColor: colors.primarySoft }]}>
               <Icon name="lock-closed-outline" size={16} color={colors.interactive} />
-              <Text style={[styles.infoText, { color: colors.textSecondary }]}>Publishing remains limited to members with sermon publish permission.</Text>
+              <Text style={[styles.infoText, { color: colors.textSecondary }]}>The Publish button appears for people who can publish church teachings.</Text>
             </View>
           ) : null}
 

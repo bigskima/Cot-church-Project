@@ -86,7 +86,7 @@ export default function ExpressionGovernanceScreen() {
       <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top + spacing.sm }]}>
         <ScreenHeader title="Expression governance" kicker="LEADERSHIP" showBack />
         <View style={styles.emptyPad}>
-          <EmptyState title="Enter an Expression first" message="Role invitations and ownership belong to the active Expression." iconName="shield-outline" />
+          <EmptyState title="Enter an Expression first" message="Choose the Expression where you want to manage leaders and ownership." iconName="shield-outline" />
         </View>
       </View>
     );
@@ -109,7 +109,7 @@ export default function ExpressionGovernanceScreen() {
 
   const sendInvitation = async () => {
     if (!email.trim() || !selectedRole) {
-      setErrorMsg('Enter the registered user email and choose the Expression role being offered.');
+      setErrorMsg('Enter the member’s email and choose the ministry role you want to offer.');
       return;
     }
 
@@ -125,7 +125,7 @@ export default function ExpressionGovernanceScreen() {
       setInviteOpen(false);
       await governance.refresh();
     } catch (error) {
-      setErrorMsg(error instanceof Error ? error.message : 'Unable to send Expression role invitation.');
+      setErrorMsg('We couldn’t send this ministry invitation. Please try again.');
     } finally {
       setBusy(false);
     }
@@ -186,7 +186,7 @@ export default function ExpressionGovernanceScreen() {
           <ScreenHeader
             title="Access & ownership"
             kicker="EXPRESSION GOVERNANCE"
-            subtitle={`Roles, invitations and accountable ownership for ${expressionName}.`}
+            subtitle={`Ministry access, invitations and ownership for ${expressionName}.`}
             showBack
             rightAction={canInviteRoles ? <Button label="Invite" onPress={openInvite} size="sm" /> : undefined}
           />
@@ -233,7 +233,7 @@ export default function ExpressionGovernanceScreen() {
 
           {canInviteRoles ? (
             <View style={styles.section}>
-              <SectionHeader title="Pending invitations" badge={pending.length} subtitle="Roles activate only after acceptance" actionLabel="Invite" onAction={openInvite} />
+              <SectionHeader title="Pending invitations" badge={pending.length} subtitle="The invitation takes effect after the member accepts" actionLabel="Invite" onAction={openInvite} />
               {governance.loading ? (
                 <Skeleton height={86} count={2} />
               ) : governance.error && !governance.data ? (
@@ -249,7 +249,7 @@ export default function ExpressionGovernanceScreen() {
                       <View style={styles.flex}>
                         <Text style={[styles.rowTitle, { color: colors.text }]}>{invite.target_email}</Text>
                         <Text style={[styles.rowMeta, { color: colors.textSecondary }]}>
-                          {role?.name ?? 'Expression role'} · expires {new Date(invite.expires_at).toLocaleDateString()}
+                          {role?.name ?? 'Ministry role'} · expires {new Date(invite.expires_at).toLocaleDateString()}
                         </Text>
                       </View>
                       <Button label="Revoke" variant="outline" size="sm" disabled={busy} onPress={() => void revokeInvitation(invite.id)} />
@@ -257,14 +257,14 @@ export default function ExpressionGovernanceScreen() {
                   );
                 })
               ) : (
-                <EmptyState title="No pending invitations" message="Invite a trusted member when a role needs to be assigned." iconName="person-add-outline" actionLabel="Invite member" onAction={openInvite} />
+                <EmptyState title="No pending invitations" message="Invite a trusted member to help with this Expression." iconName="person-add-outline" actionLabel="Invite member" onAction={openInvite} />
               )}
             </View>
           ) : (
             <View style={[styles.permissionCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
               <Icon name="shield-outline" size={18} color={colors.textMuted} />
               <Text style={[styles.permissionText, { color: colors.textSecondary }]}>
-                Role invitations are hidden because this account does not have both member-invite and role-assignment authority. Ownership controls remain available to the current owner.
+                Ministry invitations aren’t available for this account. Ownership tools remain available to the current owner.
               </Text>
             </View>
           )}
@@ -274,7 +274,7 @@ export default function ExpressionGovernanceScreen() {
       <BottomSheet
         visible={inviteOpen}
         onClose={() => !busy && setInviteOpen(false)}
-        title="Invite to a role"
+        title="Invite to a ministry role"
         subtitle={`Inside ${expressionName}`}
         maxHeightPercent={92}
       >
@@ -287,7 +287,7 @@ export default function ExpressionGovernanceScreen() {
           ) : null}
 
           <InputField label="Registered user email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" placeholder="name@example.com" />
-          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>ROLE OFFERED</Text>
+          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>MINISTRY ROLE</Text>
           {governance.loading ? (
             <Skeleton height={38} count={2} />
           ) : roles.length ? (
@@ -302,7 +302,7 @@ export default function ExpressionGovernanceScreen() {
               ))}
             </View>
           ) : (
-            <EmptyState title="No assignable Expression roles" message="No Expression-scoped roles are available yet." iconName="shield-outline" />
+            <EmptyState title="No ministry roles available" message="There are no ministry roles available to invite someone into yet." iconName="shield-outline" />
           )}
           {selectedRole?.description ? <Text style={[styles.helper, { color: colors.textMuted }]}>{selectedRole.description}</Text> : null}
           <InputField label="Invitation message (optional)" value={message} onChangeText={setMessage} multiline numberOfLines={3} placeholder="Explain the responsibility being offered." />
@@ -327,13 +327,13 @@ export default function ExpressionGovernanceScreen() {
 
           <View style={[styles.warningCard, { backgroundColor: colors.warningSoft }]}>
             <Icon name="warning-outline" size={18} color={colors.warning} />
-            <Text style={[styles.helper, { color: colors.textSecondary }]}>The new owner receives Expression Admin authority automatically. Use this only when responsibility truly changes.</Text>
+            <Text style={[styles.helper, { color: colors.textSecondary }]}>The new owner will become responsible for this Expression. Use this only when ownership truly changes.</Text>
           </View>
 
           <InputField label="New owner email" value={transferEmail} onChangeText={setTransferEmail} keyboardType="email-address" autoCapitalize="none" placeholder="newowner@example.com" />
-          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>YOUR ROLE AFTER TRANSFER</Text>
+          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>YOUR ACCESS AFTER TRANSFER</Text>
           <View style={styles.chips}>
-            <Chip label="Remove my admin role" selected={!retainPreviousAdmin} onPress={() => setRetainPreviousAdmin(false)} />
+            <Chip label="Remove my admin access" selected={!retainPreviousAdmin} onPress={() => setRetainPreviousAdmin(false)} />
             <Chip label="Keep me as admin" selected={retainPreviousAdmin} onPress={() => setRetainPreviousAdmin(true)} />
           </View>
           <Button label="Transfer ownership" onPress={() => void transferOwnership()} loading={busy} variant="destructive" size="lg" fullWidth />

@@ -86,7 +86,7 @@ export function LiveDiscoveryExperience({ scope = 'general', embedded = false }:
               </Text>
             </View>
             {canOpenLiveStudio ? (
-              <Button label="Live studio" onPress={() => router.push('/(tabs)/profile/leadership/media-studio' as any)} size="sm" />
+              <Button label="Live studio" onPress={() => router.push((expressionMode && expressionId ? `/expressions/${expressionId}/manage/live` : '/general/leadership/media-studio') as any)} size="sm" />
             ) : null}
           </View>
         ) : (
@@ -99,7 +99,7 @@ export function LiveDiscoveryExperience({ scope = 'general', embedded = false }:
               rightAction={canOpenLiveStudio ? (
                 <Button
                   label={expressionMode ? 'Live studio' : 'Go live'}
-                  onPress={() => router.push('/(tabs)/profile/leadership/media-studio' as any)}
+                  onPress={() => router.push((expressionMode && expressionId ? `/expressions/${expressionId}/manage/live` : '/general/leadership/media-studio') as any)}
                   size="sm"
                 />
               ) : undefined}
