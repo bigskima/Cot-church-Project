@@ -203,6 +203,9 @@ Deno.serve(createHandler(
     if (error?.code === "42501") {
       const message = String(error.message ?? "");
       if (message.includes("Posting is restricted")) throw new ApiError("POSTING_RESTRICTED", "Your posting access is currently restricted", 403);
+      if (message.includes("Public posting is currently unavailable")) {
+        throw new ApiError("PUBLIC_POSTING_UNAVAILABLE", "Public posting is currently unavailable for this account", 403);
+      }
 
       if (message.includes("Expression membership required")) throw new ApiError("EXPRESSION_MEMBERSHIP_REQUIRED", "Join an Expression before publishing", 403);
       if (message.includes("your own Expression")) throw new ApiError("EXPRESSION_SCOPE_DENIED", "You may publish only to your own Expression", 403);
