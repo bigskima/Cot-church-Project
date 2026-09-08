@@ -204,17 +204,19 @@ export default function MediaStudioScreen() {
           { paddingTop: expressionWorkspace ? spacing.md : insets.top + spacing.sm, paddingBottom: expressionWorkspace ? insets.bottom + spacing.xl : insets.bottom + 120 },
         ]}
       >
-        <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
-          <ScreenHeader
-            title="Live Media Studio"
-            kicker="BROADCAST"
-            subtitle={broadcastScope === 'public'
-              ? 'Create live broadcasts for General COT.'
-              : `Create private broadcasts inside ${expression?.name ?? 'your Expression'}.`}
-            showBack
-            rightAction={providerReady ? <Button label="New broadcast" onPress={openCreate} size="sm" /> : undefined}
-          />
-        </View>
+        {!expressionWorkspace ? (
+          <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+            <ScreenHeader
+              title="Live Media Studio"
+              kicker="BROADCAST"
+              subtitle={broadcastScope === 'public'
+                ? 'Create live broadcasts for General COT.'
+                : `Create private broadcasts inside ${expression?.name ?? 'your Expression'}.`}
+              showBack
+              rightAction={providerReady ? <Button label="New broadcast" onPress={openCreate} size="sm" /> : undefined}
+            />
+          </View>
+        ) : null}
 
         <View style={styles.body}>
           {canPublicBroadcast && canExpressionBroadcast ? (
