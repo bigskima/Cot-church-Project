@@ -98,6 +98,8 @@ const platformRolesAccess = await readFile('supabase/functions/platform-roles-ac
 const platformModeration = await readFile('supabase/functions/platform-moderation/index.ts', 'utf8');
 const publicPostingPolicyMigration = await readFile('supabase/migrations/20260908190000_platform_public_posting_policy.sql', 'utf8');
 const publicPostingPolicyHardening = await readFile('supabase/migrations/20260908191000_platform_public_posting_policy_hardening.sql', 'utf8');
+const platformExpressions = await readFile('supabase/functions/platform-expressions/index.ts', 'utf8');
+const destructiveModerationMigration = await readFile('supabase/migrations/20260908200800_platform_destructive_moderation.sql', 'utf8');
 const streamingBroadcasts = await readFile('supabase/functions/streaming-broadcasts/index.ts', 'utf8');
 const liveStreams = await readFile('supabase/functions/live-streams/index.ts', 'utf8');
 const onboarding = await readFile('supabase/functions/onboarding/index.ts', 'utf8');
@@ -257,6 +259,23 @@ const invariants = [
   [platformModeration, /platform\.moderation\.read[\s\S]*platform\.moderation\.manage/, 'moderation API uses dedicated platform capabilities'],
   [platformModeration, /set_public_posting_policy[\s\S]*add_public_posting_exemption[\s\S]*remove_public_posting_exemption/, 'moderation API manages global mode and approved accounts'],
   [platformModeration, /moderation\.public_posting_policy_changed[\s\S]*moderation\.public_posting_exemption_added[\s\S]*moderation\.public_posting_exemption_removed/, 'posting policy and exemption changes are audited'],
+  [platformModeration, /methods:\s*\["GET",\s*"PATCH",\s*"DELETE"\]/, 'platform moderation supports read, review, and destructive actions'],
+  [platformModeration, /view === "reports"[\s\S]*view === "content"[\s\S]*view === "deletions"/, 'platform moderation exposes layered reports, content, and deletion-history views'],
+  [platformModeration, /action === "remove_content"[\s\S]*platform_remove_content[\s\S]*processStorageCleanup/, 'platform moderation deletes canonical content then processes queued Storage cleanup'],
+  [platformModeration, /action === "remove_comment"[\s\S]*platform_remove_comment/, 'platform moderation removes reported comment threads through server-only RPC'],
+  [platformModeration, /action === "resolve_report"[\s\S]*platform_resolve_content_report/, 'platform moderation resolves reports through platform authority'],
+  [platformModeration, /retry_storage_cleanup[\s\S]*admin\.storage\.from\(bucket\)\.remove\(paths\)/, 'platform moderation retries Storage API cleanup without restoring content'],
+  [platformExpressions, /methods:\s*\["GET",\s*"PATCH",\s*"DELETE"\][\s\S]*platform_delete_expression/, 'platform Expression API exposes protected deletion'],
+  [platformExpressions, /deleted_at[\s\S]*EXPRESSION_DELETED[\s\S]*Deleted Expressions cannot be restored/, 'deleted Expressions cannot re-enter the lifecycle restore path'],
+  [destructiveModerationMigration, /platform_moderation_deletions[\s\S]*platform_storage_cleanup_tasks/, 'destructive moderation keeps deletion evidence and Storage cleanup tasks'],
+  [destructiveModerationMigration, /platform_moderation_deletions_no_client_access[\s\S]*using \(false\)[\s\S]*platform_storage_cleanup_tasks_no_client_access[\s\S]*using \(false\)/, 'destructive moderation evidence is inaccessible to client roles'],
+  [destructiveModerationMigration, /revoke all on function public\.platform_remove_content[\s\S]*authenticated[\s\S]*grant execute on function public\.platform_remove_content[\s\S]*service_role/, 'content deletion RPC is service-role only'],
+  [destructiveModerationMigration, /revoke all on function public\.platform_delete_expression[\s\S]*authenticated[\s\S]*grant execute on function public\.platform_delete_expression[\s\S]*service_role/, 'Expression deletion RPC is service-role only'],
+  [destructiveModerationMigration, /community-public-media[\s\S]*content-media[\s\S]*platform_storage_cleanup_tasks/, 'destructive moderation queues both social and normalized media Storage cleanup'],
+  [destructiveModerationMigration, /not exists\(select 1 from public\.reels[\s\S]*not exists\(select 1 from public\.videos[\s\S]*not exists\(select 1 from public\.sermons/, 'shared media assets are retained while still referenced'],
+  [destructiveModerationMigration, /expression_invite_codes[\s\S]*status='revoked'[\s\S]*deleted_at=now\(\)[\s\S]*is_active=false/, 'Expression deletion revokes invites and tombstones member-facing access'],
+  [destructiveModerationMigration, /preservedHistoricalData[\s\S]*true/, 'Expression deletion explicitly records historical-data preservation'],
+  [destructiveModerationMigration, /content_type='post'[\s\S]*content_type='reel'[\s\S]*content_type='video'[\s\S]*content_type='sermon'[\s\S]*dedicated moderation workflow/, 'canonical deletion is limited to supported content types and excludes live streams'],
   [supabaseConfig, /\[functions\.platform-moderation\][\s\S]*verify_jwt\s*=\s*true/, 'platform moderation gateway requires JWT authentication'],
   [socialFeed, /PUBLIC_POSTING_UNAVAILABLE[\s\S]*Public posting is currently unavailable/, 'social feed surfaces global public posting policy denial'],
   [feedRanking, /completedPenalty/, 'completed-content recommendation suppression'],
