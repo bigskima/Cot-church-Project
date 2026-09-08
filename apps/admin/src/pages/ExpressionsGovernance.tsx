@@ -11,6 +11,9 @@ interface ExpressionItem {
   timezone: string;
   address?: Record<string, unknown>;
   is_active: boolean;
+  deleted_at?: string | null;
+  deleted_by?: string | null;
+  deletion_reason?: string | null;
   created_at: string;
   updated_at?: string;
   organizations?: { id: string; name: string; slug: string; status: string } | null;
@@ -28,10 +31,14 @@ export function ExpressionsGovernance({ api, canManage = false }: { api: ApiClie
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [search, setSearch] = useState('');
   const [selectedExp, setSelectedExp] = useState<ExpressionItem | null>(null);
   const [lifecycleExp, setLifecycleExp] = useState<ExpressionItem | null>(null);
+  const [deleteExp, setDeleteExp] = useState<ExpressionItem | null>(null);
   const [governanceReason, setGovernanceReason] = useState('');
+  const [deleteReason, setDeleteReason] = useState('');
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [actionBusy, setActionBusy] = useState(false);
 
   const loadExpressions = async () => {
@@ -55,7 +62,7 @@ export function ExpressionsGovernance({ api, canManage = false }: { api: ApiClie
   }, [api, search]);
 
   const applyLifecycle = async () => {
-    if (!canManage || !lifecycleExp) return;
+    if (!canManage || !lifecycleExp || lifecycleExp.deleted_at) return;
     const isActive = !lifecycleExp.is_active;
     if (!isActive && !governanceReason.trim()) {
       setError('Add a reason before making this Expression unavailable.');
@@ -64,6 +71,7 @@ export function ExpressionsGovernance({ api, canManage = false }: { api: ApiClie
 
     setActionBusy(true);
     setError('');
+    setNotice('');
     try {
       const updated = await api.request<Partial<ExpressionItem> & { id: string }>('platform-expressions', {
         method: 'PATCH',
@@ -77,6 +85,7 @@ export function ExpressionsGovernance({ api, canManage = false }: { api: ApiClie
       if (selectedExp?.id === updated.id) setSelectedExp({ ...selectedExp, ...updated });
       setLifecycleExp(null);
       setGovernanceReason('');
+      setNotice(isActive ? 'Expression restored.' : 'Expression disabled.');
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to change expression lifecycle.');
     } finally {
@@ -84,11 +93,54 @@ export function ExpressionsGovernance({ api, canManage = false }: { api: ApiClie
     }
   };
 
+  const permanentlyDeleteExpression = async () => {
+    if (!canManage || !deleteExp) return;
+    if (deleteReason.trim().length < 3) {
+      setError('Add a reason before deleting this Expression.');
+      return;
+    }
+    if (deleteConfirmation.trim().toUpperCase() !== deleteExp.code.toUpperCase()) {
+      setError('Enter the exact Expression code to confirm deletion.');
+      return;
+    }
+
+    setActionBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      await api.request('platform-expressions', {
+        method: 'DELETE',
+        body: JSON.stringify({
+          expressionId: deleteExp.id,
+          reason: deleteReason.trim(),
+          confirmation: deleteConfirmation.trim(),
+        }),
+      });
+      const deletedName = deleteExp.name;
+      setDeleteExp(null);
+      setDeleteReason('');
+      setDeleteConfirmation('');
+      setSelectedExp(null);
+      await loadExpressions();
+      setNotice(`${deletedName} has been deleted from member-facing COT. Historical financial and audit records were preserved.`);
+    } catch (value) {
+      setError(value instanceof Error ? value.message : 'Unable to delete this Expression.');
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
   return (
     <div className="admin-page-stack">
+      {notice ? (
+        <div className="admin-card" style={{ padding: 14, borderColor: 'var(--admin-success, #2db783)' }}>
+          <strong>{notice}</strong>
+        </div>
+      ) : null}
+
       <Card
         title="Expressions"
-        subtitle={`${total} expression${total === 1 ? '' : 's'} across COT. Each church manages its own ministry operations; Platform Administration can apply safety or access restrictions when necessary.`}
+        subtitle={`${total} expression${total === 1 ? '' : 's'} across COT. Disable is reversible; Delete is an irreversible member-facing removal that preserves financial and audit history.`}
         headerAction={
           <div className="admin-header-actions">
             <SearchBar value={search} onChange={setSearch} placeholder="Search expression name or code..." />
@@ -122,10 +174,12 @@ export function ExpressionsGovernance({ api, canManage = false }: { api: ApiClie
             },
             {
               header: 'STATUS',
-              accessor: (item) => (
+              accessor: (item) => item.deleted_at ? (
+                <Badge label="DELETED" variant="suspended" />
+              ) : (
                 <Badge
                   label={item.is_active ? 'ACTIVE' : 'DISABLED'}
-                  variant={item.is_active ? 'active' : 'suspended'}
+                  variant={item.is_active ? 'active' : 'warning'}
                   pulse={item.is_active}
                 />
               ),
@@ -137,16 +191,31 @@ export function ExpressionsGovernance({ api, canManage = false }: { api: ApiClie
               accessor: (item) => (
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <Button variant="outline" size="sm" onClick={() => setSelectedExp(item)}>Inspect</Button>
-                  <Button
-                    variant={item.is_active ? 'danger' : 'gold'}
-                    size="sm"
-                    onClick={() => {
-                      setLifecycleExp(item);
-                      setGovernanceReason('');
-                    }}
-                  >
-                    {item.is_active ? 'Disable' : 'Restore'}
-                  </Button>
+                  {canManage && !item.deleted_at ? (
+                    <>
+                      <Button
+                        variant={item.is_active ? 'outline' : 'gold'}
+                        size="sm"
+                        onClick={() => {
+                          setLifecycleExp(item);
+                          setGovernanceReason('');
+                        }}
+                      >
+                        {item.is_active ? 'Disable' : 'Restore'}
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={() => {
+                          setDeleteExp(item);
+                          setDeleteReason('');
+                          setDeleteConfirmation('');
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    </>
+                  ) : null}
                 </div>
               ),
             },
@@ -169,15 +238,24 @@ export function ExpressionsGovernance({ api, canManage = false }: { api: ApiClie
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14 }}>
               <Metric label="EXPRESSION CODE" value={selectedExp.code} />
-              <Metric label="STATUS" value={selectedExp.is_active ? 'ACTIVE' : 'DISABLED'} />
+              <Metric label="STATUS" value={selectedExp.deleted_at ? 'DELETED' : selectedExp.is_active ? 'ACTIVE' : 'DISABLED'} />
               <Metric label="PARENT CHURCH" value={selectedExp.organizations?.name ?? selectedExp.organization_id} />
               <Metric label="TIMEZONE" value={selectedExp.timezone || 'UTC'} />
             </div>
-            <Card title="Responsibility" subtitle="Church operations remain under the owning church.">
-              <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.65 }}>
-                Platform Administration may restrict an Expression for safety, policy or security reasons. Ministry activity, roles, content, giving and local settings remain under the owning church.
-              </p>
-            </Card>
+            {selectedExp.deleted_at ? (
+              <Card title="Deleted Expression" subtitle={new Date(selectedExp.deleted_at).toLocaleString()}>
+                <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.65 }}>
+                  {selectedExp.deletion_reason || 'This Expression was permanently removed from member-facing COT.'}
+                  {' '}Historical finance and protected administration evidence remain retained.
+                </p>
+              </Card>
+            ) : (
+              <Card title="Responsibility" subtitle="Church operations remain under the owning church.">
+                <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.65 }}>
+                  Platform Administration may restrict or delete an Expression for safety, policy or security reasons. Delete removes member-facing access and invalidates active invite codes while preserving protected records.
+                </p>
+              </Card>
+            )}
           </div>
         ) : null}
       </Modal>
@@ -187,7 +265,7 @@ export function ExpressionsGovernance({ api, canManage = false }: { api: ApiClie
         onClose={() => {
           if (!actionBusy) setLifecycleExp(null);
         }}
-        title={lifecycleExp?.is_active ? 'Disable expression' : 'Restore expression'}
+        title={lifecycleExp?.is_active ? 'Disable Expression' : 'Restore Expression'}
         subtitle={lifecycleExp ? `${lifecycleExp.name} · ${lifecycleExp.organizations?.name ?? 'Parent church'}` : undefined}
         footer={
           <div style={{ display: 'flex', gap: 12 }}>
@@ -198,7 +276,7 @@ export function ExpressionsGovernance({ api, canManage = false }: { api: ApiClie
               loading={actionBusy}
               onClick={() => void applyLifecycle()}
             >
-              {lifecycleExp?.is_active ? 'Confirm disable' : 'Restore expression'}
+              {lifecycleExp?.is_active ? 'Confirm disable' : 'Restore Expression'}
             </Button>
           </div>
         }
@@ -208,14 +286,66 @@ export function ExpressionsGovernance({ api, canManage = false }: { api: ApiClie
             label="Reason for this change"
             value={governanceReason}
             onChange={(event) => setGovernanceReason(event.target.value)}
-            placeholder="Explain why this expression must be disabled"
-            helperText="The reason is recorded in protected administration history."
+            placeholder="Explain why this Expression must be disabled"
+            helperText="Disable is reversible. The reason is recorded in protected administration history."
           />
         ) : (
           <p style={{ color: 'var(--text-secondary)', lineHeight: 1.65 }}>
-            Restoring the Expression makes it available again. Parent church permissions continue to determine what its leaders may do.
+            Restoring the Expression makes it available again. This action is unavailable after permanent deletion.
           </p>
         )}
+      </Modal>
+
+      <Modal
+        isOpen={canManage && !!deleteExp}
+        onClose={() => {
+          if (!actionBusy) {
+            setDeleteExp(null);
+            setDeleteReason('');
+            setDeleteConfirmation('');
+          }
+        }}
+        title="Delete Expression"
+        subtitle={deleteExp ? `${deleteExp.name} · This cannot be restored through lifecycle controls.` : undefined}
+        footer={
+          <div style={{ display: 'flex', gap: 12 }}>
+            <Button variant="outline" size="md" disabled={actionBusy} onClick={() => setDeleteExp(null)}>Cancel</Button>
+            <Button
+              variant="danger"
+              size="md"
+              loading={actionBusy}
+              disabled={!deleteExp || deleteConfirmation.trim().toUpperCase() !== deleteExp.code.toUpperCase() || deleteReason.trim().length < 3}
+              onClick={() => void permanentlyDeleteExpression()}
+            >
+              Delete Expression
+            </Button>
+          </div>
+        }
+      >
+        {deleteExp ? (
+          <div style={{ display: 'grid', gap: 16 }}>
+            <div className="admin-card" style={{ padding: 14 }}>
+              <strong>What deletion does</strong>
+              <p className="admin-muted" style={{ marginTop: 6, lineHeight: 1.55 }}>
+                Members can no longer enter this Expression, active invite codes are revoked, and normal Restore is blocked.
+                Financial records, audit history and other protected evidence are retained.
+              </p>
+            </div>
+            <InputField
+              label="Deletion reason"
+              value={deleteReason}
+              onChange={(event) => setDeleteReason(event.target.value)}
+              placeholder="Explain why this Expression must be deleted"
+            />
+            <InputField
+              label={`Type ${deleteExp.code} to confirm`}
+              value={deleteConfirmation}
+              onChange={(event) => setDeleteConfirmation(event.target.value)}
+              placeholder={deleteExp.code}
+              helperText="The exact Expression code is required to prevent accidental deletion."
+            />
+          </div>
+        ) : null}
       </Modal>
     </div>
   );
