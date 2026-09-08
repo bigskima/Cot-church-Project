@@ -4,7 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
-import { EmptyState, LeaderCard, ResourceError, ScreenHeader, Skeleton } from '@/components';
+import { EmptyState, Icon, LeaderCard, ResourceError, ScreenHeader, Skeleton } from '@/components';
+import { ExpressionPeopleHeader } from '@/components/expression/ExpressionPeopleHeader';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import type { LeadershipProfile } from '@church/types';
 
@@ -13,6 +14,7 @@ export function ExpressionLeadershipExperience({ embedded = false, expressionId 
   const { api, context } = useSession();
   const { colors } = useTheme();
   const branchId = expressionId ?? context?.expression?.id;
+  const expressionName = context?.expression?.name ?? 'this Expression';
 
   const leadersResource = useResource<LeadershipProfile[]>(`expression:leadership:${branchId}`, (signal) =>
     branchId ? api.request(`church-story?view=leadership&expressionId=${branchId}`, { signal }) : Promise.resolve([])
@@ -31,38 +33,52 @@ export function ExpressionLeadershipExperience({ embedded = false, expressionId 
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+      {embedded ? (
+        <ExpressionPeopleHeader
+          expressionId={branchId}
+          expressionName={expressionName}
+          active="leadership"
+          title="Leadership"
+          subtitle="Meet the pastors and ministry leaders serving this Expression."
+          icon="ribbon-outline"
+        />
+      ) : null}
+
       <ScrollView
+        style={styles.scroll}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: embedded ? spacing.md : insets.top + spacing.sm, paddingBottom: embedded ? insets.bottom + spacing.xl : insets.bottom + 120 },
+          { paddingTop: embedded ? spacing.sm : insets.top + spacing.sm, paddingBottom: embedded ? insets.bottom + spacing.xl : insets.bottom + 120 },
         ]}
       >
-        {embedded ? (
-          <View style={styles.embeddedIntro}>
-            <Text style={[styles.embeddedEyebrow, { color: colors.interactive }]}>EXPRESSION PEOPLE</Text>
-            <Text style={[styles.embeddedTitle, { color: colors.text }]}>Leadership</Text>
-            <Text style={[styles.embeddedCopy, { color: colors.textSecondary }]}>
-              Pastors and ministry leaders serving {context?.expression?.name ?? 'this Expression'}.
-            </Text>
-          </View>
-        ) : (
+        {!embedded ? (
           <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
             <ScreenHeader
               title="Expression Leadership"
               kicker="COMMUNITY"
-              subtitle={`Pastors and ministry leaders serving ${context?.expression?.name ?? 'this Expression'}.`}
+              subtitle={`Pastors and ministry leaders serving ${expressionName}.`}
               showBack
             />
           </View>
-  
-        )}
+        ) : null}
 
         <View style={styles.body}>
+          <View style={[styles.contextCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+            <View style={[styles.contextIcon, { backgroundColor: colors.primarySoft }]}>
+              <Icon name="ribbon-outline" size={18} color={colors.interactive} />
+            </View>
+            <View style={styles.flex}>
+              <Text style={[styles.contextTitle, { color: colors.text }]}>Serving this community</Text>
+              <Text style={[styles.contextCopy, { color: colors.textSecondary }]}>Leadership shown here is scoped to {expressionName}, separate from the church-wide General COT leadership experience.</Text>
+            </View>
+          </View>
+
           {leadersResource.loading ? (
-            <View style={{ gap: spacing.md }}>
-              <Skeleton height={100} />
-              <Skeleton height={100} />
+            <View style={styles.stack}>
+              <Skeleton height={96} />
+              <Skeleton height={96} />
+              <Skeleton height={96} />
             </View>
           ) : leadersResource.error && !leadersResource.data ? (
             <ResourceError
@@ -70,13 +86,15 @@ export function ExpressionLeadershipExperience({ embedded = false, expressionId 
               retry={leadersResource.refresh}
             />
           ) : leaders.length > 0 ? (
-            leaders.map((leader) => (
-              <LeaderCard
-                key={leader.id}
-                leader={leader}
-                variant="standard"
-              />
-            ))
+            <View style={styles.stack}>
+              {leaders.map((leader) => (
+                <LeaderCard
+                  key={leader.id}
+                  leader={leader}
+                  variant="standard"
+                />
+              ))}
+            </View>
           ) : (
             <EmptyState
               title="No Expression leaders listed"
@@ -95,20 +113,15 @@ export default function ExpressionLeadershipRouteExperience() {
 }
 
 const styles = StyleSheet.create({
-  embeddedIntro: { marginHorizontal: spacing.md, marginBottom: spacing.md },
-  embeddedEyebrow: { fontSize: 10, lineHeight: 14, fontWeight: '900', letterSpacing: 0.9 },
-  embeddedTitle: { fontSize: 22, lineHeight: 28, fontWeight: '800' },
-  embeddedCopy: { fontSize: 12, lineHeight: 18, marginTop: 3 },
-  screen: {
-    flex: 1,
-  },
-  content: {
-    flexGrow: 1,
-  },
+  screen: { flex: 1 },
+  scroll: { flex: 1 },
+  content: { flexGrow: 1 },
   headerCard: { marginHorizontal: spacing.md, borderWidth: 1, borderRadius: radius.xxl, overflow: 'hidden' },
-  body: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-    gap: spacing.sm,
-  },
+  body: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, gap: spacing.md },
+  stack: { gap: spacing.sm },
+  contextCard: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md },
+  contextIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  flex: { flex: 1, minWidth: 0 },
+  contextTitle: { fontSize: 12, lineHeight: 16, fontWeight: '800' },
+  contextCopy: { fontSize: 11, lineHeight: 17, marginTop: 2 },
 });
