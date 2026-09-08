@@ -99,18 +99,20 @@ export default function GivingFinanceScreen() {
           { paddingTop: expressionWorkspace ? spacing.md : insets.top + spacing.sm, paddingBottom: expressionWorkspace ? insets.bottom + spacing.xl : insets.bottom + 120 },
         ]}
       >
-        <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
-          <ScreenHeader
-            title="Giving Finance"
-            kicker="FINANCE"
-            subtitle={
-              expression?.name
-                ? `Read-only giving summary for ${expression.name}.`
-                : `Read-only church-wide giving summary for ${organization.name}.`
-            }
-            showBack
-          />
-        </View>
+        {!expressionWorkspace ? (
+          <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+            <ScreenHeader
+              title="Giving Finance"
+              kicker="FINANCE"
+              subtitle={
+                expression?.name
+                  ? `Read-only giving summary for ${expression.name}.`
+                  : `Read-only church-wide giving summary for ${organization.name}.`
+              }
+              showBack
+            />
+          </View>
+        ) : null}
 
         <View style={styles.body}>
           <View style={[styles.periodCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>

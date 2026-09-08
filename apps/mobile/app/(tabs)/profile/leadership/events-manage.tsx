@@ -175,13 +175,15 @@ export default function EventsManageScreen() {
           { paddingTop: expressionWorkspace ? spacing.md : insets.top + spacing.sm, paddingBottom: expressionWorkspace ? insets.bottom + spacing.xl : insets.bottom + 120 },
         ]}
       >
-        <ScreenHeader
-          title="Events"
-          kicker="LEADERSHIP"
-          subtitle={expression?.name ? `Manage gatherings inside ${expression.name}.` : 'Manage church-wide gatherings and public events.'}
-          showBack
-          rightAction={canCreate ? <Button label="New event" onPress={openCreate} size="sm" /> : undefined}
-        />
+        {!expressionWorkspace ? (
+          <ScreenHeader
+            title="Events"
+            kicker="LEADERSHIP"
+            subtitle={expression?.name ? `Manage gatherings inside ${expression.name}.` : 'Manage church-wide gatherings and public events.'}
+            showBack
+            rightAction={canCreate ? <Button label="New event" onPress={openCreate} size="sm" /> : undefined}
+          />
+        ) : null}
 
         <View style={styles.body}>
           {successMsg ? (

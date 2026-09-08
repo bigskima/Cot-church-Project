@@ -169,15 +169,17 @@ export default function ExpressionInviteCodesScreen() {
           { paddingTop: expressionWorkspace ? spacing.md : insets.top + spacing.sm, paddingBottom: expressionWorkspace ? insets.bottom + spacing.xl : insets.bottom + 120 },
         ]}
       >
-        <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
-          <ScreenHeader
-            title="Invite codes"
-            kicker="EXPRESSION"
-            subtitle={`Invite people to join ${expression.name}.`}
-            showBack
-            rightAction={<Button label="New code" onPress={openCreate} size="sm" />}
-          />
-        </View>
+        {!expressionWorkspace ? (
+          <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+            <ScreenHeader
+              title="Invite codes"
+              kicker="EXPRESSION"
+              subtitle={`Invite people to join ${expression.name}.`}
+              showBack
+              rightAction={<Button label="New code" onPress={openCreate} size="sm" />}
+            />
+          </View>
+        ) : null}
 
         <View style={styles.body}>
           {error && !createOpen ? (
