@@ -5,6 +5,7 @@ import { authorize } from "../_shared/context.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { enrichContentCreators } from "../_shared/public-identity.ts";
+import { resolveActiveOrganizationId } from "../_shared/public-organization.ts";
 import { adminClient, publicClient } from "../_shared/supabase.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString, uuid } from "../_shared/validation.ts";
 
@@ -45,17 +46,6 @@ async function findOwnedAsset(profileId: string, assetId: string) {
     .maybeSingle();
   if (error || !data) throw new ApiError("ASSET_NOT_FOUND", "Media asset not found", 404);
   return data;
-}
-
-async function activeOrganization(admin: SupabaseClient, organizationId: string) {
-  const { data, error } = await admin
-    .from("organizations")
-    .select("id,status")
-    .eq("id", organizationId)
-    .eq("status", "active")
-    .maybeSingle();
-  if (error || !data) throw new ApiError("ORGANIZATION_NOT_FOUND", "This church community is not available", 404);
-  return data.id as string;
 }
 
 function playbackContentIds(value: string | null) {
@@ -141,10 +131,7 @@ Deno.serve(createHandler(
       const requestedOrganizationId = body.organizationId
         ? uuid(String(body.organizationId), "organizationId", true)!
         : auth.organizationId;
-      if (!requestedOrganizationId) {
-        throw new ApiError("ORGANIZATION_REQUIRED", "Choose a church community before uploading media", 422);
-      }
-      const organizationId = await activeOrganization(admin, requestedOrganizationId);
+      const organizationId = await resolveActiveOrganizationId(admin, requestedOrganizationId);
 
       if (expressionId) {
         if (!auth.organizationId || !auth.branchId || organizationId !== auth.organizationId || expressionId !== auth.branchId) {
