@@ -48,22 +48,25 @@ type GroupPayload = {
   pendingRequests: PendingRequest[];
 };
 
-export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: { embedded?: boolean; focusGroupId?: string }) {
+export function ExpressionGroupsExperience({ embedded = false, focusGroupId, expressionId }: { embedded?: boolean; focusGroupId?: string; expressionId?: string }) {
   const insets = useSafeAreaInsets();
   const { api, context, mode, hasCapability } = useSession();
   const { colors } = useTheme();
   const expression = context?.expression;
+  const targetExpressionId = expressionId || expression?.id || '';
   const canManageGroups = hasCapability('groups.manage');
   const canManageMembers = hasCapability('groups.members.manage');
   const includeManagement = canManageMembers ? '&includeManagement=true' : '';
 
   const resource = useResource<GroupPayload>(
-    `expression:groups:${expression?.id ?? 'none'}:${includeManagement}`,
+    `expression:groups:${targetExpressionId || 'none'}:${includeManagement}`,
     (signal) => {
-      if (mode !== 'authenticated' || !expression?.id) {
+      if (mode !== 'authenticated' || !targetExpressionId) {
         return Promise.resolve({ scope: 'expression', groups: [], pendingRequests: [] });
       }
-      return api.request<GroupPayload>(`groups?scope=expression${includeManagement}`, { signal });
+      const query = new URLSearchParams({ scope: 'expression', branchId: targetExpressionId });
+      if (canManageMembers) query.set('includeManagement', 'true');
+      return api.request<GroupPayload>(`groups?${query.toString()}`, { signal });
     }
   );
 
@@ -140,6 +143,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: {
       await api.request('groups', {
         method: 'POST',
         body: JSON.stringify({
+          branchId: targetExpressionId,
           name: name.trim(),
           description: description.trim(),
           visibility,
@@ -156,13 +160,13 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: {
       setFeedback(`Group created inside ${expression?.name ?? 'this Expression'}.`);
       resource.refresh();
     } catch (value) {
-      setActionError(value instanceof Error ? value.message : 'Unable to create the group.');
+      setActionError(value instanceof Error ? value.message : 'We couldn’t create this group. Please try again.');
     } finally {
       setSaving(false);
     }
   };
 
-  if (mode !== 'authenticated' || !expression?.id) {
+  if (mode !== 'authenticated' || !targetExpressionId) {
     return (
       <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top + spacing.sm }]}>
         <ScreenHeader title="Groups" subtitle="Expression community groups." showBack />
