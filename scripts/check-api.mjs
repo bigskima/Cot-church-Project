@@ -73,6 +73,7 @@ const requiredFiles = [
   'supabase/functions/platform-organizations/index.ts',
   'supabase/functions/platform-expressions/index.ts',
   'supabase/functions/platform-users/index.ts',
+  'supabase/functions/platform-moderation/index.ts',
   'supabase/functions/platform-roles-access/index.ts',
   'supabase/functions/platform-audit/index.ts',
   'supabase/functions/platform-streaming/index.ts',
@@ -94,6 +95,9 @@ const response = await readFile('supabase/functions/_shared/response.ts', 'utf8'
 const signup = await readFile('supabase/functions/signup/index.ts', 'utf8');
 const organizationContext = await readFile('supabase/functions/organization-context/index.ts', 'utf8');
 const platformRolesAccess = await readFile('supabase/functions/platform-roles-access/index.ts', 'utf8');
+const platformModeration = await readFile('supabase/functions/platform-moderation/index.ts', 'utf8');
+const publicPostingPolicyMigration = await readFile('supabase/migrations/20260908190000_platform_public_posting_policy.sql', 'utf8');
+const publicPostingPolicyHardening = await readFile('supabase/migrations/20260908191000_platform_public_posting_policy_hardening.sql', 'utf8');
 const streamingBroadcasts = await readFile('supabase/functions/streaming-broadcasts/index.ts', 'utf8');
 const liveStreams = await readFile('supabase/functions/live-streams/index.ts', 'utf8');
 const onboarding = await readFile('supabase/functions/onboarding/index.ts', 'utf8');
@@ -230,12 +234,31 @@ const invariants = [
   [publicContent, /type === "streams"[\s\S]*provisioning[\s\S]*ready[\s\S]*processing[\s\S]*replay_ready/, 'public stream catalogue lifecycle coverage'],
   [contentMedia, /action"\) === "video_detail"[\s\S]*content_items\.expression_id[\s\S]*auth\.branchId/, 'exact Expression Watch detail is scoped to active Expression'],
   [contentMedia, /video_detail[\s\S]*enrichContentCreators/, 'exact Expression Watch detail includes creator attribution'],
-  [contentMedia, /expressionId[\s\S]*auth\.branchId[\s\S]*authorize\(auth, "media\.upload"\)[\s\S]*can_profile_post/, 'media upload separates Expression authority from authenticated General creation'],
+  [contentMedia, /can_profile_post[\s\S]*expressionId[\s\S]*auth\.branchId[\s\S]*authorize\(auth, "media\.upload"\)[\s\S]*admin\.rpc\("can_profile_post_publicly"/, 'media upload keeps individual restrictions while applying global policy only to General creation'],
   [contentMedia, /resolveActiveOrganizationId[\s\S]*organizationId/, 'General content media resolves the active church without membership context'],
-  [communityMedia, /audio\/mpeg[\s\S]*audio\/webm[\s\S]*audio\/wav[\s\S]*can_profile_post/, 'General post media is restriction-aware and supports native and web audio'],
+  [communityMedia, /can_profile_post[\s\S]*const action[\s\S]*branchId[\s\S]*admin\.rpc\("can_profile_post_publicly"/, 'community media keeps account restrictions and applies public policy only to General uploads'],
+  [communityMedia, /audio\/webm/, 'community media accepts browser voice recordings'],
   [publicOrganization, /limit\(2\)[\s\S]*ORGANIZATION_REQUIRED/, 'public organization resolver fails closed when General context is ambiguous'],
-  [creatorStudio, /organization:\s*"optional"[\s\S]*can_profile_post[\s\S]*publish_typed_reel[\s\S]*publish_typed_video/, 'General creator studio supports authenticated public Reel and Watch publishing'],
+  [creatorStudio, /organization:\s*"optional"[\s\S]*admin\.rpc\("can_profile_post_publicly"[\s\S]*publish_typed_reel[\s\S]*publish_typed_video/, 'General creator studio obeys the platform public posting policy'],
   [generalPublicCreationMigration, /publish_social_post_with_uploads[\s\S]*media_kind[\s\S]*publish_typed_reel[\s\S]*can_profile_post[\s\S]*publish_typed_video[\s\S]*created_by <> auth\.uid\(\)/, 'General publishing migration keeps multimedia creation authenticated and owner-scoped'],
+  [publicPostingPolicyMigration, /platform_public_posting_policy[\s\S]*mode in \('open', 'closed', 'allowlist'\)[\s\S]*platform_public_posting_exemptions/, 'platform public posting policy supports open, paused, and approved-only modes'],
+  [publicPostingPolicyMigration, /can_profile_post[\s\S]*profile_posting_controls[\s\S]*platform_user_restrictions/, 'individual posting checks combine legacy profile controls with platform restrictions'],
+  [publicPostingPolicyMigration, /can_profile_post_publicly[\s\S]*policy_mode = 'open'[\s\S]*policy_mode = 'closed'[\s\S]*platform_public_posting_exemptions/, 'public posting resolver enforces global mode and explicit exemptions'],
+  [publicPostingPolicyMigration, /publish_social_post_with_uploads[\s\S]*can_profile_post_publicly[\s\S]*publish_social_reel_share[\s\S]*can_profile_post_publicly[\s\S]*publish_typed_reel[\s\S]*can_profile_post_publicly[\s\S]*publish_typed_video[\s\S]*can_profile_post_publicly/, 'all General publishing formats share the platform public posting gate'],
+  [publicPostingPolicyMigration, /publish_social_post\([\s\S]*target_visibility = 'public'[\s\S]*target_branch_id is null[\s\S]*can_profile_post_publicly/, 'direct social post RPC cannot bypass the global public posting policy'],
+  [publicPostingPolicyMigration, /publish_typed_post\([\s\S]*p_expression_id is null[\s\S]*p_visibility = 'public'[\s\S]*can_profile_post_publicly/, 'typed post RPC cannot bypass the global public posting policy'],
+  [publicPostingPolicyMigration, /publish_typed_reel[\s\S]*can_profile_post\(auth\.uid\(\)\)/, 'individual posting restrictions remain effective for scoped Reel publishing'],
+  [publicPostingPolicyMigration, /publish_typed_video[\s\S]*can_profile_post\(auth\.uid\(\)\)/, 'individual posting restrictions remain effective for scoped Watch publishing'],
+  [publicPostingPolicyMigration, /publish_typed_post[\s\S]*can_profile_post\(auth\.uid\(\)\)/, 'individual posting restrictions remain effective for scoped post publishing'],
+  [publicPostingPolicyMigration, /alter table public\.platform_public_posting_policy enable row level security[\s\S]*alter table public\.platform_public_posting_exemptions enable row level security[\s\S]*revoke all on table public\.platform_public_posting_policy from public, anon, authenticated/, 'public posting governance tables are protected from direct client access'],
+  [publicPostingPolicyMigration, /platform_public_posting_policy_no_client_access[\s\S]*using \(false\)[\s\S]*platform_public_posting_exemptions_no_client_access[\s\S]*using \(false\)/, 'public posting governance tables explicitly deny client row access'],
+  [publicPostingPolicyMigration, /revoke all on function public\.can_profile_post_publicly\(uuid\)[\s\S]*authenticated[\s\S]*grant execute on function public\.can_profile_post_publicly\(uuid\)[\s\S]*service_role/, 'public posting policy helper is service-only at the API boundary'],
+  [publicPostingPolicyHardening, /platform_public_posting_policy_updated_by_idx[\s\S]*platform_public_posting_exemptions_granted_by_idx[\s\S]*revoke all on function public\.can_profile_post_publicly\(uuid\)[\s\S]*authenticated/, 'production follow-up removes new advisor findings and direct helper execution'],
+  [platformModeration, /platform\.moderation\.read[\s\S]*platform\.moderation\.manage/, 'moderation API uses dedicated platform capabilities'],
+  [platformModeration, /set_public_posting_policy[\s\S]*add_public_posting_exemption[\s\S]*remove_public_posting_exemption/, 'moderation API manages global mode and approved accounts'],
+  [platformModeration, /moderation\.public_posting_policy_changed[\s\S]*moderation\.public_posting_exemption_added[\s\S]*moderation\.public_posting_exemption_removed/, 'posting policy and exemption changes are audited'],
+  [supabaseConfig, /\[functions\.platform-moderation\][\s\S]*verify_jwt\s*=\s*true/, 'platform moderation gateway requires JWT authentication'],
+  [socialFeed, /PUBLIC_POSTING_UNAVAILABLE[\s\S]*Public posting is currently unavailable/, 'social feed surfaces global public posting policy denial'],
   [feedRanking, /completedPenalty/, 'completed-content recommendation suppression'],
   [feedRanking, /diversifyFeed/, 'mixed-format feed diversification'],
   [engagement, /view.*state/, 'engagement viewer-state retrieval'],

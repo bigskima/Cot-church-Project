@@ -51,13 +51,6 @@ Deno.serve(createHandler(
   async ({ request, auth }) => {
     if (!auth?.user) throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication required", 401);
 
-    const { data: postingAllowed, error: postingError } = await auth.client.rpc("can_profile_post", {
-      target_profile_id: auth.user.id,
-    });
-    if (postingError || postingAllowed !== true) {
-      throw new ApiError("POSTING_RESTRICTED", "Your posting access is currently restricted", 403);
-    }
-
     const admin = adminClient();
     const body = assertObject(await jsonBody(request));
 
@@ -83,6 +76,13 @@ Deno.serve(createHandler(
       return { data: { uploadId, deleted: true } };
     }
 
+    const { data: postingAllowed, error: postingError } = await auth.client.rpc("can_profile_post", {
+      target_profile_id: auth.user.id,
+    });
+    if (postingError || postingAllowed !== true) {
+      throw new ApiError("POSTING_RESTRICTED", "Your posting access is currently restricted", 403);
+    }
+
     const action = requiredString(body.action, "action", 32);
     if (action === "create_upload") {
       assertNoUnknownFields(body, ["action", "organizationId", "mimeType", "fileName", "sizeBytes", "branchId", "durationSeconds"]);
@@ -96,6 +96,14 @@ Deno.serve(createHandler(
       if (!type) throw new ApiError("UNSUPPORTED_MEDIA_TYPE", "This image, video, or audio format is not supported", 415);
       const sizeBytes = positiveSize(body.sizeBytes);
       const branchId = body.branchId ? uuid(String(body.branchId), "branchId", true)! : null;
+      if (!branchId) {
+        const { data: publicPostingAllowed, error: publicPostingError } = await admin.rpc("can_profile_post_publicly", {
+          target_profile_id: auth.user.id,
+        });
+        if (publicPostingError || publicPostingAllowed !== true) {
+          throw new ApiError("PUBLIC_POSTING_UNAVAILABLE", "Public posting is currently unavailable for this account", 403);
+        }
+      }
       const declaredDurationSeconds = type.kind === "video" || type.kind === "audio"
         ? durationSeconds(body.durationSeconds)
         : null;
@@ -160,11 +168,19 @@ Deno.serve(createHandler(
       const uploadId = uuid(requiredString(body.uploadId, "uploadId", 36), "uploadId", true)!;
       const { data: upload, error: lookupError } = await admin
         .from("social_media_uploads")
-        .select("id,media_kind,mime_type,storage_path,public_url,original_filename,size_bytes,duration_seconds,status")
+        .select("id,branch_id,media_kind,mime_type,storage_path,public_url,original_filename,size_bytes,duration_seconds,status")
         .eq("id", uploadId)
         .eq("uploader_profile_id", auth.user.id)
         .maybeSingle();
       if (lookupError || !upload) throw new ApiError("UPLOAD_NOT_FOUND", "Media upload not found", 404);
+      if (!upload.branch_id) {
+        const { data: publicPostingAllowed, error: publicPostingError } = await admin.rpc("can_profile_post_publicly", {
+          target_profile_id: auth.user.id,
+        });
+        if (publicPostingError || publicPostingAllowed !== true) {
+          throw new ApiError("PUBLIC_POSTING_UNAVAILABLE", "Public posting is currently unavailable for this account", 403);
+        }
+      }
       if (upload.status === "attached" || upload.status === "uploaded") {
         return {
           data: {

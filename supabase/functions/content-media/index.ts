@@ -133,17 +133,24 @@ Deno.serve(createHandler(
         : auth.organizationId;
       const organizationId = await resolveActiveOrganizationId(admin, requestedOrganizationId);
 
+      const { data: postingAllowed, error: postingError } = await auth.client.rpc("can_profile_post", {
+        target_profile_id: auth.user.id,
+      });
+      if (postingError || postingAllowed !== true) {
+        throw new ApiError("POSTING_RESTRICTED", "Your posting access is currently restricted", 403);
+      }
+
       if (expressionId) {
         if (!auth.organizationId || !auth.branchId || organizationId !== auth.organizationId || expressionId !== auth.branchId) {
           throw new ApiError("EXPRESSION_SCOPE_DENIED", "Media can only be uploaded for your selected Expression", 403);
         }
         await authorize(auth, "media.upload");
       } else {
-        const { data: postingAllowed, error: postingError } = await auth.client.rpc("can_profile_post", {
+        const { data: publicPostingAllowed, error: publicPostingError } = await admin.rpc("can_profile_post_publicly", {
           target_profile_id: auth.user.id,
         });
-        if (postingError || postingAllowed !== true) {
-          throw new ApiError("POSTING_RESTRICTED", "Your posting access is currently restricted", 403);
+        if (publicPostingError || publicPostingAllowed !== true) {
+          throw new ApiError("PUBLIC_POSTING_UNAVAILABLE", "Public posting is currently unavailable for this account", 403);
         }
       }
 

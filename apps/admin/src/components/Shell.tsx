@@ -6,6 +6,7 @@ import { PlatformOverview } from '../pages/PlatformOverview';
 import { OrganizationsGovernance } from '../pages/OrganizationsGovernance';
 import { ExpressionsGovernance } from '../pages/ExpressionsGovernance';
 import { UserGovernance } from '../pages/UserGovernance';
+import { ModerationCenter } from '../pages/ModerationCenter';
 import { RolesAccess } from '../pages/RolesAccess';
 import { AdminInvitations } from '../pages/AdminInvitations';
 import { ExpressionCreators } from '../pages/ExpressionCreators';
@@ -30,6 +31,7 @@ const allNavSections: NavSection[] = [
       { key: 'organizations', label: 'Church Organisations', permission: 'platform.organizations.read' },
       { key: 'expressions', label: 'Expressions', permission: 'platform.expressions.read' },
       { key: 'users', label: 'Accounts & Access', permission: 'platform.users.read' },
+      { key: 'moderation', label: 'Moderation', permission: 'platform.moderation.read' },
       { key: 'roles-access', label: 'Roles & Access', permission: 'platform.roles.read' },
       { key: 'admin-invitations', label: 'Administrator Access', permission: 'platform.roles.manage', superAdminOnly: true },
       { key: 'expression-creators', label: 'Expression Creation Access', permission: 'platform.expression_creators.manage', superAdminOnly: true },
@@ -164,6 +166,7 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
       case 'organizations': return <OrganizationsGovernance api={api} canManage={can('platform.organizations.manage')} />;
       case 'expressions': return <ExpressionsGovernance api={api} canManage={can('platform.expressions.manage')} />;
       case 'users': return <UserGovernance api={api} canManage={can('platform.users.manage')} />;
+      case 'moderation': return <ModerationCenter api={api} canManage={can('platform.moderation.manage')} />;
       case 'roles-access': return <RolesAccess api={api} canManage={can('platform.roles.manage')} />;
       case 'admin-invitations': return isSuperAdmin ? <AdminInvitations api={api} /> : <PlatformOverview api={api} onNavigate={navigate} allowedPages={allowedPageKeys} />;
       case 'expression-creators': return isSuperAdmin ? <ExpressionCreators api={api} /> : <PlatformOverview api={api} onNavigate={navigate} allowedPages={allowedPageKeys} />;
