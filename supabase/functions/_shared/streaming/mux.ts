@@ -78,6 +78,12 @@ function constantTime(a: string, b: string) {
 export class MuxStreamingProvider implements StreamingProvider {
   readonly code = 'mux';
 
+  async healthCheck(config: ProviderConfiguration) {
+    await mux<Record<string, any>[]>(config, '/live-streams?limit=1');
+    return true;
+  }
+
+
   async createBroadcast(config: ProviderConfiguration, request: BroadcastRequest): Promise<ProvisionedBroadcast> {
     const playbackPolicy = request.visibility === 'public' ? 'public' : 'signed';
     const data = await mux<Record<string, any>>(config, '/live-streams', {
