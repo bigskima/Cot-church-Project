@@ -135,12 +135,12 @@ export function Button({
           container: {
             paddingVertical: 14,
             paddingHorizontal: spacing.xxl,
-            minHeight: 54,
+            minHeight: 56,
             borderRadius: radius.xl,
           },
           text: {
             ...typography.h3,
-            fontWeight: '700',
+            fontWeight: '800',
           },
         };
       case 'md':
@@ -149,12 +149,12 @@ export function Button({
           container: {
             paddingVertical: 11,
             paddingHorizontal: spacing.xl,
-            minHeight: 46,
-            borderRadius: radius.lg,
+            minHeight: 48,
+            borderRadius: radius.xl,
           },
           text: {
             ...typography.bodySmall,
-            fontWeight: '700',
+            fontWeight: '800',
           },
         };
     }
