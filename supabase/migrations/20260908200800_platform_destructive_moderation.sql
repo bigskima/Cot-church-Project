@@ -14,6 +14,31 @@ create index if not exists branches_deleted_at_idx
 on public.branches(deleted_at)
 where deleted_at is not null;
 
+alter table public.content_moderation_reports
+  add column if not exists deleted_target_type text,
+  add column if not exists deleted_target_id uuid;
+
+alter table public.content_moderation_reports
+  drop constraint if exists content_moderation_reports_check;
+
+alter table public.content_moderation_reports
+  drop constraint if exists content_moderation_reports_target_check;
+
+alter table public.content_moderation_reports
+  add constraint content_moderation_reports_target_check check (
+    num_nonnulls(content_item_id, comment_id) = 1
+    or (
+      content_item_id is null
+      and comment_id is null
+      and deleted_target_id is not null
+      and deleted_target_type in ('content','comment')
+    )
+  );
+
+create index if not exists content_moderation_reports_deleted_target_idx
+on public.content_moderation_reports(deleted_target_type,deleted_target_id)
+where deleted_target_id is not null;
+
 create table if not exists public.platform_moderation_deletions (
   id uuid primary key default gen_random_uuid(),
   target_type text not null check (target_type in ('content','comment','expression')),
@@ -35,40 +60,73 @@ language plpgsql
 set search_path = ''
 as $function$
 declare
-  platform_deletion_transition boolean := false;
+  target_reference_cleared boolean := false;
+  deleted_metadata_recorded boolean := false;
 begin
-  platform_deletion_transition :=
-    (
-      old.content_item_id is not null
-      and new.content_item_id is null
-      and new.comment_id is not distinct from old.comment_id
-      and exists (
-        select 1
-        from public.platform_moderation_deletions d
-        where d.target_type='content'
-          and d.target_id=old.content_item_id::text
+  deleted_metadata_recorded :=
+    old.deleted_target_id is null
+    and new.deleted_target_id is not null
+    and (
+      (
+        old.content_item_id is not null
+        and new.deleted_target_type='content'
+        and new.deleted_target_id=old.content_item_id
+        and exists (
+          select 1
+          from public.platform_moderation_deletions d
+          where d.target_type='content'
+            and d.target_id=old.content_item_id::text
+        )
       )
-    )
-    or
-    (
-      old.comment_id is not null
-      and new.comment_id is null
-      and new.content_item_id is not distinct from old.content_item_id
-      and exists (
-        select 1
-        from public.platform_moderation_deletions d
-        where d.target_type='comment'
-          and d.target_id=old.comment_id::text
+      or
+      (
+        old.comment_id is not null
+        and new.deleted_target_type='comment'
+        and new.deleted_target_id=old.comment_id
+        and exists (
+          select 1
+          from public.platform_moderation_deletions d
+          where d.target_type='comment'
+            and d.target_id=old.comment_id::text
+        )
+      )
+    );
+
+  target_reference_cleared :=
+    new.deleted_target_id is not null
+    and new.deleted_target_type in ('content','comment')
+    and (
+      (
+        old.content_item_id is not null
+        and new.content_item_id is null
+        and new.comment_id is not distinct from old.comment_id
+        and new.deleted_target_type='content'
+        and new.deleted_target_id=old.content_item_id
+      )
+      or
+      (
+        old.comment_id is not null
+        and new.comment_id is null
+        and new.content_item_id is not distinct from old.content_item_id
+        and new.deleted_target_type='comment'
+        and new.deleted_target_id=old.comment_id
       )
     );
 
   if new.organization_id is distinct from old.organization_id
      or new.expression_id is distinct from old.expression_id
      or (
-       not platform_deletion_transition
+       not target_reference_cleared
        and (
          new.content_item_id is distinct from old.content_item_id
          or new.comment_id is distinct from old.comment_id
+       )
+     )
+     or (
+       not deleted_metadata_recorded
+       and (
+         new.deleted_target_type is distinct from old.deleted_target_type
+         or new.deleted_target_id is distinct from old.deleted_target_id
        )
      )
      or new.reporter_profile_id is distinct from old.reporter_profile_id
@@ -258,20 +316,28 @@ begin
   where cc.content_item_id=content_row.id;
 
   update public.content_moderation_reports
-  set status='actioned',
-      reviewed_by=actor_profile_id,
-      action_taken='Removed by Platform Moderation: ' || normalized_reason
-  where content_item_id=content_row.id
-    and status in ('pending','under_review');
+  set deleted_target_type='content',
+      deleted_target_id=content_row.id,
+      status=case when status in ('pending','under_review') then 'actioned' else status end,
+      reviewed_by=case when status in ('pending','under_review') then actor_profile_id else reviewed_by end,
+      action_taken=case
+        when status in ('pending','under_review') then 'Removed by Platform Moderation: ' || normalized_reason
+        else action_taken
+      end
+  where content_item_id=content_row.id;
 
   update public.content_moderation_reports r
-  set status='actioned',
-      reviewed_by=actor_profile_id,
-      action_taken='Removed by Platform Moderation: ' || normalized_reason
+  set deleted_target_type='comment',
+      deleted_target_id=r.comment_id,
+      status=case when r.status in ('pending','under_review') then 'actioned' else r.status end,
+      reviewed_by=case when r.status in ('pending','under_review') then actor_profile_id else r.reviewed_by end,
+      action_taken=case
+        when r.status in ('pending','under_review') then 'Removed by Platform Moderation: ' || normalized_reason
+        else r.action_taken
+      end
   where r.comment_id in (
       select cc.id from public.content_comments cc where cc.content_item_id=content_row.id
-    )
-    and r.status in ('pending','under_review');
+    );
 
   if content_row.content_type='post'::public.content_item_type then
     insert into public.platform_storage_cleanup_tasks(deletion_id,bucket,storage_path)
@@ -464,12 +530,16 @@ begin
   where cc.id=any(coalesce(affected_ids,array[]::uuid[]))
     and cc.id<>comment_row.id;
 
-  update public.content_moderation_reports
-  set status='actioned',
-      reviewed_by=actor_profile_id,
-      action_taken='Removed by Platform Moderation: ' || normalized_reason
-  where comment_id=any(coalesce(affected_ids,array[target_comment_id]))
-    and status in ('pending','under_review');
+  update public.content_moderation_reports r
+  set deleted_target_type='comment',
+      deleted_target_id=r.comment_id,
+      status=case when r.status in ('pending','under_review') then 'actioned' else r.status end,
+      reviewed_by=case when r.status in ('pending','under_review') then actor_profile_id else r.reviewed_by end,
+      action_taken=case
+        when r.status in ('pending','under_review') then 'Removed by Platform Moderation: ' || normalized_reason
+        else r.action_taken
+      end
+  where r.comment_id=any(coalesce(affected_ids,array[target_comment_id]));
 
   delete from public.content_comments
   where id=target_comment_id;
