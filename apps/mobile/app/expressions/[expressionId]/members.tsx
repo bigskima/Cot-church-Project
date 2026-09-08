@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Avatar, EmptyState, Icon, ResourceError, Skeleton } from '@/components';
+import { ExpressionPeopleHeader } from '@/components/expression/ExpressionPeopleHeader';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 import { useSession } from '@/state/session';
@@ -69,133 +70,143 @@ export default function ExpressionMembersScreen() {
   }, [query, resource.data]);
 
   return (
-    <ScrollView
-      style={{ backgroundColor: colors.bg }}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={resource.refreshing}
-          onRefresh={resource.refresh}
-          tintColor={colors.interactive}
-        />
-      }
-    >
-      <View style={styles.heading}>
-        <Text style={[styles.eyebrow, { color: colors.interactive }]}>EXPRESSION PEOPLE</Text>
-        <Text style={[styles.title, { color: colors.text }]}>Members</Text>
-        <Text style={[styles.copy, { color: colors.textSecondary }]}>
-          People who currently belong to {expressionName}.
-        </Text>
-      </View>
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+      <ExpressionPeopleHeader
+        expressionId={id}
+        expressionName={expressionName}
+        active="members"
+        title="Members"
+        subtitle="Find the people who belong to this Expression and recognize the community around you."
+        icon="people-outline"
+      />
 
-      <View
-        style={[
-          styles.searchBar,
-          { backgroundColor: colors.card, borderColor: colors.borderSubtle },
-          shadows.sm,
-        ]}
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={resource.refreshing}
+            onRefresh={resource.refresh}
+            tintColor={colors.interactive}
+          />
+        }
       >
-        <Icon name="search-outline" size={18} color={colors.textMuted} />
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Find a member"
-          placeholderTextColor={colors.textMuted}
-          style={[styles.searchInput, { color: colors.text }]}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        {resource.data ? (
-          <View style={[styles.countPill, { backgroundColor: colors.primarySoft }]}>
-            <Text style={[styles.countText, { color: colors.interactive }]}>
-              {resource.data.length}
+        <View
+          style={[
+            styles.searchBar,
+            { backgroundColor: colors.card, borderColor: colors.borderSubtle },
+            shadows.sm,
+          ]}
+        >
+          <Icon name="search-outline" size={18} color={colors.textMuted} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Find a member"
+            placeholderTextColor={colors.textMuted}
+            style={[styles.searchInput, { color: colors.text }]}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {resource.data ? (
+            <View style={[styles.countPill, { backgroundColor: colors.primarySoft }]}>
+              <Text style={[styles.countText, { color: colors.interactive }]}>
+                {resource.data.length}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+
+        {resource.loading && !resource.data ? (
+          <View style={styles.stack}>
+            <Skeleton height={68} count={6} />
+          </View>
+        ) : resource.error && !resource.data ? (
+          <ResourceError message={resource.error} retry={resource.refresh} />
+        ) : members.length ? (
+          <View style={styles.stack}>
+            {members.map((member) => {
+              const profile = profileOf(member);
+              const name = profile?.display_name || profile?.username || 'Expression member';
+              const username = profile?.username ? `@${profile.username}` : null;
+              const isYou = profile?.id === context?.profile?.id;
+              const joined = joinedLabel(member.joined_at);
+
+              return (
+                <View
+                  key={member.id}
+                  style={[
+                    styles.memberRow,
+                    { backgroundColor: colors.card, borderColor: isYou ? colors.interactive : colors.borderSubtle },
+                    shadows.sm,
+                  ]}
+                >
+                  <Avatar url={profile?.avatar_url ?? undefined} name={name} size="md" />
+                  <View style={styles.memberCopy}>
+                    <View style={styles.nameRow}>
+                      <Text style={[styles.memberName, { color: colors.text }]} numberOfLines={1}>
+                        {name}
+                      </Text>
+                      {isYou ? (
+                        <View style={[styles.youPill, { backgroundColor: colors.primarySoft }]}>
+                          <Text style={[styles.youText, { color: colors.interactive }]}>YOU</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    <Text style={[styles.memberMeta, { color: colors.textMuted }]} numberOfLines={1}>
+                      {[username, joined ? `Joined ${joined}` : null].filter(Boolean).join(' · ') || 'Expression member'}
+                    </Text>
+                  </View>
+                  <View style={[styles.memberIcon, { backgroundColor: colors.bgSecondary }]}>
+                    <Icon name="person-outline" size={16} color={colors.textMuted} />
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ) : (
+          <EmptyState
+            title={query.trim() ? 'No members match your search' : 'No active members found'}
+            message={
+              query.trim()
+                ? 'Try another name or username.'
+                : 'Active Expression members will appear here.'
+            }
+            iconName="people-outline"
+          />
+        )}
+
+        <View style={[styles.privacyNote, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+          <View style={[styles.privacyIcon, { backgroundColor: colors.primarySoft }]}>
+            <Icon name="shield-checkmark-outline" size={17} color={colors.interactive} />
+          </View>
+          <View style={styles.privacyCopy}>
+            <Text style={[styles.privacyTitle, { color: colors.text }]}>Member-safe directory</Text>
+            <Text style={[styles.privacyText, { color: colors.textSecondary }]}>
+              This directory shows only member-facing profile information. Private contact details and administration data stay protected.
             </Text>
           </View>
-        ) : null}
-      </View>
-
-      {resource.loading && !resource.data ? (
-        <View style={styles.stack}>
-          <Skeleton height={72} count={6} />
         </View>
-      ) : resource.error && !resource.data ? (
-        <ResourceError message={resource.error} retry={resource.refresh} />
-      ) : members.length ? (
-        <View style={styles.stack}>
-          {members.map((member) => {
-            const profile = profileOf(member);
-            const name = profile?.display_name || profile?.username || 'Expression member';
-            const username = profile?.username ? `@${profile.username}` : null;
-            const isYou = profile?.id === context?.profile?.id;
-            const joined = joinedLabel(member.joined_at);
-
-            return (
-              <View
-                key={member.id}
-                style={[
-                  styles.memberRow,
-                  { backgroundColor: colors.card, borderColor: colors.borderSubtle },
-                  shadows.sm,
-                ]}
-              >
-                <Avatar url={profile?.avatar_url ?? undefined} name={name} size="md" />
-                <View style={styles.memberCopy}>
-                  <View style={styles.nameRow}>
-                    <Text style={[styles.memberName, { color: colors.text }]} numberOfLines={1}>
-                      {name}
-                    </Text>
-                    {isYou ? (
-                      <View style={[styles.youPill, { backgroundColor: colors.primarySoft }]}>
-                        <Text style={[styles.youText, { color: colors.interactive }]}>YOU</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  <Text style={[styles.memberMeta, { color: colors.textMuted }]} numberOfLines={1}>
-                    {[username, joined ? `Joined ${joined}` : null].filter(Boolean).join(' · ') || 'Expression member'}
-                  </Text>
-                </View>
-              </View>
-            );
-          })}
-        </View>
-      ) : (
-        <EmptyState
-          title={query.trim() ? 'No members match your search' : 'No active members found'}
-          message={
-            query.trim()
-              ? 'Try another name or username.'
-              : 'Active Expression members will appear here.'
-          }
-          iconName="people-outline"
-        />
-      )}
-
-      <View style={[styles.privacyNote, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
-        <Icon name="shield-checkmark-outline" size={18} color={colors.interactive} />
-        <Text style={[styles.privacyText, { color: colors.textSecondary }]}>
-          This directory shows only member-facing profile information. Private contact details and administration data are not exposed here.
-        </Text>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1 },
+  scroll: { flex: 1 },
   content: {
     width: '100%',
     maxWidth: 820,
     alignSelf: 'center',
     padding: spacing.md,
+    paddingTop: spacing.sm,
     paddingBottom: 80,
     gap: spacing.md,
   },
-  heading: { marginBottom: spacing.xs },
-  eyebrow: { fontSize: 10, lineHeight: 14, fontWeight: '900', letterSpacing: 0.9 },
-  title: { fontSize: 22, lineHeight: 28, fontWeight: '800' },
-  copy: { fontSize: 12, lineHeight: 18, marginTop: 3 },
   searchBar: {
-    minHeight: 50,
+    minHeight: 48,
     borderWidth: 1,
     borderRadius: radius.xl,
     paddingHorizontal: spacing.md,
@@ -208,10 +219,11 @@ const styles = StyleSheet.create({
   countText: { fontSize: 11, fontWeight: '900' },
   stack: { gap: spacing.sm },
   memberRow: {
-    minHeight: 72,
+    minHeight: 68,
     borderWidth: 1,
     borderRadius: radius.xl,
-    padding: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
@@ -219,7 +231,8 @@ const styles = StyleSheet.create({
   memberCopy: { flex: 1, minWidth: 0 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   memberName: { flexShrink: 1, fontSize: 14, lineHeight: 19, fontWeight: '800' },
-  memberMeta: { fontSize: 11, lineHeight: 16, marginTop: 3 },
+  memberMeta: { fontSize: 11, lineHeight: 16, marginTop: 2 },
+  memberIcon: { width: 32, height: 32, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   youPill: { borderRadius: radius.pill, paddingHorizontal: 7, paddingVertical: 2 },
   youText: { fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 0.5 },
   privacyNote: {
@@ -231,5 +244,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.xs,
   },
-  privacyText: { flex: 1, fontSize: 11, lineHeight: 17 },
+  privacyIcon: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  privacyCopy: { flex: 1, minWidth: 0 },
+  privacyTitle: { fontSize: 12, lineHeight: 16, fontWeight: '800' },
+  privacyText: { fontSize: 11, lineHeight: 17, marginTop: 2 },
 });
