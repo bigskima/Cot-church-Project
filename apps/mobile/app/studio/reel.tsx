@@ -162,9 +162,12 @@ export default function ReelCreatorScreen() {
   return (
     <KeyboardAvoidingView style={[styles.screen, { backgroundColor: colors.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: expressionWorkspace ? spacing.md : insets.top + spacing.sm, paddingBottom: expressionWorkspace ? insets.bottom + spacing.xl : insets.bottom + 130 }]}>
-        <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
-          <ScreenHeader title="Create Reel" kicker="MEDIA STUDIO" subtitle={expressionWorkspace ? `Publish a vertical video inside ${expression?.name ?? 'this Expression'}.` : generalWorkspace ? "Publish a vertical video to General COT." : "Upload a vertical video and choose exactly where it should appear."} showBack />
-        </View>
+        {!expressionWorkspace ? (
+          <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+            <ScreenHeader title="Create Reel" kicker="MEDIA STUDIO" subtitle={expressionWorkspace ? `Publish a vertical video inside ${expression?.name ?? 'this Expression'}.` : generalWorkspace ? "Publish a vertical video to General COT." : "Upload a vertical video and choose exactly where it should appear."} showBack />
+          </View>
+        ) : null}
+
         <View style={styles.body}>
           {errorMsg ? (
             <Pressable
@@ -182,8 +185,8 @@ export default function ReelCreatorScreen() {
             <View style={[styles.notice, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
               <Icon name="shield-outline" size={22} color={colors.textMuted} />
               <View style={styles.noticeCopy}>
-                <Text style={[styles.noticeTitle, { color: colors.text }]}>Reel publishing is role-scoped</Text>
-                <Text style={[styles.noticeText, { color: colors.textSecondary }]}>Your role does not currently grant Reel publishing in Public COT or the active Expression.</Text>
+                <Text style={[styles.noticeTitle, { color: colors.text }]}>Reel publishing isn’t available here</Text>
+                <Text style={[styles.noticeText, { color: colors.textSecondary }]}>Reel publishing is available only in church spaces where you’ve been added to the content team.</Text>
               </View>
             </View>
           ) : (
