@@ -248,7 +248,7 @@ Deno.serve(createHandler(
           .limit(1);
         if (!(existing ?? []).length) {
           const { error: renditionError } = await admin.from("media_renditions").insert({
-            organization_id: organizationId,
+            organization_id: asset.organization_id,
             media_asset_id: assetId,
             rendition_kind: mime.rendition,
             container: mime.ext,
