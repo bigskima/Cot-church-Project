@@ -70,21 +70,8 @@ function timeValue(value?: string | null) {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { api, context, mode, hasOrganizationCapability, hasPublicCapability } = useSession();
+  const { api, context, mode } = useSession();
   const { colors } = useTheme();
-
-  const hasPublicBroadcastAccess = hasPublicCapability('public.live_stream.create');
-  const hasGeneralPastoralAccess =
-    (hasOrganizationCapability('prayer.moderate') &&
-      (hasOrganizationCapability('prayer.pastoral.receive') || hasOrganizationCapability('prayer.team.receive'))) ||
-    hasOrganizationCapability('pastoral.followups.receive');
-  const hasGeneralLeadershipCapability =
-    hasPublicBroadcastAccess ||
-    hasOrganizationCapability('organization.leadership.manage') ||
-    hasOrganizationCapability('giving.campaigns.manage') ||
-    hasOrganizationCapability('giving.finance.read') ||
-    hasGeneralPastoralAccess ||
-    Boolean(context?.creatorOrganizations?.length);
 
   const contextOrganization = context?.organization ?? context?.organizations?.[0];
   const organizationId = contextOrganization?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
@@ -312,9 +299,9 @@ export default function HomeScreen() {
           <Pressable onPress={() => router.push('/general/assistant')} hitSlop={8} style={({ pressed }) => [styles.iconButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.iconPressed]} accessibilityRole="button" accessibilityLabel="COT Assistant">
             <Icon name="sparkles" size={18} color={colors.interactive} />
           </Pressable>
-          {hasGeneralLeadershipCapability ? (
-            <Pressable onPress={() => router.push('/general/studio')} hitSlop={8} style={({ pressed }) => [styles.iconButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.iconPressed]} accessibilityRole="button" accessibilityLabel="Ministry Studio">
-              <Icon name="grid-outline" size={18} color={colors.text} />
+          {mode === 'authenticated' ? (
+            <Pressable onPress={() => router.push('/general/studio')} hitSlop={8} style={({ pressed }) => [styles.iconButton, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }, pressed && styles.iconPressed]} accessibilityRole="button" accessibilityLabel="Create">
+              <Icon name="add-outline" size={20} color={colors.interactive} />
             </Pressable>
           ) : null}
           <Pressable onPress={() => router.push('/general/live' as any)} hitSlop={8} style={({ pressed }) => [styles.iconButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.iconPressed]} accessibilityRole="button" accessibilityLabel="Live">
