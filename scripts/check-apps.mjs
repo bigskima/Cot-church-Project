@@ -321,7 +321,7 @@ const checks = [
   [/\/expressions\/\$\{id\}\/event\/\$\{event\.id\}/, 'Expression event links carry exact Expression identity'],
   [/\/expressions\/\$\{expressionId\}\/comments\/\[contentId\]/, 'Expression comment links carry exact Expression identity'],
   [/postExpressionId[\s\S]*\/expressions\/\$\{postExpressionId\}\/reels/, 'Expression-shared Reels preserve exact Expression route'],
-  [/EXPRESSION MEDIA[\s\S]*key: 'live'[\s\S]*key: 'sermons'[\s\S]*key: 'videos'[\s\S]*key: 'reels'/, 'Expression media header keeps media destinations connected'],
+  [/key: 'live'[\s\S]*key: 'sermons'[\s\S]*key: 'videos'[\s\S]*key: 'reels'[\s\S]*EXPRESSION MEDIA/, 'Expression media header keeps media destinations connected'],
   [/\/expressions\/\$\{item\.expressionId\}\/videos\/\[videoId\]/, 'saved private videos use exact Expression identity'],
   [/\/expressions\/\$\{item\.expressionId\}\/sermons\/\[sermonId\]/, 'saved private sermons use exact Expression identity'],
   [/function generalTarget[\s\S]*LegacyTabRedirect[\s\S]*Redirect/, 'legacy tab tree is redirect-only'],
