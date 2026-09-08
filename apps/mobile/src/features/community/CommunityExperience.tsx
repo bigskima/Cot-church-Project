@@ -69,7 +69,6 @@ type UploadableMedia = {
 
 const MAX_MEDIA_BYTES = 50 * 1024 * 1024;
 const MAX_MEMBER_PUBLIC_ATTACHMENTS = 4;
-const MAX_MEMBER_PUBLIC_VIDEO_SECONDS = 180;
 
 function inferImagePickerMime(asset: ImagePicker.ImagePickerAsset) {
   if (asset.mimeType) return asset.mimeType.toLowerCase();
@@ -137,8 +136,7 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
   // membership is not required to publish there; account restrictions and the
   // backend scope contract still apply. Expression publishing remains separate.
   const elevatedGeneralPublisher = hasOrganizationCapability('feed.post');
-  const canPostGeneral =
-    mode === 'authenticated' && Boolean(organizationId);
+  const canPostGeneral = mode === 'authenticated';
   const canPostExpression =
     mode === 'authenticated' && Boolean(expression?.id);
   const canPostCurrent = activeTab === 'general' ? canPostGeneral : canPostExpression;
@@ -146,12 +144,9 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
   const ordinaryGeneralMemberLane = postDestination === 'general' && !elevatedGeneralPublisher;
   const attachmentLimit = ordinaryGeneralMemberLane ? MAX_MEMBER_PUBLIC_ATTACHMENTS : 10;
   const postTextLimit = ordinaryGeneralMemberLane ? 2200 : 10000;
-  const canAttachAudio = !ordinaryGeneralMemberLane;
+  const canAttachAudio = canPostDestination;
   const canEngage = mode === 'authenticated';
-  const canCreatePublicReel =
-    mode === 'authenticated' &&
-    hasOrganizationCapability('media.upload') &&
-    hasOrganizationCapability('reels.publish');
+  const canCreatePublicReel = mode === 'authenticated';
   const canCreateExpressionReel =
     mode === 'authenticated' &&
     Boolean(expression?.id) &&
@@ -159,6 +154,14 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
     hasCapability('reels.publish');
   const canCreateReel =
     postDestination === 'general' ? canCreatePublicReel : canCreateExpressionReel;
+  const canCreatePublicVideo = mode === 'authenticated';
+  const canCreateExpressionVideo =
+    mode === 'authenticated' &&
+    Boolean(expression?.id) &&
+    hasCapability('media.upload') &&
+    hasCapability('videos.publish');
+  const canCreateVideo =
+    postDestination === 'general' ? canCreatePublicVideo : canCreateExpressionVideo;
 
   const cleanupAttachments = async (items = attachments) => {
     if (!items.length) return;
@@ -200,17 +203,6 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
     const binary = await readUploadBody(media);
     const sizeBytes = Number(binary.size || media.reportedSize || 0);
     if (!sizeBytes || sizeBytes > MAX_MEDIA_BYTES) throw new Error('Each attachment must be 50 MB or smaller.');
-
-    if (ordinaryGeneralMemberLane && media.mimeType.startsWith('audio/')) {
-      throw new Error('General Community member posts support text, photos and short videos. Audio ministry content requires publishing access.');
-    }
-    if (
-      ordinaryGeneralMemberLane &&
-      media.mimeType.startsWith('video/') &&
-      (!media.durationSeconds || media.durationSeconds > MAX_MEMBER_PUBLIC_VIDEO_SECONDS)
-    ) {
-      throw new Error('General Community videos must be 3 minutes or shorter.');
-    }
 
     const branchId = postDestination === 'expression' ? expression?.id : undefined;
     const intent = await api.request<UploadIntent>('community-media', {
@@ -483,7 +475,7 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
             <View style={styles.composerCopy}>
               <Text style={[styles.composerPrompt, { color: colors.text }]}>Share with the community</Text>
               <Text style={[styles.composerPlaceholder, { color: colors.textMuted }]}>
-                {activeTab === 'general' && !elevatedGeneralPublisher ? 'Text, photos or short video' : 'Text, photos, video or audio'}
+                {activeTab === 'general' ? 'Text, photos, video or audio' : 'Text, photos, video or audio'}
               </Text>
             </View>
             <View style={[styles.composeActionIcon, { backgroundColor: colors.primarySoft }]}>
@@ -566,9 +558,9 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
               ) : null}
             </View>
             <Text style={[styles.destinationHelp, { color: colors.textMuted }]}>
-              {ordinaryGeneralMemberLane
-                ? 'General Community posts are public. Member posts are lightweight social content: text, photos and short videos only. Sermons, long-form Watch, canonical Reels and Live require publishing authority.'
-                : 'General Community posts are public. Expression posts remain inside your selected Expression.'}
+              {postDestination === 'general'
+                ? 'General Community posts are public. Signed-in members can share text, photos, videos and audio, or open the dedicated Reel and Video creators.'
+                : 'Expression posts remain inside your selected Expression and follow that Expression’s publishing access.'}
             </Text>
           </View>
 
@@ -591,7 +583,7 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
           <View style={styles.mediaToolbar}>
             <Pressable onPress={() => void choosePhotoOrVideo()} disabled={mediaUploading || attachments.length >= attachmentLimit} style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
               <Icon name="images-outline" size={18} color={colors.interactive} />
-              <Text style={[styles.mediaButtonText, { color: colors.text }]}>{ordinaryGeneralMemberLane ? 'Photo / Short video' : 'Photo / Video'}</Text>
+              <Text style={[styles.mediaButtonText, { color: colors.text }]}>Photo / Video</Text>
             </Pressable>
             {canAttachAudio ? (
               <Pressable onPress={() => void chooseAudio()} disabled={mediaUploading || attachments.length >= attachmentLimit} style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
@@ -614,6 +606,23 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
               >
                 <Icon name="flash-outline" size={18} color={colors.interactive} />
                 <Text style={[styles.mediaButtonText, { color: colors.text }]}>Create Reel</Text>
+              </Pressable>
+            ) : null}
+            {canCreateVideo ? (
+              <Pressable
+                onPress={() => {
+                  const targetScope = postDestination === 'expression' ? 'branch' : 'public';
+                  closeComposer();
+                  router.push(
+                    postDestination === 'expression' && expression?.id
+                      ? ({ pathname: `/expressions/${expression.id}/manage/video`, params: { scope: targetScope } } as any)
+                      : ({ pathname: '/general/studio/video', params: { scope: targetScope } } as any),
+                  );
+                }}
+                style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}
+              >
+                <Icon name="videocam-outline" size={18} color={colors.interactive} />
+                <Text style={[styles.mediaButtonText, { color: colors.text }]}>Create Video</Text>
               </Pressable>
             ) : null}
           </View>
