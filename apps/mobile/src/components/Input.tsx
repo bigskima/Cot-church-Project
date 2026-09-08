@@ -165,27 +165,27 @@ export function SearchBar({
 }
 
 const styles = StyleSheet.create({
-  container: { marginBottom: spacing.lg },
+  container: { marginBottom: spacing.md },
   label: {
     ...typography.caption,
     fontWeight: '700',
-    marginBottom: spacing.sm,
+    marginBottom: 6,
     paddingHorizontal: 2,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     borderWidth: 1,
     paddingHorizontal: spacing.md,
-    minHeight: 50,
+    minHeight: 52,
   },
   focusedInput: { ...shadows.sm },
   input: {
     flex: 1,
     fontSize: 15,
-    lineHeight: 20,
-    paddingVertical: 12,
+    lineHeight: 21,
+    paddingVertical: 13,
   },
   iconLeft: { marginRight: spacing.sm },
   iconRight: { marginLeft: spacing.sm },
