@@ -229,8 +229,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     zIndex: 2,
   },
-  title: { ...typography.display },
-  compactTitle: { ...typography.h1 },
+  title: { ...typography.display, fontWeight: '900', letterSpacing: -1.1 },
+  compactTitle: { ...typography.h1, fontWeight: '900' },
   subtitle: {
     ...typography.bodySmall,
     marginTop: spacing.xs,
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
     paddingHorizontal: spacing.lg,
-    marginTop: spacing.xxl,
+    marginTop: spacing.xl,
     marginBottom: spacing.md,
   },
   sectionCopy: { flex: 1, minWidth: 0 },
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  sectionTitle: { ...typography.h2 },
+  sectionTitle: { ...typography.h2, fontWeight: '900', letterSpacing: -0.5 },
   sectionBadge: {
     minWidth: 24,
     minHeight: 22,
