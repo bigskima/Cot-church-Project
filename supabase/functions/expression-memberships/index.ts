@@ -39,7 +39,7 @@ Deno.serve(createHandler(
           .eq("status", "active")
           .order("joined_at", { ascending: true });
         if (error) throw new ApiError("EXPRESSION_MEMBERSHIPS_FAILED", "Unable to load your Expressions", 500, undefined, false);
-        return { data: data ?? [] };
+        return { data: (data ?? []).filter((membership: any) => membership.branch?.is_active === true) };
       }
 
       if (view === "codes") {
