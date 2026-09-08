@@ -1,5 +1,5 @@
 import React from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CommentsThread, ResourceError, ScreenHeader } from '@/components';
@@ -36,7 +36,19 @@ export function CommentsScreen({ forcedScope }: { forcedScope?: 'general' | 'exp
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <View style={{ paddingTop: insets.top }}>
-        <ScreenHeader title="Comments" showBack />
+        <ScreenHeader
+          title={expressionMode ? 'Expression conversation' : 'Conversation'}
+          subtitle={expressionMode ? 'Replies stay inside this private Expression.' : 'Join the public COT discussion around this post.'}
+          kicker={expressionMode ? 'EXPRESSION' : 'GENERAL COT'}
+          showBack
+          rightAction={
+            comments.data ? (
+              <View style={[styles.countPill, { backgroundColor: colors.primarySoft }]}>
+                <Text style={[styles.countText, { color: colors.interactive }]}>{comments.data.length}</Text>
+              </View>
+            ) : null
+          }
+        />
       </View>
 
       {comments.error && !comments.data ? (
@@ -93,4 +105,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   flex: { flex: 1 },
   content: { width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.sm },
+  countPill: { minWidth: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm },
+  countText: { fontSize: 12, fontWeight: '900' },
 });
