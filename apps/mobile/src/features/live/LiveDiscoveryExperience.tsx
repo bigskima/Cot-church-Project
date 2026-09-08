@@ -15,6 +15,7 @@ import {
   SectionHeader,
   Skeleton,
 } from '@/components';
+import { ExpressionMediaHeader } from '@/components/expression/ExpressionMediaHeader';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import type { LiveStream } from '@/types/content';
 
@@ -76,18 +77,25 @@ export function LiveDiscoveryExperience({ scope = 'general', embedded = false }:
           />
         }
       >
-        {embedded ? (
+        {embedded && expressionMode && expressionId ? (
+          <ExpressionMediaHeader
+            expressionId={expressionId}
+            expressionName={expression?.name ?? 'This Expression'}
+            active="live"
+            title="Live"
+            subtitle="Watch current broadcasts, see what is scheduled next and return to recent replays."
+            icon="radio-outline"
+            actionLabel={canOpenLiveStudio ? 'Studio' : undefined}
+            actionIcon="videocam-outline"
+            onAction={canOpenLiveStudio ? () => router.push(`/expressions/${expressionId}/manage/live` as any) : undefined}
+          />
+        ) : embedded ? (
           <View style={[styles.embeddedHeader, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
             <View style={styles.embeddedHeaderCopy}>
-              <Text style={[styles.embeddedEyebrow, { color: colors.interactive }]}>EXPRESSION LIVE</Text>
-              <Text style={[styles.embeddedTitle, { color: colors.text }]}>Live</Text>
-              <Text style={[styles.embeddedSubtitle, { color: colors.textSecondary }]}>
-                Broadcasts and replays inside {expression?.name ?? 'this Expression'}.
-              </Text>
+              <Text style={[styles.embeddedEyebrow, { color: colors.interactive }]}>LIVE</Text>
+              <Text style={[styles.embeddedTitle, { color: colors.text }]}>Broadcasts</Text>
+              <Text style={[styles.embeddedSubtitle, { color: colors.textSecondary }]}>Services, gatherings and replays from COT.</Text>
             </View>
-            {canOpenLiveStudio ? (
-              <Button label="Live studio" onPress={() => router.push((expressionMode && expressionId ? `/expressions/${expressionId}/manage/live` : '/general/leadership/media-studio') as any)} size="sm" />
-            ) : null}
           </View>
         ) : (
           <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
@@ -105,11 +113,26 @@ export function LiveDiscoveryExperience({ scope = 'general', embedded = false }:
               ) : undefined}
             />
           </View>
-  
-  
         )}
 
         <View style={styles.body}>
+          {expressionMode && resource.data ? (
+            <View style={styles.summaryRow}>
+              <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: liveStreams.length ? colors.live : colors.borderSubtle }]}>
+                <Text style={[styles.summaryNumber, { color: liveStreams.length ? colors.live : colors.text }]}>{liveStreams.length}</Text>
+                <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Live now</Text>
+              </View>
+              <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+                <Text style={[styles.summaryNumber, { color: colors.text }]}>{scheduledStreams.length}</Text>
+                <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Upcoming</Text>
+              </View>
+              <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+                <Text style={[styles.summaryNumber, { color: colors.text }]}>{replays.length}</Text>
+                <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Replays</Text>
+              </View>
+            </View>
+          ) : null}
+
           {resource.loading && !resource.data ? (
             <View style={styles.loadingWrapper}>
               <Skeleton height={200} />
@@ -121,16 +144,23 @@ export function LiveDiscoveryExperience({ scope = 'general', embedded = false }:
             <>
               {liveStreams.length > 0 ? (
                 <View style={styles.sectionWrap}>
-                  <SectionHeader title="Broadcasting Now" />
+                  <SectionHeader title="Broadcasting now" badge={liveStreams.length} subtitle="Current broadcasts inside this Expression." />
                   <HeroLiveCard
                     stream={liveStreams[0]}
                     onPress={() => openStream(liveStreams[0].id)}
                   />
+                  {liveStreams.length > 1 ? (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carouselContainer}>
+                      {liveStreams.slice(1).map((stream) => (
+                        <LiveCard key={stream.id} stream={stream} onPress={() => openStream(stream.id)} />
+                      ))}
+                    </ScrollView>
+                  ) : null}
                 </View>
               ) : null}
 
               <View style={styles.sectionWrap}>
-                <SectionHeader title="Upcoming" badge={scheduledStreams.length} />
+                <SectionHeader title="Upcoming" badge={scheduledStreams.length} subtitle="Scheduled and preparing broadcasts." />
                 {scheduledStreams.length > 0 ? (
                   <ScrollView
                     horizontal
@@ -143,8 +173,8 @@ export function LiveDiscoveryExperience({ scope = 'general', embedded = false }:
                   </ScrollView>
                 ) : (
                   <EmptyState
-                    title="No Upcoming Broadcasts"
-                    message="No upcoming live broadcasts have been scheduled yet."
+                    title="No upcoming broadcasts"
+                    message="Nothing has been scheduled for this Expression yet."
                     iconName="radio-outline"
                   />
                 )}
@@ -152,7 +182,7 @@ export function LiveDiscoveryExperience({ scope = 'general', embedded = false }:
 
               {replays.length > 0 ? (
                 <View style={styles.sectionWrap}>
-                  <SectionHeader title="Replays & recordings" badge={replays.length} subtitle="Ended services stay here while recordings finish processing." />
+                  <SectionHeader title="Replays & recordings" badge={replays.length} subtitle="Ended broadcasts stay here while recordings finish processing." />
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -194,6 +224,10 @@ const styles = StyleSheet.create({
   content: { flexGrow: 1 },
   body: { paddingHorizontal: spacing.md, gap: spacing.xl },
   headerCard: { marginHorizontal: spacing.md, borderWidth: 1, borderRadius: radius.xxl, overflow: 'hidden' },
+  summaryRow: { flexDirection: 'row', gap: spacing.sm },
+  summaryCard: { flex: 1, minHeight: 62, borderWidth: 1, borderRadius: radius.xl, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, justifyContent: 'center' },
+  summaryNumber: { fontSize: 18, lineHeight: 22, fontWeight: '900', letterSpacing: -0.4 },
+  summaryLabel: { fontSize: 9, lineHeight: 13, fontWeight: '800', marginTop: 2 },
   loadingWrapper: { gap: spacing.md },
   sectionWrap: { gap: spacing.sm },
   carouselContainer: { gap: spacing.md, paddingVertical: spacing.xs },
