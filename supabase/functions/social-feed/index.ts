@@ -3,6 +3,8 @@ import { ApiError } from "../_shared/errors.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { enrichContentEngagement, enrichSocialPosts } from "../_shared/public-identity.ts";
+import { resolveActiveOrganizationId } from "../_shared/public-organization.ts";
+import { adminClient } from "../_shared/supabase.ts";
 import { assertNoUnknownFields, assertObject, requiredString, uuid } from "../_shared/validation.ts";
 
 const visibilities = new Set(["public", "organization", "branch", "group", "private"]);
@@ -100,11 +102,11 @@ Deno.serve(createHandler(
     }
 
     const body = assertObject(await jsonBody(request));
-    const targetOrganizationId = body.organizationId
+    const requestedOrganizationId = body.organizationId
       ? uuid(String(body.organizationId), "organizationId", true)!
       : auth.organizationId;
-    if (!targetOrganizationId) throw new ApiError("ORGANIZATION_REQUIRED", "Choose a church community before publishing", 422);
-    if (auth.organizationId && targetOrganizationId !== auth.organizationId) {
+    const targetOrganizationId = await resolveActiveOrganizationId(adminClient(), requestedOrganizationId);
+    if (auth.organizationId && body.organizationId && targetOrganizationId !== auth.organizationId) {
       throw new ApiError("ORGANIZATION_ACCESS_DENIED", "The selected church does not match this request", 403);
     }
 

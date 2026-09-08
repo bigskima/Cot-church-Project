@@ -38,15 +38,12 @@ export default function WatchVideoCreatorScreen() {
   const expressionWorkspace = pathname.startsWith('/expressions/');
   const generalWorkspace = pathname.startsWith('/general/');
   const insets = useSafeAreaInsets();
-  const { api, context, mode, hasCapability, hasOrganizationCapability } = useSession();
+  const { api, context, mode, hasCapability } = useSession();
   const { colors } = useTheme();
   const expression = context?.expression;
+  const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
   const { scope: requestedScope } = useLocalSearchParams<{ scope?: string }>();
-  const canPublishPublic =
-    !expressionWorkspace &&
-    mode === 'authenticated' &&
-    hasOrganizationCapability('media.upload') &&
-    hasOrganizationCapability('videos.publish');
+  const canPublishPublic = generalWorkspace && mode === 'authenticated';
   const canPublishExpression =
     !generalWorkspace &&
     mode === 'authenticated' &&
@@ -141,6 +138,7 @@ export default function WatchVideoCreatorScreen() {
   const cancelAsset = async (assetId: string) => {
     await api.request('content-media', {
       method: 'POST',
+      context: generalWorkspace ? 'public' : 'current',
       body: JSON.stringify({ action: 'cancel_upload', assetId }),
     }).catch(() => undefined);
   };
@@ -155,8 +153,10 @@ export default function WatchVideoCreatorScreen() {
       setStage('Preparing secure upload…');
       const intent = await api.request<UploadIntent>('content-media', {
         method: 'POST',
+        context: generalWorkspace ? 'public' : 'current',
         body: JSON.stringify({
           action: 'create_upload_intent',
+          organizationId: generalWorkspace ? organizationId || undefined : undefined,
           mediaType: 'video',
           mimeType: video.mimeType,
           expressionId: selectedExpressionId,
@@ -179,14 +179,17 @@ export default function WatchVideoCreatorScreen() {
       setStage('Verifying upload…');
       await api.request('content-media', {
         method: 'POST',
+        context: generalWorkspace ? 'public' : 'current',
         body: JSON.stringify({ action: 'complete_upload', assetId }),
       });
 
       setStage('Publishing Watch video…');
       await api.request('creator-studio', {
         method: 'POST',
+        context: generalWorkspace ? 'public' : 'current',
         body: JSON.stringify({
           action: 'publish_video',
+          organizationId: generalWorkspace ? organizationId || undefined : undefined,
           expressionId: selectedExpressionId,
           visibility: scope,
           mediaAssetId: assetId,
@@ -225,7 +228,7 @@ export default function WatchVideoCreatorScreen() {
           <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
             <ScreenHeader
               title="Create Watch Video"
-              kicker="MEDIA STUDIO"
+              kicker={generalWorkspace ? "GENERAL COT" : "MEDIA STUDIO"}
               subtitle={expressionWorkspace ? `Publish a long-form video inside ${expression?.name ?? 'this Expression'}.` : generalWorkspace ? "Publish a long-form video to General COT." : "Upload a long-form video and choose exactly where it should appear."}
               showBack
             />
@@ -259,7 +262,7 @@ export default function WatchVideoCreatorScreen() {
           ) : (
             <>
               <View style={styles.scopeBlock}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>PUBLISHING SCOPE</Text>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>PUBLISH TO</Text>
                 <View style={styles.chipRow}>
                   {canPublishPublic ? <Chip label="Public Watch" selected={scope === 'public'} onPress={() => setScope('public')} /> : null}
                   {canPublishExpression && expression?.id ? (

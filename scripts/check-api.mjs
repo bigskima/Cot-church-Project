@@ -119,6 +119,9 @@ const engagement = await readFile('supabase/functions/engagement/index.ts', 'utf
 const homeFeed = await readFile('supabase/functions/home-feed/index.ts', 'utf8');
 const streamAccess = await readFile('supabase/functions/stream-access/index.ts', 'utf8');
 const contentMedia = await readFile('supabase/functions/content-media/index.ts', 'utf8');
+const creatorStudio = await readFile('supabase/functions/creator-studio/index.ts', 'utf8');
+const publicOrganization = await readFile('supabase/functions/_shared/public-organization.ts', 'utf8');
+const generalPublicCreationMigration = await readFile('supabase/migrations/20260908165500_general_authenticated_public_creation.sql', 'utf8');
 const feedRanking = await readFile('supabase/functions/_shared/feed-ranking.ts', 'utf8');
 const eventRegistrations = await readFile('supabase/functions/event-registrations/index.ts', 'utf8');
 const sermons = await readFile('supabase/functions/sermons/index.ts', 'utf8');
@@ -198,7 +201,7 @@ const invariants = [
   [expressionMemberships, /revoke_expression_invite_code/, 'Expression invite revocation'],
   [publicContent, /type === "expression"/, 'public Expression profile contract'],
   [socialFeed, /organization:\s*"optional"/, 'social publishing separates public and scoped membership context'],
-  [socialFeed, /body\.organizationId[\s\S]*targetOrganizationId/, 'root General Community publishing accepts explicit church context'],
+  [socialFeed, /resolveActiveOrganizationId[\s\S]*requestedOrganizationId[\s\S]*targetOrganizationId/, 'root General Community publishing resolves church context without membership'],
   [socialFeed, /view === "post"[\s\S]*postId[\s\S]*scope === "expression"[\s\S]*auth\.branchId/, 'scoped post detail binds exact active Expression'],
   [publicSocialFeed, /postId[\s\S]*query = query\.eq\("id", postId\)[\s\S]*POST_NOT_FOUND/, 'public post detail returns one published General Community post'],
   [communityMedia, /organization:\s*"none"/, 'community media ignores stale membership headers'],
@@ -227,7 +230,12 @@ const invariants = [
   [publicContent, /type === "streams"[\s\S]*provisioning[\s\S]*ready[\s\S]*processing[\s\S]*replay_ready/, 'public stream catalogue lifecycle coverage'],
   [contentMedia, /action"\) === "video_detail"[\s\S]*content_items\.expression_id[\s\S]*auth\.branchId/, 'exact Expression Watch detail is scoped to active Expression'],
   [contentMedia, /video_detail[\s\S]*enrichContentCreators/, 'exact Expression Watch detail includes creator attribution'],
-  [contentMedia, /expressionId[\s\S]*expressionId !== auth\.branchId[\s\S]*authorize\(auth, "media\.upload"\)[\s\S]*authorizeOrganization\(auth, "media\.upload"\)/, 'media upload permission follows exact Public or Expression target scope'],
+  [contentMedia, /expressionId[\s\S]*auth\.branchId[\s\S]*authorize\(auth, "media\.upload"\)[\s\S]*can_profile_post/, 'media upload separates Expression authority from authenticated General creation'],
+  [contentMedia, /resolveActiveOrganizationId[\s\S]*organizationId/, 'General content media resolves the active church without membership context'],
+  [communityMedia, /audio\/mpeg[\s\S]*audio\/wav[\s\S]*can_profile_post/, 'General post media is restriction-aware and supports audio'],
+  [publicOrganization, /limit\(2\)[\s\S]*ORGANIZATION_REQUIRED/, 'public organization resolver fails closed when General context is ambiguous'],
+  [creatorStudio, /organization:\s*"optional"[\s\S]*can_profile_post[\s\S]*publish_typed_reel[\s\S]*publish_typed_video/, 'General creator studio supports authenticated public Reel and Watch publishing'],
+  [generalPublicCreationMigration, /publish_social_post_with_uploads[\s\S]*media_kind[\s\S]*publish_typed_reel[\s\S]*can_profile_post[\s\S]*publish_typed_video[\s\S]*created_by <> auth\.uid\(\)/, 'General publishing migration keeps multimedia creation authenticated and owner-scoped'],
   [feedRanking, /completedPenalty/, 'completed-content recommendation suppression'],
   [feedRanking, /diversifyFeed/, 'mixed-format feed diversification'],
   [engagement, /view.*state/, 'engagement viewer-state retrieval'],

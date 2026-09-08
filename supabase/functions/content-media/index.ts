@@ -1,10 +1,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.57.4";
 import { ApiError } from "../_shared/errors.ts";
-import { authorize, authorizeOrganization } from "../_shared/context.ts";
+import { authorize } from "../_shared/context.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { enrichContentCreators } from "../_shared/public-identity.ts";
+import { resolveActiveOrganizationId } from "../_shared/public-organization.ts";
 import { adminClient, publicClient } from "../_shared/supabase.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString, uuid } from "../_shared/validation.ts";
 
@@ -36,12 +37,11 @@ function safeFileName(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, 255) : null;
 }
 
-async function findOwnedAsset(organizationId: string, profileId: string, assetId: string) {
+async function findOwnedAsset(profileId: string, assetId: string) {
   const { data, error } = await adminClient()
     .from("media_assets")
     .select("id,organization_id,expression_id,media_type,processing_state,source_storage_path,mime_type,file_size_bytes,duration_seconds,aspect_ratio,created_by")
     .eq("id", assetId)
-    .eq("organization_id", organizationId)
     .eq("created_by", profileId)
     .maybeSingle();
   if (error || !data) throw new ApiError("ASSET_NOT_FOUND", "Media asset not found", 404);
@@ -118,23 +118,33 @@ Deno.serve(createHandler(
       return { data: await resolvePlayback(client, admin, contentId) };
     }
 
-    if (!auth?.user || !auth.organizationId) {
-      throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication and church context required", 401);
+    if (!auth?.user) {
+      throw new ApiError("AUTHENTICATION_REQUIRED", "Please sign in to continue", 401);
     }
 
     const body = assertObject(await jsonBody(request));
     const action = requiredString(body.action, "action", 40);
 
     if (action === "create_upload_intent") {
-      assertNoUnknownFields(body, ["action", "mediaType", "mimeType", "expressionId", "durationSeconds", "aspectRatio", "fileSizeBytes", "fileName"]);
+      assertNoUnknownFields(body, ["action", "organizationId", "mediaType", "mimeType", "expressionId", "durationSeconds", "aspectRatio", "fileSizeBytes", "fileName"]);
       const expressionId = body.expressionId ? uuid(String(body.expressionId), "expressionId", true) : null;
+      const requestedOrganizationId = body.organizationId
+        ? uuid(String(body.organizationId), "organizationId", true)!
+        : auth.organizationId;
+      const organizationId = await resolveActiveOrganizationId(admin, requestedOrganizationId);
+
       if (expressionId) {
-        if (expressionId !== auth.branchId) {
+        if (!auth.organizationId || !auth.branchId || organizationId !== auth.organizationId || expressionId !== auth.branchId) {
           throw new ApiError("EXPRESSION_SCOPE_DENIED", "Media can only be uploaded for your selected Expression", 403);
         }
         await authorize(auth, "media.upload");
       } else {
-        await authorizeOrganization(auth, "media.upload");
+        const { data: postingAllowed, error: postingError } = await auth.client.rpc("can_profile_post", {
+          target_profile_id: auth.user.id,
+        });
+        if (postingError || postingAllowed !== true) {
+          throw new ApiError("POSTING_RESTRICTED", "Your posting access is currently restricted", 403);
+        }
       }
 
       const mediaType = requiredString(body.mediaType, "mediaType", 20) as "video" | "audio" | "image";
@@ -147,11 +157,11 @@ Deno.serve(createHandler(
         : null;
       const aspectRatio = optionalString(body.aspectRatio, "aspectRatio", 20) ?? (mediaType === "video" ? "9:16" : null);
       const assetId = crypto.randomUUID();
-      const storagePath = `orgs/${auth.organizationId}/content/${auth.user.id}/${assetId}.${mime.ext}`;
+      const storagePath = `orgs/${organizationId}/content/${auth.user.id}/${assetId}.${mime.ext}`;
 
       const { data: asset, error: createError } = await admin.from("media_assets").insert({
         id: assetId,
-        organization_id: auth.organizationId,
+        organization_id: organizationId,
         expression_id: expressionId,
         media_type: mediaType,
         processing_state: "uploading",
@@ -176,7 +186,7 @@ Deno.serve(createHandler(
     if (action === "cancel_upload") {
       assertNoUnknownFields(body, ["action", "assetId"]);
       const assetId = uuid(requiredString(body.assetId, "assetId", 36), "assetId", true)!;
-      const asset = await findOwnedAsset(auth.organizationId, auth.user.id, assetId);
+      const asset = await findOwnedAsset(auth.user.id, assetId);
       const [reelRef, videoRef, sermonAudioRef, sermonVideoRef] = await Promise.all([
         admin.from("reels").select("id", { count: "exact", head: true }).eq("media_asset_id", assetId),
         admin.from("videos").select("id", { count: "exact", head: true }).eq("media_asset_id", assetId),
@@ -186,14 +196,14 @@ Deno.serve(createHandler(
       const references = (reelRef.count ?? 0) + (videoRef.count ?? 0) + (sermonAudioRef.count ?? 0) + (sermonVideoRef.count ?? 0);
       if (references > 0) throw new ApiError("ASSET_IN_USE", "Published media cannot be cancelled", 409);
       if (asset.source_storage_path) await admin.storage.from(BUCKET).remove([asset.source_storage_path]);
-      await admin.from("media_assets").delete().eq("id", assetId).eq("organization_id", auth.organizationId).eq("created_by", auth.user.id);
+      await admin.from("media_assets").delete().eq("id", assetId).eq("organization_id", asset.organization_id).eq("created_by", auth.user.id);
       return { data: { assetId, cancelled: true } };
     }
 
     if (action === "complete_upload") {
       assertNoUnknownFields(body, ["action", "assetId"]);
       const assetId = uuid(requiredString(body.assetId, "assetId", 36), "assetId", true)!;
-      const asset = await findOwnedAsset(auth.organizationId, auth.user.id, assetId);
+      const asset = await findOwnedAsset(auth.user.id, assetId);
       if (asset.processing_state === "ready") return { data: asset };
       if (asset.processing_state !== "uploading" && asset.processing_state !== "uploaded") {
         throw new ApiError("ASSET_STATE_INVALID", "This media upload cannot be completed", 409);
@@ -225,7 +235,7 @@ Deno.serve(createHandler(
           .limit(1);
         if (!(existing ?? []).length) {
           const { error: renditionError } = await admin.from("media_renditions").insert({
-            organization_id: auth.organizationId,
+            organization_id: asset.organization_id,
             media_asset_id: assetId,
             rendition_kind: mime.rendition,
             container: mime.ext,
@@ -242,7 +252,7 @@ Deno.serve(createHandler(
         processing_state: "ready",
         file_size_bytes: Math.round(actualSize),
         processing_error: null,
-      }).eq("id", assetId).eq("organization_id", auth.organizationId).eq("created_by", auth.user.id)
+      }).eq("id", assetId).eq("organization_id", asset.organization_id).eq("created_by", auth.user.id)
         .select("id,organization_id,expression_id,media_type,processing_state,source_storage_path,mime_type,file_size_bytes,duration_seconds,aspect_ratio").single();
       if (completeError || !completed) throw new ApiError("ASSET_UPDATE_FAILED", "Unable to finalize media upload", 500, undefined, false);
       return { data: completed };

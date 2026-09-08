@@ -3,11 +3,11 @@ import { ApiError } from "../_shared/errors.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { adminClient } from "../_shared/supabase.ts";
+import { resolveActiveOrganizationId } from "../_shared/public-organization.ts";
 import { assertNoUnknownFields, assertObject, requiredString, uuid } from "../_shared/validation.ts";
 
 const BUCKET = "community-public-media";
 const MAX_BYTES = 50 * 1024 * 1024;
-const MAX_MEMBER_PUBLIC_VIDEO_SECONDS = 180;
 const MIME_TYPES: Record<string, { kind: "image" | "video" | "audio"; ext: string }> = {
   "image/jpeg": { kind: "image", ext: "jpg" },
   "image/png": { kind: "image", ext: "png" },
@@ -85,14 +85,10 @@ Deno.serve(createHandler(
     const action = requiredString(body.action, "action", 32);
     if (action === "create_upload") {
       assertNoUnknownFields(body, ["action", "organizationId", "mimeType", "fileName", "sizeBytes", "branchId", "durationSeconds"]);
-      const organizationId = uuid(requiredString(body.organizationId, "organizationId", 36), "organizationId", true)!;
-      const { data: organization, error: organizationError } = await admin
-        .from("organizations")
-        .select("id,status")
-        .eq("id", organizationId)
-        .eq("status", "active")
-        .maybeSingle();
-      if (organizationError || !organization) throw new ApiError("ORGANIZATION_NOT_FOUND", "This church community is not available", 404);
+      const requestedOrganizationId = body.organizationId
+        ? uuid(String(body.organizationId), "organizationId", true)!
+        : null;
+      const organizationId = await resolveActiveOrganizationId(admin, requestedOrganizationId);
 
       const mimeType = requiredString(body.mimeType, "mimeType", 120).toLowerCase();
       const type = MIME_TYPES[mimeType];
@@ -113,35 +109,6 @@ Deno.serve(createHandler(
           .maybeSingle();
         if (expressionMembershipError || !expressionMembership) {
           throw new ApiError("EXPRESSION_MEMBERSHIP_REQUIRED", "Join this Expression before uploading media to it", 403);
-        }
-      }
-
-      const { data: elevatedPublisher, error: permissionError } = await auth.client.rpc("has_permission", {
-        target_organization_id: organizationId,
-        requested_permission: "feed.post",
-        target_branch_id: branchId,
-      });
-      if (permissionError) {
-        throw new ApiError("PERMISSION_CHECK_FAILED", "Unable to validate community publishing access", 500, undefined, false);
-      }
-
-      if (!branchId && elevatedPublisher !== true) {
-        if (type.kind === "audio") {
-          throw new ApiError(
-            "GENERAL_MEDIA_RESTRICTED",
-            "General Community member posts support text, images and short videos. Audio ministry content requires an authorized publishing workflow.",
-            403,
-          );
-        }
-        if (
-          type.kind === "video" &&
-          (!declaredDurationSeconds || declaredDurationSeconds > MAX_MEMBER_PUBLIC_VIDEO_SECONDS)
-        ) {
-          throw new ApiError(
-            "GENERAL_VIDEO_TOO_LONG",
-            "General Community member videos must be 3 minutes or shorter",
-            422,
-          );
         }
       }
 
