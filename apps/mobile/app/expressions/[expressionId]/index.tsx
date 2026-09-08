@@ -151,12 +151,12 @@ export default function ExpressionHomeScreen() {
                 canEngage={mode === 'authenticated'}
                 allowExternalShare={false}
                 onPress={() => router.push({
-                  pathname: '/post/[id]',
-                  params: { id: post.id, scope: 'expression' },
+                  pathname: `/expressions/${id}/post/[id]`,
+                  params: { id: post.id },
                 } as any)}
                 onReply={() => router.push({
-                  pathname: '/post/[id]',
-                  params: { id: post.id, scope: 'expression', focus: 'comments' },
+                  pathname: `/expressions/${id}/post/[id]`,
+                  params: { id: post.id, focus: 'comments' },
                 } as any)}
               />
             ))}
