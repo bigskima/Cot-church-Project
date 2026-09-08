@@ -49,14 +49,15 @@ export default function WatchScreen() {
   const videos = catalogue.data?.videos ?? [];
   const reels = catalogue.data?.reels ?? [];
   const sermons = catalogue.data?.sermons ?? [];
-
   const filteredVideos =
     selectedCategory === 'all'
       ? videos
-      : videos.filter((v) => v.category?.toLowerCase() === selectedCategory.toLowerCase());
+      : videos.filter((video) => video.category?.toLowerCase() === selectedCategory.toLowerCase());
+  const featuredVideo = filteredVideos[0];
+  const remainingVideos = featuredVideo ? filteredVideos.slice(1) : [];
 
   const categories = [
-    { value: 'all', label: 'All videos' },
+    { value: 'all', label: 'All' },
     { value: 'teaching', label: 'Teachings' },
     { value: 'worship', label: 'Worship' },
     { value: 'conference', label: 'Conferences' },
@@ -64,8 +65,6 @@ export default function WatchScreen() {
     { value: 'interview', label: 'Interviews' },
     { value: 'documentary', label: 'Documentary' },
   ];
-
-  const openReels = () => router.push('/general/reels');
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -77,36 +76,74 @@ export default function WatchScreen() {
             backgroundColor: colors.glass,
             borderColor: colors.borderSubtle,
           },
+          shadows.sm,
         ]}
       >
-        <View>
-          <Text style={[styles.headerKicker, { color: colors.interactive }]}>WATCH</Text>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Long-form & teachings</Text>
+        <View style={styles.headerCopy}>
+          <Text style={[styles.headerKicker, { color: colors.interactive }]}>GENERAL COT · WATCH</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Watch</Text>
+          <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>Long-form videos, teachings and replayable moments.</Text>
+        </View>
+        {mode === 'authenticated' ? (
+          <Pressable
+            onPress={() => router.push('/general/studio/video' as any)}
+            style={({ pressed }) => [
+              styles.headerCreate,
+              { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle },
+              pressed && styles.pressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Create public video"
+          >
+            <Icon name="add-outline" size={17} color={colors.interactive} />
+            <Text style={[styles.headerCreateText, { color: colors.interactive }]}>Create</Text>
+          </Pressable>
+        ) : null}
+      </View>
+
+      <View style={styles.overviewRow}>
+        <View style={[styles.overviewItem, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+          <Text style={[styles.overviewValue, { color: colors.text }]}>{videos.length}</Text>
+          <Text style={[styles.overviewLabel, { color: colors.textMuted }]}>Videos</Text>
+        </View>
+        <Pressable
+          onPress={() => router.push('/general/reels')}
+          style={({ pressed }) => [styles.overviewItem, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, pressed && styles.pressed]}
+        >
+          <Text style={[styles.overviewValue, { color: colors.live }]}>{reels.length}</Text>
+          <Text style={[styles.overviewLabel, { color: colors.textMuted }]}>Reels</Text>
+        </Pressable>
+        <View style={[styles.overviewItem, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+          <Text style={[styles.overviewValue, { color: colors.text }]}>{sermons.length}</Text>
+          <Text style={[styles.overviewLabel, { color: colors.textMuted }]}>Messages</Text>
         </View>
       </View>
 
-      {/* Entry point into full-screen Reels */}
       {reels.length > 0 ? (
         <Pressable
-          onPress={openReels}
+          onPress={() => router.push('/general/reels')}
           accessibilityRole="button"
-          accessibilityLabel="Open full-screen Shorts"
-          style={({ pressed }) => [styles.reelsBanner, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md, pressed && styles.pressed]}
+          accessibilityLabel="Open public Reels"
+          style={({ pressed }) => [
+            styles.reelsBanner,
+            { backgroundColor: colors.card, borderColor: colors.borderSubtle },
+            shadows.sm,
+            pressed && styles.pressed,
+          ]}
         >
-          <View style={styles.reelsBannerIconWrap}>
-            <Icon name="play-circle" size={22} color={colors.live} />
+          <View style={[styles.reelsBannerIconWrap, { backgroundColor: colors.liveSoft }]}>
+            <Icon name="flash" size={21} color={colors.live} />
           </View>
           <View style={styles.reelsBannerCopy}>
-            <Text style={[styles.reelsBannerTitle, { color: colors.text }]}>Reels</Text>
+            <Text style={[styles.reelsBannerTitle, { color: colors.text }]}>Open Reels</Text>
             <Text style={[styles.reelsBannerSubtitle, { color: colors.textMuted }]}>
-              {reels.length} vertical clips · Full-screen viewing
+              Swipe through {reels.length} public vertical {reels.length === 1 ? 'clip' : 'clips'}
             </Text>
           </View>
           <Icon name="chevron-forward" size={18} color={colors.textMuted} />
         </Pressable>
       ) : null}
 
-      {/* Category Chips Bar */}
       <View style={[styles.categoriesContainer, { borderBottomColor: colors.borderSubtle }]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
           {categories.map((category) => (
@@ -121,7 +158,7 @@ export default function WatchScreen() {
       </View>
 
       <FlatList
-        data={filteredVideos}
+        data={remainingVideos}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 130 }]}
@@ -133,19 +170,30 @@ export default function WatchScreen() {
           />
         }
         ListHeaderComponent={
-          filteredVideos.length > 0 ? (
-            <Text style={[styles.featuredTitle, { color: colors.text }]}>Featured videos</Text>
-          ) : null
-        }
-        ListEmptyComponent={
           catalogue.loading && !catalogue.data ? (
             <WatchSkeleton />
           ) : catalogue.error && !catalogue.data ? (
             <ResourceError message={catalogue.error} retry={catalogue.refresh} />
+          ) : featuredVideo ? (
+            <View style={styles.featuredSection}>
+              <View style={styles.sectionHeading}>
+                <Text style={[styles.sectionKicker, { color: colors.interactive }]}>FEATURED</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  {selectedCategory === 'all' ? 'Start watching' : categories.find((item) => item.value === selectedCategory)?.label}
+                </Text>
+              </View>
+              <VideoCard
+                video={featuredVideo}
+                onPress={() => router.push(`/general/watch/${featuredVideo.id}` as any)}
+              />
+              {remainingVideos.length ? (
+                <Text style={[styles.moreTitle, { color: colors.textSecondary }]}>More to watch</Text>
+              ) : null}
+            </View>
           ) : (
             <EmptyState
-              title="No Videos in this Category"
-              message="New video teachings and broadcast recordings will appear here soon."
+              title="Nothing here yet"
+              message="New public videos in this category will appear here."
               iconName="videocam-outline"
             />
           )
@@ -159,9 +207,10 @@ export default function WatchScreen() {
         ListFooterComponent={
           sermons.length > 0 ? (
             <View style={styles.sermonsSection}>
-              <Text style={[styles.featuredTitle, { color: colors.text, marginBottom: spacing.md }]}>
-                Sermon Series
-              </Text>
+              <View style={styles.sectionHeading}>
+                <Text style={[styles.sectionKicker, { color: colors.interactive }]}>MESSAGES</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent sermons</Text>
+              </View>
               {sermons.slice(0, 3).map((sermon) => (
                 <SermonCard
                   key={sermon.id}
@@ -179,74 +228,31 @@ export default function WatchScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  headerBar: {
-    marginHorizontal: spacing.md,
-    marginTop: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.md,
-    borderWidth: 1,
-    borderRadius: radius.xl,
-  },
+  screen: { flex: 1 },
+  headerBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: spacing.md, marginTop: spacing.xs, paddingHorizontal: spacing.md, paddingBottom: spacing.md, borderWidth: 1, borderRadius: radius.xxl, gap: spacing.md },
+  headerCopy: { flex: 1, minWidth: 0 },
   headerKicker: { ...typography.kicker, marginBottom: 2 },
-  headerTitle: {
-    ...typography.h1,
-  },
-  reelsBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: spacing.md,
-    marginTop: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    gap: spacing.md,
-  },
-  reelsBannerIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.md,
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  reelsBannerCopy: {
-    flex: 1,
-    gap: 2,
-  },
-  reelsBannerTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: -0.2,
-  },
-  reelsBannerSubtitle: {
-    fontSize: 12,
-  },
-  categoriesContainer: {
-    paddingVertical: spacing.xs,
-    borderBottomWidth: 1,
-  },
-  chipsRow: {
-    paddingHorizontal: spacing.lg,
-    gap: spacing.xs,
-  },
-  listContent: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-    gap: spacing.md,
-  },
-  featuredTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-  },
-  sermonsSection: {
-    marginTop: spacing.xl,
-    paddingTop: spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: 'transparent',
-  },
-  pressed: { opacity: 0.9, transform: [{ scale: 0.992 }] },
+  headerTitle: { fontSize: 25, lineHeight: 30, fontWeight: '900', letterSpacing: -0.8 },
+  headerSubtitle: { fontSize: 11.5, lineHeight: 16, marginTop: 2 },
+  headerCreate: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, borderRadius: radius.pill, borderWidth: 1 },
+  headerCreateText: { fontSize: 11, fontWeight: '800' },
+  overviewRow: { flexDirection: 'row', gap: spacing.xs, marginHorizontal: spacing.md, marginTop: spacing.sm },
+  overviewItem: { flex: 1, minHeight: 58, borderWidth: 1, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
+  overviewValue: { fontSize: 18, lineHeight: 22, fontWeight: '900' },
+  overviewLabel: { fontSize: 9.5, fontWeight: '700', marginTop: 1 },
+  reelsBanner: { flexDirection: 'row', alignItems: 'center', marginHorizontal: spacing.md, marginTop: spacing.sm, padding: spacing.md, borderRadius: radius.xl, borderWidth: 1, gap: spacing.md },
+  reelsBannerIconWrap: { width: 42, height: 42, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
+  reelsBannerCopy: { flex: 1, gap: 2 },
+  reelsBannerTitle: { fontSize: 15, fontWeight: '800', letterSpacing: -0.2 },
+  reelsBannerSubtitle: { fontSize: 11.5, lineHeight: 16 },
+  categoriesContainer: { paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, marginTop: spacing.xs },
+  chipsRow: { paddingHorizontal: spacing.md, gap: spacing.xs },
+  listContent: { paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: spacing.md },
+  featuredSection: { gap: spacing.md },
+  sectionHeading: { gap: 2 },
+  sectionKicker: { fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 0.8 },
+  sectionTitle: { fontSize: 18, lineHeight: 23, fontWeight: '800', letterSpacing: -0.4 },
+  moreTitle: { fontSize: 13, fontWeight: '800', marginTop: spacing.xs },
+  sermonsSection: { marginTop: spacing.xl, paddingTop: spacing.lg, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(127,127,127,0.18)', gap: spacing.sm },
+  pressed: { opacity: 0.88, transform: [{ scale: 0.992 }] },
 });

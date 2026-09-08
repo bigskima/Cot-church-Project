@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   Image,
@@ -13,7 +13,14 @@ import {
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
+import {
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+  useAudioRecorder,
+  useAudioRecorderState,
+} from 'expo-audio';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -87,6 +94,7 @@ function inferAudioMime(name: string, supplied?: string | null) {
   const value = name.toLowerCase();
   if (value.endsWith('.m4a') || value.endsWith('.mp4')) return 'audio/mp4';
   if (value.endsWith('.aac')) return 'audio/aac';
+  if (value.endsWith('.webm')) return 'audio/webm';
   if (value.endsWith('.ogg') || value.endsWith('.oga')) return 'audio/ogg';
   if (value.endsWith('.wav')) return 'audio/wav';
   return 'audio/mpeg';
@@ -115,12 +123,27 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState('');
   const [interactionError, setInteractionError] = useState('');
+  const [recordingAction, setRecordingAction] = useState(false);
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(audioRecorder, 250);
+  const { compose, intentId } = useLocalSearchParams<{ compose?: string; intentId?: string }>();
+  const handledComposeIntent = useRef<string | null>(null);
 
   useEffect(() => {
     if (activeTab !== scope) setActiveTab(scope);
     if (postDestination !== scope) setPostDestination(scope);
   }, [activeTab, postDestination, scope]);
 
+
+  useEffect(() => {
+    if (scope !== 'general' || mode !== 'authenticated' || !compose) return;
+    const key = `${compose}:${intentId ?? 'direct'}`;
+    if (handledComposeIntent.current === key) return;
+    handledComposeIntent.current = key;
+    setPostDestination('general');
+    setPostError('');
+    setComposerOpen(true);
+  }, [compose, intentId, mode, scope]);
 
   const feedKey = `mobile:community:${activeTab}:${organizationId || 'auto'}:${activeTab === 'expression' ? expression?.id ?? 'none' : 'general'}:${mode}`;
   const resource = useResource<CommunityPost[]>(feedKey, (signal) => {
@@ -179,8 +202,70 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
     setComposerOpen(true);
   };
 
+  const finishRecordingSession = async () => {
+    await setAudioModeAsync({
+      playsInSilentMode: true,
+      allowsRecording: false,
+    }).catch(() => undefined);
+  };
+
+  const startAudioRecording = async () => {
+    if (!canAttachAudio || mediaUploading || recordingAction || recorderState.isRecording || attachments.length >= attachmentLimit) return;
+    setPostError('');
+    setRecordingAction(true);
+    try {
+      const permission = await requestRecordingPermissionsAsync();
+      if (!permission.granted) {
+        setPostError('Microphone access is needed to record an audio post.');
+        return;
+      }
+      await setAudioModeAsync({
+        playsInSilentMode: true,
+        allowsRecording: true,
+      });
+      await audioRecorder.prepareToRecordAsync();
+      audioRecorder.record();
+    } catch (error) {
+      setPostError(error instanceof Error ? error.message : 'Unable to start audio recording.');
+      await finishRecordingSession();
+    } finally {
+      setRecordingAction(false);
+    }
+  };
+
+  const stopAudioRecording = async (attach = true) => {
+    if (!recorderState.isRecording || recordingAction) return;
+    setRecordingAction(true);
+    setPostError('');
+    const durationSeconds = Math.max(1, Math.round(recorderState.durationMillis / 1000));
+    try {
+      await audioRecorder.stop();
+      const uri = audioRecorder.uri;
+      await finishRecordingSession();
+      if (!attach) return;
+      if (!uri) throw new Error('The recording could not be prepared.');
+      const recordedMimeType = Platform.OS === 'web' ? 'audio/webm' : 'audio/mp4';
+      const recordedExtension = Platform.OS === 'web' ? 'webm' : 'm4a';
+      await appendUploads([{
+        uri,
+        fileName: `voice-note-${Date.now()}.${recordedExtension}`,
+        mimeType: recordedMimeType,
+        durationSeconds,
+      }]);
+    } catch (error) {
+      setPostError(error instanceof Error ? error.message : 'Unable to finish audio recording.');
+      await finishRecordingSession();
+    } finally {
+      setRecordingAction(false);
+    }
+  };
+
   const closeComposer = () => {
-    if (posting || mediaUploading) return;
+    if (posting || mediaUploading || recordingAction) return;
+    if (recorderState.isRecording) {
+      setPostError('Stop or discard the recording before closing this post.');
+      return;
+    }
     const pending = attachments;
     setComposerOpen(false);
     setPostText('');
@@ -190,6 +275,10 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
   };
 
   const changeDestination = (destination: FeedScope) => {
+    if (recorderState.isRecording || recordingAction) {
+      setPostError('Finish the current recording before changing where you are posting.');
+      return;
+    }
     if (destination === postDestination) return;
     if (destination === 'general' && !canPostGeneral) return;
     if (destination === 'expression' && !canPostExpression) return;
@@ -403,7 +492,9 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
     canPostDestination &&
     Boolean(postText.trim() || attachments.length) &&
     !posting &&
-    !mediaUploading;
+    !mediaUploading &&
+    !recordingAction &&
+    !recorderState.isRecording;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -426,11 +517,11 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
             </View>
             <View style={styles.headerCopy}>
               <Text style={[styles.headerEyebrow, { color: colors.textMuted }]}>CITY OF TRANSFORMATION</Text>
-              <Text style={[styles.headerTitle, { color: colors.text }]}>Community</Text>
+              <Text style={[styles.headerTitle, { color: colors.text }]}>{scope === 'general' ? 'Public Community' : 'Community'}</Text>
               <View style={[styles.headerScopePill, { backgroundColor: colors.primarySoft }]}>
                 <Icon name={expression?.id ? 'people-outline' : 'globe-outline'} size={11} color={colors.interactive} />
                 <Text style={[styles.headerScopeText, { color: colors.interactive }]} numberOfLines={1}>
-                  {expression?.name || 'Public fellowship'}
+                  {expression?.name || 'General COT · Public'}
                 </Text>
               </View>
             </View>
@@ -473,9 +564,9 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
           <Pressable onPress={openComposer} style={({ pressed }) => [styles.composerStrip, pressed && styles.composerPressed]}>
             <Avatar url={context?.profile?.avatar_url} name={context?.profile?.display_name || 'Me'} size="sm" />
             <View style={styles.composerCopy}>
-              <Text style={[styles.composerPrompt, { color: colors.text }]}>Share with the community</Text>
+              <Text style={[styles.composerPrompt, { color: colors.text }]}>{activeTab === 'general' ? 'Share to General COT' : 'Share with the community'}</Text>
               <Text style={[styles.composerPlaceholder, { color: colors.textMuted }]}>
-                {activeTab === 'general' ? 'Text, photos, video or audio' : 'Text, photos, video or audio'}
+                {activeTab === 'general' ? 'Post, photo, video, Reel or voice' : 'Text, photos, video or audio'}
               </Text>
             </View>
             <View style={[styles.composeActionIcon, { backgroundColor: colors.primarySoft }]}>
@@ -491,6 +582,12 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
               <Icon name="images-outline" size={15} color={colors.interactive} />
               <Text style={[styles.quickCreateText, { color: colors.textSecondary }]}>Photo / video</Text>
             </Pressable>
+            {activeTab === 'general' ? (
+              <Pressable onPress={openComposer} style={({ pressed }) => [styles.quickCreateButton, pressed && styles.composerPressed]}>
+                <Icon name="mic-outline" size={15} color={colors.interactive} />
+                <Text style={[styles.quickCreateText, { color: colors.textSecondary }]}>Voice</Text>
+              </Pressable>
+            ) : null}
             {canCreateReel ? (
               <Pressable onPress={() => router.push((scope === 'expression' && expression?.id ? `/expressions/${expression.id}/manage/reel` : '/general/studio/reel') as any)} style={({ pressed }) => [styles.quickCreateButton, pressed && styles.composerPressed]}>
                 <Icon name="flash-outline" size={15} color={colors.interactive} />
@@ -533,7 +630,12 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
         />
       )}
 
-      <BottomSheet visible={composerOpen} onClose={closeComposer} title="Create post" subtitle="Share something meaningful with your community.">
+      <BottomSheet
+        visible={composerOpen}
+        onClose={closeComposer}
+        title={compose === 'audio' && scope === 'general' ? 'Record a voice post' : 'Create post'}
+        subtitle={compose === 'audio' && scope === 'general' ? 'Record from your microphone or attach an existing audio file.' : 'Share something meaningful with your community.'}
+      >
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.composerBody}>
           <View style={styles.destinationBlock}>
             <Text style={[styles.destinationLabel, { color: colors.textSecondary }]}>POST TO</Text>
@@ -586,10 +688,24 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
               <Text style={[styles.mediaButtonText, { color: colors.text }]}>Photo / Video</Text>
             </Pressable>
             {canAttachAudio ? (
-              <Pressable onPress={() => void chooseAudio()} disabled={mediaUploading || attachments.length >= attachmentLimit} style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}>
-                <Icon name="musical-notes-outline" size={18} color={colors.interactive} />
-                <Text style={[styles.mediaButtonText, { color: colors.text }]}>Audio</Text>
-              </Pressable>
+              <>
+                <Pressable
+                  onPress={() => void startAudioRecording()}
+                  disabled={mediaUploading || recordingAction || recorderState.isRecording || attachments.length >= attachmentLimit}
+                  style={[styles.mediaButton, { backgroundColor: recorderState.isRecording ? colors.liveSoft : colors.bgSecondary, borderColor: recorderState.isRecording ? colors.live : colors.border }]}
+                >
+                  <Icon name="mic-outline" size={18} color={recorderState.isRecording ? colors.live : colors.interactive} />
+                  <Text style={[styles.mediaButtonText, { color: recorderState.isRecording ? colors.live : colors.text }]}>Record</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => void chooseAudio()}
+                  disabled={mediaUploading || recordingAction || recorderState.isRecording || attachments.length >= attachmentLimit}
+                  style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}
+                >
+                  <Icon name="musical-notes-outline" size={18} color={colors.interactive} />
+                  <Text style={[styles.mediaButtonText, { color: colors.text }]}>Upload audio</Text>
+                </Pressable>
+              </>
             ) : null}
             {canCreateReel ? (
               <Pressable
@@ -602,6 +718,7 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
                       : ({ pathname: '/general/studio/reel', params: { scope: targetScope } } as any),
                   );
                 }}
+                disabled={recorderState.isRecording || recordingAction}
                 style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}
               >
                 <Icon name="flash-outline" size={18} color={colors.interactive} />
@@ -619,6 +736,7 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
                       : ({ pathname: '/general/studio/video', params: { scope: targetScope } } as any),
                   );
                 }}
+                disabled={recorderState.isRecording || recordingAction}
                 style={[styles.mediaButton, { backgroundColor: colors.bgSecondary, borderColor: colors.border }]}
               >
                 <Icon name="videocam-outline" size={18} color={colors.interactive} />
@@ -626,9 +744,33 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
               </Pressable>
             ) : null}
           </View>
+
+          {recorderState.isRecording ? (
+            <View style={[styles.recordingCard, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}>
+              <View style={styles.recordingStatus}>
+                <View style={[styles.recordingDot, { backgroundColor: colors.live }]} />
+                <View style={styles.recordingCopy}>
+                  <Text style={[styles.recordingTitle, { color: colors.text }]}>Recording voice</Text>
+                  <Text style={[styles.recordingTime, { color: colors.live }]}>
+                    {Math.floor(recorderState.durationMillis / 60000).toString().padStart(2, '0')}:{Math.floor((recorderState.durationMillis % 60000) / 1000).toString().padStart(2, '0')}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.recordingActions}>
+                <Pressable onPress={() => void stopAudioRecording(false)} disabled={recordingAction} style={[styles.recordingSecondary, { borderColor: colors.border }]}>
+                  <Text style={[styles.recordingSecondaryText, { color: colors.textSecondary }]}>Discard</Text>
+                </Pressable>
+                <Pressable onPress={() => void stopAudioRecording(true)} disabled={recordingAction} style={[styles.recordingPrimary, { backgroundColor: colors.live }]}>
+                  <Icon name="stop" size={14} color="#FFFFFF" />
+                  <Text style={styles.recordingPrimaryText}>Stop & attach</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
+
           <Text style={[styles.mediaHelp, { color: colors.textMuted }]}>
             {ordinaryGeneralMemberLane
-              ? 'General post · up to 2,200 characters · 4 attachments · videos up to 3 minutes.'
+              ? 'General post · up to 2,200 characters · 4 attachments · 50 MB each.'
               : `Up to ${attachmentLimit} attachments · 50 MB each.`}
           </Text>
 
@@ -730,6 +872,17 @@ const styles = StyleSheet.create({
   mediaHelp: { fontSize: 10, lineHeight: 15 },
   uploadingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderRadius: radius.md },
   uploadingText: { fontSize: 12, fontWeight: '600' },
+  recordingCard: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, gap: spacing.md },
+  recordingStatus: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  recordingDot: { width: 10, height: 10, borderRadius: 5 },
+  recordingCopy: { flex: 1 },
+  recordingTitle: { fontSize: 13, fontWeight: '800' },
+  recordingTime: { fontSize: 22, lineHeight: 27, fontWeight: '800', letterSpacing: -0.6, marginTop: 2 },
+  recordingActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm },
+  recordingSecondary: { minHeight: 38, paddingHorizontal: spacing.md, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  recordingSecondaryText: { fontSize: 12, fontWeight: '700' },
+  recordingPrimary: { minHeight: 38, paddingHorizontal: spacing.md, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  recordingPrimaryText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
   attachmentsGrid: { gap: spacing.xs },
   attachmentCard: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: radius.md, overflow: 'hidden', minHeight: 64 },
   attachmentPreview: { width: 72, height: 64 },

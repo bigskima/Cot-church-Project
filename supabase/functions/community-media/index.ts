@@ -19,6 +19,7 @@ const MIME_TYPES: Record<string, { kind: "image" | "video" | "audio"; ext: strin
   "audio/mpeg": { kind: "audio", ext: "mp3" },
   "audio/mp4": { kind: "audio", ext: "m4a" },
   "audio/aac": { kind: "audio", ext: "aac" },
+  "audio/webm": { kind: "audio", ext: "webm" },
   "audio/ogg": { kind: "audio", ext: "ogg" },
   "audio/wav": { kind: "audio", ext: "wav" },
 };
@@ -40,7 +41,7 @@ function durationSeconds(value: unknown) {
   if (value === undefined || value === null || value === "") return null;
   const duration = Number(value);
   if (!Number.isFinite(duration) || duration < 0 || duration > 86400) {
-    throw new ApiError("VALIDATION_FAILED", "Video duration is invalid", 422);
+    throw new ApiError("VALIDATION_FAILED", "Media duration is invalid", 422);
   }
   return Math.round(duration);
 }
@@ -95,7 +96,9 @@ Deno.serve(createHandler(
       if (!type) throw new ApiError("UNSUPPORTED_MEDIA_TYPE", "This image, video, or audio format is not supported", 415);
       const sizeBytes = positiveSize(body.sizeBytes);
       const branchId = body.branchId ? uuid(String(body.branchId), "branchId", true)! : null;
-      const declaredDurationSeconds = type.kind === "video" ? durationSeconds(body.durationSeconds) : null;
+      const declaredDurationSeconds = type.kind === "video" || type.kind === "audio"
+        ? durationSeconds(body.durationSeconds)
+        : null;
 
       if (branchId) {
         const { data: expressionMembership, error: expressionMembershipError } = await admin
