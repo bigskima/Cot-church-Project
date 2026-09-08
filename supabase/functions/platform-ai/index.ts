@@ -35,6 +35,83 @@ async function credentialState(client: ReturnType<typeof adminClient>, reference
   return { configured: typeof data === "string" && data.length > 0, error };
 }
 
+async function ensureProviderRuntime(
+  client: ReturnType<typeof adminClient>,
+  provider: { id: string; configuration?: Record<string, unknown> | null },
+) {
+  const configuration = provider.configuration ?? {};
+  const modelKey = typeof configuration.defaultModelKey === "string"
+    ? configuration.defaultModelKey.trim()
+    : "";
+  if (!modelKey) return { modelId: null as string | null, routesCreated: 0 };
+
+  const displayName = typeof configuration.defaultModelName === "string" && configuration.defaultModelName.trim()
+    ? configuration.defaultModelName.trim()
+    : modelKey;
+  const contextWindowRaw = Number(configuration.defaultContextWindow ?? 0);
+  const contextWindow = Number.isFinite(contextWindowRaw) && contextWindowRaw > 0
+    ? Math.floor(contextWindowRaw)
+    : null;
+
+  const { data: existingModel, error: existingModelError } = await client
+    .from("ai_models")
+    .select("id")
+    .eq("provider_id", provider.id)
+    .eq("model_key", modelKey)
+    .maybeSingle();
+  if (existingModelError) throw new ApiError("AI_MODEL_LOOKUP_FAILED", "Unable to prepare the provider model", 500, undefined, false);
+
+  let modelId = existingModel?.id ?? null;
+  if (modelId) {
+    const { error } = await client
+      .from("ai_models")
+      .update({ display_name: displayName, context_window: contextWindow, is_active: true })
+      .eq("id", modelId);
+    if (error) throw new ApiError("AI_MODEL_UPDATE_FAILED", "Unable to prepare the provider model", 500, undefined, false);
+  } else {
+    const { data, error } = await client
+      .from("ai_models")
+      .insert({
+        provider_id: provider.id,
+        model_key: modelKey,
+        display_name: displayName,
+        context_window: contextWindow,
+        is_active: true,
+        configuration: { managedBy: "provider-activation" },
+      })
+      .select("id")
+      .single();
+    if (error || !data) throw new ApiError("AI_MODEL_UPDATE_FAILED", "Unable to prepare the provider model", 500, undefined, false);
+    modelId = data.id;
+  }
+
+  let routesCreated = 0;
+  for (const capabilityCode of ["assistant.answer", "admin.help"]) {
+    const { data: route, error: routeError } = await client
+      .from("ai_routes")
+      .select("id")
+      .is("organization_id", null)
+      .eq("capability_code", capabilityCode)
+      .maybeSingle();
+    if (routeError) throw new ApiError("AI_ROUTE_LOOKUP_FAILED", "Unable to prepare AI routing", 500, undefined, false);
+    if (route?.id) continue;
+
+    const { error } = await client.from("ai_routes").insert({
+      organization_id: null,
+      capability_code: capabilityCode,
+      primary_model_id: modelId,
+      fallback_model_ids: [],
+      timeout_ms: 30000,
+      max_retries: 1,
+      is_active: true,
+    });
+    if (error) throw new ApiError("AI_ROUTE_UPDATE_FAILED", "Unable to prepare AI routing", 500, undefined, false);
+    routesCreated += 1;
+  }
+
+  return { modelId, routesCreated };
+}
+
 Deno.serve(
   createHandler(
     { methods: ["GET", "PATCH"], authentication: "required", organization: "none" },
@@ -105,8 +182,16 @@ Deno.serve(
         if (body.configuration !== undefined) updates.configuration = body.configuration;
         const { data: updated, error } = await admin.from("ai_providers").update(updates).eq("id", providerId).select("id,code,name,adapter_version,status,secret_reference,configuration,updated_at").single();
         if (error) throw new ApiError("AI_PROVIDER_UPDATE_FAILED", "Unable to update AI provider", 500, undefined, false);
-        await admin.from("platform_audit_log").insert({ actor_profile_id: auth.user.id, action: "ai.provider_configured", target_type: "ai_provider", target_id: providerId, request_id: requestId, metadata: { providerCode: current.code, previousStatus: current.status, newStatus: status, reason, secretReferenceChanged: body.secretReference !== undefined } });
-        return { data: updated };
+
+        const bootstrap = status === "active"
+          ? await ensureProviderRuntime(admin, {
+              id: updated.id,
+              configuration: updated.configuration as Record<string, unknown> | null,
+            })
+          : { modelId: null, routesCreated: 0 };
+
+        await admin.from("platform_audit_log").insert({ actor_profile_id: auth.user.id, action: "ai.provider_configured", target_type: "ai_provider", target_id: providerId, request_id: requestId, metadata: { providerCode: current.code, previousStatus: current.status, newStatus: status, reason, secretReferenceChanged: body.secretReference !== undefined, runtimeModelId: bootstrap.modelId, routesCreated: bootstrap.routesCreated } });
+        return { data: { ...updated, runtime: bootstrap } };
       }
 
       if (action === "upsert_model") {
