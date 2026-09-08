@@ -3,6 +3,7 @@ import { ApiError } from "../_shared/errors.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { adminClient } from "../_shared/supabase.ts";
+import { resolveActiveOrganizationId } from "../_shared/public-organization.ts";
 import { assertNoUnknownFields, assertObject, requiredString, uuid } from "../_shared/validation.ts";
 
 const BUCKET = "community-public-media";
@@ -84,14 +85,10 @@ Deno.serve(createHandler(
     const action = requiredString(body.action, "action", 32);
     if (action === "create_upload") {
       assertNoUnknownFields(body, ["action", "organizationId", "mimeType", "fileName", "sizeBytes", "branchId", "durationSeconds"]);
-      const organizationId = uuid(requiredString(body.organizationId, "organizationId", 36), "organizationId", true)!;
-      const { data: organization, error: organizationError } = await admin
-        .from("organizations")
-        .select("id,status")
-        .eq("id", organizationId)
-        .eq("status", "active")
-        .maybeSingle();
-      if (organizationError || !organization) throw new ApiError("ORGANIZATION_NOT_FOUND", "This church community is not available", 404);
+      const requestedOrganizationId = body.organizationId
+        ? uuid(String(body.organizationId), "organizationId", true)!
+        : null;
+      const organizationId = await resolveActiveOrganizationId(admin, requestedOrganizationId);
 
       const mimeType = requiredString(body.mimeType, "mimeType", 120).toLowerCase();
       const type = MIME_TYPES[mimeType];
