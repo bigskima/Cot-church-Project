@@ -89,8 +89,7 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
   });
 
   const reels = reelsResource.data ?? [];
-  const canShareToGeneral =
-    mode === 'authenticated' && Boolean(organizationId);
+  const canShareToGeneral = mode === 'authenticated';
 
   useEffect(() => {
     if (!reelId || !reels.length || appliedDeepLinkRef.current === reelId) return;
@@ -194,7 +193,11 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
       await api.request('social-feed', {
         method: 'POST',
         context: 'public',
-        body: JSON.stringify({ action: 'share_reel', organizationId, reelId: shareTarget.id }),
+        body: JSON.stringify({
+          action: 'share_reel',
+          ...(organizationId ? { organizationId } : {}),
+          reelId: shareTarget.id,
+        }),
       });
       setShareTarget(null);
     } catch (value) {
@@ -244,6 +247,29 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
             <Icon name="grid-outline" size={15} color="#FFFFFF" />
             <Text style={styles.mediaLibraryText}>Media</Text>
           </Pressable>
+        </View>
+      ) : null}
+
+      {!expressionId ? (
+        <View style={[styles.generalScope, { top: insets.top + 8 }]}>
+          <View style={styles.generalScopePill}>
+            <Icon name="globe-outline" size={13} color="#FFFFFF" />
+            <View style={styles.expressionScopeCopy}>
+              <Text style={styles.expressionScopeLabel}>GENERAL REELS</Text>
+              <Text style={styles.expressionScopeName}>Public COT discovery</Text>
+            </View>
+          </View>
+          {mode === 'authenticated' ? (
+            <Pressable
+              onPress={() => router.push('/general/studio/reel' as any)}
+              style={({ pressed }) => [styles.mediaLibraryButton, pressed ? styles.overlayPressed : null]}
+              accessibilityRole="button"
+              accessibilityLabel="Create Reel"
+            >
+              <Icon name="add-outline" size={16} color="#FFFFFF" />
+              <Text style={styles.mediaLibraryText}>Create</Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
 
@@ -320,9 +346,7 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
                   size="lg"
                   fullWidth
                 />
-              ) : (
-                <Text style={styles.shareHint}>Choose a church community before sharing this Reel to General Community.</Text>
-              )}
+              ) : null}
               <Button
                 label="Share externally"
                 onPress={() => void shareReelExternally()}
@@ -352,6 +376,8 @@ export default function GeneralReelsExperience() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#000000' },
   expressionScope: { position: 'absolute', left: 16, right: 68, zIndex: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  generalScope: { position: 'absolute', left: 16, right: 68, zIndex: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  generalScopePill: { minHeight: 42, flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.52)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
   expressionScopePill: { minHeight: 42, maxWidth: '72%', flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.52)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
   expressionScopeCopy: { flex: 1, minWidth: 0 },
   expressionScopeLabel: { color: '#FFFFFF', fontSize: 8, lineHeight: 10, fontWeight: '900', letterSpacing: 0.8 },
