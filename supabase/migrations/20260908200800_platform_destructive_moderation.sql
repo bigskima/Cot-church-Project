@@ -38,12 +38,28 @@ declare
   platform_deletion_transition boolean := false;
 begin
   platform_deletion_transition :=
-    old.status = 'actioned'
-    and old.action_taken like 'Removed by Platform Moderation:%'
-    and (
-      (old.content_item_id is not null and new.content_item_id is null and new.comment_id is not distinct from old.comment_id)
-      or
-      (old.comment_id is not null and new.comment_id is null and new.content_item_id is not distinct from old.content_item_id)
+    (
+      old.content_item_id is not null
+      and new.content_item_id is null
+      and new.comment_id is not distinct from old.comment_id
+      and exists (
+        select 1
+        from public.platform_moderation_deletions d
+        where d.target_type='content'
+          and d.target_id=old.content_item_id::text
+      )
+    )
+    or
+    (
+      old.comment_id is not null
+      and new.comment_id is null
+      and new.content_item_id is not distinct from old.content_item_id
+      and exists (
+        select 1
+        from public.platform_moderation_deletions d
+        where d.target_type='comment'
+          and d.target_id=old.comment_id::text
+      )
     );
 
   if new.organization_id is distinct from old.organization_id
@@ -220,12 +236,42 @@ begin
   )
   returning id into v_deletion_id;
 
+  insert into public.platform_moderation_deletions(
+    target_type,target_id,organization_id,expression_id,actor_profile_id,reason,snapshot,
+    storage_cleanup_status,completed_at
+  )
+  select
+    'comment',
+    cc.id::text,
+    content_row.organization_id,
+    content_row.expression_id,
+    actor_profile_id,
+    normalized_reason,
+    jsonb_build_object(
+      'comment',to_jsonb(cc),
+      'contentId',content_row.id,
+      'cascadeFromContent',content_row.id
+    ),
+    'not_required',
+    now()
+  from public.content_comments cc
+  where cc.content_item_id=content_row.id;
+
   update public.content_moderation_reports
   set status='actioned',
       reviewed_by=actor_profile_id,
       action_taken='Removed by Platform Moderation: ' || normalized_reason
   where content_item_id=content_row.id
     and status in ('pending','under_review');
+
+  update public.content_moderation_reports r
+  set status='actioned',
+      reviewed_by=actor_profile_id,
+      action_taken='Removed by Platform Moderation: ' || normalized_reason
+  where r.comment_id in (
+      select cc.id from public.content_comments cc where cc.content_item_id=content_row.id
+    )
+    and r.status in ('pending','under_review');
 
   if content_row.content_type='post'::public.content_item_type then
     insert into public.platform_storage_cleanup_tasks(deletion_id,bucket,storage_path)
@@ -395,6 +441,28 @@ begin
     now()
   )
   returning id into v_deletion_id;
+
+  insert into public.platform_moderation_deletions(
+    target_type,target_id,organization_id,expression_id,actor_profile_id,reason,snapshot,
+    storage_cleanup_status,completed_at
+  )
+  select
+    'comment',
+    cc.id::text,
+    content_row.organization_id,
+    content_row.expression_id,
+    actor_profile_id,
+    normalized_reason,
+    jsonb_build_object(
+      'comment',to_jsonb(cc),
+      'contentId',content_row.id,
+      'cascadeFromComment',comment_row.id
+    ),
+    'not_required',
+    now()
+  from public.content_comments cc
+  where cc.id=any(coalesce(affected_ids,array[]::uuid[]))
+    and cc.id<>comment_row.id;
 
   update public.content_moderation_reports
   set status='actioned',
