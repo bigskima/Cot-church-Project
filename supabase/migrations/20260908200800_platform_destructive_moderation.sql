@@ -97,7 +97,7 @@ as $function$
 declare
   content_row public.content_items;
   typed_snapshot jsonb := '{}'::jsonb;
-  deletion_id uuid;
+  v_deletion_id uuid;
   asset_ids uuid[] := array[]::uuid[];
   asset_id uuid;
   storage_task_count integer := 0;
@@ -181,7 +181,7 @@ begin
       'typed',coalesce(typed_snapshot,'{}'::jsonb)
     )
   )
-  returning id into deletion_id;
+  returning id into v_deletion_id;
 
   update public.content_moderation_reports
   set status='actioned',
@@ -192,7 +192,7 @@ begin
 
   if content_row.content_type='post'::public.content_item_type then
     insert into public.platform_storage_cleanup_tasks(deletion_id,bucket,storage_path)
-    select deletion_id,'community-public-media',u.storage_path
+    select v_deletion_id,'community-public-media',u.storage_path
     from public.social_media_uploads u
     where u.post_id=content_row.id
       and u.storage_path is not null
@@ -220,7 +220,7 @@ begin
        and not exists(select 1 from public.sermons s where s.audio_asset_id=asset_id or s.video_asset_id=asset_id)
     then
       insert into public.platform_storage_cleanup_tasks(deletion_id,bucket,storage_path)
-      select deletion_id,'content-media',path
+      select v_deletion_id,'content-media',path
       from (
         select ma.source_storage_path as path
         from public.media_assets ma
@@ -248,12 +248,12 @@ begin
 
   select count(*) into storage_task_count
   from public.platform_storage_cleanup_tasks
-  where deletion_id=platform_remove_content.deletion_id;
+  where deletion_id=v_deletion_id;
 
   update public.platform_moderation_deletions
   set storage_cleanup_status=case when storage_task_count > 0 then 'pending' else 'not_required' end,
       completed_at=case when storage_task_count=0 then now() else null end
-  where id=deletion_id;
+  where id=v_deletion_id;
 
   insert into public.platform_audit_log(
     actor_profile_id,action,target_type,target_id,request_id,metadata
@@ -265,7 +265,7 @@ begin
     content_row.id::text,
     audit_request_id,
     jsonb_build_object(
-      'deletionId',deletion_id,
+      'deletionId',v_deletion_id,
       'organizationId',content_row.organization_id,
       'expressionId',content_row.expression_id,
       'contentType',content_row.content_type,
@@ -275,7 +275,7 @@ begin
   );
 
   return jsonb_build_object(
-    'deletionId',deletion_id,
+    'deletionId',v_deletion_id,
     'targetType','content',
     'targetId',content_row.id,
     'contentType',content_row.content_type,
@@ -299,7 +299,7 @@ declare
   comment_row public.content_comments;
   content_row public.content_items;
   affected_ids uuid[];
-  deletion_id uuid;
+  v_deletion_id uuid;
   normalized_reason text := trim(coalesce(deletion_reason,''));
 begin
   if char_length(normalized_reason) < 3 or char_length(normalized_reason) > 1000 then
@@ -357,7 +357,7 @@ begin
     'not_required',
     now()
   )
-  returning id into deletion_id;
+  returning id into v_deletion_id;
 
   update public.content_moderation_reports
   set status='actioned',
@@ -379,7 +379,7 @@ begin
     comment_row.id::text,
     audit_request_id,
     jsonb_build_object(
-      'deletionId',deletion_id,
+      'deletionId',v_deletion_id,
       'organizationId',content_row.organization_id,
       'expressionId',content_row.expression_id,
       'contentId',content_row.id,
@@ -389,7 +389,7 @@ begin
   );
 
   return jsonb_build_object(
-    'deletionId',deletion_id,
+    'deletionId',v_deletion_id,
     'targetType','comment',
     'targetId',comment_row.id,
     'affectedCommentCount',coalesce(cardinality(affected_ids),1),
@@ -412,7 +412,7 @@ set search_path = ''
 as $function$
 declare
   expression_row public.branches;
-  deletion_id uuid;
+  v_deletion_id uuid;
   normalized_reason text := trim(coalesce(deletion_reason,''));
   normalized_confirmation text := upper(trim(coalesce(confirmation_code,'')));
   revoked_invites integer := 0;
@@ -457,7 +457,7 @@ begin
     'not_required',
     now()
   )
-  returning id into deletion_id;
+  returning id into v_deletion_id;
 
   update public.expression_invite_codes
   set status='revoked',
@@ -485,7 +485,7 @@ begin
     expression_row.id::text,
     audit_request_id,
     jsonb_build_object(
-      'deletionId',deletion_id,
+      'deletionId',v_deletion_id,
       'organizationId',expression_row.organization_id,
       'expressionName',expression_row.name,
       'expressionCode',expression_row.code,
@@ -496,7 +496,7 @@ begin
   );
 
   return jsonb_build_object(
-    'deletionId',deletion_id,
+    'deletionId',v_deletion_id,
     'id',expression_row.id,
     'organizationId',expression_row.organization_id,
     'name',expression_row.name,
