@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { usePathname } from 'expo-router';
+import { useLocalSearchParams, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { toUserFacingErrorMessage } from '@/api';
@@ -34,7 +34,11 @@ type BroadcastScope = 'public' | 'expression';
 export default function MediaStudioScreen() {
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
+  const { expressionId: routeExpressionId } = useLocalSearchParams<{ expressionId?: string }>();
   const expressionWorkspace = pathname.startsWith('/expressions/');
+  const exactExpressionId = expressionWorkspace && typeof routeExpressionId === 'string'
+    ? routeExpressionId
+    : undefined;
   const { api, context, hasCapability, hasPublicCapability } = useSession();
   const { colors } = useTheme();
   const expression = context?.expression;
@@ -46,7 +50,7 @@ export default function MediaStudioScreen() {
     '';
 
   const canPublicBroadcast = !expressionWorkspace && hasPublicCapability('public.live_stream.create');
-  const canExpressionBroadcast = Boolean(expression?.id) && hasCapability('streams.broadcast');
+  const canExpressionBroadcast = Boolean(exactExpressionId ?? expression?.id) && hasCapability('streams.broadcast');
   const hasBroadcastAccess = canPublicBroadcast || canExpressionBroadcast;
 
   const [broadcastScope, setBroadcastScope] = useState<BroadcastScope>(canExpressionBroadcast ? 'expression' : 'public');
@@ -70,7 +74,7 @@ export default function MediaStudioScreen() {
     }
   }, [broadcastScope, canExpressionBroadcast, canPublicBroadcast]);
 
-  const targetExpressionId = broadcastScope === 'expression' ? expression?.id : undefined;
+  const targetExpressionId = broadcastScope === 'expression' ? (exactExpressionId ?? expression?.id) : undefined;
   const destinationName = broadcastScope === 'expression'
     ? expression?.name ?? 'Expression'
     : 'General Community';
@@ -258,18 +262,27 @@ export default function MediaStudioScreen() {
             </View>
           ) : null}
 
-          <View style={[styles.readinessCard, { backgroundColor: colors.card, borderColor: providerReady ? colors.success : colors.borderSubtle }, shadows.md]}>
+          <View style={[styles.readinessCard, { backgroundColor: colors.card, borderColor: providerReady ? colors.success : colors.borderSubtle }, shadows.sm]}>
+            <View pointerEvents="none" style={[styles.readinessGlow, { backgroundColor: providerReady ? colors.successSoft : colors.bgSecondary }]} />
             <View style={[styles.providerIcon, { backgroundColor: providerReady ? colors.successSoft : colors.bgSecondary }]}>
-              <Icon name="radio-outline" size={22} color={providerReady ? colors.success : colors.textMuted} />
+              <Icon name={providerReady ? 'checkmark-circle' : 'radio-outline'} size={22} color={providerReady ? colors.success : colors.textMuted} />
             </View>
             <View style={styles.flex}>
               <Text style={[styles.cardTitle, { color: colors.text }]}>Live broadcasting</Text>
               <Text style={[styles.helper, { color: colors.textSecondary }]}>
-                {providerReady ? `Ready for ${destinationName}.` : 'Temporarily unavailable. Existing broadcasts remain visible.'}
+                {readiness.loading && !readiness.data
+                  ? 'Checking live service…'
+                  : providerReady
+                    ? `Ready for ${destinationName}.`
+                    : 'Live creation is temporarily unavailable. You can still view existing broadcasts.'}
               </Text>
             </View>
-            <Badge label={providerReady ? 'AVAILABLE' : 'TEMPORARILY UNAVAILABLE'} variant={providerReady ? 'active' : 'neutral'} />
+            <Badge label={providerReady ? 'READY' : readiness.loading ? 'CHECKING' : 'UNAVAILABLE'} variant={providerReady ? 'active' : 'neutral'} />
           </View>
+
+          {readiness.error ? (
+            <ResourceError message={readiness.error} retry={readiness.refresh} compact />
+          ) : null}
 
           <View style={styles.listSection}>
             <SectionHeader
@@ -282,7 +295,7 @@ export default function MediaStudioScreen() {
             {streams.loading && !streams.data ? (
               <Skeleton height={112} count={2} />
             ) : streams.error && !streams.data ? (
-              <ResourceError message={streams.error} retry={streams.refresh} />
+              <ResourceError message={streams.error} retry={streams.refresh} compact />
             ) : streamList.length ? (
               streamList.map((stream) => (
                 <View key={stream.id} style={[styles.tile, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
@@ -359,8 +372,10 @@ export default function MediaStudioScreen() {
               </View>
             ) : null}
 
-            <View style={[styles.destinationNotice, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}>
-              <Icon name={broadcastScope === 'public' ? 'globe-outline' : 'people-outline'} size={19} color={colors.interactive} />
+            <View style={[styles.destinationNotice, { backgroundColor: colors.primarySoft, borderColor: colors.primarySoftStrong }]}>
+              <View style={[styles.destinationIcon, { backgroundColor: colors.card }]}>
+                <Icon name={broadcastScope === 'public' ? 'globe-outline' : 'people-outline'} size={19} color={colors.interactive} />
+              </View>
               <View style={styles.flex}>
                 <Text style={[styles.destinationTitle, { color: colors.text }]}>{destinationName}</Text>
                 <Text style={[styles.helper, { color: colors.textSecondary }]}>
@@ -369,6 +384,7 @@ export default function MediaStudioScreen() {
                     : 'This livestream will stay inside this Expression and won’t appear in General COT.'}
                 </Text>
               </View>
+              <Badge label={broadcastScope === 'public' ? 'GENERAL COT' : 'PRIVATE EXPRESSION'} variant="primary" />
             </View>
 
             <InputField label="Broadcast title" value={title} onChangeText={setTitle} placeholder="Sunday worship, conference, prayer meeting…" />
@@ -401,7 +417,8 @@ const styles = StyleSheet.create({
   scopeIcon: { width: 44, height: 44, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
   banner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1 },
   bannerText: { fontSize: 13, fontWeight: '600', flex: 1 },
-  readinessCard: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.xl, borderWidth: 1, gap: spacing.md },
+  readinessCard: { position: 'relative', overflow: 'hidden', flexDirection: 'row', alignItems: 'center', padding: spacing.lg, borderRadius: radius.xxl, borderWidth: 1, gap: spacing.md },
+  readinessGlow: { position: 'absolute', width: 150, height: 150, borderRadius: 75, right: -70, top: -90, opacity: 0.85 },
   providerIcon: { width: 46, height: 46, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
   cardTitle: { fontSize: 15, fontWeight: '800', letterSpacing: -0.2 },
   helper: { fontSize: 11, lineHeight: 17 },
@@ -416,7 +433,8 @@ const styles = StyleSheet.create({
   form: { gap: spacing.md },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   fieldLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.65 },
-  destinationNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1 },
+  destinationNotice: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radius.xl, borderWidth: 1 },
+  destinationIcon: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   destinationTitle: { fontSize: 14, fontWeight: '800', marginBottom: 2 },
   ingestSheet: { gap: spacing.md },
   securityNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg },
