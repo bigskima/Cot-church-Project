@@ -249,7 +249,7 @@ export default function ExpressionGovernanceScreen() {
                       <View style={styles.flex}>
                         <Text style={[styles.rowTitle, { color: colors.text }]}>{invite.target_email}</Text>
                         <Text style={[styles.rowMeta, { color: colors.textSecondary }]}>
-                          {role?.name ?? 'Expression role'} · expires {new Date(invite.expires_at).toLocaleDateString()}
+                          {role?.name ?? 'Ministry role'} · expires {new Date(invite.expires_at).toLocaleDateString()}
                         </Text>
                       </View>
                       <Button label="Revoke" variant="outline" size="sm" disabled={busy} onPress={() => void revokeInvitation(invite.id)} />
@@ -264,7 +264,7 @@ export default function ExpressionGovernanceScreen() {
             <View style={[styles.permissionCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
               <Icon name="shield-outline" size={18} color={colors.textMuted} />
               <Text style={[styles.permissionText, { color: colors.textSecondary }]}>
-                Role invitations are hidden because this account does not have both member-invite and role-assignment authority. Ownership controls remain available to the current owner.
+                Ministry invitations aren’t available for this account. Ownership tools remain available to the current owner.
               </Text>
             </View>
           )}
