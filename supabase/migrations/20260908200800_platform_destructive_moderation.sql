@@ -29,6 +29,43 @@ create table if not exists public.platform_moderation_deletions (
   completed_at timestamptz
 );
 
+create or replace function public.protect_content_moderation_report_evidence()
+returns trigger
+language plpgsql
+set search_path = ''
+as $function$
+declare
+  platform_deletion_transition boolean := false;
+begin
+  platform_deletion_transition :=
+    old.status = 'actioned'
+    and old.action_taken like 'Removed by Platform Moderation:%'
+    and (
+      (old.content_item_id is not null and new.content_item_id is null and new.comment_id is not distinct from old.comment_id)
+      or
+      (old.comment_id is not null and new.comment_id is null and new.content_item_id is not distinct from old.content_item_id)
+    );
+
+  if new.organization_id is distinct from old.organization_id
+     or new.expression_id is distinct from old.expression_id
+     or (
+       not platform_deletion_transition
+       and (
+         new.content_item_id is distinct from old.content_item_id
+         or new.comment_id is distinct from old.comment_id
+       )
+     )
+     or new.reporter_profile_id is distinct from old.reporter_profile_id
+     or new.reason is distinct from old.reason
+     or new.details is distinct from old.details
+     or new.created_at is distinct from old.created_at
+  then
+    raise exception using errcode='23514', message='Moderation report evidence is immutable';
+  end if;
+  return new;
+end
+$function$;
+
 create table if not exists public.platform_storage_cleanup_tasks (
   id uuid primary key default gen_random_uuid(),
   deletion_id uuid not null references public.platform_moderation_deletions(id) on delete cascade,
