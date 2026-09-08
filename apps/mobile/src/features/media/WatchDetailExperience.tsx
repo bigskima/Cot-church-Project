@@ -18,6 +18,7 @@ import {
   Avatar,
   Badge,
   Button,
+  ContentReportSheet,
   Icon,
   ResourceError,
   ScreenHeader,
@@ -44,6 +45,7 @@ export function WatchDetailExperience({ videoId: id, scope = 'general' }: { vide
   const [isLiked, setIsLiked] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [actionError, setActionError] = useState('');
+  const [reportOpen, setReportOpen] = useState(false);
   const lastSyncedSecond = useRef(0);
   const expressionMode = scope === 'expression';
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
@@ -161,6 +163,22 @@ export function WatchDetailExperience({ videoId: id, scope = 'general' }: { vide
     } catch {
       // Ignored
     }
+  };
+
+  const handleReport = () => {
+    if (mode === 'visitor') {
+      router.push({
+        pathname: '/(auth)/login',
+        params: { returnTo: expressionMode && context?.expression?.id ? `/expressions/${context.expression.id}/videos/${id}` : `/general/watch/${id}` },
+      } as any);
+      return;
+    }
+    if (!contentId) {
+      setActionError('This video is not ready to report yet.');
+      return;
+    }
+    setActionError('');
+    setReportOpen(true);
   };
 
   const syncProgress = useCallback((seconds: number, duration: number) => {
@@ -300,6 +318,11 @@ export function WatchDetailExperience({ videoId: id, scope = 'general' }: { vide
                   {video.comments_count > 0 ? `Comments ${video.comments_count}` : 'Comments'}
                 </Text>
               </Pressable>
+
+              <Pressable onPress={handleReport} style={styles.actionBtn}>
+                <Icon name="flag-outline" size={20} color={colors.text} />
+                <Text style={[styles.actionBtnText, { color: colors.text }]}>Report</Text>
+              </Pressable>
             </ScrollView>
 
             {/* Description */}
@@ -327,6 +350,15 @@ export function WatchDetailExperience({ videoId: id, scope = 'general' }: { vide
           </View>
         </ScrollView>
       ) : null}
+
+      <ContentReportSheet
+        target={reportOpen && contentId ? {
+          contentId,
+          context: expressionMode ? 'current' : 'public',
+          label: video?.title ? `Report video: ${video.title}` : 'Report this video',
+        } : null}
+        onClose={() => setReportOpen(false)}
+      />
 
     </View>
   );

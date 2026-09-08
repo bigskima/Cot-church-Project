@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
@@ -7,7 +8,9 @@ import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import {
   AudioPlayer,
+  Button,
   Chip,
+  ContentReportSheet,
   Icon,
   ResourceError,
   MediaPreviewModal,
@@ -39,6 +42,7 @@ export function SermonDetailExperience({ sermonId: id, scope = 'general' }: { se
 
   const [mediaFormat, setMediaFormat] = useState<'video' | 'audio'>('video');
   const [bannerPreviewOpen, setBannerPreviewOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const lastSyncedSecond = useRef(0);
   const expressionMode = scope === 'expression';
@@ -198,6 +202,22 @@ export function SermonDetailExperience({ sermonId: id, scope = 'general' }: { se
     sermon?.recording_id &&
     playback.data &&
     !playback.data.ready;
+
+  const handleReport = () => {
+    if (mode === 'visitor') {
+      router.push({
+        pathname: '/(auth)/login',
+        params: {
+          returnTo: expressionMode && activeExpressionId
+            ? `/expressions/${activeExpressionId}/sermons/${id}`
+            : `/general/sermon/${id}`,
+        },
+      } as any);
+      return;
+    }
+    if (!contentId) return;
+    setReportOpen(true);
+  };
 
   const syncProgress = useCallback(
     (seconds: number, duration: number) => {
@@ -447,6 +467,19 @@ export function SermonDetailExperience({ sermonId: id, scope = 'general' }: { se
               </View>
             )}
 
+            {contentId ? (
+              <View style={[styles.safetyRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+                <View style={styles.safetyCopy}>
+                  <Icon name="shield-outline" size={17} color={colors.textMuted} />
+                  <View style={styles.safetyTextWrap}>
+                    <Text style={[styles.safetyTitle, { color: colors.text }]}>Safety</Text>
+                    <Text style={[styles.safetyText, { color: colors.textMuted }]}>Report this sermon if something needs moderation review.</Text>
+                  </View>
+                </View>
+                <Button label="Report" onPress={handleReport} variant="outline" size="sm" />
+              </View>
+            ) : null}
+
             {sermon.scripture_references?.length ? (
               <View
                 style={[
@@ -547,6 +580,15 @@ export function SermonDetailExperience({ sermonId: id, scope = 'general' }: { se
         visible={bannerPreviewOpen}
         onClose={() => setBannerPreviewOpen(false)}
       />
+
+      <ContentReportSheet
+        target={reportOpen && contentId ? {
+          contentId,
+          context: expressionMode ? 'current' : 'public',
+          label: sermon?.title ? `Report sermon: ${sermon.title}` : 'Report this sermon',
+        } : null}
+        onClose={() => setReportOpen(false)}
+      />
     </View>
   );
 }
@@ -589,6 +631,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
   },
+  safetyRow: {
+    minHeight: 64,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  safetyCopy: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  safetyTextWrap: { flex: 1, minWidth: 0 },
+  safetyTitle: { fontSize: 12, lineHeight: 16, fontWeight: '800' },
+  safetyText: { fontSize: 11, lineHeight: 16, marginTop: 1 },
   card: {
     padding: spacing.lg,
     borderRadius: radius.xl,

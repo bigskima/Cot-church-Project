@@ -27,6 +27,7 @@ export interface ReelPlayerProps {
   onOpenComments?: () => void;
   onSave?: (currentlySaved: boolean) => boolean | Promise<boolean>;
   onShare?: () => void | Promise<void>;
+  onReport?: () => void;
   containerHeight?: number;
 }
 
@@ -42,6 +43,7 @@ export function ReelPlayer({
   onOpenComments,
   onSave,
   onShare,
+  onReport,
   containerHeight,
 }: ReelPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(true);
@@ -245,6 +247,21 @@ export function ReelPlayer({
             </View>
             <Text style={styles.actionLabel}>Share</Text>
           </Pressable>
+
+          {onReport ? (
+            <Pressable
+              onPress={onReport}
+              hitSlop={6}
+              style={styles.actionBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Report reel"
+            >
+              <View style={styles.actionCircle}>
+                <Icon name="flag-outline" size={22} color="#FFFFFF" />
+              </View>
+              <Text style={styles.actionLabel}>Report</Text>
+            </Pressable>
+          ) : null}
         </View>
 
         {/* Bottom Overlay Gradient & Metadata */}

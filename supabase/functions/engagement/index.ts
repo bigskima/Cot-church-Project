@@ -358,19 +358,49 @@ Deno.serve(createHandler(
 
     // 5. Moderation Report
     if (body.action === "report") {
-      assertNoUnknownFields(body, ["action", "contentId", "commentId", "reason", "details", "organizationId", "expressionId"]);
+      assertNoUnknownFields(body, ["action", "contentId", "commentId", "reason", "details"]);
       const contentId = body.contentId ? uuid(String(body.contentId), "contentId", true) : null;
       const commentId = body.commentId ? uuid(String(body.commentId), "commentId", true) : null;
+      if ((contentId ? 1 : 0) + (commentId ? 1 : 0) !== 1) {
+        throw new ApiError("VALIDATION_FAILED", "Choose exactly one content or comment target to report", 422);
+      }
+
       const reason = requiredString(body.reason, "reason", 200);
       const details = optionalString(body.details, "details", 1000) ?? "";
-      const orgId = uuid(requiredString(body.organizationId, "organizationId", 36), "organizationId", true)!;
-      const expId = body.expressionId ? uuid(String(body.expressionId), "expressionId", true) : null;
+
+      let targetContentId = contentId;
+      if (commentId) {
+        const { data: comment, error: commentError } = await auth.client
+          .from("content_comments")
+          .select("id,content_item_id,is_hidden")
+          .eq("id", commentId)
+          .maybeSingle();
+        if (commentError) throw new ApiError("REPORT_TARGET_CHECK_FAILED", "Unable to verify this comment", 500, undefined, false);
+        if (!comment || comment.is_hidden) throw new ApiError("COMMENT_NOT_FOUND", "This comment is unavailable", 404);
+        targetContentId = comment.content_item_id;
+      }
+
+      const targetContent = await assertContentAccess(auth, targetContentId!);
+
+      let existingQuery = auth.client
+        .from("content_moderation_reports")
+        .select("id,organization_id,expression_id,content_item_id,comment_id,reason,details,status,created_at,updated_at")
+        .eq("reporter_profile_id", auth.user.id)
+        .in("status", ["pending", "under_review"])
+        .limit(1);
+      existingQuery = contentId
+        ? existingQuery.eq("content_item_id", contentId)
+        : existingQuery.eq("comment_id", commentId!);
+
+      const { data: existing, error: existingError } = await existingQuery.maybeSingle();
+      if (existingError) throw new ApiError("REPORT_CHECK_FAILED", "Unable to verify an existing report", 500, undefined, false);
+      if (existing) return { data: { ...existing, alreadyReported: true } };
 
       const { data, error } = await auth.client
         .from("content_moderation_reports")
         .insert({
-          organization_id: orgId,
-          expression_id: expId,
+          organization_id: targetContent.organization_id,
+          expression_id: targetContent.expression_id ?? null,
           content_item_id: contentId,
           comment_id: commentId,
           reporter_profile_id: auth.user.id,
@@ -381,7 +411,7 @@ Deno.serve(createHandler(
         .single();
 
       if (error) throw new ApiError("REPORT_FAILED", "Unable to submit moderation report", 500, undefined, false);
-      return { data, status: 201 };
+      return { data: { ...data, alreadyReported: false }, status: 201 };
     }
 
     throw new ApiError("NOT_FOUND", "Engagement action not recognized", 404);
