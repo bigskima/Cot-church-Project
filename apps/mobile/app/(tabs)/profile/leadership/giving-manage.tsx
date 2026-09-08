@@ -336,23 +336,25 @@ export default function ExpressionGivingManageScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: expressionWorkspace ? spacing.md : insets.top + spacing.sm, paddingBottom: expressionWorkspace ? insets.bottom + spacing.xl : insets.bottom + 120 }}
       >
-        <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
-          <ScreenHeader
-            title={activeScope === 'organization' ? 'Church Giving Settings' : 'Expression Giving Settings'}
-            kicker="LEADERSHIP"
-            subtitle={activeScope === 'organization'
-              ? `Church-wide giving for ${organization.name}.`
-              : `Giving configuration for ${expression?.name ?? 'the selected Expression'}.`}
-            showBack
-            rightAction={
-              tab === 'purposes'
-                ? <Button label="New purpose" onPress={() => setPurposeOpen(true)} size="sm" />
-                : tab === 'accounts'
-                  ? <Button label="New account" onPress={() => setAccountOpen(true)} size="sm" />
-                  : undefined
-            }
-          />
-        </View>
+        {!expressionWorkspace ? (
+          <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+            <ScreenHeader
+              title={activeScope === 'organization' ? 'Church Giving Settings' : 'Expression Giving Settings'}
+              kicker="LEADERSHIP"
+              subtitle={activeScope === 'organization'
+                ? `Church-wide giving for ${organization.name}.`
+                : `Giving configuration for ${expression?.name ?? 'the selected Expression'}.`}
+              showBack
+              rightAction={
+                tab === 'purposes'
+                  ? <Button label="New purpose" onPress={() => setPurposeOpen(true)} size="sm" />
+                  : tab === 'accounts'
+                    ? <Button label="New account" onPress={() => setAccountOpen(true)} size="sm" />
+                    : undefined
+              }
+            />
+          </View>
+        ) : null}
 
         <View style={styles.body}>
           {!expressionWorkspace && scopeAccess.loading ? (
