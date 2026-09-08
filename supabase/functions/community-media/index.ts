@@ -19,6 +19,7 @@ const MIME_TYPES: Record<string, { kind: "image" | "video" | "audio"; ext: strin
   "audio/mpeg": { kind: "audio", ext: "mp3" },
   "audio/mp4": { kind: "audio", ext: "m4a" },
   "audio/aac": { kind: "audio", ext: "aac" },
+  "audio/webm": { kind: "audio", ext: "webm" },
   "audio/ogg": { kind: "audio", ext: "ogg" },
   "audio/wav": { kind: "audio", ext: "wav" },
 };
