@@ -65,7 +65,7 @@ Deno.serve(createHandler(
       const targetOrganizationId = await resolveActiveOrganizationId(admin, requestedOrganizationId);
 
       const ensurePublicPublishing = async () => {
-        const { data: postingAllowed, error: postingError } = await auth.client.rpc("can_profile_post_publicly", {
+        const { data: postingAllowed, error: postingError } = await admin.rpc("can_profile_post_publicly", {
           target_profile_id: auth.user.id,
         });
         if (postingError || postingAllowed !== true) {
