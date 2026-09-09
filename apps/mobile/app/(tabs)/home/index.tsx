@@ -441,6 +441,10 @@ export default function HomeScreen() {
                     video={item.video}
                     commentContext="public"
                     onPress={() => router.push(`/general/watch/${item.video.id}` as any)}
+                    onPressCreator={item.video.content_items?.author?.username ? () => router.push({
+                      pathname: '/general/member/[username]',
+                      params: { username: item.video.content_items!.author!.username! },
+                    } as any) : undefined}
                     onOpenComments={item.video.content_items?.id ? () => router.push({
                       pathname: '/general/comments/[contentId]',
                       params: { contentId: item.video.content_items!.id },
