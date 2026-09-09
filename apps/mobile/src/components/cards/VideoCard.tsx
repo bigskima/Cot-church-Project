@@ -1,5 +1,6 @@
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View, StyleProp, ViewStyle } from 'react-native';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useTheme } from '@/state/theme';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { Icon } from '../primitives/Icon';
@@ -17,6 +18,15 @@ export interface VideoCardProps {
 
 export function VideoCard({ video, expressionName, onPress, onBookmark, style }: VideoCardProps) {
   const { colors } = useTheme();
+  const sourceUrl =
+    video.media_assets?.renditions?.find((rendition) => rendition.rendition_kind === 'video_stream')?.storage_path ||
+    video.media_assets?.url ||
+    '';
+  const posterUrl = video.media_assets?.thumbnailUrl || '';
+  const player = useVideoPlayer(sourceUrl, (instance) => {
+    instance.loop = false;
+    instance.muted = true;
+  });
 
   const formatDuration = (secs?: number | null) => {
     if (!secs || secs <= 0) return null;
@@ -31,13 +41,8 @@ export function VideoCard({ video, expressionName, onPress, onBookmark, style }:
     return `${views} views`;
   };
 
-  const thumbnailUrl = video.media_assets?.thumbnailUrl || video.media_assets?.url;
   const duration = formatDuration(video.media_assets?.duration_seconds);
-  const sourceName =
-    expressionName ||
-    video.content_items?.expression?.name ||
-    video.content_items?.organization?.name ||
-    null;
+  const sourceName = expressionName || video.content_items?.expression?.name || video.content_items?.organization?.name || null;
   const creatorName = video.content_items?.author?.display_name || sourceName || 'COT';
   const creatorAvatar = video.content_items?.author?.avatar_url ?? undefined;
 
@@ -51,20 +56,12 @@ export function VideoCard({ video, expressionName, onPress, onBookmark, style }:
   };
 
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.container,
-        { backgroundColor: colors.card, borderColor: colors.borderSubtle },
-        pressed && { opacity: 0.94, transform: [{ scale: 0.992 }] },
-        style,
-      ]}
-      accessibilityRole="button"
-      accessibilityLabel={`Video: ${video.title}`}
-    >
+    <View style={[styles.container, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, style]}>
       <View style={[styles.thumbnailFrame, { backgroundColor: colors.cardElevated }]}>
-        {thumbnailUrl ? (
-          <Image source={{ uri: thumbnailUrl }} style={styles.thumbnail} resizeMode="cover" />
+        {sourceUrl && player ? (
+          <VideoView player={player} style={styles.media} contentFit="contain" nativeControls />
+        ) : posterUrl ? (
+          <Image source={{ uri: posterUrl }} style={styles.media} resizeMode="cover" />
         ) : (
           <View style={styles.placeholder}>
             <View style={[styles.playButton, { backgroundColor: colors.primarySoftStrong }]}>
@@ -72,30 +69,25 @@ export function VideoCard({ video, expressionName, onPress, onBookmark, style }:
             </View>
           </View>
         )}
-
-        {duration ? (
-          <View style={styles.durationBadge}>
-            <Text style={styles.durationText}>{duration}</Text>
-          </View>
-        ) : null}
+        {duration ? <View pointerEvents="none" style={styles.durationBadge}><Text style={styles.durationText}>{duration}</Text></View> : null}
       </View>
 
-      <View style={styles.metaRow}>
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [styles.metaRow, pressed && { opacity: 0.82 }]}
+        accessibilityRole="button"
+        accessibilityLabel={`Open video: ${video.title}`}
+      >
         <Avatar url={creatorAvatar} name={creatorName} size="sm" />
-
         <View style={styles.textColumn}>
           <Text style={[styles.title, { color: colors.text }]} numberOfLines={2}>{video.title}</Text>
           <Text style={[styles.metaText, { color: colors.textSecondary }]} numberOfLines={1}>
             {[sourceName, formatViews(video.views_count), timeAgo()].filter(Boolean).join(' · ')}
           </Text>
         </View>
-
         {onBookmark ? (
           <Pressable
-            onPress={(event) => {
-              event.stopPropagation?.();
-              onBookmark();
-            }}
+            onPress={(event) => { event.stopPropagation?.(); onBookmark(); }}
             hitSlop={8}
             style={({ pressed }) => [styles.moreBtn, pressed && { backgroundColor: colors.bgSecondary }]}
             accessibilityRole="button"
@@ -104,8 +96,8 @@ export function VideoCard({ video, expressionName, onPress, onBookmark, style }:
             <Icon name="ellipsis-horizontal" size={19} color={colors.textMuted} />
           </Pressable>
         ) : null}
-      </View>
-    </Pressable>
+      </Pressable>
+    </View>
   );
 }
 
@@ -124,52 +116,22 @@ const styles = StyleSheet.create({
     position: 'relative',
     borderRadius: radius.lg,
     overflow: 'hidden',
+    backgroundColor: '#000000',
   },
-  thumbnail: { width: '100%', height: '100%' },
+  media: { width: '100%', height: '100%' },
   placeholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  playButton: {
-    width: 54,
-    height: 54,
-    borderRadius: radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  playButton: { width: 54, height: 54, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   durationBadge: {
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
-    backgroundColor: 'rgba(0,0,0,0.78)',
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: radius.sm,
+    position: 'absolute', bottom: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.78)',
+    paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.sm,
   },
-  durationText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '800',
-    fontVariant: ['tabular-nums'],
-  },
+  durationText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800', fontVariant: ['tabular-nums'] },
   metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.xs,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xs,
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    paddingHorizontal: spacing.xs, paddingTop: spacing.md, paddingBottom: spacing.xs,
   },
   textColumn: { flex: 1, gap: 3, minWidth: 0 },
-  title: {
-    fontSize: 15,
-    fontWeight: '700',
-    lineHeight: 20,
-    letterSpacing: -0.18,
-  },
+  title: { fontSize: 15, fontWeight: '700', lineHeight: 20, letterSpacing: -0.18 },
   metaText: { fontSize: 12, lineHeight: 16 },
-  moreBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  moreBtn: { width: 34, height: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
 });
