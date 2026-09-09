@@ -10,6 +10,9 @@ const tableInvalidations: Record<string, string[]> = {
   conversations: ['chat:'],
   conversation_participants: ['chat:'],
   messages: ['chat:'],
+  direct_conversations: ['chat:'],
+  direct_messages: ['chat:'],
+  group_messages: ['group-chat:'],
   social_posts: ['mobile:home-feed:', 'mobile:community:', 'expression:'],
   social_comments: ['comments:', 'mobile:home-feed:', 'mobile:community:', 'expression:'],
   social_reactions: ['mobile:home-feed:', 'mobile:community:', 'expression:'],
@@ -32,9 +35,9 @@ const tableInvalidations: Record<string, string[]> = {
   expression_memberships: ['expression:', 'chat:'],
   events: ['events:', 'mobile:home-feed:', 'expression:'],
   sermons: ['sermon:', 'mobile:home-feed:', 'expression:'],
-  profiles: ['chat:', 'comments:', 'mobile:community:'],
+  profiles: ['chat:', 'comments:', 'mobile:community:', 'mobile:home-feed:', 'public-profile:'],
   notifications: ['notifications:'],
-  follows: ['mobile:home-feed:'],
+  follows: ['mobile:home-feed:', 'public-profile:'],
 };
 
 const contextTables = new Set(['branches', 'expression_memberships']);
