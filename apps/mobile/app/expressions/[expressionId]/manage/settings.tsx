@@ -139,7 +139,7 @@ export default function ExpressionSettingsScreen() {
           expressionName={expressionName}
           active="settings"
           title="Settings"
-          subtitle="Update the member-facing identity and local scheduling context for this Expression."
+          subtitle="This page updates the Expression name, member code and timezone, plus its banner and profile image."
           icon="settings-outline"
         />
 
