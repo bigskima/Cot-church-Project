@@ -184,7 +184,7 @@ const socialChatContracts = [
 const invariants = [
   [socialChatContracts, /direct_conversations[\s\S]*direct_messages/, 'global profile-to-profile direct messaging contract'],
   [socialChatContracts, /organization:\s*"none"/, 'direct chat is independent of Expression membership context'],
-  [socialChatContracts, /group_messages[\s\S]*group_memberships/, 'Group chat remains a separate membership-scoped conversation'],
+  [socialChatContracts, /group_memberships[\s\S]*group_messages/, 'Group chat remains a separate membership-scoped conversation'],
   [socialChatContracts, /targetProfileId|target_profile_id/, 'individual member follow target contract'],
   [socialChatContracts, /banner_url|profile-banners/, 'member profile banner contract'],
   [handler, /request\.method === "OPTIONS"/, 'CORS preflight handling'],
