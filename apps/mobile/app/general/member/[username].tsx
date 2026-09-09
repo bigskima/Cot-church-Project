@@ -261,9 +261,9 @@ export default function PublicMemberProfileScreen() {
               <Icon name="people-outline" size={20} color={colors.interactive} />
             </View>
             <View style={styles.futureCopy}>
-              <Text style={[styles.futureTitle, { color: colors.text }]}>Member identity</Text>
+              <Text style={[styles.futureTitle, { color: colors.text }]}>Connected on COT</Text>
               <Text style={[styles.futureText, { color: colors.textSecondary }]}>
-                Following people now becomes a durable signal for the future General COT feed without exposing private Expression membership.
+                Follow people whose posts, Reels and ministry updates you want to keep up with in General COT.
               </Text>
             </View>
           </View>
