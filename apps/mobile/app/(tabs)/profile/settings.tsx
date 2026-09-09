@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
@@ -17,11 +17,13 @@ type ProfilePayload = {
   bio: string | null;
   phone_number: string | null;
   avatar_url: string | null;
+  banner_url: string | null;
   email: string | null;
   verifiedPhoneNumber: string | null;
 };
 
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
+const MAX_BANNER_BYTES = 8 * 1024 * 1024;
 
 function inferMimeType(fileName?: string | null) {
   const name = (fileName ?? '').toLowerCase();
@@ -46,6 +48,7 @@ export default function AccountSettingsScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
+  const [bannerBusy, setBannerBusy] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [activeSection, setActiveSection] = useState<'identity' | 'privacy' | 'contact'>('identity');
@@ -65,7 +68,10 @@ export default function AccountSettingsScreen() {
       setPhoneNumber(data.phone_number ?? '');
       updateContextProfile({
         display_name: data.display_name,
+        username: data.username ?? undefined,
+        bio: data.bio ?? undefined,
         avatar_url: data.avatar_url ?? undefined,
+        banner_url: data.banner_url ?? undefined,
       });
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to load account settings.');
@@ -105,7 +111,10 @@ export default function AccountSettingsScreen() {
       setBirthdayPublicVisible(updated.birthday_public_visible === true);
       updateContextProfile({
         display_name: updated.display_name,
+        username: updated.username ?? undefined,
+        bio: updated.bio ?? undefined,
         avatar_url: updated.avatar_url ?? undefined,
+        banner_url: updated.banner_url ?? undefined,
       });
       setSuccess('Profile settings saved.');
     } catch (value) {
@@ -179,6 +188,77 @@ export default function AccountSettingsScreen() {
     }
   };
 
+  const chooseProfileBanner = async () => {
+    setBannerBusy(true);
+    setError('');
+    setSuccess('');
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        setError('Photo access is required to choose a profile banner.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [3, 1],
+        quality: 0.9,
+      });
+      if (result.canceled || !result.assets?.length) return;
+      const asset = result.assets[0];
+      if (asset.fileSize && asset.fileSize > MAX_BANNER_BYTES) {
+        setError('Choose a banner image smaller than 8 MB.');
+        return;
+      }
+      const mimeType = asset.mimeType || inferMimeType(asset.fileName);
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(mimeType)) {
+        setError('Profile banners must be JPG, PNG, or WebP.');
+        return;
+      }
+
+      const form = new FormData();
+      const webFile = (asset as any).file as File | undefined;
+      if (webFile) {
+        form.append('file', webFile);
+      } else {
+        form.append('file', {
+          uri: asset.uri,
+          name: asset.fileName || `banner.${mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg'}`,
+          type: mimeType,
+        } as any);
+      }
+
+      const response = await api.request<{ bannerUrl: string }>('profile-banner', {
+        method: 'POST',
+        context: 'public',
+        body: form,
+      });
+      setProfile((current) => current ? { ...current, banner_url: response.bannerUrl } : current);
+      updateContextProfile({ banner_url: response.bannerUrl });
+      setSuccess('Profile banner updated.');
+    } catch (value) {
+      setError(value instanceof Error ? value.message : 'Unable to update your profile banner.');
+    } finally {
+      setBannerBusy(false);
+    }
+  };
+
+  const removeProfileBanner = async () => {
+    setBannerBusy(true);
+    setError('');
+    setSuccess('');
+    try {
+      await api.request<{ bannerUrl: null }>('profile-banner', { method: 'DELETE', context: 'public' });
+      setProfile((current) => current ? { ...current, banner_url: null } : current);
+      updateContextProfile({ banner_url: undefined });
+      setSuccess('Profile banner removed.');
+    } catch (value) {
+      setError(value instanceof Error ? value.message : 'Unable to remove your profile banner.');
+    } finally {
+      setBannerBusy(false);
+    }
+  };
+
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 150 }]}>
@@ -194,6 +274,29 @@ export default function AccountSettingsScreen() {
             {error ? <View style={[styles.banner, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}><Icon name="alert-circle" size={18} color={colors.live} /><Text style={[styles.bannerText, { color: colors.live }]}>{error}</Text></View> : null}
 
             <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+              <View style={[styles.profileBannerFrame, { backgroundColor: colors.primarySoft }]}>
+                {profile.banner_url ? (
+                  <Image source={{ uri: profile.banner_url }} style={styles.profileBannerImage} resizeMode="cover" />
+                ) : (
+                  <View style={styles.profileBannerPlaceholder}>
+                    <Icon name="image-outline" size={30} color={colors.interactive} />
+                    <Text style={[styles.helper, { color: colors.textSecondary }]}>Add a banner to personalize your public profile.</Text>
+                  </View>
+                )}
+              </View>
+              <View style={styles.bannerActions}>
+                <View style={styles.flex}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>Profile Banner</Text>
+                  <Text style={[styles.helper, { color: colors.textMuted }]}>Wide JPG, PNG or WebP · maximum 8 MB</Text>
+                </View>
+                <View style={styles.buttonRow}>
+                  <Button label={profile.banner_url ? 'Change Banner' : 'Choose Banner'} onPress={() => void chooseProfileBanner()} loading={bannerBusy} variant="outline" size="sm" />
+                  {profile.banner_url ? <Button label="Remove" onPress={() => void removeProfileBanner()} disabled={bannerBusy} variant="ghost" size="sm" /> : null}
+                </View>
+              </View>
+            </View>
+
+            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
               <View style={styles.photoRow}>
                 <Avatar url={profile.avatar_url} name={profile.display_name} size="lg" />
                 <View style={styles.photoActions}>
@@ -201,7 +304,7 @@ export default function AccountSettingsScreen() {
                   <Text style={[styles.helper, { color: colors.textMuted }]}>JPG, PNG or WebP · maximum 5 MB</Text>
                   <View style={styles.buttonRow}>
                     <Button label={profile.avatar_url ? 'Change Photo' : 'Choose Photo'} onPress={() => void chooseProfilePhoto()} loading={photoBusy} variant="outline" size="sm" />
-                    {profile.avatar_url ? <Button label="Remove" onPress={() => void removeProfilePhoto()} disabled={photoBusy} variant="ghost" size="sm" /> : null}
+                    {profile.avatar_url ? <Button label="Remove" onPress={() => void removeProfilePhoto()} disabled={photoBusy || bannerBusy} variant="ghost" size="sm" /> : null}
                   </View>
                 </View>
               </View>
@@ -361,7 +464,7 @@ const styles = StyleSheet.create({
   card: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.lg, gap: spacing.md }, cardTitle: { fontSize: 16, fontWeight: '800', letterSpacing: -0.2 },
   cardHeadingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   cardHeadingIcon: { width: 40, height: 40, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
-  photoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md }, photoActions: { flex: 1, gap: spacing.xs }, buttonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
+  profileBannerFrame: { width: '100%', aspectRatio: 3 / 1, borderRadius: radius.lg, overflow: 'hidden' }, profileBannerImage: { width: '100%', height: '100%' }, profileBannerPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.xs, padding: spacing.md }, bannerActions: { gap: spacing.xs }, photoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md }, photoActions: { flex: 1, gap: spacing.xs }, buttonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
   sectionNav: { flexDirection: 'row', padding: 4, borderWidth: 1, borderRadius: radius.xl, gap: 3 },
   sectionTab: { flex: 1, minHeight: 56, alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: radius.lg, paddingHorizontal: 4 },
   sectionTabPressed: { opacity: 0.82, transform: [{ scale: 0.98 }] },
