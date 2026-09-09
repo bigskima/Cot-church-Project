@@ -2,10 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
-  ScrollView,
   Share,
   StyleSheet,
   Text,
@@ -14,15 +11,13 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { radius, spacing } from '@/design-system/tokens';
-import { useResource } from '@/hooks/use-resource';
 import { useSession } from '@/state/session';
-import { useTheme } from '@/state/theme';
 import { BottomSheet } from '../BottomSheet';
 import { CommentsThread } from '../engagement/CommentsThread';
 import { Button } from '../Button';
 import { Icon } from '../primitives/Icon';
 import { Avatar } from '../primitives/Avatar';
-import type { ContentComment, Reel } from '@/types/content';
+import type { Reel } from '@/types/content';
 
 export interface ReelPlayerProps {
   reel: Reel;
@@ -55,8 +50,7 @@ export function ReelPlayer({
   onReport,
   containerHeight,
 }: ReelPlayerProps) {
-  const { api, mode, context } = useSession();
-  const { colors } = useTheme();
+  const { context } = useSession();
   const [isPlaying, setIsPlaying] = useState(true);
   const [isLiked, setIsLiked] = useState(initialLiked);
   const [isSaved, setIsSaved] = useState(initialSaved);
@@ -79,13 +73,6 @@ export function ReelPlayer({
     creator?.username ? `@${creator.username}` : null,
     resolvedExpressionName && resolvedExpressionName !== creatorName ? resolvedExpressionName : null,
   ].filter(Boolean).join(' · ');
-
-  const comments = useResource<ContentComment[]>(
-    `comments:inline:${expressionMode ? context?.expression?.id ?? contentIdentity?.expression?.id ?? 'expression' : 'public'}:${contentId ?? 'none'}`,
-    (signal) => contentId && commentsOpen
-      ? api.request<ContentComment[]>(`engagement?contentId=${encodeURIComponent(contentId)}`, { signal, context: commentContext })
-      : Promise.resolve([]),
-  );
 
   const player = useVideoPlayer(videoUrl || '', (p) => {
     p.loop = true;
@@ -193,38 +180,16 @@ export function ReelPlayer({
         </LinearGradient>
       </View>
 
-      <BottomSheet
+      <InlineCommentsSheet
         visible={commentsOpen}
         onClose={() => setCommentsOpen(false)}
+        contentId={contentId}
+        context={commentContext}
         title="Comments"
         subtitle="Keep watching while the conversation stays on this Reel."
-        maxHeightPercent={72}
-      >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={styles.commentsSheet}>
-            <CommentsThread
-              comments={comments.data ?? []}
-              loading={comments.loading}
-              canComment={mode === 'authenticated'}
-              canReport={mode === 'authenticated'}
-              reportContext={commentContext}
-              onRequireSignIn={onOpenComments}
-              onSubmitComment={async (body, parentCommentId) => {
-                if (!contentId) return;
-                await api.request('engagement', {
-                  method: 'POST',
-                  context: commentContext,
-                  body: JSON.stringify({ action: 'comment', contentId, body, parentCommentId: parentCommentId ?? undefined }),
-                });
-                comments.refresh();
-              }}
-            />
-            {onOpenComments ? (
-              <Button label="View all comments" variant="outline" size="md" fullWidth onPress={() => { setCommentsOpen(false); onOpenComments(); }} />
-            ) : null}
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </BottomSheet>
+        returnTo={expressionMode && context?.expression?.id ? `/expressions/${context.expression.id}/reels` : '/general/reels'}
+        onViewAll={onOpenComments}
+      />
     </View>
   );
 }
@@ -255,5 +220,4 @@ const styles = StyleSheet.create({
   captionText: { color: '#FFFFFF', fontSize: 14, lineHeight: 19, textShadowColor: 'rgba(0, 0, 0, 0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   audioRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   audioText: { color: '#FFFFFF', fontSize: 12, fontWeight: '500', opacity: 0.9 },
-  commentsSheet: { minHeight: 280, paddingBottom: spacing.xl, gap: spacing.md },
 });
