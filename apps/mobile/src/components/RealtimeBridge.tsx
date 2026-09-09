@@ -2,9 +2,9 @@ import { useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useSession } from '@/state/session';
 import { invalidate } from '@/services/query-cache';
+import { apiUrl } from '@/api';
 
-const realtimeUrl = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? '').trim();
-const realtimeAnonKey = (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '').trim();
+type RealtimeConfig = { url: string; anonKey: string };
 
 const tableInvalidations: Record<string, string[]> = {
   conversations: ['chat:'],
@@ -44,34 +44,57 @@ export function RealtimeBridge() {
   const accessToken = auth?.session.accessToken ?? '';
 
   useEffect(() => {
-    if (mode === 'restoring' || !realtimeUrl || !realtimeAnonKey) return;
+    if (mode === 'restoring' || !apiUrl) return;
 
-    const client = createClient(realtimeUrl, realtimeAnonKey, {
-      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-      global: {
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
-      },
-      realtime: { params: { eventsPerSecond: 20 } },
-    });
+    let disposed = false;
+    let client: ReturnType<typeof createClient> | null = null;
+    let channel: ReturnType<ReturnType<typeof createClient>['channel']> | null = null;
 
-    if (accessToken) client.realtime.setAuth(accessToken);
-    let channel = client.channel(`cot-live-${accessToken ? auth?.session.expiresAt ?? 'member' : 'visitor'}`);
+    const connect = async () => {
+      try {
+        const response = await fetch(`${apiUrl}/realtime-config`, {
+          headers: { Accept: 'application/json' },
+        });
+        if (!response.ok) return;
+        const payload = await response.json() as { data?: RealtimeConfig };
+        const config = payload.data;
+        if (disposed || !config?.url || !config.anonKey) return;
 
-    for (const table of Object.keys(tableInvalidations)) {
-      channel = channel.on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table },
-        () => {
-          tableInvalidations[table].forEach(invalidate);
-          if (accessToken && contextTables.has(table)) refreshContext();
-        },
-      );
-    }
+        client = createClient(config.url, config.anonKey, {
+          auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+          global: {
+            headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+          },
+          realtime: { params: { eventsPerSecond: 20 } },
+        });
 
-    channel.subscribe();
+        if (accessToken) client.realtime.setAuth(accessToken);
+        let nextChannel = client.channel(`cot-live-${accessToken ? auth?.session.expiresAt ?? 'member' : 'visitor'}`);
+
+        for (const table of Object.keys(tableInvalidations)) {
+          nextChannel = nextChannel.on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table },
+            () => {
+              tableInvalidations[table].forEach(invalidate);
+              if (accessToken && contextTables.has(table)) refreshContext();
+            },
+          );
+        }
+
+        channel = nextChannel;
+        channel.subscribe();
+      } catch {
+        // Realtime is an enhancement over the canonical Edge Function reads.
+        // A transient socket/config failure must never blank the application.
+      }
+    };
+
+    void connect();
     return () => {
-      void client.removeChannel(channel);
-      void client.removeAllChannels();
+      disposed = true;
+      if (client && channel) void client.removeChannel(channel);
+      if (client) void client.removeAllChannels();
     };
   }, [accessToken, auth?.session.expiresAt, mode, refreshContext]);
 
