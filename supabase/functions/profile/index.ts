@@ -69,7 +69,7 @@ Deno.serve(createHandler(
 
     const { data: profile, error } = await auth.client
       .from("profiles")
-      .select("id,display_name,username,birthday,birthday_expression_visible,birthday_public_visible,bio,phone_number,avatar_url,created_at,updated_at")
+      .select("id,display_name,username,birthday,birthday_expression_visible,birthday_public_visible,bio,phone_number,avatar_url,banner_url,created_at,updated_at")
       .eq("id", auth.user.id)
       .single();
     if (error || !profile) throw new ApiError("PROFILE_NOT_FOUND", "Profile was not found", 404);
