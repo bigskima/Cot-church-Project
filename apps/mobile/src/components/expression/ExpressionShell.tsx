@@ -126,6 +126,13 @@ function ExpressionNavigation({
         onPress: () => router.push(`${basePath}/feed` as any),
       },
       {
+        key: 'chat',
+        label: 'Chat',
+        icon: 'chatbubble-ellipses-outline',
+        active: pathname === `${basePath}/chat`,
+        onPress: () => router.push(`${basePath}/chat` as any),
+      },
+      {
         key: 'prayer',
         label: 'Prayer',
         icon: 'heart-outline',
