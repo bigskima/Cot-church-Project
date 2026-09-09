@@ -1,23 +1,31 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useTheme } from '@/state/theme';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { Icon } from '../primitives/Icon';
+import { InlineCommentsSheet, type InlineCommentsContext } from '../engagement/InlineCommentsSheet';
 import type { Reel } from '@/types/content';
 
 export interface ReelCardProps {
   reel: Reel;
   onPress?: () => void;
   width?: number;
+  commentContext?: InlineCommentsContext;
+  onOpenComments?: () => void;
 }
 
-export function ReelCard({ reel, onPress, width = 150 }: ReelCardProps) {
+export function ReelCard({ reel, onPress, width = 150, commentContext, onOpenComments }: ReelCardProps) {
   const { colors } = useTheme();
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const contentId = reel.content_items?.id;
+  const resolvedCommentContext = commentContext ?? (reel.content_items?.expression_id ? 'current' : 'public');
+  const streamRendition = reel.media_assets?.renditions?.find((rendition) => rendition.rendition_kind === 'video_stream');
   const videoUrl =
-    reel.media_assets?.renditions?.find((rendition) => rendition.rendition_kind === 'video_stream')?.storage_path ||
     reel.media_assets?.url ||
+    streamRendition?.playbackUrl ||
+    streamRendition?.storage_path ||
     '';
   const posterUrl = reel.media_assets?.thumbnailUrl || '';
   const player = useVideoPlayer(videoUrl, (instance) => {
@@ -56,6 +64,18 @@ export function ReelCard({ reel, onPress, width = 150 }: ReelCardProps) {
           <Text style={styles.viewsText}>{formatViews(reel.views_count)}</Text>
         </View>
 
+        {contentId ? (
+          <Pressable
+            onPress={() => setCommentsOpen(true)}
+            style={styles.commentChip}
+            accessibilityRole="button"
+            accessibilityLabel="Open Reel comments"
+          >
+            <Icon name="chatbubble-ellipses-outline" size={14} color="#FFFFFF" />
+            <Text style={styles.viewsText}>{reel.comments_count || 0}</Text>
+          </Pressable>
+        ) : null}
+
         <LinearGradient
           pointerEvents="none"
           colors={['transparent', 'rgba(0,0,0,0.18)', 'rgba(0,0,0,0.78)']}
@@ -78,6 +98,15 @@ export function ReelCard({ reel, onPress, width = 150 }: ReelCardProps) {
           ) : null}
         </Pressable>
       </View>
+      <InlineCommentsSheet
+        visible={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        contentId={contentId}
+        context={resolvedCommentContext}
+        title="Reel comments"
+        subtitle="Keep this Reel in place while you join the conversation."
+        onViewAll={onOpenComments}
+      />
     </View>
   );
 }
@@ -122,6 +151,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   viewsText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800' },
+  commentChip: { position: 'absolute', top: 8, right: 8, minHeight: 27, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.56)', paddingHorizontal: 8, borderRadius: radius.pill, zIndex: 4 },
   captionGradient: {
     position: 'absolute',
     left: 0,
