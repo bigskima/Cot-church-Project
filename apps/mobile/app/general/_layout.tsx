@@ -8,7 +8,9 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 
 const TAB_ICON_SIZE = 23;
-const hidden = { href: null, tabBarButton: () => null, tabBarItemStyle: { display: 'none' } } as const;
+// Expo Router removes a route from the tab bar when its href is null. A custom
+// button override is neither needed nor valid for these hidden routes.
+const hidden = { href: null } as const;
 
 export default function GeneralLayout() {
   const { colors } = useTheme();
