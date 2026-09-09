@@ -105,6 +105,7 @@ async function streamingReadiness(organizationId: string) {
         primarySecretReady,
         webhookSecretReady,
         signedPlaybackConfigured: signingSecretReady,
+        testMode: loaded.provider.settings?.testMode === true,
       };
     }
     return {
@@ -112,6 +113,7 @@ async function streamingReadiness(organizationId: string) {
       reason: null,
       providerCode: loaded.provider.providerCode,
       signedPlaybackConfigured: signingSecretReady,
+      testMode: loaded.provider.settings?.testMode === true,
     };
   } catch (error) {
     if (error instanceof ApiError && ["STREAMING_NOT_CONFIGURED", "STREAMING_PROVIDER_DISABLED"].includes(error.code)) {
