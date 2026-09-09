@@ -36,11 +36,13 @@ export function ExpressionPeopleHeader({ expressionId, expressionName, active, t
         <View style={styles.copy}>
           <View style={styles.eyebrowRow}>
             <Icon name="lock-closed-outline" size={11} color={colors.interactive} />
-            <Text style={[styles.eyebrow, { color: colors.interactive }]}>EXPRESSION PEOPLE</Text>
+            <Text style={[styles.eyebrow, { color: colors.interactive }]}>{active === 'chat' ? 'DIRECT MESSAGES' : 'EXPRESSION PEOPLE'}</Text>
           </View>
           <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]} numberOfLines={2}>{subtitle}</Text>
-          <Text style={[styles.expression, { color: colors.textMuted }]} numberOfLines={1}>{expressionName} · Members only</Text>
+          <Text style={[styles.expression, { color: colors.textMuted }]} numberOfLines={1}>
+            {active === 'chat' ? 'Available across COT · Group chat stays separate' : `${expressionName} · Members only`}
+          </Text>
         </View>
         <Pressable
           onPress={() => router.push(`/expressions/${expressionId}` as any)}
