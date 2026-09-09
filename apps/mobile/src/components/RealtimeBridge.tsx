@@ -1,10 +1,18 @@
 import { useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import { useSession } from '@/state/session';
 import { invalidate } from '@/services/query-cache';
 import { apiUrl } from '@/api';
 
 type RealtimeConfig = { url: string; anonKey: string };
+
+type RealtimeClient = {
+  realtime: {
+    setAuth: (token: string) => void;
+  };
+  channel: (name: string) => any;
+  removeChannel: (channel: any) => Promise<unknown> | unknown;
+  removeAllChannels: () => Promise<unknown> | unknown;
+};
 
 const tableInvalidations: Record<string, string[]> = {
   conversations: ['chat:'],
@@ -50,27 +58,40 @@ export function RealtimeBridge() {
     if (mode === 'restoring' || !apiUrl) return;
 
     let disposed = false;
-    let client: ReturnType<typeof createClient> | null = null;
-    let channel: ReturnType<ReturnType<typeof createClient>['channel']> | null = null;
+    let client: RealtimeClient | null = null;
+    let channel: any = null;
 
     const connect = async () => {
       try {
-        const response = await fetch(`${apiUrl}/realtime-config`, {
-          headers: { Accept: 'application/json' },
-        });
-        if (!response.ok) return;
+        // Realtime is an optional enhancement, not an application bootstrap dependency.
+        // Load the Supabase realtime client only after React has rendered so a module,
+        // browser, websocket or runtime-configuration failure can never blank the app.
+        const [{ createClient }, response] = await Promise.all([
+          import('@supabase/supabase-js'),
+          fetch(`${apiUrl}/realtime-config`, {
+            headers: { Accept: 'application/json' },
+          }),
+        ]);
+
+        if (disposed || !response.ok) return;
         const payload = await response.json() as { data?: RealtimeConfig };
         const config = payload.data;
         if (disposed || !config?.url || !config.anonKey) return;
 
-        client = createClient(config.url, config.anonKey, {
+        const nextClient = createClient(config.url, config.anonKey, {
           auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
           global: {
             headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
           },
           realtime: { params: { eventsPerSecond: 20 } },
-        });
+        }) as unknown as RealtimeClient;
 
+        if (disposed) {
+          void nextClient.removeAllChannels();
+          return;
+        }
+
+        client = nextClient;
         if (accessToken) client.realtime.setAuth(accessToken);
         let nextChannel = client.channel(`cot-live-${accessToken ? auth?.session.expiresAt ?? 'member' : 'visitor'}`);
 
@@ -87,9 +108,13 @@ export function RealtimeBridge() {
 
         channel = nextChannel;
         channel.subscribe();
-      } catch {
-        // Realtime is an enhancement over the canonical Edge Function reads.
-        // A transient socket/config failure must never blank the application.
+      } catch (error) {
+        // Canonical Edge Function reads continue to work when realtime is unavailable.
+        // Keep this failure isolated from the route tree and leave a development-only
+        // diagnostic instead of ever failing the application shell.
+        if (typeof __DEV__ !== 'undefined' && __DEV__) {
+          console.warn('Realtime enhancement unavailable:', error);
+        }
       }
     };
 
