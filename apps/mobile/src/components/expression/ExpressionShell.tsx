@@ -133,13 +133,6 @@ function ExpressionNavigation({
         onPress: () => router.push(`${basePath}/feed` as any),
       },
       {
-        key: 'chat',
-        label: 'Chat',
-        icon: 'chatbubble-ellipses-outline',
-        active: pathname === `${basePath}/chat`,
-        onPress: () => router.push(`${basePath}/chat` as any),
-      },
-      {
         key: 'prayer',
         label: 'Prayer',
         icon: 'heart-outline',
@@ -406,6 +399,16 @@ function ExpressionNavigation({
         />
 
         <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>COT</Text>
+        <NavButton
+          onNavigate={onNavigate}
+          item={{
+            key: 'direct-messages',
+            label: 'Direct Messages',
+            icon: 'chatbubble-ellipses-outline',
+            active: pathname === `${basePath}/chat`,
+            onPress: () => router.push(`${basePath}/chat` as any),
+          }}
+        />
         <NavButton
           onNavigate={onNavigate}
           item={{
