@@ -255,7 +255,7 @@ Deno.serve(createHandler(
     if (!selectedExpressionId && userId) {
       const signals = emptySignals();
       const [followsResult, reactionsResult, bookmarksResult, progressResult] = await Promise.all([
-        admin.from("follows").select("organization_id,expression_id,leader:leaders(profile_id)").eq("profile_id", userId),
+        admin.from("follows").select("organization_id,expression_id,target_profile_id,leader:leaders(profile_id)").eq("profile_id", userId),
         admin.from("content_reactions").select("content_item_id").eq("profile_id", userId).limit(500),
         admin.from("content_bookmarks").select("content_item_id").eq("profile_id", userId).limit(500),
         admin.from("content_playback_progress").select("content_item_id,completed,progress_seconds").eq("profile_id", userId).limit(500),
@@ -264,6 +264,7 @@ Deno.serve(createHandler(
         for (const follow of followsResult.data ?? []) {
           if (follow.organization_id) signals.followedOrganizationIds.add(follow.organization_id);
           if (follow.expression_id) signals.followedExpressionIds.add(follow.expression_id);
+          if (follow.target_profile_id) signals.followedLeaderProfileIds.add(follow.target_profile_id);
           const leader = nestedItem(follow.leader);
           if (leader?.profile_id) signals.followedLeaderProfileIds.add(leader.profile_id);
         }
