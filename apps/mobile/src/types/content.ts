@@ -16,6 +16,7 @@ export type MediaRendition = {
   height?: number;
   bitrate?: number;
   storage_path?: string;
+  playbackUrl?: string;
   provider_playback_id?: string;
   is_master?: boolean;
 };
@@ -32,6 +33,7 @@ export type MediaTrack = {
 export type MediaThumbnail = {
   id?: string;
   storage_path: string;
+  playbackUrl?: string;
   width?: number;
   height?: number;
   is_primary?: boolean;
@@ -431,7 +433,7 @@ export type MembershipContext = {
   organizationPermissions?: string[];
   publicCapabilities?: string[];
   organization?: { id: string; name: string; slug: string };
-  expression?: { id: string; name: string };
+  expression?: { id: string; name: string; avatar_url?: string | null; banner_url?: string | null };
   expressions?: {
     membershipId: string;
     organizationId: string;
@@ -440,6 +442,8 @@ export type MembershipContext = {
     code?: string;
     timezone?: string;
     status: string;
+    avatar_url?: string | null;
+    banner_url?: string | null;
     joinedAt?: string | null;
   }[];
   creatorOrganizations?: {
