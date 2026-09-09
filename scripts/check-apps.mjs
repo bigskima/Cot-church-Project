@@ -120,6 +120,11 @@ const files = [
   'apps/mobile/app/event/[id].tsx',
   'apps/mobile/app/prayer/index.tsx',
   'apps/mobile/src/components/prayer/PrayerCard.tsx',
+  'apps/mobile/src/components/RealtimeBridge.tsx',
+  'apps/mobile/src/features/chat/GlobalChatExperience.tsx',
+  'apps/mobile/src/features/chat/GroupChatExperience.tsx',
+  'apps/mobile/app/general/member/[username].tsx',
+  'apps/mobile/app/expressions/[expressionId]/groups/[groupId]/chat.tsx',
   'apps/mobile/src/features/giving/GivingScreen.tsx',
   'apps/mobile/app/(tabs)/profile/leadership/giving-manage.tsx',
   'apps/mobile/app/(tabs)/profile/leadership/media-studio.tsx',
@@ -200,6 +205,10 @@ const commentProductUi = [
 ].join('\n');
 
 const checks = [
+  [/Direct chat is global[\s\S]*Group chat is separate/, 'global Direct Messages and separate Group chat product boundary'],
+  [/public-profile\?username=[\s\S]*targetProfileId/, 'member profile follow and unfollow experience'],
+  [/profile\.banner_url|banner_url/, 'member banner presentation'],
+  [/direct_messages[\s\S]*group_messages|group-chat:/, 'realtime chat invalidation contract'],
   [/expo-secure-store/, 'secure session persistence'],
   [/AbortController/, 'cancelled obsolete queries'],
   [/cacheSnapshot/, 'stale scoped cache visibility'],
