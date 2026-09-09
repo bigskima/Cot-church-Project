@@ -15,7 +15,9 @@
     "@church/types": "*",
     "@expo/metro-runtime": "latest",
     "@expo/vector-icons": "^15.1.1",
+    "@supabase/supabase-js": "^2.57.4",
     "expo": "latest",
+    "expo-audio": "~57.0.4",
     "expo-clipboard": "^57.0.1",
     "expo-constants": "^57.0.16",
     "expo-document-picker": "~57.0.1",
@@ -31,8 +33,7 @@
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
     "react-native-safe-area-context": "latest",
-    "react-native-web": "~0.21.0",
-    "expo-audio": "~57.0.4"
+    "react-native-web": "~0.21.0"
   },
   "devDependencies": {
     "@types/react": "latest",
