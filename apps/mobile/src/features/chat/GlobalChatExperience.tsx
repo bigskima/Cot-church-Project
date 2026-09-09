@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
 import { Avatar, Icon, ScreenHeader } from '@/components';
 import { ExpressionPeopleHeader } from '@/components/expression/ExpressionPeopleHeader';
 import { radius, spacing } from '@/design-system/tokens';
@@ -50,10 +51,12 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
   const insets = useSafeAreaInsets();
   const { api, context, mode } = useSession();
   const expression = context?.expression;
+  const routeParams = useLocalSearchParams<{ username?: string }>();
   const [selected, setSelected] = useState<{ id: string; person: Person } | null>(null);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [filter, setFilter] = useState('');
+  const [autoOpened, setAutoOpened] = useState(false);
 
   const normalizedFilter = filter.trim().replace(/^@/, '').toLowerCase();
   const listKey = `chat:global:${normalizedFilter || 'inbox'}`;
@@ -73,15 +76,34 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
     );
   });
 
-  const openPerson = async (person: Person) => {
+  const openUsername = async (username: string, fallback?: Person) => {
     const result = await api.request<{ conversationId: string; other: Person }>('chat', {
       method: 'POST',
       context: 'public',
-      body: JSON.stringify({ action: 'open_direct', username: person.username }),
+      body: JSON.stringify({ action: 'open_direct', username }),
     });
-    setSelected({ id: result.conversationId, person: result.other ?? person });
+    setSelected({
+      id: result.conversationId,
+      person: result.other ?? fallback ?? { id: result.other?.id ?? username, username },
+    });
     invalidate('chat:');
   };
+
+  const openPerson = async (person: Person) => {
+    await openUsername(person.username, person);
+  };
+
+  useEffect(() => {
+    const username = typeof routeParams.username === 'string'
+      ? routeParams.username.trim().replace(/^@/, '').toLowerCase()
+      : '';
+    if (!username || autoOpened || mode !== 'authenticated') return;
+    setAutoOpened(true);
+    void openUsername(username).catch(() => {
+      setAutoOpened(false);
+      setFilter(username);
+    });
+  }, [autoOpened, mode, routeParams.username]);
 
   const send = async () => {
     const value = draft.trim();
