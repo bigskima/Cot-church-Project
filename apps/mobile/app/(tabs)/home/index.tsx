@@ -503,8 +503,6 @@ export default function HomeScreen() {
               );
             }
             if (item.kind === 'sermon') {
-              const hasAudio = Boolean(item.sermon.audio_asset_id || item.sermon.audio_url);
-              const hasVideo = Boolean(item.sermon.video_asset_id || item.sermon.video_url);
               return (
                 <View style={styles.feedCardWrap}>
                   <SermonCard sermon={item.sermon} onPress={() => router.push(`/general/sermon/${item.sermon.id}` as any)} />
