@@ -64,16 +64,30 @@ async function resolvePlayback(client: SupabaseClient, admin: SupabaseClient, co
   }
   if (!data?.available) return data;
 
-  const renditions = await Promise.all((data.renditions ?? []).map(async (rendition: Record<string, unknown>) => {
-    const storagePath = typeof rendition.storagePath === "string" ? rendition.storagePath : null;
-    if (!storagePath) return rendition;
+  const signStoragePath = async (storagePath: unknown) => {
+    if (typeof storagePath !== "string" || !storagePath) return null;
     const { data: signed, error: signError } = await admin.storage.from(BUCKET).createSignedUrl(storagePath, 3600);
     if (signError || !signed?.signedUrl) {
       throw new ApiError("PLAYBACK_SIGNING_FAILED", "Unable to authorize media playback", 500, undefined, false);
     }
-    return { ...rendition, playbackUrl: signed.signedUrl };
-  }));
-  return { ...data, renditions };
+    return signed.signedUrl;
+  };
+
+  const [renditions, thumbnails, tracks] = await Promise.all([
+    Promise.all((data.renditions ?? []).map(async (rendition: Record<string, unknown>) => {
+      const playbackUrl = await signStoragePath(rendition.storagePath);
+      return playbackUrl ? { ...rendition, playbackUrl } : rendition;
+    })),
+    Promise.all((data.thumbnails ?? []).map(async (thumbnail: Record<string, unknown>) => {
+      const playbackUrl = await signStoragePath(thumbnail.storagePath);
+      return playbackUrl ? { ...thumbnail, playbackUrl } : thumbnail;
+    })),
+    Promise.all((data.tracks ?? []).map(async (track: Record<string, unknown>) => {
+      const playbackUrl = await signStoragePath(track.storagePath);
+      return playbackUrl ? { ...track, playbackUrl } : track;
+    })),
+  ]);
+  return { ...data, renditions, thumbnails, tracks };
 }
 
 Deno.serve(createHandler(
