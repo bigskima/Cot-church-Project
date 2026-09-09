@@ -140,7 +140,7 @@ Deno.serve(createHandler(
     const [streamsResult, postsResult, reelsResult, videosResult, sermonsResult, eventsResult] = await Promise.all([
       client
         .from("live_streams")
-        .select("id,organization_id,branch_id,title,description,status,visibility,scheduled_start,started_at,ended_at,recording_url,thumbnail_url,viewer_count,playback_url,playback_token_required,created_at")
+        .select("id,organization_id,branch_id,title,description,status,visibility,scheduled_start,started_at,ended_at,recording_url,thumbnail_url,playback_url,playback_token_required,created_at")
         .eq("organization_id", organizationId)
         .in("status", ["scheduled", "provisioning", "ready", "live", "ended", "processing", "replay_ready"])
         .order("scheduled_start", { ascending: false, nullsFirst: false })
@@ -177,13 +177,38 @@ Deno.serve(createHandler(
 
     ]);
 
-    const streams = resultData<any[]>(streamsResult as any, "live", degraded)
-      .filter((row) => inSelectedExperience(row, selectedExpressionId, "branch_id"))
-      .map((stream) => ({
-        ...stream,
-        playback_url: stream.playback_token_required ? null : stream.playback_url,
-        recording_url: stream.playback_token_required ? null : stream.recording_url,
-      }));
+    let streams = resultData<any[]>(streamsResult as any, "live", degraded)
+      .filter((row) => inSelectedExperience(row, selectedExpressionId, "branch_id"));
+
+    const activeViewerCounts = new Map<string, number>();
+    let viewerCountsAvailable = true;
+    const liveIds = streams.filter((stream) => stream.status === "live").map((stream) => stream.id);
+    if (liveIds.length) {
+      const heartbeatCutoff = new Date(Date.now() - 90_000).toISOString();
+      const { data: viewers, error: viewerError } = await admin
+        .from("stream_viewer_sessions")
+        .select("stream_id")
+        .in("stream_id", liveIds)
+        .is("left_at", null)
+        .gte("last_heartbeat_at", heartbeatCutoff);
+      if (viewerError) {
+        viewerCountsAvailable = false;
+        degraded.push("live viewers");
+      } else {
+        for (const viewer of viewers ?? []) {
+          activeViewerCounts.set(viewer.stream_id, (activeViewerCounts.get(viewer.stream_id) ?? 0) + 1);
+        }
+      }
+    }
+
+    streams = streams.map((stream) => ({
+      ...stream,
+      playback_url: stream.playback_token_required ? null : stream.playback_url,
+      recording_url: stream.playback_token_required ? null : stream.recording_url,
+      ...(stream.status === "live" && viewerCountsAvailable
+        ? { viewer_count: activeViewerCounts.get(stream.id) ?? 0 }
+        : {}),
+    }));
     let posts = resultData<any[]>(postsResult as any, "posts", degraded);
     posts = await enrichSocialPosts(posts);
     posts = filterByAuthor(posts, safety.hiddenFromFeed, (post: any) => post.author?.id);
