@@ -30,6 +30,7 @@ export interface ReelPlayerProps {
   onSave?: (currentlySaved: boolean) => boolean | Promise<boolean>;
   onShare?: () => void | Promise<void>;
   onReport?: () => void;
+  onPressCreator?: () => void;
   containerHeight?: number;
 }
 
@@ -46,6 +47,7 @@ export function ReelPlayer({
   onSave,
   onShare,
   onReport,
+  onPressCreator,
   containerHeight,
 }: ReelPlayerProps) {
   const { context } = useSession();
@@ -168,11 +170,19 @@ export function ReelPlayer({
 
         <LinearGradient colors={['transparent', 'rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.85)']} style={styles.bottomGradient}>
           <View style={styles.creatorRow}>
-            <Avatar url={creator?.avatar_url} name={creatorName} size="sm" />
-            <View style={styles.creatorCopy}>
-              <Text style={styles.creatorName} numberOfLines={1}>{creatorName}</Text>
-              {creatorMeta ? <Text style={styles.creatorMeta} numberOfLines={1}>{creatorMeta}</Text> : null}
-            </View>
+            <Pressable
+              onPress={onPressCreator}
+              disabled={!onPressCreator}
+              style={({ pressed }) => [styles.creatorIdentity, pressed && onPressCreator ? { opacity: 0.82 } : null]}
+              accessibilityRole={onPressCreator ? 'button' : undefined}
+              accessibilityLabel={onPressCreator ? `Open ${creatorName} profile` : undefined}
+            >
+              <Avatar url={creator?.avatar_url} name={creatorName} size="sm" />
+              <View style={styles.creatorCopy}>
+                <Text style={styles.creatorName} numberOfLines={1}>{creatorName}</Text>
+                {creatorMeta ? <Text style={styles.creatorMeta} numberOfLines={1}>{creatorMeta}</Text> : null}
+              </View>
+            </Pressable>
             {onFollow ? <Pressable onPress={onFollow} style={[styles.followBtn, isFollowing && styles.followingBtn]}><Text style={styles.followBtnText}>{isFollowing ? 'Following' : 'Follow'}</Text></Pressable> : null}
           </View>
           {reel.caption ? <Pressable onPress={() => setIsCaptionExpanded(!isCaptionExpanded)}><Text style={styles.captionText} numberOfLines={isCaptionExpanded ? undefined : 2}>{reel.caption}</Text></Pressable> : null}
@@ -211,6 +221,7 @@ const styles = StyleSheet.create({
   actionLabel: { color: '#FFFFFF', fontSize: 12, fontWeight: '700', textShadowColor: 'rgba(0, 0, 0, 0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   bottomGradient: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: spacing.lg, paddingBottom: 24, paddingTop: 60, gap: spacing.xs },
   creatorRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  creatorIdentity: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   creatorCopy: { flex: 1, minWidth: 0 },
   creatorName: { color: '#FFFFFF', fontSize: 15, fontWeight: '800', flexShrink: 1, textShadowColor: 'rgba(0, 0, 0, 0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   creatorMeta: { color: 'rgba(255,255,255,0.78)', fontSize: 11, fontWeight: '600', marginTop: 1 },
