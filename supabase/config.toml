@@ -61,6 +61,23 @@ verify_jwt = false
 [functions.profile-avatar]
 verify_jwt = false
 
+[functions.profile-banner]
+verify_jwt = false
+
+[functions.public-profile]
+verify_jwt = false
+
+[functions.realtime-config]
+verify_jwt = false
+
+# Direct and group chat authenticate in the application handler so clients get
+# consistent CORS and session-expiry responses instead of a gateway-only error.
+[functions.chat]
+verify_jwt = false
+
+[functions.group-chat]
+verify_jwt = false
+
 [functions.health]
 verify_jwt = false
 
