@@ -89,7 +89,7 @@ Deno.serve(createHandler(
       ? uuid(requestedExpressionId, "expressionId", true)!
       : null;
 
-    let selectedExpression: { id: string; name: string } | null = null;
+    let selectedExpression: { id: string; name: string; avatar_url: string | null; banner_url: string | null } | null = null;
     if (selectedExpressionId) {
       if (!userId || !authenticatedClient) {
         throw new ApiError("EXPRESSION_ACCESS_DENIED", "Sign in and join this Expression to view its member feed", 403);
@@ -109,13 +109,13 @@ Deno.serve(createHandler(
 
       const { data: branch, error: branchError } = await admin
         .from("branches")
-        .select("id,name,is_active")
+        .select("id,name,avatar_url,banner_url,is_active")
         .eq("id", selectedExpressionId)
         .eq("organization_id", organizationId)
         .eq("is_active", true)
         .maybeSingle();
       if (branchError || !branch) throw new ApiError("EXPRESSION_NOT_FOUND", "This Expression is unavailable", 404);
-      selectedExpression = { id: branch.id, name: branch.name };
+      selectedExpression = { id: branch.id, name: branch.name, avatar_url: branch.avatar_url, banner_url: branch.banner_url };
     }
 
     // General mode deliberately uses the anonymous client even when a valid session is
