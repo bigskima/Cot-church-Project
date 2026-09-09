@@ -1,7 +1,9 @@
 type Entry<T> = { value: T; storedAt: number };
 export type CacheSnapshot<T> = { value: T | undefined; stale: boolean; storedAt?: number };
+type InvalidationListener = (prefix: string) => void;
 
 const memory = new Map<string, Entry<unknown>>();
+const invalidationListeners = new Set<InvalidationListener>();
 
 export function cacheSnapshot<T>(key: string, maxAgeMs = 300_000): CacheSnapshot<T> {
   const hit = memory.get(key) as Entry<T> | undefined;
@@ -24,4 +26,10 @@ export function remember<T>(key: string, value: T) {
 
 export function invalidate(prefix: string) {
   for (const key of memory.keys()) if (key.startsWith(prefix)) memory.delete(key);
+  invalidationListeners.forEach((listener) => listener(prefix));
+}
+
+export function subscribeInvalidation(listener: InvalidationListener) {
+  invalidationListeners.add(listener);
+  return () => invalidationListeners.delete(listener);
 }
