@@ -77,6 +77,7 @@ export type ContentItem = {
     display_name?: string | null;
     username?: string | null;
     avatar_url?: string | null;
+    banner_url?: string | null;
   } | null;
   expression?: {
     id?: string;
@@ -213,10 +214,18 @@ export type Follow = {
   organization_id?: string | null;
   expression_id?: string | null;
   leader_id?: string | null;
+  target_profile_id?: string | null;
   created_at: string;
   organizations?: { id: string; name: string; slug: string };
   branches?: { id: string; name: string; city?: string; state?: string };
   leaders?: Leader;
+  target_profile?: {
+    id: string;
+    display_name?: string | null;
+    username?: string | null;
+    avatar_url?: string | null;
+    banner_url?: string | null;
+  } | null;
 };
 
 export type ContentComment = {
