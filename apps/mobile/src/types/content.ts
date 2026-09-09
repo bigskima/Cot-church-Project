@@ -425,7 +425,9 @@ export type MembershipContext = {
     id: string;
     display_name: string;
     email?: string;
+    username?: string;
     avatar_url?: string;
+    banner_url?: string;
     handle?: string;
     bio?: string;
   };
