@@ -182,6 +182,7 @@ export default function ExpressionHomeScreen() {
         <QuickLink label="Prayer" hint="Pray together" icon="heart-outline" onPress={() => router.push(`/expressions/${id}/prayer` as any)} />
         <QuickLink label="Events" hint="Gatherings" icon="calendar-outline" onPress={() => router.push(`/expressions/${id}/events` as any)} />
         <QuickLink label="Groups" hint="Smaller circles" icon="people-circle-outline" onPress={() => router.push(`/expressions/${id}/groups` as any)} />
+        <QuickLink label="Chat" hint="Direct messages" icon="chatbubble-ellipses-outline" onPress={() => router.push(`/expressions/${id}/chat` as any)} />
       </View>
 
       {resource.data?.degradedSections?.length ? (
