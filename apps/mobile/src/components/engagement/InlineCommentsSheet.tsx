@@ -33,7 +33,7 @@ export function InlineCommentsSheet({
   returnTo = '/general',
 }: InlineCommentsSheetProps) {
   const { api, mode } = useSession();
-  const key = `comments:inline:${context}:${contentId ?? 'none'}`;
+  const key = `comments:inline:${context}:${contentId ?? 'none'}:${visible ? 'open' : 'closed'}`;
   const comments = useResource<ContentComment[]>(
     key,
     (signal) => visible && contentId
