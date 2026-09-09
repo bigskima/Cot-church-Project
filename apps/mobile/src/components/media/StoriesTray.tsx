@@ -32,16 +32,8 @@ export interface StoriesTrayProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export function StoriesTray({
-  stories: customStories,
-  liveStream,
-  onOpenLive,
-  onOpenStory,
-  style,
-}: StoriesTrayProps) {
+export function StoriesTray({ stories: customStories, liveStream, onOpenLive, style }: StoriesTrayProps) {
   const { colors } = useTheme();
-
-  // Generate composite stories list
   const defaultItems: StoryItem[] = [];
 
   if (liveStream) {
@@ -55,10 +47,11 @@ export function StoriesTray({
     });
   }
 
-  const stories = customStories && customStories.length > 0 ? customStories : defaultItems;
-
-  // Production UI must never invent church highlights. If there is no real
-  // live stream or story content, the tray simply does not render.
+  // Home used to turn every existing reel into a second circular shortcut.
+  // Reels already live in the feed and the primary Reels tab, so those duplicate
+  // route bubbles are intentionally suppressed. Real live/story items still render.
+  const supplied = (customStories ?? []).filter((item) => !item.id.startsWith('reel:'));
+  const stories = supplied.length > 0 ? supplied : defaultItems;
   if (!stories.length) return null;
 
   return (
@@ -69,123 +62,47 @@ export function StoriesTray({
         keyExtractor={(item) => item.id}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
-        renderItem={({ item }) => {
-          return (
-            <Pressable
-              onPress={item.onPress}
-              style={styles.storyBubble}
-              accessibilityRole="button"
-              accessibilityLabel={`Story highlight: ${item.title}`}
-            >
-              {/* Story Gradient Ring */}
-              {item.isLive ? (
-                <View style={[styles.liveRing, { borderColor: colors.live }]}>
-                  <View style={[styles.innerCircle, { backgroundColor: colors.card }]}>
-                    {item.imageUrl ? (
-                      <Image source={{ uri: item.imageUrl }} style={styles.image} />
-                    ) : (
-                      <Icon name="radio" size={24} color={colors.live} />
-                    )}
-                  </View>
-                  <View style={[styles.livePill, { backgroundColor: colors.live }]}>
-                    <Text style={styles.livePillText}>LIVE</Text>
-                  </View>
+        renderItem={({ item }) => (
+          <Pressable
+            onPress={item.onPress}
+            style={styles.storyBubble}
+            accessibilityRole="button"
+            accessibilityLabel={`Story highlight: ${item.title}`}
+          >
+            {item.isLive ? (
+              <View style={[styles.liveRing, { borderColor: colors.live }]}>
+                <View style={[styles.innerCircle, { backgroundColor: colors.card }]}>
+                  {item.imageUrl ? <Image source={{ uri: item.imageUrl }} style={styles.image} /> : <Icon name="radio" size={24} color={colors.live} />}
                 </View>
-              ) : (
-                <LinearGradient
-                  colors={
-                    item.hasUnseen
-                      ? ['#F59E0B', '#EC4899', '#8B5CF6']
-                      : [colors.border, colors.border]
-                  }
-                  style={styles.gradientRing}
-                >
-                  <View style={[styles.innerCircle, { backgroundColor: colors.card }]}>
-                    {item.imageUrl ? (
-                      <Image source={{ uri: item.imageUrl }} style={styles.image} />
-                    ) : (
-                      <Icon name="sparkles" size={22} color={colors.interactive} />
-                    )}
-                  </View>
-                </LinearGradient>
-              )}
-
-              <Text
-                style={[
-                  styles.storyTitle,
-                  { color: item.isLive ? colors.live : colors.text },
-                ]}
-                numberOfLines={1}
+                <View style={[styles.livePill, { backgroundColor: colors.live }]}><Text style={styles.livePillText}>LIVE</Text></View>
+              </View>
+            ) : (
+              <LinearGradient
+                colors={item.hasUnseen ? ['#F59E0B', '#EC4899', '#8B5CF6'] : [colors.border, colors.border]}
+                style={styles.gradientRing}
               >
-                {item.title}
-              </Text>
-            </Pressable>
-          );
-        }}
+                <View style={[styles.innerCircle, { backgroundColor: colors.card }]}>
+                  {item.imageUrl ? <Image source={{ uri: item.imageUrl }} style={styles.image} /> : <Icon name="sparkles" size={22} color={colors.interactive} />}
+                </View>
+              </LinearGradient>
+            )}
+            <Text style={[styles.storyTitle, { color: item.isLive ? colors.live : colors.text }]} numberOfLines={1}>{item.title}</Text>
+          </Pressable>
+        )}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    paddingVertical: spacing.md,
-  },
-  listContent: {
-    paddingHorizontal: spacing.md,
-    gap: spacing.md,
-  },
-  storyBubble: {
-    alignItems: 'center',
-    width: 72,
-    gap: 4,
-  },
-  gradientRing: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    padding: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  liveRing: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    borderWidth: 2,
-    padding: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  innerCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  image: {
-    width: '100%',
-    height: '100%',
-  },
-  livePill: {
-    position: 'absolute',
-    bottom: -4,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: radius.pill,
-  },
-  livePillText: {
-    color: '#FFFFFF',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  storyTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
+  container: { paddingVertical: spacing.md },
+  listContent: { paddingHorizontal: spacing.md, gap: spacing.md },
+  storyBubble: { alignItems: 'center', width: 72, gap: 4 },
+  gradientRing: { width: 64, height: 64, borderRadius: 32, padding: 2, alignItems: 'center', justifyContent: 'center' },
+  liveRing: { width: 64, height: 64, borderRadius: 32, borderWidth: 2, padding: 1, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  innerCircle: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  image: { width: '100%', height: '100%' },
+  livePill: { position: 'absolute', bottom: -4, paddingHorizontal: 5, paddingVertical: 1, borderRadius: radius.pill },
+  livePillText: { color: '#FFFFFF', fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
+  storyTitle: { fontSize: 11, fontWeight: '700', textAlign: 'center' },
 });
