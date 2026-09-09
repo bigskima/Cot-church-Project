@@ -3,7 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, content-type, x-request-id",
+  "Access-Control-Allow-Headers": "authorization, content-type, x-organization-id, x-branch-id, x-request-id",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Content-Type": "application/json; charset=utf-8",
 };
@@ -110,6 +110,15 @@ Deno.serve(async (request) => {
     if (request.method === "GET") {
       const conversationId = uuid(url.searchParams.get("conversationId"));
       if (conversationId) {
+        const { data: conversation } = await admin.from("conversations")
+          .select("id,organization_id,branch_id,type")
+          .eq("id", conversationId)
+          .eq("organization_id", organizationId)
+          .eq("type", "direct")
+          .maybeSingle();
+        const inRequestedSpace = conversation && (branchId ? conversation.branch_id === branchId : conversation.branch_id === null);
+        if (!inRequestedSpace) return failure("CHAT_ACCESS_DENIED", "This conversation is not available in this space.", 403);
+
         const { data: participant } = await admin.from("conversation_participants")
           .select("conversation_id")
           .eq("conversation_id", conversationId)
@@ -210,6 +219,14 @@ Deno.serve(async (request) => {
       const conversationId = uuid(body.conversationId);
       const messageBody = String(body.body ?? "").trim();
       if (!conversationId || !messageBody || messageBody.length > 4000) return failure("VALIDATION_FAILED", "Enter a message up to 4,000 characters.", 422);
+      const { data: conversation } = await admin.from("conversations")
+        .select("id,organization_id,branch_id,type")
+        .eq("id", conversationId)
+        .eq("organization_id", organizationId)
+        .eq("type", "direct")
+        .maybeSingle();
+      const inRequestedSpace = conversation && (branchId ? conversation.branch_id === branchId : conversation.branch_id === null);
+      if (!inRequestedSpace) return failure("CHAT_ACCESS_DENIED", "This conversation is not available in this space.", 403);
       const { data: participant } = await admin.from("conversation_participants").select("conversation_id").eq("conversation_id", conversationId).eq("membership_id", membership.id).is("left_at", null).maybeSingle();
       if (!participant) return failure("CHAT_ACCESS_DENIED", "This conversation is not available to you.", 403);
       const { data: created, error } = await admin.from("messages").insert({ organization_id: organizationId, conversation_id: conversationId, sender_membership_id: membership.id, body: messageBody, status: "sent" }).select("id,body,status,sent_at,sender_membership_id").single();
