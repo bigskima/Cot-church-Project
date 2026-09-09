@@ -45,6 +45,9 @@ type Message = {
 
 type InboxPayload = { people: Person[]; conversations: Conversation[] };
 type MessagesPayload = { conversation?: Conversation; messages: Message[] };
+type InboxItem =
+  | { kind: 'person'; id: string; person: Person }
+  | { kind: 'conversation'; id: string; conversation: Conversation };
 
 export function GlobalChatExperience({ embeddedExpression = false }: { embeddedExpression?: boolean }) {
   const { colors } = useTheme();
@@ -77,14 +80,14 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
   });
 
   const openUsername = async (username: string, fallback?: Person) => {
-    const result = await api.request<{ conversationId: string; other: Person }>('chat', {
+    const result = await api.request<{ conversationId: string; other?: Person }>('chat', {
       method: 'POST',
       context: 'public',
       body: JSON.stringify({ action: 'open_direct', username }),
     });
     setSelected({
       id: result.conversationId,
-      person: result.other ?? fallback ?? { id: result.other?.id ?? username, username },
+      person: result.other ?? fallback ?? { id: username, username },
     });
     invalidate('chat:');
   };
@@ -129,7 +132,7 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
     }
   };
 
-  const list = useMemo(() => {
+  const list = useMemo<InboxItem[]>(() => {
     if (normalizedFilter) {
       return (inbox.data?.people ?? []).map((person) => ({
         kind: 'person' as const,
