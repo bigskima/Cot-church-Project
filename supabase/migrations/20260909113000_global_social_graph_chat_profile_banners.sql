@@ -38,6 +38,8 @@ create table if not exists public.direct_conversations (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint direct_conversations_distinct_participants_check check (participant_low <> participant_high),
+  constraint direct_conversations_canonical_pair_check check (participant_low::text < participant_high::text),
+  constraint direct_conversations_creator_is_participant_check check (created_by_profile_id in (participant_low, participant_high)),
   constraint direct_conversations_pair_key unique (participant_low, participant_high)
 );
 
@@ -77,6 +79,15 @@ create table if not exists public.group_messages (
     char_length(trim(body)) between 1 and 4000
   )
 );
+
+alter table public.group_messages
+  drop constraint if exists group_messages_group_organization_fkey;
+
+alter table public.group_messages
+  add constraint group_messages_group_organization_fkey
+  foreign key (group_id, organization_id)
+  references public.groups(id, organization_id)
+  on delete cascade;
 
 create index if not exists group_messages_group_sent_idx
   on public.group_messages(group_id, sent_at desc);
