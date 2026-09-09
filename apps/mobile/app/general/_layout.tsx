@@ -91,7 +91,7 @@ export default function GeneralLayout() {
           ),
         }}
       />
-      <Tabs.Screen name="community" options={{ title: 'Community', tabBarAccessibilityLabel: 'General Community', tabBarIcon: renderIcon('people', 'people-outline') }} />
+      <Tabs.Screen name="community" options={hidden as any} />
       <Tabs.Screen name="chat" options={{ title: 'Chat', tabBarAccessibilityLabel: 'COT Chat', tabBarIcon: renderIcon('chatbubbles', 'chatbubbles-outline') }} />
       <Tabs.Screen name="profile" options={{ title: 'You', tabBarAccessibilityLabel: 'Your General COT profile', tabBarIcon: renderIcon('person', 'person-outline') }} />
 
@@ -113,6 +113,7 @@ export default function GeneralLayout() {
       <Tabs.Screen name="studio" options={hidden as any} />
       <Tabs.Screen name="assistant" options={hidden as any} />
       <Tabs.Screen name="expression" options={hidden as any} />
+      <Tabs.Screen name="member" options={hidden as any} />
     </Tabs>
   );
 }
