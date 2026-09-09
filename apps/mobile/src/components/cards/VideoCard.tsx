@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View, StyleProp, ViewStyle } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useTheme } from '@/state/theme';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { Icon } from '../primitives/Icon';
 import { Avatar } from '../primitives/Avatar';
+import { InlineCommentsSheet, type InlineCommentsContext } from '../engagement/InlineCommentsSheet';
 import type { Video } from '@/types/content';
 
 export interface VideoCardProps {
@@ -14,13 +15,20 @@ export interface VideoCardProps {
   onBookmark?: () => void;
   style?: StyleProp<ViewStyle>;
   dark?: boolean;
+  commentContext?: InlineCommentsContext;
+  onOpenComments?: () => void;
 }
 
-export function VideoCard({ video, expressionName, onPress, onBookmark, style }: VideoCardProps) {
+export function VideoCard({ video, expressionName, onPress, onBookmark, style, commentContext, onOpenComments }: VideoCardProps) {
   const { colors } = useTheme();
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const contentId = video.content_items?.id;
+  const resolvedCommentContext = commentContext ?? (video.content_items?.expression_id ? 'current' : 'public');
+  const streamRendition = video.media_assets?.renditions?.find((rendition) => rendition.rendition_kind === 'video_stream');
   const sourceUrl =
-    video.media_assets?.renditions?.find((rendition) => rendition.rendition_kind === 'video_stream')?.storage_path ||
     video.media_assets?.url ||
+    streamRendition?.playbackUrl ||
+    streamRendition?.storage_path ||
     '';
   const posterUrl = video.media_assets?.thumbnailUrl || '';
   const player = useVideoPlayer(sourceUrl, (instance) => {
@@ -85,6 +93,17 @@ export function VideoCard({ video, expressionName, onPress, onBookmark, style }:
             {[sourceName, formatViews(video.views_count), timeAgo()].filter(Boolean).join(' · ')}
           </Text>
         </View>
+        {contentId ? (
+          <Pressable
+            onPress={(event) => { event.stopPropagation?.(); setCommentsOpen(true); }}
+            hitSlop={8}
+            style={({ pressed }) => [styles.moreBtn, pressed && { backgroundColor: colors.bgSecondary }]}
+            accessibilityRole="button"
+            accessibilityLabel="Open video comments"
+          >
+            <Icon name="chatbubble-ellipses-outline" size={18} color={colors.textMuted} />
+          </Pressable>
+        ) : null}
         {onBookmark ? (
           <Pressable
             onPress={(event) => { event.stopPropagation?.(); onBookmark(); }}
@@ -97,6 +116,15 @@ export function VideoCard({ video, expressionName, onPress, onBookmark, style }:
           </Pressable>
         ) : null}
       </Pressable>
+      <InlineCommentsSheet
+        visible={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        contentId={contentId}
+        context={resolvedCommentContext}
+        title="Video comments"
+        subtitle="Keep watching while the conversation stays with this video."
+        onViewAll={onOpenComments}
+      />
     </View>
   );
 }
