@@ -375,7 +375,7 @@ const checks = [
   [/returnTo = expressionId \? `\/expressions\/\$\{expressionId\}\/reels` : '\/general\/reels'/, 'General Reels returns inside the General shell'],
   [/CreatorStudioScreen forcedScope="general"/, 'General Ministry Studio is explicitly church-wide'],
   [/const generalWorkspace = pathname\.startsWith\('\/general'\)/, 'shared leadership hub recognizes General workspace'],
-  [/General COT tools & settings[\s\S]*\/general\/tools/, 'General Profile consolidates secondary church utilities into the General tools hub'],
+  [/\/general\/tools[\s\S]*General COT tools & settings/, 'General Profile consolidates secondary church utilities into the General tools hub'],
   [/returnTo: '\/general\/profile'/, 'General Profile authentication returns to canonical profile route'],
   [/Redirect href="\/general"/, 'app entry defaults to canonical General COT'],
   [/toUserFacingErrorMessage/, 'shared user-facing error sanitizer'],
