@@ -40,7 +40,7 @@ Deno.serve(createHandler(
         .order("joined_at", { ascending: true }),
       auth.client
         .from("profiles")
-        .select("id, display_name, avatar_url")
+        .select("id, display_name, username, bio, avatar_url, banner_url")
         .eq("id", auth.user.id)
         .maybeSingle(),
       auth.client
@@ -178,8 +178,11 @@ Deno.serve(createHandler(
         profile: {
           id: profileResult.data?.id ?? auth.user.id,
           display_name: profileResult.data?.display_name ?? auth.user.email?.split("@")[0] ?? "Member",
+          username: profileResult.data?.username ?? undefined,
+          bio: profileResult.data?.bio ?? undefined,
           email: auth.user.email ?? undefined,
           avatar_url: profileResult.data?.avatar_url ?? undefined,
+          banner_url: profileResult.data?.banner_url ?? undefined,
         },
         organization: selectedOrganization
           ? {
