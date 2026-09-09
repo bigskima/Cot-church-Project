@@ -97,13 +97,15 @@ export default function GeneralLayout() {
       <Tabs.Screen name="chat" options={{ title: 'Chat', tabBarAccessibilityLabel: 'COT Chat', tabBarIcon: renderIcon('chatbubbles', 'chatbubbles-outline') }} />
       <Tabs.Screen name="profile" options={{ title: 'You', tabBarAccessibilityLabel: 'Your General COT profile', tabBarIcon: renderIcon('person', 'person-outline') }} />
 
-      <Tabs.Screen name="watch" options={hidden as any} />
-      <Tabs.Screen name="live" options={hidden as any} />
-      <Tabs.Screen name="sermon" options={hidden as any} />
-      <Tabs.Screen name="series" options={hidden as any} />
-      <Tabs.Screen name="event" options={hidden as any} />
-      <Tabs.Screen name="post" options={hidden as any} />
-      <Tabs.Screen name="comments" options={hidden as any} />
+      <Tabs.Screen name="watch/index" options={hidden as any} />
+      <Tabs.Screen name="watch/[id]" options={hidden as any} />
+      <Tabs.Screen name="live/index" options={hidden as any} />
+      <Tabs.Screen name="live/[id]" options={hidden as any} />
+      <Tabs.Screen name="sermon/[id]" options={hidden as any} />
+      <Tabs.Screen name="series/[id]" options={hidden as any} />
+      <Tabs.Screen name="event/[id]" options={hidden as any} />
+      <Tabs.Screen name="post/[id]" options={hidden as any} />
+      <Tabs.Screen name="comments/[contentId]" options={hidden as any} />
       <Tabs.Screen name="giving" options={hidden as any} />
       <Tabs.Screen name="prayer" options={hidden as any} />
       <Tabs.Screen name="church-story" options={hidden as any} />
@@ -112,11 +114,21 @@ export default function GeneralLayout() {
       <Tabs.Screen name="notification-settings" options={hidden as any} />
       <Tabs.Screen name="saved" options={hidden as any} />
       <Tabs.Screen name="tools" options={hidden as any} />
-      <Tabs.Screen name="leadership" options={hidden as any} />
-      <Tabs.Screen name="studio" options={hidden as any} />
+      <Tabs.Screen name="leadership/index" options={hidden as any} />
+      <Tabs.Screen name="leadership/media-studio" options={hidden as any} />
+      <Tabs.Screen name="leadership/pastoral-triage" options={hidden as any} />
+      <Tabs.Screen name="leadership/church-leadership" options={hidden as any} />
+      <Tabs.Screen name="leadership/giving-manage" options={hidden as any} />
+      <Tabs.Screen name="leadership/giving-finance" options={hidden as any} />
+      <Tabs.Screen name="leadership/sermons-manage" options={hidden as any} />
+      <Tabs.Screen name="leadership/events-manage" options={hidden as any} />
+      <Tabs.Screen name="leadership/expressions-manage" options={hidden as any} />
+      <Tabs.Screen name="studio/index" options={hidden as any} />
+      <Tabs.Screen name="studio/reel" options={hidden as any} />
+      <Tabs.Screen name="studio/video" options={hidden as any} />
       <Tabs.Screen name="assistant" options={hidden as any} />
-      <Tabs.Screen name="expression" options={hidden as any} />
-      <Tabs.Screen name="member" options={hidden as any} />
+      <Tabs.Screen name="expression/[id]" options={hidden as any} />
+      <Tabs.Screen name="member/[username]" options={hidden as any} />
     </Tabs>
   );
 }
