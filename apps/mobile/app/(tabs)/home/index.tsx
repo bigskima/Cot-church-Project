@@ -14,6 +14,7 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import {
+  Avatar,
   BrandMark,
   EmptyState,
   EventCard,
@@ -257,43 +258,60 @@ export default function HomeScreen() {
     }
   };
 
-  const reelWidth = Math.max(260, Math.min(width - spacing.lg * 2, 460));
+  const reelWidth = Math.max(280, Math.min(width - spacing.md * 2, 520));
 
   const listHeader = (
     <>
       {mode === 'authenticated' ? (
-        <View style={[styles.createDeck, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
-          <View style={styles.createDeckHeader}>
-            <View>
-              <Text style={[styles.createDeckKicker, { color: colors.interactive }]}>CREATE IN GENERAL COT</Text>
-              <Text style={[styles.createDeckTitle, { color: colors.text }]}>Share something with everyone</Text>
-            </View>
+        <View style={[styles.composerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+          <View style={styles.composerMainRow}>
+            <Avatar
+              url={context?.profile?.avatar_url}
+              name={context?.profile?.display_name ?? 'COT member'}
+              size="sm"
+            />
+            <Pressable
+              onPress={() => openGeneralComposer('post')}
+              style={({ pressed }) => [
+                styles.composerPrompt,
+                { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle },
+                pressed && styles.iconPressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Create a post in General COT"
+            >
+              <Text style={[styles.composerPromptText, { color: colors.textMuted }]}>Share with General COT…</Text>
+            </Pressable>
             <Pressable
               onPress={() => router.push('/general/studio')}
               hitSlop={8}
-              style={({ pressed }) => [styles.createDeckMore, { backgroundColor: colors.bgSecondary }, pressed && styles.iconPressed]}
+              style={({ pressed }) => [styles.composerMore, { backgroundColor: colors.primarySoft }, pressed && styles.iconPressed]}
               accessibilityRole="button"
-              accessibilityLabel="Open all creation tools"
+              accessibilityLabel="Create"
             >
-              <Icon name="grid-outline" size={16} color={colors.textSecondary} />
+              <Icon name="add" size={21} color={colors.interactive} />
             </Pressable>
           </View>
-          <View style={styles.createDeckActions}>
-            <Pressable onPress={() => openGeneralComposer('post')} style={({ pressed }) => [styles.createDeckAction, { backgroundColor: colors.primarySoft }, pressed && styles.iconPressed]}>
-              <Icon name="create-outline" size={19} color={colors.interactive} />
-              <Text style={[styles.createDeckActionText, { color: colors.text }]}>Post</Text>
+
+          <View style={styles.composerActions}>
+            <Pressable onPress={() => openGeneralComposer('post')} style={({ pressed }) => [styles.composerAction, pressed && styles.iconPressed]}>
+              <Icon name="create-outline" size={16} color={colors.interactive} />
+              <Text style={[styles.composerActionText, { color: colors.textSecondary }]}>Post</Text>
             </Pressable>
-            <Pressable onPress={() => openGeneralComposer('audio')} style={({ pressed }) => [styles.createDeckAction, { backgroundColor: colors.bgSecondary }, pressed && styles.iconPressed]}>
-              <Icon name="mic-outline" size={19} color={colors.interactive} />
-              <Text style={[styles.createDeckActionText, { color: colors.text }]}>Voice</Text>
+            <View style={[styles.composerDivider, { backgroundColor: colors.borderSubtle }]} />
+            <Pressable onPress={() => openGeneralComposer('audio')} style={({ pressed }) => [styles.composerAction, pressed && styles.iconPressed]}>
+              <Icon name="mic-outline" size={16} color={colors.interactive} />
+              <Text style={[styles.composerActionText, { color: colors.textSecondary }]}>Voice</Text>
             </Pressable>
-            <Pressable onPress={() => router.push('/general/studio/reel')} style={({ pressed }) => [styles.createDeckAction, { backgroundColor: colors.bgSecondary }, pressed && styles.iconPressed]}>
-              <Icon name="flash-outline" size={19} color={colors.live} />
-              <Text style={[styles.createDeckActionText, { color: colors.text }]}>Reel</Text>
+            <View style={[styles.composerDivider, { backgroundColor: colors.borderSubtle }]} />
+            <Pressable onPress={() => router.push('/general/studio/reel')} style={({ pressed }) => [styles.composerAction, pressed && styles.iconPressed]}>
+              <Icon name="flash-outline" size={16} color={colors.live} />
+              <Text style={[styles.composerActionText, { color: colors.textSecondary }]}>Reel</Text>
             </Pressable>
-            <Pressable onPress={() => router.push('/general/studio/video')} style={({ pressed }) => [styles.createDeckAction, { backgroundColor: colors.bgSecondary }, pressed && styles.iconPressed]}>
-              <Icon name="videocam-outline" size={19} color={colors.interactive} />
-              <Text style={[styles.createDeckActionText, { color: colors.text }]}>Video</Text>
+            <View style={[styles.composerDivider, { backgroundColor: colors.borderSubtle }]} />
+            <Pressable onPress={() => router.push('/general/studio/video')} style={({ pressed }) => [styles.composerAction, pressed && styles.iconPressed]}>
+              <Icon name="videocam-outline" size={16} color={colors.interactive} />
+              <Text style={[styles.composerActionText, { color: colors.textSecondary }]}>Video</Text>
             </Pressable>
           </View>
         </View>
@@ -320,9 +338,21 @@ export default function HomeScreen() {
 
       {feed.length ? (
         <View style={styles.timelineHeading}>
-          <Text style={[styles.timelineTitle, { color: colors.text }]}>
-            {rankingMode === 'personalized' ? 'For you' : 'Latest from COT'}
-          </Text>
+          <View>
+            <Text style={[styles.timelineEyebrow, { color: colors.interactive }]}>GENERAL FEED</Text>
+            <Text style={[styles.timelineTitle, { color: colors.text }]}>
+              {rankingMode === 'personalized' ? 'For you' : 'Latest from COT'}
+            </Text>
+          </View>
+          <Pressable
+            onPress={() => router.push('/general/explore')}
+            style={({ pressed }) => [styles.exploreLink, pressed && styles.iconPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Explore General COT"
+          >
+            <Text style={[styles.exploreLinkText, { color: colors.interactive }]}>Explore</Text>
+            <Icon name="arrow-forward" size={14} color={colors.interactive} />
+          </Pressable>
         </View>
       ) : null}
     </>
@@ -330,39 +360,60 @@ export default function HomeScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <View style={[styles.topBar, { paddingTop: insets.top + spacing.xs, backgroundColor: colors.glass, borderColor: colors.borderSubtle }, shadows.sm]}>
-        <View pointerEvents="none" style={[styles.headerGlow, { backgroundColor: colors.primarySoft }]} />
-        <View style={styles.topBarLeft}>
-          <View style={[styles.topBarBrandShell, { backgroundColor: colors.cardElevated, borderColor: colors.borderSubtle }]}>
-            <BrandMark variant="header" size={29} />
+      <View
+        style={[
+          styles.homeHeader,
+          {
+            paddingTop: insets.top + spacing.xs,
+            backgroundColor: colors.card,
+            borderBottomColor: colors.borderSubtle,
+          },
+        ]}
+      >
+        <View style={styles.homeHeaderIdentity}>
+          <View style={[styles.brandBadge, { backgroundColor: colors.cardElevated, borderColor: colors.borderSubtle }]}>
+            <BrandMark variant="header" size={28} />
           </View>
-          <View style={styles.topBarBrandCopy}>
-            <Text style={[styles.brandWordmark, { color: colors.text }]} numberOfLines={1}>{organization?.name ?? 'COT'}</Text>
+          <View style={styles.homeHeaderCopy}>
             <Pressable
               onPress={() => mode === 'authenticated' && router.push('/expressions')}
               disabled={mode !== 'authenticated'}
               accessibilityRole="button"
               accessibilityLabel="General COT. Open My Expressions"
-              style={({ pressed }) => [styles.scopeControl, pressed && mode === 'authenticated' ? styles.iconPressed : null]}
+              style={({ pressed }) => [styles.scopeTitleRow, pressed && mode === 'authenticated' ? styles.iconPressed : null]}
             >
-              <Icon name="globe-outline" size={12} color={colors.interactive} />
-              <Text style={[styles.scopeControlText, { color: colors.textSecondary }]} numberOfLines={1}>General COT</Text>
-              {mode === 'authenticated' ? <Icon name="chevron-down" size={12} color={colors.textMuted} /> : null}
+              <Text style={[styles.scopeTitle, { color: colors.text }]} numberOfLines={1}>General COT</Text>
+              {mode === 'authenticated' ? <Icon name="chevron-down" size={14} color={colors.textMuted} /> : null}
             </Pressable>
+            <View style={styles.scopeMetaRow}>
+              <Icon name="globe-outline" size={11} color={colors.interactive} />
+              <Text style={[styles.scopeMeta, { color: colors.textMuted }]} numberOfLines={1}>
+                {organization?.name ?? 'City of Transformation'} · Public space
+              </Text>
+            </View>
           </View>
         </View>
 
-        <View style={styles.topBarRight}>
-          <Pressable onPress={() => router.push('/general/assistant')} hitSlop={8} style={({ pressed }) => [styles.iconButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.iconPressed]} accessibilityRole="button" accessibilityLabel="COT Assistant">
-            <Icon name="sparkles" size={18} color={colors.interactive} />
-          </Pressable>
+        <View style={styles.homeHeaderActions}>
           {mode === 'authenticated' ? (
-            <Pressable onPress={() => router.push('/general/studio')} hitSlop={8} style={({ pressed }) => [styles.iconButton, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }, pressed && styles.iconPressed]} accessibilityRole="button" accessibilityLabel="Create">
-              <Icon name="add-outline" size={20} color={colors.interactive} />
+            <Pressable
+              onPress={() => router.push('/general/notifications')}
+              hitSlop={8}
+              style={({ pressed }) => [styles.headerAction, { backgroundColor: colors.bgSecondary }, pressed && styles.iconPressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Notifications"
+            >
+              <Icon name="notifications-outline" size={19} color={colors.text} />
             </Pressable>
           ) : null}
-          <Pressable onPress={() => router.push('/general/live' as any)} hitSlop={8} style={({ pressed }) => [styles.iconButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.iconPressed]} accessibilityRole="button" accessibilityLabel="Live">
-            <Icon name="radio" size={18} color={activeStream?.status === 'live' ? '#EF4444' : colors.text} />
+          <Pressable
+            onPress={() => router.push('/general/tools')}
+            hitSlop={8}
+            style={({ pressed }) => [styles.headerAction, { backgroundColor: colors.primarySoft }, pressed && styles.iconPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="General COT tools and settings"
+          >
+            <Icon name="grid-outline" size={18} color={colors.interactive} />
           </Pressable>
         </View>
       </View>
@@ -389,7 +440,7 @@ export default function HomeScreen() {
               />
             </View>
           }
-          contentContainerStyle={{ paddingBottom: insets.bottom + 130 }}
+          contentContainerStyle={{ paddingHorizontal: spacing.md, paddingBottom: insets.bottom + 130 }}
           refreshControl={<RefreshControl refreshing={resource.refreshing} onRefresh={resource.refresh} tintColor={colors.interactive} />}
           renderItem={({ item }) => {
             if (item.kind === 'post') {
@@ -416,7 +467,6 @@ export default function HomeScreen() {
             if (item.kind === 'reel') {
               return (
                 <View style={styles.feedCardWrap}>
-                  <View style={styles.itemLabelRow}><Icon name="flash" size={16} color="#EF4444" /><Text style={[styles.itemLabel, { color: colors.textSecondary }]}>REEL</Text></View>
                   <ReelCard
                     reel={item.reel}
                     width={reelWidth}
@@ -436,7 +486,6 @@ export default function HomeScreen() {
             if (item.kind === 'video') {
               return (
                 <View style={styles.feedCardWrap}>
-                  <View style={styles.itemLabelRow}><Icon name="play-circle-outline" size={16} color={colors.interactive} /><Text style={[styles.itemLabel, { color: colors.textSecondary }]}>WATCH</Text></View>
                   <VideoCard
                     video={item.video}
                     commentContext="public"
@@ -454,18 +503,14 @@ export default function HomeScreen() {
               );
             }
             if (item.kind === 'sermon') {
-              const hasAudio = Boolean(item.sermon.audio_asset_id || item.sermon.audio_url);
-              const hasVideo = Boolean(item.sermon.video_asset_id || item.sermon.video_url);
               return (
                 <View style={styles.feedCardWrap}>
-                  <View style={styles.itemLabelRow}><Icon name={hasAudio && !hasVideo ? 'headset-outline' : 'book-outline'} size={16} color={colors.interactive} /><Text style={[styles.itemLabel, { color: colors.textSecondary }]}>{hasAudio && !hasVideo ? 'AUDIO TEACHING' : 'SERMON / TEACHING'}</Text></View>
                   <SermonCard sermon={item.sermon} onPress={() => router.push(`/general/sermon/${item.sermon.id}` as any)} />
                 </View>
               );
             }
             return (
               <View style={styles.feedCardWrap}>
-                <View style={styles.itemLabelRow}><Icon name="calendar-outline" size={16} color={colors.interactive} /><Text style={[styles.itemLabel, { color: colors.textSecondary }]}>UPCOMING</Text></View>
                 <EventCard event={item.event} onPress={() => router.push(`/general/event/${item.event.id}` as any)} />
               </View>
             );
@@ -478,47 +523,55 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  topBar: {
-    position: 'relative',
-    overflow: 'hidden',
+  homeHeader: {
+    width: '100%',
+    minHeight: 68,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginHorizontal: spacing.md,
-    marginTop: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    paddingBottom: spacing.sm,
-    borderWidth: 1,
-    borderRadius: radius.xxl,
-    minHeight: 66,
+    gap: spacing.sm,
   },
-  headerGlow: { position: 'absolute', width: 120, height: 120, borderRadius: 60, right: -44, top: -74, opacity: 0.7 },
-  topBarLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1, minWidth: 0 },
-  topBarBrandShell: { width: 42, height: 42, borderRadius: radius.lg, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  topBarBrandCopy: { flex: 1, minWidth: 0, justifyContent: 'center' },
-  brandWordmark: { fontSize: 16, lineHeight: 20, fontWeight: '800', letterSpacing: -0.45, flexShrink: 1 },
-  scopeControl: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2, minHeight: 22, borderRadius: radius.pill, paddingRight: 4 },
-  scopeControlText: { fontSize: 11, lineHeight: 15, fontWeight: '600', maxWidth: 150 },
-  topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 6, zIndex: 2 },
-  iconButton: { width: 36, height: 36, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  homeHeaderIdentity: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  brandBadge: { width: 40, height: 40, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  homeHeaderCopy: { flex: 1, minWidth: 0 },
+  scopeTitleRow: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 3, minHeight: 23 },
+  scopeTitle: { fontSize: 17, lineHeight: 21, fontWeight: '900', letterSpacing: -0.45 },
+  scopeMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
+  scopeMeta: { fontSize: 10.5, lineHeight: 14, fontWeight: '600', flexShrink: 1 },
+  homeHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  headerAction: { width: 38, height: 38, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   iconPressed: { opacity: 0.82, transform: [{ scale: 0.96 }] },
-  createDeck: { marginHorizontal: spacing.md, marginTop: spacing.sm, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.md },
-  createDeckHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  createDeckKicker: { fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 0.8 },
-  createDeckTitle: { fontSize: 16, lineHeight: 21, fontWeight: '800', letterSpacing: -0.35, marginTop: 2 },
-  createDeckMore: { width: 34, height: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  createDeckActions: { flexDirection: 'row', gap: spacing.xs },
-  createDeckAction: { flex: 1, minHeight: 58, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: spacing.xs },
-  createDeckActionText: { fontSize: 10.5, fontWeight: '800' },
-  degradedBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.md, marginTop: spacing.sm, paddingHorizontal: spacing.md, minHeight: 42, borderWidth: 1, borderRadius: radius.lg },
+  composerCard: {
+    width: '100%',
+    maxWidth: 680,
+    alignSelf: 'center',
+    marginTop: spacing.sm,
+    borderWidth: 1,
+    borderRadius: radius.xl,
+    padding: spacing.sm,
+    gap: spacing.xs,
+  },
+  composerMainRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  composerPrompt: { flex: 1, minHeight: 40, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: spacing.md, justifyContent: 'center' },
+  composerPromptText: { fontSize: 13, fontWeight: '600' },
+  composerMore: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  composerActions: { flexDirection: 'row', alignItems: 'center', minHeight: 34, paddingHorizontal: 2 },
+  composerAction: { flex: 1, minHeight: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  composerActionText: { fontSize: 10.5, fontWeight: '800' },
+  composerDivider: { width: StyleSheet.hairlineWidth, height: 18 },
+  degradedBanner: { width: '100%', maxWidth: 680, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm, paddingHorizontal: spacing.md, minHeight: 42, borderWidth: 1, borderRadius: radius.lg },
   degradedText: { flex: 1, fontSize: 11, lineHeight: 16, fontWeight: '600' },
-  heroSection: { paddingHorizontal: spacing.md, paddingTop: spacing.md },
-  timelineHeading: { paddingHorizontal: spacing.md, paddingTop: spacing.lg, paddingBottom: spacing.xs },
-  timelineTitle: { fontSize: 18, fontWeight: '800', letterSpacing: -0.35 },
-  feedCardWrap: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  heroSection: { width: '100%', maxWidth: 680, alignSelf: 'center', paddingTop: spacing.md },
+  timelineHeading: { width: '100%', maxWidth: 680, alignSelf: 'center', paddingTop: spacing.lg, paddingBottom: spacing.xs, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md },
+  timelineEyebrow: { fontSize: 8.5, fontWeight: '900', letterSpacing: 1.1, marginBottom: 2 },
+  timelineTitle: { fontSize: 20, lineHeight: 24, fontWeight: '900', letterSpacing: -0.5 },
+  exploreLink: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 4 },
+  exploreLinkText: { fontSize: 12, fontWeight: '800' },
+  feedCardWrap: { width: '100%', maxWidth: 680, alignSelf: 'center', paddingVertical: 6 },
   homePostCard: { marginHorizontal: 0, marginVertical: 0 },
-  itemLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.sm },
-  itemLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
   loadingContainer: { padding: spacing.lg, gap: spacing.md },
   emptyHome: { paddingVertical: 56, paddingHorizontal: spacing.lg },
 });

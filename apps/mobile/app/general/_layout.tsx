@@ -109,6 +109,7 @@ export default function GeneralLayout() {
       <Tabs.Screen name="notifications" options={hidden as any} />
       <Tabs.Screen name="notification-settings" options={hidden as any} />
       <Tabs.Screen name="saved" options={hidden as any} />
+      <Tabs.Screen name="tools" options={hidden as any} />
       <Tabs.Screen name="leadership" options={hidden as any} />
       <Tabs.Screen name="studio" options={hidden as any} />
       <Tabs.Screen name="assistant" options={hidden as any} />
