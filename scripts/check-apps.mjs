@@ -484,6 +484,7 @@ const forbiddenGeneralProfilePatterns = [
 
 const forbiddenGeneralShellPatterns = [
   [/\/\(tabs\)\//, 'legacy tab route inside canonical General shell'],
+  [/href\s*:\s*null[\s\S]{0,160}tabBarButton|tabBarButton[\s\S]{0,160}href\s*:\s*null/, 'incompatible href and tabBarButton options on a hidden General route'],
 ];
 
 const forbiddenGeneralGivingRoutePatterns = [
