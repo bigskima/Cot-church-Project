@@ -338,6 +338,10 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
               onOpenComments={() => handleOpenComments(item)}
               onShare={() => handleShareReel(item)}
               onReport={() => handleReportReel(item)}
+              onPressCreator={item.content_items?.author?.username ? () => router.push({
+                pathname: '/general/member/[username]',
+                params: { username: item.content_items!.author!.username! },
+              } as any) : undefined}
             />
           )}
         />
