@@ -1,6 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { ApiError } from "../_shared/errors.ts";
-import { authorize } from "../_shared/context.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { adminClient } from "../_shared/supabase.ts";
@@ -42,6 +41,7 @@ Deno.serve(createHandler(
     if (!auth?.organizationId || !auth.membershipId) {
       throw new ApiError("ORGANIZATION_REQUIRED", "Active church membership is required", 400);
     }
+    const admin = adminClient();
 
     if (request.method === "GET") {
       const url = new URL(request.url);
@@ -51,7 +51,7 @@ Deno.serve(createHandler(
         throw new ApiError("EXPRESSION_REQUIRED", "Select or join an Expression to view its groups", 400);
       }
 
-      let query = auth.client
+      let query = admin
         .from("groups")
         .select("id,branch_id,ministry_id,name,description,visibility,capacity,meeting_schedule,is_active,created_at,updated_at")
         .eq("organization_id", auth.organizationId)
@@ -66,7 +66,7 @@ Deno.serve(createHandler(
       const groupIds = rows.map((group) => group.id);
 
       const { data: ownMemberships, error: ownError } = groupIds.length
-        ? await auth.client
+        ? await admin
             .from("group_memberships")
             .select("id,group_id,status,is_leader,requested_at,responded_at")
             .eq("membership_id", auth.membershipId)
@@ -79,28 +79,26 @@ Deno.serve(createHandler(
       const includeManagement = url.searchParams.get("includeManagement") === "true";
       if (includeManagement && groupIds.length) {
         const targetBranch = requestedScope === "expression" ? auth.branchId : null;
-        if (!(await hasScopedPermission(auth, "groups.members.manage", targetBranch))) {
-          throw new ApiError("PERMISSION_DENIED", "You do not have permission to manage group memberships in this scope", 403);
-        }
-        const admin = adminClient();
-        const { data: requests, error: requestError } = await admin
-          .from("group_memberships")
-          .select("id,group_id,membership_id,status,is_leader,requested_at,responded_at")
-          .in("group_id", groupIds)
-          .eq("status", "requested")
-          .order("requested_at", { ascending: true });
-        if (requestError) throw new ApiError("GROUP_REQUEST_LIST_FAILED", "Unable to retrieve pending group requests", 500, undefined, false);
+        if (await hasScopedPermission(auth, "groups.members.manage", targetBranch)) {
+          const { data: requests, error: requestError } = await admin
+            .from("group_memberships")
+            .select("id,group_id,membership_id,status,is_leader,requested_at,responded_at")
+            .in("group_id", groupIds)
+            .eq("status", "requested")
+            .order("requested_at", { ascending: true });
+          if (requestError) throw new ApiError("GROUP_REQUEST_LIST_FAILED", "Unable to retrieve pending group requests", 500, undefined, false);
 
-        const membershipIds = [...new Set((requests ?? []).map((item: any) => item.membership_id))];
-        const { data: members, error: membersError } = membershipIds.length
-          ? await admin
-              .from("memberships")
-              .select("id,profile_id,branch_id,profile:profiles(id,display_name,username,avatar_url)")
-              .in("id", membershipIds)
-          : { data: [], error: null };
-        if (membersError) throw new ApiError("GROUP_REQUEST_LIST_FAILED", "Unable to resolve pending group members", 500, undefined, false);
-        const memberMap = new Map((members ?? []).map((item: any) => [item.id, item]));
-        pendingRequests = (requests ?? []).map((item: any) => ({ ...item, member: memberMap.get(item.membership_id) ?? null }));
+          const membershipIds = [...new Set((requests ?? []).map((item: any) => item.membership_id))];
+          const { data: members, error: membersError } = membershipIds.length
+            ? await admin
+                .from("memberships")
+                .select("id,profile_id,branch_id,profile:profiles(id,display_name,username,avatar_url)")
+                .in("id", membershipIds)
+            : { data: [], error: null };
+          if (membersError) throw new ApiError("GROUP_REQUEST_LIST_FAILED", "Unable to resolve pending group members", 500, undefined, false);
+          const memberMap = new Map((members ?? []).map((item: any) => [item.id, item]));
+          pendingRequests = (requests ?? []).map((item: any) => ({ ...item, member: memberMap.get(item.membership_id) ?? null }));
+        }
       }
 
       return {
@@ -157,7 +155,7 @@ Deno.serve(createHandler(
       targetBranchId = auth.branchId ?? suppliedBranch;
     } else {
       const id = uuid(requiredString(body.id, "id", 36), "id", true)!;
-      const { data: existing, error: existingError } = await auth.client
+      const { data: existing, error: existingError } = await admin
         .from("groups")
         .select("id,branch_id")
         .eq("id", id)
@@ -199,13 +197,13 @@ Deno.serve(createHandler(
 
     if (request.method === "POST") {
       Object.assign(record, { organization_id: auth.organizationId, created_by: auth.user.id });
-      const { data, error } = await auth.client.from("groups").insert(record).select().single();
+      const { data, error } = await admin.from("groups").insert(record).select().single();
       if (error) throw new ApiError("GROUP_CREATE_FAILED", "Unable to create group", 500, undefined, false);
       return { data, status: 201 };
     }
 
     const id = uuid(requiredString(body.id, "id", 36), "id", true)!;
-    const { data, error } = await auth.client
+    const { data, error } = await admin
       .from("groups")
       .update(record)
       .eq("id", id)
