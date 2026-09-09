@@ -19,7 +19,7 @@ function inSelectedExperience(row: any, selectedExpressionId: string | null, key
 
 function emptySignals(): FeedSignals {
   return {
-    followedOrganizationIds: new Set(), followedExpressionIds: new Set(), followedLeaderProfileIds: new Set(),
+    followedOrganizationIds: new Set(), followedExpressionIds: new Set(), followedAuthorProfileIds: new Set(),
     reactedContentIds: new Set(), bookmarkedContentIds: new Set(), completedContentIds: new Set(), inProgressContentIds: new Set(),
   };
 }
@@ -264,9 +264,9 @@ Deno.serve(createHandler(
         for (const follow of followsResult.data ?? []) {
           if (follow.organization_id) signals.followedOrganizationIds.add(follow.organization_id);
           if (follow.expression_id) signals.followedExpressionIds.add(follow.expression_id);
-          if (follow.target_profile_id) signals.followedLeaderProfileIds.add(follow.target_profile_id);
+          if (follow.target_profile_id) signals.followedAuthorProfileIds.add(follow.target_profile_id);
           const leader = nestedItem(follow.leader);
-          if (leader?.profile_id) signals.followedLeaderProfileIds.add(leader.profile_id);
+          if (leader?.profile_id) signals.followedAuthorProfileIds.add(leader.profile_id);
         }
         for (const row of reactionsResult.data ?? []) signals.reactedContentIds.add(row.content_item_id);
         for (const row of bookmarksResult.data ?? []) signals.bookmarkedContentIds.add(row.content_item_id);
