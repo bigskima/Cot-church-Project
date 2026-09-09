@@ -3,7 +3,7 @@ import { diversifyFeed, rankFeedCandidates, type FeedSignals } from "./feed-rank
 
 function signals(overrides: Partial<FeedSignals> = {}): FeedSignals {
   return {
-    followedOrganizationIds: new Set(), followedExpressionIds: new Set(), followedLeaderProfileIds: new Set(),
+    followedOrganizationIds: new Set(), followedExpressionIds: new Set(), followedAuthorProfileIds: new Set(),
     reactedContentIds: new Set(), bookmarkedContentIds: new Set(), completedContentIds: new Set(), inProgressContentIds: new Set(),
     ...overrides,
   };

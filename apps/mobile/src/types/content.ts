@@ -16,6 +16,7 @@ export type MediaRendition = {
   height?: number;
   bitrate?: number;
   storage_path?: string;
+  playbackUrl?: string;
   provider_playback_id?: string;
   is_master?: boolean;
 };
@@ -32,6 +33,7 @@ export type MediaTrack = {
 export type MediaThumbnail = {
   id?: string;
   storage_path: string;
+  playbackUrl?: string;
   width?: number;
   height?: number;
   is_primary?: boolean;
@@ -75,6 +77,7 @@ export type ContentItem = {
     display_name?: string | null;
     username?: string | null;
     avatar_url?: string | null;
+    banner_url?: string | null;
   } | null;
   expression?: {
     id?: string;
@@ -211,10 +214,18 @@ export type Follow = {
   organization_id?: string | null;
   expression_id?: string | null;
   leader_id?: string | null;
+  target_profile_id?: string | null;
   created_at: string;
   organizations?: { id: string; name: string; slug: string };
   branches?: { id: string; name: string; city?: string; state?: string };
   leaders?: Leader;
+  target_profile?: {
+    id: string;
+    display_name?: string | null;
+    username?: string | null;
+    avatar_url?: string | null;
+    banner_url?: string | null;
+  } | null;
 };
 
 export type ContentComment = {
@@ -423,7 +434,9 @@ export type MembershipContext = {
     id: string;
     display_name: string;
     email?: string;
+    username?: string;
     avatar_url?: string;
+    banner_url?: string;
     handle?: string;
     bio?: string;
   };
@@ -431,7 +444,7 @@ export type MembershipContext = {
   organizationPermissions?: string[];
   publicCapabilities?: string[];
   organization?: { id: string; name: string; slug: string };
-  expression?: { id: string; name: string };
+  expression?: { id: string; name: string; avatar_url?: string | null; banner_url?: string | null };
   expressions?: {
     membershipId: string;
     organizationId: string;
@@ -440,6 +453,8 @@ export type MembershipContext = {
     code?: string;
     timezone?: string;
     status: string;
+    avatar_url?: string | null;
+    banner_url?: string | null;
     joinedAt?: string | null;
   }[];
   creatorOrganizations?: {

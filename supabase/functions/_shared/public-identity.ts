@@ -39,7 +39,7 @@ async function enrichMembershipAuthors<T extends MembershipAuthoredRow>(rows: T[
 
   const [profilesResult, defaultsResult, assignmentsResult, branchesResult] = await Promise.all([
     profileIds.length
-      ? admin.from("profiles").select("id,display_name,username,avatar_url,bio").in("id", profileIds)
+      ? admin.from("profiles").select("id,display_name,username,avatar_url,banner_url,bio").in("id", profileIds)
       : Promise.resolve({ data: [] as any[] }),
     organizationIds.length
       ? admin.from("identity_badge_definitions").select("id,organization_id,code,label,background_color,text_color,priority").in("organization_id", organizationIds).eq("is_membership_default", true).eq("is_active", true)
@@ -94,6 +94,7 @@ async function enrichMembershipAuthors<T extends MembershipAuthoredRow>(rows: T[
         displayName: profile.display_name,
         username: profile.username,
         avatarUrl: profile.avatar_url,
+        bannerUrl: profile.banner_url,
         bio: profile.bio,
         badges,
       } : null,
@@ -119,7 +120,7 @@ export async function enrichContentCreators<T extends { content_items?: any }>(r
 
   const [profilesResult, expressionsResult, organizationsResult] = await Promise.all([
     profileIds.length
-      ? admin.from("profiles").select("id,display_name,username,avatar_url").in("id", profileIds)
+      ? admin.from("profiles").select("id,display_name,username,avatar_url,banner_url").in("id", profileIds)
       : Promise.resolve({ data: [] as any[], error: null }),
     expressionIds.length
       ? admin.from("branches").select("id,name,code,is_active").in("id", expressionIds).eq("is_active", true)
@@ -148,6 +149,7 @@ export async function enrichContentCreators<T extends { content_items?: any }>(r
           display_name: author.display_name,
           username: author.username,
           avatar_url: author.avatar_url,
+          banner_url: author.banner_url,
         } : null,
         expression: expression ? {
           id: expression.id,

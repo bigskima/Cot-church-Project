@@ -11,7 +11,7 @@ export type FeedCandidate = {
 export type FeedSignals = {
   followedOrganizationIds: Set<string>;
   followedExpressionIds: Set<string>;
-  followedLeaderProfileIds: Set<string>;
+  followedAuthorProfileIds: Set<string>;
   reactedContentIds: Set<string>;
   bookmarkedContentIds: Set<string>;
   completedContentIds: Set<string>;
@@ -42,10 +42,10 @@ export function rankFeedCandidates(
     const popularity = Math.min(18, Math.log10(finiteCount(candidate.engagementCount) + 1) * 6);
     const followsOrganization = signals.followedOrganizationIds.has(organizationId);
     const followsExpression = Boolean(candidate.expressionId && signals.followedExpressionIds.has(candidate.expressionId));
-    const followsLeader = Boolean(candidate.authorProfileId && signals.followedLeaderProfileIds.has(candidate.authorProfileId));
+    const followsAuthor = Boolean(candidate.authorProfileId && signals.followedAuthorProfileIds.has(candidate.authorProfileId));
     const contentId = candidate.contentItemId ?? "";
     const continueBoost = contentId && signals.inProgressContentIds.has(contentId) ? 22 : 0;
-    const followBoost = followsLeader ? 24 : followsExpression ? 18 : followsOrganization ? 8 : 0;
+    const followBoost = followsAuthor ? 24 : followsExpression ? 18 : followsOrganization ? 8 : 0;
     const priorInterest = contentId && (signals.reactedContentIds.has(contentId) || signals.bookmarkedContentIds.has(contentId)) ? 5 : 0;
     const completedPenalty = contentId && signals.completedContentIds.has(contentId) ? 30 : 0;
     const rank = recency + popularity + followBoost + continueBoost + priorInterest - completedPenalty;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
@@ -114,8 +114,17 @@ export default function ProfileScreen() {
           <ResourceError message={contextError || 'We couldn’t load your account right now.'} retry={refreshContext} />
         ) : (
           <View style={[styles.memberCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+            <View style={[styles.memberBanner, { backgroundColor: colors.primarySoft }]}>
+              {profile?.banner_url ? (
+                <Image source={{ uri: profile.banner_url }} style={styles.memberBannerImage} resizeMode="cover" />
+              ) : (
+                <View style={styles.memberBannerFallback}>
+                  <Icon name="image-outline" size={24} color={colors.interactive} />
+                </View>
+              )}
+            </View>
             <View style={styles.memberHeader}>
-              <View style={[styles.avatarHalo, { backgroundColor: colors.primarySoft }]}>
+              <View style={[styles.avatarHalo, { backgroundColor: colors.card, borderColor: colors.card }]}>
                 <Avatar url={profile?.avatar_url} name={profile?.display_name} size="lg" />
               </View>
               <View style={styles.memberInfo}>
@@ -193,7 +202,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 }, content: { flexGrow: 1, paddingHorizontal: spacing.md, gap: spacing.xl },
   visitorCard: { padding: spacing.xl, borderRadius: radius.xxl, borderWidth: 1, alignItems: 'center', gap: spacing.xs }, visitorIconWrap: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xs },
   visitorTitle: { ...typography.h2, textAlign: 'center' }, visitorSubtitle: { ...typography.bodySmall, textAlign: 'center', lineHeight: 18 },
-  memberCard: { padding: spacing.lg, borderRadius: radius.xxl, borderWidth: 1, gap: spacing.md }, memberHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md }, avatarHalo: { padding: 4, borderRadius: radius.pill }, memberInfo: { flex: 1, minWidth: 0, gap: 2 }, memberName: { fontSize: 20, fontWeight: '800', letterSpacing: -0.4 }, memberEmail: { fontSize: 13 }, memberContextRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }, memberOrg: { fontSize: 12, fontWeight: '700', flexShrink: 1 }, profileQuickActions: { flexDirection: 'row', gap: spacing.sm }, profileQuickAction: { flex: 1, minHeight: 42, borderRadius: radius.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: spacing.sm }, profileQuickActionText: { fontSize: 12, fontWeight: '700' },
+  memberCard: { borderRadius: radius.xxl, borderWidth: 1, gap: spacing.md, overflow: 'hidden', paddingBottom: spacing.lg }, memberBanner: { width: '100%', aspectRatio: 3 / 1, overflow: 'hidden' }, memberBannerImage: { width: '100%', height: '100%' }, memberBannerFallback: { flex: 1, alignItems: 'flex-end', justifyContent: 'flex-start', padding: spacing.md }, memberHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, marginTop: -26 }, avatarHalo: { padding: 4, borderWidth: 3, borderRadius: radius.pill }, memberInfo: { flex: 1, minWidth: 0, gap: 2 }, memberName: { fontSize: 20, fontWeight: '800', letterSpacing: -0.4 }, memberEmail: { fontSize: 13 }, memberContextRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }, memberOrg: { fontSize: 12, fontWeight: '700', flexShrink: 1 }, profileQuickActions: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg }, profileQuickAction: { flex: 1, minHeight: 42, borderRadius: radius.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: spacing.sm }, profileQuickActionText: { fontSize: 12, fontWeight: '700' },
   sectionWrap: { gap: spacing.sm }, linksList: { gap: spacing.sm }, linkTile: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.xl, borderWidth: 1, gap: spacing.md },
   tileIcon: { width: 42, height: 42, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' }, tileContent: { flex: 1, gap: 2 }, tileTitle: { fontSize: 15, fontWeight: '700' }, tileSub: { fontSize: 12, lineHeight: 16 },
   leadershipBanner: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.xl, borderWidth: 1, gap: spacing.md }, leadershipIconWrap: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' }, leadershipContent: { flex: 1, gap: 2 },

@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import {
+  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -26,7 +27,7 @@ import type { Event, LiveStream, Sermon, SocialPost } from '@/types/content';
 
 type ExpressionHomePayload = {
   organization: { id: string; name: string; slug?: string };
-  expression?: { id: string; name: string } | null;
+  expression?: { id: string; name: string; avatar_url?: string | null; banner_url?: string | null } | null;
   mode: 'general' | 'expression';
   streams: LiveStream[];
   posts: SocialPost[];
@@ -137,9 +138,22 @@ export default function ExpressionHomeScreen() {
         ]}
       >
         <View pointerEvents="none" style={[styles.heroGlow, { backgroundColor: colors.primarySoft }]} />
+        <View style={[styles.identityBanner, { backgroundColor: colors.primarySoft }]}>
+          {expression?.banner_url ? (
+            <Image source={{ uri: expression.banner_url }} style={styles.identityBannerImage} resizeMode="cover" />
+          ) : (
+            <View style={styles.identityBannerFallback}>
+              <Icon name="people-circle-outline" size={34} color={colors.interactive} />
+            </View>
+          )}
+        </View>
         <View style={styles.heroTopRow}>
-          <View style={[styles.heroIcon, { backgroundColor: colors.primarySoft }]}>
-            <Icon name="people" size={22} color={colors.interactive} />
+          <View style={[styles.heroAvatar, { backgroundColor: colors.cardElevated, borderColor: colors.card }]}>
+            {expression?.avatar_url ? (
+              <Image source={{ uri: expression.avatar_url }} style={styles.heroAvatarImage} resizeMode="cover" />
+            ) : (
+              <Icon name="people" size={28} color={colors.interactive} />
+            )}
           </View>
           <View style={[styles.privatePill, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
             <Icon name="lock-closed" size={12} color={colors.interactive} />
@@ -182,6 +196,7 @@ export default function ExpressionHomeScreen() {
         <QuickLink label="Prayer" hint="Pray together" icon="heart-outline" onPress={() => router.push(`/expressions/${id}/prayer` as any)} />
         <QuickLink label="Events" hint="Gatherings" icon="calendar-outline" onPress={() => router.push(`/expressions/${id}/events` as any)} />
         <QuickLink label="Groups" hint="Smaller circles" icon="people-circle-outline" onPress={() => router.push(`/expressions/${id}/groups` as any)} />
+        <QuickLink label="Chat" hint="Direct messages" icon="chatbubble-ellipses-outline" onPress={() => router.push(`/expressions/${id}/chat` as any)} />
       </View>
 
       {resource.data?.degradedSections?.length ? (
@@ -348,18 +363,42 @@ const styles = StyleSheet.create({
     right: -54,
     opacity: 0.9,
   },
+  identityBanner: {
+    height: 132,
+    marginHorizontal: -24,
+    marginTop: -24,
+    marginBottom: -34,
+    overflow: 'hidden',
+  },
+  identityBannerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  identityBannerFallback: {
+    flex: 1,
+    alignItems: 'flex-end',
+    justifyContent: 'flex-start',
+    padding: spacing.lg,
+    opacity: 0.75,
+  },
   heroTopRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
-  heroIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 17,
+  heroAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 22,
+    borderWidth: 4,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  heroAvatarImage: {
+    width: '100%',
+    height: '100%',
   },
   privatePill: {
     minHeight: 30,

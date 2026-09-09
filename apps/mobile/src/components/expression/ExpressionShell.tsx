@@ -1,5 +1,6 @@
 import React, { useMemo, useState, type PropsWithChildren } from 'react';
 import {
+  Image,
   Modal,
   Platform,
   Pressable,
@@ -92,7 +93,13 @@ function ExpressionNavigation({
   const management = useExpressionManagementAccess();
   const expression = context?.expressions?.find((item) => item.id === expressionId)
     ?? (context?.expression?.id === expressionId
-      ? { id: expressionId, name: context.expression.name, code: undefined }
+      ? {
+          id: expressionId,
+          name: context.expression.name,
+          code: undefined,
+          avatar_url: context.expression.avatar_url,
+          banner_url: context.expression.banner_url,
+        }
       : undefined);
 
   const basePath = `/expressions/${expressionId}`;
@@ -331,7 +338,11 @@ function ExpressionNavigation({
     <View style={styles.navRoot}>
       <View style={[styles.identityCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
         <View style={[styles.identityMark, { backgroundColor: colors.primarySoft }]}>
-          <Icon name="people" size={22} color={colors.interactive} />
+          {expression?.avatar_url ? (
+            <Image source={{ uri: expression.avatar_url }} style={styles.identityImage} resizeMode="cover" />
+          ) : (
+            <Icon name="people" size={22} color={colors.interactive} />
+          )}
         </View>
         <View style={styles.identityCopy}>
           <Text style={[styles.identityName, { color: colors.text }]} numberOfLines={2}>
@@ -391,6 +402,16 @@ function ExpressionNavigation({
         <NavButton
           onNavigate={onNavigate}
           item={{
+            key: 'direct-messages',
+            label: 'Direct Messages',
+            icon: 'chatbubble-ellipses-outline',
+            active: pathname === `${basePath}/chat`,
+            onPress: () => router.push(`${basePath}/chat` as any),
+          }}
+        />
+        <NavButton
+          onNavigate={onNavigate}
+          item={{
             key: 'general',
             label: 'Return to General COT',
             icon: 'globe-outline',
@@ -409,10 +430,10 @@ export function ExpressionShell({ expressionId, children }: Props) {
   const { width } = useWindowDimensions();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const wide = width >= 900;
-  const expressionName =
-    context?.expressions?.find((item) => item.id === expressionId)?.name
-    ?? context?.expression?.name
-    ?? 'Expression';
+  const activeExpression = context?.expressions?.find((item) => item.id === expressionId)
+    ?? (context?.expression?.id === expressionId ? context.expression : undefined);
+  const expressionName = activeExpression?.name ?? 'Expression';
+  const expressionAvatar = activeExpression?.avatar_url;
 
   if (wide) {
     return (
@@ -459,6 +480,13 @@ export function ExpressionShell({ expressionId, children }: Props) {
         >
           <Icon name="menu" size={21} color={colors.text} />
         </Pressable>
+        <View style={[styles.headerAvatar, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}>
+          {expressionAvatar ? (
+            <Image source={{ uri: expressionAvatar }} style={styles.headerAvatarImage} resizeMode="cover" />
+          ) : (
+            <Icon name="people" size={16} color={colors.interactive} />
+          )}
+        </View>
         <View style={styles.headerCopy}>
           <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
             {expressionName}
@@ -577,6 +605,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerAvatar: { width: 34, height: 34, borderRadius: 12, borderWidth: 1, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  headerAvatarImage: { width: '100%', height: '100%' },
   headerCopy: {
     flex: 1,
     minWidth: 0,
@@ -612,6 +642,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginBottom: spacing.md,
   },
+  identityImage: { width: '100%', height: '100%' },
   identityMark: {
     width: 44,
     height: 44,

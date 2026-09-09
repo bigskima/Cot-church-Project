@@ -84,6 +84,11 @@ const requiredFiles = [
   'supabase/functions/platform-payments/index.ts',
   'supabase/functions/platform-giving/index.ts',
   'supabase/functions/search/index.ts',
+  'supabase/functions/chat/index.ts',
+  'supabase/functions/group-chat/index.ts',
+  'supabase/functions/public-profile/index.ts',
+  'supabase/functions/profile-banner/index.ts',
+  'supabase/functions/realtime-config/index.ts',
 ];
 
 await Promise.all(requiredFiles.map((file) => access(file)));
@@ -168,7 +173,20 @@ const streamGrantHardening = await readFile('supabase/migrations/20260905121401_
 const triggerGrantHardening = await readFile('supabase/migrations/20260905121523_remove_api_execute_from_security_definer_triggers.sql', 'utf8');
 const profileStateRpcHardening = await readFile('supabase/migrations/20260905122057_harden_ai_usage_and_profile_state_rpc_access.sql', 'utf8');
 
+const socialChatContracts = [
+  await readFile('supabase/functions/chat/index.ts', 'utf8'),
+  await readFile('supabase/functions/group-chat/index.ts', 'utf8'),
+  await readFile('supabase/functions/public-profile/index.ts', 'utf8'),
+  await readFile('supabase/functions/profile-banner/index.ts', 'utf8'),
+  await readFile('supabase/functions/realtime-config/index.ts', 'utf8'),
+].join('\n');
+
 const invariants = [
+  [socialChatContracts, /direct_conversations[\s\S]*direct_messages/, 'global profile-to-profile direct messaging contract'],
+  [socialChatContracts, /organization:\s*"none"/, 'direct chat is independent of Expression membership context'],
+  [socialChatContracts, /group_memberships[\s\S]*group_messages/, 'Group chat remains a separate membership-scoped conversation'],
+  [socialChatContracts, /targetProfileId|target_profile_id/, 'individual member follow target contract'],
+  [socialChatContracts, /banner_url|profile-banners/, 'member profile banner contract'],
   [handler, /request\.method === "OPTIONS"/, 'CORS preflight handling'],
   [handler, /authenticate\(request/, 'central authentication'],
   [handler, /options\.organization \?\? "optional"/, 'handler preserves explicit organisation context mode'],

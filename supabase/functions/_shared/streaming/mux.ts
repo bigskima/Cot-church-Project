@@ -80,6 +80,7 @@ export class MuxStreamingProvider implements StreamingProvider {
 
   async createBroadcast(config: ProviderConfiguration, request: BroadcastRequest): Promise<ProvisionedBroadcast> {
     const playbackPolicy = request.visibility === 'public' ? 'public' : 'signed';
+    const testMode = config.settings?.testMode === true;
     const data = await mux<Record<string, any>>(config, '/live-streams', {
       method: 'POST',
       body: JSON.stringify({
@@ -87,7 +88,7 @@ export class MuxStreamingProvider implements StreamingProvider {
         new_asset_settings: { playback_policies: [playbackPolicy] },
         latency_mode: request.latencyMode,
         reconnect_window: request.reconnectWindowSeconds,
-        test: false,
+        test: testMode,
       }),
     });
     const playbackId = data.playback_ids?.[0]?.id;

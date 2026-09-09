@@ -1,19 +1,37 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useTheme } from '@/state/theme';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { Icon } from '../primitives/Icon';
+import { InlineCommentsSheet, type InlineCommentsContext } from '../engagement/InlineCommentsSheet';
 import type { Reel } from '@/types/content';
 
 export interface ReelCardProps {
   reel: Reel;
   onPress?: () => void;
   width?: number;
+  commentContext?: InlineCommentsContext;
+  onOpenComments?: () => void;
 }
 
-export function ReelCard({ reel, onPress, width = 150 }: ReelCardProps) {
+export function ReelCard({ reel, onPress, width = 150, commentContext, onOpenComments }: ReelCardProps) {
   const { colors } = useTheme();
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const contentId = reel.content_items?.id;
+  const resolvedCommentContext = commentContext ?? (reel.content_items?.expression_id ? 'current' : 'public');
+  const streamRendition = reel.media_assets?.renditions?.find((rendition) => rendition.rendition_kind === 'video_stream');
+  const videoUrl =
+    reel.media_assets?.url ||
+    streamRendition?.playbackUrl ||
+    streamRendition?.storage_path ||
+    '';
+  const posterUrl = reel.media_assets?.thumbnailUrl || '';
+  const player = useVideoPlayer(videoUrl, (instance) => {
+    instance.loop = true;
+    instance.muted = true;
+  });
 
   const formatViews = (views: number) => {
     if (views >= 1000000) return `${(views / 1000000).toFixed(1)}M`;
@@ -21,22 +39,18 @@ export function ReelCard({ reel, onPress, width = 150 }: ReelCardProps) {
     return `${views}`;
   };
 
-  const thumbnailUrl = reel.media_assets?.thumbnailUrl || reel.media_assets?.url;
-
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.card,
-        { width, backgroundColor: colors.card, borderColor: colors.borderSubtle },
-        pressed && styles.pressed,
-      ]}
-      accessibilityRole="button"
-      accessibilityLabel={`Reel: ${reel.caption}`}
-    >
+    <View style={[styles.card, { width, backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
       <View style={styles.frame}>
-        {thumbnailUrl ? (
-          <Image source={{ uri: thumbnailUrl }} style={styles.thumbnail} resizeMode="cover" />
+        {videoUrl && player ? (
+          <VideoView
+            player={player}
+            style={styles.media}
+            contentFit="cover"
+            nativeControls
+          />
+        ) : posterUrl ? (
+          <Image source={{ uri: posterUrl }} style={styles.media} resizeMode="cover" />
         ) : (
           <View style={[styles.placeholder, { backgroundColor: colors.cardElevated }]}>
             <View style={[styles.placeholderIcon, { backgroundColor: colors.primarySoft }]}>
@@ -45,30 +59,55 @@ export function ReelCard({ reel, onPress, width = 150 }: ReelCardProps) {
           </View>
         )}
 
-        <View style={styles.playChip}>
+        <View pointerEvents="none" style={styles.playChip}>
           <Icon name="play" size={10} color="#FFFFFF" />
           <Text style={styles.viewsText}>{formatViews(reel.views_count)}</Text>
         </View>
 
+        {contentId ? (
+          <Pressable
+            onPress={() => setCommentsOpen(true)}
+            style={styles.commentChip}
+            accessibilityRole="button"
+            accessibilityLabel="Open Reel comments"
+          >
+            <Icon name="chatbubble-ellipses-outline" size={14} color="#FFFFFF" />
+            <Text style={styles.viewsText}>{reel.comments_count || 0}</Text>
+          </Pressable>
+        ) : null}
+
         <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.28)', 'rgba(0,0,0,0.88)']}
-          locations={[0, 0.48, 1]}
-          style={styles.captionOverlay}
+          pointerEvents="none"
+          colors={['transparent', 'rgba(0,0,0,0.18)', 'rgba(0,0,0,0.78)']}
+          locations={[0, 0.58, 1]}
+          style={styles.captionGradient}
+        />
+
+        <Pressable
+          onPress={onPress}
+          style={({ pressed }) => [styles.captionOverlay, pressed && styles.pressed]}
+          accessibilityRole="button"
+          accessibilityLabel={`Open reel: ${reel.caption || 'Reel'}`}
         >
-          <Text style={styles.captionText} numberOfLines={2}>
-            {reel.caption || 'Reel'}
-          </Text>
+          <Text style={styles.captionText} numberOfLines={2}>{reel.caption || 'Reel'}</Text>
           {reel.audio_title ? (
             <View style={styles.audioRow}>
-              <View style={styles.audioIcon}>
-                <Icon name="musical-notes" size={10} color="#FFFFFF" />
-              </View>
+              <View style={styles.audioIcon}><Icon name="musical-notes" size={10} color="#FFFFFF" /></View>
               <Text style={styles.audioText} numberOfLines={1}>{reel.audio_title}</Text>
             </View>
           ) : null}
-        </LinearGradient>
+        </Pressable>
       </View>
-    </Pressable>
+      <InlineCommentsSheet
+        visible={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        contentId={contentId}
+        context={resolvedCommentContext}
+        title="Reel comments"
+        subtitle="Keep this Reel in place while you join the conversation."
+        onViewAll={onOpenComments}
+      />
+    </View>
   );
 }
 
@@ -83,8 +122,9 @@ const styles = StyleSheet.create({
     width: '100%',
     aspectRatio: 9 / 16,
     position: 'relative',
+    backgroundColor: '#050B14',
   },
-  thumbnail: { width: '100%', height: '100%' },
+  media: { width: '100%', height: '100%' },
   placeholder: {
     width: '100%',
     height: '100%',
@@ -110,19 +150,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderRadius: radius.pill,
   },
-  viewsText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '800',
+  viewsText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800' },
+  commentChip: { position: 'absolute', top: 8, right: 8, minHeight: 27, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.56)', paddingHorizontal: 8, borderRadius: radius.pill, zIndex: 4 },
+  captionGradient: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '42%',
   },
   captionOverlay: {
     position: 'absolute',
-    bottom: 0,
     left: 0,
     right: 0,
-    minHeight: '43%',
-    justifyContent: 'flex-end',
+    bottom: 0,
     padding: spacing.md,
+    paddingTop: spacing.xl,
     gap: spacing.xs,
   },
   captionText: {
@@ -147,8 +190,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     flexShrink: 1,
   },
-  pressed: {
-    opacity: 0.92,
-    transform: [{ scale: 0.985 }],
-  },
+  pressed: { opacity: 0.9 },
 });

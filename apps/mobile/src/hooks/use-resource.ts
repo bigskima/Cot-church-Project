@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { cacheSnapshot, remember } from '../services/query-cache';
+import { cacheSnapshot, remember, subscribeInvalidation } from '../services/query-cache';
 
 export type ResourceState<T> = {
   data: T | undefined;
@@ -26,13 +26,14 @@ export function useResource<T>(
 
   const refresh = useCallback(() => setVersion((value) => value + 1), []);
 
+  useEffect(() => subscribeInvalidation((prefix) => {
+    if (key.startsWith(prefix)) setVersion((value) => value + 1);
+  }), [key]);
+
   useEffect(() => {
     const controller = new AbortController();
     const scopedCache = cacheSnapshot<T>(key);
 
-    // A resource key is a data-isolation boundary. When church / Expression /
-    // authentication scope changes, never keep rendering data from the old key
-    // while the new request is in flight.
     setData(scopedCache.value);
     setStale(scopedCache.stale);
     setError('');

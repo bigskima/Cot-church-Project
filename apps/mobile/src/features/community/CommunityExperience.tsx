@@ -615,6 +615,10 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
               expressionName={item.expression?.name}
               canEngage={canEngage}
               allowExternalShare={item.visibility === 'public'}
+              onPressAuthor={item.author?.username ? () => router.push({
+                pathname: '/general/member/[username]',
+                params: { username: item.author!.username! },
+              } as any) : undefined}
               onPress={() => router.push(activeTab === 'general' ? { pathname: '/general/post/[id]', params: { id: item.id } } as any : { pathname: `/expressions/${expression?.id}/post/[id]`, params: { id: item.id } } as any)}
               onReply={() => router.push(activeTab === 'general' ? { pathname: '/general/post/[id]', params: { id: item.id, focus: 'comments' } } as any : { pathname: `/expressions/${expression?.id}/post/[id]`, params: { id: item.id, focus: 'comments' } } as any)}
               onReact={canEngage ? (reaction) => reactToPost(item.id, reaction, activeTab) : undefined}

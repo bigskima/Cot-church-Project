@@ -24,7 +24,6 @@ import {
   ResourceError,
   SermonCard,
   Skeleton,
-  StoriesTray,
   VideoCard,
 } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
@@ -54,6 +53,12 @@ type CommunityPost = SocialPost & {
   viewer_bookmarked?: boolean;
 };
 type Ranked = { feed_rank?: number; feed_reason?: 'following' | 'continue' | 'popular' | 'recent' };
+type PlaybackBatchEntry = {
+  contentId: string;
+  available: boolean;
+  renditions?: Array<{ kind?: string; playbackUrl?: string; storagePath?: string }>;
+  thumbnails?: Array<{ isPrimary?: boolean; playbackUrl?: string; storagePath?: string }>;
+};
 type HomeFeedUnit =
   | { key: string; kind: 'post'; timestamp: number; rank: number; post: CommunityPost & Ranked }
   | { key: string; kind: 'reel'; timestamp: number; rank: number; reel: Reel & Ranked }
@@ -86,7 +91,53 @@ export default function HomeScreen() {
   }, [organizationId]);
 
   const resourceKey = `mobile:home-feed:${organizationId || 'auto'}:general:${mode}`;
-  const resource = useResource<HomePayload>(resourceKey, (signal) => api.request<HomePayload>(query, { signal }));
+  const resource = useResource<HomePayload>(resourceKey, async (signal) => {
+    const payload = await api.request<HomePayload>(query, { signal, context: 'public' });
+    const mediaItems = [...(payload.reels ?? []), ...(payload.videos ?? [])];
+    const contentIds = [...new Set(mediaItems.map((item) => item.content_items?.id).filter(Boolean) as string[])];
+    if (!contentIds.length) return payload;
+
+    const chunks: string[][] = [];
+    for (let index = 0; index < contentIds.length; index += 30) chunks.push(contentIds.slice(index, index + 30));
+    const settled = await Promise.allSettled(chunks.map((chunk) =>
+      api.request<PlaybackBatchEntry[]>(
+        `content-media?action=playback_batch&contentIds=${encodeURIComponent(chunk.join(','))}`,
+        { signal, context: 'public' },
+      ),
+    ));
+    const playback = new Map<string, PlaybackBatchEntry>();
+    settled.forEach((result) => {
+      if (result.status === 'fulfilled') result.value.forEach((item) => playback.set(item.contentId, item));
+    });
+
+    const hydrate = <T extends Reel | Video>(item: T): T => {
+      const contentId = item.content_items?.id;
+      const prepared = contentId ? playback.get(contentId) : undefined;
+      const stream = prepared?.renditions?.find((rendition) => rendition.kind === 'video_stream');
+      const thumbnail = prepared?.thumbnails?.find((candidate) => candidate.isPrimary)
+        ?? prepared?.thumbnails?.[0];
+      if (!stream?.playbackUrl && !thumbnail?.playbackUrl) return item;
+      return {
+        ...item,
+        media_assets: {
+          ...(item.media_assets ?? {}),
+          ...(stream?.playbackUrl ? { url: stream.playbackUrl } : {}),
+          ...(thumbnail?.playbackUrl ? { thumbnailUrl: thumbnail.playbackUrl } : {}),
+          renditions: (item.media_assets?.renditions ?? []).map((rendition) =>
+            rendition.rendition_kind === 'video_stream' && stream?.playbackUrl
+              ? { ...rendition, playbackUrl: stream.playbackUrl }
+              : rendition
+          ),
+        },
+      };
+    };
+
+    return {
+      ...payload,
+      reels: (payload.reels ?? []).map(hydrate),
+      videos: (payload.videos ?? []).map(hydrate),
+    };
+  });
 
   const organization = resource.data?.organization ?? contextOrganization;
   const streams = resource.data?.streams ?? [];
@@ -206,43 +257,6 @@ export default function HomeScreen() {
     }
   };
 
-  const stories = useMemo(() => {
-    const list: Array<{
-      id: string;
-      title: string;
-      imageUrl?: string;
-      isLive: boolean;
-      hasUnseen: boolean;
-      onPress: () => void;
-    }> = [];
-
-    if (activeStream) {
-      list.push({
-        id: `stream:${activeStream.id}`,
-        title: activeStream.status === 'live' ? 'LIVE NOW' : 'Upcoming',
-        imageUrl: activeStream.thumbnail_url,
-        isLive: activeStream.status === 'live',
-        hasUnseen: false,
-        onPress: () => router.push(`/general/live/${activeStream.id}` as any),
-      });
-    }
-
-    reels.slice(0, 6).forEach((reel) => {
-      list.push({
-        id: `reel:${reel.id}`,
-        title: reel.caption ? reel.caption.slice(0, 12) : 'Reel',
-        imageUrl: reel.media_assets?.thumbnailUrl,
-        isLive: false,
-        hasUnseen: false,
-        onPress: () => router.push({
-          pathname: '/general/reels',
-          params: { reelId: reel.id },
-        } as any),
-      });
-    });
-    return list;
-  }, [activeStream, reels]);
-
   const reelWidth = Math.max(260, Math.min(width - spacing.lg * 2, 460));
 
   const listHeader = (
@@ -297,8 +311,6 @@ export default function HomeScreen() {
           <Icon name="refresh-outline" size={15} color={colors.textMuted} />
         </Pressable>
       ) : null}
-
-      {stories.length ? <StoriesTray stories={stories} /> : null}
 
       {activeStream ? (
         <View style={styles.heroSection}>
@@ -388,6 +400,10 @@ export default function HomeScreen() {
                     expressionName={item.post.expression?.name}
                     canEngage={canEngage}
                     allowExternalShare={item.post.visibility === 'public'}
+                    onPressAuthor={item.post.author?.username ? () => router.push({
+                      pathname: '/general/member/[username]',
+                      params: { username: item.post.author!.username! },
+                    } as any) : undefined}
                     onPress={() => openPost(item.post.id)}
                     onReply={() => openPost(item.post.id, true)}
                     onReact={canEngage ? (reaction) => reactToPost(item.post.id, reaction) : undefined}
@@ -404,10 +420,15 @@ export default function HomeScreen() {
                   <ReelCard
                     reel={item.reel}
                     width={reelWidth}
+                    commentContext="public"
                     onPress={() => router.push({
                       pathname: '/general/reels',
                       params: { reelId: item.reel.id },
                     } as any)}
+                    onOpenComments={item.reel.content_items?.id ? () => router.push({
+                      pathname: '/general/comments/[contentId]',
+                      params: { contentId: item.reel.content_items!.id },
+                    } as any) : undefined}
                   />
                 </View>
               );
@@ -416,7 +437,19 @@ export default function HomeScreen() {
               return (
                 <View style={styles.feedCardWrap}>
                   <View style={styles.itemLabelRow}><Icon name="play-circle-outline" size={16} color={colors.interactive} /><Text style={[styles.itemLabel, { color: colors.textSecondary }]}>WATCH</Text></View>
-                  <VideoCard video={item.video} onPress={() => router.push(`/general/watch/${item.video.id}` as any)} />
+                  <VideoCard
+                    video={item.video}
+                    commentContext="public"
+                    onPress={() => router.push(`/general/watch/${item.video.id}` as any)}
+                    onPressCreator={item.video.content_items?.author?.username ? () => router.push({
+                      pathname: '/general/member/[username]',
+                      params: { username: item.video.content_items!.author!.username! },
+                    } as any) : undefined}
+                    onOpenComments={item.video.content_items?.id ? () => router.push({
+                      pathname: '/general/comments/[contentId]',
+                      params: { contentId: item.video.content_items!.id },
+                    } as any) : undefined}
+                  />
                 </View>
               );
             }

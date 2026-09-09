@@ -20,6 +20,7 @@ import {
   Button,
   ContentReportSheet,
   Icon,
+  InlineCommentsSheet,
   ResourceError,
   ScreenHeader,
   VideoCard,
@@ -46,6 +47,7 @@ export function WatchDetailExperience({ videoId: id, scope = 'general' }: { vide
   const [isSaved, setIsSaved] = useState(false);
   const [actionError, setActionError] = useState('');
   const [reportOpen, setReportOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
   const lastSyncedSecond = useRef(0);
   const expressionMode = scope === 'expression';
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
@@ -249,17 +251,26 @@ export function WatchDetailExperience({ videoId: id, scope = 'general' }: { vide
             </View>
             <Text style={[styles.title, { color: colors.text }]}>{video.title}</Text>
 
-            <View style={styles.authorRow}>
+            <Pressable
+              onPress={contentIdentity?.author?.username ? () => router.push({
+                pathname: '/general/member/[username]',
+                params: { username: contentIdentity.author!.username! },
+              } as any) : undefined}
+              disabled={!contentIdentity?.author?.username}
+              style={({ pressed }) => [styles.authorRow, pressed && contentIdentity?.author?.username ? styles.authorPressed : null]}
+              accessibilityRole={contentIdentity?.author?.username ? 'button' : undefined}
+              accessibilityLabel={contentIdentity?.author?.username ? `Open ${creatorName} profile` : undefined}
+            >
               <Avatar url={creatorAvatar} name={creatorName} size="sm" />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.authorName, { color: colors.text }]} numberOfLines={1}>
                   {creatorName}
                 </Text>
                 <Text style={[styles.authorSub, { color: colors.textSecondary }]} numberOfLines={1}>
-                  {[sourceName, video.category].filter(Boolean).join(' · ') || 'COT video'}
+                  {[sourceName, contentIdentity?.author?.username ? `@${contentIdentity.author.username}` : null, video.category].filter(Boolean).join(' · ') || 'COT video'}
                 </Text>
               </View>
-            </View>
+            </Pressable>
             {actionError ? <Text style={[styles.actionError, { color: colors.live }]} accessibilityRole="alert">{actionError}</Text> : null}
 
             {/* YouTube-Style Action Rail (Like, Save, Share, Comments) */}
@@ -305,11 +316,7 @@ export function WatchDetailExperience({ videoId: id, scope = 'general' }: { vide
                     setActionError('Comments are not available for this video yet.');
                     return;
                   }
-                  router.push(
-                    expressionMode && context?.expression?.id
-                      ? ({ pathname: `/expressions/${context.expression.id}/comments/[contentId]`, params: { contentId } } as any)
-                      : ({ pathname: '/general/comments/[contentId]', params: { contentId } } as any),
-                  );
+                  setCommentsOpen(true);
                 }}
                 style={styles.actionBtn}
               >
@@ -341,7 +348,17 @@ export function WatchDetailExperience({ videoId: id, scope = 'general' }: { vide
                     <VideoCard
                       key={v.id}
                       video={v}
+                      commentContext={expressionMode ? 'current' : 'public'}
+                      onPressCreator={v.content_items?.author?.username ? () => router.push({
+                        pathname: '/general/member/[username]',
+                        params: { username: v.content_items!.author!.username! },
+                      } as any) : undefined}
                       onPress={() => router.push((expressionMode && context?.expression?.id ? `/expressions/${context.expression.id}/videos/${v.id}` : `/general/watch/${v.id}`) as any)}
+                      onOpenComments={v.content_items?.id ? () => router.push(
+                        expressionMode && context?.expression?.id
+                          ? ({ pathname: `/expressions/${context.expression.id}/comments/[contentId]`, params: { contentId: v.content_items!.id } } as any)
+                          : ({ pathname: '/general/comments/[contentId]', params: { contentId: v.content_items!.id } } as any),
+                      ) : undefined}
                     />
                   ))}
                 </View>
@@ -350,6 +367,21 @@ export function WatchDetailExperience({ videoId: id, scope = 'general' }: { vide
           </View>
         </ScrollView>
       ) : null}
+
+      <InlineCommentsSheet
+        visible={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        contentId={contentId}
+        context={expressionMode ? 'current' : 'public'}
+        title="Video comments"
+        subtitle="Keep watching while the conversation stays with this video."
+        returnTo={expressionMode && context?.expression?.id ? `/expressions/${context.expression.id}/videos/${id}` : `/general/watch/${id}`}
+        onViewAll={contentId ? () => router.push(
+          expressionMode && context?.expression?.id
+            ? ({ pathname: `/expressions/${context.expression.id}/comments/[contentId]`, params: { contentId } } as any)
+            : ({ pathname: '/general/comments/[contentId]', params: { contentId } } as any),
+        ) : undefined}
+      />
 
       <ContentReportSheet
         target={reportOpen && contentId ? {
@@ -409,6 +441,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
+  authorPressed: { opacity: 0.82 },
   authorName: {
     fontSize: 14,
     fontWeight: '700',

@@ -8,7 +8,7 @@ type MembershipRow = {
   joined_at: string | null;
   branch_id: string | null;
   organization: { id: string; name: string; slug: string; status: string; timezone: string } | null;
-  branch: { id: string; name: string; code: string; timezone: string; is_active: boolean } | null;
+  branch: { id: string; name: string; code: string; timezone: string; avatar_url: string | null; banner_url: string | null; is_active: boolean } | null;
 };
 
 type ExpressionMembershipRow = {
@@ -17,7 +17,7 @@ type ExpressionMembershipRow = {
   branch_id: string;
   status: string;
   joined_at: string | null;
-  branch: { id: string; name: string; code: string; timezone: string; is_active: boolean } | null;
+  branch: { id: string; name: string; code: string; timezone: string; avatar_url: string | null; banner_url: string | null; is_active: boolean } | null;
 };
 
 Deno.serve(createHandler(
@@ -28,19 +28,19 @@ Deno.serve(createHandler(
     const [membershipsResult, expressionMembershipsResult, profileResult, creatorOrganizationsResult, publicCapabilitiesResult] = await Promise.all([
       auth.client
         .from("memberships")
-        .select("id, status, joined_at, branch_id, organization:organizations(id, name, slug, status, timezone), branch:branches(id, name, code, timezone, is_active)")
+        .select("id, status, joined_at, branch_id, organization:organizations(id, name, slug, status, timezone), branch:branches(id, name, code, timezone, avatar_url, banner_url, is_active)")
         .eq("profile_id", auth.user.id)
         .eq("status", "active")
         .order("created_at", { ascending: true }),
       auth.client
         .from("expression_memberships")
-        .select("id,organization_id,branch_id,status,joined_at,branch:branches(id,name,code,timezone,is_active)")
+        .select("id,organization_id,branch_id,status,joined_at,branch:branches(id,name,code,timezone,avatar_url,banner_url,is_active)")
         .eq("profile_id", auth.user.id)
         .eq("status", "active")
         .order("joined_at", { ascending: true }),
       auth.client
         .from("profiles")
-        .select("id, display_name, avatar_url")
+        .select("id, display_name, username, bio, avatar_url, banner_url")
         .eq("id", auth.user.id)
         .maybeSingle(),
       auth.client
@@ -164,6 +164,8 @@ Deno.serve(createHandler(
         name: membership.branch!.name,
         code: membership.branch!.code,
         timezone: membership.branch!.timezone,
+        avatar_url: membership.branch!.avatar_url,
+        banner_url: membership.branch!.banner_url,
         status: membership.status,
         joinedAt: membership.joined_at,
       }));
@@ -176,8 +178,11 @@ Deno.serve(createHandler(
         profile: {
           id: profileResult.data?.id ?? auth.user.id,
           display_name: profileResult.data?.display_name ?? auth.user.email?.split("@")[0] ?? "Member",
+          username: profileResult.data?.username ?? undefined,
+          bio: profileResult.data?.bio ?? undefined,
           email: auth.user.email ?? undefined,
           avatar_url: profileResult.data?.avatar_url ?? undefined,
+          banner_url: profileResult.data?.banner_url ?? undefined,
         },
         organization: selectedOrganization
           ? {
@@ -190,6 +195,8 @@ Deno.serve(createHandler(
           ? {
               id: selectedExpression.id,
               name: selectedExpression.name,
+              avatar_url: selectedExpression.avatar_url,
+              banner_url: selectedExpression.banner_url,
             }
           : undefined,
         organizations,

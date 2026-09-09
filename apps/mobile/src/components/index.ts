@@ -29,5 +29,6 @@ export * from './media/ReelPlayer';
 export * from './cards/VideoCard';
 export * from './cards/ReelCard';
 export * from './engagement/CommentsThread';
+export * from './engagement/InlineCommentsSheet';
 export * from './engagement/ContentReportSheet';
 export * from './engagement/ReactionDrawer';

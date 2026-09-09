@@ -290,6 +290,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: {
                 <View style={styles.actionRow}>
                   {!membership && group.visibility === 'members' ? <Button label="Request to Join" onPress={() => void requestMembership(group.id)} loading={busyId === group.id} variant="primary" size="sm" /> : null}
                   {membership?.status === 'declined' || membership?.status === 'removed' ? <Button label="Request Again" onPress={() => void requestMembership(group.id)} loading={busyId === group.id} variant="outline" size="sm" /> : null}
+                  {joined ? <Button label="Group chat" onPress={() => router.push(`/expressions/${expression.id}/groups/${group.id}/chat` as any)} variant="primary" size="sm" /> : null}
                   {!focusGroupId ? <Button label="Open group" onPress={() => router.push(`/expressions/${expression.id}/groups/${group.id}` as any)} variant="ghost" size="sm" /> : null}
                 </View>
 

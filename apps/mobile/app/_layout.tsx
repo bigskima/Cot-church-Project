@@ -8,23 +8,18 @@ import { SessionProvider, useSession } from '@/state/session';
 import { ThemeProvider, useTheme } from '@/state/theme';
 import { BrandingProvider } from '@/state/branding';
 import { OnboardingGate } from '@/components/OnboardingGate';
+import { RealtimeBridge } from '@/components/RealtimeBridge';
 import { fetchPlatformBranding } from '@/services/branding';
 import { palette, radius, spacing } from '@/design-system/tokens';
 
-// Keep the native splash visible only until the React application shell mounts.
-// Remote configuration must never block every route from rendering.
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function AppContent() {
   const { isDark, colors } = useTheme();
   const { mode, accessReady, contextStatus } = useSession();
-  const resolvingAccess =
-    mode === 'restoring' ||
-    (mode === 'authenticated' && !accessReady && contextStatus !== 'error');
+  const resolvingAccess = mode === 'restoring' || (mode === 'authenticated' && !accessReady && contextStatus !== 'error');
 
   useEffect(() => {
-    // Warm runtime branding in the background. The branding service owns its
-    // local fallback, so offline/CORS/provider failures cannot blank the app.
     void fetchPlatformBranding();
     SplashScreen.hideAsync().catch(() => {});
   }, []);
@@ -35,9 +30,7 @@ function AppContent() {
         <View style={[styles.accessBootstrapCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
           <ActivityIndicator size="large" color={colors.interactive} />
           <Text style={[styles.accessBootstrapTitle, { color: colors.text }]}>Getting COT ready</Text>
-          <Text style={[styles.accessBootstrapCopy, { color: colors.textSecondary }]}>
-            Loading your church, Expressions and personal tools.
-          </Text>
+          <Text style={[styles.accessBootstrapCopy, { color: colors.textSecondary }]}>Loading your church, Expressions and personal tools.</Text>
         </View>
       </View>
     );
@@ -46,13 +39,9 @@ function AppContent() {
   return (
     <>
       <StatusBar style={isDark ? 'light' : 'dark'} />
+      <RealtimeBridge />
       <OnboardingGate />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          animation: 'fade_from_bottom',
-        }}
-      >
+      <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="general" options={{ headerShown: false }} />
         <Stack.Screen name="expressions/[expressionId]" options={{ headerShown: false }} />
@@ -102,19 +91,11 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   return (
     <View style={styles.errorScreen}>
       <View style={styles.errorCard}>
-        <View style={styles.errorIcon}>
-          <Text style={styles.errorIconText}>!</Text>
-        </View>
+        <View style={styles.errorIcon}><Text style={styles.errorIconText}>!</Text></View>
         <Text style={styles.errorTitle}>We couldn’t open this screen</Text>
-        <Text style={styles.errorMessage}>
-          Something went wrong while opening this page. Your account and church data have not been changed.
-        </Text>
-        {showTechnicalDetail && error?.message ? (
-          <Text style={styles.technicalMessage}>{error.message}</Text>
-        ) : null}
-        <Pressable onPress={retry} style={styles.retryButton} accessibilityRole="button">
-          <Text style={styles.retryText}>Try again</Text>
-        </Pressable>
+        <Text style={styles.errorMessage}>Something went wrong while opening this page. Your account and church data have not been changed.</Text>
+        {showTechnicalDetail && error?.message ? <Text style={styles.technicalMessage}>{error.message}</Text> : null}
+        <Pressable onPress={retry} style={styles.retryButton} accessibilityRole="button"><Text style={styles.retryText}>Try again</Text></Pressable>
       </View>
     </View>
   );
@@ -135,98 +116,17 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
-  accessBootstrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.xl,
-  },
-  accessBootstrapCard: {
-    width: '100%',
-    maxWidth: 420,
-    minHeight: 180,
-    borderWidth: 1,
-    borderRadius: radius.xxl,
-    padding: spacing.xxl,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-  },
-  accessBootstrapTitle: {
-    marginTop: spacing.sm,
-    fontSize: 20,
-    fontWeight: '800',
-    textAlign: 'center',
-    letterSpacing: -0.35,
-  },
-  accessBootstrapCopy: {
-    fontSize: 13,
-    lineHeight: 19,
-    textAlign: 'center',
-    maxWidth: 330,
-  },
-  errorScreen: {
-    flex: 1,
-    backgroundColor: palette.darkBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.xxl,
-  },
-  errorCard: {
-    width: '100%',
-    maxWidth: 460,
-    borderRadius: radius.xxl,
-    borderWidth: 1,
-    borderColor: palette.darkBorder,
-    backgroundColor: palette.darkCard,
-    padding: spacing.xxl,
-  },
-  errorTitle: {
-    color: palette.textDarkPrimary,
-    fontSize: 22,
-    fontWeight: '800',
-    letterSpacing: -0.4,
-    marginBottom: spacing.sm,
-  },
-  errorMessage: {
-    color: palette.textDarkSecondary,
-    fontSize: 14,
-    lineHeight: 21,
-    marginBottom: spacing.xl,
-  },
-  technicalMessage: {
-    color: palette.textDarkMuted,
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: -10,
-    marginBottom: 18,
-  },
-  retryButton: {
-    minHeight: 46,
-    borderRadius: radius.lg,
-    backgroundColor: palette.blue,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 18,
-  },
-  retryText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  errorIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: palette.liveSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
-  },
-  errorIconText: {
-    color: palette.live,
-    fontSize: 24,
-    lineHeight: 28,
-    fontWeight: '800',
-  },
+  accessBootstrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+  accessBootstrapCard: { width: '100%', maxWidth: 420, minHeight: 180, borderWidth: 1, borderRadius: radius.xxl, padding: spacing.xxl, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+  accessBootstrapTitle: { marginTop: spacing.sm, fontSize: 20, fontWeight: '800', textAlign: 'center', letterSpacing: -0.35 },
+  accessBootstrapCopy: { fontSize: 13, lineHeight: 19, textAlign: 'center', maxWidth: 330 },
+  errorScreen: { flex: 1, backgroundColor: palette.darkBg, alignItems: 'center', justifyContent: 'center', padding: spacing.xxl },
+  errorCard: { width: '100%', maxWidth: 460, borderRadius: radius.xxl, borderWidth: 1, borderColor: palette.darkBorder, backgroundColor: palette.darkCard, padding: spacing.xxl },
+  errorTitle: { color: palette.textDarkPrimary, fontSize: 22, fontWeight: '800', letterSpacing: -0.4, marginBottom: spacing.sm },
+  errorMessage: { color: palette.textDarkSecondary, fontSize: 14, lineHeight: 21, marginBottom: spacing.xl },
+  technicalMessage: { color: palette.textDarkMuted, fontSize: 12, lineHeight: 18, marginTop: -10, marginBottom: 18 },
+  retryButton: { minHeight: 46, borderRadius: radius.lg, backgroundColor: palette.blue, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18 },
+  retryText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
+  errorIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: palette.liveSoft, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md },
+  errorIconText: { color: palette.live, fontSize: 24, lineHeight: 28, fontWeight: '800' },
 });

@@ -9,6 +9,7 @@ import { AudioPlayer } from '../media/AudioPlayer';
 import { VideoPlayer } from '../media/VideoPlayer';
 import { MediaPreviewModal, type PreviewableMedia } from '../media/MediaPreviewModal';
 import { ContentReportSheet } from '../engagement/ContentReportSheet';
+import { InlineCommentsSheet } from '../engagement/InlineCommentsSheet';
 import type { MediaAsset, Post, SocialPost } from '@/types/content';
 
 type PublicIdentityBadge = {
@@ -92,6 +93,7 @@ export function PostCard({
   const [hasSaved, setHasSaved] = useState(Boolean(postAsAny.viewer_bookmarked));
   const [preview, setPreview] = useState<PreviewableMedia | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
 
   useEffect(() => {
     setHasLiked(Boolean(postAsAny.viewer_reaction));
@@ -384,7 +386,10 @@ export function PostCard({
           {canEngage ? (
             <View style={styles.actionGroup}>
               <Pressable
-                onPress={onComment || onReply}
+                onPress={(event) => {
+                  event.stopPropagation?.();
+                  setCommentsOpen(true);
+                }}
                 hitSlop={6}
                 style={({ pressed }) => [styles.actionButton, pressed ? { backgroundColor: colors.bgSecondary } : null]}
                 accessibilityRole="button"
@@ -437,6 +442,16 @@ export function PostCard({
         </View>
       </Pressable>
       <MediaPreviewModal media={preview} visible={Boolean(preview)} onClose={() => setPreview(null)} />
+      <InlineCommentsSheet
+        visible={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        contentId={post.id}
+        context={isExpressionPost ? 'current' : 'public'}
+        title="Comments"
+        subtitle="Keep this post and its media in view while you read and reply."
+        returnTo={isExpressionPost && postExpressionId ? `/expressions/${postExpressionId}/feed` : '/general'}
+        onViewAll={onComment || onReply}
+      />
       <ContentReportSheet
         target={reportOpen ? {
           contentId: post.id,

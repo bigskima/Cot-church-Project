@@ -19,7 +19,7 @@ function inSelectedExperience(row: any, selectedExpressionId: string | null, key
 
 function emptySignals(): FeedSignals {
   return {
-    followedOrganizationIds: new Set(), followedExpressionIds: new Set(), followedLeaderProfileIds: new Set(),
+    followedOrganizationIds: new Set(), followedExpressionIds: new Set(), followedAuthorProfileIds: new Set(),
     reactedContentIds: new Set(), bookmarkedContentIds: new Set(), completedContentIds: new Set(), inProgressContentIds: new Set(),
   };
 }
@@ -89,7 +89,7 @@ Deno.serve(createHandler(
       ? uuid(requestedExpressionId, "expressionId", true)!
       : null;
 
-    let selectedExpression: { id: string; name: string } | null = null;
+    let selectedExpression: { id: string; name: string; avatar_url: string | null; banner_url: string | null } | null = null;
     if (selectedExpressionId) {
       if (!userId || !authenticatedClient) {
         throw new ApiError("EXPRESSION_ACCESS_DENIED", "Sign in and join this Expression to view its member feed", 403);
@@ -109,13 +109,13 @@ Deno.serve(createHandler(
 
       const { data: branch, error: branchError } = await admin
         .from("branches")
-        .select("id,name,is_active")
+        .select("id,name,avatar_url,banner_url,is_active")
         .eq("id", selectedExpressionId)
         .eq("organization_id", organizationId)
         .eq("is_active", true)
         .maybeSingle();
       if (branchError || !branch) throw new ApiError("EXPRESSION_NOT_FOUND", "This Expression is unavailable", 404);
-      selectedExpression = { id: branch.id, name: branch.name };
+      selectedExpression = { id: branch.id, name: branch.name, avatar_url: branch.avatar_url, banner_url: branch.banner_url };
     }
 
     // General mode deliberately uses the anonymous client even when a valid session is
@@ -140,7 +140,7 @@ Deno.serve(createHandler(
     const [streamsResult, postsResult, reelsResult, videosResult, sermonsResult, eventsResult] = await Promise.all([
       client
         .from("live_streams")
-        .select("id,organization_id,branch_id,title,description,status,visibility,scheduled_start,started_at,ended_at,recording_url,thumbnail_url,viewer_count,playback_url,playback_token_required,created_at")
+        .select("id,organization_id,branch_id,title,description,status,visibility,scheduled_start,started_at,ended_at,recording_url,thumbnail_url,playback_url,playback_token_required,created_at")
         .eq("organization_id", organizationId)
         .in("status", ["scheduled", "provisioning", "ready", "live", "ended", "processing", "replay_ready"])
         .order("scheduled_start", { ascending: false, nullsFirst: false })
@@ -177,13 +177,38 @@ Deno.serve(createHandler(
 
     ]);
 
-    const streams = resultData<any[]>(streamsResult as any, "live", degraded)
-      .filter((row) => inSelectedExperience(row, selectedExpressionId, "branch_id"))
-      .map((stream) => ({
-        ...stream,
-        playback_url: stream.playback_token_required ? null : stream.playback_url,
-        recording_url: stream.playback_token_required ? null : stream.recording_url,
-      }));
+    let streams = resultData<any[]>(streamsResult as any, "live", degraded)
+      .filter((row) => inSelectedExperience(row, selectedExpressionId, "branch_id"));
+
+    const activeViewerCounts = new Map<string, number>();
+    let viewerCountsAvailable = true;
+    const liveIds = streams.filter((stream) => stream.status === "live").map((stream) => stream.id);
+    if (liveIds.length) {
+      const heartbeatCutoff = new Date(Date.now() - 90_000).toISOString();
+      const { data: viewers, error: viewerError } = await admin
+        .from("stream_viewer_sessions")
+        .select("stream_id")
+        .in("stream_id", liveIds)
+        .is("left_at", null)
+        .gte("last_heartbeat_at", heartbeatCutoff);
+      if (viewerError) {
+        viewerCountsAvailable = false;
+        degraded.push("live viewers");
+      } else {
+        for (const viewer of viewers ?? []) {
+          activeViewerCounts.set(viewer.stream_id, (activeViewerCounts.get(viewer.stream_id) ?? 0) + 1);
+        }
+      }
+    }
+
+    streams = streams.map((stream) => ({
+      ...stream,
+      playback_url: stream.playback_token_required ? null : stream.playback_url,
+      recording_url: stream.playback_token_required ? null : stream.recording_url,
+      ...(stream.status === "live" && viewerCountsAvailable
+        ? { viewer_count: activeViewerCounts.get(stream.id) ?? 0 }
+        : {}),
+    }));
     let posts = resultData<any[]>(postsResult as any, "posts", degraded);
     posts = await enrichSocialPosts(posts);
     posts = filterByAuthor(posts, safety.hiddenFromFeed, (post: any) => post.author?.id);
@@ -230,7 +255,7 @@ Deno.serve(createHandler(
     if (!selectedExpressionId && userId) {
       const signals = emptySignals();
       const [followsResult, reactionsResult, bookmarksResult, progressResult] = await Promise.all([
-        admin.from("follows").select("organization_id,expression_id,leader:leaders(profile_id)").eq("profile_id", userId),
+        admin.from("follows").select("organization_id,expression_id,target_profile_id,leader:leaders(profile_id)").eq("profile_id", userId),
         admin.from("content_reactions").select("content_item_id").eq("profile_id", userId).limit(500),
         admin.from("content_bookmarks").select("content_item_id").eq("profile_id", userId).limit(500),
         admin.from("content_playback_progress").select("content_item_id,completed,progress_seconds").eq("profile_id", userId).limit(500),
@@ -239,8 +264,9 @@ Deno.serve(createHandler(
         for (const follow of followsResult.data ?? []) {
           if (follow.organization_id) signals.followedOrganizationIds.add(follow.organization_id);
           if (follow.expression_id) signals.followedExpressionIds.add(follow.expression_id);
+          if (follow.target_profile_id) signals.followedAuthorProfileIds.add(follow.target_profile_id);
           const leader = nestedItem(follow.leader);
-          if (leader?.profile_id) signals.followedLeaderProfileIds.add(leader.profile_id);
+          if (leader?.profile_id) signals.followedAuthorProfileIds.add(leader.profile_id);
         }
         for (const row of reactionsResult.data ?? []) signals.reactedContentIds.add(row.content_item_id);
         for (const row of bookmarksResult.data ?? []) signals.bookmarkedContentIds.add(row.content_item_id);

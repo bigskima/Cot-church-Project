@@ -27,6 +27,7 @@ type StreamingReadiness = {
   reason?: string | null;
   providerCode?: string;
   signedPlaybackConfigured?: boolean;
+  testMode?: boolean;
 };
 
 type BroadcastScope = 'public' | 'expression';
@@ -267,10 +268,17 @@ export default function MediaStudioScreen() {
             <View style={styles.flex}>
               <Text style={[styles.cardTitle, { color: colors.text }]}>Live broadcasting</Text>
               <Text style={[styles.helper, { color: colors.textSecondary }]}>
-                {providerReady ? `Ready for ${destinationName}.` : 'Temporarily unavailable. Existing broadcasts remain visible.'}
+                {providerReady
+                  ? readiness.data?.testMode
+                    ? `Ready for ${destinationName} in test broadcast mode.`
+                    : `Ready for ${destinationName}.`
+                  : 'Temporarily unavailable. Existing broadcasts remain visible.'}
               </Text>
             </View>
-            <Badge label={providerReady ? 'AVAILABLE' : 'TEMPORARILY UNAVAILABLE'} variant={providerReady ? 'active' : 'neutral'} />
+            <Badge
+              label={providerReady ? (readiness.data?.testMode ? 'TEST MODE' : 'AVAILABLE') : 'TEMPORARILY UNAVAILABLE'}
+              variant={providerReady ? (readiness.data?.testMode ? 'warning' : 'active') : 'neutral'}
+            />
           </View>
 
           <View style={styles.listSection}>
