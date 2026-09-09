@@ -400,6 +400,10 @@ export default function HomeScreen() {
                     expressionName={item.post.expression?.name}
                     canEngage={canEngage}
                     allowExternalShare={item.post.visibility === 'public'}
+                    onPressAuthor={item.post.author?.username ? () => router.push({
+                      pathname: '/general/member/[username]',
+                      params: { username: item.post.author!.username! },
+                    } as any) : undefined}
                     onPress={() => openPost(item.post.id)}
                     onReply={() => openPost(item.post.id, true)}
                     onReact={canEngage ? (reaction) => reactToPost(item.post.id, reaction) : undefined}
