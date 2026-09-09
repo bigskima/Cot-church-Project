@@ -17,9 +17,10 @@ export interface VideoCardProps {
   dark?: boolean;
   commentContext?: InlineCommentsContext;
   onOpenComments?: () => void;
+  onPressCreator?: () => void;
 }
 
-export function VideoCard({ video, expressionName, onPress, onBookmark, style, commentContext, onOpenComments }: VideoCardProps) {
+export function VideoCard({ video, expressionName, onPress, onBookmark, style, commentContext, onOpenComments, onPressCreator }: VideoCardProps) {
   const { colors } = useTheme();
   const [commentsOpen, setCommentsOpen] = useState(false);
   const contentId = video.content_items?.id;
@@ -86,7 +87,19 @@ export function VideoCard({ video, expressionName, onPress, onBookmark, style, c
         accessibilityRole="button"
         accessibilityLabel={`Open video: ${video.title}`}
       >
-        <Avatar url={creatorAvatar} name={creatorName} size="sm" />
+        <Pressable
+          onPress={(event) => {
+            if (!onPressCreator) return;
+            event.stopPropagation?.();
+            onPressCreator();
+          }}
+          disabled={!onPressCreator}
+          hitSlop={6}
+          accessibilityRole={onPressCreator ? 'button' : undefined}
+          accessibilityLabel={onPressCreator ? `Open ${creatorName} profile` : undefined}
+        >
+          <Avatar url={creatorAvatar} name={creatorName} size="sm" />
+        </Pressable>
         <View style={styles.textColumn}>
           <Text style={[styles.title, { color: colors.text }]} numberOfLines={2}>{video.title}</Text>
           <Text style={[styles.metaText, { color: colors.textSecondary }]} numberOfLines={1}>
