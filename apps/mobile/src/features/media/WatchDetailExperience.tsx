@@ -20,6 +20,7 @@ import {
   Button,
   ContentReportSheet,
   Icon,
+  InlineCommentsSheet,
   ResourceError,
   ScreenHeader,
   VideoCard,
@@ -46,6 +47,7 @@ export function WatchDetailExperience({ videoId: id, scope = 'general' }: { vide
   const [isSaved, setIsSaved] = useState(false);
   const [actionError, setActionError] = useState('');
   const [reportOpen, setReportOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
   const lastSyncedSecond = useRef(0);
   const expressionMode = scope === 'expression';
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
@@ -305,11 +307,7 @@ export function WatchDetailExperience({ videoId: id, scope = 'general' }: { vide
                     setActionError('Comments are not available for this video yet.');
                     return;
                   }
-                  router.push(
-                    expressionMode && context?.expression?.id
-                      ? ({ pathname: `/expressions/${context.expression.id}/comments/[contentId]`, params: { contentId } } as any)
-                      : ({ pathname: '/general/comments/[contentId]', params: { contentId } } as any),
-                  );
+                  setCommentsOpen(true);
                 }}
                 style={styles.actionBtn}
               >
@@ -341,7 +339,13 @@ export function WatchDetailExperience({ videoId: id, scope = 'general' }: { vide
                     <VideoCard
                       key={v.id}
                       video={v}
+                      commentContext={expressionMode ? 'current' : 'public'}
                       onPress={() => router.push((expressionMode && context?.expression?.id ? `/expressions/${context.expression.id}/videos/${v.id}` : `/general/watch/${v.id}`) as any)}
+                      onOpenComments={v.content_items?.id ? () => router.push(
+                        expressionMode && context?.expression?.id
+                          ? ({ pathname: `/expressions/${context.expression.id}/comments/[contentId]`, params: { contentId: v.content_items!.id } } as any)
+                          : ({ pathname: '/general/comments/[contentId]', params: { contentId: v.content_items!.id } } as any),
+                      ) : undefined}
                     />
                   ))}
                 </View>
@@ -350,6 +354,21 @@ export function WatchDetailExperience({ videoId: id, scope = 'general' }: { vide
           </View>
         </ScrollView>
       ) : null}
+
+      <InlineCommentsSheet
+        visible={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        contentId={contentId}
+        context={expressionMode ? 'current' : 'public'}
+        title="Video comments"
+        subtitle="Keep watching while the conversation stays with this video."
+        returnTo={expressionMode && context?.expression?.id ? `/expressions/${context.expression.id}/videos/${id}` : `/general/watch/${id}`}
+        onViewAll={contentId ? () => router.push(
+          expressionMode && context?.expression?.id
+            ? ({ pathname: `/expressions/${context.expression.id}/comments/[contentId]`, params: { contentId } } as any)
+            : ({ pathname: '/general/comments/[contentId]', params: { contentId } } as any),
+        ) : undefined}
+      />
 
       <ContentReportSheet
         target={reportOpen && contentId ? {
