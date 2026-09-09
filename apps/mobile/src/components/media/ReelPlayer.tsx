@@ -56,9 +56,11 @@ export function ReelPlayer({
   const [isBuffering, setIsBuffering] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
 
+  const streamRendition = reel.media_assets?.renditions?.find((r) => r.rendition_kind === 'video_stream');
   const videoUrl =
-    reel.media_assets?.renditions?.find((r) => r.rendition_kind === 'video_stream')?.storage_path ||
-    reel.media_assets?.url;
+    reel.media_assets?.url ||
+    streamRendition?.playbackUrl ||
+    streamRendition?.storage_path;
   const thumbnailUrl = reel.media_assets?.thumbnailUrl || reel.media_assets?.url;
   const contentIdentity = reel.content_items;
   const contentId = contentIdentity?.id;
