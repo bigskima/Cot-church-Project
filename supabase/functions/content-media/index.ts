@@ -111,7 +111,7 @@ Deno.serve(createHandler(
         .maybeSingle();
       if (error) throw new ApiError("VIDEO_DETAIL_FAILED", "Unable to retrieve this Expression video", 500, undefined, false);
       if (!data) throw new ApiError("VIDEO_NOT_FOUND", "This video is not available in the active Expression", 404);
-      const [enriched] = await enrichContentCreators([data]);
+      const [enriched] = await enrichContentCreators([data], auth.client);
       return { data: enriched };
     }
 

@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { invalidateAfterMutation } from './services/resource-invalidation';
 import * as SecureStore from 'expo-secure-store';
 
 const SESSION_KEY = 'church-os-session';
@@ -210,6 +211,9 @@ export class ApiClient {
       if (!response.ok) {
         const code = payload.error?.code ?? 'REQUEST_FAILED';
         throw new ApiError(code, userFacingApiMessage(code, response.status, payload.error?.message), response.status);
+      }
+      if (['POST', 'PATCH', 'PUT', 'DELETE'].includes((fetchInit.method ?? 'GET').toUpperCase())) {
+        invalidateAfterMutation(cleanPath, fetchInit.body);
       }
       return payload.data as T;
     } catch (error) {

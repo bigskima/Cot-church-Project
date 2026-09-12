@@ -38,6 +38,7 @@
   "devDependencies": {
     "@types/react": "latest",
     "@types/react-native": "latest",
+    "react-test-renderer": "19.2.3",
     "typescript": "latest"
   }
 }

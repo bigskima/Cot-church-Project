@@ -1,7 +1,7 @@
-type Entry<T> = { value: T; storedAt: number };
+type Entry<T> = { value: T; storedAt: number; invalidated?: boolean };
 export type CacheSnapshot<T> = { value: T | undefined; stale: boolean; storedAt?: number };
 
-type InvalidationListener = (prefix: string) => void;
+type InvalidationListener = (prefix: string, evicted: boolean) => void;
 
 const memory = new Map<string, Entry<unknown>>();
 const invalidationListeners = new Set<InvalidationListener>();
@@ -11,7 +11,7 @@ export function cacheSnapshot<T>(key: string, maxAgeMs = 300_000): CacheSnapshot
   if (!hit) return { value: undefined, stale: false };
   return {
     value: hit.value,
-    stale: Date.now() - hit.storedAt >= maxAgeMs,
+    stale: hit.invalidated === true || Date.now() - hit.storedAt >= maxAgeMs,
     storedAt: hit.storedAt,
   };
 }
@@ -33,8 +33,17 @@ export function subscribeInvalidation(listener: InvalidationListener) {
 }
 
 export function invalidate(prefix: string) {
+  for (const [key, entry] of memory) {
+    if (key.startsWith(prefix)) entry.invalidated = true;
+  }
+  for (const listener of invalidationListeners) listener(prefix, false);
+}
+
+// Authentication/scope transitions must discard private data. Background updates
+// use invalidate instead, keeping players, scroll position and comments mounted.
+export function evict(prefix = '') {
   for (const key of memory.keys()) {
     if (key.startsWith(prefix)) memory.delete(key);
   }
-  for (const listener of invalidationListeners) listener(prefix);
+  for (const listener of invalidationListeners) listener(prefix, true);
 }

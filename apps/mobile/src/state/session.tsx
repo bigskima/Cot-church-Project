@@ -2,7 +2,7 @@ import { AppState } from 'react-native';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
 import { ApiClient, ApiError, apiUrl, loadAuth, saveAuth, type StoredAuth } from '../api';
 import type { MembershipContext } from '../types/content';
-import { invalidate } from '../services/query-cache';
+import { evict } from '../services/query-cache';
 
 type Mode = 'restoring' | 'visitor' | 'authenticated';
 type ContextStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -48,9 +48,7 @@ const SessionContext = createContext<Value | null>(null);
 const REFRESH_SKEW_SECONDS = 120;
 
 function clearContextResources() {
-  for (const prefix of ['expression:', 'mobile:home-feed:', 'mobile:community:', 'live:discovery:', 'watch:catalogue:', 'reels:immersive:']) {
-    invalidate(prefix);
-  }
+  evict();
 }
 
 function sessionNeedsRefresh(value: StoredAuth) {
@@ -162,6 +160,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
       return refreshed;
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
+        clearContextResources();
         setContext(null);
         await persist(null);
         return null;
@@ -437,7 +436,11 @@ export function SessionProvider({ children }: PropsWithChildren) {
         hasPublicCapability,
         updateContextProfile,
         api,
-        authenticate: persist,
+        authenticate: async (value) => {
+          clearContextResources();
+          setContext(null);
+          await persist(value);
+        },
         setSession,
         login,
         continueAsVisitor: async () => {

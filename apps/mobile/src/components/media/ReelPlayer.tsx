@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -50,7 +50,7 @@ export function ReelPlayer({
   onPressCreator,
   containerHeight,
 }: ReelPlayerProps) {
-  const { context } = useSession();
+  const { mode } = useSession();
   const [isPlaying, setIsPlaying] = useState(true);
   const [isLiked, setIsLiked] = useState(initialLiked);
   const [isSaved, setIsSaved] = useState(initialSaved);
@@ -67,7 +67,7 @@ export function ReelPlayer({
   const contentIdentity = reel.content_items;
   const contentId = contentIdentity?.id;
   const creator = contentIdentity?.author;
-  const expressionMode = Boolean(contentIdentity?.expression?.id || context?.expression?.id);
+  const expressionMode = Boolean(contentIdentity?.expression_id && contentIdentity.visibility !== 'public');
   const commentContext = expressionMode ? 'current' : 'public';
   const resolvedExpressionName = expressionName || contentIdentity?.expression?.name || undefined;
   const creatorName = creator?.display_name || resolvedExpressionName || contentIdentity?.organization?.name || 'City of Transformation';
@@ -104,11 +104,29 @@ export function ReelPlayer({
     if (isPlaying) player.pause(); else player.play();
   };
 
-  useEffect(() => setIsLiked(initialLiked), [initialLiked, reel.id]);
-  useEffect(() => setIsSaved(initialSaved), [initialSaved, reel.id]);
+  const likePending = useRef(false);
+  const savePending = useRef(false);
+  useEffect(() => { if (!likePending.current) setIsLiked(initialLiked); }, [initialLiked, reel.id]);
+  useEffect(() => { if (!savePending.current) setIsSaved(initialSaved); }, [initialSaved, reel.id]);
 
-  const toggleLike = async () => setIsLiked(onLike ? await onLike(isLiked) : !isLiked);
-  const toggleSave = async () => setIsSaved(onSave ? await onSave(isSaved) : !isSaved);
+  const toggleLike = async () => {
+    if (likePending.current) return;
+    const previous = isLiked;
+    likePending.current = true;
+    if (mode === 'authenticated') setIsLiked(!previous);
+    try { setIsLiked(onLike ? await onLike(previous) : previous); }
+    catch { setIsLiked(previous); }
+    finally { likePending.current = false; }
+  };
+  const toggleSave = async () => {
+    if (savePending.current) return;
+    const previous = isSaved;
+    savePending.current = true;
+    if (mode === 'authenticated') setIsSaved(!previous);
+    try { setIsSaved(onSave ? await onSave(previous) : previous); }
+    catch { setIsSaved(previous); }
+    finally { savePending.current = false; }
+  };
 
   const handleShare = async () => {
     if (onShare) { await onShare(); return; }
@@ -142,7 +160,7 @@ export function ReelPlayer({
         <View style={styles.actionRail}>
           <Pressable onPress={toggleLike} hitSlop={6} style={styles.actionBtn} accessibilityRole="button" accessibilityLabel="Like reel">
             <View style={[styles.actionCircle, isLiked && styles.likedCircle]}><Icon name={isLiked ? 'heart' : 'heart-outline'} size={24} color={isLiked ? '#EF4444' : '#FFFFFF'} /></View>
-            <Text style={styles.actionLabel}>{Math.max(0, reel.likes_count + (isLiked ? 1 : 0) - (initialLiked ? 1 : 0))}</Text>
+            <Text style={styles.actionLabel}>{Math.max(0, (reel.likes_count ?? 0) + (isLiked ? 1 : 0) - (initialLiked ? 1 : 0))}</Text>
           </Pressable>
 
           <Pressable onPress={openInlineComments} hitSlop={6} style={styles.actionBtn} accessibilityRole="button" accessibilityLabel="Comments">
@@ -197,7 +215,7 @@ export function ReelPlayer({
         context={commentContext}
         title="Comments"
         subtitle="Keep watching while the conversation stays on this Reel."
-        returnTo={expressionMode && context?.expression?.id ? `/expressions/${context.expression.id}/reels` : '/general/reels'}
+        returnTo={expressionMode && contentIdentity?.expression_id ? `/expressions/${contentIdentity.expression_id}/reels` : '/general/reels'}
         onViewAll={onOpenComments}
       />
     </View>

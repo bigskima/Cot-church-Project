@@ -65,7 +65,7 @@ Deno.serve(createHandler(
       if (auth?.user && item?.author_profile_id) {
         await assertProfilesMayInteract(admin, auth.user.id, item.author_profile_id);
       }
-      const [enriched] = await enrichContentCreators([data]);
+      const [enriched] = await enrichContentCreators([data], client);
       return { data: enriched };
     }
 
@@ -117,7 +117,7 @@ Deno.serve(createHandler(
       }
 
       const [sermons, videos, reels, events, leaders] = await Promise.all([
-        client.from("sermons").select("id,organization_id,expression_id,series_id,title,slug,preacher,sermon_date,scripture_references,topics,description,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,duration_seconds,status,visibility,is_featured,play_count,published_at").eq("expression_id", expressionId).eq("visibility", "public").eq("status", "published").order("published_at", { ascending: false }).limit(30),
+        client.from("sermons").select("id,organization_id,expression_id,content_item_id,series_id,title,slug,preacher,sermon_date,scripture_references,topics,description,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,duration_seconds,status,visibility,is_featured,play_count,published_at").eq("expression_id", expressionId).eq("visibility", "public").eq("status", "published").order("published_at", { ascending: false }).limit(30),
         client.from("videos").select("id,organization_id,media_asset_id,series_id,title,slug,description,category,chapters,views_count,likes_count,comments_count,shares_count,created_at,content_items!inner(id,organization_id,expression_id,author_profile_id,visibility,status,published_at),media_assets(id,media_type,duration_seconds,aspect_ratio,media_renditions(id,rendition_kind,container,codec,width,height,storage_path,provider_playback_id),media_thumbnails(storage_path,is_primary))").eq("content_items.expression_id", expressionId).eq("content_items.visibility", "public").eq("content_items.status", "published").order("created_at", { ascending: false }).limit(30),
         client.from("reels").select("id,organization_id,media_asset_id,caption,audio_title,audio_artist,views_count,likes_count,comments_count,shares_count,created_at,content_items!inner(id,organization_id,expression_id,author_profile_id,visibility,status,published_at),media_assets(id,media_type,duration_seconds,aspect_ratio,media_renditions(id,rendition_kind,container,codec,width,height,storage_path,provider_playback_id),media_thumbnails(storage_path,is_primary))").eq("content_items.expression_id", expressionId).eq("content_items.visibility", "public").eq("content_items.status", "published").order("created_at", { ascending: false }).limit(30),
         client.from("events").select("id,organization_id,branch_id,title,description,starts_at,ends_at,location,capacity,visibility").eq("branch_id", expressionId).eq("visibility", "public").gte("ends_at", new Date().toISOString()).order("starts_at").limit(30),
@@ -134,8 +134,8 @@ Deno.serve(createHandler(
         data: {
           expression,
           sermons: visibleExpressionSermons,
-          videos: await enrichContentCreators(visibleExpressionVideos),
-          reels: await enrichContentCreators(visibleExpressionReels),
+          videos: await enrichContentCreators(visibleExpressionVideos, client),
+          reels: await enrichContentCreators(visibleExpressionReels, client),
           events: events.data ?? [],
           leaders: visibleExpressionLeaders.map((leader) => ({
             id: leader.id,
@@ -174,7 +174,7 @@ Deno.serve(createHandler(
       const { data, error } = await query;
       if (error) throw new ApiError("PUBLIC_REELS_FAILED", "Unable to retrieve public reels", 500, undefined, false);
       const visible = filterByAuthor(data ?? [], safety.hiddenFromFeed, (row: any) => nestedItem(row.content_items)?.author_profile_id);
-      return { data: await enrichContentCreators(visible) };
+      return { data: await enrichContentCreators(visible, client) };
     }
 
     if (type === "videos") {
@@ -197,7 +197,7 @@ Deno.serve(createHandler(
       const { data, error } = await query;
       if (error) throw new ApiError("PUBLIC_VIDEOS_FAILED", "Unable to retrieve public videos", 500, undefined, false);
       const visible = filterByAuthor(data ?? [], safety.hiddenFromFeed, (row: any) => nestedItem(row.content_items)?.author_profile_id);
-      return { data: await enrichContentCreators(visible) };
+      return { data: await enrichContentCreators(visible, client) };
     }
 
     if (type === "sermons") {

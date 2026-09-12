@@ -18,6 +18,7 @@
     "mobile:build:web": "npm --workspace @church/mobile run build:web",
     "mobile:typecheck": "npm --workspace @church/mobile run typecheck",
     "apps:check": "node scripts/check-apps.mjs",
+    "mobile:test:resources": "node --test scripts/test-resource-behavior.mjs",
     "check": "npm run foundation:check && npm run api:check && npm run apps:check && npm run services:check",
     "foundation:check": "node scripts/check-foundation.mjs",
     "supabase:start": "supabase start",
