@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
 import { Image, Pressable, Share, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { useTheme } from '@/state/theme';
@@ -95,32 +95,45 @@ export function PostCard({
   const [reportOpen, setReportOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
 
+  const likePending = useRef(false);
+  const savePending = useRef(false);
+
   useEffect(() => {
-    setHasLiked(Boolean(postAsAny.viewer_reaction));
-    setLikeCount(postAsAny.likes_count ?? (post.social_reactions?.length || 0));
-    setHasSaved(Boolean(postAsAny.viewer_bookmarked));
+    if (!likePending.current) {
+      setHasLiked(Boolean(postAsAny.viewer_reaction));
+      setLikeCount(postAsAny.likes_count ?? (post.social_reactions?.length || 0));
+    }
+    if (!savePending.current) setHasSaved(Boolean(postAsAny.viewer_bookmarked));
   }, [post.id, postAsAny.viewer_reaction, postAsAny.viewer_bookmarked, postAsAny.likes_count, post.social_reactions]);
 
   const handleLike = async () => {
-    if (!canEngage || (!onReact && !onLike)) return;
+    if (!canEngage || (!onReact && !onLike) || likePending.current) return;
+    const previousLiked = hasLiked;
+    const previousCount = likeCount;
     const nextLiked = !hasLiked;
-    if (onReact) {
-      const saved = await onReact(nextLiked ? 'like' : null);
-      if (saved === false) return;
-    } else if (nextLiked) {
-      onLike?.();
-    } else {
-      return;
-    }
+    if (!onReact && !nextLiked) return;
+    likePending.current = true;
     setHasLiked(nextLiked);
-    setLikeCount((count: number) => Math.max(0, count + (nextLiked ? 1 : -1)));
+    setLikeCount(Math.max(0, previousCount + (nextLiked ? 1 : -1)));
+    try {
+      if (onReact) {
+        if (await onReact(nextLiked ? 'like' : null) === false) throw new Error('Reaction was not saved');
+      } else onLike?.();
+    } catch {
+      setHasLiked(previousLiked);
+      setLikeCount(previousCount);
+    } finally { likePending.current = false; }
   };
 
   const handleSave = async () => {
-    if (!canEngage || !onBookmark) return;
-    const saved = await onBookmark(hasSaved);
-    if (saved === false) return;
-    setHasSaved(!hasSaved);
+    if (!canEngage || !onBookmark || savePending.current) return;
+    const previous = hasSaved;
+    savePending.current = true;
+    setHasSaved(!previous);
+    try {
+      if (await onBookmark(previous) === false) setHasSaved(previous);
+    } catch { setHasSaved(previous); }
+    finally { savePending.current = false; }
   };
 
   const handleNativeShare = async () => {

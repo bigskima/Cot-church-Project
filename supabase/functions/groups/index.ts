@@ -7,6 +7,7 @@ import { assertNoUnknownFields, assertObject, optionalString, requiredString, uu
 
 const scopes = new Set(["expression", "church", "all"]);
 const visibilities = new Set(["members", "private"]);
+const joinPolicies = new Set(["open", "approval", "invite"]);
 
 async function hasScopedPermission(auth: any, permission: string, branchId: string | null) {
   const { data, error } = await auth.client.rpc("has_permission", {
@@ -51,9 +52,9 @@ Deno.serve(createHandler(
         throw new ApiError("EXPRESSION_REQUIRED", "Select or join an Expression to view its groups", 400);
       }
 
-      let query = admin
+      let query = auth.client
         .from("groups")
-        .select("id,branch_id,ministry_id,name,description,visibility,capacity,meeting_schedule,is_active,created_at,updated_at")
+        .select("id,branch_id,ministry_id,name,description,visibility,join_policy,created_by,capacity,meeting_schedule,is_active,created_at,updated_at")
         .eq("organization_id", auth.organizationId)
         .eq("is_active", true)
         .order("name");
@@ -75,15 +76,20 @@ Deno.serve(createHandler(
       if (ownError) throw new ApiError("GROUP_MEMBERSHIP_LOOKUP_FAILED", "Unable to resolve your group memberships", 500, undefined, false);
       const ownMap = new Map((ownMemberships ?? []).map((membership: any) => [membership.group_id, membership]));
 
+      const manageByGroup = new Map(await Promise.all(rows.map(async (group: any) => [group.id,
+        group.created_by === auth.user.id ||
+        (ownMap.get(group.id) as any)?.is_leader === true && (ownMap.get(group.id) as any)?.status === "active" ||
+        await hasScopedPermission(auth, "groups.members.manage", group.branch_id),
+      ] as const)));
       let pendingRequests: any[] = [];
       const includeManagement = url.searchParams.get("includeManagement") === "true";
       if (includeManagement && groupIds.length) {
-        const targetBranch = requestedScope === "expression" ? auth.branchId : null;
-        if (await hasScopedPermission(auth, "groups.members.manage", targetBranch)) {
+        const managedIds = groupIds.filter((id: string) => manageByGroup.get(id));
+        if (managedIds.length) {
           const { data: requests, error: requestError } = await admin
             .from("group_memberships")
             .select("id,group_id,membership_id,status,is_leader,requested_at,responded_at")
-            .in("group_id", groupIds)
+            .in("group_id", managedIds)
             .eq("status", "requested")
             .order("requested_at", { ascending: true });
           if (requestError) throw new ApiError("GROUP_REQUEST_LIST_FAILED", "Unable to retrieve pending group requests", 500, undefined, false);
@@ -104,7 +110,7 @@ Deno.serve(createHandler(
       return {
         data: {
           scope: requestedScope,
-          groups: rows.map((group) => ({ ...group, myMembership: ownMap.get(group.id) ?? null })),
+          groups: rows.map((group) => ({ ...group, myMembership: ownMap.get(group.id) ?? null, canManageMembers: manageByGroup.get(group.id) === true })),
           pendingRequests,
         },
       };
@@ -144,7 +150,7 @@ Deno.serve(createHandler(
       return { data };
     }
 
-    assertNoUnknownFields(body, ["id", "name", "description", "branchId", "ministryId", "visibility", "capacity", "meetingSchedule", "isActive"]);
+    assertNoUnknownFields(body, ["id", "name", "description", "branchId", "ministryId", "visibility", "joinPolicy", "capacity", "meetingSchedule", "isActive"]);
 
     let targetBranchId: string | null;
     if (request.method === "POST") {
@@ -186,6 +192,12 @@ Deno.serve(createHandler(
       if (!visibilities.has(visibility)) throw new ApiError("VALIDATION_FAILED", "visibility must be members or private", 422);
       record.visibility = visibility;
     }
+    if (body.joinPolicy !== undefined) {
+      const policy = requiredString(body.joinPolicy, "joinPolicy", 20);
+      if (!joinPolicies.has(policy)) throw new ApiError("VALIDATION_FAILED", "Invalid group joining policy", 422);
+      record.join_policy = policy;
+    }
+    if (record.visibility === "private") record.join_policy = "invite";
     const capacity = capacityValue(body.capacity);
     if (capacity !== undefined) record.capacity = capacity;
     const schedule = scheduleValue(body.meetingSchedule);

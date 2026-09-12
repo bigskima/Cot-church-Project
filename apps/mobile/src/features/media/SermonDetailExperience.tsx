@@ -86,7 +86,7 @@ export function SermonDetailExperience({ sermonId: id, scope = 'general' }: { se
       }
 
       const sermon = await api.request<Sermon>(`sermons?id=${encodeURIComponent(id)}`, { signal });
-      if (sermon.expression_id !== activeExpressionId) {
+      if (!sermon || sermon.expression_id !== activeExpressionId) {
         throw new Error('This sermon is not part of this Expression.');
       }
       return sermon;

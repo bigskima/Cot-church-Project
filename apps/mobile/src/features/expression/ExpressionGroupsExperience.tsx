@@ -24,6 +24,8 @@ type Group = {
   name: string;
   description: string;
   visibility: 'members' | 'private';
+  join_policy: 'open' | 'approval' | 'invite';
+  canManageMembers: boolean;
   capacity: number | null;
   meeting_schedule: Record<string, unknown>;
   is_active: boolean;
@@ -55,8 +57,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: {
   const { colors } = useTheme();
   const expression = context?.expression;
   const canManageGroups = hasCapability('groups.manage');
-  const canManageMembers = hasCapability('groups.members.manage');
-  const includeManagement = canManageMembers ? '&includeManagement=true' : '';
+  const includeManagement = '&includeManagement=true';
 
   const resource = useResource<GroupPayload>(
     `expression:groups:${expression?.id ?? 'none'}:${includeManagement}`,
@@ -72,6 +73,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [visibility, setVisibility] = useState<'members' | 'private'>('members');
+  const [joinPolicy, setJoinPolicy] = useState<'open' | 'approval'>('open');
   const [capacity, setCapacity] = useState('');
   const [meetingNote, setMeetingNote] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -92,11 +94,11 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: {
     setActionError('');
     setFeedback('');
     try {
-      await api.request('groups', {
+      const result = await api.request<GroupMembership>('groups', {
         method: 'POST',
         body: JSON.stringify({ action: 'request_membership', groupId }),
       });
-      setFeedback('Membership request sent to the group leaders.');
+      setFeedback(result.status === 'active' ? 'You have joined the group.' : 'Membership request sent to the group leaders.');
       resource.refresh();
     } catch (value) {
       setActionError(value instanceof Error ? value.message : 'Unable to request group membership.');
@@ -144,6 +146,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: {
           name: name.trim(),
           description: description.trim(),
           visibility,
+          joinPolicy: visibility === 'private' ? 'invite' : joinPolicy,
           capacity: parsedCapacity,
           meetingSchedule: meetingNote.trim() ? { summary: meetingNote.trim() } : {},
         }),
@@ -153,6 +156,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: {
       setCapacity('');
       setMeetingNote('');
       setVisibility('members');
+      setJoinPolicy('open');
       setCreateOpen(false);
       setFeedback(`Group created inside ${expression?.name ?? 'this Expression'}.`);
       resource.refresh();
@@ -288,13 +292,13 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: {
                 ) : null}
 
                 <View style={styles.actionRow}>
-                  {!membership && group.visibility === 'members' ? <Button label="Request to Join" onPress={() => void requestMembership(group.id)} loading={busyId === group.id} variant="primary" size="sm" /> : null}
-                  {membership?.status === 'declined' || membership?.status === 'removed' ? <Button label="Request Again" onPress={() => void requestMembership(group.id)} loading={busyId === group.id} variant="outline" size="sm" /> : null}
+                  {!membership && group.visibility === 'members' && group.join_policy !== 'invite' ? <Button label={group.join_policy === 'open' ? 'Join group' : 'Request to join'} onPress={() => void requestMembership(group.id)} loading={busyId === group.id} variant="primary" size="sm" /> : null}
+                  {(membership?.status === 'declined' || membership?.status === 'removed') && group.visibility !== 'private' && group.join_policy !== 'invite' ? <Button label="Request Again" onPress={() => void requestMembership(group.id)} loading={busyId === group.id} variant="outline" size="sm" /> : null}
                   {joined ? <Button label="Group chat" onPress={() => router.push(`/expressions/${expression.id}/groups/${group.id}/chat` as any)} variant="primary" size="sm" /> : null}
                   {!focusGroupId ? <Button label="Open group" onPress={() => router.push(`/expressions/${expression.id}/groups/${group.id}` as any)} variant="ghost" size="sm" /> : null}
                 </View>
 
-                {canManageMembers && requests.length ? (
+                {group.canManageMembers && requests.length ? (
                   <View style={[styles.requestsBlock, { borderTopColor: colors.borderSubtle }]}>
                     <View style={styles.requestsHeading}>
                       <View style={[styles.requestIcon, { backgroundColor: colors.primarySoft }]}><Icon name="person-add-outline" size={15} color={colors.interactive} /></View>
@@ -341,6 +345,12 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: {
           <InputField label="Description" value={description} onChangeText={setDescription} placeholder="What is this group for?" multiline numberOfLines={3} />
           <Text style={[styles.label, { color: colors.textSecondary }]}>VISIBILITY</Text>
           <View style={styles.chips}><Chip label="Expression Members" selected={visibility === 'members'} onPress={() => setVisibility('members')} /><Chip label="Private / Invite-led" selected={visibility === 'private'} onPress={() => setVisibility('private')} /></View>
+          {visibility === 'members' ? (
+            <View style={styles.actionRow}>
+              <Chip label="Open joining" selected={joinPolicy === 'open'} onPress={() => setJoinPolicy('open')} />
+              <Chip label="Leader approval" selected={joinPolicy === 'approval'} onPress={() => setJoinPolicy('approval')} />
+            </View>
+          ) : null}
           <InputField label="Capacity (Optional)" value={capacity} onChangeText={setCapacity} placeholder="Leave blank for no limit" keyboardType="number-pad" />
           <InputField label="Meeting Note (Optional)" value={meetingNote} onChangeText={setMeetingNote} placeholder="e.g. Saturdays, 5:00 PM · Fellowship Hall" />
           <Button label="Create Expression Group" onPress={() => void createGroup()} loading={saving} variant="primary" size="lg" />

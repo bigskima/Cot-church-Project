@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.57.4";
 import { adminClient } from "./supabase.ts";
+import { ApiError } from "./errors.ts";
 
 type MembershipAuthoredRow = Record<string, any> & { author_membership_id?: string | null; branch_id?: string | null; organization_id?: string | null };
 
@@ -110,15 +111,16 @@ function nestedContentItem(value: any) {
   return Array.isArray(value) ? value[0] ?? null : value ?? null;
 }
 
-export async function enrichContentCreators<T extends { content_items?: any }>(rows: T[]) {
+export async function enrichContentCreators<T extends { content_items?: any }>(rows: T[], client: SupabaseClient) {
   if (!rows.length) return rows;
   const admin = adminClient();
   const items = rows.map((row) => nestedContentItem(row.content_items)).filter(Boolean);
   const profileIds = [...new Set(items.map((item) => item.author_profile_id).filter(Boolean))] as string[];
   const expressionIds = [...new Set(items.map((item) => item.expression_id).filter(Boolean))] as string[];
   const organizationIds = [...new Set(items.map((item) => item.organization_id).filter(Boolean))] as string[];
+  const contentIds = [...new Set(items.map((item) => item.id).filter(Boolean))] as string[];
 
-  const [profilesResult, expressionsResult, organizationsResult] = await Promise.all([
+  const [profilesResult, expressionsResult, organizationsResult, engagementResult] = await Promise.all([
     profileIds.length
       ? admin.from("profiles").select("id,display_name,username,avatar_url,banner_url").in("id", profileIds)
       : Promise.resolve({ data: [] as any[], error: null }),
@@ -128,11 +130,19 @@ export async function enrichContentCreators<T extends { content_items?: any }>(r
     organizationIds.length
       ? admin.from("organizations").select("id,name,status").in("id", organizationIds).eq("status", "active")
       : Promise.resolve({ data: [] as any[], error: null }),
+    // Media counters are legacy snapshots. Read canonical totals through the
+    // same RLS client as the feed, without downloading every reaction/comment.
+    contentIds.length
+      ? client.from("content_items").select("id,content_reactions(count),content_comments(count)")
+          .in("id", contentIds).eq("content_comments.is_hidden", false)
+      : Promise.resolve({ data: [] as any[], error: null }),
   ]);
+  if (engagementResult.error) throw new ApiError("MEDIA_ENGAGEMENT_FAILED", "Unable to retrieve media engagement", 500, undefined, false);
 
   const profileMap = new Map((profilesResult.data ?? []).map((profile: any) => [profile.id, profile]));
   const expressionMap = new Map((expressionsResult.data ?? []).map((expression: any) => [expression.id, expression]));
   const organizationMap = new Map((organizationsResult.data ?? []).map((organization: any) => [organization.id, organization]));
+  const engagementMap = new Map((engagementResult.data ?? []).map((item: any) => [item.id, item]));
 
   return rows.map((row) => {
     const item = nestedContentItem(row.content_items);
@@ -140,8 +150,11 @@ export async function enrichContentCreators<T extends { content_items?: any }>(r
     const author = item.author_profile_id ? profileMap.get(item.author_profile_id) ?? null : null;
     const expression = item.expression_id ? expressionMap.get(item.expression_id) ?? null : null;
     const organization = item.organization_id ? organizationMap.get(item.organization_id) ?? null : null;
+    const engagement = engagementMap.get(item.id);
     return {
       ...row,
+      likes_count: engagement?.content_reactions?.[0]?.count ?? 0,
+      comments_count: engagement?.content_comments?.[0]?.count ?? 0,
       content_items: {
         ...item,
         author: author ? {

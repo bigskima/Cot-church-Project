@@ -59,10 +59,16 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [filter, setFilter] = useState('');
-  const [autoOpened, setAutoOpened] = useState(false);
+  const [autoOpened, setAutoOpened] = useState('');
 
-  const normalizedFilter = filter.trim().replace(/^@/, '').toLowerCase();
-  const listKey = `chat:global:${normalizedFilter || 'inbox'}`;
+  const [normalizedFilter, setNormalizedFilter] = useState('');
+  const [actionError, setActionError] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setNormalizedFilter(filter.trim().replace(/^@/, '').toLowerCase()), 250);
+    return () => clearTimeout(timer);
+  }, [filter]);
+  const viewerKey = `${mode}:${context?.profile?.id ?? 'pending'}`;
+  const listKey = `chat:global:${viewerKey}:${normalizedFilter || 'inbox'}`;
 
   const inbox = useResource<InboxPayload>(listKey, (signal) => {
     if (mode !== 'authenticated') return Promise.resolve({ people: [], conversations: [] });
@@ -70,7 +76,7 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
     return api.request<InboxPayload>(query, { signal, context: 'public' });
   });
 
-  const threadKey = selected ? `chat:conversation:${selected.id}` : 'chat:conversation:none';
+  const threadKey = selected ? `chat:conversation:${viewerKey}:${selected.id}` : 'chat:conversation:none';
   const thread = useResource<MessagesPayload>(threadKey, (signal) => {
     if (!selected || mode !== 'authenticated') return Promise.resolve({ messages: [] });
     return api.request<MessagesPayload>(
@@ -93,25 +99,28 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
   };
 
   const openPerson = async (person: Person) => {
-    await openUsername(person.username, person);
+    setActionError('');
+    try { await openUsername(person.username, person); }
+    catch (error) { setActionError(error instanceof Error ? error.message : 'Unable to open this conversation.'); }
   };
 
   useEffect(() => {
     const username = typeof routeParams.username === 'string'
       ? routeParams.username.trim().replace(/^@/, '').toLowerCase()
       : '';
-    if (!username || autoOpened || mode !== 'authenticated') return;
-    setAutoOpened(true);
-    void openUsername(username).catch(() => {
-      setAutoOpened(false);
+    if (!username || autoOpened === `${viewerKey}:${username}` || mode !== 'authenticated') return;
+    setAutoOpened(`${viewerKey}:${username}`);
+    void openUsername(username).catch((error) => {
+      setActionError(error instanceof Error ? error.message : 'Unable to open this conversation.');
       setFilter(username);
     });
-  }, [autoOpened, mode, routeParams.username]);
+  }, [autoOpened, mode, viewerKey, routeParams.username]);
 
   const send = async () => {
     const value = draft.trim();
     if (!value || !selected || sending) return;
     setSending(true);
+    setActionError('');
     setDraft('');
     try {
       await api.request('chat', {
@@ -125,7 +134,8 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
       });
       invalidate(threadKey);
       invalidate('chat:global:');
-    } catch {
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Message was not sent. Please try again.');
       setDraft(value);
     } finally {
       setSending(false);
@@ -239,6 +249,7 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
           />
         )}
 
+        {actionError ? <Text style={{ color: colors.live, padding: 12 }}>{actionError}</Text> : null}
         <View
           style={[
             styles.composer,
@@ -326,6 +337,7 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
         />
       </View>
 
+      {actionError ? <Text style={{ color: colors.live, padding: 12 }}>{actionError}</Text> : null}
       {inbox.error ? (
         <Pressable
           onPress={inbox.refresh}

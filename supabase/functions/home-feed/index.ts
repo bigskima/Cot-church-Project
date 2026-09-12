@@ -142,6 +142,7 @@ Deno.serve(createHandler(
         .from("live_streams")
         .select("id,organization_id,branch_id,title,description,status,visibility,scheduled_start,started_at,ended_at,recording_url,thumbnail_url,playback_url,playback_token_required,created_at")
         .eq("organization_id", organizationId)
+        .match(selectedExpressionId ? { "branch_id": selectedExpressionId } : {})
         .in("status", ["scheduled", "provisioning", "ready", "live", "ended", "processing", "replay_ready"])
         .order("scheduled_start", { ascending: false, nullsFirst: false })
         .limit(30),
@@ -150,6 +151,7 @@ Deno.serve(createHandler(
         .from("reels")
         .select("id,organization_id,media_asset_id,caption,audio_title,audio_artist,views_count,likes_count,comments_count,shares_count,created_at,content_items!inner(id,organization_id,expression_id,author_profile_id,visibility,status,published_at),media_assets(id,media_type,processing_state,duration_seconds,aspect_ratio,media_renditions(id,rendition_kind,container,codec,width,height,storage_path,provider_playback_id),media_thumbnails(storage_path,is_primary))")
         .eq("organization_id", organizationId)
+        .match(selectedExpressionId ? { "content_items.expression_id": selectedExpressionId } : {})
         .eq("content_items.status", "published")
         .order("created_at", { ascending: false })
         .limit(40),
@@ -157,6 +159,7 @@ Deno.serve(createHandler(
         .from("videos")
         .select("id,organization_id,media_asset_id,series_id,title,slug,description,category,chapters,transcript,views_count,likes_count,comments_count,shares_count,created_at,content_items!inner(id,organization_id,expression_id,author_profile_id,visibility,status,published_at),media_assets(id,media_type,processing_state,duration_seconds,aspect_ratio,media_renditions(id,rendition_kind,container,codec,width,height,storage_path,provider_playback_id),media_thumbnails(storage_path,is_primary))")
         .eq("organization_id", organizationId)
+        .match(selectedExpressionId ? { "content_items.expression_id": selectedExpressionId } : {})
         .eq("content_items.status", "published")
         .order("created_at", { ascending: false })
         .limit(40),
@@ -164,6 +167,7 @@ Deno.serve(createHandler(
         .from("sermons")
         .select("id,organization_id,expression_id,content_item_id,series_id,title,slug,preacher,sermon_date,scripture_references,topics,description,transcript,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,chapters,duration_seconds,status,visibility,is_featured,play_count,published_at,created_at")
         .eq("organization_id", organizationId)
+        .match(selectedExpressionId ? { "expression_id": selectedExpressionId } : {})
         .eq("status", "published")
         .order("published_at", { ascending: false, nullsFirst: false })
         .limit(50),
@@ -171,6 +175,8 @@ Deno.serve(createHandler(
         .from("events")
         .select("id,organization_id,branch_id,title,description,starts_at,ends_at,location,capacity,visibility,created_at")
         .eq("organization_id", organizationId)
+        .match(selectedExpressionId ? { "branch_id": selectedExpressionId } : {})
+        .eq("status", "published")
         .gte("ends_at", recentEventCutoff)
         .order("starts_at", { ascending: true })
         .limit(30),
@@ -224,8 +230,8 @@ Deno.serve(createHandler(
       .filter((row) => inSelectedExperience(row, selectedExpressionId, "content_items"));
     videos = filterByAuthor(videos, safety.hiddenFromFeed, (row: any) => nestedItem(row.content_items)?.author_profile_id);
     [reels, videos] = await Promise.all([
-      enrichContentCreators(reels),
-      enrichContentCreators(videos),
+      enrichContentCreators(reels, client),
+      enrichContentCreators(videos, client),
     ]);
     let sermons = resultData<any[]>(sermonsResult as any, "sermons", degraded)
       .filter((row) => inSelectedExperience(row, selectedExpressionId, "expression_id"));

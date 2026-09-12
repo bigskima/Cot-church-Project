@@ -49,47 +49,48 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
     const contentIds = reels.map((reel) => reel.content_items?.id).filter(Boolean) as string[];
     if (!contentIds.length) return reels as ReelWithViewerState[];
 
-    const encodedIds = encodeURIComponent(contentIds.join(','));
-    const [playbackResult, engagementResult] = await Promise.allSettled([
-      api.request<PlaybackBatchEntry[]>(
-        `content-media?action=playback_batch&contentIds=${encodedIds}`,
-        { signal, context: expressionId ? 'current' : 'public' },
-      ),
-      mode === 'authenticated'
-        ? api.request<EngagementBatchEntry[]>(
-            `engagement?view=states&contentIds=${encodedIds}`,
-            { signal, context: expressionId ? 'current' : 'public' },
-          )
-        : Promise.resolve([] as EngagementBatchEntry[]),
-    ]);
-
-    const playbackMap = new Map(
-      (playbackResult.status === 'fulfilled' ? playbackResult.value : []).map((item) => [item.contentId, item]),
-    );
-    const engagementMap = new Map(
-      (engagementResult.status === 'fulfilled' ? engagementResult.value : []).map((item) => [item.contentId, item]),
-    );
+    const batches: string[][] = [];
+    for (let i = 0; i < contentIds.length; i += 30) batches.push(contentIds.slice(i, i + 30));
+    const states = mode === 'authenticated'
+      ? (await Promise.all(batches.map((ids) => api.request<EngagementBatchEntry[]>(
+          `engagement?view=states&contentIds=${encodeURIComponent(ids.join(','))}`,
+          { signal, context: expressionId ? 'current' : 'public' },
+        )))).flat()
+      : [];
+    const engagementMap = new Map(states.map((item) => [item.contentId, item]));
 
     return reels.map((reel) => {
       const contentId = reel.content_items?.id;
       if (!contentId) return reel as ReelWithViewerState;
 
-      const playback = playbackMap.get(contentId);
       const engagement = engagementMap.get(contentId);
-      const playbackUrl = playback?.renditions?.find((rendition) => rendition.kind === 'video_stream')?.playbackUrl;
 
       return {
         ...reel,
         viewerReaction: engagement?.reaction ?? null,
         viewerBookmarked: engagement?.bookmarked ?? false,
-        media_assets: playbackUrl
-          ? { ...(reel.media_assets ?? {}), url: playbackUrl }
-          : reel.media_assets,
       } as ReelWithViewerState;
     });
   });
 
-  const reels = reelsResource.data ?? [];
+  const playbackIds = (reelsResource.data ?? []).map((reel) => reel.content_items?.id).filter(Boolean) as string[];
+  const playback = useResource<PlaybackBatchEntry[]>(
+    `playback:reels:${expressionId ?? 'public'}:${mode}:${playbackIds.join(',')}`,
+    async (signal) => {
+      const batches: string[][] = [];
+      for (let i = 0; i < playbackIds.length; i += 30) batches.push(playbackIds.slice(i, i + 30));
+      return (await Promise.all(batches.map((ids) => api.request<PlaybackBatchEntry[]>(
+        `content-media?action=playback_batch&contentIds=${encodeURIComponent(ids.join(','))}`,
+        { signal, context: expressionId ? 'current' : 'public' },
+      )))).flat();
+    },
+  );
+  const playbackMap = new Map((playback.data ?? []).map((item) => [item.contentId, item]));
+  const reels = (reelsResource.data ?? []).map((reel) => {
+    const source = playbackMap.get(reel.content_items?.id ?? '');
+    const playbackUrl = source?.renditions?.find((rendition) => rendition.kind === 'video_stream')?.playbackUrl;
+    return playbackUrl ? { ...reel, media_assets: { ...reel.media_assets, url: playbackUrl } } as ReelWithViewerState : reel;
+  });
   const canShareToGeneral = mode === 'authenticated';
 
   useEffect(() => {

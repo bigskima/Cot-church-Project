@@ -43,6 +43,9 @@ jobs:
       - name: Typecheck church application
         run: npm run mobile:typecheck
 
+      - name: Verify realtime resource behavior
+        run: npm run mobile:test:resources
+
       - name: Build Platform Administration
         run: npm run admin:build
 

@@ -78,7 +78,7 @@ Deno.serve(createHandler(
 
         let managementQuery = auth.client
           .from("sermons")
-          .select("id,organization_id,expression_id,series_id,recording_id,title,slug,preacher,sermon_date,scripture_references,topics,description,transcript,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,duration_seconds,status,visibility,is_featured,play_count,published_at")
+          .select("id,organization_id,expression_id,content_item_id,series_id,recording_id,title,slug,preacher,sermon_date,scripture_references,topics,description,transcript,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,duration_seconds,status,visibility,is_featured,play_count,published_at")
           .eq("organization_id", auth.organizationId)
           .order("sermon_date", { ascending: false })
           .limit(200);
@@ -101,7 +101,7 @@ Deno.serve(createHandler(
           .eq("organization_id", organizationId)
           .order("starts_at", { ascending: false })
           .limit(50);
-        if (auth?.branchId) seriesQuery = seriesQuery.or(`visibility.eq.public,and(visibility.eq.branch,expression_id.eq.${auth.branchId})`);
+        if (auth?.branchId) seriesQuery = seriesQuery.eq("expression_id", auth.branchId);
         else seriesQuery = seriesQuery.eq("visibility", "public");
         const { data, error } = await seriesQuery;
         if (error) throw new ApiError("SERIES_LIST_FAILED", "Unable to retrieve sermon series", 500, undefined, false);
@@ -110,7 +110,7 @@ Deno.serve(createHandler(
 
       let query = client
         .from("sermons")
-        .select("id,organization_id,expression_id,series_id,recording_id,title,slug,preacher,sermon_date,scripture_references,topics,description,transcript,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,duration_seconds,status,visibility,is_featured,play_count,published_at")
+        .select("id,organization_id,expression_id,content_item_id,series_id,recording_id,title,slug,preacher,sermon_date,scripture_references,topics,description,transcript,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,duration_seconds,status,visibility,is_featured,play_count,published_at")
         .eq("organization_id", organizationId);
 
       if (sermonId) {
@@ -121,7 +121,7 @@ Deno.serve(createHandler(
         query = query.order("sermon_date", { ascending: false }).limit(100);
       }
       query = query.eq("status", "published");
-      if (auth?.branchId) query = query.or(`visibility.eq.public,and(visibility.eq.branch,expression_id.eq.${auth.branchId})`);
+      if (auth?.branchId) query = query.eq("expression_id", auth.branchId);
       else query = query.eq("visibility", "public");
 
       const { data, error } = await query;

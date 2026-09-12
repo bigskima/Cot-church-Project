@@ -62,7 +62,7 @@ Deno.serve(createHandler(
             .from("direct_messages")
             .select("id,conversation_id,sender_profile_id,body,reply_to_id,sent_at,edited_at,redacted_at")
             .eq("conversation_id", conversationId)
-            .order("sent_at", { ascending: true })
+            .order("sent_at", { ascending: false })
             .limit(500),
           admin
             .from("profiles")
@@ -78,7 +78,7 @@ Deno.serve(createHandler(
               ...conversation,
               other: publicProfile(profileMap.get(otherProfileId)),
             },
-            messages: (messages ?? []).map((message: any) => ({
+            messages: (messages ?? []).reverse().map((message: any) => ({
               ...message,
               sender: publicProfile(profileMap.get(message.sender_profile_id)),
             })),
@@ -120,45 +120,28 @@ Deno.serve(createHandler(
       }
 
       const search = (url.searchParams.get("search") ?? "").trim().replace(/^@/, "").toLowerCase();
-      let candidateQuery = admin
-        .from("profiles")
+      const directoryQuery = () => admin.from("profiles")
         .select("id,username,display_name,avatar_url,banner_url")
-        .neq("id", viewerId)
-        .not("username", "is", null)
-        .order("display_name")
-        .limit(search ? 100 : 40);
-
-      if (search) {
-        // Username is canonical for direct addressing; display-name filtering is
-        // completed below so punctuation in names cannot enter a PostgREST filter.
-        candidateQuery = candidateQuery.ilike("username", `%${search.replace(/[%_]/g, "")}%`);
+        .neq("id", viewerId).not("username", "is", null).order("display_name").limit(search ? 100 : 40);
+      // Escape pattern characters and search both indexed identities directly;
+      // do not scan an arbitrary first 300 users to find a display name.
+      const pattern = `%${search.replace(/[\\%_]/g, "\\$&")}%`;
+      const results = search
+        ? await Promise.all([
+            directoryQuery().eq("username", search),
+            directoryQuery().ilike("username", pattern),
+            directoryQuery().ilike("display_name", pattern),
+          ])
+        : [await directoryQuery()];
+      if (results.some((result) => result.error)) throw new ApiError("CHAT_DIRECTORY_FAILED", "We couldn’t load people right now.", 500, undefined, false);
+      const matched = new Map<string, any>();
+      for (const result of results) for (const profile of result.data ?? []) {
+        if (!safety.blockedProfiles.has(profile.id)) matched.set(profile.id, profile);
       }
-
-      const { data: candidateProfiles, error: peopleError } = await candidateQuery;
-      if (peopleError) throw new ApiError("CHAT_DIRECTORY_FAILED", "We couldn’t load people right now.", 500, undefined, false);
-
-      let people = (candidateProfiles ?? [])
-        .filter((profile: any) => !safety.blockedProfiles.has(profile.id));
-
-      // When the user typed a display-name fragment that is not a username
-      // fragment, include matching profiles from a bounded public directory page.
-      if (search && !people.some((profile: any) => profile.display_name?.toLowerCase().includes(search))) {
-        const { data: displayCandidates } = await admin
-          .from("profiles")
-          .select("id,username,display_name,avatar_url,banner_url")
-          .neq("id", viewerId)
-          .not("username", "is", null)
-          .order("display_name")
-          .limit(300);
-        const merged = new Map(people.map((profile: any) => [profile.id, profile]));
-        for (const profile of displayCandidates ?? []) {
-          if (safety.blockedProfiles.has(profile.id)) continue;
-          if (`${profile.display_name ?? ""} ${profile.username ?? ""}`.toLowerCase().includes(search)) {
-            merged.set(profile.id, profile);
-          }
-        }
-        people = [...merged.values()].slice(0, 100);
-      }
+      const people = [...matched.values()].sort((a, b) =>
+        Number(b.username === search) - Number(a.username === search) ||
+        (a.display_name ?? a.username).localeCompare(b.display_name ?? b.username)
+      ).slice(0, 100);
 
       return {
         data: {

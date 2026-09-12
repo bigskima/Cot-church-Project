@@ -2,12 +2,13 @@ import { useEffect } from 'react';
 import { useSession } from '@/state/session';
 import { invalidate } from '@/services/query-cache';
 import { apiUrl } from '@/api';
+import { engagementResources } from '@/services/resource-invalidation';
 
 type RealtimeConfig = { url: string; anonKey: string };
 
 type RealtimeClient = {
   realtime: {
-    setAuth: (token: string) => void;
+    setAuth: (token: string) => Promise<void> | void;
   };
   channel: (name: string) => any;
   removeChannel: (channel: any) => Promise<unknown> | unknown;
@@ -25,13 +26,13 @@ const tableInvalidations: Record<string, string[]> = {
   social_comments: ['comments:', 'mobile:home-feed:', 'mobile:community:', 'expression:'],
   social_reactions: ['mobile:home-feed:', 'mobile:community:', 'expression:'],
   content_items: ['mobile:home-feed:', 'mobile:community:', 'expression:', 'reels:immersive:', 'watch:catalogue:'],
-  content_comments: ['comments:', 'mobile:home-feed:', 'reels:immersive:', 'watch:catalogue:', 'expression:'],
-  content_reactions: ['mobile:home-feed:', 'reels:immersive:', 'watch:catalogue:', 'expression:'],
-  content_bookmarks: ['mobile:home-feed:', 'saved:', 'reels:immersive:', 'watch:catalogue:'],
+  content_comments: engagementResources,
+  content_reactions: engagementResources,
+  content_bookmarks: engagementResources,
   reels: ['mobile:home-feed:', 'reels:immersive:', 'expression:'],
   videos: ['mobile:home-feed:', 'watch:catalogue:', 'expression:'],
-  media_assets: ['mobile:home-feed:', 'reels:immersive:', 'watch:catalogue:', 'expression:'],
-  media_renditions: ['mobile:home-feed:', 'reels:immersive:', 'watch:catalogue:', 'expression:'],
+  media_assets: ['playback:', 'mobile:home-feed:', 'reels:immersive:', 'watch:catalogue:', 'expression:'],
+  media_renditions: ['playback:', 'mobile:home-feed:', 'reels:immersive:', 'watch:catalogue:', 'expression:'],
   media_thumbnails: ['mobile:home-feed:', 'reels:immersive:', 'watch:catalogue:', 'expression:'],
   media_tracks: ['reels:immersive:', 'watch:catalogue:', 'expression:'],
   live_streams: ['live:', 'leadership:streams:', 'mobile:home-feed:', 'expression:'],
@@ -60,6 +61,18 @@ export function RealtimeBridge() {
     let disposed = false;
     let client: RealtimeClient | null = null;
     let channel: any = null;
+    let flushTimer: ReturnType<typeof setTimeout> | undefined;
+    const pendingPrefixes = new Set<string>();
+    const queueInvalidation = (prefix: string) => {
+      pendingPrefixes.add(prefix);
+      if (flushTimer) return;
+      flushTimer = setTimeout(() => {
+        flushTimer = undefined;
+        if (disposed) return;
+        pendingPrefixes.forEach(invalidate);
+        pendingPrefixes.clear();
+      }, 150);
+    };
 
     const connect = async () => {
       try {
@@ -92,7 +105,8 @@ export function RealtimeBridge() {
         }
 
         client = nextClient;
-        if (accessToken) client.realtime.setAuth(accessToken);
+        if (accessToken) await client.realtime.setAuth(accessToken);
+        if (disposed) return;
         let nextChannel = client.channel(`cot-live-${accessToken ? auth?.session.expiresAt ?? 'member' : 'visitor'}`);
 
         for (const table of Object.keys(tableInvalidations)) {
@@ -100,14 +114,20 @@ export function RealtimeBridge() {
             'postgres_changes',
             { event: '*', schema: 'public', table },
             () => {
-              tableInvalidations[table].forEach(invalidate);
+              tableInvalidations[table].forEach(queueInvalidation);
               if (accessToken && contextTables.has(table)) refreshContext();
             },
           );
         }
 
         channel = nextChannel;
-        channel.subscribe();
+        let subscribed = false;
+        channel.subscribe((status: string) => {
+          if (disposed || status !== 'SUBSCRIBED') return;
+          // Postgres changes are not replayed after a disconnected socket.
+          if (subscribed) Object.values(tableInvalidations).flat().forEach(queueInvalidation);
+          subscribed = true;
+        });
       } catch (error) {
         // Canonical Edge Function reads continue to work when realtime is unavailable.
         // Keep this failure isolated from the route tree and leave a development-only
@@ -121,6 +141,7 @@ export function RealtimeBridge() {
     void connect();
     return () => {
       disposed = true;
+      if (flushTimer) clearTimeout(flushTimer);
       if (client && channel) void client.removeChannel(channel);
       if (client) void client.removeAllChannels();
     };

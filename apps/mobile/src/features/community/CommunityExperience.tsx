@@ -461,7 +461,6 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
             : { action: 'unreact', contentId: postId },
         ),
       });
-      void resource.refresh();
       return true;
     } catch (value) {
       setInteractionError(value instanceof Error ? value.message : 'Unable to update this reaction.');
@@ -479,7 +478,6 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
         context: requestContext,
         body: JSON.stringify({ action: 'bookmark', contentId: postId }),
       });
-      void resource.refresh();
       return result.bookmarked === !currentlySaved;
     } catch (value) {
       setInteractionError(value instanceof Error ? value.message : 'Unable to update this bookmark.');
