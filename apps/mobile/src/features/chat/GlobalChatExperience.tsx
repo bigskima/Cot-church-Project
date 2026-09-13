@@ -63,6 +63,12 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
 
   const [normalizedFilter, setNormalizedFilter] = useState('');
   const [actionError, setActionError] = useState('');
+  // General Chat lives inside an absolute bottom-tab bar. Keep the thread
+  // composer above that bar; otherwise the input is present but hidden behind
+  // navigation after a person is opened from search or a member profile.
+  const generalThreadBottomInset = embeddedExpression
+    ? 0
+    : 75 + Math.max(insets.bottom, Platform.OS === 'web' ? 10 : 8);
   useEffect(() => {
     const timer = setTimeout(() => setNormalizedFilter(filter.trim().replace(/^@/, '').toLowerCase()), 250);
     return () => clearTimeout(timer);
@@ -179,7 +185,13 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
     const messages = thread.data?.messages ?? [];
     return (
       <KeyboardAvoidingView
-        style={[styles.screen, { backgroundColor: colors.bg }]}
+        style={[
+          styles.screen,
+          {
+            backgroundColor: colors.bg,
+            paddingBottom: generalThreadBottomInset,
+          },
+        ]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View
