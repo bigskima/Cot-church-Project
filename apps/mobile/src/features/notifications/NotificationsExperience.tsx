@@ -47,6 +47,12 @@ type NotificationItem = {
 type InboxView = 'actions' | 'updates' | 'history';
 type ScopeView = 'expression' | 'general';
 
+type NotificationsExperienceProps = {
+  forcedExpressionId?: string;
+  onRespondInvitation?: (invitation: { id: string }, decision: 'accept' | 'decline') => Promise<void>;
+  onMarkNotificationRead?: (item: { id: string }) => Promise<void>;
+};
+
 function itemScope(item: NotificationItem): ScopeView {
   return item.data?.scope === 'expression' || Boolean(item.data?.branchId) ? 'expression' : 'general';
 }
@@ -64,7 +70,7 @@ function inferredRoute(item: NotificationItem) {
   return branchId ? `/expressions/${branchId}` : '';
 }
 
-export function NotificationsExperience({ forcedExpressionId }: { forcedExpressionId?: string }) {
+export function NotificationsExperience({ forcedExpressionId, onRespondInvitation, onMarkNotificationRead }: NotificationsExperienceProps) {
   const insets = useSafeAreaInsets();
   const { api, mode, context, auth, selectContext } = useSession();
   const { colors } = useTheme();
@@ -94,13 +100,14 @@ export function NotificationsExperience({ forcedExpressionId }: { forcedExpressi
   const unread = scopedNotifications.filter((item) => !item.read_at);
 
   const expressionName = (branchId?: string | null) => context?.expressions?.find((item) => item.id === branchId)?.name
-    ?? (context?.expression?.id === branchId ? context.expression.name : undefined)
+    ?? (context?.expression?.id === branchId ? context?.expression?.name : undefined)
     ?? 'Expression';
 
   const respond = async (invitation: GovernanceInvitation, decision: 'accept' | 'decline') => {
     setBusyId(invitation.id); setMessage('');
     try {
-      await api.request('governance-invitations', { method: 'POST', body: JSON.stringify({ invitationId: invitation.id, decision }) });
+      if (onRespondInvitation) await onRespondInvitation(invitation, decision);
+      else await api.request('governance-invitations', { method: 'POST', body: JSON.stringify({ invitationId: invitation.id, decision }) });
       setMessage(decision === 'accept' ? 'Invitation accepted. Your access has been refreshed.' : 'Invitation declined.');
       await invitations.refresh();
       if (decision === 'accept') {
@@ -113,7 +120,8 @@ export function NotificationsExperience({ forcedExpressionId }: { forcedExpressi
 
   const markRead = async (item: NotificationItem) => {
     if (item.read_at) return;
-    await api.request('notifications', { method: 'PATCH', body: JSON.stringify({ id: item.id, read: true }) });
+    if (onMarkNotificationRead) await onMarkNotificationRead(item);
+    else await api.request('notifications', { method: 'PATCH', body: JSON.stringify({ id: item.id, read: true }) });
   };
 
   const openNotification = async (item: NotificationItem) => {
