@@ -85,6 +85,12 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
       iconName: 'videocam-outline',
       action: () => router.push('/general/studio/video' as any),
     },
+    {
+      title: 'Giveaway',
+      description: 'Host a member giveaway and record the selected winners.',
+      iconName: 'gift-outline',
+      action: () => router.push({ pathname: '/general/participate', params: { tab: 'giveaways', compose: 'giveaway' } } as any),
+    },
   ] : [];
 
   const leadershipModules = [
@@ -111,6 +117,14 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
       badge: 'UPDATES',
       route: routeFor('/general/leadership/announcements-manage', '/general/leadership/announcements-manage'),
       enabled: generalWorkspace ? hasOrganizationCapability('announcements.manage') : hasCapability('announcements.manage'),
+    },
+    {
+      title: 'Polls',
+      description: 'Publish official community polls and review participation.',
+      iconName: 'stats-chart-outline',
+      badge: 'ENGAGE',
+      route: routeFor('/general/participate?tab=polls&compose=poll', '/general/participate?tab=polls&compose=poll'),
+      enabled: generalWorkspace ? hasOrganizationCapability('polls.manage') : hasCapability('polls.manage'),
     },
     {
       title: 'Live Media Studio',
@@ -185,13 +199,13 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
             </View>
             <View style={styles.publicNoticeCopy}>
               <Text style={[styles.publicNoticeTitle, { color: colors.text }]}>General COT is public</Text>
-              <Text style={[styles.publicNoticeText, { color: colors.textSecondary }]}>Posts, Reels, videos and voice recordings created here can be seen across the public COT experience.</Text>
+              <Text style={[styles.publicNoticeText, { color: colors.textSecondary }]}>Posts, Reels, videos, voice recordings and public giveaways created here can be seen across the public COT experience.</Text>
             </View>
           </View>
 
           {signedIn ? (
             <View style={styles.createSection}>
-              <SectionHeader title="Create something" subtitle="Choose a format — no ministry role is required." />
+              <SectionHeader title="Create something" subtitle="Choose a format. Giveaway hosting is available to signed-in members; official polls remain permission-controlled." />
               <View style={styles.createGrid}>
                 {creationActions.map((item) => (
                   <Pressable
