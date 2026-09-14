@@ -1,29 +1,21 @@
--- Keep the organization owner role aligned with its documented full organization authority.
-do $$
-declare
-  owner_role_id uuid;
-begin
-  select id into owner_role_id
-  from public.roles
-  where code = 'owner'
-  limit 1;
-
-  if owner_role_id is not null then
-    insert into public.role_permissions (role_id, permission_code)
-    select owner_role_id, permission_code
-    from unnest(array[
-      'finance.manage',
-      'finance.read',
-      'testimonies.manage',
-      'testimonies.review',
-      'pastoral.followups.receive',
-      'prayer.intake.receive',
-      'prayer.pastoral.receive',
-      'prayer.team.receive'
-    ]::text[]) as permissions(permission_code)
-    on conflict do nothing;
-  end if;
-end $$;
+-- Keep every organization owner role aligned with its documented full organization authority.
+-- roles.code is unique only inside an organization, so grant the repair set to
+-- every existing owner role rather than selecting one arbitrary church.
+insert into public.role_permissions (role_id, permission_code)
+select owner_role.id, permission.permission_code
+from public.roles owner_role
+cross join unnest(array[
+  'finance.manage',
+  'finance.read',
+  'testimonies.manage',
+  'testimonies.review',
+  'pastoral.followups.receive',
+  'prayer.intake.receive',
+  'prayer.pastoral.receive',
+  'prayer.team.receive'
+]::text[]) as permission(permission_code)
+where owner_role.code = 'owner'
+on conflict do nothing;
 
 -- Browser voice recording uses Opus/WebM. The API already accepts audio/webm,
 -- so keep Storage policy in sync with the signed-upload contract.
