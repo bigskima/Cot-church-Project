@@ -40,6 +40,8 @@ export interface PostCardProps {
   onMore?: () => void;
   style?: StyleProp<ViewStyle>;
   dark?: boolean;
+  variant?: 'card' | 'feed';
+  showContext?: boolean;
 }
 
 function mediaKind(media: MediaAsset): string | undefined {
@@ -69,12 +71,16 @@ export function PostCard({
   allowExternalShare = true,
   onMore,
   style,
+  variant,
+  showContext,
 }: PostCardProps) {
   const { colors } = useTheme();
   const postAsAny = post as any;
   const author = postAsAny.author ?? {};
   const expressionLabel = expressionName || postAsAny.expression?.name || undefined;
   const isExpressionPost = post.visibility === 'branch' || postAsAny.scope === 'expression';
+  const resolvedVariant = variant ?? (isExpressionPost ? 'card' : 'feed');
+  const showContextRow = showContext ?? isExpressionPost;
   const postExpressionId =
     postAsAny.expression_id ||
     postAsAny.branch_id ||
@@ -169,44 +175,47 @@ export function PostCard({
         onPress={onPress}
         style={({ pressed }) => [
           styles.container,
+          resolvedVariant === 'feed' ? styles.feedContainer : null,
           {
             backgroundColor: colors.card,
             borderColor: isExpressionPost ? colors.primarySoftStrong : colors.borderSubtle,
           },
-          isExpressionPost ? styles.expressionCard : styles.publicCard,
+          isExpressionPost ? styles.expressionCard : resolvedVariant === 'card' ? styles.publicCard : null,
           pressed && onPress ? { backgroundColor: colors.pressed } : null,
           style,
         ]}
       >
-        <View style={styles.contextRow}>
-          <View
-            style={[
-              styles.contextPill,
-              { backgroundColor: isExpressionPost ? colors.primarySoft : colors.bgSecondary },
-            ]}
-          >
-            <Icon
-              name={isExpressionPost ? 'people-outline' : 'globe-outline'}
-              size={12}
-              color={isExpressionPost ? colors.interactive : colors.textSecondary}
-            />
-            <Text
+        {showContextRow ? (
+          <View style={styles.contextRow}>
+            <View
               style={[
-                styles.contextText,
-                { color: isExpressionPost ? colors.interactive : colors.textSecondary },
+                styles.contextPill,
+                { backgroundColor: isExpressionPost ? colors.primarySoft : colors.bgSecondary },
               ]}
-              numberOfLines={1}
             >
-              {isExpressionPost ? expressionLabel || 'Expression' : 'General COT'}
-            </Text>
-          </View>
-          {isExpressionPost ? (
-            <View style={[styles.privatePill, { backgroundColor: colors.bgSecondary }]}>
-              <Icon name="lock-closed-outline" size={11} color={colors.textMuted} />
-              <Text style={[styles.privateText, { color: colors.textMuted }]}>Members</Text>
+              <Icon
+                name={isExpressionPost ? 'people-outline' : 'globe-outline'}
+                size={12}
+                color={isExpressionPost ? colors.interactive : colors.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.contextText,
+                  { color: isExpressionPost ? colors.interactive : colors.textSecondary },
+                ]}
+                numberOfLines={1}
+              >
+                {isExpressionPost ? expressionLabel || 'Expression' : 'General COT'}
+              </Text>
             </View>
-          ) : null}
-        </View>
+            {isExpressionPost ? (
+              <View style={[styles.privatePill, { backgroundColor: colors.bgSecondary }]}>
+                <Icon name="lock-closed-outline" size={11} color={colors.textMuted} />
+                <Text style={[styles.privateText, { color: colors.textMuted }]}>Members</Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
 
         <View style={styles.headerRow}>
           <Pressable onPress={onPressAuthor || onPress} hitSlop={4}>
@@ -252,7 +261,7 @@ export function PostCard({
           </View>
         ) : null}
 
-        {post.body?.trim() ? <Text style={[styles.bodyText, { color: colors.text }]}>{post.body}</Text> : null}
+        {post.body?.trim() ? <Text style={[styles.bodyText, resolvedVariant === 'feed' && styles.feedBodyText, { color: colors.text }]}>{post.body}</Text> : null}
 
         {media.length ? (
           <View style={styles.mediaList}>
@@ -485,6 +494,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radius.card,
   },
+  feedContainer: {
+    padding: spacing.md,
+    borderRadius: radius.xxl,
+  },
   publicCard: { ...shadows.sm },
   expressionCard: { ...shadows.md },
   contextRow: {
@@ -506,18 +519,19 @@ const styles = StyleSheet.create({
   contextText: { fontSize: 10, lineHeight: 14, fontWeight: '800', letterSpacing: 0.15, flexShrink: 1 },
   privatePill: { minHeight: 26, borderRadius: radius.pill, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 4 },
   privateText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.15 },
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   identityColumn: { flex: 1, minWidth: 0 },
   authorLine: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   nameGroup: { flexDirection: 'row', alignItems: 'center', flexShrink: 1, gap: 4 },
   displayName: { fontSize: 15, fontWeight: '800', flexShrink: 1, letterSpacing: -0.2 },
-  timestamp: { fontSize: 11, fontWeight: '600' },
-  handleText: { fontSize: 11, marginTop: 2 },
+  timestamp: { fontSize: 10.5, fontWeight: '600' },
+  handleText: { fontSize: 10.5, marginTop: 2 },
   moreButton: { width: 34, height: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  identityMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, marginTop: spacing.md },
+  identityMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, marginTop: spacing.sm },
   identityBadge: { borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3 },
   identityBadgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.2 },
   bodyText: { fontSize: 15, lineHeight: 23, marginTop: spacing.md, letterSpacing: -0.08 },
+  feedBodyText: { fontSize: 15.5, lineHeight: 24 },
   mediaList: { gap: spacing.sm, marginTop: spacing.md },
   mediaFrame: { width: '100%', aspectRatio: 16 / 10, borderRadius: radius.xl, overflow: 'hidden' },
   mediaImage: { width: '100%', height: '100%' },
