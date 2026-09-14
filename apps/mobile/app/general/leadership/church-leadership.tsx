@@ -1,1 +1,1 @@
-export { default } from '../../(tabs)/profile/leadership/church-leadership';
+export { default } from '@/features/general/GeneralChurchLeadershipExperience';
