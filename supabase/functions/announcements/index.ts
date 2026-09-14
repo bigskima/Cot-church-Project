@@ -37,7 +37,7 @@ Deno.serve(createHandler(
       } else if (!auth.branchId) {
         query = query.is("branch_id", null);
       }
-      if (memberFeed) query = query.eq("status", "published");
+      if (memberFeed) query = query.eq("status","published");
       const { data, error } = await query.order("created_at", { ascending: false }).limit(100);
       if (error) throw new ApiError("ANNOUNCEMENT_LIST_FAILED", "Unable to retrieve announcements", 500, undefined, false);
       return { data: data ?? [] };
