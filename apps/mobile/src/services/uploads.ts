@@ -1,5 +1,3 @@
-import { Platform } from 'react-native';
-
 export type UploadFile = {
   uri: string;
   name: string;
@@ -15,6 +13,37 @@ function delay(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
+export function normalizeUploadMime(name: string, supplied?: string | null) {
+  const mime = supplied?.toLowerCase().split(';')[0]?.trim() || '';
+  const aliases: Record<string, string> = {
+    'audio/x-m4a': 'audio/mp4',
+    'audio/m4a': 'audio/mp4',
+    'audio/mp3': 'audio/mpeg',
+    'audio/x-wav': 'audio/wav',
+    'image/jpg': 'image/jpeg',
+    'video/x-m4v': 'video/mp4',
+    'video/m4v': 'video/mp4',
+  };
+  if (aliases[mime]) return aliases[mime];
+  if (mime && mime !== 'application/octet-stream') return mime;
+
+  const lower = name.toLowerCase();
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  if (lower.endsWith('.gif')) return 'image/gif';
+  if (lower.endsWith('.mp3')) return 'audio/mpeg';
+  if (lower.endsWith('.m4a') || lower.endsWith('.mp4a') || lower.endsWith('.aac.mp4')) return 'audio/mp4';
+  if (lower.endsWith('.aac')) return 'audio/aac';
+  if (lower.endsWith('.ogg') || lower.endsWith('.oga')) return 'audio/ogg';
+  if (lower.endsWith('.wav')) return 'audio/wav';
+  if (lower.endsWith('.webm')) return 'audio/webm';
+  if (lower.endsWith('.mov')) return 'video/quicktime';
+  if (lower.endsWith('.mp4') || lower.endsWith('.m4v')) return 'video/mp4';
+  if (lower.endsWith('.pdf')) return 'application/pdf';
+  return mime || 'application/octet-stream';
+}
+
 export async function readUploadFile(file: UploadFile): Promise<Blob> {
   if (file.file) return file.file;
   const response = await fetch(file.uri);
@@ -24,26 +53,22 @@ export async function readUploadFile(file: UploadFile): Promise<Blob> {
 
 /**
  * Uploads to a Supabase signed upload URL on web, iOS and Android.
- *
- * Signed URLs are short-lived, so retries are deliberately limited and only cover
- * transient connectivity/server responses. Permanent validation/auth failures are
- * surfaced immediately instead of repeatedly sending the same file.
+ * Browser-managed Content-Length is intentionally left alone because it is a
+ * forbidden request header on the web. The declared MIME is normalized before
+ * upload so Android/iOS picker aliases match the Storage bucket allow-list.
  */
 export async function putSignedUpload(signedUploadUrl: string, file: UploadFile): Promise<number> {
   const body = await readUploadFile(file);
   const size = Number(body.size || file.size || 0);
   if (!size) throw new Error('The selected file is empty. Choose another file.');
+  const mimeType = normalizeUploadMime(file.name, file.mimeType);
 
   let lastError: Error | null = null;
   for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt += 1) {
     try {
       const response = await fetch(signedUploadUrl, {
         method: 'PUT',
-        headers: {
-          'Content-Type': file.mimeType,
-          // React Native's fetch accepts Blob bodies; the signed URL supplies authorization.
-          ...(Platform.OS === 'web' ? { 'Content-Length': String(size) } : {}),
-        },
+        headers: { 'Content-Type': mimeType },
         body,
       });
 
