@@ -213,7 +213,7 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
 
           {signedIn ? (
             <View style={styles.createSection}>
-              <SectionHeader title="Create something" subtitle="Choose a format. Giveaway hosting is available to signed-in members; official polls remain permission-controlled." />
+              <SectionHeader title="Create something" subtitle="Choose a format; no ministry role is required for public Posts, Reels, videos, voice or giveaways. Official polls remain permission-controlled." />
               <View style={styles.createGrid}>
                 {creationActions.map((item) => (
                   <Pressable
