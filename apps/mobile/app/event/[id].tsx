@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, Share } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Redirect, useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
+import { shareContent } from '@/services/share';
 import {
   Badge,
   Button,
@@ -24,6 +25,8 @@ type EventRegistration = {
   status: 'registered' | 'waitlisted' | 'cancelled' | 'attended';
   registered_at: string;
 };
+
+type EventWithBanner = Event & { banner_url?: string | null };
 
 export function EventDetailScreen({ forcedScope }: { forcedScope?: 'general' | 'expression' } = {}) {
   const { id, context: requestedContext } = useLocalSearchParams<{ id: string; context?: string }>();
@@ -46,7 +49,7 @@ export function EventDetailScreen({ forcedScope }: { forcedScope?: 'general' | '
     return api.request<Event>(`public-content?type=event&id=${id}`, { signal, context: 'public' });
   });
 
-  const event = resource.data;
+  const event = resource.data as EventWithBanner | undefined;
   const registrations = useResource<EventRegistration[]>(`event:registration:${mode}:${id}`, (signal) =>
     mode === 'authenticated'
       ? api.request<EventRegistration[]>(`event-registrations?eventId=${id}`, { signal })
@@ -105,12 +108,15 @@ export function EventDetailScreen({ forcedScope }: { forcedScope?: 'general' | '
 
   const handleShare = async () => {
     if (!event || expressionMode) return;
+    const message = `Join us for ${event.title}!${event.location?.name ? ` At ${event.location.name}.` : ''}`;
     try {
-      await Share.share({
-        message: `Join us for ${event.title}! ${event.location?.name ? `At ${event.location.name}` : ''}`,
+      await shareContent({
+        title: event.title,
+        message,
+        attachment: event.banner_url ? { url: event.banner_url, mimeType: 'image/jpeg' } : null,
       });
     } catch {
-      // Ignored
+      // Closing the operating-system share sheet leaves the event unchanged.
     }
   };
 
@@ -129,13 +135,19 @@ export function EventDetailScreen({ forcedScope }: { forcedScope?: 'general' | '
 
         {resource.loading ? (
           <View style={styles.body}>
-            <Skeleton height={140} borderRadius={radius.lg} />
+            <Skeleton height={210} borderRadius={radius.lg} />
             <Skeleton height={80} count={2} borderRadius={radius.md} />
           </View>
         ) : resource.error && !event ? (
           <ResourceError message={resource.error} retry={resource.refresh} />
         ) : event ? (
           <View style={styles.body}>
+            {event.banner_url ? (
+              <View style={[styles.bannerFrame, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, shadows.md]}>
+                <Image source={{ uri: event.banner_url }} style={styles.bannerImage} resizeMode="cover" accessibilityLabel={`${event.title} event banner`} />
+              </View>
+            ) : null}
+
             <EventLiveCountdown
               startsAt={event.starts_at}
               endsAt={event.ends_at}
@@ -240,6 +252,17 @@ const styles = StyleSheet.create({
   body: {
     paddingHorizontal: spacing.md,
     gap: spacing.lg,
+  },
+  bannerFrame: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  bannerImage: {
+    width: '100%',
+    height: '100%',
   },
   card: {
     padding: spacing.lg,
