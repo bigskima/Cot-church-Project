@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { router } from 'expo-router';
-import { Avatar, Icon } from '@/components';
+import { Avatar, BottomSheet, Icon } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -13,6 +13,7 @@ type Props = {
 
 type QuickAction = { key: string; label: string; hint: string; icon: string; route: string };
 type MinistryAction = { key: string; label: string; icon: string; route: string };
+type CreateChoice = { key: string; title: string; subtitle: string; icon: string; onPress: () => void };
 
 function ActionTile({ action, compact = false }: { action: QuickAction; compact?: boolean }) {
   const { colors } = useTheme();
@@ -37,6 +38,7 @@ export function GeneralHomeActionDeck({ onComposePost, onComposeVoice }: Props) 
   const { width } = useWindowDimensions();
   const { colors } = useTheme();
   const { context, mode, hasOrganizationCapability, hasPublicCapability } = useSession();
+  const [createOpen, setCreateOpen] = useState(false);
   const authenticated = mode === 'authenticated';
   const displayName = context?.profile?.display_name?.trim() || '';
   const firstName = displayName.split(/\s+/).filter(Boolean)[0] || 'there';
@@ -62,6 +64,37 @@ export function GeneralHomeActionDeck({ onComposePost, onComposeVoice }: Props) 
     return actions;
   }, [authenticated, hasOrganizationCapability, hasPublicCapability]);
 
+  const createChoices = useMemo<CreateChoice[]>(() => [
+    {
+      key: 'post',
+      title: 'Share with General COT',
+      subtitle: 'Text, photos, files or a normal community update.',
+      icon: 'create-outline',
+      onPress: () => { setCreateOpen(false); onComposePost(); },
+    },
+    {
+      key: 'voice',
+      title: 'Voice',
+      subtitle: 'Record and attach a voice update without opening a long form.',
+      icon: 'mic-outline',
+      onPress: () => { setCreateOpen(false); onComposeVoice(); },
+    },
+    {
+      key: 'reel',
+      title: 'Reel',
+      subtitle: 'Create a short public video for General COT.',
+      icon: 'flash-outline',
+      onPress: () => { setCreateOpen(false); router.push('/general/studio/reel' as any); },
+    },
+    {
+      key: 'video',
+      title: 'Video',
+      subtitle: 'Publish a longer public video through the focused creator flow.',
+      icon: 'videocam-outline',
+      onPress: () => { setCreateOpen(false); router.push('/general/studio/video' as any); },
+    },
+  ], [onComposePost, onComposeVoice]);
+
   return (
     <View style={styles.root}>
       <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
@@ -85,7 +118,7 @@ export function GeneralHomeActionDeck({ onComposePost, onComposeVoice }: Props) 
               <Icon name="mic-outline" size={17} color={colors.interactive} />
               <Text style={[styles.composeSecondaryText, { color: colors.text }]}>Voice</Text>
             </Pressable>
-            <Pressable onPress={() => router.push('/general/studio' as any)} style={({ pressed }) => [styles.composeSecondary, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.pressed]} accessibilityRole="button">
+            <Pressable onPress={() => setCreateOpen(true)} style={({ pressed }) => [styles.composeSecondary, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Create">
               <Icon name="add-outline" size={18} color={colors.interactive} />
               <Text style={[styles.composeSecondaryText, { color: colors.text }]}>Create</Text>
             </Pressable>
@@ -117,6 +150,25 @@ export function GeneralHomeActionDeck({ onComposePost, onComposeVoice }: Props) 
           </View>
         </View>
       ) : null}
+
+      <BottomSheet visible={createOpen} onClose={() => setCreateOpen(false)} title="Create something" subtitle="Public creation is available to signed-in members; no ministry role is required. Choose a format and continue in a focused flow." maxHeightPercent={86}>
+        <View style={styles.createSheet}>
+          {createChoices.map((choice) => (
+            <Pressable key={choice.key} onPress={choice.onPress} style={({ pressed }) => [styles.createChoice, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, pressed && styles.pressed]} accessibilityRole="button">
+              <View style={[styles.createChoiceIcon, { backgroundColor: colors.primarySoft }]}><Icon name={choice.icon as any} size={20} color={colors.interactive} /></View>
+              <View style={styles.flex}><Text style={[styles.createChoiceTitle, { color: colors.text }]}>{choice.title}</Text><Text style={[styles.createChoiceSubtitle, { color: colors.textMuted }]}>{choice.subtitle}</Text></View>
+              <Icon name="arrow-forward" size={15} color={colors.interactive} />
+            </Pressable>
+          ))}
+          {ministryActions.length ? (
+            <Pressable onPress={() => { setCreateOpen(false); router.push('/general/leadership' as any); }} style={({ pressed }) => [styles.moreTools, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.pressed]}>
+              <Icon name="shield-checkmark-outline" size={18} color={colors.interactive} />
+              <View style={styles.flex}><Text style={[styles.moreToolsTitle, { color: colors.text }]}>More tools</Text><Text style={[styles.moreToolsText, { color: colors.textMuted }]}>Open ministry publishing and management tools available to your role.</Text></View>
+              <Icon name="chevron-forward" size={16} color={colors.textMuted} />
+            </Pressable>
+          ) : null}
+        </View>
+      </BottomSheet>
     </View>
   );
 }
@@ -152,5 +204,13 @@ const styles = StyleSheet.create({
   ministryActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   ministryAction: { minHeight: 38, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: 6 },
   ministryActionText: { fontSize: 10.5, fontWeight: '800', maxWidth: 130 },
+  createSheet: { gap: spacing.sm, paddingBottom: spacing.lg },
+  createChoice: { minHeight: 72, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  createChoiceIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  createChoiceTitle: { fontSize: 13.5, lineHeight: 18, fontWeight: '900' },
+  createChoiceSubtitle: { fontSize: 10.5, lineHeight: 15, marginTop: 2 },
+  moreTools: { minHeight: 70, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs },
+  moreToolsTitle: { fontSize: 12.5, lineHeight: 17, fontWeight: '900' },
+  moreToolsText: { fontSize: 10.5, lineHeight: 15, marginTop: 2 },
   pressed: { opacity: 0.8, transform: [{ scale: 0.98 }] },
 });
