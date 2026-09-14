@@ -37,6 +37,7 @@ const files = [
   'apps/mobile/app/(auth)/login.tsx',
   'apps/mobile/app/expressions/[expressionId]/_layout.tsx',
   'apps/mobile/app/expressions/[expressionId]/index.tsx',
+  'apps/mobile/src/features/expression/ExpressionLayeredHomeExperience.tsx',
   'apps/mobile/src/components/expression/ExpressionRouteBoundary.tsx',
   'apps/mobile/src/components/expression/ExpressionShell.tsx',
   'apps/mobile/src/components/expression/ExpressionMediaHeader.tsx',
@@ -53,6 +54,7 @@ const files = [
   'apps/mobile/src/features/media/ReelsExperience.tsx',
   'apps/mobile/src/features/media/WatchDetailExperience.tsx',
   'apps/mobile/src/features/media/SermonDetailExperience.tsx',
+  'apps/mobile/src/features/media/EnhancedSermonDetailExperience.tsx',
   'apps/mobile/app/expressions/[expressionId]/live/index.tsx',
   'apps/mobile/app/expressions/[expressionId]/live/[streamId].tsx',
   'apps/mobile/app/expressions/[expressionId]/videos/index.tsx',
@@ -314,7 +316,7 @@ const checks = [
   [/item\.id === expressionId && item\.status === 'active'/, 'Expression routes require exact active membership'],
   [/Return to General COT/, 'Expression shell provides an explicit General COT exit'],
   [/ExpressionNavigation/, 'Expression workspace owns a dedicated navigation shell'],
-  [/expression:workspace-home:/, 'Expression Home uses a dedicated scoped resource identity'],
+  [/expression:layered-home:/, 'Expression Home uses a dedicated scoped resource identity'],
   [/context\?\.expression\?\.id[\s\S]*Redirect[\s\S]*\/expressions\//, 'General tabs cannot render while an Expression context is active'],
   [/label: 'Announcements'[\s\S]*label: 'Feed'[\s\S]*label: 'Prayer'[\s\S]*label: 'Events'[\s\S]*label: 'Birthdays'/, 'Expression shell exposes Phase 2 community destinations'],
   [/CommunityExperience scope="expression" embedded/, 'Expression feed owns a dedicated scoped route'],
@@ -373,7 +375,7 @@ const checks = [
   [/pathname: '\/general\/post\/\[id\]'/, 'General Home opens posts inside the General shell'],
   [/\/general\/live\/\$\{activeStream\.id\}/, 'General Home opens live media inside the General shell'],
   [/\/general\/watch\/\$\{item\.video\.id\}/, 'General Home opens Watch media inside the General shell'],
-  [/\/general\/sermon\/\$\{item\.sermon\.id\}/, 'General Home opens sermons inside the General shell'],
+  [/\/general\/sermon\/\$\{(?:item\.sermon|sermon)\.id\}/, 'General Home opens sermons inside the General shell'],
   [/GivingScreen initialScope="church" lockedScope/, 'General Giving is locked to church-wide scope'],
   [/const expression = scope === 'expression' \? context\?\.expression : undefined/, 'shared General features ignore stale Expression context'],
   [/returnTo = expressionId \? `\/expressions\/\$\{expressionId\}\/reels` : '\/general\/reels'/, 'General Reels returns inside the General shell'],
@@ -395,7 +397,7 @@ const checks = [
   [/context === 'expression'\) return <Redirect href="\/expressions"/, 'legacy private media links fail closed instead of inferring Expression identity'],
   [/Redirect href="\/general\/live"/, 'legacy Live root redirects to canonical General Live'],
   [/Redirect href="\/general\/watch"/, 'legacy Watch root redirects to canonical General Watch'],
-    [/action: 'preview'/, 'invite-code preview flow'],
+  [/action: 'preview'/, 'invite-code preview flow'],
   [/action: 'redeem'/, 'invite-code redemption flow'],
   [/action: 'generate'/, 'invite-code generation flow'],
   [/codeId/, 'invite-code revocation flow'],
@@ -470,7 +472,6 @@ const forbiddenPermissionGatePatterns = [
 const forbiddenExpressionRoutingPatterns = [
   [/enterExpression[\s\S]{0,500}router\.replace\(['"]\/\(tabs\)\/home['"]\)/, 'Expression entry routed back into the General tab shell'],
 ];
-
 
 const forbiddenGeneralHomePatterns = [
   [/params\.set\('expressionId'/, 'Expression ID injection into General Home feed'],
