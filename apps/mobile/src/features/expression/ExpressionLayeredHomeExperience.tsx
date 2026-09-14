@@ -23,6 +23,7 @@ import {
   Skeleton,
   VideoCard,
 } from '@/components';
+import { ParticipationHomeShelf } from '@/features/community/ParticipationHomeShelf';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 import { getRuntimeSupabase } from '@/services/runtime-supabase';
@@ -120,7 +121,7 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
           const contentId = item.content_items?.id;
           const prepared = contentId ? playback.get(contentId) : undefined;
           const stream = prepared?.renditions?.find((rendition) => rendition.kind === 'video_stream');
-          const thumbnail = prepared?.thumbnails?.find((item) => item.isPrimary) ?? prepared?.thumbnails?.[0];
+          const thumbnail = prepared?.thumbnails?.find((candidate) => candidate.isPrimary) ?? prepared?.thumbnails?.[0];
           if (!stream?.playbackUrl && !thumbnail?.playbackUrl) return item;
           return {
             ...item,
@@ -147,19 +148,12 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
               section_batch_size: 6,
               stream_items_between_sections: 4,
             }),
-            supabase
-              .from('announcements')
-              .select('id,title,body,published_at,created_at')
-              .eq('organization_id', organizationId)
-              .eq('branch_id', expressionId)
-              .eq('status', 'published')
-              .order('published_at', { ascending: false, nullsFirst: false })
-              .limit(36),
+            supabase.from('announcements').select('id,title,body,published_at,created_at').eq('organization_id', organizationId).eq('branch_id', expressionId).eq('status', 'published').order('published_at', { ascending: false, nullsFirst: false }).limit(36),
           ]);
           if (!planResult.error && Array.isArray(planResult.data)) plan = planResult.data as FeedPlanRow[];
           if (!announcementResult.error && Array.isArray(announcementResult.data)) announcements = announcementResult.data as Announcement[];
         } catch {
-          // The draft can preview before the migration is promoted; fallback below preserves layered UX.
+          // Draft preview fallback preserves the layered experience before migration promotion.
         }
       }
       return { payload, plan, announcements };
@@ -188,9 +182,7 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
         if (row.unit_kind === 'stream' && row.content_kind === 'post' && postMap.has(id)) return [{ key: `post:${id}`, kind: 'post', post: postMap.get(id)! }];
         if (row.unit_kind === 'stream' && row.content_kind === 'reel' && reelMap.has(id)) return [{ key: `reel:${id}`, kind: 'reel', reel: reelMap.get(id)! }];
         if (row.unit_kind === 'stream' && row.content_kind === 'video' && videoMap.has(id)) return [{ key: `video:${id}`, kind: 'video', video: videoMap.get(id)! }];
-        if (row.unit_kind === 'section' && ['sermon', 'event', 'announcement'].includes(row.content_kind)) {
-          return [{ key: `section:${row.content_kind}:${index}:${row.content_ids.join(':')}`, kind: 'section', contentKind: row.content_kind as SectionUnit['contentKind'], ids: row.content_ids }];
-        }
+        if (row.unit_kind === 'section' && ['sermon', 'event', 'announcement'].includes(row.content_kind)) return [{ key: `section:${row.content_kind}:${index}:${row.content_ids.join(':')}`, kind: 'section', contentKind: row.content_kind as SectionUnit['contentKind'], ids: row.content_ids }];
         return [];
       });
     }
@@ -229,19 +221,12 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
     const announcementMap = new Map(announcements.map((item) => [item.id, item]));
     const title = unit.contentKind === 'sermon' ? 'Sermons' : unit.contentKind === 'event' ? 'Events' : 'Announcements';
     const icon = unit.contentKind === 'sermon' ? 'book-outline' : unit.contentKind === 'event' ? 'calendar-outline' : 'megaphone-outline';
-    const destination = unit.contentKind === 'sermon'
-      ? `/expressions/${expressionId}/sermons`
-      : unit.contentKind === 'event'
-        ? `/expressions/${expressionId}/events`
-        : `/expressions/${expressionId}/announcements`;
+    const destination = unit.contentKind === 'sermon' ? `/expressions/${expressionId}/sermons` : unit.contentKind === 'event' ? `/expressions/${expressionId}/events` : `/expressions/${expressionId}/announcements`;
 
     return (
       <View style={[styles.shelf, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
         <View style={styles.shelfHeader}>
-          <View style={styles.shelfTitleRow}>
-            <View style={[styles.shelfIcon, { backgroundColor: colors.primarySoft }]}><Icon name={icon as any} size={17} color={colors.interactive} /></View>
-            <View><Text style={[styles.shelfEyebrow, { color: colors.interactive }]}>IN THIS EXPRESSION</Text><Text style={[styles.shelfTitle, { color: colors.text }]}>{title}</Text></View>
-          </View>
+          <View style={styles.shelfTitleRow}><View style={[styles.shelfIcon, { backgroundColor: colors.primarySoft }]}><Icon name={icon as any} size={17} color={colors.interactive} /></View><View><Text style={[styles.shelfEyebrow, { color: colors.interactive }]}>IN THIS EXPRESSION</Text><Text style={[styles.shelfTitle, { color: colors.text }]}>{title}</Text></View></View>
           <Pressable onPress={() => router.push(destination as any)}><Text style={[styles.seeAll, { color: colors.interactive }]}>See all</Text></Pressable>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalContent}>
@@ -255,13 +240,7 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
               return <View key={id} style={styles.horizontalCard}><EventCard event={event} onPress={() => router.push(`/expressions/${expressionId}/event/${id}` as any)} /></View>;
             }
             const announcement = announcementMap.get(id); if (!announcement) return null;
-            return (
-              <Pressable key={id} onPress={() => router.push(`/expressions/${expressionId}/announcements` as any)} style={[styles.announcementCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
-                <View style={[styles.announcementIcon, { backgroundColor: colors.primarySoft }]}><Icon name="megaphone-outline" size={18} color={colors.interactive} /></View>
-                <Text style={[styles.announcementTitle, { color: colors.text }]} numberOfLines={2}>{announcement.title}</Text>
-                <Text style={[styles.announcementBody, { color: colors.textSecondary }]} numberOfLines={4}>{announcement.body}</Text>
-              </Pressable>
-            );
+            return <Pressable key={id} onPress={() => router.push(`/expressions/${expressionId}/announcements` as any)} style={[styles.announcementCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}><View style={[styles.announcementIcon, { backgroundColor: colors.primarySoft }]}><Icon name="megaphone-outline" size={18} color={colors.interactive} /></View><Text style={[styles.announcementTitle, { color: colors.text }]} numberOfLines={2}>{announcement.title}</Text><Text style={[styles.announcementBody, { color: colors.textSecondary }]} numberOfLines={4}>{announcement.body}</Text></Pressable>;
           })}
         </ScrollView>
       </View>
@@ -271,36 +250,26 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
   const header = (
     <View style={styles.headerWrap}>
       <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
-        <View style={[styles.identityBanner, { backgroundColor: colors.primarySoft }]}>
-          {expression?.banner_url ? <Image source={{ uri: expression.banner_url }} style={styles.identityBannerImage} resizeMode="cover" /> : <View style={styles.identityFallback}><Icon name="people-circle-outline" size={38} color={colors.interactive} /></View>}
-        </View>
-        <View style={styles.heroTopRow}>
-          <View style={[styles.heroAvatar, { backgroundColor: colors.cardElevated, borderColor: colors.card }]}>
-            {expression?.avatar_url ? <Image source={{ uri: expression.avatar_url }} style={styles.avatarImage} /> : <Icon name="people" size={28} color={colors.interactive} />}
-          </View>
-          <View style={[styles.privatePill, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Icon name="lock-closed" size={12} color={colors.interactive} /><Text style={[styles.privateText, { color: colors.textSecondary }]}>Members only</Text></View>
-        </View>
+        <View style={[styles.identityBanner, { backgroundColor: colors.primarySoft }]}>{expression?.banner_url ? <Image source={{ uri: expression.banner_url }} style={styles.identityBannerImage} resizeMode="cover" /> : <View style={styles.identityFallback}><Icon name="people-circle-outline" size={38} color={colors.interactive} /></View>}</View>
+        <View style={styles.heroTopRow}><View style={[styles.heroAvatar, { backgroundColor: colors.cardElevated, borderColor: colors.card }]}>{expression?.avatar_url ? <Image source={{ uri: expression.avatar_url }} style={styles.avatarImage} /> : <Icon name="people" size={28} color={colors.interactive} />}</View><View style={[styles.privatePill, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Icon name="lock-closed" size={12} color={colors.interactive} /><Text style={[styles.privateText, { color: colors.textSecondary }]}>Members only</Text></View></View>
         <Text style={[styles.heroEyebrow, { color: colors.interactive }]}>YOUR EXPRESSION</Text>
         <Text style={[styles.heroTitle, { color: colors.text }]}>{expression?.name ?? 'Your Expression'}</Text>
-        <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>Your Expression Home now mixes conversations and media vertically while sermons, events and announcements appear as repeatable horizontal discovery layers.</Text>
-        <View style={styles.heroActions}>
-          <Pressable onPress={() => router.push(`/expressions/${expressionId}/feed` as any)} style={[styles.primaryAction, { backgroundColor: colors.interactive }]}><Icon name="chatbubbles" size={17} color="#fff" /><Text style={styles.primaryActionText}>Community feed</Text></Pressable>
-          <Pressable onPress={() => router.replace('/general')} style={[styles.secondaryAction, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Icon name="globe-outline" size={17} color={colors.text} /><Text style={[styles.secondaryActionText, { color: colors.text }]}>General COT</Text></Pressable>
-        </View>
+        <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>Conversations and media flow vertically while sermons, events, announcements, polls and giveaways appear in focused discovery layers.</Text>
+        <View style={styles.heroActions}><Pressable onPress={() => router.push(`/expressions/${expressionId}/feed` as any)} style={[styles.primaryAction, { backgroundColor: colors.interactive }]}><Icon name="chatbubbles" size={17} color="#fff" /><Text style={styles.primaryActionText}>Community feed</Text></Pressable><Pressable onPress={() => router.replace('/general')} style={[styles.secondaryAction, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Icon name="globe-outline" size={17} color={colors.text} /><Text style={[styles.secondaryActionText, { color: colors.text }]}>General COT</Text></Pressable></View>
       </View>
 
       <View style={styles.quickGrid}>
         <QuickLink label="Announcements" hint="Important updates" icon="megaphone-outline" onPress={() => router.push(`/expressions/${expressionId}/announcements` as any)} />
         <QuickLink label="Prayer" hint="Pray together" icon="heart-outline" onPress={() => router.push(`/expressions/${expressionId}/prayer` as any)} />
         <QuickLink label="Events" hint="Gatherings" icon="calendar-outline" onPress={() => router.push(`/expressions/${expressionId}/events` as any)} />
+        <QuickLink label="Engage" hint="Polls & giveaways" icon="gift-outline" onPress={() => router.push(`/expressions/${expressionId}/participate` as any)} />
         <QuickLink label="Groups" hint="Smaller circles" icon="people-circle-outline" onPress={() => router.push(`/expressions/${expressionId}/groups` as any)} />
         <QuickLink label="Chat" hint="Direct messages" icon="chatbubble-ellipses-outline" onPress={() => router.push(`/expressions/${expressionId}/chat` as any)} />
       </View>
 
-      {payload?.degradedSections?.length ? (
-        <Pressable onPress={resource.refresh} style={[styles.notice, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Icon name="alert-circle-outline" size={17} color={colors.textSecondary} /><Text style={[styles.noticeText, { color: colors.textSecondary }]}>Some Expression sections are still loading. Tap to retry.</Text><Icon name="refresh-outline" size={15} color={colors.textMuted} /></Pressable>
-      ) : null}
+      {payload?.degradedSections?.length ? <Pressable onPress={resource.refresh} style={[styles.notice, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Icon name="alert-circle-outline" size={17} color={colors.textSecondary} /><Text style={[styles.noticeText, { color: colors.textSecondary }]}>Some Expression sections are still loading. Tap to retry.</Text><Icon name="refresh-outline" size={15} color={colors.textMuted} /></Pressable> : null}
       {activeStream ? <View style={styles.liveWrap}><HeroLiveCard stream={activeStream} onPress={() => router.push(`/expressions/${expressionId}/live/${activeStream.id}` as any)} /></View> : null}
+      <ParticipationHomeShelf scope="expression" expressionId={expressionId} />
       {feed.length ? <View style={styles.feedHeading}><View><Text style={[styles.feedEyebrow, { color: colors.interactive }]}>EXPRESSION HOME</Text><Text style={[styles.feedTitle, { color: colors.text }]}>For this community</Text></View><Pressable onPress={() => router.push(`/expressions/${expressionId}/feed` as any)}><Text style={[styles.seeAll, { color: colors.interactive }]}>Open full feed</Text></Pressable></View> : null}
     </View>
   );
@@ -314,7 +283,7 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
       data={feed}
       keyExtractor={(item) => item.key}
       ListHeaderComponent={header}
-      ListEmptyComponent={<EmptyState title="This Expression Home is ready" message="Posts, Reels, videos, sermons, events and announcements will form layered sections as they are published." iconName="home-outline" />}
+      ListEmptyComponent={<EmptyState title="This Expression Home is ready" message="Posts, Reels, videos, sermons, events, announcements, polls and giveaways will form focused layers as they are published." iconName="home-outline" />}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={resource.refreshing} onRefresh={resource.refresh} tintColor={colors.interactive} />}
