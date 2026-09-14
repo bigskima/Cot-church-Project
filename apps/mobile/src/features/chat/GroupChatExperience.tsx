@@ -19,7 +19,7 @@ type GroupChatPayload = {
   messages: RichChatMessage[];
 };
 
-export function GroupChatExperience({ groupId }: { groupId: string }) {
+export function GroupChatExperience({ groupId, sectionId }: { groupId: string; sectionId?: string | null }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { api, context, mode } = useSession();
@@ -27,11 +27,13 @@ export function GroupChatExperience({ groupId }: { groupId: string }) {
   const [replyTo, setReplyTo] = useState<ChatReply | null>(null);
   const [actionError, setActionError] = useState('');
   const listRef = useRef<FlatList<RichChatMessage>>(null);
-  const key = `group-chat:${groupId}:main`;
+  const key = `group-chat:${groupId}:${sectionId ?? 'main'}`;
 
   const resource = useResource<GroupChatPayload>(key, (signal) => {
     if (mode !== 'authenticated' || !groupId) return Promise.reject(new Error('Join this Group to use its chat.'));
-    return api.request<GroupChatPayload>(`group-chat?groupId=${encodeURIComponent(groupId)}`, { signal, context: 'current' });
+    const query = new URLSearchParams({ groupId });
+    if (sectionId) query.set('sectionId', sectionId);
+    return api.request<GroupChatPayload>(`group-chat?${query.toString()}`, { signal, context: 'current' });
   });
 
   useEffect(() => {
@@ -57,7 +59,7 @@ export function GroupChatExperience({ groupId }: { groupId: string }) {
       const created = await api.request<RichChatMessage>('group-chat', {
         method: 'POST',
         context: 'current',
-        body: JSON.stringify({ action: 'send', groupId, body: payload.body, replyToId: payload.replyToId, attachmentIds: payload.attachments.map((item) => item.uploadId) }),
+        body: JSON.stringify({ action: 'send', groupId, sectionId, body: payload.body, replyToId: payload.replyToId, attachmentIds: payload.attachments.map((item) => item.uploadId) }),
       });
       setMessages((current) => current.map((item) => item.id === optimisticId ? created : item));
       invalidate(key);
@@ -77,7 +79,7 @@ export function GroupChatExperience({ groupId }: { groupId: string }) {
         : [...before, { emoji, count: 1, reactedByMe: true }];
     setMessages((current) => current.map((item) => item.id === message.id ? { ...item, reactions: next } : item));
     try {
-      await api.request('group-chat', { method: 'POST', context: 'current', body: JSON.stringify({ action: 'react', groupId, messageId: message.id, emoji }) });
+      await api.request('group-chat', { method: 'POST', context: 'current', body: JSON.stringify({ action: 'react', groupId, sectionId, messageId: message.id, emoji }) });
       invalidate(key);
     } catch (error) {
       setMessages((current) => current.map((item) => item.id === message.id ? { ...item, reactions: before } : item));
@@ -89,7 +91,7 @@ export function GroupChatExperience({ groupId }: { groupId: string }) {
     const before = { pinned_at: message.pinned_at, pinned_by_profile_id: message.pinned_by_profile_id };
     setMessages((current) => current.map((item) => item.id === message.id ? { ...item, pinned_at: pinned ? new Date().toISOString() : null, pinned_by_profile_id: pinned ? context?.profile?.id ?? null : null } : item));
     try {
-      await api.request('group-chat', { method: 'POST', context: 'current', body: JSON.stringify({ action: 'pin', groupId, messageId: message.id, pinned }) });
+      await api.request('group-chat', { method: 'POST', context: 'current', body: JSON.stringify({ action: 'pin', groupId, sectionId, messageId: message.id, pinned }) });
       invalidate(key);
     } catch (error) {
       setMessages((current) => current.map((item) => item.id === message.id ? { ...item, ...before } : item));
@@ -114,7 +116,7 @@ export function GroupChatExperience({ groupId }: { groupId: string }) {
 
   return (
     <KeyboardAvoidingView style={[styles.screen, { backgroundColor: colors.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={{ paddingTop: insets.top }}><ScreenHeader title={resource.data?.group.name ?? 'Group chat'} kicker='GROUP CHAT' subtitle='Replies, media, voice notes, reactions and pins.' showBack /></View>
+      <View style={{ paddingTop: insets.top }}><ScreenHeader title={sectionId ? 'Temporary chat' : resource.data?.group.name ?? 'Group chat'} kicker={sectionId ? 'PRIVATE GROUP ROOM' : 'GROUP CHAT'} subtitle='Replies, media, voice notes, reactions and pins.' showBack /></View>
       <View style={[styles.scope, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}>
         <Icon name='people-circle-outline' size={17} color={colors.interactive} />
         <Text style={[styles.scopeText, { color: colors.textSecondary }]}>This conversation stays inside the Group.</Text>
@@ -133,7 +135,7 @@ export function GroupChatExperience({ groupId }: { groupId: string }) {
         renderItem={({ item }) => <RichMessageBubble message={item} mine={item.sender_profile_id === context?.profile?.id} showSender canPin={resource.data?.permissions.pinMessages === true} onReply={beginReply} onReact={(target, emoji) => void react(target, emoji)} onPin={(target, value) => void pin(target, value)} onJumpToMessage={jumpToMessage} />}
       />
       {actionError ? <Text style={[styles.error, { color: colors.live }]}>{actionError}</Text> : null}
-      <RichChatComposer endpoint='group-chat' requestContext='current' scope={{ groupId }} replyTo={replyTo} disabledReason={restriction} bottomInset={Math.max(insets.bottom, 10)} onCancelReply={() => setReplyTo(null)} onSend={send} />
+      <RichChatComposer endpoint='group-chat' requestContext='current' scope={{ groupId, sectionId }} replyTo={replyTo} disabledReason={restriction} bottomInset={Math.max(insets.bottom, 10)} onCancelReply={() => setReplyTo(null)} onSend={send} />
     </KeyboardAvoidingView>
   );
 }

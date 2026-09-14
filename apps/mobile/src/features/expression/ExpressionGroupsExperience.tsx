@@ -295,7 +295,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: {
                   {!membership && group.visibility === 'members' && group.join_policy !== 'invite' ? <Button label={group.join_policy === 'open' ? 'Join group' : 'Request to join'} onPress={() => void requestMembership(group.id)} loading={busyId === group.id} variant="primary" size="sm" /> : null}
                   {(membership?.status === 'declined' || membership?.status === 'removed') && group.visibility !== 'private' && group.join_policy !== 'invite' ? <Button label="Request Again" onPress={() => void requestMembership(group.id)} loading={busyId === group.id} variant="outline" size="sm" /> : null}
                   {joined ? <Button label="Group chat" onPress={() => router.push(`/expressions/${expression.id}/groups/${group.id}/chat` as any)} variant="primary" size="sm" /> : null}
-                  {!focusGroupId ? <Button label="Open group" onPress={() => router.push(`/expressions/${expression.id}/groups/${group.id}` as any)} variant="ghost" size="sm" /> : null}
+                  {!focusGroupId && joined ? <Button label="Open group" onPress={() => router.push(`/expressions/${expression.id}/groups/${group.id}` as any)} variant="ghost" size="sm" /> : null}
                 </View>
 
                 {group.canManageMembers && requests.length ? (
