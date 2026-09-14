@@ -8,8 +8,9 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 
 const TAB_ICON_SIZE = 23;
-// Expo Router removes a route from the tab bar when its href is null. A custom
-// button override is neither needed nor valid for these hidden routes.
+// Expo Router removes a route from the tab bar when its href is null. Every
+// utility/detail route must be registered here so adding a new route can never
+// silently turn it into a sixth bottom-navigation item.
 const hidden = { href: null } as const;
 
 export default function GeneralLayout() {
@@ -97,6 +98,9 @@ export default function GeneralLayout() {
       <Tabs.Screen name="chat" options={{ title: 'Chat', tabBarAccessibilityLabel: 'COT Chat', tabBarIcon: renderIcon('chatbubbles', 'chatbubbles-outline') }} />
       <Tabs.Screen name="profile" options={{ title: 'You', tabBarAccessibilityLabel: 'Your General COT profile', tabBarIcon: renderIcon('person', 'person-outline') }} />
 
+      <Tabs.Screen name="announcements" options={hidden as any} />
+      <Tabs.Screen name="participate" options={hidden as any} />
+      <Tabs.Screen name="sermons" options={hidden as any} />
       <Tabs.Screen name="watch/index" options={hidden as any} />
       <Tabs.Screen name="watch/[id]" options={hidden as any} />
       <Tabs.Screen name="live/index" options={hidden as any} />
@@ -119,6 +123,9 @@ export default function GeneralLayout() {
       <Tabs.Screen name="leadership/media-studio" options={hidden as any} />
       <Tabs.Screen name="leadership/pastoral-triage" options={hidden as any} />
       <Tabs.Screen name="leadership/church-leadership" options={hidden as any} />
+      <Tabs.Screen name="leadership/announcements-manage" options={hidden as any} />
+      <Tabs.Screen name="leadership/feed-ranking" options={hidden as any} />
+      <Tabs.Screen name="leadership/watch-categories" options={hidden as any} />
       <Tabs.Screen name="leadership/giving-manage" options={hidden as any} />
       <Tabs.Screen name="leadership/giving-finance" options={hidden as any} />
       <Tabs.Screen name="leadership/sermons-manage" options={hidden as any} />
