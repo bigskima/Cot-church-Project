@@ -17,10 +17,9 @@ export interface ReelCardProps {
   variant?: 'tile' | 'feed';
 }
 
-export function ReelCard({ reel, onPress, width = 150, commentContext, onOpenComments, variant }: ReelCardProps) {
+export function ReelCard({ reel, onPress, width = 150, commentContext, onOpenComments, variant = 'tile' }: ReelCardProps) {
   const { colors } = useTheme();
   const [commentsOpen, setCommentsOpen] = useState(false);
-  const resolvedVariant = variant ?? (width >= 260 ? 'feed' : 'tile');
   const contentId = reel.content_items?.id;
   const resolvedCommentContext = commentContext ?? (reel.content_items?.expression_id ? 'current' : 'public');
   const streamRendition = reel.media_assets?.renditions?.find((rendition) => rendition.rendition_kind === 'video_stream');
@@ -30,17 +29,17 @@ export function ReelCard({ reel, onPress, width = 150, commentContext, onOpenCom
   const formatViews = (views: number) => views >= 1000000 ? `${(views / 1000000).toFixed(1)}M` : views >= 1000 ? `${(views / 1000).toFixed(1)}K` : `${views}`;
 
   return (
-    <View style={[styles.card, resolvedVariant === 'feed' && styles.feedCard, { width, backgroundColor: colors.card, borderColor: colors.borderSubtle }, resolvedVariant === 'tile' ? shadows.md : shadows.sm]}>
-      <View style={[styles.frame, resolvedVariant === 'feed' && styles.feedFrame]}>
+    <View style={[styles.card, variant === 'feed' && styles.feedCard, { width, backgroundColor: colors.card, borderColor: colors.borderSubtle }, variant === 'tile' ? shadows.md : shadows.sm]}>
+      <View style={[styles.frame, variant === 'feed' && styles.feedFrame]}>
         {videoUrl && player ? <VideoView player={player} style={styles.media} contentFit="cover" nativeControls /> : posterUrl ? <Image source={{ uri: posterUrl }} style={styles.media} resizeMode="cover" /> : <View style={[styles.placeholder, { backgroundColor: colors.cardElevated }]}><View style={[styles.placeholderIcon, { backgroundColor: colors.primarySoft }]}><Icon name="play" size={22} color={colors.interactive} /></View></View>}
         <View pointerEvents="none" style={styles.reelLabel}><Icon name="flash" size={11} color="#FFFFFF" /><Text style={styles.reelLabelText}>REEL</Text></View>
         <View pointerEvents="none" style={styles.playChip}><Icon name="play" size={10} color="#FFFFFF" /><Text style={styles.viewsText}>{formatViews(reel.views_count)}</Text></View>
         {contentId ? <Pressable onPress={() => setCommentsOpen(true)} style={styles.commentChip} accessibilityRole="button" accessibilityLabel="Open Reel comments"><Icon name="chatbubble-ellipses-outline" size={14} color="#FFFFFF" /><Text style={styles.viewsText}>{reel.comments_count || 0}</Text></Pressable> : null}
         <LinearGradient pointerEvents="none" colors={['transparent', 'rgba(0,0,0,0.14)', 'rgba(0,0,0,0.82)']} locations={[0, 0.52, 1]} style={styles.captionGradient} />
-        <Pressable onPress={onPress} style={({ pressed }) => [styles.captionOverlay, resolvedVariant === 'feed' && styles.feedCaptionOverlay, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel={`Open reel: ${reel.caption || 'Reel'}`}>
-          <Text style={[styles.captionText, resolvedVariant === 'feed' && styles.feedCaptionText]} numberOfLines={resolvedVariant === 'feed' ? 3 : 2}>{reel.caption || 'Reel'}</Text>
+        <Pressable onPress={onPress} style={({ pressed }) => [styles.captionOverlay, variant === 'feed' && styles.feedCaptionOverlay, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel={`Open reel: ${reel.caption || 'Reel'}`}>
+          <Text style={[styles.captionText, variant === 'feed' && styles.feedCaptionText]} numberOfLines={variant === 'feed' ? 3 : 2}>{reel.caption || 'Reel'}</Text>
           {reel.audio_title ? <View style={styles.audioRow}><View style={styles.audioIcon}><Icon name="musical-notes" size={10} color="#FFFFFF" /></View><Text style={styles.audioText} numberOfLines={1}>{reel.audio_title}</Text></View> : null}
-          {resolvedVariant === 'feed' ? <View style={styles.openRow}><Text style={styles.openText}>Open Reel</Text><Icon name="arrow-forward" size={14} color="#FFFFFF" /></View> : null}
+          {variant === 'feed' ? <View style={styles.openRow}><Text style={styles.openText}>Open Reel</Text><Icon name="arrow-forward" size={14} color="#FFFFFF" /></View> : null}
         </Pressable>
       </View>
       <InlineCommentsSheet visible={commentsOpen} onClose={() => setCommentsOpen(false)} contentId={contentId} context={resolvedCommentContext} title="Reel comments" subtitle="Keep this Reel in place while you join the conversation." onViewAll={onOpenComments} />
