@@ -1,0 +1,54 @@
+-- Cover legacy public-schema foreign-key relationships flagged by Supabase's advisor.
+-- These are plain btree indexes on the FK columns in constraint order; no data or
+-- authorization semantics are changed.
+
+create index if not exists cot_fk_cover_0001 on public.ai_content_drafts (run_id);
+create index if not exists cot_fk_cover_0002 on public.ai_content_drafts (created_by);
+create index if not exists cot_fk_cover_0003 on public.ai_content_drafts (reviewed_by);
+create index if not exists cot_fk_cover_0004 on public.ai_generation_runs (capability_code);
+create index if not exists cot_fk_cover_0005 on public.ai_generation_runs (route_id);
+create index if not exists cot_fk_cover_0006 on public.ai_generation_runs (model_id);
+create index if not exists cot_fk_cover_0007 on public.ai_generation_runs (prompt_template_id);
+create index if not exists cot_fk_cover_0008 on public.ai_prompt_templates (capability_code);
+create index if not exists cot_fk_cover_0009 on public.ai_prompt_templates (created_by);
+create index if not exists cot_fk_cover_0010 on public.ai_routes (capability_code);
+create index if not exists cot_fk_cover_0011 on public.ai_routes (primary_model_id);
+create index if not exists cot_fk_cover_0012 on public.ai_usage_limits (capability_code);
+create index if not exists cot_fk_cover_0013 on public.announcements (created_by);
+create index if not exists cot_fk_cover_0014 on public.announcements (branch_id, organization_id);
+create index if not exists cot_fk_cover_0015 on public.api_idempotency_keys (organization_id);
+create index if not exists cot_fk_cover_0016 on public.attendance_records (organization_id);
+create index if not exists cot_fk_cover_0017 on public.attendance_records (checked_in_by);
+create index if not exists cot_fk_cover_0018 on public.attendance_records (event_id, organization_id);
+create index if not exists cot_fk_cover_0019 on public.attendance_records (occurrence_id, event_id, organization_id);
+create index if not exists cot_fk_cover_0020 on public.attendance_records (membership_id, organization_id);
+create index if not exists cot_fk_cover_0021 on public.audit_log (actor_profile_id);
+create index if not exists cot_fk_cover_0022 on public.audit_log (branch_id, organization_id);
+create index if not exists cot_fk_cover_0023 on public.branches (parent_branch_id, organization_id);
+create index if not exists cot_fk_cover_0024 on public.church_story (updated_by);
+create index if not exists cot_fk_cover_0025 on public.content_bookmarks (profile_id);
+create index if not exists cot_fk_cover_0026 on public.content_comments (author_profile_id);
+create index if not exists cot_fk_cover_0027 on public.content_comments (parent_comment_id);
+create index if not exists cot_fk_cover_0028 on public.content_items (expression_id);
+create index if not exists cot_fk_cover_0029 on public.content_items (group_id);
+create index if not exists cot_fk_cover_0030 on public.content_items (author_profile_id);
+create index if not exists cot_fk_cover_0031 on public.content_moderation_reports (organization_id);
+create index if not exists cot_fk_cover_0032 on public.content_moderation_reports (expression_id);
+create index if not exists cot_fk_cover_0033 on public.content_moderation_reports (content_item_id);
+create index if not exists cot_fk_cover_0034 on public.content_moderation_reports (comment_id);
+create index if not exists cot_fk_cover_0035 on public.content_moderation_reports (reporter_profile_id);
+create index if not exists cot_fk_cover_0036 on public.content_moderation_reports (reviewed_by);
+create index if not exists cot_fk_cover_0037 on public.content_reactions (profile_id);
+create index if not exists cot_fk_cover_0038 on public.conversation_participants (organization_id);
+create index if not exists cot_fk_cover_0039 on public.conversation_participants (conversation_id, organization_id);
+create index if not exists cot_fk_cover_0040 on public.conversation_participants (membership_id, organization_id);
+create index if not exists cot_fk_cover_0041 on public.conversations (created_by);
+create index if not exists cot_fk_cover_0042 on public.conversations (branch_id, organization_id);
+create index if not exists cot_fk_cover_0043 on public.departments (branch_id, organization_id);
+create index if not exists cot_fk_cover_0044 on public.departments (leader_membership_id, organization_id);
+create index if not exists cot_fk_cover_0045 on public.devotionals (expression_id);
+create index if not exists cot_fk_cover_0046 on public.devotionals (created_by);
+create index if not exists cot_fk_cover_0047 on public.devotionals (sermon_id, organization_id);
+create index if not exists cot_fk_cover_0048 on public.direct_conversations (created_by_profile_id);
+create index if not exists cot_fk_cover_0049 on public.domain_events (organization_id);
+create index if not exists cot_fk_cover_0050 on public.domain_events (actor_profile_id);

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ApiClient } from '../api';
 import { Badge, Button, Card, InputField, Modal, SelectField, Toggle } from '../components/ui';
+import { putSignedBrowserUpload } from '../lib/uploads';
 
 type Organization = { id: string; name: string; slug?: string; status: string };
 type Story = {
@@ -137,12 +138,7 @@ export function PublicDirectory({ api }: { api: ApiClient }) {
         fileName: file.name,
       }),
     });
-    const response = await fetch(intent.signedUploadUrl, {
-      method: 'PUT',
-      headers: { 'Content-Type': file.type },
-      body: file,
-    });
-    if (!response.ok) throw new Error(`Image upload failed (${response.status}).`);
+    await putSignedBrowserUpload(intent.signedUploadUrl, file);
     return api.request<{ publicUrl: string; mediaPath: string }>('platform-public-directory', {
       method: 'POST',
       body: JSON.stringify({ action: 'complete_upload', organizationId, mediaPath: intent.mediaPath }),

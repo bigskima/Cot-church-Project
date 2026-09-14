@@ -1,0 +1,54 @@
+-- Cover legacy public-schema foreign-key relationships flagged by Supabase's advisor.
+-- These are plain btree indexes on the FK columns in constraint order; no data or
+-- authorization semantics are changed.
+
+create index if not exists cot_fk_cover_0051 on public.donations (branch_id, organization_id);
+create index if not exists cot_fk_cover_0052 on public.donations (campaign_id, organization_id);
+create index if not exists cot_fk_cover_0053 on public.donations (purpose_id, organization_id);
+create index if not exists cot_fk_cover_0054 on public.event_occurrences (event_id, organization_id);
+create index if not exists cot_fk_cover_0055 on public.event_registrations (organization_id);
+create index if not exists cot_fk_cover_0056 on public.event_registrations (event_id, organization_id);
+create index if not exists cot_fk_cover_0057 on public.event_registrations (occurrence_id, event_id, organization_id);
+create index if not exists cot_fk_cover_0058 on public.event_registrations (membership_id, organization_id);
+create index if not exists cot_fk_cover_0059 on public.events (created_by);
+create index if not exists cot_fk_cover_0060 on public.events (branch_id, organization_id);
+create index if not exists cot_fk_cover_0061 on public.expression_creator_authorizations (profile_id);
+create index if not exists cot_fk_cover_0062 on public.expression_creator_authorizations (granted_by);
+create index if not exists cot_fk_cover_0063 on public.expression_creator_authorizations (revoked_by);
+create index if not exists cot_fk_cover_0064 on public.expression_invite_codes (created_by);
+create index if not exists cot_fk_cover_0065 on public.expression_invite_codes (revoked_by);
+create index if not exists cot_fk_cover_0066 on public.expression_invite_codes (branch_id, organization_id);
+create index if not exists cot_fk_cover_0067 on public.expression_memberships (organization_id);
+create index if not exists cot_fk_cover_0068 on public.expression_memberships (branch_id, organization_id);
+create index if not exists cot_fk_cover_0069 on public.expression_memberships (membership_id, organization_id);
+create index if not exists cot_fk_cover_0070 on public.expression_ownerships (owner_profile_id);
+create index if not exists cot_fk_cover_0071 on public.expression_ownerships (assigned_by);
+create index if not exists cot_fk_cover_0072 on public.follows (organization_id);
+create index if not exists cot_fk_cover_0073 on public.follows (expression_id);
+create index if not exists cot_fk_cover_0074 on public.follows (leader_id);
+create index if not exists cot_fk_cover_0075 on public.giving_campaigns (created_by);
+create index if not exists cot_fk_cover_0076 on public.giving_campaigns (branch_id, organization_id);
+create index if not exists cot_fk_cover_0077 on public.giving_purposes (created_by);
+create index if not exists cot_fk_cover_0078 on public.giving_purposes (updated_by);
+create index if not exists cot_fk_cover_0079 on public.giving_purposes (branch_id, organization_id);
+create index if not exists cot_fk_cover_0080 on public.giving_settings (created_by);
+create index if not exists cot_fk_cover_0081 on public.giving_settings (updated_by);
+create index if not exists cot_fk_cover_0082 on public.giving_settings (branch_id, organization_id);
+create index if not exists cot_fk_cover_0083 on public.governance_invitations (platform_role_code);
+create index if not exists cot_fk_cover_0084 on public.governance_invitations (invited_by);
+create index if not exists cot_fk_cover_0085 on public.governance_invitations (branch_id, organization_id);
+create index if not exists cot_fk_cover_0086 on public.governance_invitations (organization_role_id, organization_id);
+create index if not exists cot_fk_cover_0087 on public.groups (created_by);
+create index if not exists cot_fk_cover_0088 on public.groups (branch_id, organization_id);
+create index if not exists cot_fk_cover_0089 on public.groups (ministry_id, organization_id);
+create index if not exists cot_fk_cover_0090 on public.identity_badge_assignments (organization_id);
+create index if not exists cot_fk_cover_0091 on public.identity_badge_assignments (profile_id);
+create index if not exists cot_fk_cover_0092 on public.identity_badge_assignments (assigned_by);
+create index if not exists cot_fk_cover_0093 on public.identity_badge_assignments (branch_id, organization_id);
+create index if not exists cot_fk_cover_0094 on public.identity_badge_assignments (badge_definition_id, organization_id);
+create index if not exists cot_fk_cover_0095 on public.identity_badge_definitions (created_by);
+create index if not exists cot_fk_cover_0096 on public.integration_deliveries (organization_id);
+create index if not exists cot_fk_cover_0097 on public.integration_deliveries (domain_event_id);
+create index if not exists cot_fk_cover_0098 on public.integration_deliveries (connection_id, organization_id);
+create index if not exists cot_fk_cover_0099 on public.leaders (organization_id);
+create index if not exists cot_fk_cover_0100 on public.leaders (expression_id);
