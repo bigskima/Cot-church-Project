@@ -46,7 +46,7 @@ function MessageAttachment({ attachment }: { attachment: ChatAttachment }) {
   if (attachment.type === 'video') {
     return (
       <VideoPlayer
-        title={attachment.fileName || 'Chat video'}
+        title="Video"
         sourceUrl={attachment.url}
         durationSeconds={attachment.durationSeconds}
         style={styles.player}
@@ -55,7 +55,7 @@ function MessageAttachment({ attachment }: { attachment: ChatAttachment }) {
   }
   return (
     <AudioPlayer
-      title={attachment.fileName || 'Voice note'}
+      title="Voice note"
       sourceUrl={attachment.url}
       durationSeconds={attachment.durationSeconds}
       style={styles.player}
