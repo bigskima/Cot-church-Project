@@ -62,67 +62,31 @@ function buildCountdownState({
 }): CountdownState {
   const normalizedStatus = status?.toLowerCase();
   if (normalizedStatus === 'cancelled') {
-    return {
-      phase: 'cancelled',
-      prefix: '',
-      value: 'Event cancelled',
-      accessibilityLabel: 'Event cancelled',
-    };
+    return { phase: 'cancelled', prefix: '', value: 'Event cancelled', accessibilityLabel: 'Event cancelled' };
   }
 
   if (normalizedStatus === 'completed' || normalizedStatus === 'archived') {
-    return {
-      phase: 'ended',
-      prefix: '',
-      value: 'Event ended',
-      accessibilityLabel: 'Event ended',
-    };
+    return { phase: 'ended', prefix: '', value: 'Event ended', accessibilityLabel: 'Event ended' };
   }
 
   if (!start) {
-    return {
-      phase: 'unknown',
-      prefix: '',
-      value: 'Time to be announced',
-      accessibilityLabel: 'Event time to be announced',
-    };
+    return { phase: 'unknown', prefix: '', value: 'Time to be announced', accessibilityLabel: 'Event time to be announced' };
   }
 
   if (now < start) {
     const remaining = formatRemaining(start - now, compact);
-    return {
-      phase: 'upcoming',
-      prefix: 'Starts in',
-      value: remaining,
-      accessibilityLabel: `Event starts in ${remaining}`,
-    };
+    return { phase: 'upcoming', prefix: 'Starts in', value: remaining, accessibilityLabel: `Event starts in ${remaining}` };
   }
 
   if (!end || now < end) {
     if (end) {
       const remaining = formatRemaining(end - now, compact);
-      return {
-        phase: 'live',
-        prefix: 'LIVE NOW',
-        value: `Ends in ${remaining}`,
-        accessibilityLabel: `Event is live now and ends in ${remaining}`,
-      };
+      return { phase: 'live', prefix: 'LIVE NOW', value: `Ends in ${remaining}`, accessibilityLabel: `Event is live now and ends in ${remaining}` };
     }
-
-    return {
-      phase: 'live',
-      prefix: 'LIVE NOW',
-      value: 'Happening now',
-      accessibilityLabel: 'Event is live now',
-    };
+    return { phase: 'live', prefix: 'LIVE NOW', value: 'Happening now', accessibilityLabel: 'Event is live now' };
   }
 
-  return {
-    phase: 'ended',
-    prefix: '',
-    value: 'Event ended',
-    accessibilityLabel: 'Event ended',
-  };
+  return { phase: 'ended', prefix: '', value: 'Event ended', accessibilityLabel: 'Event ended' };
 }
 
 export function EventLiveCountdown({
@@ -138,10 +102,21 @@ export function EventLiveCountdown({
   const end = useMemo(() => parseTimestamp(endsAt), [endsAt]);
 
   useEffect(() => {
-    setNow(Date.now());
-    const interval = setInterval(() => setNow(Date.now()), SECOND);
+    const current = Date.now();
+    setNow(current);
+
+    const normalizedStatus = status?.toLowerCase();
+    const inactiveStatus = normalizedStatus === 'cancelled' || normalizedStatus === 'completed' || normalizedStatus === 'archived';
+    if (!start || inactiveStatus || (end !== null && current >= end)) return undefined;
+
+    const interval = setInterval(() => {
+      const tick = Date.now();
+      setNow(tick);
+      if (end !== null && tick >= end) clearInterval(interval);
+    }, SECOND);
+
     return () => clearInterval(interval);
-  }, [startsAt, endsAt, status]);
+  }, [start, end, status]);
 
   const state = buildCountdownState({ now, start, end, status, compact });
   if (!showEnded && state.phase === 'ended') return null;
@@ -170,10 +145,7 @@ export function EventLiveCountdown({
         {state.prefix ? (
           <Text style={[styles.prefix, compact && styles.compactPrefix, { color: foreground }]}>{state.prefix}</Text>
         ) : null}
-        <Text
-          numberOfLines={1}
-          style={[styles.value, compact && styles.compactValue, { color: foreground }]}
-        >
+        <Text numberOfLines={1} style={[styles.value, compact && styles.compactValue, { color: foreground }]}>
           {state.value}
         </Text>
       </View>
@@ -200,29 +172,9 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     gap: 6,
   },
-  copy: {
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  prefix: {
-    fontSize: 10,
-    lineHeight: 13,
-    fontWeight: '800',
-    letterSpacing: 0.7,
-  },
-  compactPrefix: {
-    fontSize: 9,
-    lineHeight: 11,
-  },
-  value: {
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: '800',
-    fontVariant: ['tabular-nums'],
-  },
-  compactValue: {
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '700',
-  },
+  copy: { flexShrink: 1, minWidth: 0 },
+  prefix: { fontSize: 10, lineHeight: 13, fontWeight: '800', letterSpacing: 0.7 },
+  compactPrefix: { fontSize: 9, lineHeight: 11 },
+  value: { fontSize: 14, lineHeight: 18, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  compactValue: { fontSize: 11, lineHeight: 14, fontWeight: '700' },
 });
