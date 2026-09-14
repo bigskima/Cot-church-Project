@@ -1,6 +1,11 @@
 import React from 'react';
-import { CommunityExperience } from '@/features/community/CommunityExperience';
+import { Redirect, useLocalSearchParams } from 'expo-router';
+import GeneralComposerExperience from '@/features/general/GeneralComposerExperience';
 
 export default function GeneralCommunityScreen() {
-  return <CommunityExperience scope="general" />;
+  const { compose } = useLocalSearchParams<{ compose?: string }>();
+
+  if (!compose) return <Redirect href="/general" />;
+
+  return <GeneralComposerExperience mode={compose === 'audio' ? 'audio' : 'post'} />;
 }
