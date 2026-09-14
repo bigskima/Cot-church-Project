@@ -10,10 +10,31 @@ import type { Event } from '@/types/content';
 
 type Payload = { events: Event[] };
 
-function eventDate(value?: string | null) {
+function timestamp(value?: string | null) {
   if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function isCurrentOrUpcoming(event: Event, now: number) {
+  const status = event.status?.toLowerCase();
+  if (status === 'cancelled' || status === 'completed' || status === 'archived') return false;
+  const end = timestamp(event.ends_at);
+  return end === null || end > now;
+}
+
+function isLiveEvent(event: Event, now: number) {
+  const start = timestamp(event.starts_at);
+  const end = timestamp(event.ends_at);
+  return start !== null && start <= now && (end === null || end > now);
+}
+
+function eventRank(event: Event, now: number) {
+  const start = timestamp(event.starts_at);
+  return {
+    bucket: isLiveEvent(event, now) ? 0 : 1,
+    time: start ?? Number.MAX_SAFE_INTEGER,
+  };
 }
 
 export default function ExpressionEventsScreen() {
@@ -24,9 +45,8 @@ export default function ExpressionEventsScreen() {
 
   const membership = context?.expressions?.find((item) => item.id === id && item.status === 'active');
   const organizationId = membership?.organizationId ?? context?.organization?.id ?? '';
-  const expressionName = context?.expression?.id === id
-    ? context.expression.name
-    : membership?.name ?? 'this Expression';
+  const activeExpressionName = context?.expression?.id === id ? context?.expression?.name : undefined;
+  const expressionName = activeExpressionName ?? membership?.name ?? 'this Expression';
 
   const path = useMemo(() => {
     const params = new URLSearchParams();
@@ -40,11 +60,19 @@ export default function ExpressionEventsScreen() {
     (signal) => api.request<Payload>(path, { signal }),
   );
 
-  const events = [...(resource.data?.events ?? [])].sort((a: any, b: any) => {
-    const aDate = eventDate(a.starts_at ?? a.start_at ?? a.startDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
-    const bDate = eventDate(b.starts_at ?? b.start_at ?? b.startDate)?.getTime() ?? Number.MAX_SAFE_INTEGER;
-    return aDate - bDate;
-  });
+  const events = useMemo(() => {
+    const now = Date.now();
+    return [...(resource.data?.events ?? [])]
+      .filter((event) => isCurrentOrUpcoming(event, now))
+      .sort((a, b) => {
+        const left = eventRank(a, now);
+        const right = eventRank(b, now);
+        return left.bucket - right.bucket || left.time - right.time;
+      });
+  }, [resource.data?.events]);
+
+  const now = Date.now();
+  const liveCount = events.filter((event) => isLiveEvent(event, now)).length;
   const nextEvent = events[0];
   const laterEvents = events.slice(1);
 
@@ -57,8 +85,8 @@ export default function ExpressionEventsScreen() {
     >
       <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
         <View style={styles.heroTop}>
-          <View style={[styles.iconWrap, { backgroundColor: colors.primarySoft }]}>
-            <Icon name="calendar-outline" size={22} color={colors.interactive} />
+          <View style={[styles.iconWrap, { backgroundColor: liveCount ? colors.liveSoft : colors.primarySoft }]}>
+            <Icon name={liveCount ? 'radio-outline' : 'calendar-outline'} size={22} color={liveCount ? colors.live : colors.interactive} />
           </View>
           <View style={styles.flex}>
             <View style={styles.scopeRow}>
@@ -75,7 +103,7 @@ export default function ExpressionEventsScreen() {
         <View style={styles.quickRow}>
           <View style={[styles.countPill, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
             <Text style={[styles.countNumber, { color: colors.text }]}>{events.length}</Text>
-            <Text style={[styles.countLabel, { color: colors.textMuted }]}>upcoming</Text>
+            <Text style={[styles.countLabel, { color: colors.textMuted }]}>{liveCount ? `${liveCount} live · ${events.length - liveCount} upcoming` : 'upcoming'}</Text>
           </View>
           <Pressable
             onPress={() => router.push(`/expressions/${id}/feed` as any)}
@@ -95,15 +123,15 @@ export default function ExpressionEventsScreen() {
         <>
           <View style={styles.sectionHeader}>
             <View>
-              <Text style={[styles.sectionEyebrow, { color: colors.interactive }]}>NEXT UP</Text>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Coming soon</Text>
+              <Text style={[styles.sectionEyebrow, { color: liveCount ? colors.live : colors.interactive }]}>{liveCount ? 'HAPPENING / NEXT UP' : 'NEXT UP'}</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>{liveCount ? 'Happening now' : 'Coming soon'}</Text>
             </View>
           </View>
-          <View style={[styles.featuredShell, { backgroundColor: colors.card, borderColor: colors.interactive }, shadows.sm]}>
+          <View style={[styles.featuredShell, { backgroundColor: colors.card, borderColor: liveCount ? colors.live : colors.interactive }, shadows.sm]}>
             <View style={styles.featuredLabelRow}>
-              <View style={[styles.nextPill, { backgroundColor: colors.primarySoft }]}>
-                <Icon name="time-outline" size={12} color={colors.interactive} />
-                <Text style={[styles.nextPillText, { color: colors.interactive }]}>NEXT GATHERING</Text>
+              <View style={[styles.nextPill, { backgroundColor: liveCount ? colors.liveSoft : colors.primarySoft }]}>
+                <Icon name={liveCount ? 'radio-outline' : 'time-outline'} size={12} color={liveCount ? colors.live : colors.interactive} />
+                <Text style={[styles.nextPillText, { color: liveCount ? colors.live : colors.interactive }]}>{liveCount ? 'LIVE GATHERING' : 'NEXT GATHERING'}</Text>
               </View>
             </View>
             <EventCard
@@ -135,7 +163,7 @@ export default function ExpressionEventsScreen() {
       ) : (
         <EmptyState
           title="No upcoming Expression events"
-          message="New gatherings and activities published for this Expression will appear here."
+          message="New gatherings and activities published for this Expression will appear here with a live countdown."
           iconName="calendar-outline"
         />
       )}
@@ -156,7 +184,7 @@ const styles = StyleSheet.create({
   quickRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   countPill: { flex: 1, minHeight: 40, borderRadius: radius.pill, borderWidth: 1, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', gap: 6 },
   countNumber: { fontSize: 15, fontWeight: '900' },
-  countLabel: { fontSize: 11, fontWeight: '700' },
+  countLabel: { flexShrink: 1, fontSize: 11, fontWeight: '700' },
   feedButton: { minHeight: 40, borderRadius: radius.pill, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   feedButtonText: { fontSize: 11, fontWeight: '800' },
   sectionHeader: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
