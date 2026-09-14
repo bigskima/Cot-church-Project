@@ -1,6 +1,6 @@
 -- Expression-wide discussion channel with role-aware moderation.
--- All active Expression members can read/post. Branch-scoped members.update
--- authority can restrict posting, ban chat access, or remove a member.
+-- All active, non-banned Expression members can read/post. Branch-scoped
+-- members.update authority can restrict posting, ban chat access, or remove a member.
 
 alter table public.expression_memberships
   add column if not exists chat_restricted_until timestamptz,
@@ -86,20 +86,34 @@ alter table public.expression_chat_messages enable row level security;
 alter table public.expression_chat_reactions enable row level security;
 alter table public.expression_chat_uploads enable row level security;
 
--- Realtime readers may see discussion rows only while they are active members
--- of the exact Expression. All writes remain Edge-Function mediated.
+-- Realtime/direct readers may see discussion rows only while they are active
+-- members of the exact Expression and have not been banned from Discussion.
 drop policy if exists expression_chat_messages_member_read on public.expression_chat_messages;
 create policy expression_chat_messages_member_read on public.expression_chat_messages
 for select to authenticated
-using (public.is_expression_member(organization_id, branch_id));
+using (exists (
+  select 1
+  from public.expression_memberships em
+  where em.organization_id = expression_chat_messages.organization_id
+    and em.branch_id = expression_chat_messages.branch_id
+    and em.profile_id = auth.uid()
+    and em.status = 'active'
+    and em.chat_banned_at is null
+));
 
 drop policy if exists expression_chat_reactions_member_read on public.expression_chat_reactions;
 create policy expression_chat_reactions_member_read on public.expression_chat_reactions
 for select to authenticated
 using (exists (
-  select 1 from public.expression_chat_messages m
+  select 1
+  from public.expression_chat_messages m
+  join public.expression_memberships em
+    on em.organization_id = m.organization_id
+   and em.branch_id = m.branch_id
+   and em.profile_id = auth.uid()
+   and em.status = 'active'
+   and em.chat_banned_at is null
   where m.id = expression_chat_reactions.message_id
-    and public.is_expression_member(m.organization_id, m.branch_id)
 ));
 
 -- Do not expose private storage metadata directly.
