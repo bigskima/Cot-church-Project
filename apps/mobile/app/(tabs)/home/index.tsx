@@ -1,4 +1,28 @@
-export { default } from '@/features/general/GeneralHomeExperience';
+import React, { Suspense } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { spacing } from '@/design-system/tokens';
+import { useTheme } from '@/state/theme';
+
+const GeneralHomeExperience = React.lazy(() => import('@/features/general/GeneralHomeExperience'));
+
+export default function GeneralHomeRoute() {
+  const { colors } = useTheme();
+  return (
+    <Suspense fallback={(
+      <View style={[styles.loading, { backgroundColor: colors.bg }]}>
+        <ActivityIndicator size="small" color={colors.interactive} />
+        <Text style={[styles.loadingText, { color: colors.textMuted }]}>Preparing your Home…</Text>
+      </View>
+    )}>
+      <GeneralHomeExperience />
+    </Suspense>
+  );
+}
+
+const styles = StyleSheet.create({
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+  loadingText: { fontSize: 11.5, fontWeight: '700' },
+});
 
 /**
  * Static route contract for the extracted General Home feature.
