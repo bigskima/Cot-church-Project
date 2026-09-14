@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { Avatar, Button, Chip, Icon, ResourceError, ScreenHeader, Skeleton } from '@/components';
+import { DateTimeField, formatDateOnly } from '@/components/DateTimeField';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 
 type ProfilePayload = {
@@ -32,6 +33,13 @@ function inferMimeType(fileName?: string | null) {
   return 'image/jpeg';
 }
 
+function parseDateOnly(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12, 0, 0, 0);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 export default function AccountSettingsScreen() {
   const insets = useSafeAreaInsets();
   const { api, updateContextProfile } = useSession();
@@ -52,6 +60,7 @@ export default function AccountSettingsScreen() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [activeSection, setActiveSection] = useState<'identity' | 'privacy' | 'contact'>('identity');
+  const birthdayDate = parseDateOnly(birthday);
 
   const loadProfile = async () => {
     setLoading(true);
@@ -107,6 +116,7 @@ export default function AccountSettingsScreen() {
         }),
       });
       setProfile(updated);
+      setBirthday(updated.birthday ?? '');
       setBirthdayExpressionVisible(updated.birthday_expression_visible !== false);
       setBirthdayPublicVisible(updated.birthday_public_visible === true);
       updateContextProfile({
@@ -321,11 +331,7 @@ export default function AccountSettingsScreen() {
                   <Pressable
                     key={key}
                     onPress={() => setActiveSection(key)}
-                    style={({ pressed }) => [
-                      styles.sectionTab,
-                      selected && { backgroundColor: colors.primarySoft },
-                      pressed && styles.sectionTabPressed,
-                    ]}
+                    style={({ pressed }) => [styles.sectionTab, selected && { backgroundColor: colors.primarySoft }, pressed && styles.sectionTabPressed]}
                     accessibilityRole="tab"
                     accessibilityState={{ selected }}
                   >
@@ -341,9 +347,7 @@ export default function AccountSettingsScreen() {
             {activeSection === 'identity' ? (
               <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
                 <View style={styles.cardHeadingRow}>
-                  <View style={[styles.cardHeadingIcon, { backgroundColor: colors.primarySoft }]}>
-                    <Icon name="person-outline" size={18} color={colors.interactive} />
-                  </View>
+                  <View style={[styles.cardHeadingIcon, { backgroundColor: colors.primarySoft }]}><Icon name="person-outline" size={18} color={colors.interactive} /></View>
                   <View style={styles.flex}>
                     <Text style={[styles.cardTitle, { color: colors.text }]}>Profile identity</Text>
                     <Text style={[styles.helper, { color: colors.textMuted }]}>How your name and introduction appear around COT.</Text>
@@ -359,15 +363,26 @@ export default function AccountSettingsScreen() {
             {activeSection === 'privacy' ? (
               <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
                 <View style={styles.cardHeadingRow}>
-                  <View style={[styles.cardHeadingIcon, { backgroundColor: colors.primarySoft }]}>
-                    <Icon name="shield-checkmark-outline" size={18} color={colors.interactive} />
-                  </View>
+                  <View style={[styles.cardHeadingIcon, { backgroundColor: colors.primarySoft }]}><Icon name="shield-checkmark-outline" size={18} color={colors.interactive} /></View>
                   <View style={styles.flex}>
                     <Text style={[styles.cardTitle, { color: colors.text }]}>Birthday privacy</Text>
                     <Text style={[styles.helper, { color: colors.textMuted }]}>Your full date stays private. You control whether month/day is shown.</Text>
                   </View>
                 </View>
-                <Field label="BIRTHDAY" value={birthday} onChangeText={setBirthday} placeholder="YYYY-MM-DD" colors={colors} keyboardType="numbers-and-punctuation" />
+                <DateTimeField
+                  label="Birthday"
+                  value={birthdayDate}
+                  onChange={(date) => {
+                    setBirthday(formatDateOnly(date));
+                    setError('');
+                    setSuccess('');
+                  }}
+                  includeTime={false}
+                  minYear={1900}
+                  maxYear={new Date().getFullYear()}
+                  placeholder="Choose your birthday"
+                  helperText="Tap to choose the date instead of typing it manually."
+                />
 
                 <View style={[styles.privacyChoice, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
                   <View style={styles.privacyChoiceHeader}>
@@ -402,9 +417,7 @@ export default function AccountSettingsScreen() {
             {activeSection === 'contact' ? (
               <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
                 <View style={styles.cardHeadingRow}>
-                  <View style={[styles.cardHeadingIcon, { backgroundColor: colors.primarySoft }]}>
-                    <Icon name="call-outline" size={18} color={colors.interactive} />
-                  </View>
+                  <View style={[styles.cardHeadingIcon, { backgroundColor: colors.primarySoft }]}><Icon name="call-outline" size={18} color={colors.interactive} /></View>
                   <View style={styles.flex}>
                     <Text style={[styles.cardTitle, { color: colors.text }]}>Contact & sign-in</Text>
                     <Text style={[styles.helper, { color: colors.textMuted }]}>Profile contact can be edited here; authentication identity stays protected.</Text>
@@ -423,7 +436,6 @@ export default function AccountSettingsScreen() {
                 ) : null}
               </View>
             ) : null}
-
           </View>
         ) : null}
       </ScrollView>
