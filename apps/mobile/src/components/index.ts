@@ -33,3 +33,4 @@ export * from './engagement/CommentsThread';
 export * from './engagement/InlineCommentsSheet';
 export * from './engagement/ContentReportSheet';
 export * from './engagement/ReactionDrawer';
+export * from './workflow/ProgressiveFlow';
