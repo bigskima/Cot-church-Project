@@ -53,11 +53,11 @@ const tableInvalidations: Record<string, string[]> = {
   groups: ['expression:groups:', 'expression:'],
   group_memberships: ['expression:groups:', 'expression:'],
   branches: ['expression:', 'mobile:home-feed:'],
-  expression_memberships: ['expression:', 'chat:'],
+  expression_memberships: ['expression:', 'chat:', 'expression-chat:'],
   events: ['events:', 'mobile:home-feed:', 'expression:'],
   announcements: ['announcements:', 'mobile:home-feed:', 'expression:'],
   sermons: ['sermon:', 'mobile:home-feed:', 'expression:'],
-  profiles: ['chat:', 'comments:', 'mobile:community:', 'mobile:home-feed:', 'public-profile:', 'birthdays:', 'expression:birthdays:'],
+  profiles: ['chat:', 'comments:', 'mobile:community:', 'mobile:home-feed:', 'public-profile:', 'birthdays:', 'expression:birthdays:', 'expression-chat:'],
   notifications: ['notifications:'],
   follows: ['mobile:home-feed:', 'public-profile:', 'expression:'],
   giving_purposes: ['expression:finance-books:', 'giving:'],
@@ -65,9 +65,9 @@ const tableInvalidations: Record<string, string[]> = {
   giving_settings: ['expression:finance-books:', 'giving:'],
 };
 
-// These tables are introduced by this draft PR. They intentionally live on a
-// second channel: if the database migration has not been promoted yet, that
-// channel may fail without affecting established chat/feed/media realtime.
+// These tables are introduced by draft migrations. They intentionally live on a
+// second channel: if a migration has not been promoted yet, that channel may fail
+// without affecting established chat/feed/media realtime.
 const optionalTableInvalidations: Record<string, string[]> = {
   polls: ['participation:'],
   poll_options: ['participation:'],
@@ -81,6 +81,8 @@ const optionalTableInvalidations: Record<string, string[]> = {
   financial_sessions: ['expression:finance-books:'],
   financial_ledger_entries: ['expression:finance-books:'],
   feed_ranking_settings: ['mobile:home-feed:', 'expression:layered-home:'],
+  expression_chat_messages: ['expression-chat:'],
+  expression_chat_reactions: ['expression-chat:'],
 };
 
 const contextTables = new Set(['branches', 'expression_memberships']);
