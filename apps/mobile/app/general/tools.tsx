@@ -43,6 +43,7 @@ export default function GeneralToolsScreen() {
     hasOrganizationCapability('sermons.manage') ||
     hasOrganizationCapability('events.create') ||
     hasOrganizationCapability('events.update') ||
+    hasOrganizationCapability('polls.manage') ||
     hasOrganizationCapability('prayer.moderate') ||
     hasOrganizationCapability('giving.campaigns.manage') ||
     hasOrganizationCapability('giving.finance.read')
@@ -124,71 +125,24 @@ export default function GeneralToolsScreen() {
             </View>
             <View style={styles.signInCopy}>
               <Text style={[styles.signInTitle, { color: colors.text }]}>Sign in for your COT tools</Text>
-              <Text style={[styles.signInText, { color: colors.textSecondary }]}>
-                Public content stays open. Sign in to create, message, save and manage your account.
-              </Text>
+              <Text style={[styles.signInText, { color: colors.textSecondary }]}>Public content stays open. Sign in to create, message, vote, save and manage your account.</Text>
             </View>
-            <Button
-              label="Sign in"
-              variant="primary"
-              size="sm"
-              onPress={() => router.push({ pathname: '/(auth)/login', params: { returnTo: '/general/tools' } } as any)}
-            />
+            <Button label="Sign in" variant="primary" size="sm" onPress={() => router.push({ pathname: '/(auth)/login', params: { returnTo: '/general/tools' } } as any)} />
           </View>
         )}
 
         <View style={styles.section}>
           <SectionHeader title="COT tools" subtitle="Everything useful without crowding Home" />
           <View style={styles.toolsGrid}>
-            {mode === 'authenticated' ? toolTile({
-              icon: 'chatbubbles-outline',
-              title: 'Messages',
-              subtitle: 'Private direct messages across COT',
-              onPress: () => router.push('/general/chat'),
-            }) : null}
-            {toolTile({
-              icon: 'radio-outline',
-              title: 'Live',
-              subtitle: 'Watch current and upcoming broadcasts',
-              onPress: () => router.push('/general/live' as any),
-            })}
-            {mode === 'authenticated' ? toolTile({
-              icon: 'bookmark-outline',
-              title: 'Saved',
-              subtitle: 'Posts, Reels, videos and sermons you kept',
-              onPress: () => router.push('/general/saved'),
-            }) : null}
-            {toolTile({
-              icon: 'heart-outline',
-              title: 'Prayer',
-              subtitle: 'Prayer wall and private petitions',
-              onPress: () => router.push('/general/prayer'),
-            })}
-            {toolTile({
-              icon: 'gift-outline',
-              title: 'Giving',
-              subtitle: 'Giving destinations, receipts and statements',
-              onPress: () => router.push('/general/giving'),
-            })}
-            {mode === 'authenticated' ? toolTile({
-              icon: 'business-outline',
-              title: 'Expressions',
-              subtitle: 'Open or join your private church spaces',
-              onPress: () => router.push('/expressions'),
-            }) : null}
-            {mode === 'authenticated' ? toolTile({
-              icon: 'sparkles',
-              title: 'COT Assistant',
-              subtitle: 'Ask for help navigating COT and church resources',
-              onPress: () => router.push('/general/assistant'),
-            }) : null}
-            {mode === 'authenticated' && hasLeadershipAccess ? toolTile({
-              icon: 'construct-outline',
-              title: 'Ministry tools',
-              subtitle: 'The ministry tools available to your account',
-              badge: 'MINISTRY',
-              onPress: () => router.push('/general/leadership'),
-            }) : null}
+            {mode === 'authenticated' ? toolTile({ icon: 'chatbubbles-outline', title: 'Messages', subtitle: 'Private direct messages across COT', onPress: () => router.push('/general/chat') }) : null}
+            {toolTile({ icon: 'radio-outline', title: 'Live', subtitle: 'Watch current and upcoming broadcasts', onPress: () => router.push('/general/live' as any) })}
+            {mode === 'authenticated' ? toolTile({ icon: 'stats-chart-outline', title: 'Polls & giveaways', subtitle: 'Vote in official polls or host and join giveaways', badge: 'ENGAGE', onPress: () => router.push('/general/participate' as any) }) : null}
+            {mode === 'authenticated' ? toolTile({ icon: 'bookmark-outline', title: 'Saved', subtitle: 'Posts, Reels, videos and sermons you kept', onPress: () => router.push('/general/saved') }) : null}
+            {toolTile({ icon: 'heart-outline', title: 'Prayer', subtitle: 'Prayer wall and private petitions', onPress: () => router.push('/general/prayer') })}
+            {toolTile({ icon: 'gift-outline', title: 'Giving', subtitle: 'Giving destinations, receipts and statements', onPress: () => router.push('/general/giving') })}
+            {mode === 'authenticated' ? toolTile({ icon: 'business-outline', title: 'Expressions', subtitle: 'Open or join your private church spaces', onPress: () => router.push('/expressions') }) : null}
+            {mode === 'authenticated' ? toolTile({ icon: 'sparkles', title: 'COT Assistant', subtitle: 'Ask for help navigating COT and church resources', onPress: () => router.push('/general/assistant') }) : null}
+            {mode === 'authenticated' && hasLeadershipAccess ? toolTile({ icon: 'construct-outline', title: 'Ministry tools', subtitle: 'The ministry tools available to your account', badge: 'MINISTRY', onPress: () => router.push('/general/leadership') }) : null}
           </View>
         </View>
 
@@ -198,35 +152,20 @@ export default function GeneralToolsScreen() {
             {mode === 'authenticated' ? (
               <>
                 <Pressable onPress={() => router.push('/general/settings')} style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}>
-                  <View style={[styles.settingsIcon, { backgroundColor: colors.bgSecondary }]}>
-                    <Icon name="person-circle-outline" size={19} color={colors.text} />
-                  </View>
-                  <View style={styles.settingsCopy}>
-                    <Text style={[styles.settingsTitle, { color: colors.text }]}>Profile & privacy</Text>
-                    <Text style={[styles.settingsSubtitle, { color: colors.textSecondary }]}>Identity, banner, birthday privacy and contact</Text>
-                  </View>
+                  <View style={[styles.settingsIcon, { backgroundColor: colors.bgSecondary }]}><Icon name="person-circle-outline" size={19} color={colors.text} /></View>
+                  <View style={styles.settingsCopy}><Text style={[styles.settingsTitle, { color: colors.text }]}>Profile & privacy</Text><Text style={[styles.settingsSubtitle, { color: colors.textSecondary }]}>Identity, banner, birthday privacy and contact</Text></View>
                   <Icon name="chevron-forward" size={18} color={colors.textMuted} />
                 </Pressable>
                 <View style={[styles.settingsDivider, { backgroundColor: colors.borderSubtle }]} />
                 <Pressable onPress={() => router.push('/general/notifications')} style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}>
-                  <View style={[styles.settingsIcon, { backgroundColor: colors.bgSecondary }]}>
-                    <Icon name="notifications-outline" size={19} color={colors.text} />
-                  </View>
-                  <View style={styles.settingsCopy}>
-                    <Text style={[styles.settingsTitle, { color: colors.text }]}>Notifications</Text>
-                    <Text style={[styles.settingsSubtitle, { color: colors.textSecondary }]}>Inbox, invitations and activity</Text>
-                  </View>
+                  <View style={[styles.settingsIcon, { backgroundColor: colors.bgSecondary }]}><Icon name="notifications-outline" size={19} color={colors.text} /></View>
+                  <View style={styles.settingsCopy}><Text style={[styles.settingsTitle, { color: colors.text }]}>Notifications</Text><Text style={[styles.settingsSubtitle, { color: colors.textSecondary }]}>Inbox, invitations and activity</Text></View>
                   <Icon name="chevron-forward" size={18} color={colors.textMuted} />
                 </Pressable>
                 <View style={[styles.settingsDivider, { backgroundColor: colors.borderSubtle }]} />
                 <Pressable onPress={() => router.push('/general/notification-settings')} style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}>
-                  <View style={[styles.settingsIcon, { backgroundColor: colors.bgSecondary }]}>
-                    <Icon name="options-outline" size={19} color={colors.text} />
-                  </View>
-                  <View style={styles.settingsCopy}>
-                    <Text style={[styles.settingsTitle, { color: colors.text }]}>Notification preferences</Text>
-                    <Text style={[styles.settingsSubtitle, { color: colors.textSecondary }]}>Choose what COT should notify you about</Text>
-                  </View>
+                  <View style={[styles.settingsIcon, { backgroundColor: colors.bgSecondary }]}><Icon name="options-outline" size={19} color={colors.text} /></View>
+                  <View style={styles.settingsCopy}><Text style={[styles.settingsTitle, { color: colors.text }]}>Notification preferences</Text><Text style={[styles.settingsSubtitle, { color: colors.textSecondary }]}>Choose what COT should notify you about</Text></View>
                   <Icon name="chevron-forward" size={18} color={colors.textMuted} />
                 </Pressable>
               </>
@@ -234,13 +173,8 @@ export default function GeneralToolsScreen() {
 
             <View style={[styles.appearanceBlock, mode === 'authenticated' && { borderTopColor: colors.borderSubtle, borderTopWidth: StyleSheet.hairlineWidth }]}>
               <View style={styles.appearanceHeading}>
-                <View style={[styles.settingsIcon, { backgroundColor: colors.bgSecondary }]}>
-                  <Icon name="color-palette-outline" size={19} color={colors.text} />
-                </View>
-                <View style={styles.settingsCopy}>
-                  <Text style={[styles.settingsTitle, { color: colors.text }]}>Appearance</Text>
-                  <Text style={[styles.settingsSubtitle, { color: colors.textSecondary }]}>Choose how COT looks on this device</Text>
-                </View>
+                <View style={[styles.settingsIcon, { backgroundColor: colors.bgSecondary }]}><Icon name="color-palette-outline" size={19} color={colors.text} /></View>
+                <View style={styles.settingsCopy}><Text style={[styles.settingsTitle, { color: colors.text }]}>Appearance</Text><Text style={[styles.settingsSubtitle, { color: colors.textSecondary }]}>Choose how COT looks on this device</Text></View>
               </View>
               <View style={styles.themeRow}>
                 <Chip label="System" selected={preference === 'system'} onPress={() => setPreference('system')} />
