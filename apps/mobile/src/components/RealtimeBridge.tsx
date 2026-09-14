@@ -15,13 +15,24 @@ type RealtimeClient = {
   removeAllChannels: () => Promise<unknown> | unknown;
 };
 
+// Tables that exist in the current production schema. Keep these on the primary
+// channel so unreleased draft migrations can never disable established realtime.
 const tableInvalidations: Record<string, string[]> = {
   conversations: ['chat:'],
   conversation_participants: ['chat:'],
   messages: ['chat:'],
   direct_conversations: ['chat:'],
   direct_messages: ['chat:'],
+  direct_message_reactions: ['chat:'],
   group_messages: ['group-chat:'],
+  group_message_reactions: ['group-chat:'],
+  group_chat_sections: ['group-chat:', 'expression:groups:'],
+  group_chat_section_members: ['group-chat:'],
+  group_roles: ['group-chat:', 'expression:groups:'],
+  group_role_assignments: ['group-chat:', 'expression:groups:'],
+  group_announcements: ['group-chat:', 'expression:groups:'],
+  group_events: ['group-chat:', 'expression:groups:'],
+  group_giving_options: ['group-chat:', 'expression:groups:'],
   social_posts: ['mobile:home-feed:', 'mobile:community:', 'expression:'],
   social_comments: ['comments:', 'mobile:home-feed:', 'mobile:community:', 'expression:'],
   social_reactions: ['mobile:home-feed:', 'mobile:community:', 'expression:'],
@@ -29,6 +40,7 @@ const tableInvalidations: Record<string, string[]> = {
   content_comments: engagementResources,
   content_reactions: engagementResources,
   content_bookmarks: engagementResources,
+  content_playback_progress: ['mobile:home-feed:', 'expression:', 'reels:immersive:', 'watch:catalogue:', 'playback:'],
   reels: ['mobile:home-feed:', 'reels:immersive:', 'expression:'],
   videos: ['mobile:home-feed:', 'watch:catalogue:', 'expression:'],
   media_assets: ['playback:', 'mobile:home-feed:', 'reels:immersive:', 'watch:catalogue:', 'expression:'],
@@ -43,10 +55,32 @@ const tableInvalidations: Record<string, string[]> = {
   branches: ['expression:', 'mobile:home-feed:'],
   expression_memberships: ['expression:', 'chat:'],
   events: ['events:', 'mobile:home-feed:', 'expression:'],
+  announcements: ['announcements:', 'mobile:home-feed:', 'expression:'],
   sermons: ['sermon:', 'mobile:home-feed:', 'expression:'],
-  profiles: ['chat:', 'comments:', 'mobile:community:', 'mobile:home-feed:', 'public-profile:'],
+  profiles: ['chat:', 'comments:', 'mobile:community:', 'mobile:home-feed:', 'public-profile:', 'birthdays:', 'expression:birthdays:'],
   notifications: ['notifications:'],
-  follows: ['mobile:home-feed:', 'public-profile:'],
+  follows: ['mobile:home-feed:', 'public-profile:', 'expression:'],
+  giving_purposes: ['expression:finance-books:', 'giving:'],
+  giving_campaigns: ['expression:finance-books:', 'giving:'],
+  giving_settings: ['expression:finance-books:', 'giving:'],
+};
+
+// These tables are introduced by this draft PR. They intentionally live on a
+// second channel: if the database migration has not been promoted yet, that
+// channel may fail without affecting established chat/feed/media realtime.
+const optionalTableInvalidations: Record<string, string[]> = {
+  polls: ['participation:'],
+  poll_options: ['participation:'],
+  poll_votes: ['participation:'],
+  giveaways: ['participation:'],
+  giveaway_entries: ['participation:'],
+  giveaway_winners: ['participation:'],
+  testimonies: ['expression:testimonies:'],
+  testimony_responses: ['expression:testimonies:'],
+  financial_accounts: ['expression:finance-books:'],
+  financial_sessions: ['expression:finance-books:'],
+  financial_ledger_entries: ['expression:finance-books:'],
+  feed_ranking_settings: ['mobile:home-feed:', 'expression:layered-home:'],
 };
 
 const contextTables = new Set(['branches', 'expression_memberships']);
@@ -60,7 +94,7 @@ export function RealtimeBridge() {
 
     let disposed = false;
     let client: RealtimeClient | null = null;
-    let channel: any = null;
+    const channels: any[] = [];
     let flushTimer: ReturnType<typeof setTimeout> | undefined;
     const pendingPrefixes = new Set<string>();
     const queueInvalidation = (prefix: string) => {
@@ -107,31 +141,37 @@ export function RealtimeBridge() {
         client = nextClient;
         if (accessToken) await client.realtime.setAuth(accessToken);
         if (disposed) return;
-        let nextChannel = client.channel(`cot-live-${accessToken ? auth?.session.expiresAt ?? 'member' : 'visitor'}`);
 
-        for (const table of Object.keys(tableInvalidations)) {
-          nextChannel = nextChannel.on(
-            'postgres_changes',
-            { event: '*', schema: 'public', table },
-            () => {
-              tableInvalidations[table].forEach(queueInvalidation);
-              if (accessToken && contextTables.has(table)) refreshContext();
-            },
-          );
-        }
+        const attach = (name: string, invalidations: Record<string, string[]>, refreshMembershipContext: boolean) => {
+          let nextChannel = client!.channel(name);
+          for (const table of Object.keys(invalidations)) {
+            nextChannel = nextChannel.on(
+              'postgres_changes',
+              { event: '*', schema: 'public', table },
+              () => {
+                invalidations[table].forEach(queueInvalidation);
+                if (refreshMembershipContext && accessToken && contextTables.has(table)) refreshContext();
+              },
+            );
+          }
 
-        channel = nextChannel;
-        let subscribed = false;
-        channel.subscribe((status: string) => {
-          if (disposed || status !== 'SUBSCRIBED') return;
-          // Postgres changes are not replayed after a disconnected socket.
-          if (subscribed) Object.values(tableInvalidations).flat().forEach(queueInvalidation);
-          subscribed = true;
-        });
+          let subscribed = false;
+          nextChannel.subscribe((status: string) => {
+            if (disposed || status !== 'SUBSCRIBED') return;
+            // Postgres changes are not replayed after a disconnected socket.
+            if (subscribed) Object.values(invalidations).flat().forEach(queueInvalidation);
+            subscribed = true;
+          });
+          channels.push(nextChannel);
+        };
+
+        const identity = accessToken ? auth?.session.expiresAt ?? 'member' : 'visitor';
+        attach(`cot-live-core-${identity}`, tableInvalidations, true);
+        attach(`cot-live-draft-${identity}`, optionalTableInvalidations, false);
       } catch (error) {
-        // Canonical Edge Function reads continue to work when realtime is unavailable.
-        // Keep this failure isolated from the route tree and leave a development-only
-        // diagnostic instead of ever failing the application shell.
+        // Canonical reads continue to work when realtime is unavailable. Keep a
+        // websocket/config failure isolated from the route tree instead of ever
+        // blanking the application shell.
         if (typeof __DEV__ !== 'undefined' && __DEV__) {
           console.warn('Realtime enhancement unavailable:', error);
         }
@@ -142,8 +182,10 @@ export function RealtimeBridge() {
     return () => {
       disposed = true;
       if (flushTimer) clearTimeout(flushTimer);
-      if (client && channel) void client.removeChannel(channel);
-      if (client) void client.removeAllChannels();
+      if (client) {
+        channels.forEach((channel) => void client!.removeChannel(channel));
+        void client.removeAllChannels();
+      }
     };
   }, [accessToken, auth?.session.expiresAt, mode, refreshContext]);
 

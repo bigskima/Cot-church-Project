@@ -62,10 +62,34 @@ export function ExpressionManagementHub() {
       {
         key: 'events',
         title: 'Events',
-        description: 'Schedule and update gatherings.',
+        description: 'Schedule gatherings with optional flyers.',
         iconName: 'calendar-outline',
         route: `${base}/events`,
         enabled: access.canManageEvents,
+      },
+      {
+        key: 'announcements',
+        title: 'Announcements',
+        description: 'Publish or schedule official updates and flyers.',
+        iconName: 'megaphone-outline',
+        route: `${base}/announcements`,
+        enabled: access.canManageAnnouncements,
+      },
+      {
+        key: 'ranking',
+        title: 'Feed Ranking',
+        description: 'Tune freshness, engagement and diversity weights for Home.',
+        iconName: 'analytics-outline',
+        route: `${base}/feed-ranking`,
+        enabled: access.canManageFeedRanking,
+      },
+      {
+        key: 'testimonies',
+        title: 'Testimony review',
+        description: 'Respond privately and coordinate physical sharing.',
+        iconName: 'document-text-outline',
+        route: `${base}/testimonies`,
+        enabled: access.canReviewTestimonies,
       },
     ];
 
@@ -73,7 +97,7 @@ export function ExpressionManagementHub() {
       {
         key: 'leadership',
         title: 'Leadership',
-        description: 'Manage leaders shown to members.',
+        description: 'Search members, add leaders and edit portraits.',
         iconName: 'people-circle-outline',
         route: `${base}/leadership`,
         enabled: access.canManageLeadership,
@@ -108,18 +132,26 @@ export function ExpressionManagementHub() {
       {
         key: 'giving',
         title: 'Giving Setup',
-        description: 'Giving options, funds and destination.',
+        description: 'Giving options, purposes and transfer destination.',
         iconName: 'gift-outline',
         route: `${base}/giving`,
         enabled: access.canManageGiving,
       },
       {
-        key: 'finance',
+        key: 'giving-reports',
         title: 'Giving Reports',
-        description: 'Read totals, refunds and net giving.',
+        description: 'Read provider-linked giving totals and refunds.',
         iconName: 'analytics-outline',
         route: `${base}/finance`,
         enabled: access.canReadGivingFinance,
+      },
+      {
+        key: 'books',
+        title: 'Financial Management',
+        description: 'Wallets, sessions, manual records and immutable ledger.',
+        iconName: 'wallet-outline',
+        route: `${base}/books`,
+        enabled: access.canReadExpressionFinance,
       },
     ];
 
@@ -127,7 +159,7 @@ export function ExpressionManagementHub() {
       {
         key: 'operations',
         title: 'Content & gatherings',
-        subtitle: 'Create what members watch, read and attend.',
+        subtitle: 'Create what members watch, read, receive and attend, and tune how Home orders eligible content.',
         icon: 'sparkles-outline',
         tools: content.filter((tool) => tool.enabled),
       },
@@ -140,22 +172,26 @@ export function ExpressionManagementHub() {
       },
       {
         key: 'finance',
-        title: 'Giving',
-        subtitle: 'Configure giving and review Expression-level reports.',
+        title: 'Giving & finance',
+        subtitle: 'Configure giving, document manual activity and review balances.',
         icon: 'wallet-outline',
         tools: finance.filter((tool) => tool.enabled),
       },
     ].filter((section) => section.tools.length);
   }, [
     access.canManageAccess,
+    access.canManageAnnouncements,
     access.canManageEvents,
+    access.canManageFeedRanking,
     access.canManageGiving,
     access.canManageInviteCodes,
     access.canManageLeadership,
     access.canManageSettings,
     access.canManageLive,
     access.canManageSermons,
+    access.canReadExpressionFinance,
     access.canReadGivingFinance,
+    access.canReviewTestimonies,
     access.canUseContentStudio,
     base,
   ]);
@@ -176,46 +212,25 @@ export function ExpressionManagementHub() {
         icon="grid-outline"
       />
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={[styles.accessNote, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}>
           <Icon name="shield-checkmark-outline" size={17} color={colors.interactive} />
-          <Text style={[styles.accessNoteText, { color: colors.textSecondary }]}>
-            Only the ministry tools available to you in this Expression are shown here.
-          </Text>
+          <Text style={[styles.accessNoteText, { color: colors.textSecondary }]}>Only the ministry tools available to you in this Expression are shown here.</Text>
         </View>
 
         {!access.ready ? (
-          <View style={styles.stack}>
-            <Skeleton height={82} count={4} />
-          </View>
+          <View style={styles.stack}><Skeleton height={82} count={4} /></View>
         ) : toolCount ? (
           <>
             <View style={styles.summaryRow}>
-              <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
-                <Text style={[styles.summaryValue, { color: colors.text }]}>{toolCount}</Text>
-                <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Available tools</Text>
-              </View>
-              <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
-                <Text style={[styles.summaryValue, { color: colors.text }]}>{contentCount}</Text>
-                <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Content</Text>
-              </View>
-              <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
-                <Text style={[styles.summaryValue, { color: colors.text }]}>{peopleCount + financeCount}</Text>
-                <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>People & giving</Text>
-              </View>
+              <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}><Text style={[styles.summaryValue, { color: colors.text }]}>{toolCount}</Text><Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Available tools</Text></View>
+              <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}><Text style={[styles.summaryValue, { color: colors.text }]}>{contentCount}</Text><Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Content</Text></View>
+              <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}><Text style={[styles.summaryValue, { color: colors.text }]}>{peopleCount + financeCount}</Text><Text style={[styles.summaryLabel, { color: colors.textMuted }]}>People & finance</Text></View>
             </View>
 
             {sections.map((section) => (
               <View key={section.key} style={styles.section}>
-                <SectionHeader
-                  title={section.title}
-                  badge={section.tools.length}
-                  subtitle={section.subtitle}
-                />
+                <SectionHeader title={section.title} badge={section.tools.length} subtitle={section.subtitle} />
                 <View style={styles.toolGrid}>
                   {section.tools.map((tool) => (
                     <Pressable
@@ -223,23 +238,10 @@ export function ExpressionManagementHub() {
                       onPress={() => router.push(tool.route as any)}
                       accessibilityRole="button"
                       accessibilityLabel={tool.title}
-                      style={({ pressed }) => [
-                        styles.toolCard,
-                        {
-                          backgroundColor: colors.card,
-                          borderColor: colors.borderSubtle,
-                        },
-                        shadows.sm,
-                        pressed ? styles.pressed : null,
-                      ]}
+                      style={({ pressed }) => [styles.toolCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed ? styles.pressed : null]}
                     >
-                      <View style={[styles.toolIcon, { backgroundColor: colors.primarySoft }]}>
-                        <Icon name={tool.iconName as any} size={20} color={colors.interactive} />
-                      </View>
-                      <View style={styles.toolCopy}>
-                        <Text style={[styles.toolTitle, { color: colors.text }]} numberOfLines={1}>{tool.title}</Text>
-                        <Text style={[styles.toolDescription, { color: colors.textSecondary }]} numberOfLines={2}>{tool.description}</Text>
-                      </View>
+                      <View style={[styles.toolIcon, { backgroundColor: colors.primarySoft }]}><Icon name={tool.iconName as any} size={20} color={colors.interactive} /></View>
+                      <View style={styles.toolCopy}><Text style={[styles.toolTitle, { color: colors.text }]} numberOfLines={1}>{tool.title}</Text><Text style={[styles.toolDescription, { color: colors.textSecondary }]} numberOfLines={2}>{tool.description}</Text></View>
                       <Icon name="chevron-forward" size={16} color={colors.textMuted} />
                     </Pressable>
                   ))}
@@ -248,84 +250,21 @@ export function ExpressionManagementHub() {
             ))}
           </>
         ) : (
-          <EmptyState
-            title="No ministry tools available"
-            message="You can still enjoy everything available to members here. Ministry tools will appear if you’re added to an Expression team."
-            iconName="lock-closed-outline"
-          />
+          <EmptyState title="No ministry tools available" message="You can still enjoy everything available to members here. Ministry tools will appear if you’re added to an Expression team." iconName="lock-closed-outline" />
         )}
 
-        <View style={[styles.boundary, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
-          <Icon name="shield-checkmark-outline" size={18} color={colors.interactive} />
-          <Text style={[styles.boundaryText, { color: colors.textSecondary }]}>
-            These tools affect only this Expression. Church-wide ministry tools remain separate.
-          </Text>
-        </View>
+        <View style={[styles.boundary, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Icon name="shield-checkmark-outline" size={18} color={colors.interactive} /><Text style={[styles.boundaryText, { color: colors.textSecondary }]}>These tools affect only this Expression. Church-wide ministry tools remain separate.</Text></View>
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 },
-  scroll: { flex: 1 },
-  content: {
-    width: '100%',
-    maxWidth: 940,
-    alignSelf: 'center',
-    padding: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: 90,
-    gap: spacing.lg,
-  },
-  accessNote: {
-    borderWidth: 1,
-    borderRadius: radius.xl,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  accessNoteText: { flex: 1, fontSize: 11, lineHeight: 16, fontWeight: '600' },
-  summaryRow: { flexDirection: 'row', gap: spacing.sm },
-  summaryCard: {
-    flex: 1,
-    minHeight: 64,
-    borderWidth: 1,
-    borderRadius: radius.xl,
-    padding: spacing.md,
-    justifyContent: 'center',
-  },
-  summaryValue: { fontSize: 18, lineHeight: 22, fontWeight: '900', letterSpacing: -0.35 },
-  summaryLabel: { fontSize: 9, lineHeight: 13, fontWeight: '800', marginTop: 2 },
-  section: { gap: spacing.sm },
-  stack: { gap: spacing.sm },
-  toolGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  toolCard: {
-    width: '48.5%',
-    minWidth: 250,
-    flexGrow: 1,
-    minHeight: 86,
-    borderWidth: 1,
-    borderRadius: radius.xl,
-    padding: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  toolIcon: { width: 40, height: 40, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
-  toolCopy: { flex: 1, minWidth: 0 },
-  toolTitle: { fontSize: 14, lineHeight: 18, fontWeight: '900', letterSpacing: -0.18 },
-  toolDescription: { fontSize: 10, lineHeight: 15, marginTop: 2 },
-  boundary: {
-    borderWidth: 1,
-    borderRadius: radius.xl,
-    padding: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-  },
-  boundaryText: { flex: 1, fontSize: 11, lineHeight: 17 },
-  pressed: { opacity: 0.75, transform: [{ scale: 0.99 }] },
+  screen: { flex: 1 }, scroll: { flex: 1 },
+  content: { width: '100%', maxWidth: 940, alignSelf: 'center', padding: spacing.md, paddingTop: spacing.sm, paddingBottom: 90, gap: spacing.lg },
+  accessNote: { borderWidth: 1, borderRadius: radius.xl, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, accessNoteText: { flex: 1, fontSize: 11, lineHeight: 16, fontWeight: '600' },
+  summaryRow: { flexDirection: 'row', gap: spacing.sm }, summaryCard: { flex: 1, minHeight: 64, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, justifyContent: 'center' }, summaryValue: { fontSize: 18, lineHeight: 22, fontWeight: '900' }, summaryLabel: { fontSize: 9, lineHeight: 13, fontWeight: '800', marginTop: 2 },
+  section: { gap: spacing.sm }, stack: { gap: spacing.sm }, toolGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  toolCard: { width: '48.5%', minWidth: 250, flexGrow: 1, minHeight: 86, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, toolIcon: { width: 40, height: 40, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' }, toolCopy: { flex: 1, minWidth: 0 }, toolTitle: { fontSize: 14, lineHeight: 18, fontWeight: '900' }, toolDescription: { fontSize: 10, lineHeight: 15, marginTop: 2 },
+  boundary: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, boundaryText: { flex: 1, fontSize: 11, lineHeight: 17 }, pressed: { opacity: 0.75, transform: [{ scale: 0.99 }] },
 });

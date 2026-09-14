@@ -7,9 +7,10 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { Button, Chip, Icon, InputField, ScreenHeader, VideoPlayer } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
+import { putSignedUpload, readUploadFile, type UploadFile } from '@/services/uploads';
 
 type ReelScope = 'public' | 'branch';
-type SelectedVideo = { uri: string; fileName: string; mimeType: string; sizeBytes: number; durationSeconds?: number; body: Blob };
+type SelectedVideo = UploadFile & { sizeBytes: number; durationSeconds?: number };
 type UploadIntent = { asset: { id: string }; uploadSession: { assetId: string; signedUploadUrl: string; storagePath: string } };
 const MAX_BYTES = 200 * 1024 * 1024;
 
@@ -84,27 +85,25 @@ export default function ReelCreatorScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['videos'], allowsMultipleSelection: false, quality: 1 });
       if (result.canceled || !result.assets?.[0]) return;
       const asset = result.assets[0];
-      const webFile = (asset as any).file as Blob | undefined;
-      let body: Blob;
-      if (webFile) {
-        body = webFile;
-      } else {
-        const response = await fetch(asset.uri);
-        if (!response.ok) throw new Error('Unable to read the selected video.');
-        body = await response.blob();
-      }
+      const candidate: UploadFile = {
+        uri: asset.uri,
+        name: asset.fileName || `reel-${Date.now()}.mp4`,
+        mimeType: inferVideoMime(asset),
+        size: asset.fileSize,
+        file: (asset as any).file as Blob | undefined,
+      };
+      const body = await readUploadFile(candidate);
       const sizeBytes = Number(body.size || asset.fileSize || 0);
       if (!sizeBytes || sizeBytes > MAX_BYTES) {
         setErrorMsg('Choose a Reel video that is 200 MB or smaller.');
         return;
       }
       setVideo({
-        uri: asset.uri,
-        fileName: asset.fileName || `reel-${Date.now()}.mp4`,
-        mimeType: inferVideoMime(asset),
+        ...candidate,
+        size: sizeBytes,
         sizeBytes,
         durationSeconds: asset.duration ? Math.round(asset.duration / 1000) : undefined,
-        body,
+        file: body,
       });
     } catch (error) {
       setErrorMsg(error instanceof Error ? error.message : 'Unable to choose this video.');
@@ -138,13 +137,12 @@ export default function ReelCreatorScreen() {
           durationSeconds: video.durationSeconds,
           aspectRatio: '9:16',
           fileSizeBytes: video.sizeBytes,
-          fileName: video.fileName,
+          fileName: video.name,
         }),
       });
       assetId = intent.uploadSession.assetId;
       setStage('Uploading video…');
-      const uploaded = await fetch(intent.uploadSession.signedUploadUrl, { method: 'PUT', headers: { 'Content-Type': video.mimeType }, body: video.body });
-      if (!uploaded.ok) throw new Error(`Video upload failed (${uploaded.status}).`);
+      await putSignedUpload(intent.uploadSession.signedUploadUrl, video);
       setStage('Verifying upload…');
       await api.request('content-media', {
         method: 'POST',
@@ -225,10 +223,10 @@ export default function ReelCreatorScreen() {
 
               {video ? (
                 <View style={[styles.videoCard, { borderColor: colors.borderSubtle }, shadows.md]}>
-                  <VideoPlayer title={video.fileName} sourceUrl={video.uri} durationSeconds={video.durationSeconds} />
+                  <VideoPlayer title={video.name} sourceUrl={video.uri} durationSeconds={video.durationSeconds} />
                   <View style={styles.videoMeta}>
                     <View style={styles.videoMetaCopy}>
-                      <Text style={[styles.videoName, { color: colors.text }]} numberOfLines={1}>{video.fileName}</Text>
+                      <Text style={[styles.videoName, { color: colors.text }]} numberOfLines={1}>{video.name}</Text>
                       <Text style={[styles.helper, { color: colors.textMuted }]}>{(video.sizeBytes / (1024 * 1024)).toFixed(1)} MB</Text>
                     </View>
                     <Pressable onPress={() => !working && setVideo(null)} hitSlop={8}><Icon name="trash-outline" size={20} color={colors.live} /></Pressable>

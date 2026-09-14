@@ -78,6 +78,12 @@ verify_jwt = false
 [functions.group-chat]
 verify_jwt = false
 
+[functions.announcements]
+verify_jwt = true
+
+[functions.events]
+verify_jwt = true
+
 [functions.health]
 verify_jwt = false
 

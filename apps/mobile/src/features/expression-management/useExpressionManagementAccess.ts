@@ -7,21 +7,12 @@ type OwnershipState = {
 } | null;
 
 export function useExpressionManagementAccess() {
-  const {
-    api,
-    context,
-    accessReady,
-    hasCapability,
-  } = useSession();
-
+  const { api, context, accessReady, hasCapability } = useSession();
   const expressionId = context?.expression?.id ?? '';
 
   const ownership = useResource<OwnershipState>(
     `expression:management:ownership:${expressionId || 'none'}`,
-    (signal) =>
-      expressionId
-        ? api.request<OwnershipState>('expression-ownership', { signal }).catch(() => null)
-        : Promise.resolve(null),
+    (signal) => expressionId ? api.request<OwnershipState>('expression-ownership', { signal }).catch(() => null) : Promise.resolve(null),
   );
 
   const isCurrentOwner = ownership.data?.isCurrentOwner === true;
@@ -29,68 +20,53 @@ export function useExpressionManagementAccess() {
   const ready = accessReady && ownershipReady;
 
   const canManageLive = Boolean(expressionId) && hasCapability('streams.broadcast');
-  const canManageSermons =
-    Boolean(expressionId) &&
-    (hasCapability('sermons.create') ||
-      hasCapability('sermons.manage') ||
-      hasCapability('sermons.publish'));
-  const canManageEvents =
-    Boolean(expressionId) &&
-    (hasCapability('events.create') || hasCapability('events.update'));
-  const canManageGiving =
-    Boolean(expressionId) && hasCapability('giving.campaigns.manage');
-  const canReadGivingFinance =
-    Boolean(expressionId) && hasCapability('giving.finance.read');
-  const canManageLeadership =
-    Boolean(expressionId) && hasCapability('expression.leadership.manage');
-  const canManageSettings =
-    Boolean(expressionId) && hasCapability('branches.update');
-  const canManageInviteCodes =
-    Boolean(expressionId) && hasCapability('members.invite');
-  const canManageRoleInvitations =
-    Boolean(expressionId) &&
-    hasCapability('members.invite') &&
-    hasCapability('roles.assign');
-  const canManageAccess =
-    Boolean(expressionId) && (isCurrentOwner || canManageRoleInvitations);
-  const canPublishExpressionPosts =
-    Boolean(expressionId) &&
-    (hasCapability('posts.create') || hasCapability('posts.publish'));
-  const canPublishExpressionReels =
-    Boolean(expressionId) &&
-    hasCapability('media.upload') &&
-    hasCapability('reels.publish');
-  const canPublishExpressionVideos =
-    Boolean(expressionId) &&
-    hasCapability('media.upload') &&
-    hasCapability('videos.publish');
-
-  const canUseContentStudio =
-    canPublishExpressionPosts ||
-    canPublishExpressionReels ||
-    canPublishExpressionVideos ||
-    canManageSermons;
+  const canManageSermons = Boolean(expressionId) && (hasCapability('sermons.create') || hasCapability('sermons.manage') || hasCapability('sermons.publish'));
+  const canManageEvents = Boolean(expressionId) && (hasCapability('events.create') || hasCapability('events.update'));
+  const canManageAnnouncements = Boolean(expressionId) && hasCapability('announcements.manage');
+  const canReviewTestimonies = Boolean(expressionId) && (hasCapability('testimonies.review') || hasCapability('testimonies.manage'));
+  const canManageTestimonies = Boolean(expressionId) && hasCapability('testimonies.manage');
+  const canManageGiving = Boolean(expressionId) && hasCapability('giving.campaigns.manage');
+  const canReadGivingFinance = Boolean(expressionId) && hasCapability('giving.finance.read');
+  const canReadExpressionFinance = Boolean(expressionId) && (hasCapability('finance.read') || hasCapability('finance.manage'));
+  const canManageExpressionFinance = Boolean(expressionId) && hasCapability('finance.manage');
+  const canManageFeedRanking = Boolean(expressionId) && hasCapability('feed.ranking.manage');
+  const canManageLeadership = Boolean(expressionId) && hasCapability('expression.leadership.manage');
+  const canManageSettings = Boolean(expressionId) && hasCapability('branches.update');
+  const canManageInviteCodes = Boolean(expressionId) && hasCapability('members.invite');
+  const canManageRoleInvitations = Boolean(expressionId) && hasCapability('members.invite') && hasCapability('roles.assign');
+  const canManageAccess = Boolean(expressionId) && (isCurrentOwner || canManageRoleInvitations);
+  const canPublishExpressionPosts = Boolean(expressionId) && (hasCapability('posts.create') || hasCapability('posts.publish'));
+  const canPublishExpressionReels = Boolean(expressionId) && hasCapability('media.upload') && hasCapability('reels.publish');
+  const canPublishExpressionVideos = Boolean(expressionId) && hasCapability('media.upload') && hasCapability('videos.publish');
+  const canUseContentStudio = canPublishExpressionPosts || canPublishExpressionReels || canPublishExpressionVideos || canManageSermons;
 
   const canManageAny = useMemo(
     () =>
       canUseContentStudio ||
       canManageLive ||
       canManageEvents ||
+      canManageAnnouncements ||
+      canReviewTestimonies ||
       canManageGiving ||
       canReadGivingFinance ||
+      canReadExpressionFinance ||
+      canManageFeedRanking ||
       canManageLeadership ||
       canManageSettings ||
       canManageInviteCodes ||
       canManageAccess,
     [
       canManageAccess,
+      canManageAnnouncements,
       canManageEvents,
+      canManageFeedRanking,
       canManageGiving,
       canManageInviteCodes,
       canManageLeadership,
       canManageSettings,
       canManageLive,
-      canManageSermons,
+      canReviewTestimonies,
+      canReadExpressionFinance,
       canReadGivingFinance,
       canUseContentStudio,
     ],
@@ -105,8 +81,14 @@ export function useExpressionManagementAccess() {
     canManageLive,
     canManageSermons,
     canManageEvents,
+    canManageAnnouncements,
+    canReviewTestimonies,
+    canManageTestimonies,
     canManageGiving,
     canReadGivingFinance,
+    canReadExpressionFinance,
+    canManageExpressionFinance,
+    canManageFeedRanking,
     canManageLeadership,
     canManageSettings,
     canManageInviteCodes,

@@ -23,7 +23,7 @@ type RedeemResult = {
 export default function ExpressionsScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
-  const { api, auth, context, mode, enterExpression, selectContext } = useSession();
+  const { api, context, mode, enterExpression, selectContext, refreshContext } = useSession();
   const [code, setCode] = useState('');
   const [preview, setPreview] = useState<InvitePreview | null>(null);
   const [loading, setLoading] = useState(false);
@@ -67,17 +67,35 @@ export default function ExpressionsScreen() {
   };
 
   const confirmJoin = async () => {
+    const normalized = code.trim();
+    if (!normalized) {
+      setPreview(null);
+      setError('Enter the invite code shared by your Expression leader.');
+      return;
+    }
+
     setLoading(true);
     setError('');
+    setSuccess('');
     try {
       const result = await api.request<RedeemResult>('expression-memberships', {
         method: 'POST',
-        body: JSON.stringify({ action: 'redeem', code: code.trim() }),
+        body: JSON.stringify({ action: 'redeem', code: normalized }),
       });
+
+      // Redemption is the membership-changing operation. Once it succeeds, do not
+      // turn a later local context-refresh problem into a false "join failed" state.
       setPreview(null);
       setCode('');
       setSuccess(`You joined ${result.expression_name}. You can now enter its private space.`);
-      await selectContext(result.organization_id);
+
+      try {
+        await selectContext(result.organization_id);
+      } catch {
+        // The database membership is already committed. Ask the session provider to
+        // re-resolve memberships without making the user redeem the invite twice.
+        refreshContext();
+      }
     } catch (value) {
       setError(value instanceof ApiError ? value.message : 'We couldn’t join this Expression. Please try again.');
     } finally {
@@ -152,14 +170,14 @@ export default function ExpressionsScreen() {
           <InputField
             label="Invite code"
             value={code}
-            onChangeText={(value) => { setCode(value.toUpperCase()); setPreview(null); setError(''); }}
+            onChangeText={(value) => { setCode(value.toUpperCase()); setPreview(null); setError(''); setSuccess(''); }}
             placeholder="COT-XXXX-XXXX-XXXX-XXXX"
             autoCapitalize="characters"
             autoCorrect={false}
             error={error || undefined}
             accessibilityLabel="Expression invite code"
           />
-                    {success ? <Text style={[styles.message, { color: colors.success }]} accessibilityRole="alert">{success}</Text> : null}
+          {success ? <Text style={[styles.message, { color: colors.success }]} accessibilityRole="alert">{success}</Text> : null}
           {preview ? (
             <View style={[styles.preview, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
               <Icon name="checkmark-circle" size={24} color={colors.success} />

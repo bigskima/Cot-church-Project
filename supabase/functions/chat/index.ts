@@ -1,10 +1,21 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { ApiError } from "../_shared/errors.ts";
+import {
+  chatAttachmentIds,
+  completeChatUpload,
+  createChatUpload,
+  deleteChatUpload,
+  hydrateChatMessages,
+  markChatUploadsAttached,
+  validateChatUploads,
+} from "../_shared/chat-media.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { assertProfilesMayInteract, loadSafetyProfileSets } from "../_shared/safety.ts";
 import { assertNoUnknownFields, assertObject, requiredString, uuid } from "../_shared/validation.ts";
+
+const MESSAGE_SELECT = "id,conversation_id,sender_profile_id,body,reply_to_id,attachment_ids,pinned_at,pinned_by_profile_id,sent_at,edited_at,redacted_at";
 
 function normalizeUsername(value: unknown) {
   const username = requiredString(value, "username", 30).trim().replace(/^@/, "").toLowerCase();
@@ -30,6 +41,44 @@ function publicProfile(profile: any) {
   } : null;
 }
 
+async function requireConversation(admin: any, conversationId: string, viewerId: string) {
+  const { data: conversation, error } = await admin
+    .from("direct_conversations")
+    .select("id,participant_low,participant_high,created_at,updated_at")
+    .eq("id", conversationId)
+    .maybeSingle();
+  if (error) throw new ApiError("CHAT_LOAD_FAILED", "We couldn’t load this conversation.", 500, undefined, false);
+  if (!conversation || ![conversation.participant_low, conversation.participant_high].includes(viewerId)) {
+    throw new ApiError("CHAT_ACCESS_DENIED", "This conversation is not available to you.", 403);
+  }
+  return conversation;
+}
+
+function uploadId(value: unknown) {
+  return uuid(requiredString(value, "uploadId", 36), "uploadId", true)!;
+}
+
+function emojiValue(value: unknown) {
+  const emoji = requiredString(value, "emoji", 16).trim();
+  if (!emoji || Array.from(emoji).length > 8) throw new ApiError("VALIDATION_FAILED", "Choose a valid emoji.", 422);
+  return emoji;
+}
+
+function optionalText(value: unknown, field: string, maxLength: number) {
+  if (value === undefined || value === null) return "";
+  if (typeof value !== "string" || value.trim().length > maxLength) {
+    throw new ApiError("VALIDATION_FAILED", `Invalid ${field}.`, 422);
+  }
+  return value.trim();
+}
+
+async function assertConversationInteraction(admin: any, conversation: any, viewerId: string) {
+  const otherProfileId = conversation.participant_low === viewerId
+    ? conversation.participant_high
+    : conversation.participant_low;
+  await assertProfilesMayInteract(admin, viewerId, otherProfileId);
+}
+
 Deno.serve(createHandler(
   { methods: ["GET", "POST"], authentication: "required", organization: "none" },
   async ({ request, auth }) => {
@@ -42,25 +91,15 @@ Deno.serve(createHandler(
     if (request.method === "GET") {
       const conversationId = uuid(url.searchParams.get("conversationId"), "conversationId");
       if (conversationId) {
-        const { data: conversation, error: conversationError } = await admin
-          .from("direct_conversations")
-          .select("id,participant_low,participant_high,created_at,updated_at")
-          .eq("id", conversationId)
-          .maybeSingle();
-
-        if (conversationError) throw new ApiError("CHAT_LOAD_FAILED", "We couldn’t load this conversation.", 500, undefined, false);
-        if (!conversation || ![conversation.participant_low, conversation.participant_high].includes(viewerId)) {
-          throw new ApiError("CHAT_ACCESS_DENIED", "This conversation is not available to you.", 403);
-        }
-
+        const conversation = await requireConversation(admin, conversationId, viewerId);
         const otherProfileId = conversation.participant_low === viewerId
           ? conversation.participant_high
           : conversation.participant_low;
 
-        const [{ data: messages, error: messagesError }, { data: people }] = await Promise.all([
+        const [{ data: messageRows, error: messagesError }, { data: people }] = await Promise.all([
           admin
             .from("direct_messages")
-            .select("id,conversation_id,sender_profile_id,body,reply_to_id,sent_at,edited_at,redacted_at")
+            .select(MESSAGE_SELECT)
             .eq("conversation_id", conversationId)
             .order("sent_at", { ascending: false })
             .limit(500),
@@ -72,16 +111,21 @@ Deno.serve(createHandler(
 
         if (messagesError) throw new ApiError("CHAT_LOAD_FAILED", "We couldn’t load these messages.", 500, undefined, false);
         const profileMap = new Map((people ?? []).map((profile: any) => [profile.id, profile]));
+        const messages = await hydrateChatMessages(
+          admin,
+          "direct_messages",
+          "direct_message_reactions",
+          (messageRows ?? []).reverse(),
+          viewerId,
+        );
         return {
           data: {
             conversation: {
               ...conversation,
               other: publicProfile(profileMap.get(otherProfileId)),
             },
-            messages: (messages ?? []).reverse().map((message: any) => ({
-              ...message,
-              sender: publicProfile(profileMap.get(message.sender_profile_id)),
-            })),
+            messages,
+            pinnedMessages: messages.filter((message: any) => message.pinned_at),
           },
         };
       }
@@ -106,7 +150,7 @@ Deno.serve(createHandler(
           : Promise.resolve({ data: [] as any[] }),
         rows.length
           ? admin.from("direct_messages")
-              .select("conversation_id,body,sent_at,sender_profile_id")
+              .select("conversation_id,body,attachment_ids,sent_at,sender_profile_id")
               .in("conversation_id", rows.map((row: any) => row.id))
               .order("sent_at", { ascending: false })
               .limit(1000)
@@ -157,7 +201,12 @@ Deno.serve(createHandler(
                 created_at: conversation.created_at,
                 updated_at: conversation.updated_at,
                 other: publicProfile(profileMap.get(otherId)),
-                lastMessage: recentMap.get(conversation.id) ?? null,
+                lastMessage: recentMap.has(conversation.id)
+                  ? {
+                      ...recentMap.get(conversation.id),
+                      body: recentMap.get(conversation.id).body || "Media attachment",
+                    }
+                  : null,
               };
             })
             .filter(Boolean),
@@ -223,29 +272,54 @@ Deno.serve(createHandler(
       };
     }
 
-    if (action === "send") {
-      assertNoUnknownFields(body, ["action", "conversationId", "body", "replyToId"]);
+    if (action === "create_upload") {
+      assertNoUnknownFields(body, ["action", "conversationId", "mimeType", "fileName", "sizeBytes", "durationSeconds"]);
       const conversationId = uuid(requiredString(body.conversationId, "conversationId", 36), "conversationId", true)!;
-      const messageBody = requiredString(body.body, "body", 4000).trim();
-      const replyToId = body.replyToId
-        ? uuid(String(body.replyToId), "replyToId", true)
-        : null;
-
-      const { data: conversation, error: conversationError } = await admin
-        .from("direct_conversations")
-        .select("id,participant_low,participant_high")
-        .eq("id", conversationId)
-        .maybeSingle();
-
-      if (conversationError) throw new ApiError("CHAT_SEND_FAILED", "We couldn’t send this message.", 500, undefined, false);
-      if (!conversation || ![conversation.participant_low, conversation.participant_high].includes(viewerId)) {
-        throw new ApiError("CHAT_ACCESS_DENIED", "This conversation is not available to you.", 403);
-      }
-
+      const conversation = await requireConversation(admin, conversationId, viewerId);
       const otherProfileId = conversation.participant_low === viewerId
         ? conversation.participant_high
         : conversation.participant_low;
       await assertProfilesMayInteract(admin, viewerId, otherProfileId);
+      return {
+        data: await createChatUpload(admin, viewerId, { conversationId }, {
+          mimeType: body.mimeType,
+          fileName: body.fileName,
+          sizeBytes: body.sizeBytes,
+          durationSeconds: body.durationSeconds,
+        }),
+        status: 201,
+      };
+    }
+
+    if (action === "complete_upload") {
+      assertNoUnknownFields(body, ["action", "conversationId", "uploadId"]);
+      const conversationId = uuid(requiredString(body.conversationId, "conversationId", 36), "conversationId", true)!;
+      await requireConversation(admin, conversationId, viewerId);
+      return { data: await completeChatUpload(admin, viewerId, uploadId(body.uploadId), { conversationId }) };
+    }
+
+    if (action === "delete_upload") {
+      assertNoUnknownFields(body, ["action", "conversationId", "uploadId"]);
+      const conversationId = uuid(requiredString(body.conversationId, "conversationId", 36), "conversationId", true)!;
+      await requireConversation(admin, conversationId, viewerId);
+      return { data: await deleteChatUpload(admin, viewerId, uploadId(body.uploadId), { conversationId }) };
+    }
+
+    if (action === "send") {
+      assertNoUnknownFields(body, ["action", "conversationId", "body", "replyToId", "attachmentIds"]);
+      const conversationId = uuid(requiredString(body.conversationId, "conversationId", 36), "conversationId", true)!;
+      const messageBody = optionalText(body.body, "body", 4000);
+      const attachmentIds = chatAttachmentIds(body.attachmentIds);
+      if (!messageBody && !attachmentIds.length) {
+        throw new ApiError("VALIDATION_FAILED", "Write a message or add an attachment.", 422);
+      }
+      const replyToId = body.replyToId
+        ? uuid(String(body.replyToId), "replyToId", true)
+        : null;
+
+      const conversation = await requireConversation(admin, conversationId, viewerId);
+      await assertConversationInteraction(admin, conversation, viewerId);
+      await validateChatUploads(admin, viewerId, attachmentIds, { conversationId });
 
       if (replyToId) {
         const { data: replyTarget } = await admin
@@ -264,26 +338,84 @@ Deno.serve(createHandler(
           sender_profile_id: viewerId,
           body: messageBody,
           reply_to_id: replyToId,
+          attachment_ids: attachmentIds,
         })
-        .select("id,conversation_id,sender_profile_id,body,reply_to_id,sent_at,edited_at,redacted_at")
+        .select(MESSAGE_SELECT)
         .single();
 
       if (sendError || !created) throw new ApiError("CHAT_SEND_FAILED", "We couldn’t send this message.", 500, undefined, false);
+      try {
+        await markChatUploadsAttached(admin, attachmentIds);
+      } catch (error) {
+        await admin.from("direct_messages").delete().eq("id", created.id);
+        throw error;
+      }
       await admin
         .from("direct_conversations")
         .update({ updated_at: new Date().toISOString() })
         .eq("id", conversationId);
 
-      const { data: sender } = await admin
-        .from("profiles")
-        .select("id,username,display_name,avatar_url,banner_url")
-        .eq("id", viewerId)
-        .single();
-
       return {
-        data: { ...created, sender: publicProfile(sender) },
+        data: (await hydrateChatMessages(
+          admin,
+          "direct_messages",
+          "direct_message_reactions",
+          [created],
+          viewerId,
+        ))[0],
         status: 201,
       };
+    }
+
+    if (action === "react") {
+      assertNoUnknownFields(body, ["action", "conversationId", "messageId", "emoji"]);
+      const conversationId = uuid(requiredString(body.conversationId, "conversationId", 36), "conversationId", true)!;
+      const messageId = uuid(requiredString(body.messageId, "messageId", 36), "messageId", true)!;
+      const conversation = await requireConversation(admin, conversationId, viewerId);
+      await assertConversationInteraction(admin, conversation, viewerId);
+      const { data: message } = await admin.from("direct_messages")
+        .select("id")
+        .eq("id", messageId)
+        .eq("conversation_id", conversationId)
+        .maybeSingle();
+      if (!message) throw new ApiError("MESSAGE_NOT_FOUND", "This message is unavailable.", 404);
+      const emoji = emojiValue(body.emoji);
+      const { data: existing, error: lookupError } = await admin.from("direct_message_reactions")
+        .select("id")
+        .eq("message_id", messageId)
+        .eq("profile_id", viewerId)
+        .eq("emoji", emoji)
+        .maybeSingle();
+      if (lookupError) throw new ApiError("CHAT_REACTION_FAILED", "We couldn’t update this reaction.", 500, undefined, false);
+      if (existing) {
+        const { error } = await admin.from("direct_message_reactions").delete().eq("id", existing.id);
+        if (error) throw new ApiError("CHAT_REACTION_FAILED", "We couldn’t update this reaction.", 500, undefined, false);
+        return { data: { messageId, emoji, reacted: false } };
+      }
+      const { error } = await admin.from("direct_message_reactions")
+        .insert({ message_id: messageId, profile_id: viewerId, emoji });
+      if (error && error.code !== "23505") {
+        throw new ApiError("CHAT_REACTION_FAILED", "We couldn’t update this reaction.", 500, undefined, false);
+      }
+      return { data: { messageId, emoji, reacted: true } };
+    }
+
+    if (action === "pin") {
+      assertNoUnknownFields(body, ["action", "conversationId", "messageId", "pinned"]);
+      if (typeof body.pinned !== "boolean") {
+        throw new ApiError("VALIDATION_FAILED", "pinned must be true or false.", 422);
+      }
+      const conversationId = uuid(requiredString(body.conversationId, "conversationId", 36), "conversationId", true)!;
+      const messageId = uuid(requiredString(body.messageId, "messageId", 36), "messageId", true)!;
+      const conversation = await requireConversation(admin, conversationId, viewerId);
+      await assertConversationInteraction(admin, conversation, viewerId);
+      const { data, error } = await admin.from("direct_messages").update({
+        pinned_at: body.pinned ? new Date().toISOString() : null,
+        pinned_by_profile_id: body.pinned ? viewerId : null,
+      }).eq("id", messageId).eq("conversation_id", conversationId)
+        .select("id,pinned_at,pinned_by_profile_id").maybeSingle();
+      if (error || !data) throw new ApiError("MESSAGE_NOT_FOUND", "This message is unavailable.", 404);
+      return { data };
     }
 
     throw new ApiError("VALIDATION_FAILED", "Unsupported chat action.", 422);

@@ -85,6 +85,12 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
       iconName: 'videocam-outline',
       action: () => router.push('/general/studio/video' as any),
     },
+    {
+      title: 'Giveaway',
+      description: 'Host a member giveaway and record the selected winners.',
+      iconName: 'gift-outline',
+      action: () => router.push({ pathname: '/general/participate', params: { tab: 'giveaways', compose: 'giveaway' } } as any),
+    },
   ] : [];
 
   const leadershipModules = [
@@ -98,11 +104,35 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
     },
     {
       title: 'Events',
-      description: 'Create and manage church gatherings and events.',
+      description: 'Create gatherings with calendar/time selection and optional event banners.',
       iconName: 'calendar-outline',
       badge: 'EVENTS',
       route: routeFor('/general/leadership/events-manage', '/leadership/events'),
       enabled: generalWorkspace ? (hasOrganizationCapability('events.create') || hasOrganizationCapability('events.update')) : (hasCapability('events.create') || hasCapability('events.update')),
+    },
+    {
+      title: 'Announcements',
+      description: 'Draft, schedule and publish official church updates with optional flyers.',
+      iconName: 'megaphone-outline',
+      badge: 'UPDATES',
+      route: routeFor('/general/leadership/announcements-manage', '/general/leadership/announcements-manage'),
+      enabled: generalWorkspace ? hasOrganizationCapability('announcements.manage') : hasCapability('announcements.manage'),
+    },
+    {
+      title: 'Polls',
+      description: 'Publish official community polls and review participation.',
+      iconName: 'stats-chart-outline',
+      badge: 'ENGAGE',
+      route: routeFor('/general/participate?tab=polls&compose=poll', '/general/participate?tab=polls&compose=poll'),
+      enabled: generalWorkspace ? hasOrganizationCapability('polls.manage') : hasCapability('polls.manage'),
+    },
+    {
+      title: 'Feed Ranking',
+      description: 'Tune explainable Home ranking weights without redeploying the app.',
+      iconName: 'analytics-outline',
+      badge: 'HOME',
+      route: routeFor('/general/leadership/feed-ranking', '/general/leadership/feed-ranking'),
+      enabled: generalWorkspace ? hasOrganizationCapability('feed.ranking.manage') : hasCapability('feed.ranking.manage'),
     },
     {
       title: 'Live Media Studio',
@@ -177,26 +207,19 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
             </View>
             <View style={styles.publicNoticeCopy}>
               <Text style={[styles.publicNoticeTitle, { color: colors.text }]}>General COT is public</Text>
-              <Text style={[styles.publicNoticeText, { color: colors.textSecondary }]}>
-                Posts, Reels, videos and voice recordings created here can be seen across the public COT experience.
-              </Text>
+              <Text style={[styles.publicNoticeText, { color: colors.textSecondary }]}>Posts, Reels, videos, voice recordings and public giveaways created here can be seen across the public COT experience.</Text>
             </View>
           </View>
 
           {signedIn ? (
             <View style={styles.createSection}>
-              <SectionHeader title="Create something" subtitle="Choose a format — no ministry role is required." />
+              <SectionHeader title="Create something" subtitle="Choose a format; no ministry role is required for public Posts, Reels, videos, voice or giveaways. Official polls remain permission-controlled." />
               <View style={styles.createGrid}>
                 {creationActions.map((item) => (
                   <Pressable
                     key={item.title}
                     onPress={item.action}
-                    style={({ pressed }) => [
-                      styles.createCard,
-                      { backgroundColor: colors.card, borderColor: colors.borderSubtle },
-                      shadows.sm,
-                      pressed && styles.pressed,
-                    ]}
+                    style={({ pressed }) => [styles.createCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}
                     accessibilityRole="button"
                     accessibilityLabel={`Create ${item.title}`}
                   >
@@ -205,9 +228,7 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
                     </View>
                     <Text style={[styles.createTitle, { color: colors.text }]}>{item.title}</Text>
                     <Text style={[styles.createDescription, { color: colors.textMuted }]}>{item.description}</Text>
-                    <View style={styles.createArrow}>
-                      <Icon name="arrow-forward" size={15} color={colors.textMuted} />
-                    </View>
+                    <View style={styles.createArrow}><Icon name="arrow-forward" size={15} color={colors.textMuted} /></View>
                   </Pressable>
                 ))}
               </View>
@@ -215,37 +236,19 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
           ) : (
             <Pressable
               onPress={() => router.push({ pathname: '/(auth)/login', params: { returnTo: '/general/studio' } } as any)}
-              style={({ pressed }) => [
-                styles.signInCard,
-                { backgroundColor: colors.card, borderColor: colors.borderSubtle },
-                pressed && styles.pressed,
-              ]}
+              style={({ pressed }) => [styles.signInCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, pressed && styles.pressed]}
             >
               <Icon name="person-circle-outline" size={28} color={colors.interactive} />
-              <View style={styles.signInCopy}>
-                <Text style={[styles.signInTitle, { color: colors.text }]}>Sign in to create</Text>
-                <Text style={[styles.signInText, { color: colors.textMuted }]}>Public content creation is available to every signed-in account.</Text>
-              </View>
+              <View style={styles.signInCopy}><Text style={[styles.signInTitle, { color: colors.text }]}>Sign in to create</Text><Text style={[styles.signInText, { color: colors.textMuted }]}>Public content creation is available to every signed-in account.</Text></View>
               <Icon name="chevron-forward" size={18} color={colors.textMuted} />
             </Pressable>
           )}
 
           {leadershipModules.length ? (
             <View style={styles.modulesSection}>
-              <SectionHeader
-                title="More tools"
-                badge={leadershipModules.length}
-                subtitle="Ministry tools appear only when they are available to your account."
-              />
+              <SectionHeader title="More tools" badge={leadershipModules.length} subtitle="Ministry tools appear only when they are available to your account." />
               {leadershipModules.map((module) => (
-                <LeadershipModuleCard
-                  key={module.title}
-                  title={module.title}
-                  description={module.description}
-                  iconName={module.iconName}
-                  badge={module.badge}
-                  onPress={() => router.push(module.route as any)}
-                />
+                <LeadershipModuleCard key={module.title} title={module.title} description={module.description} iconName={module.iconName} badge={module.badge} onPress={() => router.push(module.route as any)} />
               ))}
             </View>
           ) : null}

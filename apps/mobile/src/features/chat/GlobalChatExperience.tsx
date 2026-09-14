@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -19,6 +19,9 @@ import { useResource } from '@/hooks/use-resource';
 import { invalidate } from '@/services/query-cache';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
+import { RichChatComposer } from './RichChatComposer';
+import { RichMessageBubble } from './RichMessageBubble';
+import type { ChatReaction, ChatReply, ChatSendPayload, RichChatMessage } from './rich-chat-types';
 
 type Person = {
   id: string;
@@ -35,16 +38,8 @@ type Conversation = {
   updated_at: string;
 };
 
-type Message = {
-  id: string;
-  body: string;
-  sent_at: string;
-  sender_profile_id: string;
-  sender?: Person | null;
-};
-
 type InboxPayload = { people: Person[]; conversations: Conversation[] };
-type MessagesPayload = { conversation?: Conversation; messages: Message[] };
+type MessagesPayload = { conversation?: Conversation; messages: RichChatMessage[]; pinnedMessages?: RichChatMessage[] };
 type InboxItem =
   | { kind: 'person'; id: string; person: Person }
   | { kind: 'conversation'; id: string; conversation: Conversation };
@@ -56,13 +51,21 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
   const expression = context?.expression;
   const routeParams = useLocalSearchParams<{ username?: string }>();
   const [selected, setSelected] = useState<{ id: string; person: Person } | null>(null);
-  const [draft, setDraft] = useState('');
-  const [sending, setSending] = useState(false);
   const [filter, setFilter] = useState('');
   const [autoOpened, setAutoOpened] = useState('');
+  const [replyTo, setReplyTo] = useState<ChatReply | null>(null);
+  const [localMessages, setLocalMessages] = useState<RichChatMessage[]>([]);
+  const [messageOverrides, setMessageOverrides] = useState<Map<string, Partial<RichChatMessage>>>(new Map());
+  const messageListRef = useRef<FlatList<RichChatMessage>>(null);
 
   const [normalizedFilter, setNormalizedFilter] = useState('');
   const [actionError, setActionError] = useState('');
+  // General Chat lives inside an absolute bottom-tab bar. Keep the thread
+  // composer above that bar; otherwise the input is present but hidden behind
+  // navigation after a person is opened from search or a member profile.
+  const generalThreadBottomInset = embeddedExpression
+    ? 0
+    : 75 + Math.max(insets.bottom, Platform.OS === 'web' ? 10 : 8);
   useEffect(() => {
     const timer = setTimeout(() => setNormalizedFilter(filter.trim().replace(/^@/, '').toLowerCase()), 250);
     return () => clearTimeout(timer);
@@ -84,6 +87,18 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
       { signal, context: 'public' },
     );
   });
+
+  useEffect(() => {
+    setReplyTo(null);
+    setLocalMessages([]);
+    setMessageOverrides(new Map());
+  }, [selected?.id]);
+
+  useEffect(() => {
+    const serverIds = new Set((thread.data?.messages ?? []).map((message) => message.id));
+    setLocalMessages((current) => current.filter((message) => !serverIds.has(message.id)));
+    setMessageOverrides(new Map());
+  }, [thread.data?.messages]);
 
   const openUsername = async (username: string, fallback?: Person) => {
     const result = await api.request<{ conversationId: string; other?: Person }>('chat', {
@@ -116,29 +131,101 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
     });
   }, [autoOpened, mode, viewerKey, routeParams.username]);
 
-  const send = async () => {
-    const value = draft.trim();
-    if (!value || !selected || sending) return;
-    setSending(true);
+  const send = async (payload: ChatSendPayload) => {
+    if (!selected) throw new Error('Open a conversation first.');
+    const optimisticId = `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const optimistic: RichChatMessage = {
+      id: optimisticId,
+      body: payload.body,
+      sent_at: new Date().toISOString(),
+      sender_profile_id: context?.profile?.id ?? 'me',
+      sender: context?.profile ? {
+        id: context.profile.id,
+        username: context.profile.username,
+        display_name: context.profile.display_name,
+        avatar_url: context.profile.avatar_url,
+      } : null,
+      reply_to_id: payload.replyToId,
+      replyTo,
+      attachments: payload.attachments,
+      reactions: [],
+      optimistic: true,
+    };
+    setLocalMessages((current) => [...current, optimistic]);
     setActionError('');
-    setDraft('');
     try {
-      await api.request('chat', {
+      const created = await api.request<RichChatMessage>('chat', {
         method: 'POST',
         context: 'public',
         body: JSON.stringify({
           action: 'send',
           conversationId: selected.id,
-          body: value,
+          body: payload.body,
+          replyToId: payload.replyToId,
+          attachmentIds: payload.attachments.map((attachment) => attachment.uploadId),
         }),
       });
+      setLocalMessages((current) => current.map((message) => message.id === optimisticId ? created : message));
       invalidate(threadKey);
       invalidate('chat:global:');
     } catch (error) {
+      setLocalMessages((current) => current.filter((message) => message.id !== optimisticId));
       setActionError(error instanceof Error ? error.message : 'Message was not sent. Please try again.');
-      setDraft(value);
-    } finally {
-      setSending(false);
+      throw error;
+    }
+  };
+
+  const updateMessage = (messageId: string, patcher: (message: RichChatMessage) => Partial<RichChatMessage>) => {
+    const source = [...(thread.data?.messages ?? []), ...localMessages].find((message) => message.id === messageId);
+    if (!source) return;
+    const current = { ...source, ...(messageOverrides.get(messageId) ?? {}) };
+    setMessageOverrides((previous) => {
+      const next = new Map(previous);
+      next.set(messageId, { ...(next.get(messageId) ?? {}), ...patcher(current) });
+      return next;
+    });
+  };
+
+  const react = async (message: RichChatMessage, emoji: string) => {
+    const before = message.reactions ?? [];
+    const existing = before.find((reaction) => reaction.emoji === emoji);
+    const after: ChatReaction[] = existing?.reactedByMe
+      ? before.map((reaction) => reaction.emoji === emoji
+        ? { ...reaction, count: reaction.count - 1, reactedByMe: false }
+        : reaction).filter((reaction) => reaction.count > 0)
+      : existing
+        ? before.map((reaction) => reaction.emoji === emoji
+          ? { ...reaction, count: reaction.count + 1, reactedByMe: true }
+          : reaction)
+        : [...before, { emoji, count: 1, reactedByMe: true }];
+    updateMessage(message.id, () => ({ reactions: after }));
+    try {
+      await api.request('chat', {
+        method: 'POST', context: 'public',
+        body: JSON.stringify({ action: 'react', conversationId: selected?.id, messageId: message.id, emoji }),
+      });
+      invalidate(threadKey);
+    } catch (error) {
+      updateMessage(message.id, () => ({ reactions: before }));
+      setActionError(error instanceof Error ? error.message : 'Unable to update that reaction.');
+    }
+  };
+
+  const pin = async (message: RichChatMessage, pinned: boolean) => {
+    const before = { pinned_at: message.pinned_at, pinned_by_profile_id: message.pinned_by_profile_id };
+    updateMessage(message.id, () => ({
+      pinned_at: pinned ? new Date().toISOString() : null,
+      pinned_by_profile_id: pinned ? context?.profile?.id ?? null : null,
+    }));
+    try {
+      await api.request('chat', {
+        method: 'POST', context: 'public',
+        body: JSON.stringify({ action: 'pin', conversationId: selected?.id, messageId: message.id, pinned }),
+      });
+      invalidate(threadKey);
+    } catch (error) {
+      updateMessage(message.id, () => before);
+      setActionError(error instanceof Error ? error.message : 'Unable to update that pin.');
     }
   };
 
@@ -163,6 +250,32 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
     }));
   }, [inbox.data, normalizedFilter]);
 
+  const displayedMessages = useMemo(() => {
+    const server = (thread.data?.messages ?? []).map((message) => ({
+      ...message,
+      ...(messageOverrides.get(message.id) ?? {}),
+    }));
+    const ids = new Set(server.map((message) => message.id));
+    return [...server, ...localMessages.filter((message) => !ids.has(message.id)).map((message) => ({
+      ...message,
+      ...(messageOverrides.get(message.id) ?? {}),
+    }))];
+  }, [localMessages, messageOverrides, thread.data?.messages]);
+
+  const beginReply = (message: RichChatMessage) => setReplyTo({
+    id: message.id,
+    body: message.body,
+    sender_profile_id: message.sender_profile_id,
+    sender: message.sender,
+    attachmentType: message.attachments?.[0]?.type ?? null,
+  });
+
+  const jumpToMessage = (messageId: string) => {
+    const index = displayedMessages.findIndex((message) => message.id === messageId);
+    if (index < 0) return;
+    messageListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+  };
+
   if (mode !== 'authenticated') {
     return (
       <View style={[styles.center, { backgroundColor: colors.bg }]}>
@@ -176,10 +289,16 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
   }
 
   if (selected) {
-    const messages = thread.data?.messages ?? [];
+    const pinnedMessages = displayedMessages.filter((message) => message.pinned_at);
     return (
       <KeyboardAvoidingView
-        style={[styles.screen, { backgroundColor: colors.bg }]}
+        style={[
+          styles.screen,
+          {
+            backgroundColor: colors.bg,
+            paddingBottom: generalThreadBottomInset,
+          },
+        ]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View
@@ -210,6 +329,19 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
           </View>
         </View>
 
+        {pinnedMessages.length ? (
+          <Pressable
+            onPress={() => jumpToMessage(pinnedMessages[0].id)}
+            style={[styles.pinnedBanner, { backgroundColor: colors.primarySoft, borderBottomColor: colors.borderSubtle }]}
+          >
+            <Icon name="pin" size={15} color={colors.interactive} />
+            <Text style={[styles.pinnedText, { color: colors.textSecondary }]} numberOfLines={1}>
+              {pinnedMessages.length === 1 ? 'Pinned: ' : `${pinnedMessages.length} pinned · `}
+              {pinnedMessages[0].body || 'Media attachment'}
+            </Text>
+          </Pressable>
+        ) : null}
+
         {thread.loading && !thread.data ? (
           <View style={styles.center}><ActivityIndicator color={colors.interactive} /></View>
         ) : thread.error && !thread.data ? (
@@ -219,79 +351,43 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
           </Pressable>
         ) : (
           <FlatList
-            data={messages}
+            ref={messageListRef}
+            data={displayedMessages}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.messages}
+            keyboardShouldPersistTaps="handled"
+            onContentSizeChange={() => {
+              if (localMessages.length) messageListRef.current?.scrollToEnd({ animated: true });
+            }}
+            onScrollToIndexFailed={({ index, averageItemLength }) => {
+              messageListRef.current?.scrollToOffset({ offset: Math.max(0, averageItemLength * index), animated: true });
+            }}
             renderItem={({ item }) => {
               const mine = item.sender_profile_id === context?.profile?.id;
               return (
-                <View
-                  style={[
-                    styles.bubble,
-                    mine ? styles.mine : styles.theirs,
-                    {
-                      backgroundColor: mine ? colors.interactive : colors.card,
-                      borderColor: colors.borderSubtle,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.messageText, { color: mine ? '#FFFFFF' : colors.text }]}>
-                    {item.body}
-                  </Text>
-                  {!mine && item.sender?.username ? (
-                    <Text style={[styles.sender, { color: colors.textMuted }]}>
-                      @{item.sender.username}
-                    </Text>
-                  ) : null}
-                </View>
+                <RichMessageBubble
+                  message={item}
+                  mine={mine}
+                  onReply={beginReply}
+                  onReact={(target, emoji) => void react(target, emoji)}
+                  onPin={(target, pinned) => void pin(target, pinned)}
+                  onJumpToMessage={jumpToMessage}
+                />
               );
             }}
           />
         )}
 
         {actionError ? <Text style={{ color: colors.live, padding: 12 }}>{actionError}</Text> : null}
-        <View
-          style={[
-            styles.composer,
-            {
-              paddingBottom: Math.max(insets.bottom, 10),
-              backgroundColor: colors.card,
-              borderTopColor: colors.borderSubtle,
-            },
-          ]}
-        >
-          <TextInput
-            value={draft}
-            onChangeText={setDraft}
-            placeholder="Message…"
-            placeholderTextColor={colors.textMuted}
-            multiline
-            maxLength={4000}
-            style={[
-              styles.input,
-              {
-                color: colors.text,
-                backgroundColor: colors.bgSecondary,
-                borderColor: colors.borderSubtle,
-              },
-            ]}
-          />
-          <Pressable
-            onPress={() => void send()}
-            disabled={!draft.trim() || sending}
-            style={[
-              styles.sendButton,
-              {
-                backgroundColor: colors.interactive,
-                opacity: !draft.trim() || sending ? 0.45 : 1,
-              },
-            ]}
-          >
-            {sending
-              ? <ActivityIndicator size="small" color="#FFFFFF" />
-              : <Icon name="send" size={20} color="#FFFFFF" />}
-          </Pressable>
-        </View>
+        <RichChatComposer
+          endpoint="chat"
+          requestContext="public"
+          scope={{ conversationId: selected.id }}
+          replyTo={replyTo}
+          bottomInset={embeddedExpression ? Math.max(insets.bottom, 10) : 8}
+          onCancelReply={() => setReplyTo(null)}
+          onSend={send}
+        />
       </KeyboardAvoidingView>
     );
   }
@@ -431,6 +527,8 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1, minWidth: 0 },
   headerTitle: { fontSize: 16, fontWeight: '800' },
   username: { fontSize: 11, marginTop: 1 },
+  pinnedBanner: { minHeight: 38, borderBottomWidth: StyleSheet.hairlineWidth, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  pinnedText: { flex: 1, fontSize: 11, fontWeight: '700' },
   messages: { padding: spacing.md, gap: spacing.sm, flexGrow: 1, justifyContent: 'flex-end' },
   bubble: { maxWidth: '84%', borderWidth: 1, borderRadius: 18, paddingHorizontal: 13, paddingVertical: 9 },
   mine: { alignSelf: 'flex-end', borderBottomRightRadius: 5 },

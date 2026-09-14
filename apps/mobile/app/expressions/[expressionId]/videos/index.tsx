@@ -1,35 +1,30 @@
 import React, { useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Chip, EmptyState, ResourceError, Skeleton, VideoCard } from '@/components';
+import { Chip, EmptyState, InputField, ResourceError, Skeleton, VideoCard } from '@/components';
 import { ExpressionMediaHeader } from '@/components/expression/ExpressionMediaHeader';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
+import { getRuntimeSupabase } from '@/services/runtime-supabase';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import type { Video } from '@/types/content';
 
 type Payload = { videos: Video[] };
-
-const categories = [
-  { value: 'all', label: 'All' },
-  { value: 'teaching', label: 'Teachings' },
-  { value: 'worship', label: 'Worship' },
-  { value: 'conference', label: 'Conferences' },
-  { value: 'testimony', label: 'Testimonies' },
-  { value: 'interview', label: 'Interviews' },
-];
+type CategoryOption = { category: string; label: string; aliases?: string[] };
 
 export default function ExpressionVideosScreen() {
   const { expressionId } = useLocalSearchParams<{ expressionId: string }>();
   const id = typeof expressionId === 'string' ? expressionId : '';
-  const { api, context, mode } = useSession();
+  const { api, auth, context, mode } = useSession();
   const { colors } = useTheme();
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [categorySearch, setCategorySearch] = useState('');
 
   const membership = context?.expressions?.find((item) => item.id === id && item.status === 'active');
   const organizationId = membership?.organizationId ?? context?.organization?.id ?? '';
   const expressionName = context?.expression?.id === id ? context.expression.name : membership?.name ?? 'this Expression';
+  const accessToken = auth?.session.accessToken ?? null;
 
   const path = useMemo(() => {
     const params = new URLSearchParams();
@@ -43,11 +38,42 @@ export default function ExpressionVideosScreen() {
     (signal) => api.request<Payload>(path, { signal }),
   );
 
+  const categoryResource = useResource<CategoryOption[]>(
+    `expression:video-category-options:${organizationId || 'none'}`,
+    async () => {
+      if (!organizationId) return [];
+      try {
+        const supabase = await getRuntimeSupabase(accessToken);
+        const { data, error } = await supabase.rpc('get_video_category_options', { target_organization_id: organizationId });
+        if (error) throw error;
+        return Array.isArray(data) ? data as CategoryOption[] : [];
+      } catch {
+        return [];
+      }
+    },
+  );
+
   const videos = resource.data?.videos ?? [];
+  const fallbackCategories = useMemo<CategoryOption[]>(() => {
+    const unique = [...new Set(videos.map((video) => String(video.category ?? '').trim()).filter(Boolean))];
+    return unique.map((category) => ({
+      category,
+      label: category.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()),
+      aliases: [],
+    }));
+  }, [videos]);
+  const categoryOptions = categoryResource.data?.length ? categoryResource.data : fallbackCategories;
+  const categories = useMemo(() => [{ category: 'all', label: 'All', aliases: [] as string[] }, ...categoryOptions], [categoryOptions]);
+  const visibleCategories = useMemo(() => {
+    const query = categorySearch.trim().toLowerCase();
+    if (!query) return categories;
+    return categories.filter((item) => item.category === 'all' || [item.category, item.label, ...(item.aliases ?? [])].some((value) => value.toLowerCase().includes(query)));
+  }, [categories, categorySearch]);
+
   const filtered = selectedCategory === 'all'
     ? videos
-    : videos.filter((video) => video.category?.toLowerCase() === selectedCategory);
-  const activeCategory = categories.find((item) => item.value === selectedCategory)?.label ?? 'All';
+    : videos.filter((video) => video.category?.toLowerCase() === selectedCategory.toLowerCase());
+  const activeCategory = categories.find((item) => item.category === selectedCategory)?.label ?? 'All';
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -79,16 +105,18 @@ export default function ExpressionVideosScreen() {
 
         <View style={[styles.filterCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
           <Text style={[styles.filterEyebrow, { color: colors.textMuted }]}>BROWSE BY TYPE</Text>
+          <InputField label="Find a category" value={categorySearch} onChangeText={setCategorySearch} placeholder="Search video categories…" autoCapitalize="none" />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-            {categories.map((category) => (
+            {visibleCategories.map((category) => (
               <Chip
-                key={category.value}
+                key={category.category}
                 label={category.label}
-                selected={selectedCategory === category.value}
-                onPress={() => setSelectedCategory(category.value)}
+                selected={selectedCategory === category.category}
+                onPress={() => setSelectedCategory(category.category)}
               />
             ))}
           </ScrollView>
+          {!visibleCategories.length ? <Text style={[styles.filterHint, { color: colors.textMuted }]}>No enabled category matches that search.</Text> : null}
         </View>
 
         {resource.loading && !resource.data ? (
@@ -134,6 +162,7 @@ const styles = StyleSheet.create({
   metricLabel: { fontSize: 9, lineHeight: 13, fontWeight: '800', marginTop: 2 },
   filterCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm },
   filterEyebrow: { fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 0.8 },
+  filterHint: { fontSize: 10.5, lineHeight: 15 },
   chips: { gap: spacing.xs, paddingRight: spacing.md },
   section: { gap: spacing.sm },
   sectionEyebrow: { fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 0.9 },

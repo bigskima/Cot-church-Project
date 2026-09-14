@@ -16,6 +16,7 @@ export * from './live/HeroLiveCard';
 export * from './live/LiveCard';
 export * from './sermons/SermonCard';
 export * from './events/EventCard';
+export * from './events/EventLiveCountdown';
 export * from './community/PostCard';
 export * from './leadership/LeadershipModuleCard';
 export * from './leadership/LeaderCard';

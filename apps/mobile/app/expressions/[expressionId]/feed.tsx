@@ -11,6 +11,7 @@ const shortcuts = [
   { key: 'announcements', label: 'Updates', icon: 'megaphone-outline', route: 'announcements' },
   { key: 'prayer', label: 'Prayer', icon: 'heart-outline', route: 'prayer' },
   { key: 'events', label: 'Events', icon: 'calendar-outline', route: 'events' },
+  { key: 'participate', label: 'Engage', icon: 'gift-outline', route: 'participate' },
   { key: 'members', label: 'People', icon: 'people-outline', route: 'members' },
 ] as const;
 
@@ -98,8 +99,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 18, lineHeight: 22, fontWeight: '900', letterSpacing: -0.35, marginTop: 1 },
   subtitle: { fontSize: 10, lineHeight: 14, marginTop: 1 },
   homeButton: { width: 38, height: 38, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  shortcuts: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.md },
-  shortcut: { flex: 1, minHeight: 34, borderRadius: radius.pill, borderWidth: 1, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  shortcuts: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.xs, marginTop: spacing.md },
+  shortcut: { minWidth: '30%', flexGrow: 1, minHeight: 34, borderRadius: radius.pill, borderWidth: 1, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
   shortcutText: { fontSize: 9, lineHeight: 12, fontWeight: '800' },
   feed: { flex: 1, minHeight: 0 },
   pressed: { opacity: 0.72, transform: [{ scale: 0.98 }] },

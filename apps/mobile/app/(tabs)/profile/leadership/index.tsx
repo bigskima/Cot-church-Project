@@ -64,6 +64,7 @@ export default function LeadershipHubScreen() {
     : hasCapability('giving.finance.read');
   const canManageLeadership = hasExpression && hasCapability('expression.leadership.manage');
   const canManageChurchLeadership = hasOrganizationCapability('organization.leadership.manage');
+  const canManageWatchCategories = generalWorkspace && canManageChurchLeadership;
   const canManageExpressionAccess =
     hasExpression &&
     (isCurrentExpressionOwner ||
@@ -79,6 +80,7 @@ export default function LeadershipHubScreen() {
 
   const tools = [
     { title: 'Live Media Studio', description: 'Create live broadcasts, prepare broadcasts and keep an eye on live services.', iconName: 'radio-outline', badge: 'LIVE OPS', route: routeFor('/general/leadership/media-studio', '/(tabs)/profile/leadership/media-studio'), enabled: canManageMedia },
+    { title: 'Watch Categories', description: 'Rename, search, reorder, or hide video discovery categories without redeploying the app.', iconName: 'pricetags-outline', badge: 'MEDIA', route: '/general/leadership/watch-categories', enabled: canManageWatchCategories },
     { title: 'Pastoral Triage & Care Queue', description: 'Manage confidential prayer petitions, decisions, and assigned follow-ups.', iconName: 'heart-outline', badge: 'CARE', route: routeFor('/general/leadership/pastoral-triage', '/(tabs)/profile/leadership/pastoral-triage'), enabled: canPastoralTriage },
     { title: 'Church Leadership Directory', description: 'Manage church-wide leaders and choose who appears in the public Church Story.', iconName: 'business-outline', badge: 'CHURCH', route: routeFor('/general/leadership/church-leadership', '/(tabs)/profile/leadership/church-leadership'), enabled: canManageChurchLeadership },
     { title: 'Expression Leadership Directory', description: 'Manage pastoral and ministry leadership profiles for the selected Expression. Public featuring remains explicit.', iconName: 'people-outline', badge: 'DIRECTORY', route: '/(tabs)/profile/leadership/expression-leadership', enabled: !generalWorkspace && canManageLeadership },
