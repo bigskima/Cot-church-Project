@@ -8,6 +8,17 @@ import { adminClient, publicClient } from "../_shared/supabase.ts";
 
 const PORTRAIT_BUCKET = "leadership-portraits";
 
+async function authorizeLeadershipScope(auth: any, expressionId: string | null) {
+  if (expressionId) {
+    if (!auth?.branchId || auth.branchId !== expressionId) {
+      throw new ApiError("EXPRESSION_CONTEXT_MISMATCH", "Enter this exact Expression before managing its leaders", 403);
+    }
+    await authorize(auth, "expression.leadership.manage");
+  } else {
+    await authorizeOrganization(auth, "organization.leadership.manage");
+  }
+}
+
 Deno.serve(
   createHandler(
     { methods: ["GET", "POST", "PATCH"], authentication: "optional", organization: "optional" },
@@ -20,17 +31,60 @@ Deno.serve(
         const view = url.searchParams.get("view") ?? "all";
         const expressionId = uuid(url.searchParams.get("expressionId"), "expressionId");
 
+        if (view === "leader-candidates") {
+          if (!auth?.user || !auth.organizationId) throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication and organization context required", 401);
+          await authorizeLeadershipScope(auth, expressionId ?? null);
+          const admin = adminClient();
+          const normalized = (url.searchParams.get("q") ?? "").trim().replace(/^@/, "").toLowerCase();
+          const limit = Math.min(100, Math.max(10, Number(url.searchParams.get("limit") || "100") || 100));
+
+          if (expressionId) {
+            const { data, error } = await admin
+              .from("expression_memberships")
+              .select("profile_id,joined_at,profile:profiles(id,display_name,username,avatar_url)")
+              .eq("organization_id", auth.organizationId)
+              .eq("branch_id", expressionId)
+              .eq("status", "active")
+              .order("joined_at", { ascending: true })
+              .limit(limit);
+            if (error) throw new ApiError("LEADER_CANDIDATES_FAILED", "Unable to retrieve Expression members", 500, undefined, false);
+            const candidates = (data ?? []).filter((row: any) => {
+              const profile = Array.isArray(row.profile) ? row.profile[0] : row.profile;
+              if (!normalized) return Boolean(profile);
+              return [profile?.display_name, profile?.username]
+                .filter(Boolean)
+                .some((value) => String(value).toLowerCase().includes(normalized));
+            });
+            return { data: candidates };
+          }
+
+          const { data, error } = await admin
+            .from("memberships")
+            .select("profile_id,joined_at,profile:profiles(id,display_name,username,avatar_url)")
+            .eq("organization_id", auth.organizationId)
+            .eq("status", "active")
+            .order("joined_at", { ascending: true })
+            .limit(limit);
+          if (error) throw new ApiError("LEADER_CANDIDATES_FAILED", "Unable to retrieve church members", 500, undefined, false);
+          const candidates = (data ?? []).filter((row: any) => {
+            const profile = Array.isArray(row.profile) ? row.profile[0] : row.profile;
+            if (!normalized) return Boolean(profile);
+            return [profile?.display_name, profile?.username]
+              .filter(Boolean)
+              .some((value) => String(value).toLowerCase().includes(normalized));
+          });
+          return { data: candidates };
+        }
+
         let storyData = null;
         let leadershipData = null;
 
         if (view === "leadership-manage") {
-          if (!auth?.user || !auth.organizationId) {
-            throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication and organization context required", 401);
-          }
+          if (!auth?.user || !auth.organizationId) throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication and organization context required", 401);
           await authorizeOrganization(auth, "organization.leadership.manage");
           const { data, error } = await auth.client
             .from("leadership_profiles")
-            .select("id, organization_id, expression_id, profile_id, display_name, portrait_url, role_title, short_bio, full_bio, ministry, display_order, tenure_start, tenure_end, is_founder, is_featured_public, is_active, social_links, created_at, updated_at")
+            .select("id,organization_id,expression_id,profile_id,display_name,portrait_url,role_title,short_bio,full_bio,ministry,display_order,tenure_start,tenure_end,is_founder,is_featured_public,is_active,social_links,created_at,updated_at")
             .eq("organization_id", auth.organizationId)
             .is("expression_id", null)
             .order("is_founder", { ascending: false })
@@ -43,12 +97,9 @@ Deno.serve(
         if (view === "all" || view === "story") {
           let query = publicClient()
             .from("church_story")
-            .select("id, organization_id, title, subtitle, mission, vision, founding_story, founding_year, history_milestones, values, banner_image_url, is_published, created_at, updated_at")
+            .select("id,organization_id,title,subtitle,mission,vision,founding_story,founding_year,history_milestones,values,banner_image_url,is_published,created_at,updated_at")
             .eq("is_published", true);
-
-          if (organizationId) {
-            query = query.eq("organization_id", organizationId);
-          }
+          if (organizationId) query = query.eq("organization_id", organizationId);
           const { data, error } = await query.limit(1).maybeSingle();
           if (error) throw new ApiError("STORY_FETCH_FAILED", "Unable to retrieve the church story", 500, undefined, false);
           storyData = data ?? null;
@@ -60,19 +111,11 @@ Deno.serve(
           }
           let query = client
             .from("leadership_profiles")
-            .select("id, organization_id, expression_id, profile_id, display_name, portrait_url, role_title, short_bio, full_bio, ministry, display_order, tenure_start, tenure_end, is_founder, is_featured_public, is_active, social_links, created_at, updated_at")
+            .select("id,organization_id,expression_id,profile_id,display_name,portrait_url,role_title,short_bio,full_bio,ministry,display_order,tenure_start,tenure_end,is_founder,is_featured_public,is_active,social_links,created_at,updated_at")
             .eq("is_active", true);
-
-          if (organizationId) {
-            query = query.eq("organization_id", organizationId);
-          }
-
-          if (expressionId) {
-            query = query.eq("expression_id", expressionId).order("display_order", { ascending: true });
-          } else {
-            query = query.eq("is_featured_public", true).order("is_founder", { ascending: false }).order("display_order", { ascending: true });
-          }
-
+          if (organizationId) query = query.eq("organization_id", organizationId);
+          if (expressionId) query = query.eq("expression_id", expressionId).order("display_order", { ascending: true });
+          else query = query.eq("is_featured_public", true).order("is_founder", { ascending: false }).order("display_order", { ascending: true });
           const { data, error } = await query.limit(50);
           if (error) throw new ApiError("LEADERSHIP_FETCH_FAILED", "Unable to retrieve leadership profiles", 500, undefined, false);
           leadershipData = data ?? [];
@@ -83,16 +126,13 @@ Deno.serve(
         return { data: { story: storyData, leadership: leadershipData } };
       }
 
-      // Authenticated POST / PATCH
-      if (!auth?.user || !auth?.organizationId) {
-        throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication and organization context required", 401);
-      }
-
+      if (!auth?.user || !auth?.organizationId) throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication and organization context required", 401);
       const body = assertObject(await jsonBody(request));
 
       if (request.method === "POST" && body.action === "create_portrait_upload") {
-        await authorizeOrganization(auth, "organization.leadership.manage");
-        assertNoUnknownFields(body, ["action", "mimeType"]);
+        assertNoUnknownFields(body, ["action", "mimeType", "expressionId"]);
+        const expressionId = body.expressionId ? uuid(String(body.expressionId), "expressionId", true) : null;
+        await authorizeLeadershipScope(auth, expressionId);
         const mimeType = requiredString(body.mimeType, "mimeType", 80).toLowerCase();
         const extension = mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : mimeType === "image/jpeg" ? "jpg" : null;
         if (!extension) throw new ApiError("UNSUPPORTED_MEDIA_TYPE", "Choose a JPG, PNG, or WebP portrait", 415);
@@ -107,7 +147,6 @@ Deno.serve(
         if (body.type === "story") {
           await authorizeOrganization(auth, "organization.leadership.manage");
           assertNoUnknownFields(body, ["type", "title", "subtitle", "mission", "vision", "foundingStory", "foundingYear", "milestones", "values", "bannerImageUrl"]);
-
           const record = {
             organization_id: auth.organizationId,
             title: requiredString(body.title, "title", 200),
@@ -122,41 +161,14 @@ Deno.serve(
             updated_by: auth.user.id,
             is_published: true,
           };
-
-          const { data, error } = await auth.client
-            .from("church_story")
-            .upsert(record, { onConflict: "organization_id" })
-            .select()
-            .single();
-
+          const { data, error } = await auth.client.from("church_story").upsert(record, { onConflict: "organization_id" }).select().single();
           if (error) throw new ApiError("STORY_SAVE_FAILED", "Unable to save church story", 500, undefined, false);
           return { data, status: 201 };
         }
 
-        // Leadership profile create
         const expressionId = body.expressionId ? uuid(String(body.expressionId), "expressionId", true) : null;
-        if (expressionId) {
-          await authorize(auth, "expression.leadership.manage");
-        } else {
-          await authorizeOrganization(auth, "organization.leadership.manage");
-        }
-
-        assertNoUnknownFields(body, [
-          "type",
-          "expressionId",
-          "profileId",
-          "displayName",
-          "portraitUrl",
-          "roleTitle",
-          "shortBio",
-          "fullBio",
-          "ministry",
-          "displayOrder",
-          "isFounder",
-          "isFeaturedPublic",
-          "socialLinks",
-        ]);
-
+        await authorizeLeadershipScope(auth, expressionId);
+        assertNoUnknownFields(body, ["type", "expressionId", "profileId", "displayName", "portraitUrl", "roleTitle", "shortBio", "fullBio", "ministry", "displayOrder", "isFounder", "isFeaturedPublic", "socialLinks"]);
         const record = {
           organization_id: auth.organizationId,
           expression_id: expressionId,
@@ -175,43 +187,16 @@ Deno.serve(
           created_by: auth.user.id,
           updated_by: auth.user.id,
         };
-
         const { data, error } = await auth.client.from("leadership_profiles").insert(record).select().single();
         if (error) throw new ApiError("LEADERSHIP_CREATE_FAILED", "Unable to create leadership profile", 500, undefined, false);
         return { data, status: 201 };
       }
 
-      // PATCH leadership profile
       const id = uuid(requiredString(body.id, "id", 36), "id", true)!;
-      const { data: existing, error: fetchErr } = await auth.client
-        .from("leadership_profiles")
-        .select("organization_id, expression_id")
-        .eq("id", id)
-        .single();
-
+      const { data: existing, error: fetchErr } = await auth.client.from("leadership_profiles").select("organization_id,expression_id").eq("id", id).single();
       if (fetchErr || !existing) throw new ApiError("NOT_FOUND", "Leadership profile not found", 404);
-
-      if (existing.expression_id) {
-        await authorize(auth, "expression.leadership.manage");
-      } else {
-        await authorizeOrganization(auth, "organization.leadership.manage");
-      }
-
-      assertNoUnknownFields(body, [
-        "id",
-        "displayName",
-        "portraitUrl",
-        "roleTitle",
-        "shortBio",
-        "fullBio",
-        "ministry",
-        "displayOrder",
-        "isFounder",
-        "isFeaturedPublic",
-        "isActive",
-        "socialLinks",
-      ]);
-
+      await authorizeLeadershipScope(auth, existing.expression_id);
+      assertNoUnknownFields(body, ["id", "displayName", "portraitUrl", "roleTitle", "shortBio", "fullBio", "ministry", "displayOrder", "isFounder", "isFeaturedPublic", "isActive", "socialLinks"]);
       const updates: Record<string, unknown> = { updated_by: auth.user.id };
       if (body.displayName !== undefined) updates.display_name = requiredString(body.displayName, "displayName", 120);
       if (body.portraitUrl !== undefined) updates.portrait_url = optionalString(body.portraitUrl, "portraitUrl", 2000);
@@ -224,16 +209,9 @@ Deno.serve(
       if (body.isFeaturedPublic !== undefined) updates.is_featured_public = Boolean(body.isFeaturedPublic);
       if (body.isActive !== undefined) updates.is_active = Boolean(body.isActive);
       if (body.socialLinks !== undefined && typeof body.socialLinks === "object") updates.social_links = body.socialLinks;
-
-      const { data, error } = await auth.client
-        .from("leadership_profiles")
-        .update(updates)
-        .eq("id", id)
-        .select()
-        .single();
-
+      const { data, error } = await auth.client.from("leadership_profiles").update(updates).eq("id", id).select().single();
       if (error) throw new ApiError("LEADERSHIP_UPDATE_FAILED", "Unable to update leadership profile", 500, undefined, false);
       return { data };
-    }
-  )
+    },
+  ),
 );
