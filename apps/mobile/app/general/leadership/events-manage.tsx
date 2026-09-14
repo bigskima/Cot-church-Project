@@ -1,1 +1,1 @@
-export { default } from '../../(tabs)/profile/leadership/events-manage';
+export { default } from '@/features/general/GeneralEventsManageExperience';
