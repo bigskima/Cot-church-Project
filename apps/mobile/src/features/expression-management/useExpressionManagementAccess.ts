@@ -29,6 +29,7 @@ export function useExpressionManagementAccess() {
   const canReadGivingFinance = Boolean(expressionId) && hasCapability('giving.finance.read');
   const canReadExpressionFinance = Boolean(expressionId) && (hasCapability('finance.read') || hasCapability('finance.manage'));
   const canManageExpressionFinance = Boolean(expressionId) && hasCapability('finance.manage');
+  const canManageFeedRanking = Boolean(expressionId) && hasCapability('feed.ranking.manage');
   const canManageLeadership = Boolean(expressionId) && hasCapability('expression.leadership.manage');
   const canManageSettings = Boolean(expressionId) && hasCapability('branches.update');
   const canManageInviteCodes = Boolean(expressionId) && hasCapability('members.invite');
@@ -49,6 +50,7 @@ export function useExpressionManagementAccess() {
       canManageGiving ||
       canReadGivingFinance ||
       canReadExpressionFinance ||
+      canManageFeedRanking ||
       canManageLeadership ||
       canManageSettings ||
       canManageInviteCodes ||
@@ -57,6 +59,7 @@ export function useExpressionManagementAccess() {
       canManageAccess,
       canManageAnnouncements,
       canManageEvents,
+      canManageFeedRanking,
       canManageGiving,
       canManageInviteCodes,
       canManageLeadership,
@@ -85,6 +88,7 @@ export function useExpressionManagementAccess() {
     canReadGivingFinance,
     canReadExpressionFinance,
     canManageExpressionFinance,
+    canManageFeedRanking,
     canManageLeadership,
     canManageSettings,
     canManageInviteCodes,
