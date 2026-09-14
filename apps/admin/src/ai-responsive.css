@@ -1,0 +1,85 @@
+/* AI Administration responsive polish.
+   Scoped with :has(.admin-capability-tags) so provider layouts used by payments
+   and streaming keep their own composition. */
+.admin-provider-card:has(.admin-capability-tags) {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.admin-provider-card:has(.admin-capability-tags) > div:nth-child(3) {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.admin-provider-card:has(.admin-capability-tags) code {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+#ai-capability-routes .admin-table-wrapper {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+#ai-capability-routes .admin-table {
+  min-width: 820px;
+}
+
+@media (max-width: 760px) {
+  .admin-provider-card:has(.admin-capability-tags) > div:first-child {
+    align-items: flex-start !important;
+  }
+
+  .admin-provider-card:has(.admin-capability-tags) > div:nth-child(3) {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-provider-card:has(.admin-capability-tags) .admin-capability-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  #ai-capability-routes .admin-card-body {
+    padding-inline: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .admin-provider-card:has(.admin-capability-tags) {
+    padding: 14px;
+  }
+
+  .admin-provider-card:has(.admin-capability-tags) > div:first-child {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .admin-provider-card:has(.admin-capability-tags) h4 {
+    font-size: 15px !important;
+    overflow-wrap: anywhere;
+  }
+
+  .admin-provider-card:has(.admin-capability-tags) p {
+    overflow-wrap: anywhere;
+  }
+
+  .admin-modal-dialog {
+    width: calc(100% - 18px);
+    max-height: calc(100dvh - 18px);
+  }
+
+  .admin-modal-header,
+  .admin-modal-body,
+  .admin-modal-footer {
+    padding-inline: 14px;
+  }
+
+  .admin-modal-footer > div {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .admin-modal-footer .admin-btn {
+    flex: 1 1 140px;
+  }
+}
