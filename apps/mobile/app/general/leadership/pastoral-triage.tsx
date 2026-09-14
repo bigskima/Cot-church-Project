@@ -1,1 +1,1 @@
-export { default } from '../../(tabs)/profile/leadership/pastoral-triage';
+export { default } from '@/features/general/GeneralPastoralCareExperience';

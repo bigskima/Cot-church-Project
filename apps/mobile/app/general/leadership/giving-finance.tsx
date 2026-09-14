@@ -1,1 +1,1 @@
-export { default } from '../../(tabs)/profile/leadership/giving-finance';
+export { default } from '@/features/general/GeneralGivingFinanceExperience';

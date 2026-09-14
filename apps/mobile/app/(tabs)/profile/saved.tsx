@@ -89,7 +89,9 @@ export default function SavedLibraryScreen() {
         : ({ pathname: '/general/sermon/[id]', params: { id: item.routeId } } as any));
       return;
     }
-    router.push('/general/community');
+    router.push(expressionOnly && item.expressionId
+      ? ({ pathname: `/expressions/${item.expressionId}/post/[id]`, params: { id: item.routeId } } as any)
+      : ({ pathname: '/general/post/[id]', params: { id: item.routeId } } as any));
   };
 
   const remove = async (item: SavedItem) => {

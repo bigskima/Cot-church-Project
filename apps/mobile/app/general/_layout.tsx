@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Tabs } from 'expo-router';
+import { Tabs, usePathname } from 'expo-router';
 import { ActivityIndicator, Platform, StyleSheet, Text, View, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/primitives/Icon';
@@ -9,11 +9,13 @@ import { useTheme } from '@/state/theme';
 
 const TAB_ICON_SIZE = 22;
 const hidden = { href: null } as const;
+const PRIMARY_GENERAL_PATHS = new Set(['/general', '/general/explore', '/general/reels', '/general/chat', '/general/profile']);
 
 export default function GeneralLayout() {
   const { colors } = useTheme();
   const { mode, accessReady, context, leaveExpression } = useSession();
   const insets = useSafeAreaInsets();
+  const pathname = usePathname();
   const [leaving, setLeaving] = useState(false);
   const [boundaryError, setBoundaryError] = useState('');
 
@@ -44,6 +46,8 @@ export default function GeneralLayout() {
 
   const bottomInset = Math.max(insets.bottom, Platform.OS === 'web' ? 9 : 7);
   const barHeight = 64 + bottomInset;
+  const normalizedPath = pathname.replace(/\/+$/, '') || '/general';
+  const showPrimaryNavigation = PRIMARY_GENERAL_PATHS.has(normalizedPath);
   const screenOptions = {
     headerShown: false,
     lazy: true,
@@ -51,7 +55,9 @@ export default function GeneralLayout() {
     tabBarInactiveTintColor: colors.textMuted,
     tabBarLabelStyle: styles.label,
     tabBarHideOnKeyboard: true,
-    tabBarStyle: [styles.tabBar, { backgroundColor: colors.glass, borderColor: colors.borderSubtle, height: barHeight, paddingBottom: bottomInset }] as any,
+    tabBarStyle: showPrimaryNavigation
+      ? [styles.tabBar, { backgroundColor: colors.glass, borderColor: colors.borderSubtle, height: barHeight, paddingBottom: bottomInset }] as any
+      : styles.hiddenTabBar,
     tabBarItemStyle: styles.item,
     tabBarIconStyle: styles.icon,
     sceneStyle: { backgroundColor: colors.bg } as any,
@@ -130,4 +136,5 @@ const styles = StyleSheet.create({
   iconShell: { minWidth: 42, height: 31, borderRadius: 13, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 9 },
   activeDot: { width: 4, height: 4, borderRadius: 2 },
   tabBar: { position: 'absolute', left: 14, right: 14, bottom: 10, maxWidth: 620, alignSelf: 'center', borderTopWidth: 0, borderWidth: 1, borderRadius: 28, overflow: 'hidden', paddingHorizontal: 4, ...shadows.floating },
+  hiddenTabBar: { display: 'none' },
 });
