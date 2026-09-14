@@ -29,10 +29,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        # This draft branch adds Expo native modules while its root lockfile is being
-        # reconciled. npm install still honors the existing lock as the baseline, then
-        # resolves only the missing workspace entries so validation can reach typecheck.
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Validate API structure
         id: api_check

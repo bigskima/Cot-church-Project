@@ -75,7 +75,7 @@ create or replace function public.home_feed_layer_plan(
   stream_items_between_sections integer default 4
 )
 returns table(
-  position numeric,
+  "position" numeric,
   unit_kind text,
   content_kind text,
   content_ids uuid[],
@@ -279,7 +279,7 @@ begin
     from specialty_chunks sc
   ), stream_units as (
     select
-      (rs.rn * 100)::numeric as position,
+      (rs.rn * 100)::numeric as "position",
       'stream'::text as unit_kind,
       rs.kind as content_kind,
       array[rs.id]::uuid[] as content_ids,
@@ -288,7 +288,7 @@ begin
     from ranked_stream rs
   ), section_units as (
     select
-      ((so.section_rn * stream_items_between_sections * 100) - 50)::numeric as position,
+      ((so.section_rn * stream_items_between_sections * 100) - 50)::numeric as "position",
       'section'::text as unit_kind,
       so.kind as content_kind,
       so.ids as content_ids,
@@ -299,7 +299,7 @@ begin
   select * from stream_units
   union all
   select * from section_units
-  order by position, newest_at desc;
+  order by "position", newest_at desc;
 end;
 $function$;
 

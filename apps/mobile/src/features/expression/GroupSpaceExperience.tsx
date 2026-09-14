@@ -74,24 +74,38 @@ export function GroupSpaceExperience({ groupId }: { groupId: string }) {
       return result;
     } catch (error) {
       setActionError(error instanceof Error ? error.message : 'That Group action could not be completed.');
-      throw error;
+      return null;
     } finally { setBusy(''); }
   };
 
   const resetSheet = () => { setSheet(null); setTitle(''); setBody(''); setStartsAt(''); setEndsAt(''); setLocation(''); setSelectedMembers([]); setRoomHours('24'); setRoleColor('#64748B'); setRolePermissions([]); };
-  const createAnnouncement = async () => { if (!title.trim() || !body.trim()) return setActionError('Add an announcement title and message.'); await mutate('create_announcement', { title: title.trim(), body: body.trim(), isPinned: true }, 'Announcement published.'); resetSheet(); };
+  const createAnnouncement = async () => {
+    if (!title.trim() || !body.trim()) return setActionError('Add an announcement title and message.');
+    const result = await mutate('create_announcement', { title: title.trim(), body: body.trim(), isPinned: true }, 'Announcement published.');
+    if (result) resetSheet();
+  };
   const createEvent = async () => {
-    if (!title.trim() || !startsAt.trim() || Number.isNaN(new Date(startsAt).getTime())) return setActionError('Add an event title and a valid date/time.');
-    await mutate('create_event', { title: title.trim(), description: body.trim(), startsAt: new Date(startsAt).toISOString(), endsAt: endsAt.trim() ? new Date(endsAt).toISOString() : undefined, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', location: location.trim() }, 'Group event published.'); resetSheet();
+    const startDate = new Date(startsAt);
+    const endDate = endsAt.trim() ? new Date(endsAt) : null;
+    if (!title.trim() || !startsAt.trim() || Number.isNaN(startDate.getTime())) return setActionError('Add an event title and a valid start date/time.');
+    if (endDate && Number.isNaN(endDate.getTime())) return setActionError('Add a valid end date/time or leave it empty.');
+    if (endDate && endDate <= startDate) return setActionError('The event end must be after its start.');
+    const result = await mutate('create_event', { title: title.trim(), description: body.trim(), startsAt: startDate.toISOString(), endsAt: endDate?.toISOString(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', location: location.trim() }, 'Group event published.');
+    if (result) resetSheet();
   };
   const createSection = async () => {
     const hours = Number(roomHours);
     if (!title.trim() || !Number.isFinite(hours) || hours < 1 || hours > 720) return setActionError('Enter a room name and duration between 1 and 720 hours.');
     const result = await mutate('create_section', { name: title.trim(), description: body.trim(), memberIds: selectedMembers, expiresAt: new Date(Date.now() + hours * 3600000).toISOString() }, 'Temporary chat created.');
+    if (!result) return;
     resetSheet();
-    if (expression?.id && result?.id) router.push(`/expressions/${expression.id}/groups/${groupId}/chat?sectionId=${result.id}` as any);
+    if (expression?.id && result.id) router.push(`/expressions/${expression.id}/groups/${groupId}/chat?sectionId=${result.id}` as any);
   };
-  const createRole = async () => { if (!title.trim()) return setActionError('Enter a role name.'); await mutate('create_role', { name: title.trim(), color: roleColor, permissions: rolePermissions }, 'Group role created.'); resetSheet(); };
+  const createRole = async () => {
+    if (!title.trim()) return setActionError('Enter a role name.');
+    const result = await mutate('create_role', { name: title.trim(), color: roleColor, permissions: rolePermissions }, 'Group role created.');
+    if (result) resetSheet();
+  };
 
   const activeMembers = useMemo(() => (resource.data?.members ?? []).filter((member) => member.status === 'active' && !member.banned_at), [resource.data?.members]);
   const canAdmin = Boolean(resource.data?.permissions.manageMembers || resource.data?.permissions.manageChat || resource.data?.permissions.assignRoles);

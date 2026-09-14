@@ -14,6 +14,7 @@ import type { ChatReaction, ChatReply, ChatSendPayload, RichChatMessage } from '
 
 type GroupChatPayload = {
   group: { id: string; name: string; branch_id?: string | null };
+  activeSection?: { id: string; name: string; description?: string | null } | null;
   membership: { chat_restricted_until?: string | null; moderation_reason?: string | null };
   permissions: { pinMessages: boolean };
   messages: RichChatMessage[];
@@ -116,7 +117,7 @@ export function GroupChatExperience({ groupId, sectionId }: { groupId: string; s
 
   return (
     <KeyboardAvoidingView style={[styles.screen, { backgroundColor: colors.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={{ paddingTop: insets.top }}><ScreenHeader title={sectionId ? 'Temporary chat' : resource.data?.group.name ?? 'Group chat'} kicker={sectionId ? 'PRIVATE GROUP ROOM' : 'GROUP CHAT'} subtitle='Replies, media, voice notes, reactions and pins.' showBack /></View>
+      <View style={{ paddingTop: insets.top }}><ScreenHeader title={resource.data?.activeSection?.name ?? resource.data?.group.name ?? 'Group chat'} kicker={sectionId ? 'PRIVATE GROUP ROOM' : 'GROUP CHAT'} subtitle={resource.data?.activeSection?.description || 'Replies, media, voice notes, reactions and pins.'} showBack /></View>
       <View style={[styles.scope, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}>
         <Icon name='people-circle-outline' size={17} color={colors.interactive} />
         <Text style={[styles.scopeText, { color: colors.textSecondary }]}>This conversation stays inside the Group.</Text>
