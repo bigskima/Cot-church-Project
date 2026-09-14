@@ -46,6 +46,21 @@ const STEPS: ProgressiveFlowStep[] = [
   { key: 'review', label: 'Review', hint: 'Choose the status and confirm before saving.', icon: 'checkmark-circle-outline' },
 ];
 
+function normalizeAudioMime(name: string, supplied?: string | null) {
+  const value = supplied?.toLowerCase().split(';')[0]?.trim();
+  if (value === 'audio/x-m4a' || value === 'audio/m4a') return 'audio/mp4';
+  if (value === 'audio/mp3') return 'audio/mpeg';
+  if (value === 'audio/x-wav') return 'audio/wav';
+  if (value && ['audio/mpeg', 'audio/mp4', 'audio/aac', 'audio/ogg', 'audio/wav', 'audio/webm'].includes(value)) return value;
+  const lower = name.toLowerCase();
+  if (lower.endsWith('.mp3')) return 'audio/mpeg';
+  if (lower.endsWith('.webm')) return 'audio/webm';
+  if (lower.endsWith('.ogg') || lower.endsWith('.oga')) return 'audio/ogg';
+  if (lower.endsWith('.wav')) return 'audio/wav';
+  if (lower.endsWith('.aac')) return 'audio/aac';
+  return 'audio/mp4';
+}
+
 export default function GeneralSermonsManageExperience() {
   const insets = useSafeAreaInsets();
   const { api, context, hasOrganizationCapability } = useSession();
@@ -140,14 +155,14 @@ export default function GeneralSermonsManageExperience() {
 
   const chooseAudio = async () => {
     setError('');
-    const result = await DocumentPicker.getDocumentAsync({ type: ['audio/mpeg', 'audio/mp4', 'audio/aac', 'audio/ogg', 'audio/wav'], copyToCacheDirectory: true });
+    const result = await DocumentPicker.getDocumentAsync({ type: ['audio/mpeg', 'audio/mp4', 'audio/aac', 'audio/ogg', 'audio/wav', 'audio/webm', 'audio/*'], copyToCacheDirectory: true });
     const asset = result.canceled ? null : result.assets?.[0];
     if (!asset) return;
     if ((asset.size ?? 0) > 200 * 1024 * 1024) {
       setError('Choose an audio recording that is 200 MB or smaller.');
       return;
     }
-    const mimeType = asset.mimeType?.toLowerCase() || (asset.name.toLowerCase().endsWith('.mp3') ? 'audio/mpeg' : 'audio/mp4');
+    const mimeType = normalizeAudioMime(asset.name, asset.mimeType);
     setAudioFile({ uri: asset.uri, name: asset.name, mimeType, size: asset.size, file: (asset as any).file });
   };
 
@@ -257,7 +272,7 @@ export default function GeneralSermonsManageExperience() {
         <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>OPTIONAL AUDIO</Text>
         <Pressable onPress={() => void chooseAudio()} style={[styles.uploadCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
           <View style={[styles.mediaIcon, { backgroundColor: colors.primarySoft }]}><Icon name={audioFile || editing?.audio_asset_id ? 'checkmark-circle-outline' : 'headset-outline'} size={24} color={colors.interactive} /></View>
-          <View style={styles.flex}><Text style={[styles.uploadTitle, { color: colors.text }]}>{audioFile?.name || (editing?.audio_asset_id ? 'Audio recording attached' : 'Attach sermon audio')}</Text><Text style={[styles.uploadHint, { color: colors.textMuted }]}>Listeners can use the original recording or Read Aloud.</Text></View><Icon name="chevron-forward" size={17} color={colors.textMuted} />
+          <View style={styles.flex}><Text style={[styles.uploadTitle, { color: colors.text }]}>{audioFile ? 'Audio selected' : editing?.audio_asset_id ? 'Audio recording attached' : 'Attach sermon audio'}</Text><Text style={[styles.uploadHint, { color: colors.textMuted }]}>Listeners can use the original recording or Read Aloud. File names stay private.</Text></View><Icon name="chevron-forward" size={17} color={colors.textMuted} />
         </Pressable>
       </View>
     );
@@ -298,10 +313,10 @@ export default function GeneralSermonsManageExperience() {
             <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}><Text style={[styles.summaryValue, { color: colors.text }]}>{publishedCount}</Text><Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Published</Text></View>
             <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}><Text style={[styles.summaryValue, { color: colors.text }]}>{draftCount}</Text><Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Draft / review</Text></View>
           </View>
-          <SectionHeader title="Sermon library" badge={list.length} subtitle="Open a message to read it, or edit when your role allows." />
+          <SectionHeader title="Sermon library" badge={list.length} subtitle="Published messages open publicly. Draft and review messages open directly in the editor." />
           {sermons.loading ? <Skeleton height={104} count={3} /> : sermons.error && !sermons.data ? <ResourceError message={sermons.error} retry={sermons.refresh} /> : list.length ? list.map((sermon) => (
             <View key={sermon.id} style={styles.sermonWrap}>
-              <SermonCard sermon={sermon} variant="row" onPress={() => router.push(`/general/sermon/${sermon.id}` as any)} />
+              <SermonCard sermon={sermon} variant="row" onPress={() => sermon.status === 'published' ? router.push(`/general/sermon/${sermon.id}` as any) : canManage ? openEdit(sermon) : undefined} />
               <View style={styles.statusRow}><View style={styles.statusMeta}><Badge label={(sermon.status || 'draft').toUpperCase()} variant={sermon.status === 'published' ? 'success' : 'neutral'} /><Text style={[styles.scopeText, { color: colors.textMuted }]}>General COT</Text></View>{canManage ? <Button label="Edit" onPress={() => openEdit(sermon)} variant="outline" size="sm" /> : null}</View>
             </View>
           )) : <EmptyState title="No sermons yet" message={canCreate ? 'Start a sermon and move through Basics, Message, Media and Review.' : 'Published teachings will appear here.'} iconName="book-outline" actionLabel={canCreate ? 'Create sermon' : undefined} onAction={canCreate ? openCreate : undefined} />}
