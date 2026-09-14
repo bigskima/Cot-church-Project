@@ -35,7 +35,7 @@ export default function GeneralLayout() {
           {boundaryError ? (
             <><Icon name="alert-circle-outline" size={27} color={colors.live} /><Text style={[styles.boundaryTitle, { color: colors.text }]}>General COT is unavailable</Text><Text style={[styles.boundaryCopy, { color: colors.textSecondary }]}>{boundaryError}</Text></>
           ) : (
-            <><ActivityIndicator size="large" color={colors.interactive} /><Text style={[styles.boundaryTitle, { color: colors.text }]}>Opening General COT</Text><Text style={[styles.boundaryCopy, { color: colors.textSecondary }]}>Preparing the church-wide space and clearing private Expression context.</Text></>
+            <><ActivityIndicator size="large" color={colors.interactive} /><Text style={[styles.boundaryTitle, { color: colors.text }]}>Opening General COT</Text><Text style={[styles.boundaryCopy, { color: colors.textSecondary }]}>Clearing the private Expression context and preparing the church-wide space.</Text></>
           )}
         </View>
       </View>
