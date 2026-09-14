@@ -294,7 +294,7 @@ export default function HomeScreen() {
           {unit.ids.map((id) => {
             if (unit.contentKind === 'sermon') {
               const sermon = sermonMap.get(id); if (!sermon) return null;
-              return <View key={id} style={styles.horizontalCard}><SermonCard sermon={sermon} onPress={() => router.push(`/general/sermon/${id}` as any)} /></View>;
+              return <View key={id} style={styles.horizontalCard}><SermonCard sermon={sermon} onPress={() => router.push(`/general/sermon/${sermon.id}` as any)} /></View>;
             }
             if (unit.contentKind === 'event') {
               const event = eventMap.get(id); if (!event) return null;
@@ -315,7 +315,7 @@ export default function HomeScreen() {
           <View style={styles.composerMainRow}>
             <Avatar url={context?.profile?.avatar_url} name={context?.profile?.display_name ?? 'COT member'} size="sm" />
             <Pressable onPress={() => openGeneralComposer('post')} style={({ pressed }) => [styles.composerPrompt, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.iconPressed]}><Text style={[styles.composerPromptText, { color: colors.textMuted }]}>Share with General COT…</Text></Pressable>
-            <Pressable onPress={() => router.push('/general/studio')} style={({ pressed }) => [styles.composerMore, { backgroundColor: colors.primarySoft }, pressed && styles.iconPressed]}><Icon name="add" size={21} color={colors.interactive} /></Pressable>
+            <Pressable onPress={() => router.push('/general/studio')} style={({ pressed }) => [styles.composerMore, { backgroundColor: colors.primarySoft }, pressed && styles.iconPressed]} accessibilityRole="button" accessibilityLabel="Create"><Icon name="add" size={21} color={colors.interactive} /></Pressable>
           </View>
           <View style={styles.composerActions}>
             <Pressable onPress={() => openGeneralComposer('post')} style={styles.composerAction}><Icon name="create-outline" size={16} color={colors.interactive} /><Text style={[styles.composerActionText, { color: colors.textSecondary }]}>Post</Text></Pressable>
@@ -339,8 +339,8 @@ export default function HomeScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <View style={[styles.homeHeader, { paddingTop: insets.top + spacing.xs, backgroundColor: colors.card, borderBottomColor: colors.borderSubtle }]}>
-        <View style={styles.homeHeaderIdentity}><View style={[styles.brandBadge, { backgroundColor: colors.cardElevated, borderColor: colors.borderSubtle }]}><BrandMark variant="header" size={28} /></View><View style={styles.homeHeaderCopy}><Pressable onPress={() => mode === 'authenticated' && router.push('/expressions')} disabled={mode !== 'authenticated'} style={styles.scopeTitleRow}><Text style={[styles.scopeTitle, { color: colors.text }]} numberOfLines={1}>General COT</Text>{mode === 'authenticated' ? <Icon name="chevron-down" size={14} color={colors.textMuted} /> : null}</Pressable><View style={styles.scopeMetaRow}><Icon name="globe-outline" size={11} color={colors.interactive} /><Text style={[styles.scopeMeta, { color: colors.textMuted }]} numberOfLines={1}>{organization?.name ?? 'City of Transformation'} · Public space</Text></View></View></View>
-        <View style={styles.homeHeaderActions}>{mode === 'authenticated' ? <Pressable onPress={() => router.push('/general/notifications')} style={[styles.headerAction, { backgroundColor: colors.bgSecondary }]}><Icon name="notifications-outline" size={19} color={colors.text} /></Pressable> : null}<Pressable onPress={() => router.push('/general/tools')} style={[styles.headerAction, { backgroundColor: colors.primarySoft }]}><Icon name="grid-outline" size={18} color={colors.interactive} /></Pressable></View>
+        <View style={styles.homeHeaderIdentity}><View style={[styles.brandBadge, { backgroundColor: colors.cardElevated, borderColor: colors.borderSubtle }]}><BrandMark variant="header" size={28} /></View><View style={styles.homeHeaderCopy}><Pressable onPress={() => mode === 'authenticated' && router.push('/expressions')} disabled={mode !== 'authenticated'} style={styles.scopeTitleRow} accessibilityRole="button" accessibilityLabel={mode === 'authenticated' ? 'General COT. Open My Expressions' : 'General COT'}><Text style={[styles.scopeTitle, { color: colors.text }]} numberOfLines={1}>General COT</Text>{mode === 'authenticated' ? <Icon name="chevron-down" size={14} color={colors.textMuted} /> : null}</Pressable><View style={styles.scopeMetaRow}><Icon name="globe-outline" size={11} color={colors.interactive} /><Text style={[styles.scopeMeta, { color: colors.textMuted }]} numberOfLines={1}>{organization?.name ?? 'City of Transformation'} · Public space</Text></View></View></View>
+        <View style={styles.homeHeaderActions}>{mode === 'authenticated' ? <Pressable onPress={() => router.push('/general/notifications')} style={[styles.headerAction, { backgroundColor: colors.bgSecondary }]}><Icon name="notifications-outline" size={19} color={colors.text} /></Pressable> : null}<Pressable onPress={() => router.push('/general/tools')} style={[styles.headerAction, { backgroundColor: colors.primarySoft }]} accessibilityRole="button" accessibilityLabel="General COT tools and settings"><Icon name="grid-outline" size={18} color={colors.interactive} /></Pressable></View>
       </View>
 
       {resource.loading && !resource.data ? <View style={styles.loadingContainer}><Skeleton height={190} borderRadius={radius.lg} /><Skeleton height={120} count={4} /></View> : resource.error && !resource.data ? <ResourceError message={resource.error} retry={resource.refresh} /> : (
