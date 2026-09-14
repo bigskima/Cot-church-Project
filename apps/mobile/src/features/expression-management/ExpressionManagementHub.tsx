@@ -76,6 +76,14 @@ export function ExpressionManagementHub() {
         enabled: access.canManageAnnouncements,
       },
       {
+        key: 'ranking',
+        title: 'Feed Ranking',
+        description: 'Tune freshness, engagement and diversity weights for Home.',
+        iconName: 'analytics-outline',
+        route: `${base}/feed-ranking`,
+        enabled: access.canManageFeedRanking,
+      },
+      {
         key: 'testimonies',
         title: 'Testimony review',
         description: 'Respond privately and coordinate physical sharing.',
@@ -151,7 +159,7 @@ export function ExpressionManagementHub() {
       {
         key: 'operations',
         title: 'Content & gatherings',
-        subtitle: 'Create what members watch, read, receive and attend.',
+        subtitle: 'Create what members watch, read, receive and attend, and tune how Home orders eligible content.',
         icon: 'sparkles-outline',
         tools: content.filter((tool) => tool.enabled),
       },
@@ -174,6 +182,7 @@ export function ExpressionManagementHub() {
     access.canManageAccess,
     access.canManageAnnouncements,
     access.canManageEvents,
+    access.canManageFeedRanking,
     access.canManageGiving,
     access.canManageInviteCodes,
     access.canManageLeadership,
