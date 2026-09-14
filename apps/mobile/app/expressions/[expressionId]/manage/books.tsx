@@ -1,5 +1,5 @@
 import React from 'react';
-import ExpressionFinanceManagementExperience from '@/features/finance/ExpressionFinanceManagementExperience';
+import ExpressionFinanceManagementV2 from '@/features/finance/ExpressionFinanceManagementV2';
 import { ExpressionManagementGate } from '@/features/expression-management/ExpressionManagementGate';
 import { ExpressionManagementWorkspace } from '@/features/expression-management/ExpressionManagementWorkspace';
 import { useExpressionManagementAccess } from '@/features/expression-management/useExpressionManagementAccess';
@@ -11,11 +11,11 @@ export default function ExpressionFinanceManagementScreen() {
       <ExpressionManagementWorkspace
         expressionId={access.expressionId}
         active="books"
-        title="Financial management"
-        subtitle="Document giving, expenses, sessions and wallet balances for this Expression."
+        title="Finance"
+        subtitle="See total giving first, then add optional member-level detail, expenses and reconciliation."
         icon="wallet-outline"
       >
-        <ExpressionFinanceManagementExperience />
+        <ExpressionFinanceManagementV2 />
       </ExpressionManagementWorkspace>
     </ExpressionManagementGate>
   );
