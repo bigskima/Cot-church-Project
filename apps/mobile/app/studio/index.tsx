@@ -127,6 +127,14 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
       enabled: generalWorkspace ? hasOrganizationCapability('polls.manage') : hasCapability('polls.manage'),
     },
     {
+      title: 'Feed Ranking',
+      description: 'Tune explainable Home ranking weights without redeploying the app.',
+      iconName: 'analytics-outline',
+      badge: 'HOME',
+      route: routeFor('/general/leadership/feed-ranking', '/general/leadership/feed-ranking'),
+      enabled: generalWorkspace ? hasOrganizationCapability('feed.ranking.manage') : hasCapability('feed.ranking.manage'),
+    },
+    {
       title: 'Live Media Studio',
       description: 'Create and manage live broadcasts available to you.',
       iconName: 'radio-outline',
