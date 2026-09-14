@@ -22,7 +22,7 @@ create index if not exists group_chat_sections_org_idx
 create index if not exists group_chat_section_members_added_by_idx
   on public.group_chat_section_members(added_by_profile_id);
 create index if not exists group_chat_section_members_member_scope_idx
-  on public.group_chat_section_members(membership_id, group_id, organization_id);
+  on public.group_chat_section_members(group_membership_id, group_id, organization_id);
 create index if not exists group_chat_section_members_section_scope_idx
   on public.group_chat_section_members(section_id, group_id, organization_id);
 create index if not exists group_chat_section_members_org_idx
@@ -62,9 +62,9 @@ create index if not exists group_roles_org_idx
 create index if not exists group_role_assignments_assigned_by_idx
   on public.group_role_assignments(assigned_by_profile_id);
 create index if not exists group_role_assignments_member_scope_idx
-  on public.group_role_assignments(membership_id, group_id, organization_id);
+  on public.group_role_assignments(group_membership_id, group_id, organization_id);
 create index if not exists group_role_assignments_role_scope_idx
-  on public.group_role_assignments(role_id, group_id, organization_id);
+  on public.group_role_assignments(group_role_id, group_id, organization_id);
 create index if not exists group_role_assignments_org_idx
   on public.group_role_assignments(organization_id);
 
@@ -89,7 +89,7 @@ create index if not exists group_giving_options_group_org_idx
 create index if not exists group_giving_options_org_idx
   on public.group_giving_options(organization_id);
 create index if not exists group_giving_options_purpose_org_idx
-  on public.group_giving_options(purpose_id, organization_id);
+  on public.group_giving_options(giving_purpose_id, organization_id);
 
 create index if not exists group_memberships_banned_by_idx
   on public.group_memberships(banned_by_profile_id);
