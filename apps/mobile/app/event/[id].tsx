@@ -8,6 +8,7 @@ import { useResource } from '@/hooks/use-resource';
 import {
   Badge,
   Button,
+  EventLiveCountdown,
   Icon,
   ResourceError,
   ScreenHeader,
@@ -135,7 +136,12 @@ export function EventDetailScreen({ forcedScope }: { forcedScope?: 'general' | '
           <ResourceError message={resource.error} retry={resource.refresh} />
         ) : event ? (
           <View style={styles.body}>
-            {/* Event Time & Location Card */}
+            <EventLiveCountdown
+              startsAt={event.starts_at}
+              endsAt={event.ends_at}
+              status={event.status}
+            />
+
             <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
               <View style={styles.cardRow}>
                 <View style={[styles.iconCircle, { backgroundColor: colors.primarySoft }]}>
@@ -146,6 +152,9 @@ export function EventDetailScreen({ forcedScope }: { forcedScope?: 'general' | '
                   <Text style={[styles.cardValue, { color: colors.text }]}>
                     {event.starts_at ? new Date(event.starts_at).toLocaleString([], { dateStyle: 'full', timeStyle: 'short' }) : 'To Be Announced'}
                   </Text>
+                  {event.ends_at ? (
+                    <Text style={[styles.timeHint, { color: colors.textSecondary }]}>Ends {new Date(event.ends_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</Text>
+                  ) : null}
                 </View>
               </View>
 
@@ -167,7 +176,6 @@ export function EventDetailScreen({ forcedScope }: { forcedScope?: 'general' | '
               </View>
             </View>
 
-            {/* Description */}
             {event.description ? (
               <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
                 <Text style={[styles.cardKicker, { color: colors.interactive }]}>ABOUT THIS GATHERING</Text>
@@ -175,7 +183,6 @@ export function EventDetailScreen({ forcedScope }: { forcedScope?: 'general' | '
               </View>
             ) : null}
 
-            {/* Actions Bar */}
             {registrations.loading && mode === 'authenticated' ? <Skeleton height={48} borderRadius={radius.md} /> : null}
             {registrations.error && mode === 'authenticated' ? <ResourceError message={registrations.error} retry={registrations.refresh} /> : null}
             {registration ? (
@@ -264,6 +271,12 @@ const styles = StyleSheet.create({
   cardValue: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  timeHint: {
+    marginTop: 3,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '500',
   },
   divider: {
     height: 1,
