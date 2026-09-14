@@ -3,6 +3,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'r
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, Badge, BottomSheet, Button, Chip, EmptyState, Icon, InputField, ResourceError, ScreenHeader, SectionHeader, Skeleton } from '@/components';
+import { DateTimeField } from '@/components/DateTimeField';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 import { invalidate } from '@/services/query-cache';
@@ -54,8 +55,8 @@ export function GroupSpaceExperience({ groupId }: { groupId: string }) {
   const [actionError, setActionError] = useState('');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [startsAt, setStartsAt] = useState('');
-  const [endsAt, setEndsAt] = useState('');
+  const [startsAt, setStartsAt] = useState<Date | null>(null);
+  const [endsAt, setEndsAt] = useState<Date | null>(null);
   const [location, setLocation] = useState('');
   const [roomHours, setRoomHours] = useState('24');
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
@@ -78,19 +79,23 @@ export function GroupSpaceExperience({ groupId }: { groupId: string }) {
     } finally { setBusy(''); }
   };
 
-  const resetSheet = () => { setSheet(null); setTitle(''); setBody(''); setStartsAt(''); setEndsAt(''); setLocation(''); setSelectedMembers([]); setRoomHours('24'); setRoleColor('#64748B'); setRolePermissions([]); };
+  const resetSheet = () => { setSheet(null); setTitle(''); setBody(''); setStartsAt(null); setEndsAt(null); setLocation(''); setSelectedMembers([]); setRoomHours('24'); setRoleColor('#64748B'); setRolePermissions([]); };
   const createAnnouncement = async () => {
     if (!title.trim() || !body.trim()) return setActionError('Add an announcement title and message.');
     const result = await mutate('create_announcement', { title: title.trim(), body: body.trim(), isPinned: true }, 'Announcement published.');
     if (result) resetSheet();
   };
   const createEvent = async () => {
-    const startDate = new Date(startsAt);
-    const endDate = endsAt.trim() ? new Date(endsAt) : null;
-    if (!title.trim() || !startsAt.trim() || Number.isNaN(startDate.getTime())) return setActionError('Add an event title and a valid start date/time.');
-    if (endDate && Number.isNaN(endDate.getTime())) return setActionError('Add a valid end date/time or leave it empty.');
-    if (endDate && endDate <= startDate) return setActionError('The event end must be after its start.');
-    const result = await mutate('create_event', { title: title.trim(), description: body.trim(), startsAt: startDate.toISOString(), endsAt: endDate?.toISOString(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', location: location.trim() }, 'Group event published.');
+    if (!title.trim() || !startsAt) return setActionError('Add an event title and choose its start date/time.');
+    if (endsAt && endsAt <= startsAt) return setActionError('The event end must be after its start.');
+    const result = await mutate('create_event', {
+      title: title.trim(),
+      description: body.trim(),
+      startsAt: startsAt.toISOString(),
+      endsAt: endsAt?.toISOString(),
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      location: location.trim(),
+    }, 'Group event published.');
     if (result) resetSheet();
   };
   const createSection = async () => {
@@ -162,7 +167,7 @@ export function GroupSpaceExperience({ groupId }: { groupId: string }) {
       </ScrollView>
 
       <BottomSheet visible={sheet === 'announcement'} onClose={resetSheet} title='New Group announcement'><View style={styles.form}><InputField label='Title' value={title} onChangeText={setTitle} /><InputField label='Message' value={body} onChangeText={setBody} multiline numberOfLines={5} /><Button label='Publish announcement' onPress={() => void createAnnouncement()} loading={busy === 'create_announcement'} /></View></BottomSheet>
-      <BottomSheet visible={sheet === 'event'} onClose={resetSheet} title='New Group event'><View style={styles.form}><InputField label='Title' value={title} onChangeText={setTitle} /><InputField label='Description' value={body} onChangeText={setBody} multiline /><InputField label='Starts' value={startsAt} onChangeText={setStartsAt} placeholder='2026-09-20 17:00' /><InputField label='Ends (optional)' value={endsAt} onChangeText={setEndsAt} /><InputField label='Location' value={location} onChangeText={setLocation} /><Button label='Publish event' onPress={() => void createEvent()} loading={busy === 'create_event'} /></View></BottomSheet>
+      <BottomSheet visible={sheet === 'event'} onClose={resetSheet} title='New Group event' subtitle='Choose dates instead of typing them manually'><View style={styles.form}><InputField label='Title' value={title} onChangeText={setTitle} /><InputField label='Description' value={body} onChangeText={setBody} multiline /><DateTimeField label='Starts' value={startsAt} onChange={setStartsAt} includeTime minYear={new Date().getFullYear()} maxYear={new Date().getFullYear() + 10} placeholder='Choose start date and time' /><DateTimeField label='Ends (optional)' value={endsAt} onChange={setEndsAt} includeTime minYear={new Date().getFullYear()} maxYear={new Date().getFullYear() + 10} placeholder='Choose end date and time' /><InputField label='Location' value={location} onChangeText={setLocation} /><Button label='Publish event' onPress={() => void createEvent()} loading={busy === 'create_event'} /></View></BottomSheet>
       <BottomSheet visible={sheet === 'section'} onClose={resetSheet} title='Temporary chat' subtitle='Choose exactly who can enter'><View style={styles.form}><InputField label='Room name' value={title} onChangeText={setTitle} /><InputField label='Purpose' value={body} onChangeText={setBody} /><InputField label='Duration in hours' value={roomHours} onChangeText={setRoomHours} keyboardType='number-pad' /><Text style={[styles.label, { color: colors.textMuted }]}>ADD PEOPLE</Text>{activeMembers.map((member) => <Chip key={member.id} label={member.profile?.display_name || member.profile?.username || 'Member'} selected={selectedMembers.includes(member.id)} onPress={() => setSelectedMembers((current) => current.includes(member.id) ? current.filter((id) => id !== member.id) : [...current, member.id])} />)}<Button label='Create private room' onPress={() => void createSection()} loading={busy === 'create_section'} /></View></BottomSheet>
       <BottomSheet visible={sheet === 'role'} onClose={resetSheet} title='Create Group role'><View style={styles.form}><InputField label='Role name' value={title} onChangeText={setTitle} /><InputField label='Color' value={roleColor} onChangeText={setRoleColor} autoCapitalize='characters' /><Text style={[styles.label, { color: colors.textMuted }]}>PERMISSIONS</Text><View style={styles.roleRow}>{ROLE_PERMISSIONS.map((permission) => <Chip key={permission.value} label={permission.label} selected={rolePermissions.includes(permission.value)} onPress={() => setRolePermissions((current) => current.includes(permission.value) ? current.filter((item) => item !== permission.value) : [...current, permission.value])} />)}</View><Button label='Create role' onPress={() => void createRole()} loading={busy === 'create_role'} /></View></BottomSheet>
     </View>
