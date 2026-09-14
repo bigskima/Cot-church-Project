@@ -37,6 +37,7 @@ export function GeneralTopBar({ organizationName, authenticated, avatarUrl, disp
   const { width } = useWindowDimensions();
   const { colors } = useTheme();
   const wide = width >= 720;
+  const roomForUtilities = width >= 430;
 
   return (
     <View style={[styles.wrap, { paddingTop: insets.top + spacing.xs }]}>
@@ -45,7 +46,7 @@ export function GeneralTopBar({ organizationName, authenticated, avatarUrl, disp
           onPress={() => authenticated ? router.push('/expressions') : undefined}
           disabled={!authenticated}
           accessibilityRole="button"
-          accessibilityLabel={authenticated ? 'General COT. Open Expressions' : 'General COT'}
+          accessibilityLabel={authenticated ? 'General COT. Open My Expressions' : 'General COT'}
           style={({ pressed }) => [styles.identity, pressed && authenticated ? styles.pressed : null]}
         >
           <View style={[styles.brand, { backgroundColor: colors.cardElevated, borderColor: colors.borderSubtle }]}>
@@ -71,14 +72,15 @@ export function GeneralTopBar({ organizationName, authenticated, avatarUrl, disp
           >
             <Icon name="search-outline" size={17} color={colors.textMuted} />
             <Text style={[styles.searchText, { color: colors.textMuted }]}>Search sermons, people, events and posts</Text>
-            <View style={[styles.searchHint, { backgroundColor: colors.card }]}><Text style={[styles.searchHintText, { color: colors.textMuted }]}>Explore</Text></View>
+            <View style={[styles.searchHint, { backgroundColor: colors.card }]}><Text style={[styles.searchHintText, { color: colors.textMuted }]}>Discover</Text></View>
           </Pressable>
         ) : null}
 
         <View style={styles.actions}>
           {!wide ? <HeaderButton icon="search-outline" label="Search General COT" onPress={() => router.push('/general/explore')} /> : null}
-          {authenticated ? <HeaderButton icon="notifications-outline" label="Notifications" onPress={() => router.push('/general/notifications')} /> : null}
+          {authenticated && roomForUtilities ? <HeaderButton icon="notifications-outline" label="Notifications" onPress={() => router.push('/general/notifications')} /> : null}
           {authenticated && canManage ? <HeaderButton icon="shield-checkmark-outline" label="Leadership tools" onPress={() => router.push('/general/leadership')} accent /> : null}
+          {authenticated && wide ? <HeaderButton icon="ellipsis-horizontal" label="General COT tools and settings" onPress={() => router.push('/general/tools')} /> : null}
           {authenticated ? (
             <Pressable onPress={() => router.push('/general/profile')} accessibilityRole="button" accessibilityLabel="Open your profile" style={({ pressed }) => [styles.avatarButton, pressed && styles.pressed]}>
               <Avatar url={avatarUrl} name={displayName || 'COT member'} size="sm" />
