@@ -15,6 +15,8 @@ type RealtimeClient = {
   removeAllChannels: () => Promise<unknown> | unknown;
 };
 
+// Tables that exist in the current production schema. Keep these on the primary
+// channel so unreleased draft migrations can never disable established realtime.
 const tableInvalidations: Record<string, string[]> = {
   conversations: ['chat:'],
   conversation_participants: ['chat:'],
@@ -58,28 +60,26 @@ const tableInvalidations: Record<string, string[]> = {
   profiles: ['chat:', 'comments:', 'mobile:community:', 'mobile:home-feed:', 'public-profile:', 'birthdays:', 'expression:birthdays:'],
   notifications: ['notifications:'],
   follows: ['mobile:home-feed:', 'public-profile:', 'expression:'],
+  giving_purposes: ['expression:finance-books:', 'giving:'],
+  giving_campaigns: ['expression:finance-books:', 'giving:'],
+  giving_settings: ['expression:finance-books:', 'giving:'],
+};
 
-  // New participation workflows.
+// These tables are introduced by this draft PR. They intentionally live on a
+// second channel: if the database migration has not been promoted yet, that
+// channel may fail without affecting established chat/feed/media realtime.
+const optionalTableInvalidations: Record<string, string[]> = {
   polls: ['participation:'],
   poll_options: ['participation:'],
   poll_votes: ['participation:'],
   giveaways: ['participation:'],
   giveaway_entries: ['participation:'],
   giveaway_winners: ['participation:'],
-
-  // Expression testimony workflow.
   testimonies: ['expression:testimonies:'],
   testimony_responses: ['expression:testimonies:'],
-
-  // Expression financial documentation and giving-linked books.
   financial_accounts: ['expression:finance-books:'],
   financial_sessions: ['expression:finance-books:'],
   financial_ledger_entries: ['expression:finance-books:'],
-  giving_purposes: ['expression:finance-books:', 'giving:'],
-  giving_campaigns: ['expression:finance-books:', 'giving:'],
-  giving_settings: ['expression:finance-books:', 'giving:'],
-
-  // Feed tuning changes should immediately recalculate visible Home ordering.
   feed_ranking_settings: ['mobile:home-feed:', 'expression:layered-home:'],
 };
 
@@ -94,7 +94,7 @@ export function RealtimeBridge() {
 
     let disposed = false;
     let client: RealtimeClient | null = null;
-    let channel: any = null;
+    const channels: any[] = [];
     let flushTimer: ReturnType<typeof setTimeout> | undefined;
     const pendingPrefixes = new Set<string>();
     const queueInvalidation = (prefix: string) => {
@@ -141,27 +141,33 @@ export function RealtimeBridge() {
         client = nextClient;
         if (accessToken) await client.realtime.setAuth(accessToken);
         if (disposed) return;
-        let nextChannel = client.channel(`cot-live-${accessToken ? auth?.session.expiresAt ?? 'member' : 'visitor'}`);
 
-        for (const table of Object.keys(tableInvalidations)) {
-          nextChannel = nextChannel.on(
-            'postgres_changes',
-            { event: '*', schema: 'public', table },
-            () => {
-              tableInvalidations[table].forEach(queueInvalidation);
-              if (accessToken && contextTables.has(table)) refreshContext();
-            },
-          );
-        }
+        const attach = (name: string, invalidations: Record<string, string[]>, refreshMembershipContext: boolean) => {
+          let nextChannel = client!.channel(name);
+          for (const table of Object.keys(invalidations)) {
+            nextChannel = nextChannel.on(
+              'postgres_changes',
+              { event: '*', schema: 'public', table },
+              () => {
+                invalidations[table].forEach(queueInvalidation);
+                if (refreshMembershipContext && accessToken && contextTables.has(table)) refreshContext();
+              },
+            );
+          }
 
-        channel = nextChannel;
-        let subscribed = false;
-        channel.subscribe((status: string) => {
-          if (disposed || status !== 'SUBSCRIBED') return;
-          // Postgres changes are not replayed after a disconnected socket.
-          if (subscribed) Object.values(tableInvalidations).flat().forEach(queueInvalidation);
-          subscribed = true;
-        });
+          let subscribed = false;
+          nextChannel.subscribe((status: string) => {
+            if (disposed || status !== 'SUBSCRIBED') return;
+            // Postgres changes are not replayed after a disconnected socket.
+            if (subscribed) Object.values(invalidations).flat().forEach(queueInvalidation);
+            subscribed = true;
+          });
+          channels.push(nextChannel);
+        };
+
+        const identity = accessToken ? auth?.session.expiresAt ?? 'member' : 'visitor';
+        attach(`cot-live-core-${identity}`, tableInvalidations, true);
+        attach(`cot-live-draft-${identity}`, optionalTableInvalidations, false);
       } catch (error) {
         // Canonical reads continue to work when realtime is unavailable. Keep a
         // websocket/config failure isolated from the route tree instead of ever
@@ -176,8 +182,10 @@ export function RealtimeBridge() {
     return () => {
       disposed = true;
       if (flushTimer) clearTimeout(flushTimer);
-      if (client && channel) void client.removeChannel(channel);
-      if (client) void client.removeAllChannels();
+      if (client) {
+        channels.forEach((channel) => void client!.removeChannel(channel));
+        void client.removeAllChannels();
+      }
     };
   }, [accessToken, auth?.session.expiresAt, mode, refreshContext]);
 
