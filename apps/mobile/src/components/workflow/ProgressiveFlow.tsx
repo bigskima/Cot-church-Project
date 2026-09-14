@@ -26,6 +26,8 @@ type Props = {
   children: React.ReactNode;
 };
 
+const noop = () => undefined;
+
 export function ProgressiveFlow({
   steps,
   currentStep,
@@ -42,6 +44,8 @@ export function ProgressiveFlow({
   const { colors } = useTheme();
   const active = steps[currentStep] ?? steps[0];
   const isLast = currentStep >= steps.length - 1;
+  const backAction = onBack ?? noop;
+  const continueAction = (isLast ? onComplete : onNext) ?? noop;
 
   return (
     <View style={styles.root}>
@@ -89,13 +93,13 @@ export function ProgressiveFlow({
           label={currentStep === 0 ? 'Cancel' : 'Back'}
           variant="outline"
           size="md"
-          onPress={onBack}
+          onPress={backAction}
           disabled={busy}
         />
         <Button
           label={isLast ? completeLabel : nextLabel}
           size="md"
-          onPress={isLast ? onComplete : onNext}
+          onPress={continueAction}
           loading={isLast && busy}
           disabled={!canContinue || busy}
         />
