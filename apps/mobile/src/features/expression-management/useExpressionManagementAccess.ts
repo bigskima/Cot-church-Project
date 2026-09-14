@@ -37,6 +37,8 @@ export function useExpressionManagementAccess() {
   const canManageEvents =
     Boolean(expressionId) &&
     (hasCapability('events.create') || hasCapability('events.update'));
+  const canManageAnnouncements =
+    Boolean(expressionId) && hasCapability('announcements.manage');
   const canManageGiving =
     Boolean(expressionId) && hasCapability('giving.campaigns.manage');
   const canReadGivingFinance =
@@ -76,6 +78,7 @@ export function useExpressionManagementAccess() {
       canUseContentStudio ||
       canManageLive ||
       canManageEvents ||
+      canManageAnnouncements ||
       canManageGiving ||
       canReadGivingFinance ||
       canManageLeadership ||
@@ -84,6 +87,7 @@ export function useExpressionManagementAccess() {
       canManageAccess,
     [
       canManageAccess,
+      canManageAnnouncements,
       canManageEvents,
       canManageGiving,
       canManageInviteCodes,
@@ -105,6 +109,7 @@ export function useExpressionManagementAccess() {
     canManageLive,
     canManageSermons,
     canManageEvents,
+    canManageAnnouncements,
     canManageGiving,
     canReadGivingFinance,
     canManageLeadership,
