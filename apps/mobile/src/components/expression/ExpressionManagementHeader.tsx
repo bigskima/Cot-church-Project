@@ -14,6 +14,7 @@ export type ExpressionManagementSection =
   | 'events'
   | 'announcements'
   | 'testimonies'
+  | 'prayer'
   | 'leadership'
   | 'invites'
   | 'access'
@@ -42,6 +43,7 @@ const tabs: Array<{ key: ExpressionManagementSection; label: string; icon: strin
   { key: 'events', label: 'Events', icon: 'calendar-outline' },
   { key: 'announcements', label: 'Updates', icon: 'megaphone-outline' },
   { key: 'testimonies', label: 'Testimony', icon: 'document-text-outline' },
+  { key: 'prayer', label: 'Prayer inbox', icon: 'heart-outline' },
   { key: 'leadership', label: 'Leaders', icon: 'people-circle-outline' },
   { key: 'invites', label: 'Invites', icon: 'key-outline' },
   { key: 'access', label: 'Access', icon: 'shield-checkmark-outline' },
@@ -59,6 +61,7 @@ function sectionPath(expressionId: string, key: ExpressionManagementSection) {
   if (key === 'events') return `/expressions/${expressionId}/manage/events`;
   if (key === 'announcements') return `/expressions/${expressionId}/manage/announcements`;
   if (key === 'testimonies') return `/expressions/${expressionId}/manage/testimonies`;
+  if (key === 'prayer') return `/expressions/${expressionId}/manage/prayer`;
   if (key === 'leadership') return `/expressions/${expressionId}/manage/leadership`;
   if (key === 'invites') return `/expressions/${expressionId}/manage/invite-codes`;
   if (key === 'access') return `/expressions/${expressionId}/manage/access`;
@@ -89,6 +92,7 @@ export function ExpressionManagementHeader({
     if (tab.key === 'events') return access.canManageEvents;
     if (tab.key === 'announcements') return access.canManageAnnouncements;
     if (tab.key === 'testimonies') return access.canReviewTestimonies;
+    if (tab.key === 'prayer') return access.canManagePrayer;
     if (tab.key === 'leadership') return access.canManageLeadership;
     if (tab.key === 'invites') return access.canManageInviteCodes;
     if (tab.key === 'access') return access.canManageAccess;
