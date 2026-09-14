@@ -36,6 +36,7 @@ import {
   Skeleton,
 } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
+import { putSignedUpload, readUploadFile, type UploadFile } from '@/services/uploads';
 import type { SocialPost } from '@/types/content';
 
 type FeedScope = 'general' | 'expression';
@@ -98,13 +99,6 @@ function inferAudioMime(name: string, supplied?: string | null) {
   if (value.endsWith('.ogg') || value.endsWith('.oga')) return 'audio/ogg';
   if (value.endsWith('.wav')) return 'audio/wav';
   return 'audio/mpeg';
-}
-
-async function readUploadBody(media: UploadableMedia) {
-  if (media.webFile) return media.webFile;
-  const response = await fetch(media.uri);
-  if (!response.ok) throw new Error('Unable to read the selected media file.');
-  return response.blob();
 }
 
 export function CommunityExperience({ scope = 'general', embedded = false }: { scope?: FeedScope; embedded?: boolean }) {
@@ -289,7 +283,14 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
   };
 
   const uploadMedia = async (media: UploadableMedia) => {
-    const binary = await readUploadBody(media);
+    const uploadFile: UploadFile = {
+      uri: media.uri,
+      name: media.fileName || `community-upload-${Date.now()}`,
+      mimeType: media.mimeType,
+      size: media.reportedSize,
+      file: media.webFile ?? undefined,
+    };
+    const binary = await readUploadFile(uploadFile);
     const sizeBytes = Number(binary.size || media.reportedSize || 0);
     if (!sizeBytes || sizeBytes > MAX_MEDIA_BYTES) throw new Error('Each attachment must be 50 MB or smaller.');
 
@@ -309,12 +310,11 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
     });
 
     try {
-      const uploaded = await fetch(intent.signedUploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': media.mimeType },
-        body: binary,
+      await putSignedUpload(intent.signedUploadUrl, {
+        ...uploadFile,
+        size: sizeBytes,
+        file: binary,
       });
-      if (!uploaded.ok) throw new Error(`Media upload failed (${uploaded.status}).`);
       return await api.request<MediaAttachment>('community-media', {
         method: 'POST',
         context: 'public',
