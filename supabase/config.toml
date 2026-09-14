@@ -70,12 +70,15 @@ verify_jwt = false
 [functions.realtime-config]
 verify_jwt = false
 
-# Direct and group chat authenticate in the application handler so clients get
-# consistent CORS and session-expiry responses instead of a gateway-only error.
+# Direct, group, and Expression-wide chat authenticate inside the application
+# handler so clients receive consistent CORS and scoped membership errors.
 [functions.chat]
 verify_jwt = false
 
 [functions.group-chat]
+verify_jwt = false
+
+[functions.expression-chat]
 verify_jwt = false
 
 [functions.announcements]
@@ -88,6 +91,12 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.public-content]
+verify_jwt = false
+
+# Compatibility enrichment for event banners while older public-content versions
+# are still in circulation. It remains optional-auth/public like the canonical
+# public event detail read.
+[functions.public-event-detail]
 verify_jwt = false
 
 [functions.public-social-feed]

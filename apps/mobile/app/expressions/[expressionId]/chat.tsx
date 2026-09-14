@@ -1,6 +1,8 @@
 import React from 'react';
-import { GlobalChatExperience } from '@/features/chat/GlobalChatExperience';
+import { useLocalSearchParams } from 'expo-router';
+import { ExpressionChatExperience } from '@/features/chat/ExpressionChatExperience';
 
 export default function ExpressionChatRoute() {
-  return <GlobalChatExperience embeddedExpression />;
+  const { expressionId } = useLocalSearchParams<{ expressionId?: string }>();
+  return <ExpressionChatExperience expressionId={typeof expressionId === 'string' ? expressionId : ''} />;
 }

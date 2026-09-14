@@ -1,28 +1,20 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Dimensions, FlatList, Pressable, RefreshControl, Share, StyleSheet, Text, View, ViewToken } from 'react-native';
+import { Dimensions, FlatList, Pressable, RefreshControl, StyleSheet, Text, View, ViewToken } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
+import { shareContent } from '@/services/share';
 import { BottomSheet, Button, ContentReportSheet, Icon, ReelPlayer, ResourceError, Skeleton } from '@/components';
 import type { Reel } from '@/types/content';
 
 const { height: windowHeight } = Dimensions.get('window');
-type PlaybackInfo = {
-  available: boolean;
-  renditions?: { kind?: string; playbackUrl?: string; storagePath?: string }[];
-};
-type ReelEngagementState = {
-  reaction: string | null;
-  bookmarked: boolean;
-};
+type PlaybackInfo = { available: boolean; renditions?: { kind?: string; playbackUrl?: string; storagePath?: string }[] };
+type ReelEngagementState = { reaction: string | null; bookmarked: boolean };
 type PlaybackBatchEntry = PlaybackInfo & { contentId: string };
 type EngagementBatchEntry = ReelEngagementState & { contentId: string };
-type ReelWithViewerState = Reel & {
-  viewerReaction?: string | null;
-  viewerBookmarked?: boolean;
-};
+type ReelWithViewerState = Reel & { viewerReaction?: string | null; viewerBookmarked?: boolean };
 
 export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { scope?: 'general' | 'expression'; reelId?: string }) {
   const insets = useSafeAreaInsets();
@@ -45,46 +37,28 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
     const reels = expressionId
       ? (await api.request<{ reels: Reel[] }>(`home-feed?organizationId=${encodeURIComponent(organizationId)}&expressionId=${encodeURIComponent(expressionId)}`, { signal })).reels
       : await api.request<Reel[]>(`public-content?type=reels${organizationId ? `&organizationId=${encodeURIComponent(organizationId)}` : ''}`, { signal });
-
     const contentIds = reels.map((reel) => reel.content_items?.id).filter(Boolean) as string[];
     if (!contentIds.length) return reels as ReelWithViewerState[];
-
     const batches: string[][] = [];
     for (let i = 0; i < contentIds.length; i += 30) batches.push(contentIds.slice(i, i + 30));
     const states = mode === 'authenticated'
-      ? (await Promise.all(batches.map((ids) => api.request<EngagementBatchEntry[]>(
-          `engagement?view=states&contentIds=${encodeURIComponent(ids.join(','))}`,
-          { signal, context: expressionId ? 'current' : 'public' },
-        )))).flat()
+      ? (await Promise.all(batches.map((ids) => api.request<EngagementBatchEntry[]>(`engagement?view=states&contentIds=${encodeURIComponent(ids.join(','))}`, { signal, context: expressionId ? 'current' : 'public' })))).flat()
       : [];
     const engagementMap = new Map(states.map((item) => [item.contentId, item]));
-
     return reels.map((reel) => {
       const contentId = reel.content_items?.id;
       if (!contentId) return reel as ReelWithViewerState;
-
       const engagement = engagementMap.get(contentId);
-
-      return {
-        ...reel,
-        viewerReaction: engagement?.reaction ?? null,
-        viewerBookmarked: engagement?.bookmarked ?? false,
-      } as ReelWithViewerState;
+      return { ...reel, viewerReaction: engagement?.reaction ?? null, viewerBookmarked: engagement?.bookmarked ?? false } as ReelWithViewerState;
     });
   });
 
   const playbackIds = (reelsResource.data ?? []).map((reel) => reel.content_items?.id).filter(Boolean) as string[];
-  const playback = useResource<PlaybackBatchEntry[]>(
-    `playback:reels:${expressionId ?? 'public'}:${mode}:${playbackIds.join(',')}`,
-    async (signal) => {
-      const batches: string[][] = [];
-      for (let i = 0; i < playbackIds.length; i += 30) batches.push(playbackIds.slice(i, i + 30));
-      return (await Promise.all(batches.map((ids) => api.request<PlaybackBatchEntry[]>(
-        `content-media?action=playback_batch&contentIds=${encodeURIComponent(ids.join(','))}`,
-        { signal, context: expressionId ? 'current' : 'public' },
-      )))).flat();
-    },
-  );
+  const playback = useResource<PlaybackBatchEntry[]>(`playback:reels:${expressionId ?? 'public'}:${mode}:${playbackIds.join(',')}`, async (signal) => {
+    const batches: string[][] = [];
+    for (let i = 0; i < playbackIds.length; i += 30) batches.push(playbackIds.slice(i, i + 30));
+    return (await Promise.all(batches.map((ids) => api.request<PlaybackBatchEntry[]>(`content-media?action=playback_batch&contentIds=${encodeURIComponent(ids.join(','))}`, { signal, context: expressionId ? 'current' : 'public' })))).flat();
+  });
   const playbackMap = new Map((playback.data ?? []).map((item) => [item.contentId, item]));
   const reels = (reelsResource.data ?? []).map((reel) => {
     const source = playbackMap.get(reel.content_items?.id ?? '');
@@ -99,9 +73,7 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
     if (targetIndex < 0) return;
     appliedDeepLinkRef.current = reelId;
     setActiveIndex(targetIndex);
-    requestAnimationFrame(() => {
-      listRef.current?.scrollToIndex({ index: targetIndex, animated: false });
-    });
+    requestAnimationFrame(() => listRef.current?.scrollToIndex({ index: targetIndex, animated: false }));
   }, [reelId, reels]);
 
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -111,85 +83,41 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
 
   const handleOpenComments = (reel: Reel) => {
     const contentId = reel.content_items?.id;
-    if (!contentId) {
-      setActionError('Comments are not available for this Reel yet.');
-      return;
-    }
-    router.push(expressionId
-      ? {
-          pathname: `/expressions/${expressionId}/comments/[contentId]`,
-          params: { contentId },
-        } as any
-      : {
-          pathname: '/general/comments/[contentId]',
-          params: { contentId },
-        } as any);
+    if (!contentId) { setActionError('Comments are not available for this Reel yet.'); return; }
+    router.push(expressionId ? { pathname: `/expressions/${expressionId}/comments/[contentId]`, params: { contentId } } as any : { pathname: '/general/comments/[contentId]', params: { contentId } } as any);
   };
 
   const handleLikeReel = async (reel: ReelWithViewerState, currentlyLiked: boolean) => {
-    if (mode === 'visitor') {
-      router.push({ pathname: '/(auth)/login', params: { returnTo } } as any);
-      return currentlyLiked;
-    }
+    if (mode === 'visitor') { router.push({ pathname: '/(auth)/login', params: { returnTo } } as any); return currentlyLiked; }
     const contentId = reel.content_items?.id;
     if (!contentId) return currentlyLiked;
     try {
       setActionError('');
-      await api.request('engagement', {
-        method: 'POST',
-        context: expressionId ? 'current' : 'public',
-        body: JSON.stringify(
-          currentlyLiked
-            ? { action: 'unreact', contentId }
-            : { action: 'react', contentId, reaction: 'like' },
-        ),
-      });
+      await api.request('engagement', { method: 'POST', context: expressionId ? 'current' : 'public', body: JSON.stringify(currentlyLiked ? { action: 'unreact', contentId } : { action: 'react', contentId, reaction: 'like' }) });
       return !currentlyLiked;
-    } catch (value) {
-      setActionError(value instanceof Error ? value.message : 'Unable to update your reaction.');
-      return currentlyLiked;
-    }
+    } catch (value) { setActionError(value instanceof Error ? value.message : 'Unable to update your reaction.'); return currentlyLiked; }
   };
 
   const handleSaveReel = async (reel: ReelWithViewerState, currentlySaved: boolean) => {
-    if (mode === 'visitor') {
-      router.push({ pathname: '/(auth)/login', params: { returnTo } } as any);
-      return currentlySaved;
-    }
+    if (mode === 'visitor') { router.push({ pathname: '/(auth)/login', params: { returnTo } } as any); return currentlySaved; }
     const contentId = reel.content_items?.id;
     if (!contentId) return currentlySaved;
     try {
       setActionError('');
-      const result = await api.request<{ bookmarked: boolean }>('engagement', {
-        method: 'POST',
-        context: expressionId ? 'current' : 'public',
-        body: JSON.stringify({ action: 'bookmark', contentId }),
-      });
+      const result = await api.request<{ bookmarked: boolean }>('engagement', { method: 'POST', context: expressionId ? 'current' : 'public', body: JSON.stringify({ action: 'bookmark', contentId }) });
       return result.bookmarked;
-    } catch (value) {
-      setActionError(value instanceof Error ? value.message : 'Unable to update this bookmark.');
-      return currentlySaved;
-    }
+    } catch (value) { setActionError(value instanceof Error ? value.message : 'Unable to update this bookmark.'); return currentlySaved; }
   };
 
   const handleShareReel = (reel: ReelWithViewerState) => {
-    if (mode === 'visitor') {
-      router.push({ pathname: '/(auth)/login', params: { returnTo } } as any);
-      return;
-    }
+    if (mode === 'visitor') { router.push({ pathname: '/(auth)/login', params: { returnTo } } as any); return; }
     setActionError('');
     setShareTarget(reel);
   };
 
   const handleReportReel = (reel: ReelWithViewerState) => {
-    if (mode === 'visitor') {
-      router.push({ pathname: '/(auth)/login', params: { returnTo } } as any);
-      return;
-    }
-    if (!reel.content_items?.id) {
-      setActionError('This Reel is not ready to report yet.');
-      return;
-    }
+    if (mode === 'visitor') { router.push({ pathname: '/(auth)/login', params: { returnTo } } as any); return; }
+    if (!reel.content_items?.id) { setActionError('This Reel is not ready to report yet.'); return; }
     setActionError('');
     setReportTarget(reel);
   };
@@ -197,46 +125,31 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
   const shareReelToGeneral = async () => {
     if (!shareTarget || !canShareToGeneral) return;
     const isPublic = shareTarget.content_items?.visibility === 'public';
-    if (!isPublic) {
-      setActionError('This Reel belongs to a private Expression and cannot be shared to General Community.');
-      setShareTarget(null);
-      return;
-    }
-    setShareBusy(true);
-    setActionError('');
+    if (!isPublic) { setActionError('This Reel belongs to a private Expression and cannot be shared to General Community.'); setShareTarget(null); return; }
+    setShareBusy(true); setActionError('');
     try {
-      await api.request('social-feed', {
-        method: 'POST',
-        context: 'public',
-        body: JSON.stringify({
-          action: 'share_reel',
-          ...(organizationId ? { organizationId } : {}),
-          reelId: shareTarget.id,
-        }),
-      });
+      await api.request('social-feed', { method: 'POST', context: 'public', body: JSON.stringify({ action: 'share_reel', ...(organizationId ? { organizationId } : {}), reelId: shareTarget.id }) });
       setShareTarget(null);
-    } catch (value) {
-      setActionError(value instanceof Error ? value.message : 'Unable to share this Reel to General Community.');
-    } finally {
-      setShareBusy(false);
-    }
+    } catch (value) { setActionError(value instanceof Error ? value.message : 'Unable to share this Reel to General Community.'); }
+    finally { setShareBusy(false); }
   };
 
   const shareReelExternally = async () => {
     if (!shareTarget) return;
     const isPublic = shareTarget.content_items?.visibility === 'public';
-    if (!isPublic) {
-      setActionError('This Reel belongs to a private Expression and cannot be shared outside it.');
-      setShareTarget(null);
-      return;
-    }
+    if (!isPublic) { setActionError('This Reel belongs to a private Expression and cannot be shared outside it.'); setShareTarget(null); return; }
+    const stream = shareTarget.media_assets?.renditions?.find((rendition) => rendition.rendition_kind === 'video_stream');
+    const mediaUrl = shareTarget.media_assets?.url || stream?.playbackUrl || stream?.storage_path || null;
+    const thumbnailUrl = shareTarget.media_assets?.thumbnailUrl || null;
     try {
-      await Share.share({
-        message: `Watch this Reel on City of Transformation: ${shareTarget.caption || 'Church video'}`,
+      await shareContent({
+        title: 'COT Reel',
+        message: shareTarget.caption?.trim() || 'Watch this Reel from City of Transformation.',
+        attachment: mediaUrl ? { url: mediaUrl, mimeType: mediaUrl.includes('.webm') ? 'video/webm' : 'video/mp4' } : thumbnailUrl ? { url: thumbnailUrl, mimeType: 'image/jpeg' } : null,
       });
       setShareTarget(null);
     } catch {
-      // Dismissing the native share sheet does not change Reel state.
+      // Dismissing the operating-system share sheet does not change Reel state.
     }
   };
 
@@ -246,74 +159,22 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
     <View style={styles.screen}>
       {expressionId ? (
         <View style={[styles.expressionScope, { top: insets.top + 8 }]}>
-          <View style={styles.expressionScopePill}>
-            <Icon name="lock-closed-outline" size={12} color="#FFFFFF" />
-            <View style={styles.expressionScopeCopy}>
-              <Text style={styles.expressionScopeLabel}>EXPRESSION REELS</Text>
-              <Text style={styles.expressionScopeName} numberOfLines={1}>{expressionName ?? 'Members only'}</Text>
-            </View>
-          </View>
-          <Pressable
-            onPress={() => router.push(`/expressions/${expressionId}/videos` as any)}
-            style={({ pressed }) => [styles.mediaLibraryButton, pressed ? styles.overlayPressed : null]}
-            accessibilityRole="button"
-            accessibilityLabel="Open Expression media library"
-          >
-            <Icon name="grid-outline" size={15} color="#FFFFFF" />
-            <Text style={styles.mediaLibraryText}>Media</Text>
-          </Pressable>
+          <View style={styles.expressionScopePill}><Icon name="lock-closed-outline" size={12} color="#FFFFFF" /><View style={styles.expressionScopeCopy}><Text style={styles.expressionScopeLabel}>EXPRESSION REELS</Text><Text style={styles.expressionScopeName} numberOfLines={1}>{expressionName ?? 'Members only'}</Text></View></View>
+          <Pressable onPress={() => router.push(`/expressions/${expressionId}/videos` as any)} style={({ pressed }) => [styles.mediaLibraryButton, pressed ? styles.overlayPressed : null]} accessibilityRole="button" accessibilityLabel="Open Expression media library"><Icon name="grid-outline" size={15} color="#FFFFFF" /><Text style={styles.mediaLibraryText}>Media</Text></Pressable>
         </View>
       ) : null}
 
       {!expressionId ? (
         <View style={[styles.generalScope, { top: insets.top + 8 }]}>
-          <View style={styles.generalScopePill}>
-            <Icon name="globe-outline" size={13} color="#FFFFFF" />
-            <View style={styles.expressionScopeCopy}>
-              <Text style={styles.expressionScopeLabel}>GENERAL REELS</Text>
-              <Text style={styles.expressionScopeName}>Public COT discovery</Text>
-            </View>
-          </View>
-          {mode === 'authenticated' ? (
-            <Pressable
-              onPress={() => router.push('/general/studio/reel' as any)}
-              style={({ pressed }) => [styles.mediaLibraryButton, pressed ? styles.overlayPressed : null]}
-              accessibilityRole="button"
-              accessibilityLabel="Create Reel"
-            >
-              <Icon name="add-outline" size={16} color="#FFFFFF" />
-              <Text style={styles.mediaLibraryText}>Create</Text>
-            </Pressable>
-          ) : null}
+          <View style={styles.generalScopePill}><Icon name="globe-outline" size={13} color="#FFFFFF" /><View style={styles.expressionScopeCopy}><Text style={styles.expressionScopeLabel}>GENERAL REELS</Text><Text style={styles.expressionScopeName}>Public COT discovery</Text></View></View>
+          {mode === 'authenticated' ? <Pressable onPress={() => router.push('/general/studio/reel' as any)} style={({ pressed }) => [styles.mediaLibraryButton, pressed ? styles.overlayPressed : null]} accessibilityRole="button" accessibilityLabel="Create Reel"><Icon name="add-outline" size={16} color="#FFFFFF" /><Text style={styles.mediaLibraryText}>Create</Text></Pressable> : null}
         </View>
       ) : null}
 
-      <View style={[styles.closeButton, { top: insets.top + 8 }]}>
-        <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close Reels" style={styles.closeBtnInner}>
-          <Icon name="close" size={22} color="#FFFFFF" />
-        </Pressable>
-      </View>
+      <View style={[styles.closeButton, { top: insets.top + 8 }]}><Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close Reels" style={styles.closeBtnInner}><Icon name="close" size={22} color="#FFFFFF" /></Pressable></View>
+      {actionError ? <Pressable onPress={() => setActionError('')} style={[styles.errorToast, { top: insets.top + 58 }]} accessibilityRole="button" accessibilityLabel="Dismiss Reel error"><Icon name="alert-circle-outline" size={15} color="#FFFFFF" /><Text style={styles.errorToastText} numberOfLines={2}>{actionError}</Text><Icon name="close" size={14} color="rgba(255,255,255,0.86)" /></Pressable> : null}
 
-      {actionError ? (
-        <Pressable
-          onPress={() => setActionError('')}
-          style={[styles.errorToast, { top: insets.top + 58 }]}
-          accessibilityRole="button"
-          accessibilityLabel="Dismiss Reel error"
-        >
-          <Icon name="alert-circle-outline" size={15} color="#FFFFFF" />
-          <Text style={styles.errorToastText} numberOfLines={2}>{actionError}</Text>
-          <Icon name="close" size={14} color="rgba(255,255,255,0.86)" />
-        </Pressable>
-      ) : null}
-
-      {reelsResource.loading && !reels.length ? (
-        <Skeleton height={windowHeight} />
-      ) : reelsResource.error && !reels.length ? (
-        <View style={styles.centerWrapper}><ResourceError message={reelsResource.error} retry={reelsResource.refresh} /></View>
-      ) : reels.length === 0 ? (
-        <View style={styles.centerWrapper}><ResourceError message="No Reels Yet" retry={reelsResource.refresh} /></View>
-      ) : (
+      {reelsResource.loading && !reels.length ? <Skeleton height={windowHeight} /> : reelsResource.error && !reels.length ? <View style={styles.centerWrapper}><ResourceError message={reelsResource.error} retry={reelsResource.refresh} /></View> : reels.length === 0 ? <View style={styles.centerWrapper}><ResourceError message="No Reels Yet" retry={reelsResource.refresh} /></View> : (
         <FlatList
           ref={listRef}
           data={reels}
@@ -327,100 +188,23 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
           refreshControl={<RefreshControl refreshing={reelsResource.loading} onRefresh={reelsResource.refresh} tintColor={colors.interactive} />}
-          renderItem={({ item, index }) => (
-            <ReelPlayer
-              reel={item}
-              expressionName={expressionName}
-              isActive={index === activeIndex}
-              initialLiked={Boolean(item.viewerReaction)}
-              initialSaved={item.viewerBookmarked === true}
-              onLike={(currentlyLiked) => handleLikeReel(item, currentlyLiked)}
-              onSave={(currentlySaved) => handleSaveReel(item, currentlySaved)}
-              onOpenComments={() => handleOpenComments(item)}
-              onShare={() => handleShareReel(item)}
-              onReport={() => handleReportReel(item)}
-              onPressCreator={item.content_items?.author?.username ? () => router.push({
-                pathname: '/general/member/[username]',
-                params: { username: item.content_items!.author!.username! },
-              } as any) : undefined}
-            />
-          )}
+          renderItem={({ item, index }) => <ReelPlayer reel={item} expressionName={expressionName} isActive={index === activeIndex} initialLiked={Boolean(item.viewerReaction)} initialSaved={item.viewerBookmarked === true} onLike={(currentlyLiked) => handleLikeReel(item, currentlyLiked)} onSave={(currentlySaved) => handleSaveReel(item, currentlySaved)} onOpenComments={() => handleOpenComments(item)} onShare={() => handleShareReel(item)} onReport={() => handleReportReel(item)} onPressCreator={item.content_items?.author?.username ? () => router.push({ pathname: '/general/member/[username]', params: { username: item.content_items!.author!.username! } } as any) : undefined} />}
         />
       )}
 
-      <BottomSheet
-        visible={!!shareTarget}
-        onClose={() => { if (!shareBusy) setShareTarget(null); }}
-        title="Share Reel"
-        subtitle={shareTarget?.caption || 'Choose where to share this Reel.'}
-      >
+      <BottomSheet visible={!!shareTarget} onClose={() => { if (!shareBusy) setShareTarget(null); }} title="Share Reel" subtitle={shareTarget?.caption || 'Choose where to share this Reel.'}>
         <View style={styles.shareSheet}>
-          {shareTarget?.content_items?.visibility === 'public' ? (
-            <>
-              {canShareToGeneral ? (
-                <Button
-                  label="Share to General Community"
-                  onPress={() => void shareReelToGeneral()}
-                  loading={shareBusy}
-                  variant="primary"
-                  size="lg"
-                  fullWidth
-                />
-              ) : null}
-              <Button
-                label="Share externally"
-                onPress={() => void shareReelExternally()}
-                disabled={shareBusy}
-                variant="outline"
-                size="lg"
-                fullWidth
-              />
-            </>
-          ) : (
-            <View style={styles.privateShareNotice}>
-              <Icon name="lock-closed-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.privateShareText}>This Reel is private to its Expression and cannot be shared outside that space.</Text>
-            </View>
-          )}
+          {shareTarget?.content_items?.visibility === 'public' ? <>{canShareToGeneral ? <Button label="Share to General Community" onPress={() => void shareReelToGeneral()} loading={shareBusy} variant="primary" size="lg" fullWidth /> : null}<Button label="Share externally" onPress={() => void shareReelExternally()} disabled={shareBusy} variant="outline" size="lg" fullWidth /></> : <View style={styles.privateShareNotice}><Icon name="lock-closed-outline" size={20} color="#FFFFFF" /><Text style={styles.privateShareText}>This Reel is private to its Expression and cannot be shared outside that space.</Text></View>}
         </View>
       </BottomSheet>
 
-      <ContentReportSheet
-        target={reportTarget?.content_items?.id ? {
-          contentId: reportTarget.content_items.id,
-          context: expressionId ? 'current' : 'public',
-          label: reportTarget.caption ? `Report Reel: ${reportTarget.caption}` : 'Report this Reel',
-        } : null}
-        onClose={() => setReportTarget(null)}
-      />
-
+      <ContentReportSheet target={reportTarget?.content_items?.id ? { contentId: reportTarget.content_items.id, context: expressionId ? 'current' : 'public', label: reportTarget.caption ? `Report Reel: ${reportTarget.caption}` : 'Report this Reel' } : null} onClose={() => setReportTarget(null)} />
     </View>
   );
 }
 
-export default function GeneralReelsExperience() {
-  return <ReelsExperience scope="general" />;
-}
+export default function GeneralReelsExperience() { return <ReelsExperience scope="general" />; }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#000000' },
-  expressionScope: { position: 'absolute', left: 16, right: 68, zIndex: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  generalScope: { position: 'absolute', left: 16, right: 68, zIndex: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  generalScopePill: { minHeight: 42, flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.52)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
-  expressionScopePill: { minHeight: 42, maxWidth: '72%', flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.52)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
-  expressionScopeCopy: { flex: 1, minWidth: 0 },
-  expressionScopeLabel: { color: '#FFFFFF', fontSize: 8, lineHeight: 10, fontWeight: '900', letterSpacing: 0.8 },
-  expressionScopeName: { color: 'rgba(255,255,255,0.72)', fontSize: 10, lineHeight: 14, fontWeight: '700', marginTop: 1 },
-  mediaLibraryButton: { minHeight: 42, borderRadius: 16, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.52)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
-  mediaLibraryText: { color: '#FFFFFF', fontSize: 9, fontWeight: '800' },
-  overlayPressed: { opacity: 0.72, transform: [{ scale: 0.98 }] },
-  closeButton: { position: 'absolute', right: 16, zIndex: 10 },
-  closeBtnInner: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.48)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
-  errorToast: { position: 'absolute', left: 16, right: 68, zIndex: 20, minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 16, backgroundColor: 'rgba(180,35,24,0.92)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
-  errorToastText: { flex: 1, color: '#FFFFFF', fontSize: 12, lineHeight: 17, fontWeight: '700' },
-  centerWrapper: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  shareSheet: { gap: 12 },
-  shareHint: { fontSize: 12, lineHeight: 18, color: '#9AA8B8', textAlign: 'center' },
-  privateShareNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.08)' },
-  privateShareText: { flex: 1, color: '#FFFFFF', fontSize: 12, lineHeight: 18, fontWeight: '600' },
+  screen: { flex: 1, backgroundColor: '#000000' }, expressionScope: { position: 'absolute', left: 16, right: 68, zIndex: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }, generalScope: { position: 'absolute', left: 16, right: 68, zIndex: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }, generalScopePill: { minHeight: 42, flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.52)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' }, expressionScopePill: { minHeight: 42, maxWidth: '72%', flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.52)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' }, expressionScopeCopy: { flex: 1, minWidth: 0 }, expressionScopeLabel: { color: '#FFFFFF', fontSize: 8, lineHeight: 10, fontWeight: '900', letterSpacing: 0.8 }, expressionScopeName: { color: 'rgba(255,255,255,0.72)', fontSize: 10, lineHeight: 14, fontWeight: '700', marginTop: 1 }, mediaLibraryButton: { minHeight: 42, borderRadius: 16, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.52)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' }, mediaLibraryText: { color: '#FFFFFF', fontSize: 9, fontWeight: '800' }, overlayPressed: { opacity: 0.72, transform: [{ scale: 0.98 }] }, closeButton: { position: 'absolute', right: 16, zIndex: 10 }, closeBtnInner: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.48)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' }, errorToast: { position: 'absolute', left: 16, right: 68, zIndex: 20, minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 16, backgroundColor: 'rgba(180,35,24,0.92)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' }, errorToastText: { flex: 1, color: '#FFFFFF', fontSize: 12, lineHeight: 17, fontWeight: '700' }, centerWrapper: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }, shareSheet: { gap: 12 }, privateShareNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.08)' }, privateShareText: { flex: 1, color: '#FFFFFF', fontSize: 12, lineHeight: 18, fontWeight: '600' },
 });

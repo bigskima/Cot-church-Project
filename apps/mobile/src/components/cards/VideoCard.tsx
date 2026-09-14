@@ -66,7 +66,11 @@ export function VideoCard({ video, expressionName, onPress, onBookmark, style, c
           <Text style={[styles.metaText, { color: colors.textSecondary }]} numberOfLines={1}>{[sourceName, formatViews(video.views_count), timeAgo()].filter(Boolean).join(' · ')}</Text>
         </View>
         {contentId ? <Pressable onPress={(event) => { event.stopPropagation?.(); setCommentsOpen(true); }} hitSlop={8} style={({ pressed }) => [styles.moreBtn, pressed && { backgroundColor: colors.bgSecondary }]} accessibilityRole="button" accessibilityLabel="Open video comments"><Icon name="chatbubble-ellipses-outline" size={18} color={colors.textMuted} /></Pressable> : null}
-        {onBookmark ? <Pressable onPress={(event) => { event.stopPropagation?.(); onBookmark(); }} hitSlop={8} style={({ pressed }) => [styles.moreBtn, pressed && { backgroundColor: colors.bgSecondary }]} accessibilityRole="button" accessibilityLabel={`Options for ${video.title}`}><Icon name="ellipsis-horizontal" size={19} color={colors.textMuted} /></Pressable> : null}
+        {onBookmark ? (
+          <Pressable onPress={(event) => { event.stopPropagation?.(); onBookmark(); }} hitSlop={8} style={({ pressed }) => [styles.moreBtn, pressed && { backgroundColor: colors.bgSecondary }]} accessibilityRole="button" accessibilityLabel={`Options for ${video.title}`}>
+            <Icon name="ellipsis-horizontal" size={19} color={colors.textMuted} />
+          </Pressable>
+        ) : null}
       </Pressable>
       <InlineCommentsSheet visible={commentsOpen} onClose={() => setCommentsOpen(false)} contentId={contentId} context={resolvedCommentContext} title="Video comments" subtitle="Keep watching while the conversation stays with this video." onViewAll={onOpenComments} />
     </View>

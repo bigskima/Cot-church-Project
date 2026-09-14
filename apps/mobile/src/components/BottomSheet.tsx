@@ -48,7 +48,8 @@ export function BottomSheet({
           accessibilityLabel="Close sheet"
         />
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
+          keyboardVerticalOffset={0}
           style={[
             styles.sheetContainer,
             {
@@ -61,7 +62,7 @@ export function BottomSheet({
           ]}
         >
           <View pointerEvents="none" style={[styles.sheetGlow, { backgroundColor: colors.primarySoft }]} />
-          <View style={[styles.handleBar, { backgroundColor: colors.borderStrong }]} />
+          <View pointerEvents="none" style={[styles.handleBar, { backgroundColor: colors.borderStrong }]} />
 
           {(title || subtitle) ? (
             <View style={[styles.header, { borderBottomColor: colors.borderSubtle }]}>
@@ -87,7 +88,9 @@ export function BottomSheet({
 
           <ScrollView
             showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="always"
+            keyboardDismissMode="none"
+            nestedScrollEnabled
             contentContainerStyle={styles.contentContainer}
           >
             {children}
