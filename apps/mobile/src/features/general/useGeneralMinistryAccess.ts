@@ -30,7 +30,7 @@ export function useGeneralMinistryAccess() {
     const canManageGiving = hasOrganizationCapability('giving.campaigns.manage');
     const canReadGivingFinance = hasOrganizationCapability('giving.finance.read');
     const canManageLeadership = hasOrganizationCapability('organization.leadership.manage');
-    const canManageRoles = hasOrganizationCapability('roles.read') && (
+    const canManageRoles = hasOrganizationCapability('members.read') && hasOrganizationCapability('roles.read') && (
       hasOrganizationCapability('roles.assign') || hasOrganizationCapability('roles.manage')
     );
     const canBroadcastLive = hasPublicCapability('public.live_stream.create');
