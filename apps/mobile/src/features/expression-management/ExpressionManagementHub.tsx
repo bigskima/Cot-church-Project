@@ -62,7 +62,7 @@ export function ExpressionManagementHub() {
       {
         key: 'events',
         title: 'Events',
-        description: 'Schedule and update gatherings.',
+        description: 'Schedule gatherings with optional flyers.',
         iconName: 'calendar-outline',
         route: `${base}/events`,
         enabled: access.canManageEvents,
@@ -75,13 +75,21 @@ export function ExpressionManagementHub() {
         route: `${base}/announcements`,
         enabled: access.canManageAnnouncements,
       },
+      {
+        key: 'testimonies',
+        title: 'Testimony review',
+        description: 'Respond privately and coordinate physical sharing.',
+        iconName: 'document-text-outline',
+        route: `${base}/testimonies`,
+        enabled: access.canReviewTestimonies,
+      },
     ];
 
     const people: Tool[] = [
       {
         key: 'leadership',
         title: 'Leadership',
-        description: 'Manage leaders shown to members.',
+        description: 'Search members, add leaders and edit portraits.',
         iconName: 'people-circle-outline',
         route: `${base}/leadership`,
         enabled: access.canManageLeadership,
@@ -116,18 +124,26 @@ export function ExpressionManagementHub() {
       {
         key: 'giving',
         title: 'Giving Setup',
-        description: 'Giving options, funds and destination.',
+        description: 'Giving options, purposes and transfer destination.',
         iconName: 'gift-outline',
         route: `${base}/giving`,
         enabled: access.canManageGiving,
       },
       {
-        key: 'finance',
+        key: 'giving-reports',
         title: 'Giving Reports',
-        description: 'Read totals, refunds and net giving.',
+        description: 'Read provider-linked giving totals and refunds.',
         iconName: 'analytics-outline',
         route: `${base}/finance`,
         enabled: access.canReadGivingFinance,
+      },
+      {
+        key: 'books',
+        title: 'Financial Management',
+        description: 'Wallets, sessions, manual records and immutable ledger.',
+        iconName: 'wallet-outline',
+        route: `${base}/books`,
+        enabled: access.canReadExpressionFinance,
       },
     ];
 
@@ -135,7 +151,7 @@ export function ExpressionManagementHub() {
       {
         key: 'operations',
         title: 'Content & gatherings',
-        subtitle: 'Create what members watch, read and attend.',
+        subtitle: 'Create what members watch, read, receive and attend.',
         icon: 'sparkles-outline',
         tools: content.filter((tool) => tool.enabled),
       },
@@ -148,8 +164,8 @@ export function ExpressionManagementHub() {
       },
       {
         key: 'finance',
-        title: 'Giving',
-        subtitle: 'Configure giving and review Expression-level reports.',
+        title: 'Giving & finance',
+        subtitle: 'Configure giving, document manual activity and review balances.',
         icon: 'wallet-outline',
         tools: finance.filter((tool) => tool.enabled),
       },
@@ -164,7 +180,9 @@ export function ExpressionManagementHub() {
     access.canManageSettings,
     access.canManageLive,
     access.canManageSermons,
+    access.canReadExpressionFinance,
     access.canReadGivingFinance,
+    access.canReviewTestimonies,
     access.canUseContentStudio,
     base,
   ]);
@@ -198,7 +216,7 @@ export function ExpressionManagementHub() {
             <View style={styles.summaryRow}>
               <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}><Text style={[styles.summaryValue, { color: colors.text }]}>{toolCount}</Text><Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Available tools</Text></View>
               <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}><Text style={[styles.summaryValue, { color: colors.text }]}>{contentCount}</Text><Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Content</Text></View>
-              <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}><Text style={[styles.summaryValue, { color: colors.text }]}>{peopleCount + financeCount}</Text><Text style={[styles.summaryLabel, { color: colors.textMuted }]}>People & giving</Text></View>
+              <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}><Text style={[styles.summaryValue, { color: colors.text }]}>{peopleCount + financeCount}</Text><Text style={[styles.summaryLabel, { color: colors.textMuted }]}>People & finance</Text></View>
             </View>
 
             {sections.map((section) => (
