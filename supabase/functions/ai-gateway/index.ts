@@ -9,15 +9,7 @@ import { adminClient } from "../_shared/supabase.ts";
 import { resolveSecretValue } from "../_shared/secrets.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString, uuid } from "../_shared/validation.ts";
 
-const allowed = new Set([
-  "assistant.answer",
-  "sermon.summarize",
-  "translate.text",
-  "content.moderate",
-  "pastoral.triage",
-  "admin.insight",
-]);
-
+const allowed = new Set(["assistant.answer", "sermon.summarize", "translate.text", "content.moderate", "pastoral.triage", "admin.insight"]);
 const adapterMethod: Record<string, string> = {
   "assistant.answer": "generateText",
   "sermon.summarize": "generateStructuredData",
@@ -28,51 +20,26 @@ const adapterMethod: Record<string, string> = {
 };
 
 async function requireActiveMembership(auth: any) {
-  const { data, error } = await auth.client
-    .from("memberships")
-    .select("id")
-    .eq("organization_id", auth.organizationId)
-    .eq("profile_id", auth.user.id)
-    .eq("status", "active")
-    .maybeSingle();
+  const { data, error } = await auth.client.from("memberships").select("id").eq("organization_id", auth.organizationId).eq("profile_id", auth.user.id).eq("status", "active").maybeSingle();
   if (error) throw new ApiError("MEMBERSHIP_LOOKUP_FAILED", "Unable to verify church membership", 500, undefined, false);
   if (!data) throw new ApiError("ACTIVE_MEMBERSHIP_REQUIRED", "Active church membership is required", 403);
 }
 
 async function readiness(organizationId: string, capability: string) {
   const admin = adminClient();
-
-  const { data: tenantRoute, error: tenantRouteError } = await admin
-    .from("ai_routes")
-    .select("id,primary_model_id,fallback_model_ids,timeout_ms,max_retries")
-    .eq("organization_id", organizationId)
-    .eq("capability_code", capability)
-    .eq("is_active", true)
-    .maybeSingle();
+  const { data: tenantRoute, error: tenantRouteError } = await admin.from("ai_routes").select("id,primary_model_id,fallback_model_ids,timeout_ms,max_retries").eq("organization_id", organizationId).eq("capability_code", capability).eq("is_active", true).maybeSingle();
   if (tenantRouteError) throw new ApiError("AI_READINESS_FAILED", "Unable to inspect AI route", 500, undefined, false);
-
   let route = tenantRoute;
   if (!route) {
-    const { data: globalRoute, error: globalRouteError } = await admin
-      .from("ai_routes")
-      .select("id,primary_model_id,fallback_model_ids,timeout_ms,max_retries")
-      .is("organization_id", null)
-      .eq("capability_code", capability)
-      .eq("is_active", true)
-      .maybeSingle();
-    if (globalRouteError) throw new ApiError("AI_READINESS_FAILED", "Unable to inspect AI route", 500, undefined, false);
+    const { data: globalRoute, error: globalRouteError } = await admin.from("ai_routes").select("id,primary_model_id,fallback_model_ids,timeout_ms,max_retries").is("organization_id", null).eq("capability_code", capability).eq("is_active", true).maybeSingle();
+    if (globalRouteError) throw new ApiError("AI_READINESS_FAILED", "Unable to inspect AI models", 500, undefined, false);
     route = globalRoute;
   }
-
   if (!route) return { ready: false, reason: "route_not_configured" as const };
 
   const candidateIds = [route.primary_model_id, ...(route.fallback_model_ids ?? [])];
-  const { data: models, error: modelsError } = await admin
-    .from("ai_models")
-    .select("id,model_key,display_name,is_active,provider_id,ai_providers!inner(code,name,status,secret_reference)")
-    .in("id", candidateIds);
+  const { data: models, error: modelsError } = await admin.from("ai_models").select("id,model_key,display_name,is_active,provider_id,ai_providers!inner(code,name,status,secret_reference)").in("id", candidateIds);
   if (modelsError) throw new ApiError("AI_READINESS_FAILED", "Unable to inspect AI models", 500, undefined, false);
-
   const modelMap = new Map((models ?? []).map((model: any) => [model.id, model]));
   for (const modelId of candidateIds) {
     const model: any = modelMap.get(modelId);
@@ -81,22 +48,34 @@ async function readiness(organizationId: string, capability: string) {
     if (!provider || provider.status !== "active" || !provider.secret_reference) continue;
     try {
       await resolveSecretValue(provider.secret_reference);
-      const adapter = aiProvider(provider.code);
-      if (!adapter.supports(adapterMethod[capability] as any)) continue;
-    } catch {
-      continue;
-    }
-    return {
-      ready: true,
-      reason: null,
-      providerCode: provider.code,
-      providerName: provider.name,
-      modelKey: model.model_key,
-      modelName: model.display_name,
-    };
+      if (!aiProvider(provider.code).supports(adapterMethod[capability] as any)) continue;
+    } catch { continue; }
+    return { ready: true, reason: null, providerCode: provider.code, providerName: provider.name, modelKey: model.model_key, modelName: model.display_name };
+  }
+  return { ready: false, reason: "provider_model_or_secret_unavailable" as const };
+}
+
+async function assistantContext(auth: any, entityType?: string, entityId?: string) {
+  if (entityType === "sermon" && entityId) {
+    // Fetch through the caller-scoped client so private Expression sermons remain
+    // inaccessible unless the signed-in member can already read them.
+    const { data: sermon, error } = await auth.client
+      .from("sermons")
+      .select("id,organization_id,branch_id,title,preacher,description,transcript,content_blocks,scripture_references,topics,status,published_at")
+      .eq("organization_id", auth.organizationId)
+      .eq("id", entityId)
+      .maybeSingle();
+    if (error) throw new ApiError("AI_SERMON_CONTEXT_FAILED", "Unable to load this sermon for the study helper", 500, undefined, false);
+    if (!sermon) throw new ApiError("AI_SERMON_NOT_FOUND", "This sermon is not available in your current church or Expression", 404);
+    return JSON.stringify({ focus: "sermon", sermon });
   }
 
-  return { ready: false, reason: "provider_model_or_secret_unavailable" as const };
+  const [branches, events, announcements] = await Promise.all([
+    auth.client.from("branches").select("name,timezone,address").eq("organization_id", auth.organizationId).eq("is_active", true).limit(30),
+    auth.client.from("events").select("title,starts_at,ends_at,location,visibility").eq("organization_id", auth.organizationId).gte("ends_at", new Date().toISOString()).limit(30),
+    auth.client.from("announcements").select("title,body,published_at").eq("organization_id", auth.organizationId).eq("status", "published").limit(20),
+  ]);
+  return JSON.stringify({ focus: "church", branches: branches.data ?? [], events: events.data ?? [], announcements: announcements.data ?? [] });
 }
 
 Deno.serve(createHandler(
@@ -118,9 +97,8 @@ Deno.serve(createHandler(
     const capability = requiredString(body.capability, "capability", 60);
     if (!allowed.has(capability)) throw new ApiError("AI_CAPABILITY_DENIED", "Capability is not available through this endpoint", 422);
 
-    if (capability !== "assistant.answer") {
-      await authorize(auth, "ai.use");
-    } else {
+    if (capability !== "assistant.answer") await authorize(auth, "ai.use");
+    else {
       const state = await readiness(auth.organizationId, capability);
       if (!state.ready) throw new ApiError("AI_ASSISTANT_NOT_READY", "The church assistant is not configured yet", 503, { reason: state.reason }, false);
     }
@@ -128,18 +106,10 @@ Deno.serve(createHandler(
     const prompt = requiredString(body.prompt, "prompt", 12000);
     const entityType = optionalString(body.entityType, "entityType", 50);
     const entityId = body.entityId ? uuid(String(body.entityId), "entityId", true) : undefined;
+    const verifiedContext = capability === "assistant.answer" ? await assistantContext(auth, entityType, entityId) : "";
+    const sermonRule = entityType === "sermon" ? " The verified context contains the exact saved sermon. Base the answer on that sermon, including its content_blocks/description/transcript, and never claim that only a fragment was supplied when the verified sermon contains more content." : "";
+    const system = `You are the church platform assistant. Use only verified tenant-scoped context. Never invent people, times, policies or pastoral claims. Never reveal private prayer, counselling, giving or attendance records. If uncertain, say so.${sermonRule} Verified context: ${verifiedContext}`;
 
-    let verifiedContext = "";
-    if (capability === "assistant.answer") {
-      const [branches, events, announcements] = await Promise.all([
-        auth.client.from("branches").select("name,timezone,address").eq("organization_id", auth.organizationId).eq("is_active", true).limit(30),
-        auth.client.from("events").select("title,starts_at,ends_at,location,visibility").eq("organization_id", auth.organizationId).gte("ends_at", new Date().toISOString()).limit(30),
-        auth.client.from("announcements").select("title,body,published_at").eq("organization_id", auth.organizationId).eq("status", "published").limit(20),
-      ]);
-      verifiedContext = JSON.stringify({ branches: branches.data ?? [], events: events.data ?? [], announcements: announcements.data ?? [] });
-    }
-
-    const system = `You are the church platform assistant. Use only verified tenant-scoped context. Never invent people, times, policies or pastoral claims. Never reveal private prayer, counselling, giving or attendance records. If uncertain, say so. Verified context: ${verifiedContext}`;
     const result = await runAi({
       organizationId: auth.organizationId,
       profileId: auth.user.id,
@@ -149,18 +119,11 @@ Deno.serve(createHandler(
         system,
         prompt,
         language: optionalString(body.language, "language", 30),
-        jsonSchema: capability === "pastoral.triage"
-          ? {
-              type: "object",
-              properties: {
-                category: { type: "string" },
-                urgency: { type: "string" },
-                suggestedWorkflow: { type: "string" },
-                requiresHumanReview: { type: "boolean" },
-              },
-              required: ["category", "urgency", "requiresHumanReview"],
-            }
-          : undefined,
+        jsonSchema: capability === "pastoral.triage" ? {
+          type: "object",
+          properties: { category: { type: "string" }, urgency: { type: "string" }, suggestedWorkflow: { type: "string" }, requiresHumanReview: { type: "boolean" } },
+          required: ["category", "urgency", "requiresHumanReview"],
+        } : undefined,
       },
       entityType,
       entityId,

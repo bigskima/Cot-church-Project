@@ -25,6 +25,7 @@ export function useExpressionManagementAccess() {
   const canManageAnnouncements = Boolean(expressionId) && hasCapability('announcements.manage');
   const canReviewTestimonies = Boolean(expressionId) && (hasCapability('testimonies.review') || hasCapability('testimonies.manage'));
   const canManageTestimonies = Boolean(expressionId) && hasCapability('testimonies.manage');
+  const canManagePrayer = Boolean(expressionId) && hasCapability('prayer.moderate') && (hasCapability('prayer.pastoral.receive') || hasCapability('prayer.team.receive'));
   const canManageGiving = Boolean(expressionId) && hasCapability('giving.campaigns.manage');
   const canReadGivingFinance = Boolean(expressionId) && hasCapability('giving.finance.read');
   const canReadExpressionFinance = Boolean(expressionId) && (hasCapability('finance.read') || hasCapability('finance.manage'));
@@ -47,6 +48,7 @@ export function useExpressionManagementAccess() {
       canManageEvents ||
       canManageAnnouncements ||
       canReviewTestimonies ||
+      canManagePrayer ||
       canManageGiving ||
       canReadGivingFinance ||
       canReadExpressionFinance ||
@@ -63,6 +65,7 @@ export function useExpressionManagementAccess() {
       canManageGiving,
       canManageInviteCodes,
       canManageLeadership,
+      canManagePrayer,
       canManageSettings,
       canManageLive,
       canReviewTestimonies,
@@ -84,6 +87,7 @@ export function useExpressionManagementAccess() {
     canManageAnnouncements,
     canReviewTestimonies,
     canManageTestimonies,
+    canManagePrayer,
     canManageGiving,
     canReadGivingFinance,
     canReadExpressionFinance,

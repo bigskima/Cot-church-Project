@@ -8,6 +8,7 @@ import { BrandMark } from '@/components/primitives/BrandMark';
 import { Icon } from '@/components/primitives/Icon';
 import { Button } from '@/components/Button';
 import { InputField } from '@/components/Input';
+import { DateTimeField, formatDateOnly } from '@/components/DateTimeField';
 import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 
 type SignupStep = 'identity' | 'security';
@@ -17,6 +18,13 @@ function safeReturnTo(value?: string) {
     return '/general';
   }
   return value;
+}
+
+function parseDateOnly(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12, 0, 0, 0);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 export default function SignupScreen() {
@@ -44,7 +52,8 @@ export default function SignupScreen() {
   const [verifyError, setVerifyError] = useState('');
 
   const usernameValid = /^[a-z0-9][a-z0-9._]{2,29}$/.test(username.trim().toLowerCase());
-  const birthdayValid = /^\d{4}-\d{2}-\d{2}$/.test(birthday.trim());
+  const birthdayDate = parseDateOnly(birthday);
+  const birthdayValid = Boolean(birthdayDate);
 
   const validateIdentity = () => {
     setErrorMsg('');
@@ -57,7 +66,7 @@ export default function SignupScreen() {
       return false;
     }
     if (!birthdayValid) {
-      setErrorMsg('Enter your birthday as YYYY-MM-DD.');
+      setErrorMsg('Choose your birthday.');
       return false;
     }
     return true;
@@ -101,9 +110,6 @@ export default function SignupScreen() {
         await setSession(res.session);
         router.replace(returnTo as any);
       } else {
-        // The signup Edge Function may intentionally omit the raw Auth session.
-        // An active account is still a successful registration; route to login
-        // instead of incorrectly asking for an OTP that may not exist.
         router.replace({
           pathname: '/(auth)/login',
           params: { returnTo, registered: '1' },
@@ -152,7 +158,6 @@ export default function SignupScreen() {
     const leftIcon =
       label === 'FULL NAME' ? <Icon name="person-outline" size={18} color={colors.textMuted} /> :
       label === 'USERNAME' ? <Icon name="at-outline" size={18} color={colors.textMuted} /> :
-      label === 'BIRTHDAY' ? <Icon name="calendar-outline" size={18} color={colors.textMuted} /> :
       label === 'EMAIL ADDRESS' ? <Icon name="mail-outline" size={18} color={colors.textMuted} /> :
       label.startsWith('PHONE') ? <Icon name="call-outline" size={18} color={colors.textMuted} /> :
       <Icon name="lock-closed-outline" size={18} color={colors.textMuted} />;
@@ -193,12 +198,7 @@ export default function SignupScreen() {
             <Text style={[styles.stepProgressMeta, { color: colors.textMuted }]}>Name & profile</Text>
           </View>
         </View>
-        <View
-          style={[
-            styles.stepConnector,
-            { backgroundColor: step === 'security' ? colors.interactive : colors.borderSubtle },
-          ]}
-        />
+        <View style={[styles.stepConnector, { backgroundColor: step === 'security' ? colors.interactive : colors.borderSubtle }]} />
         <View
           style={[
             styles.stepProgressItem,
@@ -208,12 +208,7 @@ export default function SignupScreen() {
             },
           ]}
         >
-          <View
-            style={[
-              styles.stepNumber,
-              { backgroundColor: step === 'security' ? colors.interactive : colors.cardElevated },
-            ]}
-          >
+          <View style={[styles.stepNumber, { backgroundColor: step === 'security' ? colors.interactive : colors.cardElevated }]}>
             <Text style={[styles.stepNumberText, step !== 'security' && { color: colors.textMuted }]}>2</Text>
           </View>
           <View style={styles.stepProgressCopy}>
@@ -270,9 +265,7 @@ export default function SignupScreen() {
           <>
             <View style={styles.header}>
               <Text style={[styles.title, { color: colors.text }]}>Create your account</Text>
-              <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                Your COT account is separate from Expression membership. You can join an Expression later.
-              </Text>
+              <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Your COT account is separate from Expression membership. You can join an Expression later.</Text>
             </View>
 
             <View style={[styles.authCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
@@ -281,48 +274,35 @@ export default function SignupScreen() {
 
               {step === 'identity' ? (
                 <View style={styles.form}>
-                  {field('FULL NAME', fullName, setFullName, 'e.g. Grace Adebayo', {
-                    autoCapitalize: 'words',
-                    textContentType: 'name',
-                  })}
-                  {field('USERNAME', username, (value) => setUsername(value.replace(/\s/g, '').toLowerCase()), 'grace.adebayo', {
-                    autoCapitalize: 'none',
-                    autoCorrect: false,
-                  })}
+                  {field('FULL NAME', fullName, setFullName, 'e.g. Grace Adebayo', { autoCapitalize: 'words', textContentType: 'name' })}
+                  {field('USERNAME', username, (value) => setUsername(value.replace(/\s/g, '').toLowerCase()), 'grace.adebayo', { autoCapitalize: 'none', autoCorrect: false })}
                   <Text style={[styles.helper, { color: colors.textMuted }]}>Your username is public. It is not a church role or permission.</Text>
-                  {field('BIRTHDAY', birthday, setBirthday, 'YYYY-MM-DD', {
-                    keyboardType: 'numbers-and-punctuation',
-                    maxLength: 10,
-                  })}
-                  <Text style={[styles.helper, { color: colors.textMuted }]}>Birthday visibility becomes relevant only after you join an Expression.</Text>
+                  <DateTimeField
+                    label="Birthday"
+                    value={birthdayDate}
+                    onChange={(date) => {
+                      setBirthday(formatDateOnly(date));
+                      if (errorMsg) setErrorMsg('');
+                    }}
+                    includeTime={false}
+                    minYear={1900}
+                    maxYear={new Date().getFullYear()}
+                    placeholder="Choose your birthday"
+                    helperText="Tap to choose your date. Birthday visibility becomes relevant only after you join an Expression."
+                  />
                   <Button label="Continue" onPress={continueToSecurity} variant="primary" size="lg" />
                 </View>
               ) : (
                 <View style={styles.form}>
-                  {field('EMAIL ADDRESS', email, setEmail, 'name@example.com', {
-                    autoCapitalize: 'none',
-                    keyboardType: 'email-address',
-                    textContentType: 'emailAddress',
-                  })}
-                  {field('PHONE NUMBER (OPTIONAL)', phone, setPhone, '+234…', {
-                    keyboardType: 'phone-pad',
-                    textContentType: 'telephoneNumber',
-                  })}
+                  {field('EMAIL ADDRESS', email, setEmail, 'name@example.com', { autoCapitalize: 'none', keyboardType: 'email-address', textContentType: 'emailAddress' })}
+                  {field('PHONE NUMBER (OPTIONAL)', phone, setPhone, '+234…', { keyboardType: 'phone-pad', textContentType: 'telephoneNumber' })}
                   {field(
                     'PASSWORD',
                     password,
                     setPassword,
                     'Create your password',
-                    {
-                      secureTextEntry: !showPassword,
-                      textContentType: 'newPassword',
-                    },
-                    <Pressable
-                      onPress={() => setShowPassword((value) => !value)}
-                      hitSlop={8}
-                      accessibilityRole="button"
-                      accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
-                    >
+                    { secureTextEntry: !showPassword, textContentType: 'newPassword' },
+                    <Pressable onPress={() => setShowPassword((value) => !value)} hitSlop={8} accessibilityRole="button" accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}>
                       <Icon name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={19} color={colors.textMuted} />
                     </Pressable>,
                   )}
@@ -332,16 +312,8 @@ export default function SignupScreen() {
                     confirmPassword,
                     setConfirmPassword,
                     'Repeat password',
-                    {
-                      secureTextEntry: !showConfirmPassword,
-                      textContentType: 'newPassword',
-                    },
-                    <Pressable
-                      onPress={() => setShowConfirmPassword((value) => !value)}
-                      hitSlop={8}
-                      accessibilityRole="button"
-                      accessibilityLabel={showConfirmPassword ? 'Hide confirmation password' : 'Show confirmation password'}
-                    >
+                    { secureTextEntry: !showConfirmPassword, textContentType: 'newPassword' },
+                    <Pressable onPress={() => setShowConfirmPassword((value) => !value)} hitSlop={8} accessibilityRole="button" accessibilityLabel={showConfirmPassword ? 'Hide confirmation password' : 'Show confirmation password'}>
                       <Icon name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'} size={19} color={colors.textMuted} />
                     </Pressable>,
                   )}
