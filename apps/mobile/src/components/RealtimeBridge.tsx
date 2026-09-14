@@ -38,6 +38,7 @@ const tableInvalidations: Record<string, string[]> = {
   content_comments: engagementResources,
   content_reactions: engagementResources,
   content_bookmarks: engagementResources,
+  content_playback_progress: ['mobile:home-feed:', 'expression:', 'reels:immersive:', 'watch:catalogue:', 'playback:'],
   reels: ['mobile:home-feed:', 'reels:immersive:', 'expression:'],
   videos: ['mobile:home-feed:', 'watch:catalogue:', 'expression:'],
   media_assets: ['playback:', 'mobile:home-feed:', 'reels:immersive:', 'watch:catalogue:', 'expression:'],
@@ -52,10 +53,34 @@ const tableInvalidations: Record<string, string[]> = {
   branches: ['expression:', 'mobile:home-feed:'],
   expression_memberships: ['expression:', 'chat:'],
   events: ['events:', 'mobile:home-feed:', 'expression:'],
+  announcements: ['announcements:', 'mobile:home-feed:', 'expression:'],
   sermons: ['sermon:', 'mobile:home-feed:', 'expression:'],
-  profiles: ['chat:', 'comments:', 'mobile:community:', 'mobile:home-feed:', 'public-profile:'],
+  profiles: ['chat:', 'comments:', 'mobile:community:', 'mobile:home-feed:', 'public-profile:', 'birthdays:', 'expression:birthdays:'],
   notifications: ['notifications:'],
-  follows: ['mobile:home-feed:', 'public-profile:'],
+  follows: ['mobile:home-feed:', 'public-profile:', 'expression:'],
+
+  // New participation workflows.
+  polls: ['participation:'],
+  poll_options: ['participation:'],
+  poll_votes: ['participation:'],
+  giveaways: ['participation:'],
+  giveaway_entries: ['participation:'],
+  giveaway_winners: ['participation:'],
+
+  // Expression testimony workflow.
+  testimonies: ['expression:testimonies:'],
+  testimony_responses: ['expression:testimonies:'],
+
+  // Expression financial documentation and giving-linked books.
+  financial_accounts: ['expression:finance-books:'],
+  financial_sessions: ['expression:finance-books:'],
+  financial_ledger_entries: ['expression:finance-books:'],
+  giving_purposes: ['expression:finance-books:', 'giving:'],
+  giving_campaigns: ['expression:finance-books:', 'giving:'],
+  giving_settings: ['expression:finance-books:', 'giving:'],
+
+  // Feed tuning changes should immediately recalculate visible Home ordering.
+  feed_ranking_settings: ['mobile:home-feed:', 'expression:layered-home:'],
 };
 
 const contextTables = new Set(['branches', 'expression_memberships']);
@@ -138,9 +163,9 @@ export function RealtimeBridge() {
           subscribed = true;
         });
       } catch (error) {
-        // Canonical Edge Function reads continue to work when realtime is unavailable.
-        // Keep this failure isolated from the route tree and leave a development-only
-        // diagnostic instead of ever failing the application shell.
+        // Canonical reads continue to work when realtime is unavailable. Keep a
+        // websocket/config failure isolated from the route tree instead of ever
+        // blanking the application shell.
         if (typeof __DEV__ !== 'undefined' && __DEV__) {
           console.warn('Realtime enhancement unavailable:', error);
         }
