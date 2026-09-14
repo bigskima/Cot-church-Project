@@ -78,9 +78,10 @@ type FinanceResource = {
 type EntryKind = LedgerEntry['entry_kind'];
 type SourceType = LedgerEntry['source_type'];
 
-function exponentForCurrency(currency: string) {
+function exponentForCurrency(currency: string): number {
   try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).resolvedOptions().maximumFractionDigits;
+    const digits = new Intl.NumberFormat(undefined, { style: 'currency', currency }).resolvedOptions().maximumFractionDigits;
+    return typeof digits === 'number' ? digits : 2;
   } catch {
     return 2;
   }
