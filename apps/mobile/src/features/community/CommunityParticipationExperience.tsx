@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import {
   Badge,
   BottomSheet,
@@ -101,7 +101,8 @@ function dateLabel(value?: string | null) {
 }
 
 export function CommunityParticipationExperience({ scope, expressionId }: { scope: Scope; expressionId?: string }) {
-  const { auth, context, mode, hasCapability, hasOrganizationCapability } = useSession();
+  const { tab: routeTab, compose: routeCompose, intentId } = useLocalSearchParams<{ tab?: string; compose?: string; intentId?: string }>();
+  const { auth, context, mode, accessReady, hasCapability, hasOrganizationCapability } = useSession();
   const { colors } = useTheme();
   const organizationId = scope === 'expression'
     ? context?.expressions?.find((item) => item.id === expressionId)?.organizationId ?? context?.organization?.id ?? ''
@@ -111,8 +112,12 @@ export function CommunityParticipationExperience({ scope, expressionId }: { scop
   const canCreatePoll = mode === 'authenticated' && (scope === 'general' ? hasOrganizationCapability('polls.manage') : hasCapability('polls.manage'));
   const canHostGiveaway = mode === 'authenticated' && Boolean(organizationId) && (scope === 'general' || Boolean(branchId));
   const viewerProfileId = context?.profile?.id ?? '';
+  const requestedTab: 'polls' | 'giveaways' = routeTab === 'giveaways' || routeCompose === 'giveaway' ? 'giveaways' : 'polls';
+  const requestedCompose = routeCompose === 'poll' || routeCompose === 'giveaway' ? routeCompose : null;
+  const routeIntent = `${scope}:${expressionId ?? 'general'}:${requestedTab}:${requestedCompose ?? 'browse'}:${intentId ?? 'initial'}`;
+  const handledRouteIntent = useRef<string | null>(null);
 
-  const [tab, setTab] = useState<'polls' | 'giveaways'>('polls');
+  const [tab, setTab] = useState<'polls' | 'giveaways'>(requestedTab);
   const [pollComposerOpen, setPollComposerOpen] = useState(false);
   const [giveawayComposerOpen, setGiveawayComposerOpen] = useState(false);
   const [question, setQuestion] = useState('');
@@ -130,6 +135,36 @@ export function CommunityParticipationExperience({ scope, expressionId }: { scop
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [selections, setSelections] = useState<Record<string, string[]>>({});
+
+  useEffect(() => {
+    if (handledRouteIntent.current === routeIntent) return;
+    setTab(requestedTab);
+
+    if (!requestedCompose) {
+      handledRouteIntent.current = routeIntent;
+      return;
+    }
+    if (!accessReady) return;
+
+    if (requestedCompose === 'poll') {
+      if (canCreatePoll) {
+        setError('');
+        setPollComposerOpen(true);
+      } else if (mode === 'authenticated') {
+        setError('Official poll publishing is available only to members with poll publishing access.');
+      }
+      handledRouteIntent.current = routeIntent;
+      return;
+    }
+
+    if (canHostGiveaway) {
+      setError('');
+      setGiveawayComposerOpen(true);
+      handledRouteIntent.current = routeIntent;
+    } else if (mode !== 'authenticated' || organizationId) {
+      handledRouteIntent.current = routeIntent;
+    }
+  }, [accessReady, canCreatePoll, canHostGiveaway, mode, organizationId, requestedCompose, requestedTab, routeIntent]);
 
   const resource = useResource<ParticipationData>(
     `participation:${scope}:${organizationId || 'none'}:${branchId ?? 'general'}:${mode}`,
