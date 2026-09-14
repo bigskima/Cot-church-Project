@@ -84,8 +84,14 @@ async function expressionContext(auth: any, admin: any, branchId: string) {
   return { branch, membership };
 }
 
+function assertMayAccess(membership: any) {
+  if (membership.chat_banned_at) {
+    throw new ApiError("EXPRESSION_CHAT_BANNED", "Your access to this Expression discussion is currently disabled.", 403);
+  }
+}
+
 function assertMayPost(membership: any) {
-  if (membership.chat_banned_at) throw new ApiError("EXPRESSION_CHAT_BANNED", "Your access to this Expression discussion is currently disabled.", 403);
+  assertMayAccess(membership);
   if (membership.chat_restricted_until && new Date(membership.chat_restricted_until) > new Date()) {
     throw new ApiError("EXPRESSION_CHAT_RESTRICTED", `Posting is restricted until ${membership.chat_restricted_until}.`, 403);
   }
@@ -108,13 +114,14 @@ async function hydrate(admin: any, rows: any[], viewerId: string) {
   if (profilesResult.error || reactionsResult.error || repliesResult.error || uploadsResult.error) {
     throw new ApiError("EXPRESSION_CHAT_LOAD_FAILED", "Unable to prepare this discussion.", 500, undefined, false);
   }
-  const extraReplyProfileIds = [...new Set((repliesResult.data ?? []).map((row: any) => row.sender_profile_id).filter(Boolean))].filter((id) => !profileIds.includes(id));
+  const visibleReplies = (repliesResult.data ?? []).filter((row: any) => !safety.hiddenFromFeed.has(row.sender_profile_id));
+  const extraReplyProfileIds = [...new Set(visibleReplies.map((row: any) => row.sender_profile_id).filter(Boolean))].filter((id) => !profileIds.includes(id));
   if (extraReplyProfileIds.length) {
     const extra = await admin.from("profiles").select("id,username,display_name,avatar_url").in("id", extraReplyProfileIds);
     if (!extra.error) profilesResult.data = [...(profilesResult.data ?? []), ...(extra.data ?? [])];
   }
   const profileMap = new Map((profilesResult.data ?? []).map((profile: any) => [profile.id, profile]));
-  const replyMap = new Map((repliesResult.data ?? []).map((reply: any) => [reply.id, reply]));
+  const replyMap = new Map(visibleReplies.map((reply: any) => [reply.id, reply]));
   const reactions = new Map<string, Map<string, { count: number; reactedByMe: boolean }>>();
   for (const row of reactionsResult.data ?? []) {
     const byEmoji = reactions.get(row.message_id) ?? new Map();
@@ -177,6 +184,7 @@ Deno.serve(createHandler(
     const body = request.method === "POST" ? assertObject(await jsonBody(request)) : {};
     const branchId = uuid(request.method === "GET" ? url.searchParams.get("branchId") : String(body.branchId ?? ""), "branchId", true)!;
     const { branch, membership } = await expressionContext(auth, admin, branchId);
+    assertMayAccess(membership);
     const canModerate = await mayModerate(auth, branchId);
 
     if (request.method === "GET") {
