@@ -79,7 +79,7 @@ export function PostCard({
   const author = postAsAny.author ?? {};
   const expressionLabel = expressionName || postAsAny.expression?.name || undefined;
   const isExpressionPost = post.visibility === 'branch' || postAsAny.scope === 'expression';
-  const resolvedVariant = variant ?? (isExpressionPost ? 'card' : 'feed');
+  const resolvedVariant = variant ?? 'card';
   const showContextRow = showContext ?? isExpressionPost;
   const postExpressionId =
     postAsAny.expression_id ||
