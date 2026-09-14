@@ -298,6 +298,24 @@ export function CommunityParticipationExperience({ scope, expressionId }: { scop
     finally { setActionId(null); }
   };
 
+  const markWinnerFulfilled = async (giveaway: Giveaway, winner: Winner) => {
+    const fulfillmentActionId = `fulfill:${giveaway.id}:${winner.profileId}`;
+    setActionId(fulfillmentActionId); clearMessages();
+    try {
+      const client = await getRuntimeSupabase(accessToken);
+      const result = await client.rpc('mark_giveaway_winner_fulfilled', {
+        target_giveaway_id: giveaway.id,
+        target_profile_id: winner.profileId,
+        fulfillment_note: '',
+      });
+      if (result.error) throw new Error(result.error.message);
+      setSuccess(`Prize fulfillment recorded for ${winner.displayName || 'the selected winner'}.`);
+      resource.refresh();
+    } catch (value) {
+      setError(value instanceof Error ? value.message : 'Unable to record prize fulfillment.');
+    } finally { setActionId(null); }
+  };
+
   const renderPoll = (poll: Poll) => {
     const totalVotes = poll.options.reduce((sum, option) => sum + option.votes, 0);
     const selected = selections[poll.id] ?? poll.options.filter((item) => item.selected).map((item) => item.id);
@@ -354,7 +372,23 @@ export function CommunityParticipationExperience({ scope, expressionId }: { scop
         {giveaway.winners?.length ? (
           <View style={styles.winnersWrap}>
             <Text style={[styles.smallLabel, { color: colors.textMuted }]}>WINNER{giveaway.winners.length === 1 ? '' : 'S'}</Text>
-            {giveaway.winners.map((winner) => <View key={winner.profileId} style={styles.winnerRow}><Icon name="trophy-outline" size={16} color={colors.interactive} /><Text style={[styles.winnerText, { color: colors.text }]}>{winner.displayName || 'COT member'}</Text></View>)}
+            {giveaway.winners.map((winner) => {
+              const fulfillmentActionId = `fulfill:${giveaway.id}:${winner.profileId}`;
+              return (
+                <View key={winner.profileId} style={styles.winnerRow}>
+                  <Icon name="trophy-outline" size={16} color={colors.interactive} />
+                  <View style={styles.flex}>
+                    <Text style={[styles.winnerText, { color: colors.text }]}>{winner.displayName || 'COT member'}</Text>
+                    {winner.fulfilledAt ? <Text style={[styles.meta, { color: colors.textMuted }]}>Prize fulfilled {dateLabel(winner.fulfilledAt)}</Text> : null}
+                  </View>
+                  {winner.fulfilledAt ? (
+                    <Badge label="FULFILLED" variant="success" />
+                  ) : host && giveaway.status === 'completed' ? (
+                    <Button label="Mark fulfilled" onPress={() => void markWinnerFulfilled(giveaway, winner)} loading={actionId === fulfillmentActionId} variant="outline" size="sm" />
+                  ) : null}
+                </View>
+              );
+            })}
           </View>
         ) : null}
         <View style={styles.cardFooter}>
@@ -454,7 +488,7 @@ const styles = StyleSheet.create({
   prizeLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
   prizeText: { fontSize: 14, lineHeight: 20, fontWeight: '800' },
   winnersWrap: { gap: spacing.xs },
-  winnerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  winnerRow: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   winnerText: { fontSize: 12.5, fontWeight: '800' },
   smallLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 0.7 },
   form: { gap: spacing.md },
