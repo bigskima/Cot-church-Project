@@ -21,11 +21,11 @@ export function EventCard({
 }: EventCardProps) {
   const { colors } = useTheme();
 
-  const startDate = event.starts_at ? new Date(event.starts_at) : null;
-  const hasValidStart = startDate && !Number.isNaN(startDate.getTime());
-  const monthStr = hasValidStart ? startDate.toLocaleDateString(undefined, { month: 'short' }).toUpperCase() : 'TBA';
-  const dayStr = hasValidStart ? startDate.getDate().toString() : '—';
-  const timeStr = hasValidStart ? startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Time TBA';
+  const parsedStartDate = event.starts_at ? new Date(event.starts_at) : null;
+  const startDate = parsedStartDate && !Number.isNaN(parsedStartDate.getTime()) ? parsedStartDate : null;
+  const monthStr = startDate ? startDate.toLocaleDateString(undefined, { month: 'short' }).toUpperCase() : 'TBA';
+  const dayStr = startDate ? startDate.getDate().toString() : '—';
+  const timeStr = startDate ? startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Time TBA';
   const isOnline = event.location?.is_online;
   const locationName = event.location?.name;
 
