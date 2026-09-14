@@ -21,7 +21,8 @@ export function PollComposerExperience({ scope, expressionId }: { scope: Scope; 
     : context?.organization?.id ?? context?.organizations?.[0]?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
   const branchId = scope === 'expression' ? expressionId ?? null : null;
   const accessToken = auth?.session.accessToken ?? null;
-  const expressionName = membership?.name ?? (context?.expression?.id === expressionId ? context.expression.name : 'this Expression');
+  const activeExpressionName = context?.expression?.id === expressionId ? context?.expression?.name : undefined;
+  const expressionName = membership?.name ?? activeExpressionName ?? 'this Expression';
   const allowed = mode === 'authenticated' && (scope === 'general'
     ? hasOrganizationCapability('polls.manage')
     : Boolean(membership) && hasCapability('polls.manage'));
