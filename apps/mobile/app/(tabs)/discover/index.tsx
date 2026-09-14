@@ -171,7 +171,7 @@ export default function DiscoverScreen() {
             <Text style={[styles.discoveryTitle, { color: colors.text }]}>Reels</Text>
             <Text style={[styles.discoveryMeta, { color: colors.textMuted }]}>Quick discovery</Text>
           </Pressable>
-          <Pressable onPress={() => router.push('/general/community')} style={({ pressed }) => [styles.discoveryTile, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}>
+          <Pressable onPress={() => router.push('/general')} style={({ pressed }) => [styles.discoveryTile, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}>
             <View style={[styles.discoveryIcon, { backgroundColor: colors.primarySoft }]}>
               <Icon name="people-outline" size={21} color={colors.interactive} />
             </View>
