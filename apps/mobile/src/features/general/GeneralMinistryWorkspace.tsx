@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
   heroCopy: { fontSize: 11, lineHeight: 16, marginTop: 2 },
   quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   quickAction: { minHeight: 36, maxWidth: 230, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  quickText: { fontSize: 10, fontWeight: '850', flexShrink: 1 },
+  quickText: { fontSize: 10, fontWeight: '800', flexShrink: 1 },
   filterBlock: { gap: spacing.sm },
   filterHeading: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.md },
   filterTitle: { fontSize: 21, lineHeight: 26, fontWeight: '900' },
