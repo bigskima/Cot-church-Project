@@ -3,13 +3,10 @@ import { View } from 'react-native';
 import { ScreenHeader } from '@/components';
 import { spacing } from '@/design-system/tokens';
 import { FeedRankingSettingsExperience } from '@/features/feed/FeedRankingSettingsExperience';
-import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 
 export default function GeneralFeedRankingScreen() {
-  const { accessReady, hasOrganizationCapability } = useSession();
   const { colors } = useTheme();
-  const allowed = accessReady && hasOrganizationCapability('feed.ranking.manage');
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -21,7 +18,7 @@ export default function GeneralFeedRankingScreen() {
           showBack
         />
       </View>
-      {allowed ? <FeedRankingSettingsExperience scope="general" /> : <FeedRankingSettingsExperience scope="general" />}
+      <FeedRankingSettingsExperience scope="general" />
     </View>
   );
 }
