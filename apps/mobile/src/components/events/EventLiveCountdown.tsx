@@ -28,10 +28,50 @@ type CountdownParts = {
   seconds: number;
 };
 
+type TickSubscriber = (now: number) => void;
+
 const SECOND = 1_000;
 const MINUTE = 60 * SECOND;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
+
+const tickSubscribers = new Set<TickSubscriber>();
+let sharedTicker: ReturnType<typeof setInterval> | null = null;
+let sharedAppStateSubscription: { remove: () => void } | null = null;
+
+function emitNow() {
+  const now = Date.now();
+  tickSubscribers.forEach((subscriber) => subscriber(now));
+}
+
+function ensureSharedTicker() {
+  if (!sharedTicker) sharedTicker = setInterval(emitNow, SECOND);
+  if (!sharedAppStateSubscription) {
+    sharedAppStateSubscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') emitNow();
+    });
+  }
+}
+
+function stopSharedTickerWhenIdle() {
+  if (tickSubscribers.size > 0) return;
+  if (sharedTicker) {
+    clearInterval(sharedTicker);
+    sharedTicker = null;
+  }
+  sharedAppStateSubscription?.remove();
+  sharedAppStateSubscription = null;
+}
+
+function subscribeToClock(subscriber: TickSubscriber) {
+  tickSubscribers.add(subscriber);
+  ensureSharedTicker();
+  subscriber(Date.now());
+  return () => {
+    tickSubscribers.delete(subscriber);
+    stopSharedTickerWhenIdle();
+  };
+}
 
 function parseTimestamp(value?: string | null) {
   if (!value) return null;
@@ -100,7 +140,7 @@ function buildCountdownState({
     };
   }
 
-  if (!start) {
+  if (start === null) {
     return {
       phase: 'unknown',
       prefix: 'Time to be announced',
@@ -119,8 +159,8 @@ function buildCountdownState({
     };
   }
 
-  if (!end || now < end) {
-    if (!end) {
+  if (end === null || now < end) {
+    if (end === null) {
       return {
         phase: 'live',
         prefix: 'LIVE NOW',
@@ -174,22 +214,13 @@ export function EventLiveCountdown({
   const end = useMemo(() => parseTimestamp(endsAt), [endsAt]);
 
   useEffect(() => {
-    const syncNow = () => setNow(Date.now());
-    syncNow();
-
     const normalizedStatus = status?.toLowerCase();
     const inactiveStatus = normalizedStatus === 'cancelled' || normalizedStatus === 'completed' || normalizedStatus === 'archived';
-    if (!start || inactiveStatus || (end !== null && Date.now() >= end)) return undefined;
+    const currentTime = Date.now();
+    setNow(currentTime);
 
-    const interval = setInterval(syncNow, SECOND);
-    const subscription = AppState.addEventListener('change', (nextState) => {
-      if (nextState === 'active') syncNow();
-    });
-
-    return () => {
-      clearInterval(interval);
-      subscription.remove();
-    };
+    if (start === null || inactiveStatus || (end !== null && currentTime >= end)) return undefined;
+    return subscribeToClock(setNow);
   }, [start, end, status]);
 
   const state = buildCountdownState({ now, start, end, status });
