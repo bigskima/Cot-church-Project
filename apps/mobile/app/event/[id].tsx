@@ -39,17 +39,26 @@ export function EventDetailScreen({ forcedScope }: { forcedScope?: 'general' | '
   const [actionMessage, setActionMessage] = useState('');
   const expressionMode = forcedScope ? forcedScope === 'expression' : requestedContext === 'expression';
 
-  const resource = useResource<Event>(`event:detail:${expressionMode ? context?.expression?.id ?? 'none' : 'public'}:${id}`, (signal) => {
+  const resource = useResource<EventWithBanner>(`event:detail:${expressionMode ? context?.expression?.id ?? 'none' : 'public'}:${id}`, async (signal) => {
     if (expressionMode) {
-      if (mode === 'visitor' || !context?.expression?.id) {
-        return Promise.reject(new Error('Enter this Expression to view its internal event.'));
-      }
-      return api.request<Event>(`events?id=${id}`, { signal });
+      if (mode === 'visitor' || !context?.expression?.id) throw new Error('Enter this Expression to view its internal event.');
+      return api.request<EventWithBanner>(`events?id=${id}`, { signal });
     }
-    return api.request<Event>(`public-event-detail?id=${id}`, { signal, context: 'public' });
+
+    // Keep the canonical public-content event contract as the source of truth.
+    // The small detail endpoint only enriches older deployments that do not yet
+    // expose the banner field through public-content.
+    const event = await api.request<EventWithBanner>(`public-content?type=event&id=${id}`, { signal, context: 'public' });
+    if (event.banner_url) return event;
+    try {
+      const enriched = await api.request<EventWithBanner>(`public-event-detail?id=${id}`, { signal, context: 'public' });
+      return { ...event, banner_url: enriched.banner_url ?? null };
+    } catch {
+      return event;
+    }
   });
 
-  const event = resource.data as EventWithBanner | undefined;
+  const event = resource.data;
   const registrations = useResource<EventRegistration[]>(`event:registration:${mode}:${id}`, (signal) =>
     mode === 'authenticated'
       ? api.request<EventRegistration[]>(`event-registrations?eventId=${id}`, { signal })
@@ -68,102 +77,47 @@ export function EventDetailScreen({ forcedScope }: { forcedScope?: 'general' | '
 
   const handleRegister = async () => {
     if (mode === 'visitor') {
-      router.push({
-        pathname: '/(auth)/login',
-        params: { returnTo: forcedScope === 'general' ? `/general/event/${id}` : `/event/${id}${expressionMode ? '?context=expression' : ''}` },
-      } as any);
+      router.push({ pathname: '/(auth)/login', params: { returnTo: forcedScope === 'general' ? `/general/event/${id}` : `/event/${id}${expressionMode ? '?context=expression' : ''}` } } as any);
       return;
     }
-    setRegistering(true);
-    setActionError('');
-    setActionMessage('');
+    setRegistering(true); setActionError(''); setActionMessage('');
     try {
-      const result = await api.request<EventRegistration>('event-registrations', {
-        method: 'POST',
-        body: JSON.stringify({ eventId: id }),
-      });
+      const result = await api.request<EventRegistration>('event-registrations', { method: 'POST', body: JSON.stringify({ eventId: id }) });
       setActionMessage(result.status === 'waitlisted' ? 'You joined the waitlist.' : 'Your registration is confirmed.');
       registrations.refresh();
-    } catch (value) {
-      setActionError(value instanceof Error ? value.message : 'Unable to complete event registration.');
-    } finally {
-      setRegistering(false);
-    }
+    } catch (value) { setActionError(value instanceof Error ? value.message : 'Unable to complete event registration.'); }
+    finally { setRegistering(false); }
   };
 
   const handleCancel = async () => {
-    setRegistering(true);
-    setActionError('');
-    setActionMessage('');
+    setRegistering(true); setActionError(''); setActionMessage('');
     try {
       await api.request('event-registrations', { method: 'DELETE', body: JSON.stringify({ eventId: id }) });
-      setActionMessage('Your registration has been cancelled.');
-      registrations.refresh();
-    } catch (value) {
-      setActionError(value instanceof Error ? value.message : 'Unable to cancel registration.');
-    } finally {
-      setRegistering(false);
-    }
+      setActionMessage('Your registration has been cancelled.'); registrations.refresh();
+    } catch (value) { setActionError(value instanceof Error ? value.message : 'Unable to cancel registration.'); }
+    finally { setRegistering(false); }
   };
 
   const handleShare = async () => {
     if (!event || expressionMode) return;
     const message = `Join us for ${event.title}!${event.location?.name ? ` At ${event.location.name}.` : ''}`;
-    try {
-      await shareContent({
-        title: event.title,
-        message,
-        attachment: event.banner_url ? { url: event.banner_url, mimeType: 'image/jpeg' } : null,
-      });
-    } catch {
-      // Closing the operating-system share sheet leaves the event unchanged.
-    }
+    try { await shareContent({ title: event.title, message, attachment: event.banner_url ? { url: event.banner_url, mimeType: 'image/jpeg' } : null }); } catch {}
   };
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 130 }]}>
         <ScreenHeader title={event?.title ?? 'Event'} kicker="EVENT" subtitle={event?.location?.name ?? undefined} showBack />
-
-        {resource.loading ? (
+        {resource.loading ? <View style={styles.body}><Skeleton height={210} borderRadius={radius.lg} /><Skeleton height={80} count={2} borderRadius={radius.md} /></View> : resource.error && !event ? <ResourceError message={resource.error} retry={resource.refresh} /> : event ? (
           <View style={styles.body}>
-            <Skeleton height={210} borderRadius={radius.lg} />
-            <Skeleton height={80} count={2} borderRadius={radius.md} />
-          </View>
-        ) : resource.error && !event ? (
-          <ResourceError message={resource.error} retry={resource.refresh} />
-        ) : event ? (
-          <View style={styles.body}>
-            {event.banner_url ? (
-              <View style={[styles.bannerFrame, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, shadows.md]}>
-                <Image source={{ uri: event.banner_url }} style={styles.bannerImage} resizeMode="cover" accessibilityLabel={`${event.title} event banner`} />
-              </View>
-            ) : null}
-
+            {event.banner_url ? <View style={[styles.bannerFrame, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, shadows.md]}><Image source={{ uri: event.banner_url }} style={styles.bannerImage} resizeMode="cover" accessibilityLabel={`${event.title} event banner`} /></View> : null}
             <EventLiveCountdown startsAt={event.starts_at} endsAt={event.ends_at} status={event.status} />
-
             <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
-              <View style={styles.cardRow}>
-                <View style={[styles.iconCircle, { backgroundColor: colors.primarySoft }]}><Icon name="calendar-outline" size={20} color={colors.interactive} /></View>
-                <View style={styles.cardInfo}>
-                  <Text style={[styles.cardLabel, { color: colors.textMuted }]}>DATE & TIME</Text>
-                  <Text style={[styles.cardValue, { color: colors.text }]}>{event.starts_at ? new Date(event.starts_at).toLocaleString([], { dateStyle: 'full', timeStyle: 'short' }) : 'To Be Announced'}</Text>
-                  {event.ends_at ? <Text style={[styles.timeHint, { color: colors.textSecondary }]}>Ends {new Date(event.ends_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</Text> : null}
-                </View>
-              </View>
+              <View style={styles.cardRow}><View style={[styles.iconCircle, { backgroundColor: colors.primarySoft }]}><Icon name="calendar-outline" size={20} color={colors.interactive} /></View><View style={styles.cardInfo}><Text style={[styles.cardLabel, { color: colors.textMuted }]}>DATE & TIME</Text><Text style={[styles.cardValue, { color: colors.text }]}>{event.starts_at ? new Date(event.starts_at).toLocaleString([], { dateStyle: 'full', timeStyle: 'short' }) : 'To Be Announced'}</Text>{event.ends_at ? <Text style={[styles.timeHint, { color: colors.textSecondary }]}>Ends {new Date(event.ends_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</Text> : null}</View></View>
               <View style={[styles.divider, { backgroundColor: colors.borderSubtle }]} />
-              <View style={styles.cardRow}>
-                <View style={[styles.iconCircle, { backgroundColor: colors.primarySoft }]}><Icon name="location-outline" size={20} color={colors.interactive} /></View>
-                <View style={styles.cardInfo}>
-                  <Text style={[styles.cardLabel, { color: colors.textMuted }]}>VENUE LOCATION</Text>
-                  <Text style={[styles.cardValue, { color: colors.text }]}>{event.location?.name || 'Location to be announced'}</Text>
-                  {event.location?.is_online ? <Badge label="HYBRID & ONLINE STREAM" variant="primary" style={{ marginTop: 4, alignSelf: 'flex-start' }} /> : null}
-                </View>
-              </View>
+              <View style={styles.cardRow}><View style={[styles.iconCircle, { backgroundColor: colors.primarySoft }]}><Icon name="location-outline" size={20} color={colors.interactive} /></View><View style={styles.cardInfo}><Text style={[styles.cardLabel, { color: colors.textMuted }]}>VENUE LOCATION</Text><Text style={[styles.cardValue, { color: colors.text }]}>{event.location?.name || 'Location to be announced'}</Text>{event.location?.is_online ? <Badge label="HYBRID & ONLINE STREAM" variant="primary" style={{ marginTop: 4, alignSelf: 'flex-start' }} /> : null}</View></View>
             </View>
-
             {event.description ? <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}><Text style={[styles.cardKicker, { color: colors.interactive }]}>ABOUT THIS GATHERING</Text><Text style={[styles.bodyText, { color: colors.text }]}>{event.description}</Text></View> : null}
-
             {registrations.loading && mode === 'authenticated' ? <Skeleton height={48} borderRadius={radius.md} /> : null}
             {registrations.error && mode === 'authenticated' ? <ResourceError message={registrations.error} retry={registrations.refresh} /> : null}
             {registration ? <View style={[styles.registrationState, { backgroundColor: colors.primarySoft, borderColor: colors.interactive }]}><Icon name="checkmark-circle" size={20} color={colors.interactive} /><View style={styles.cardInfo}><Text style={[styles.cardValue, { color: colors.text }]}>{registration.status === 'waitlisted' ? 'You are on the waitlist' : registration.status === 'attended' ? 'Attendance recorded' : 'You are registered'}</Text><Text style={[styles.registrationHint, { color: colors.textSecondary }]}>{registration.status === 'waitlisted' ? 'Your place may be confirmed if capacity becomes available.' : 'Your registration is saved to your account.'}</Text></View></View> : null}
@@ -187,23 +141,5 @@ export default function LegacyEventDetailRoute() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 },
-  content: { flexGrow: 1 },
-  body: { paddingHorizontal: spacing.md, gap: spacing.lg },
-  bannerFrame: { width: '100%', aspectRatio: 16 / 9, borderRadius: radius.xl, borderWidth: 1, overflow: 'hidden' },
-  bannerImage: { width: '100%', height: '100%' },
-  card: { padding: spacing.lg, borderRadius: radius.xl, borderWidth: 1, gap: spacing.md },
-  cardRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  iconCircle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  cardInfo: { flex: 1, gap: 2 },
-  cardLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
-  cardValue: { fontSize: 15, fontWeight: '600' },
-  timeHint: { marginTop: 3, fontSize: 12, lineHeight: 17, fontWeight: '500' },
-  divider: { height: 1, width: '100%' },
-  cardKicker: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
-  bodyText: { fontSize: 14, lineHeight: 22 },
-  actionRow: { flexDirection: 'row', gap: spacing.sm, padding: spacing.sm, borderRadius: radius.xxl, borderWidth: 1 },
-  statusMessage: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
-  registrationState: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md },
-  registrationHint: { fontSize: 12, lineHeight: 17 },
+  screen: { flex: 1 }, content: { flexGrow: 1 }, body: { paddingHorizontal: spacing.md, gap: spacing.lg }, bannerFrame: { width: '100%', aspectRatio: 16 / 9, borderRadius: radius.xl, borderWidth: 1, overflow: 'hidden' }, bannerImage: { width: '100%', height: '100%' }, card: { padding: spacing.lg, borderRadius: radius.xl, borderWidth: 1, gap: spacing.md }, cardRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md }, iconCircle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }, cardInfo: { flex: 1, gap: 2 }, cardLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 }, cardValue: { fontSize: 15, fontWeight: '600' }, timeHint: { marginTop: 3, fontSize: 12, lineHeight: 17, fontWeight: '500' }, divider: { height: 1, width: '100%' }, cardKicker: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 }, bodyText: { fontSize: 14, lineHeight: 22 }, actionRow: { flexDirection: 'row', gap: spacing.sm, padding: spacing.sm, borderRadius: radius.xxl, borderWidth: 1 }, statusMessage: { fontSize: 13, lineHeight: 18, fontWeight: '600' }, registrationState: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md }, registrationHint: { fontSize: 12, lineHeight: 17 },
 });
