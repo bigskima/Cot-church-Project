@@ -15,6 +15,7 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import { getRuntimeSupabase } from '@/services/runtime-supabase';
+import { ParticipationHomeShelf } from '@/features/community/ParticipationHomeShelf';
 import {
   Avatar,
   BrandMark,
@@ -93,12 +94,7 @@ type SectionUnit = {
 };
 
 type HomeFeedUnit = StreamUnit | SectionUnit;
-
-type HomeResource = {
-  payload: HomePayload;
-  plan: FeedPlanRow[];
-  announcements: Announcement[];
-};
+type HomeResource = { payload: HomePayload; plan: FeedPlanRow[]; announcements: Announcement[] };
 
 function timeValue(value?: string | null) {
   if (!value) return 0;
@@ -115,12 +111,12 @@ function chunks<T>(items: T[], size: number) {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { api, auth, context, mode } = useSession();
+  const { api, auth, context, mode, hasOrganizationCapability } = useSession();
   const { colors } = useTheme();
-
   const contextOrganization = context?.organization ?? context?.organizations?.[0];
   const organizationId = contextOrganization?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
   const accessToken = auth?.session.accessToken ?? null;
+  const canCreatePoll = mode === 'authenticated' && hasOrganizationCapability('polls.manage');
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
@@ -129,28 +125,19 @@ export default function HomeScreen() {
     return `home-feed${suffix ? `?${suffix}` : ''}`;
   }, [organizationId]);
 
-  const resourceKey = `mobile:home-feed:${organizationId || 'auto'}:general:${mode}`;
-  const resource = useResource<HomeResource>(resourceKey, async (signal) => {
+  const resource = useResource<HomeResource>(`mobile:home-feed:${organizationId || 'auto'}:general:${mode}`, async (signal) => {
     let payload = await api.request<HomePayload>(query, { signal, context: 'public' });
     const mediaItems = [...(payload.reels ?? []), ...(payload.videos ?? [])];
     const contentIds = [...new Set(mediaItems.map((item) => item.content_items?.id).filter(Boolean) as string[])];
 
     if (contentIds.length) {
-      const playbackChunks = chunks(contentIds, 30);
-      const settled = await Promise.allSettled(playbackChunks.map((chunk) =>
-        api.request<PlaybackBatchEntry[]>(
-          `content-media?action=playback_batch&contentIds=${encodeURIComponent(chunk.join(','))}`,
-          { signal, context: 'public' },
-        ),
+      const settled = await Promise.allSettled(chunks(contentIds, 30).map((chunk) =>
+        api.request<PlaybackBatchEntry[]>(`content-media?action=playback_batch&contentIds=${encodeURIComponent(chunk.join(','))}`, { signal, context: 'public' }),
       ));
       const playback = new Map<string, PlaybackBatchEntry>();
-      settled.forEach((result) => {
-        if (result.status === 'fulfilled') result.value.forEach((item) => playback.set(item.contentId, item));
-      });
-
+      settled.forEach((result) => { if (result.status === 'fulfilled') result.value.forEach((item) => playback.set(item.contentId, item)); });
       const hydrate = <T extends Reel | Video>(item: T): T => {
-        const contentId = item.content_items?.id;
-        const prepared = contentId ? playback.get(contentId) : undefined;
+        const prepared = item.content_items?.id ? playback.get(item.content_items.id) : undefined;
         const stream = prepared?.renditions?.find((rendition) => rendition.kind === 'video_stream');
         const thumbnail = prepared?.thumbnails?.find((candidate) => candidate.isPrimary) ?? prepared?.thumbnails?.[0];
         if (!stream?.playbackUrl && !thumbnail?.playbackUrl) return item;
@@ -161,19 +148,12 @@ export default function HomeScreen() {
             ...(stream?.playbackUrl ? { url: stream.playbackUrl } : {}),
             ...(thumbnail?.playbackUrl ? { thumbnailUrl: thumbnail.playbackUrl } : {}),
             renditions: (item.media_assets?.renditions ?? []).map((rendition) =>
-              rendition.rendition_kind === 'video_stream' && stream?.playbackUrl
-                ? { ...rendition, playbackUrl: stream.playbackUrl }
-                : rendition
+              rendition.rendition_kind === 'video_stream' && stream?.playbackUrl ? { ...rendition, playbackUrl: stream.playbackUrl } : rendition
             ),
           },
         };
       };
-
-      payload = {
-        ...payload,
-        reels: (payload.reels ?? []).map(hydrate),
-        videos: (payload.videos ?? []).map(hydrate),
-      };
+      payload = { ...payload, reels: (payload.reels ?? []).map(hydrate), videos: (payload.videos ?? []).map(hydrate) };
     }
 
     let plan: FeedPlanRow[] = [];
@@ -190,24 +170,15 @@ export default function HomeScreen() {
             stream_items_between_sections: 4,
           }),
           mode === 'authenticated'
-            ? supabase
-                .from('announcements')
-                .select('id,title,body,published_at,created_at')
-                .eq('organization_id', organizationId)
-                .is('branch_id', null)
-                .eq('status', 'published')
-                .order('published_at', { ascending: false, nullsFirst: false })
-                .limit(36)
+            ? supabase.from('announcements').select('id,title,body,published_at,created_at').eq('organization_id', organizationId).is('branch_id', null).eq('status', 'published').order('published_at', { ascending: false, nullsFirst: false }).limit(36)
             : Promise.resolve({ data: [], error: null }),
         ]);
         if (!planResult.error && Array.isArray(planResult.data)) plan = planResult.data as FeedPlanRow[];
         if (!announcementResult.error && Array.isArray(announcementResult.data)) announcements = announcementResult.data as Announcement[];
       } catch {
-        // Draft previews may run before the migration is promoted. Home must remain usable;
-        // once the database function exists, it becomes the authoritative layout plan.
+        // Draft previews may precede the migration; Edge data remains a safe fallback.
       }
     }
-
     return { payload, plan, announcements };
   });
 
@@ -221,18 +192,13 @@ export default function HomeScreen() {
   const events = payload?.events ?? [];
   const announcements = resource.data?.announcements ?? [];
   const degradedSections = payload?.degradedSections ?? [];
-  const rankingMode = payload?.rankingMode === 'personalized' ? 'personalized' : 'recent';
-
-  const activeStream = useMemo(
-    () => streams.find((stream) => stream.status === 'live') ?? streams.find((stream) => stream.status === 'scheduled'),
-    [streams],
-  );
+  const rankingMode = (resource.data?.plan?.length ?? 0) > 0 ? 'personalized' : payload?.rankingMode === 'personalized' ? 'personalized' : 'recent';
+  const activeStream = useMemo(() => streams.find((stream) => stream.status === 'live') ?? streams.find((stream) => stream.status === 'scheduled'), [streams]);
 
   const feed = useMemo<HomeFeedUnit[]>(() => {
     const postMap = new Map(posts.map((item) => [item.id, item]));
     const reelMap = new Map(reels.map((item) => [item.id, item]));
     const videoMap = new Map(videos.map((item) => [item.id, item]));
-
     const makeStream = (kind: 'post' | 'reel' | 'video', id: string): StreamUnit | null => {
       if (kind === 'post') {
         const post = postMap.get(id); if (!post) return null;
@@ -260,8 +226,6 @@ export default function HomeScreen() {
       });
     }
 
-    // Safe preview fallback before the DB migration is promoted. It mirrors the database
-    // cadence but is intentionally secondary; production ordering comes from Postgres.
     const stream = [
       ...posts.map((post) => makeStream('post', post.id)),
       ...reels.map((reel) => makeStream('reel', reel.id)),
@@ -294,25 +258,23 @@ export default function HomeScreen() {
   }, [announcements, events, posts, reels, resource.data?.plan, sermons, videos]);
 
   const canEngage = mode === 'authenticated';
-  const postRequestContext = 'public' as const;
   const reelWidth = Math.max(280, Math.min(width - spacing.md * 2, 520));
-
   const openGeneralComposer = (compose: 'post' | 'audio') => router.push({ pathname: '/general/community', params: { compose, intentId: String(Date.now()) } } as any);
   const openPost = (postId: string, focusComments = false) => router.push({ pathname: '/general/post/[id]', params: { id: postId, scope: 'general', ...(focusComments ? { focus: 'comments' } : {}) } } as any);
 
   const reactToPost = async (postId: string, reaction: string | null) => {
     if (!canEngage) { openPost(postId, true); return false; }
     try {
-      await api.request('engagement', { method: 'POST', context: postRequestContext, body: JSON.stringify(reaction ? { action: 'react', contentId: postId, reaction } : { action: 'unreact', contentId: postId }) });
-      resource.refresh(); return true;
+      await api.request('engagement', { method: 'POST', context: 'public', body: JSON.stringify(reaction ? { action: 'react', contentId: postId, reaction } : { action: 'unreact', contentId: postId }) });
+      return true;
     } catch { return false; }
   };
 
   const bookmarkPost = async (postId: string, currentlySaved: boolean) => {
     if (!canEngage) { openPost(postId); return false; }
     try {
-      const result = await api.request<{ bookmarked: boolean }>('engagement', { method: 'POST', context: postRequestContext, body: JSON.stringify({ action: 'bookmark', contentId: postId }) });
-      resource.refresh(); return result.bookmarked === !currentlySaved;
+      const result = await api.request<{ bookmarked: boolean }>('engagement', { method: 'POST', context: 'public', body: JSON.stringify({ action: 'bookmark', contentId: postId }) });
+      return result.bookmarked === !currentlySaved;
     } catch { return false; }
   };
 
@@ -322,20 +284,11 @@ export default function HomeScreen() {
     const sermonMap = new Map(sermons.map((item) => [item.id, item]));
     const eventMap = new Map(events.map((item) => [item.id, item]));
     const announcementMap = new Map(announcements.map((item) => [item.id, item]));
-
     return (
       <View style={[styles.sectionShelf, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
         <View style={styles.sectionShelfHeader}>
-          <View style={styles.sectionTitleRow}>
-            <View style={[styles.sectionIcon, { backgroundColor: colors.primarySoft }]}><Icon name={icon as any} size={17} color={colors.interactive} /></View>
-            <View>
-              <Text style={[styles.sectionEyebrow, { color: colors.interactive }]}>DISCOVER</Text>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
-            </View>
-          </View>
-          <Pressable onPress={() => router.push((unit.contentKind === 'sermon' ? '/general/sermons' : unit.contentKind === 'event' ? '/general/events' : '/general/announcements') as any)}>
-            <Text style={[styles.seeAll, { color: colors.interactive }]}>See all</Text>
-          </Pressable>
+          <View style={styles.sectionTitleRow}><View style={[styles.sectionIcon, { backgroundColor: colors.primarySoft }]}><Icon name={icon as any} size={17} color={colors.interactive} /></View><View><Text style={[styles.sectionEyebrow, { color: colors.interactive }]}>DISCOVER</Text><Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text></View></View>
+          <Pressable onPress={() => router.push((unit.contentKind === 'sermon' ? '/general/sermons' : unit.contentKind === 'event' ? '/general/events' : '/general/announcements') as any)}><Text style={[styles.seeAll, { color: colors.interactive }]}>See all</Text></Pressable>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalContent}>
           {unit.ids.map((id) => {
@@ -348,14 +301,7 @@ export default function HomeScreen() {
               return <View key={id} style={styles.horizontalCard}><EventCard event={event} onPress={() => router.push(`/general/event/${id}` as any)} /></View>;
             }
             const announcement = announcementMap.get(id); if (!announcement) return null;
-            return (
-              <Pressable key={id} onPress={() => router.push('/general/announcements' as any)} style={[styles.announcementCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
-                <View style={[styles.announcementIcon, { backgroundColor: colors.primarySoft }]}><Icon name="megaphone-outline" size={18} color={colors.interactive} /></View>
-                <Text style={[styles.announcementTitle, { color: colors.text }]} numberOfLines={2}>{announcement.title}</Text>
-                <Text style={[styles.announcementBody, { color: colors.textSecondary }]} numberOfLines={4}>{announcement.body}</Text>
-                {announcement.published_at ? <Text style={[styles.announcementDate, { color: colors.textMuted }]}>{new Date(announcement.published_at).toLocaleDateString()}</Text> : null}
-              </Pressable>
-            );
+            return <Pressable key={id} onPress={() => router.push('/general/announcements' as any)} style={[styles.announcementCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}><View style={[styles.announcementIcon, { backgroundColor: colors.primarySoft }]}><Icon name="megaphone-outline" size={18} color={colors.interactive} /></View><Text style={[styles.announcementTitle, { color: colors.text }]} numberOfLines={2}>{announcement.title}</Text><Text style={[styles.announcementBody, { color: colors.textSecondary }]} numberOfLines={4}>{announcement.body}</Text>{announcement.published_at ? <Text style={[styles.announcementDate, { color: colors.textMuted }]}>{new Date(announcement.published_at).toLocaleDateString()}</Text> : null}</Pressable>;
           })}
         </ScrollView>
       </View>
@@ -368,12 +314,8 @@ export default function HomeScreen() {
         <View style={[styles.composerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
           <View style={styles.composerMainRow}>
             <Avatar url={context?.profile?.avatar_url} name={context?.profile?.display_name ?? 'COT member'} size="sm" />
-            <Pressable onPress={() => openGeneralComposer('post')} style={({ pressed }) => [styles.composerPrompt, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.iconPressed]}>
-              <Text style={[styles.composerPromptText, { color: colors.textMuted }]}>Share with General COT…</Text>
-            </Pressable>
-            <Pressable onPress={() => router.push('/general/studio')} style={({ pressed }) => [styles.composerMore, { backgroundColor: colors.primarySoft }, pressed && styles.iconPressed]}>
-              <Icon name="add" size={21} color={colors.interactive} />
-            </Pressable>
+            <Pressable onPress={() => openGeneralComposer('post')} style={({ pressed }) => [styles.composerPrompt, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.iconPressed]}><Text style={[styles.composerPromptText, { color: colors.textMuted }]}>Share with General COT…</Text></Pressable>
+            <Pressable onPress={() => router.push('/general/studio')} style={({ pressed }) => [styles.composerMore, { backgroundColor: colors.primarySoft }, pressed && styles.iconPressed]}><Icon name="add" size={21} color={colors.interactive} /></Pressable>
           </View>
           <View style={styles.composerActions}>
             <Pressable onPress={() => openGeneralComposer('post')} style={styles.composerAction}><Icon name="create-outline" size={16} color={colors.interactive} /><Text style={[styles.composerActionText, { color: colors.textSecondary }]}>Post</Text></Pressable>
@@ -381,49 +323,27 @@ export default function HomeScreen() {
             <Pressable onPress={() => openGeneralComposer('audio')} style={styles.composerAction}><Icon name="mic-outline" size={16} color={colors.interactive} /><Text style={[styles.composerActionText, { color: colors.textSecondary }]}>Voice</Text></Pressable>
             <View style={[styles.composerDivider, { backgroundColor: colors.borderSubtle }]} />
             <Pressable onPress={() => router.push('/general/studio/reel')} style={styles.composerAction}><Icon name="flash-outline" size={16} color={colors.live} /><Text style={[styles.composerActionText, { color: colors.textSecondary }]}>Reel</Text></Pressable>
+            {canCreatePoll ? <><View style={[styles.composerDivider, { backgroundColor: colors.borderSubtle }]} /><Pressable onPress={() => router.push('/general/participate' as any)} style={styles.composerAction}><Icon name="stats-chart-outline" size={16} color={colors.interactive} /><Text style={[styles.composerActionText, { color: colors.textSecondary }]}>Poll</Text></Pressable></> : null}
             <View style={[styles.composerDivider, { backgroundColor: colors.borderSubtle }]} />
             <Pressable onPress={() => router.push('/general/studio/video')} style={styles.composerAction}><Icon name="videocam-outline" size={16} color={colors.interactive} /><Text style={[styles.composerActionText, { color: colors.textSecondary }]}>Video</Text></Pressable>
           </View>
         </View>
       ) : null}
-      {degradedSections.length ? (
-        <Pressable onPress={resource.refresh} style={[styles.degradedBanner, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
-          <Icon name="alert-circle-outline" size={16} color={colors.textSecondary} /><Text style={[styles.degradedText, { color: colors.textSecondary }]}>Some items couldn’t load. Tap to retry.</Text><Icon name="refresh-outline" size={15} color={colors.textMuted} />
-        </Pressable>
-      ) : null}
+      {degradedSections.length ? <Pressable onPress={resource.refresh} style={[styles.degradedBanner, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Icon name="alert-circle-outline" size={16} color={colors.textSecondary} /><Text style={[styles.degradedText, { color: colors.textSecondary }]}>Some items couldn’t load. Tap to retry.</Text><Icon name="refresh-outline" size={15} color={colors.textMuted} /></Pressable> : null}
       {activeStream ? <View style={styles.heroSection}><HeroLiveCard stream={activeStream} onPress={() => router.push(`/general/live/${activeStream.id}` as any)} /></View> : null}
-      {feed.length ? (
-        <View style={styles.timelineHeading}>
-          <View><Text style={[styles.timelineEyebrow, { color: colors.interactive }]}>GENERAL HOME</Text><Text style={[styles.timelineTitle, { color: colors.text }]}>{rankingMode === 'personalized' ? 'For you' : 'Latest from COT'}</Text></View>
-          <Pressable onPress={() => router.push('/general/explore')} style={styles.exploreLink}><Text style={[styles.exploreLinkText, { color: colors.interactive }]}>Explore</Text><Icon name="arrow-forward" size={14} color={colors.interactive} /></Pressable>
-        </View>
-      ) : null}
+      <ParticipationHomeShelf scope="general" />
+      {feed.length ? <View style={styles.timelineHeading}><View><Text style={[styles.timelineEyebrow, { color: colors.interactive }]}>GENERAL HOME</Text><Text style={[styles.timelineTitle, { color: colors.text }]}>{rankingMode === 'personalized' ? 'For you' : 'Latest from COT'}</Text></View><Pressable onPress={() => router.push('/general/explore')} style={styles.exploreLink}><Text style={[styles.exploreLinkText, { color: colors.interactive }]}>Explore</Text><Icon name="arrow-forward" size={14} color={colors.interactive} /></Pressable></View> : null}
     </>
   );
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <View style={[styles.homeHeader, { paddingTop: insets.top + spacing.xs, backgroundColor: colors.card, borderBottomColor: colors.borderSubtle }]}>
-        <View style={styles.homeHeaderIdentity}>
-          <View style={[styles.brandBadge, { backgroundColor: colors.cardElevated, borderColor: colors.borderSubtle }]}><BrandMark variant="header" size={28} /></View>
-          <View style={styles.homeHeaderCopy}>
-            <Pressable onPress={() => mode === 'authenticated' && router.push('/expressions')} disabled={mode !== 'authenticated'} style={styles.scopeTitleRow}>
-              <Text style={[styles.scopeTitle, { color: colors.text }]} numberOfLines={1}>General COT</Text>{mode === 'authenticated' ? <Icon name="chevron-down" size={14} color={colors.textMuted} /> : null}
-            </Pressable>
-            <View style={styles.scopeMetaRow}><Icon name="globe-outline" size={11} color={colors.interactive} /><Text style={[styles.scopeMeta, { color: colors.textMuted }]} numberOfLines={1}>{organization?.name ?? 'City of Transformation'} · Public space</Text></View>
-          </View>
-        </View>
-        <View style={styles.homeHeaderActions}>
-          {mode === 'authenticated' ? <Pressable onPress={() => router.push('/general/notifications')} style={[styles.headerAction, { backgroundColor: colors.bgSecondary }]}><Icon name="notifications-outline" size={19} color={colors.text} /></Pressable> : null}
-          <Pressable onPress={() => router.push('/general/tools')} style={[styles.headerAction, { backgroundColor: colors.primarySoft }]}><Icon name="grid-outline" size={18} color={colors.interactive} /></Pressable>
-        </View>
+        <View style={styles.homeHeaderIdentity}><View style={[styles.brandBadge, { backgroundColor: colors.cardElevated, borderColor: colors.borderSubtle }]}><BrandMark variant="header" size={28} /></View><View style={styles.homeHeaderCopy}><Pressable onPress={() => mode === 'authenticated' && router.push('/expressions')} disabled={mode !== 'authenticated'} style={styles.scopeTitleRow}><Text style={[styles.scopeTitle, { color: colors.text }]} numberOfLines={1}>General COT</Text>{mode === 'authenticated' ? <Icon name="chevron-down" size={14} color={colors.textMuted} /> : null}</Pressable><View style={styles.scopeMetaRow}><Icon name="globe-outline" size={11} color={colors.interactive} /><Text style={[styles.scopeMeta, { color: colors.textMuted }]} numberOfLines={1}>{organization?.name ?? 'City of Transformation'} · Public space</Text></View></View></View>
+        <View style={styles.homeHeaderActions}>{mode === 'authenticated' ? <Pressable onPress={() => router.push('/general/notifications')} style={[styles.headerAction, { backgroundColor: colors.bgSecondary }]}><Icon name="notifications-outline" size={19} color={colors.text} /></Pressable> : null}<Pressable onPress={() => router.push('/general/tools')} style={[styles.headerAction, { backgroundColor: colors.primarySoft }]}><Icon name="grid-outline" size={18} color={colors.interactive} /></Pressable></View>
       </View>
 
-      {resource.loading && !resource.data ? (
-        <View style={styles.loadingContainer}><Skeleton height={190} borderRadius={radius.lg} /><Skeleton height={120} count={4} /></View>
-      ) : resource.error && !resource.data ? (
-        <ResourceError message={resource.error} retry={resource.refresh} />
-      ) : (
+      {resource.loading && !resource.data ? <View style={styles.loadingContainer}><Skeleton height={190} borderRadius={radius.lg} /><Skeleton height={120} count={4} /></View> : resource.error && !resource.data ? <ResourceError message={resource.error} retry={resource.refresh} /> : (
         <FlatList
           data={feed}
           keyExtractor={(item) => item.key}
@@ -462,8 +382,8 @@ const styles = StyleSheet.create({
   composerPrompt: { flex: 1, minHeight: 40, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: spacing.md, justifyContent: 'center' },
   composerPromptText: { fontSize: 13, fontWeight: '600' },
   composerMore: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  composerActions: { flexDirection: 'row', alignItems: 'center', minHeight: 34, paddingHorizontal: 2 },
-  composerAction: { flex: 1, minHeight: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  composerActions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', minHeight: 34, paddingHorizontal: 2 },
+  composerAction: { flexGrow: 1, minWidth: 58, minHeight: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
   composerActionText: { fontSize: 10.5, fontWeight: '800' },
   composerDivider: { width: StyleSheet.hairlineWidth, height: 18 },
   degradedBanner: { width: '100%', maxWidth: 680, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm, paddingHorizontal: spacing.md, minHeight: 42, borderWidth: 1, borderRadius: radius.lg },
