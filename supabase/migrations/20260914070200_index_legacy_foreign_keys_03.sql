@@ -1,0 +1,54 @@
+-- Cover legacy public-schema foreign-key relationships flagged by Supabase's advisor.
+-- These are plain btree indexes on the FK columns in constraint order; no data or
+-- authorization semantics are changed.
+
+create index if not exists cot_fk_cover_0101 on public.leaders (profile_id);
+create index if not exists cot_fk_cover_0102 on public.leadership_profiles (expression_id);
+create index if not exists cot_fk_cover_0103 on public.leadership_profiles (profile_id);
+create index if not exists cot_fk_cover_0104 on public.leadership_profiles (created_by);
+create index if not exists cot_fk_cover_0105 on public.leadership_profiles (updated_by);
+create index if not exists cot_fk_cover_0106 on public.live_access_grants (organization_id);
+create index if not exists cot_fk_cover_0107 on public.live_access_grants (profile_id);
+create index if not exists cot_fk_cover_0108 on public.live_access_grants (stream_id, organization_id);
+create index if not exists cot_fk_cover_0109 on public.live_clips (organization_id);
+create index if not exists cot_fk_cover_0110 on public.live_clips (recording_id);
+create index if not exists cot_fk_cover_0111 on public.live_clips (created_by);
+create index if not exists cot_fk_cover_0112 on public.live_follow_ups (profile_id);
+create index if not exists cot_fk_cover_0113 on public.live_follow_ups (assigned_to);
+create index if not exists cot_fk_cover_0114 on public.live_follow_ups (stream_id, organization_id);
+create index if not exists cot_fk_cover_0115 on public.live_follow_ups (branch_id, organization_id);
+create index if not exists cot_fk_cover_0116 on public.live_moderation_actions (organization_id);
+create index if not exists cot_fk_cover_0117 on public.live_moderation_actions (target_profile_id);
+create index if not exists cot_fk_cover_0118 on public.live_moderation_actions (moderator_profile_id);
+create index if not exists cot_fk_cover_0119 on public.live_moderation_actions (stream_id, organization_id);
+create index if not exists cot_fk_cover_0120 on public.live_recordings (organization_id);
+create index if not exists cot_fk_cover_0121 on public.live_recordings (stream_id, organization_id);
+create index if not exists cot_fk_cover_0122 on public.live_streams (created_by);
+create index if not exists cot_fk_cover_0123 on public.live_streams (branch_id, organization_id);
+create index if not exists cot_fk_cover_0124 on public.live_streams (event_id, organization_id);
+create index if not exists cot_fk_cover_0125 on public.live_streams (group_id, organization_id);
+create index if not exists cot_fk_cover_0126 on public.live_webhook_events (stream_id);
+create index if not exists cot_fk_cover_0127 on public.media_assets (expression_id);
+create index if not exists cot_fk_cover_0128 on public.media_assets (created_by);
+create index if not exists cot_fk_cover_0129 on public.media_renditions (organization_id);
+create index if not exists cot_fk_cover_0130 on public.media_renditions (media_asset_id, organization_id);
+create index if not exists cot_fk_cover_0131 on public.media_thumbnails (organization_id);
+create index if not exists cot_fk_cover_0132 on public.media_thumbnails (media_asset_id, organization_id);
+create index if not exists cot_fk_cover_0133 on public.media_tracks (organization_id);
+create index if not exists cot_fk_cover_0134 on public.media_tracks (media_asset_id, organization_id);
+create index if not exists cot_fk_cover_0135 on public.membership_invitations (invited_by);
+create index if not exists cot_fk_cover_0136 on public.membership_invitations (accepted_by);
+create index if not exists cot_fk_cover_0137 on public.membership_invitations (branch_id, organization_id);
+create index if not exists cot_fk_cover_0138 on public.memberships (branch_id, organization_id);
+create index if not exists cot_fk_cover_0139 on public.messages (organization_id);
+create index if not exists cot_fk_cover_0140 on public.messages (reply_to_id);
+create index if not exists cot_fk_cover_0141 on public.messages (conversation_id, organization_id);
+create index if not exists cot_fk_cover_0142 on public.messages (sender_membership_id, organization_id);
+create index if not exists cot_fk_cover_0143 on public.ministries (department_id, organization_id);
+create index if not exists cot_fk_cover_0144 on public.ministries (branch_id, organization_id);
+create index if not exists cot_fk_cover_0145 on public.ministries (leader_membership_id, organization_id);
+create index if not exists cot_fk_cover_0146 on public.notification_deliveries (outbox_id);
+create index if not exists cot_fk_cover_0147 on public.notification_outbox (organization_id);
+create index if not exists cot_fk_cover_0148 on public.notification_outbox (recipient_profile_id);
+create index if not exists cot_fk_cover_0149 on public.notification_outbox (announcement_id, organization_id);
+create index if not exists cot_fk_cover_0150 on public.notification_preferences (organization_id);
