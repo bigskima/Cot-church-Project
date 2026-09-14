@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { AppState, StyleSheet, Text, View } from 'react-native';
 import { radius, spacing } from '@/design-system/tokens';
 import { useTheme } from '@/state/theme';
 import { Icon } from '../primitives/Icon';
@@ -12,11 +12,20 @@ type EventLiveCountdownProps = {
   showEnded?: boolean;
 };
 
+type CountdownPhase = 'upcoming' | 'live' | 'ended' | 'cancelled' | 'unknown';
+
 type CountdownState = {
-  phase: 'upcoming' | 'live' | 'ended' | 'cancelled' | 'unknown';
+  phase: CountdownPhase;
   prefix: string;
-  value: string;
   accessibilityLabel: string;
+  remainingMs: number | null;
+};
+
+type CountdownParts = {
+  days: number;
+  hours: number;
+  minutes: number;
+  seconds: number;
 };
 
 const SECOND = 1_000;
@@ -30,21 +39,34 @@ function parseTimestamp(value?: string | null) {
   return Number.isFinite(timestamp) ? timestamp : null;
 }
 
-function formatRemaining(milliseconds: number, compact: boolean) {
+function remainingParts(milliseconds: number): CountdownParts {
   const remaining = Math.max(0, milliseconds);
-  const days = Math.floor(remaining / DAY);
-  const hours = Math.floor((remaining % DAY) / HOUR);
-  const minutes = Math.floor((remaining % HOUR) / MINUTE);
-  const seconds = Math.floor((remaining % MINUTE) / SECOND);
+  return {
+    days: Math.floor(remaining / DAY),
+    hours: Math.floor((remaining % DAY) / HOUR),
+    minutes: Math.floor((remaining % HOUR) / MINUTE),
+    seconds: Math.floor((remaining % MINUTE) / SECOND),
+  };
+}
+
+function compactRemaining(milliseconds: number) {
+  const { days, hours, minutes, seconds } = remainingParts(milliseconds);
   const pad = (value: number) => String(value).padStart(2, '0');
 
-  if (compact) {
-    if (days > 0) return `${days}d ${pad(hours)}h ${pad(minutes)}m`;
-    if (hours > 0) return `${hours}h ${pad(minutes)}m ${pad(seconds)}s`;
-    return `${minutes}m ${pad(seconds)}s`;
-  }
+  if (days > 0) return `${days}d ${pad(hours)}h ${pad(minutes)}m`;
+  if (hours > 0) return `${hours}h ${pad(minutes)}m ${pad(seconds)}s`;
+  return `${minutes}m ${pad(seconds)}s`;
+}
 
-  return `${pad(days)}d : ${pad(hours)}h : ${pad(minutes)}m : ${pad(seconds)}s`;
+function spokenRemaining(milliseconds: number) {
+  const { days, hours, minutes, seconds } = remainingParts(milliseconds);
+  const parts = [
+    days ? `${days} day${days === 1 ? '' : 's'}` : '',
+    hours ? `${hours} hour${hours === 1 ? '' : 's'}` : '',
+    minutes ? `${minutes} minute${minutes === 1 ? '' : 's'}` : '',
+    `${seconds} second${seconds === 1 ? '' : 's'}`,
+  ].filter(Boolean);
+  return parts.join(', ');
 }
 
 function buildCountdownState({
@@ -52,41 +74,91 @@ function buildCountdownState({
   start,
   end,
   status,
-  compact,
 }: {
   now: number;
   start: number | null;
   end: number | null;
   status?: string | null;
-  compact: boolean;
 }): CountdownState {
   const normalizedStatus = status?.toLowerCase();
+
   if (normalizedStatus === 'cancelled') {
-    return { phase: 'cancelled', prefix: '', value: 'Event cancelled', accessibilityLabel: 'Event cancelled' };
+    return {
+      phase: 'cancelled',
+      prefix: 'Event cancelled',
+      accessibilityLabel: 'Event cancelled',
+      remainingMs: null,
+    };
   }
 
   if (normalizedStatus === 'completed' || normalizedStatus === 'archived') {
-    return { phase: 'ended', prefix: '', value: 'Event ended', accessibilityLabel: 'Event ended' };
+    return {
+      phase: 'ended',
+      prefix: 'Event ended',
+      accessibilityLabel: 'Event ended',
+      remainingMs: null,
+    };
   }
 
   if (!start) {
-    return { phase: 'unknown', prefix: '', value: 'Time to be announced', accessibilityLabel: 'Event time to be announced' };
+    return {
+      phase: 'unknown',
+      prefix: 'Time to be announced',
+      accessibilityLabel: 'Event time to be announced',
+      remainingMs: null,
+    };
   }
 
   if (now < start) {
-    const remaining = formatRemaining(start - now, compact);
-    return { phase: 'upcoming', prefix: 'Starts in', value: remaining, accessibilityLabel: `Event starts in ${remaining}` };
+    const remainingMs = start - now;
+    return {
+      phase: 'upcoming',
+      prefix: 'Starts in',
+      accessibilityLabel: `Event starts in ${spokenRemaining(remainingMs)}`,
+      remainingMs,
+    };
   }
 
   if (!end || now < end) {
-    if (end) {
-      const remaining = formatRemaining(end - now, compact);
-      return { phase: 'live', prefix: 'LIVE NOW', value: `Ends in ${remaining}`, accessibilityLabel: `Event is live now and ends in ${remaining}` };
+    if (!end) {
+      return {
+        phase: 'live',
+        prefix: 'LIVE NOW',
+        accessibilityLabel: 'Event is live now',
+        remainingMs: null,
+      };
     }
-    return { phase: 'live', prefix: 'LIVE NOW', value: 'Happening now', accessibilityLabel: 'Event is live now' };
+
+    const remainingMs = end - now;
+    return {
+      phase: 'live',
+      prefix: 'LIVE NOW · Ends in',
+      accessibilityLabel: `Event is live now and ends in ${spokenRemaining(remainingMs)}`,
+      remainingMs,
+    };
   }
 
-  return { phase: 'ended', prefix: '', value: 'Event ended', accessibilityLabel: 'Event ended' };
+  return {
+    phase: 'ended',
+    prefix: 'Event ended',
+    accessibilityLabel: 'Event ended',
+    remainingMs: null,
+  };
+}
+
+function CountdownUnit({ value, label, foreground, background, border }: {
+  value: number;
+  label: string;
+  foreground: string;
+  background: string;
+  border: string;
+}) {
+  return (
+    <View style={[styles.unit, { backgroundColor: background, borderColor: border }]}>
+      <Text style={[styles.unitValue, { color: foreground }]}>{String(value).padStart(2, '0')}</Text>
+      <Text style={[styles.unitLabel, { color: foreground }]}>{label}</Text>
+    </View>
+  );
 }
 
 export function EventLiveCountdown({
@@ -102,23 +174,25 @@ export function EventLiveCountdown({
   const end = useMemo(() => parseTimestamp(endsAt), [endsAt]);
 
   useEffect(() => {
-    const current = Date.now();
-    setNow(current);
+    const syncNow = () => setNow(Date.now());
+    syncNow();
 
     const normalizedStatus = status?.toLowerCase();
     const inactiveStatus = normalizedStatus === 'cancelled' || normalizedStatus === 'completed' || normalizedStatus === 'archived';
-    if (!start || inactiveStatus || (end !== null && current >= end)) return undefined;
+    if (!start || inactiveStatus || (end !== null && Date.now() >= end)) return undefined;
 
-    const interval = setInterval(() => {
-      const tick = Date.now();
-      setNow(tick);
-      if (end !== null && tick >= end) clearInterval(interval);
-    }, SECOND);
+    const interval = setInterval(syncNow, SECOND);
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') syncNow();
+    });
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
   }, [start, end, status]);
 
-  const state = buildCountdownState({ now, start, end, status, compact });
+  const state = buildCountdownState({ now, start, end, status });
   if (!showEnded && state.phase === 'ended') return null;
 
   const isLive = state.phase === 'live';
@@ -126,55 +200,149 @@ export function EventLiveCountdown({
   const foreground = isLive ? colors.live : isInactive ? colors.textMuted : colors.interactive;
   const background = isLive ? colors.liveSoft : isInactive ? colors.bgSecondary : colors.primarySoft;
   const border = isLive ? colors.live : isInactive ? colors.borderSubtle : colors.primarySoftStrong;
+  const parts = state.remainingMs !== null ? remainingParts(state.remainingMs) : null;
+
+  if (compact) {
+    const compactValue = state.remainingMs !== null
+      ? compactRemaining(state.remainingMs)
+      : state.phase === 'live'
+        ? 'Happening now'
+        : state.prefix;
+
+    return (
+      <View
+        style={[styles.compactContainer, { backgroundColor: background, borderColor: border }]}
+        accessibilityLabel={state.accessibilityLabel}
+      >
+        <Icon
+          name={isLive ? 'radio-outline' : state.phase === 'upcoming' ? 'time-outline' : 'calendar-outline'}
+          size={13}
+          color={foreground}
+        />
+        <Text numberOfLines={1} style={[styles.compactText, { color: foreground }]}>
+          {state.remainingMs !== null ? `${state.prefix} ${compactValue}` : compactValue}
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View
-      style={[
-        styles.container,
-        compact && styles.compactContainer,
-        { backgroundColor: background, borderColor: border },
-      ]}
+      style={[styles.container, { backgroundColor: background, borderColor: border }]}
       accessibilityLabel={state.accessibilityLabel}
     >
-      <Icon
-        name={isLive ? 'radio-outline' : state.phase === 'upcoming' ? 'time-outline' : 'calendar-outline'}
-        size={compact ? 13 : 16}
-        color={foreground}
-      />
-      <View style={styles.copy}>
-        {state.prefix ? (
-          <Text style={[styles.prefix, compact && styles.compactPrefix, { color: foreground }]}>{state.prefix}</Text>
-        ) : null}
-        <Text numberOfLines={1} style={[styles.value, compact && styles.compactValue, { color: foreground }]}>
-          {state.value}
-        </Text>
+      <View style={styles.headingRow}>
+        <View style={[styles.iconBubble, { backgroundColor: colors.card }]}>
+          <Icon
+            name={isLive ? 'radio-outline' : state.phase === 'upcoming' ? 'time-outline' : 'calendar-outline'}
+            size={17}
+            color={foreground}
+          />
+        </View>
+        <View style={styles.headingCopy}>
+          <Text style={[styles.prefix, { color: foreground }]}>{state.prefix}</Text>
+          {state.phase === 'upcoming' ? (
+            <Text style={[styles.helper, { color: colors.textSecondary }]}>Live countdown to the event start</Text>
+          ) : state.phase === 'live' ? (
+            <Text style={[styles.helper, { color: colors.textSecondary }]}>This gathering is happening now</Text>
+          ) : null}
+        </View>
       </View>
+
+      {parts ? (
+        <View style={styles.unitsRow}>
+          <CountdownUnit value={parts.days} label="DAYS" foreground={foreground} background={colors.card} border={border} />
+          <CountdownUnit value={parts.hours} label="HRS" foreground={foreground} background={colors.card} border={border} />
+          <CountdownUnit value={parts.minutes} label="MIN" foreground={foreground} background={colors.card} border={border} />
+          <CountdownUnit value={parts.seconds} label="SEC" foreground={foreground} background={colors.card} border={border} />
+        </View>
+      ) : state.phase === 'live' ? (
+        <View style={[styles.liveNowPanel, { backgroundColor: colors.card, borderColor: border }]}>
+          <View style={[styles.liveDot, { backgroundColor: colors.live }]} />
+          <Text style={[styles.liveNowText, { color: foreground }]}>Happening now</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    minHeight: 48,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+  headingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
   },
+  iconBubble: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headingCopy: { flex: 1, minWidth: 0 },
+  prefix: { fontSize: 12, lineHeight: 16, fontWeight: '900', letterSpacing: 0.55 },
+  helper: { marginTop: 2, fontSize: 11.5, lineHeight: 16, fontWeight: '500' },
+  unitsRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  unit: {
+    flex: 1,
+    minWidth: 0,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unitValue: {
+    fontSize: 22,
+    lineHeight: 26,
+    fontWeight: '900',
+    fontVariant: ['tabular-nums'],
+    letterSpacing: -0.5,
+  },
+  unitLabel: {
+    marginTop: 1,
+    fontSize: 8.5,
+    lineHeight: 11,
+    fontWeight: '800',
+    letterSpacing: 0.65,
+  },
+  liveNowPanel: {
+    minHeight: 48,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  liveDot: { width: 9, height: 9, borderRadius: 5 },
+  liveNowText: { fontSize: 14, lineHeight: 18, fontWeight: '900' },
   compactContainer: {
     minHeight: 30,
     alignSelf: 'flex-start',
+    maxWidth: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
     borderRadius: radius.md,
+    borderWidth: 1,
     paddingHorizontal: spacing.sm,
     paddingVertical: 5,
     gap: 6,
   },
-  copy: { flexShrink: 1, minWidth: 0 },
-  prefix: { fontSize: 10, lineHeight: 13, fontWeight: '800', letterSpacing: 0.7 },
-  compactPrefix: { fontSize: 9, lineHeight: 11 },
-  value: { fontSize: 14, lineHeight: 18, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  compactValue: { fontSize: 11, lineHeight: 14, fontWeight: '700' },
+  compactText: {
+    flexShrink: 1,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
 });
