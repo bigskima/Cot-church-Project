@@ -70,12 +70,15 @@ set fallback_model_ids = case
     end,
     max_retries = greatest(route.max_retries, 1),
     updated_at = now()
-from public.ai_models fallback
-join public.ai_providers fallback_provider on fallback_provider.id = fallback.provider_id
-join public.ai_models primary_model on primary_model.id = route.primary_model_id
-join public.ai_providers primary_provider on primary_provider.id = primary_model.provider_id
-where fallback_provider.code = 'gemini'
+from public.ai_models fallback,
+     public.ai_providers fallback_provider,
+     public.ai_models primary_model,
+     public.ai_providers primary_provider
+where fallback_provider.id = fallback.provider_id
+  and fallback_provider.code = 'gemini'
   and fallback.model_key = 'gemini-2.5-flash'
   and fallback.is_active = true
+  and primary_model.id = route.primary_model_id
+  and primary_provider.id = primary_model.provider_id
   and primary_provider.code = 'gemini'
   and route.is_active = true;
