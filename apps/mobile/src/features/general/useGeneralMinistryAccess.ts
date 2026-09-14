@@ -30,18 +30,21 @@ export function useGeneralMinistryAccess() {
     const canManageGiving = hasOrganizationCapability('giving.campaigns.manage');
     const canReadGivingFinance = hasOrganizationCapability('giving.finance.read');
     const canManageLeadership = hasOrganizationCapability('organization.leadership.manage');
+    const canManageRoles = hasOrganizationCapability('roles.read') && (
+      hasOrganizationCapability('roles.assign') || hasOrganizationCapability('roles.manage')
+    );
     const canBroadcastLive = hasPublicCapability('public.live_stream.create');
     const canManageExpressions = isAuthorizedExpressionCreator;
     const canManageCare = canManagePrayer || canReceivePastoralFollowups || canReviewTestimonies;
     const canCreateOfficialContent = canCreatePosts || canPublishMedia || canManageSermons || canManageEvents || canManageAnnouncements || canManagePolls;
     const canManageMedia = canBroadcastLive || canPublishMedia || canManageLeadership;
-    const canManageSettings = canManageLeadership;
+    const canManageSettings = canManageLeadership || canManageRoles;
 
     const focusAreas: GeneralMinistryArea[] = [];
     if (canCreateOfficialContent) focusAreas.push('Create');
     if (canManageSermons || canManageEvents || canManageAnnouncements || canManagePolls) focusAreas.push('Content');
     if (canManageCare) focusAreas.push('Care');
-    if (canManageLeadership || canManageExpressions) focusAreas.push('People');
+    if (canManageLeadership || canManageExpressions || canManageRoles) focusAreas.push('People');
     if (canManageGiving || canReadGivingFinance) focusAreas.push('Finance');
     if (canManageMedia) focusAreas.push('Media');
     if (canManageSettings) focusAreas.push('Settings');
@@ -60,6 +63,7 @@ export function useGeneralMinistryAccess() {
       canManageGiving,
       canReadGivingFinance,
       canManageLeadership,
+      canManageRoles,
       canBroadcastLive,
       canManageExpressions,
       canManageMedia,
@@ -79,6 +83,7 @@ export function useGeneralMinistryAccess() {
     access.canManageGiving ||
     access.canReadGivingFinance ||
     access.canManageLeadership ||
+    access.canManageRoles ||
     access.canBroadcastLive ||
     access.canManageExpressions
   );
