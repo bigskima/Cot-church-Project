@@ -12,6 +12,7 @@ export type ExpressionManagementSection =
   | 'live'
   | 'sermons'
   | 'events'
+  | 'announcements'
   | 'leadership'
   | 'invites'
   | 'access'
@@ -37,6 +38,7 @@ const tabs: Array<{ key: ExpressionManagementSection; label: string; icon: strin
   { key: 'live', label: 'Live', icon: 'radio-outline' },
   { key: 'sermons', label: 'Sermons', icon: 'book-outline' },
   { key: 'events', label: 'Events', icon: 'calendar-outline' },
+  { key: 'announcements', label: 'Updates', icon: 'megaphone-outline' },
   { key: 'leadership', label: 'Leaders', icon: 'people-circle-outline' },
   { key: 'invites', label: 'Invites', icon: 'key-outline' },
   { key: 'access', label: 'Access', icon: 'shield-checkmark-outline' },
@@ -51,6 +53,7 @@ function sectionPath(expressionId: string, key: ExpressionManagementSection) {
   if (key === 'live') return `/expressions/${expressionId}/manage/live`;
   if (key === 'sermons') return `/expressions/${expressionId}/manage/sermons`;
   if (key === 'events') return `/expressions/${expressionId}/manage/events`;
+  if (key === 'announcements') return `/expressions/${expressionId}/manage/announcements`;
   if (key === 'leadership') return `/expressions/${expressionId}/manage/leadership`;
   if (key === 'invites') return `/expressions/${expressionId}/manage/invite-codes`;
   if (key === 'access') return `/expressions/${expressionId}/manage/access`;
@@ -78,6 +81,7 @@ export function ExpressionManagementHeader({
     if (tab.key === 'live') return access.canManageLive;
     if (tab.key === 'sermons') return access.canManageSermons;
     if (tab.key === 'events') return access.canManageEvents;
+    if (tab.key === 'announcements') return access.canManageAnnouncements;
     if (tab.key === 'leadership') return access.canManageLeadership;
     if (tab.key === 'invites') return access.canManageInviteCodes;
     if (tab.key === 'access') return access.canManageAccess;
@@ -132,11 +136,7 @@ export function ExpressionManagementHeader({
         )}
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.tabs}
-      >
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
         {visibleTabs.map((tab) => {
           const selected = tab.key === active;
           return (
@@ -147,10 +147,7 @@ export function ExpressionManagementHeader({
               accessibilityLabel={tab.label}
               style={({ pressed }) => [
                 styles.tab,
-                {
-                  backgroundColor: selected ? colors.primarySoft : colors.bgSecondary,
-                  borderColor: selected ? colors.interactive : colors.borderSubtle,
-                },
+                { backgroundColor: selected ? colors.primarySoft : colors.bgSecondary, borderColor: selected ? colors.interactive : colors.borderSubtle },
                 pressed ? styles.pressed : null,
               ]}
             >
@@ -165,14 +162,7 @@ export function ExpressionManagementHeader({
 }
 
 const styles = StyleSheet.create({
-  card: {
-    marginHorizontal: spacing.md,
-    marginTop: spacing.md,
-    marginBottom: spacing.xs,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderRadius: radius.xl,
-  },
+  card: { marginHorizontal: spacing.md, marginTop: spacing.md, marginBottom: spacing.xs, padding: spacing.md, borderWidth: 1, borderRadius: radius.xl },
   topRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   iconWrap: { width: 42, height: 42, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   copy: { flex: 1, minWidth: 0 },
