@@ -4,6 +4,7 @@ import { useTheme } from '@/state/theme';
 import type { Event } from '@/types/content';
 import { radius, spacing, shadows, typography } from '@/design-system/tokens';
 import { Icon } from '../primitives/Icon';
+import { EventLiveCountdown } from './EventLiveCountdown';
 
 export interface EventCardProps {
   event: Event;
@@ -20,10 +21,11 @@ export function EventCard({
 }: EventCardProps) {
   const { colors } = useTheme();
 
-  const startDate = event.starts_at ? new Date(event.starts_at) : new Date();
-  const monthStr = startDate.toLocaleDateString(undefined, { month: 'short' }).toUpperCase();
-  const dayStr = startDate.getDate().toString();
-  const timeStr = startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const startDate = event.starts_at ? new Date(event.starts_at) : null;
+  const hasValidStart = startDate && !Number.isNaN(startDate.getTime());
+  const monthStr = hasValidStart ? startDate.toLocaleDateString(undefined, { month: 'short' }).toUpperCase() : 'TBA';
+  const dayStr = hasValidStart ? startDate.getDate().toString() : '—';
+  const timeStr = hasValidStart ? startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Time TBA';
   const isOnline = event.location?.is_online;
   const locationName = event.location?.name;
 
@@ -48,11 +50,17 @@ export function EventCard({
         <Text style={[styles.dayText, { color: colors.text }]}>{dayStr}</Text>
       </View>
 
-      {/* Content Area */}
       <View style={styles.contentArea}>
         <Text numberOfLines={2} style={[styles.title, { color: colors.text }]}>
           {event.title}
         </Text>
+
+        <EventLiveCountdown
+          startsAt={event.starts_at}
+          endsAt={event.ends_at}
+          status={event.status}
+          compact
+        />
 
         <View style={styles.metaRow}>
           <Icon name="time-outline" size={13} color={colors.textMuted} style={{ marginRight: 4 }} />
@@ -76,7 +84,7 @@ export function EventCard({
         </View>
 
         {event.description ? (
-          <Text numberOfLines={2} style={[styles.description, { color: colors.textMuted }]}>
+          <Text numberOfLines={variant === 'row' ? 1 : 2} style={[styles.description, { color: colors.textMuted }]}>
             {event.description}
           </Text>
         ) : null}
@@ -117,7 +125,7 @@ const styles = StyleSheet.create({
   },
   contentArea: {
     flex: 1,
-    gap: 3,
+    gap: 6,
   },
   title: {
     ...typography.h3,
