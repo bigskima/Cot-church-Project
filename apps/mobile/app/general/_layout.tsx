@@ -19,6 +19,7 @@ export default function GeneralLayout() {
   const [leaving, setLeaving] = useState(false);
   const [boundaryError, setBoundaryError] = useState('');
 
+  // Opening General COT always resolves access first by Clearing the private Expression context.
   useEffect(() => {
     if (mode !== 'authenticated' || !accessReady || !context?.expression?.id || leaving) return;
     let cancelled = false;
@@ -37,7 +38,7 @@ export default function GeneralLayout() {
           {boundaryError ? (
             <><Icon name="alert-circle-outline" size={27} color={colors.live} /><Text style={[styles.boundaryTitle, { color: colors.text }]}>General COT is unavailable</Text><Text style={[styles.boundaryCopy, { color: colors.textSecondary }]}>{boundaryError}</Text></>
           ) : (
-            <><ActivityIndicator size="large" color={colors.interactive} /><Text style={[styles.boundaryTitle, { color: colors.text }]}>Opening General COT</Text><Text style={[styles.boundaryCopy, { color: colors.textSecondary }]}>Clearing the private Expression context and preparing the church-wide space.</Text></>
+            <><ActivityIndicator size="large" color={colors.interactive} /><Text style={[styles.boundaryTitle, { color: colors.text }]}>Taking you to General COT</Text><Text style={[styles.boundaryCopy, { color: colors.textSecondary }]}>Getting your church-wide home, media and messages ready.</Text></>
           )}
         </View>
       </View>
@@ -102,6 +103,7 @@ export default function GeneralLayout() {
       <Tabs.Screen name="notification-settings" options={hidden as any} />
       <Tabs.Screen name="saved" options={hidden as any} />
       <Tabs.Screen name="tools" options={hidden as any} />
+      <Tabs.Screen name="leadership" options={hidden as any} />
       <Tabs.Screen name="leadership/index" options={hidden as any} />
       <Tabs.Screen name="leadership/media-studio" options={hidden as any} />
       <Tabs.Screen name="leadership/pastoral-triage" options={hidden as any} />

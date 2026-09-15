@@ -46,6 +46,9 @@ export function ExpressionChatExperience({ expressionId }: { expressionId: strin
   const [reason, setReason] = useState('');
   const [moderating, setModerating] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [pinnedOnly, setPinnedOnly] = useState(false);
   const listRef = useRef<FlatList<RichChatMessage>>(null);
   const key = `expression-chat:${expressionId}`;
 
@@ -151,12 +154,26 @@ export function ExpressionChatExperience({ expressionId }: { expressionId: strin
       ? `Posting restricted until ${new Date(restrictedUntil).toLocaleString()}${resource.data?.membership.chat_moderation_reason ? ` · ${resource.data.membership.chat_moderation_reason}` : ''}`
       : null;
   const pinned = messages.filter((message) => message.pinned_at);
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const visibleMessages = useMemo(() => messages.filter((message) => {
+    if (pinnedOnly && !message.pinned_at) return false;
+    if (!normalizedSearch) return true;
+    const author = `${message.sender?.display_name ?? ''} ${message.sender?.username ?? ''}`.toLowerCase();
+    return (message.body ?? '').toLowerCase().includes(normalizedSearch) || author.includes(normalizedSearch);
+  }), [messages, normalizedSearch, pinnedOnly]);
   const memberList = useMemo(() => (resource.data?.members ?? []).filter((member) => member.status === 'active'), [resource.data?.members]);
 
   const beginReply = (message: RichChatMessage) => setReplyTo({ id: message.id, body: message.body, sender_profile_id: message.sender_profile_id, sender: message.sender, attachmentType: message.attachments?.[0]?.type ?? null });
   const jumpToMessage = (id: string) => {
+    setPinnedOnly(false);
+    setSearchQuery('');
     const index = messages.findIndex((message) => message.id === id);
-    if (index >= 0) listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+    if (index >= 0) requestAnimationFrame(() => listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 }));
+  };
+  const jumpToLatest = () => {
+    setPinnedOnly(false);
+    setSearchQuery('');
+    requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
   };
 
   if (resource.loading && !resource.data) return <View style={[styles.center, { backgroundColor: colors.bg }]}><ActivityIndicator color={colors.interactive} /></View>;
@@ -176,17 +193,39 @@ export function ExpressionChatExperience({ expressionId }: { expressionId: strin
           </Pressable>
         ) : null}
       </View>
-      {pinned.length ? <Pressable onPress={() => jumpToMessage(pinned[0].id)} style={[styles.pinned, { backgroundColor: colors.primarySoft }]}><Icon name="pin" size={14} color={colors.interactive} /><Text style={[styles.pinnedText, { color: colors.textSecondary }]} numberOfLines={1}>{pinned[0].body || 'Pinned media message'}</Text></Pressable> : null}
+
+      <View style={styles.quickTools}>
+        <Pressable onPress={() => setSearchOpen((current) => !current)} style={[styles.quickTool, { backgroundColor: searchOpen || !!normalizedSearch ? colors.primarySoft : colors.card, borderColor: searchOpen || !!normalizedSearch ? colors.interactive : colors.borderSubtle }]} accessibilityRole="button" accessibilityState={{ selected: searchOpen || !!normalizedSearch }}>
+          <Icon name="search-outline" size={14} color={searchOpen || !!normalizedSearch ? colors.interactive : colors.textSecondary} />
+          <Text style={[styles.quickToolText, { color: searchOpen || !!normalizedSearch ? colors.interactive : colors.textSecondary }]}>Search</Text>
+        </Pressable>
+        <Pressable onPress={() => setPinnedOnly((current) => !current)} style={[styles.quickTool, { backgroundColor: pinnedOnly ? colors.primarySoft : colors.card, borderColor: pinnedOnly ? colors.interactive : colors.borderSubtle }]} accessibilityRole="button" accessibilityState={{ selected: pinnedOnly }}>
+          <Icon name="pin-outline" size={14} color={pinnedOnly ? colors.interactive : colors.textSecondary} />
+          <Text style={[styles.quickToolText, { color: pinnedOnly ? colors.interactive : colors.textSecondary }]}>Pinned {pinned.length ? `(${pinned.length})` : ''}</Text>
+        </Pressable>
+        <Pressable onPress={jumpToLatest} style={[styles.quickTool, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]} accessibilityRole="button" accessibilityLabel="Jump to latest message">
+          <Icon name="arrow-down-circle-outline" size={14} color={colors.textSecondary} />
+          <Text style={[styles.quickToolText, { color: colors.textSecondary }]}>Latest</Text>
+        </Pressable>
+      </View>
+
+      {searchOpen ? (
+        <View style={styles.searchWrap}>
+          <InputField label="Search discussion" value={searchQuery} onChangeText={setSearchQuery} placeholder="Message or member name" autoCapitalize="none" />
+        </View>
+      ) : null}
+
+      {pinned.length && !pinnedOnly && !normalizedSearch ? <Pressable onPress={() => jumpToMessage(pinned[0].id)} style={[styles.pinned, { backgroundColor: colors.primarySoft }]}><Icon name="pin" size={14} color={colors.interactive} /><Text style={[styles.pinnedText, { color: colors.textSecondary }]} numberOfLines={1}>{pinned[0].body || 'Pinned media message'}</Text></Pressable> : null}
       <FlatList
         ref={listRef}
-        data={messages}
+        data={visibleMessages}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.messages}
         keyboardShouldPersistTaps="always"
         keyboardDismissMode="none"
-        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+        onContentSizeChange={() => { if (!normalizedSearch && !pinnedOnly) listRef.current?.scrollToEnd({ animated: true }); }}
         onScrollToIndexFailed={({ index, averageItemLength }) => listRef.current?.scrollToOffset({ offset: averageItemLength * index, animated: true })}
-        ListEmptyComponent={<View style={styles.empty}><Icon name="chatbubbles-outline" size={34} color={colors.textMuted} /><Text style={[styles.emptyTitle, { color: colors.text }]}>Start the Expression discussion</Text><Text style={[styles.emptyCopy, { color: colors.textMuted }]}>Messages, photos, videos, reactions and voice notes stay inside this Expression.</Text></View>}
+        ListEmptyComponent={<View style={styles.empty}><Icon name={normalizedSearch || pinnedOnly ? 'search-outline' : 'chatbubbles-outline'} size={34} color={colors.textMuted} /><Text style={[styles.emptyTitle, { color: colors.text }]}>{normalizedSearch || pinnedOnly ? 'No matching messages' : 'Start the Expression discussion'}</Text><Text style={[styles.emptyCopy, { color: colors.textMuted }]}>{normalizedSearch || pinnedOnly ? 'Try another search or turn off the pinned filter.' : 'Messages, photos, videos, reactions and voice notes stay inside this Expression.'}</Text></View>}
         renderItem={({ item }) => <RichMessageBubble message={item} mine={item.sender_profile_id === context?.profile?.id} showSender canPin={resource.data?.permissions.pinMessages === true} onReply={beginReply} onReact={(target, emoji) => void react(target, emoji)} onPin={(target, value) => void pin(target, value)} onJumpToMessage={jumpToMessage} />}
       />
       {actionError ? <Text style={[styles.error, { color: colors.live }]} accessibilityRole="alert">{actionError}</Text> : null}
@@ -230,6 +269,9 @@ const styles = StyleSheet.create({
   screen: { flex: 1 }, center: { flex: 1, alignItems: 'center', justifyContent: 'center' }, state: { flex: 1, padding: spacing.lg, justifyContent: 'center' }, flex: { flex: 1, minWidth: 0 },
   scope: { marginHorizontal: spacing.md, marginBottom: spacing.xs, padding: spacing.sm, borderWidth: 1, borderRadius: radius.lg, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   scopeText: { flex: 1, fontSize: 10.5, lineHeight: 15, fontWeight: '600' }, manageButton: { minHeight: 34, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', gap: 4 }, manageText: { fontSize: 9.5, fontWeight: '900' },
+  quickTools: { marginHorizontal: spacing.md, marginBottom: spacing.xs, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  quickTool: { minHeight: 32, flex: 1, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  quickToolText: { fontSize: 9, lineHeight: 12, fontWeight: '900' }, searchWrap: { marginHorizontal: spacing.md, marginBottom: spacing.xs },
   pinned: { marginHorizontal: spacing.md, borderRadius: radius.md, padding: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }, pinnedText: { flex: 1, fontSize: 11, fontWeight: '700' },
   messages: { padding: spacing.md, gap: spacing.sm, flexGrow: 1, justifyContent: 'flex-end' }, empty: { paddingVertical: 54, paddingHorizontal: spacing.lg, alignItems: 'center', gap: 7 }, emptyTitle: { fontSize: 17, fontWeight: '900', textAlign: 'center' }, emptyCopy: { fontSize: 11, lineHeight: 16, textAlign: 'center', maxWidth: 320 }, error: { paddingHorizontal: spacing.md, paddingVertical: 5, fontSize: 11 },
   memberList: { gap: spacing.sm }, sheetHint: { fontSize: 11, lineHeight: 16, marginBottom: spacing.xs }, memberRow: { minHeight: 64, borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, memberName: { fontSize: 12.5, fontWeight: '900' }, memberMeta: { fontSize: 10, lineHeight: 14, marginTop: 2 }, moderationForm: { gap: spacing.md }, backRow: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' }, backText: { fontSize: 11, fontWeight: '900' }, selectedCard: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, selectedName: { fontSize: 14, fontWeight: '900' }, actionTitle: { fontSize: 9, fontWeight: '900', letterSpacing: 0.8 }, chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 }, moderationButtons: { gap: spacing.sm },

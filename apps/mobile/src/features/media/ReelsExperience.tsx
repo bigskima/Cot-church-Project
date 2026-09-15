@@ -65,6 +65,8 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
     const playbackUrl = source?.renditions?.find((rendition) => rendition.kind === 'video_stream')?.playbackUrl;
     return playbackUrl ? { ...reel, media_assets: { ...reel.media_assets, url: playbackUrl } } as ReelWithViewerState : reel;
   });
+  const waitingForInitialPlayback = playbackIds.length > 0 && playback.loading && !playback.data && !playback.error;
+  const initialSurfaceLoading = (reelsResource.loading && !reelsResource.data) || waitingForInitialPlayback;
   const canShareToGeneral = mode === 'authenticated';
 
   useEffect(() => {
@@ -155,6 +157,19 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
 
   const expressionName = context?.expression?.name;
 
+  if (initialSurfaceLoading) {
+    return (
+      <View style={styles.screen}>
+        <Skeleton height={windowHeight} />
+        <View style={[styles.closeButton, { top: insets.top + 8 }]}>
+          <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close Reels" style={styles.closeBtnInner}>
+            <Icon name="close" size={22} color="#FFFFFF" />
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.screen}>
       {expressionId ? (
@@ -174,7 +189,7 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
       <View style={[styles.closeButton, { top: insets.top + 8 }]}><Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close Reels" style={styles.closeBtnInner}><Icon name="close" size={22} color="#FFFFFF" /></Pressable></View>
       {actionError ? <Pressable onPress={() => setActionError('')} style={[styles.errorToast, { top: insets.top + 58 }]} accessibilityRole="button" accessibilityLabel="Dismiss Reel error"><Icon name="alert-circle-outline" size={15} color="#FFFFFF" /><Text style={styles.errorToastText} numberOfLines={2}>{actionError}</Text><Icon name="close" size={14} color="rgba(255,255,255,0.86)" /></Pressable> : null}
 
-      {reelsResource.loading && !reels.length ? <Skeleton height={windowHeight} /> : reelsResource.error && !reels.length ? <View style={styles.centerWrapper}><ResourceError message={reelsResource.error} retry={reelsResource.refresh} /></View> : reels.length === 0 ? <View style={styles.centerWrapper}><ResourceError message="No Reels Yet" retry={reelsResource.refresh} /></View> : (
+      {reelsResource.error && !reels.length ? <View style={styles.centerWrapper}><ResourceError message={reelsResource.error} retry={reelsResource.refresh} /></View> : reels.length === 0 ? <View style={styles.centerWrapper}><ResourceError message="No Reels Yet" retry={reelsResource.refresh} /></View> : (
         <FlatList
           ref={listRef}
           data={reels}
