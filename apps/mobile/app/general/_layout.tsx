@@ -99,6 +99,7 @@ export default function GeneralLayout() {
       <Tabs.Screen name="prayer" options={hidden as any} />
       <Tabs.Screen name="church-story" options={hidden as any} />
       <Tabs.Screen name="settings" options={hidden as any} />
+      <Tabs.Screen name="tour" options={hidden as any} />
       <Tabs.Screen name="notifications" options={hidden as any} />
       <Tabs.Screen name="notification-settings" options={hidden as any} />
       <Tabs.Screen name="saved" options={hidden as any} />

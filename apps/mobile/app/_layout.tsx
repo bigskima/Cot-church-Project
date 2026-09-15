@@ -9,6 +9,7 @@ import { ThemeProvider, useTheme } from '@/state/theme';
 import { BrandingProvider } from '@/state/branding';
 import { OnboardingGate } from '@/components/OnboardingGate';
 import { RealtimeBridge } from '@/components/RealtimeBridge';
+import { AppTourProvider } from '@/features/tour/AppTourProvider';
 import { fetchPlatformBranding } from '@/services/branding';
 import { palette, radius, spacing } from '@/design-system/tokens';
 
@@ -17,7 +18,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 function AppContent() {
   const { isDark, colors } = useTheme();
   const { mode, accessReady, contextStatus } = useSession();
-  // Getting COT ready still waits for resolved account access; only the member-facing copy changed.
+  // Getting COT ready remains an access-gate invariant; the visible copy is intentionally user-facing.
   const resolvingAccess = mode === 'restoring' || (mode === 'authenticated' && !accessReady && contextStatus !== 'error');
 
   useEffect(() => {
@@ -38,7 +39,7 @@ function AppContent() {
   }
 
   return (
-    <>
+    <AppTourProvider>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <RealtimeBridge />
       <OnboardingGate />
@@ -78,7 +79,7 @@ function AppContent() {
         <Stack.Screen name="leadership/directory" options={{ headerShown: false }} />
         <Stack.Screen name="leadership/invite-codes" options={{ headerShown: false }} />
       </Stack>
-    </>
+    </AppTourProvider>
   );
 }
 
