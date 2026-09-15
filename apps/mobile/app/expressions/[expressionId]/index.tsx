@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Icon } from '@/components';
 import { ExpressionLayeredHomeExperience } from '@/features/expression/ExpressionLayeredHomeExperience';
+import { TourAnchor } from '@/features/tour/AppTourProvider';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useTheme } from '@/state/theme';
 
@@ -13,29 +14,31 @@ export default function ExpressionHomeScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <Pressable
-        onPress={() => id && router.push(`/expressions/${id}/notifications` as any)}
-        accessibilityRole="button"
-        accessibilityLabel="Open Expression notifications"
-        style={({ pressed }) => [
-          styles.notificationBar,
-          { backgroundColor: colors.card, borderColor: colors.borderSubtle },
-          shadows.sm,
-          pressed && styles.pressed,
-        ]}
-      >
-        <View style={[styles.iconWrap, { backgroundColor: colors.primarySoft }]}>
-          <Icon name="notifications-outline" size={18} color={colors.interactive} />
-        </View>
-        <View style={styles.copy}>
-          <Text style={[styles.title, { color: colors.text }]}>Expression notifications</Text>
-          <Text style={[styles.subtitle, { color: colors.textMuted }]}>Only updates from this Expression</Text>
-        </View>
-        <Icon name="chevron-forward" size={17} color={colors.textMuted} />
-      </Pressable>
-      <View style={styles.content}>
+      <TourAnchor targetKey="expression.header">
+        <Pressable
+          onPress={() => id && router.push(`/expressions/${id}/notifications` as any)}
+          accessibilityRole="button"
+          accessibilityLabel="Open Expression notifications"
+          style={({ pressed }) => [
+            styles.notificationBar,
+            { backgroundColor: colors.card, borderColor: colors.borderSubtle },
+            shadows.sm,
+            pressed && styles.pressed,
+          ]}
+        >
+          <View style={[styles.iconWrap, { backgroundColor: colors.primarySoft }]}>
+            <Icon name="notifications-outline" size={18} color={colors.interactive} />
+          </View>
+          <View style={styles.copy}>
+            <Text style={[styles.title, { color: colors.text }]}>Expression notifications</Text>
+            <Text style={[styles.subtitle, { color: colors.textMuted }]}>Only updates from this Expression</Text>
+          </View>
+          <Icon name="chevron-forward" size={17} color={colors.textMuted} />
+        </Pressable>
+      </TourAnchor>
+      <TourAnchor targetKey="expression.home.hero" style={styles.content}>
         <ExpressionLayeredHomeExperience expressionId={id} />
-      </View>
+      </TourAnchor>
     </View>
   );
 }
