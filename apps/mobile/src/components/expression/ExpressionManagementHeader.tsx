@@ -35,7 +35,7 @@ type Props = {
   onAction?: () => void;
 };
 
-const destinations: Array<{ key: ExpressionManagementSection; label: string; description: string; icon: string }> = [
+const tabs: Array<{ key: ExpressionManagementSection; label: string; description: string; icon: string }> = [
   { key: 'tools', label: 'Tools', description: 'Expression operations and shortcuts', icon: 'grid-outline' },
   { key: 'studio', label: 'Studio', description: 'Create and publish Expression content', icon: 'color-wand-outline' },
   { key: 'live', label: 'Live', description: 'Prepare and manage broadcasts', icon: 'radio-outline' },
@@ -85,7 +85,7 @@ export function ExpressionManagementHeader({
   const { colors } = useTheme();
   const access = useExpressionManagementAccess();
   const [menuOpen, setMenuOpen] = useState(false);
-  const visibleDestinations = destinations.filter((item) => {
+  const visibleTabs = tabs.filter((item) => {
     if (item.key === 'tools') return access.canManageAny;
     if (item.key === 'studio') return access.canUseContentStudio;
     if (item.key === 'live') return access.canManageLive;
@@ -102,7 +102,7 @@ export function ExpressionManagementHeader({
     if (item.key === 'books') return access.canReadExpressionFinance;
     return access.canManageSettings;
   });
-  const activeDestination = visibleDestinations.find((item) => item.key === active);
+  const activeDestination = visibleTabs.find((item) => item.key === active);
 
   const openDestination = (key: ExpressionManagementSection) => {
     setMenuOpen(false);
@@ -166,7 +166,7 @@ export function ExpressionManagementHeader({
 
       <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)} title="Expression management" subtitle={`${expressionName} · choose a management area`} maxHeightPercent={84}>
         <View style={styles.menuList}>
-          {visibleDestinations.map((destination) => {
+          {visibleTabs.map((destination) => {
             const selected = destination.key === active;
             return (
               <Pressable
