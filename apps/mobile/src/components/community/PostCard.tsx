@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
 import { Image, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useTheme } from '@/state/theme';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { shareContent } from '@/services/share';
@@ -102,6 +103,7 @@ export function PostCard({
   const [hasLiked, setHasLiked] = useState(Boolean(postAsAny.viewer_reaction));
   const [likeCount, setLikeCount] = useState(postAsAny.likes_count ?? (post.social_reactions?.length || 0));
   const [hasSaved, setHasSaved] = useState(Boolean(postAsAny.viewer_bookmarked));
+  const [copied, setCopied] = useState(false);
   const [preview, setPreview] = useState<PreviewableMedia | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -145,6 +147,14 @@ export function PostCard({
       if (await onBookmark(previous) === false) setHasSaved(previous);
     } catch { setHasSaved(previous); }
     finally { savePending.current = false; }
+  };
+
+  const handleCopy = async () => {
+    const text = post.body?.trim();
+    if (!text) return;
+    await Clipboard.setStringAsync(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1400);
   };
 
   const handleNativeShare = async () => {
@@ -230,7 +240,7 @@ export function PostCard({
                 return <View key={key} style={styles.audioWrap}><AudioPlayer title={mediaTitle(item, 'Audio')} speaker={displayName} sourceUrl={item.url} durationSeconds={item.duration_seconds} style={styles.audioPlayer} /><Pressable onPress={(event) => { event.stopPropagation(); setPreview({ url: item.url!, type: 'audio', title: mediaTitle(item, 'Audio'), durationSeconds: item.duration_seconds }); }} style={[styles.audioExpand, { backgroundColor: colors.primarySoft }]} accessibilityLabel="Open audio preview"><Icon name="expand-outline" size={17} color={colors.interactive} /></Pressable></View>;
               }
               if (kind === 'document' || kind === 'file') {
-                return <Pressable key={key} onPress={(event) => { event.stopPropagation(); setPreview({ url: item.url!, type: 'document', title: mediaTitle(item, 'Attachment'), mimeType: mediaMime(item) || undefined }); }} style={[styles.fileCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]} accessibilityRole="button" accessibilityLabel="Open attached file"><View style={[styles.fileIcon, { backgroundColor: colors.primarySoft }]}><Icon name="document-text-outline" size={22} color={colors.interactive} /></View><View style={styles.fileCopy}><Text numberOfLines={1} style={[styles.fileTitle, { color: colors.text }]}>Attachment</Text><Text style={[styles.fileHint, { color: colors.textMuted }]}>Preview attachment</Text></View><Icon name="expand-outline" size={18} color={colors.interactive} /></Pressable>;
+                return <Pressable key={key} onPress={(event) => { event.stopPropagation(); setPreview({ url: item.url!, type: 'document', title: mediaTitle(item, 'Attachment'), mimeType: mediaMime(item) || undefined }); }} style={[styles.fileCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]} accessibilityRole="button" accessibilityLabel="Open attached file"><View style={[styles.fileIcon, { backgroundColor: colors.primarySoft }]}><Icon name="document-text-outline" size={22} color={colors.interactive} /></View><View style={styles.fileCopy}><Text numberOfLines={1} style={[styles.fileTitle, { color: colors.text }]}>Attachment</Text><Text style={[styles.fileHint, { color: colors.textMuted }]}>Preview or download attachment</Text></View><Icon name="expand-outline" size={18} color={colors.interactive} /></Pressable>;
               }
               return <Pressable key={key} onPress={(event) => { event.stopPropagation(); setPreview({ url: item.url!, type: 'image', title: mediaTitle(item, 'Photo') }); }} style={[styles.mediaFrame, { backgroundColor: colors.bgSecondary }]} accessibilityRole="button" accessibilityLabel="View full image"><Image source={{ uri: item.url! }} style={styles.mediaImage} resizeMode="cover" accessibilityLabel={item.alt || 'Community post image'} /><View style={styles.expandButton}><Icon name="expand-outline" size={19} color="#FFFFFF" /></View></Pressable>;
             })}
@@ -243,8 +253,9 @@ export function PostCard({
               <Pressable onPress={(event) => { event.stopPropagation?.(); setCommentsOpen(true); }} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed ? { backgroundColor: colors.bgSecondary } : null]} accessibilityRole="button" accessibilityLabel="Reply to post"><Icon name="chatbubble-outline" size={18} color={colors.textSecondary} /><Text style={[styles.actionCount, { color: colors.textSecondary }]}>{postAsAny.comments_count || ''}</Text></Pressable>
               <Pressable onPress={() => void handleLike()} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed ? { backgroundColor: colors.liveSoft } : null]} accessibilityRole="button" accessibilityLabel="Like post"><Icon name={hasLiked ? 'heart' : 'heart-outline'} size={18} color={hasLiked ? colors.live : colors.textSecondary} /><Text style={[styles.actionCount, { color: hasLiked ? colors.live : colors.textSecondary }]}>{likeCount > 0 ? likeCount : ''}</Text></Pressable>
               {onBookmark ? <Pressable onPress={() => void handleSave()} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed ? { backgroundColor: colors.primarySoft } : null]} accessibilityRole="button" accessibilityLabel="Bookmark post"><Icon name={hasSaved ? 'bookmark' : 'bookmark-outline'} size={18} color={hasSaved ? colors.interactive : colors.textSecondary} /></Pressable> : null}
+              {post.body?.trim() ? <Pressable onPress={(event) => { event.stopPropagation?.(); void handleCopy(); }} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed ? { backgroundColor: colors.primarySoft } : null]} accessibilityRole="button" accessibilityLabel="Copy post text"><Icon name={copied ? 'checkmark-outline' : 'copy-outline'} size={18} color={copied ? colors.interactive : colors.textSecondary} /></Pressable> : null}
             </View>
-          ) : <Text style={[styles.guestMeta, { color: colors.textMuted }]}>Sign in to join the conversation</Text>}
+          ) : <View style={styles.guestGroup}><Text style={[styles.guestMeta, { color: colors.textMuted }]}>Sign in to join the conversation</Text>{post.body?.trim() ? <Pressable onPress={(event) => { event.stopPropagation?.(); void handleCopy(); }} style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Copy post text"><Icon name={copied ? 'checkmark-outline' : 'copy-outline'} size={18} color={copied ? colors.interactive : colors.textSecondary} /></Pressable> : null}</View>}
           {allowExternalShare ? <Pressable onPress={handleNativeShare} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed ? { backgroundColor: colors.bgSecondary } : null]} accessibilityRole="button" accessibilityLabel="Share post"><Icon name="share-social-outline" size={18} color={colors.textSecondary} /></Pressable> : <View style={styles.noShareMeta}><Icon name="lock-closed-outline" size={12} color={colors.textMuted} /><Text style={[styles.noShareText, { color: colors.textMuted }]}>Stays here</Text></View>}
         </View>
       </Pressable>
@@ -299,9 +310,10 @@ const styles = StyleSheet.create({
   reelReferenceMeta: { fontSize: 10, marginTop: 3 },
   actionRail: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, minHeight: 42 },
   actionGroup: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  guestGroup: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 },
   actionButton: { minWidth: 42, height: 36, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 8 },
   actionCount: { fontSize: 12, fontWeight: '700' },
-  guestMeta: { fontSize: 11, fontWeight: '600' },
+  guestMeta: { fontSize: 11, fontWeight: '600', flexShrink: 1 },
   noShareMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6 },
   noShareText: { fontSize: 9, fontWeight: '700' },
 });
