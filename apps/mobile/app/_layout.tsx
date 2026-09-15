@@ -29,8 +29,8 @@ function AppContent() {
       <View style={[styles.accessBootstrap, { backgroundColor: colors.bg }]}>
         <View style={[styles.accessBootstrapCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
           <ActivityIndicator size="large" color={colors.interactive} />
-          <Text style={[styles.accessBootstrapTitle, { color: colors.text }]}>Getting COT ready</Text>
-          <Text style={[styles.accessBootstrapCopy, { color: colors.textSecondary }]}>Loading your church, Expressions and personal tools.</Text>
+          <Text style={[styles.accessBootstrapTitle, { color: colors.text }]}>Opening COT</Text>
+          <Text style={[styles.accessBootstrapCopy, { color: colors.textSecondary }]}>Getting your church home, Expressions and messages ready.</Text>
         </View>
       </View>
     );
