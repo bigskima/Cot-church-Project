@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Clipboard from 'expo-clipboard';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
@@ -41,6 +42,27 @@ interface ExpressionData {
   isFollowing?: boolean;
 }
 
+type StructuredAddress = {
+  line1?: string | null;
+  line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  landmark?: string | null;
+  mapUrl?: string | null;
+};
+
+function addressDisplay(value: unknown) {
+  if (typeof value === 'string') return value.trim();
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return '';
+  const address = value as StructuredAddress;
+  const locality = [address.city, address.state].filter(Boolean).join(', ');
+  return [address.line1, address.line2, locality, address.country]
+    .map((part) => String(part || '').trim())
+    .filter(Boolean)
+    .join(', ');
+}
+
 export default function ExpressionProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
@@ -51,6 +73,7 @@ export default function ExpressionProfileScreen() {
   const [isFollowing, setIsFollowing] = useState(false);
   const [followingLoading, setFollowingLoading] = useState(false);
   const [followError, setFollowError] = useState('');
+  const [addressCopied, setAddressCopied] = useState(false);
 
   const resource = useResource<ExpressionData>(`expression:profile:${id}`, (signal) => {
     return api.request<ExpressionData>(`public-content?type=expression&expressionId=${encodeURIComponent(id ?? '')}`, { signal });
@@ -64,6 +87,8 @@ export default function ExpressionProfileScreen() {
   const events = data?.events ?? [];
   const leaders = data?.leaders ?? [];
   const membership = context?.expressions?.find((item) => item.id === id && item.status === 'active');
+  const expressionAddress = useMemo(() => addressDisplay((expression as any)?.address), [expression]);
+  const expressionAddressMeta = (expression as any)?.address as StructuredAddress | undefined;
 
   useEffect(() => {
     if (typeof data?.isFollowing === 'boolean') setIsFollowing(data.isFollowing);
@@ -89,9 +114,7 @@ export default function ExpressionProfileScreen() {
       await api.request('follows', {
         method: 'POST',
         context: 'public',
-        body: JSON.stringify({
-          expressionId: id,
-        }),
+        body: JSON.stringify({ expressionId: id }),
       });
       setIsFollowing(!isFollowing);
     } catch (value) {
@@ -99,6 +122,14 @@ export default function ExpressionProfileScreen() {
     } finally {
       setFollowingLoading(false);
     }
+  };
+
+  const copyAddress = async () => {
+    if (!expressionAddress) return;
+    const value = [expressionAddress, expressionAddressMeta?.landmark ? `Landmark: ${expressionAddressMeta.landmark}` : ''].filter(Boolean).join('\n');
+    await Clipboard.setStringAsync(value);
+    setAddressCopied(true);
+    setTimeout(() => setAddressCopied(false), 1400);
   };
 
   return (
@@ -131,12 +162,15 @@ export default function ExpressionProfileScreen() {
                 <Badge label={expression.code || 'EXPRESSION'} variant="primary" />
               </View>
 
-              {expression.address ? (
-                <View style={styles.locationRow}>
-                  <Icon name="location-outline" size={14} color={colors.interactive} />
-                  <Text style={[styles.locationText, { color: colors.textSecondary }]}>
-                    {expression.address}
-                  </Text>
+              {expressionAddress ? (
+                <View style={[styles.locationCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+                  <View style={[styles.locationIcon, { backgroundColor: colors.primarySoft }]}><Icon name="location-outline" size={17} color={colors.interactive} /></View>
+                  <View style={styles.locationCopy}>
+                    <Text style={[styles.locationKicker, { color: colors.interactive }]}>PUBLIC LOCATION</Text>
+                    <Text style={[styles.locationText, { color: colors.text }]}>{expressionAddress}</Text>
+                    {expressionAddressMeta?.landmark ? <Text style={[styles.locationHint, { color: colors.textSecondary }]}>Landmark: {expressionAddressMeta.landmark}</Text> : null}
+                  </View>
+                  <Pressable onPress={() => void copyAddress()} style={styles.locationCopyButton} accessibilityRole="button" accessibilityLabel="Copy Expression address"><Icon name={addressCopied ? 'checkmark-outline' : 'copy-outline'} size={16} color={colors.interactive} /></Pressable>
                 </View>
               ) : null}
 
@@ -183,7 +217,7 @@ export default function ExpressionProfileScreen() {
             <View style={styles.publicBoundaryCopy}>
               <Text style={[styles.publicBoundaryTitle, { color: colors.text }]}>Public Expression profile</Text>
               <Text style={[styles.publicBoundaryText, { color: colors.textSecondary }]}>
-                Only content intentionally published to General COT appears here. Members, groups, internal announcements and management tools remain private.
+                Only content and location information intentionally published for this Expression appear here. Members, groups, internal announcements and management tools remain private.
               </Text>
             </View>
           </View>
@@ -207,48 +241,17 @@ export default function ExpressionProfileScreen() {
             </View>
           </View>
 
-          {/* Navigation Filter Tabs */}
           <View style={[styles.tabsBar, { borderBottomColor: colors.borderSubtle }]}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsRow}>
-              <Chip
-                label="Overview"
-                selected={activeTab === 'overview'}
-                onPress={() => setActiveTab('overview')}
-              />
-              <Chip
-                label="Sermons"
-                selected={activeTab === 'sermons'}
-                onPress={() => setActiveTab('sermons')}
-                count={sermons.length}
-              />
-              <Chip
-                label="Videos"
-                selected={activeTab === 'watch'}
-                onPress={() => setActiveTab('watch')}
-                count={videos.length}
-              />
-              <Chip
-                label="Reels"
-                selected={activeTab === 'reels'}
-                onPress={() => setActiveTab('reels')}
-                count={reels.length}
-              />
-              <Chip
-                label="Events"
-                selected={activeTab === 'events'}
-                onPress={() => setActiveTab('events')}
-                count={events.length}
-              />
-              <Chip
-                label="Leadership"
-                selected={activeTab === 'leaders'}
-                onPress={() => setActiveTab('leaders')}
-                count={leaders.length}
-              />
+              <Chip label="Overview" selected={activeTab === 'overview'} onPress={() => setActiveTab('overview')} />
+              <Chip label="Sermons" selected={activeTab === 'sermons'} onPress={() => setActiveTab('sermons')} count={sermons.length} />
+              <Chip label="Videos" selected={activeTab === 'watch'} onPress={() => setActiveTab('watch')} count={videos.length} />
+              <Chip label="Reels" selected={activeTab === 'reels'} onPress={() => setActiveTab('reels')} count={reels.length} />
+              <Chip label="Events" selected={activeTab === 'events'} onPress={() => setActiveTab('events')} count={events.length} />
+              <Chip label="Leadership" selected={activeTab === 'leaders'} onPress={() => setActiveTab('leaders')} count={leaders.length} />
             </ScrollView>
           </View>
 
-          {/* Tab Content Display */}
           <View style={styles.tabContentArea}>
             {activeTab === 'overview' ? (
               <View style={styles.overviewStack}>
@@ -271,114 +274,30 @@ export default function ExpressionProfileScreen() {
                   </View>
                 ) : null}
                 {!events.length && !sermons.length && !videos.length && !reels.length && !leaders.length ? (
-                  <EmptyState
-                    title="Public profile is ready"
-                    message="Public sermons, media, events and featured leaders from this Expression will appear here."
-                    iconName="globe-outline"
-                  />
+                  <EmptyState title="Public profile is ready" message="Public sermons, media, events and featured leaders from this Expression will appear here." iconName="globe-outline" />
                 ) : null}
               </View>
             ) : null}
 
-            {activeTab === 'sermons' && (
-              sermons.length > 0 ? (
-                <View style={styles.cardStack}>
-                  {sermons.map((s) => (
-                    <SermonCard
-                      key={s.id}
-                      sermon={s}
-                      onPress={() => router.push(`/general/sermon/${s.id}` as any)}
-                    />
-                  ))}
-                </View>
-              ) : (
-                <EmptyState
-                  title="No Sermons Published"
-                  message="This Expression has not published sermon recordings yet."
-                  iconName="book-outline"
-                />
-              )
-            )}
+            {activeTab === 'sermons' && (sermons.length > 0 ? (
+              <View style={styles.cardStack}>{sermons.map((s) => <SermonCard key={s.id} sermon={s} onPress={() => router.push(`/general/sermon/${s.id}` as any)} />)}</View>
+            ) : <EmptyState title="No Sermons Published" message="This Expression has not published sermon recordings yet." iconName="book-outline" />)}
 
-            {activeTab === 'watch' && (
-              videos.length > 0 ? (
-                <View style={styles.cardStack}>
-                  {videos.map((v) => (
-                    <VideoCard
-                      key={v.id}
-                      video={v}
-                      onPress={() => router.push(`/general/watch/${v.id}` as any)}
-                    />
-                  ))}
-                </View>
-              ) : (
-                <EmptyState
-                  title="No Videos in Library"
-                  message="Broadcast archives and teachings will appear here."
-                  iconName="videocam-outline"
-                />
-              )
-            )}
+            {activeTab === 'watch' && (videos.length > 0 ? (
+              <View style={styles.cardStack}>{videos.map((v) => <VideoCard key={v.id} video={v} onPress={() => router.push(`/general/watch/${v.id}` as any)} />)}</View>
+            ) : <EmptyState title="No Videos in Library" message="Broadcast archives and teachings will appear here." iconName="videocam-outline" />)}
 
-            {activeTab === 'reels' && (
-              reels.length > 0 ? (
-                <View style={styles.reelsGrid}>
-                  {reels.map((r) => (
-                    <ReelCard
-                      key={r.id}
-                      reel={r}
-                      onPress={() => router.push({ pathname: '/general/reels', params: { reelId: r.id } } as any)}
-                    />
-                  ))}
-                </View>
-              ) : (
-                <EmptyState
-                  title="No Reels Available"
-                  message="Short devotional clips will appear here."
-                  iconName="film-outline"
-                />
-              )
-            )}
+            {activeTab === 'reels' && (reels.length > 0 ? (
+              <View style={styles.reelsGrid}>{reels.map((r) => <ReelCard key={r.id} reel={r} onPress={() => router.push({ pathname: '/general/reels', params: { reelId: r.id } } as any)} />)}</View>
+            ) : <EmptyState title="No Reels Available" message="Short devotional clips will appear here." iconName="film-outline" />)}
 
-            {activeTab === 'events' && (
-              events.length > 0 ? (
-                <View style={styles.cardStack}>
-                  {events.map((e) => (
-                    <EventCard
-                      key={e.id}
-                      event={e}
-                      onPress={() => router.push(`/general/event/${e.id}` as any)}
-                    />
-                  ))}
-                </View>
-              ) : (
-                <EmptyState
-                  title="No Upcoming Events"
-                  message="Calendar gatherings for this Expression will appear here."
-                  iconName="calendar-outline"
-                />
-              )
-            )}
+            {activeTab === 'events' && (events.length > 0 ? (
+              <View style={styles.cardStack}>{events.map((e) => <EventCard key={e.id} event={e} onPress={() => router.push(`/general/event/${e.id}` as any)} />)}</View>
+            ) : <EmptyState title="No Upcoming Events" message="Calendar gatherings for this Expression will appear here." iconName="calendar-outline" />)}
 
-            {activeTab === 'leaders' && (
-              leaders.length > 0 ? (
-                <View style={styles.cardStack}>
-                  {leaders.map((leader) => (
-                    <LeaderCard
-                      key={leader.id}
-                      leader={leader}
-                      variant="standard"
-                    />
-                  ))}
-                </View>
-              ) : (
-                <EmptyState
-                  title="No Leaders Listed"
-                  message="Expression pastors and leaders will appear here."
-                  iconName="people-outline"
-                />
-              )
-            )}
+            {activeTab === 'leaders' && (leaders.length > 0 ? (
+              <View style={styles.cardStack}>{leaders.map((leader) => <LeaderCard key={leader.id} leader={leader} variant="standard" />)}</View>
+            ) : <EmptyState title="No Leaders Listed" message="Expression pastors and leaders will appear here." iconName="people-outline" />)}
           </View>
         </ScrollView>
       ) : null}
@@ -387,83 +306,19 @@ export default function ExpressionProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  headerSection: {
-    marginHorizontal: spacing.md,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderRadius: radius.xxl,
-    gap: spacing.md,
-  },
-  avatarWrap: {
-    alignSelf: 'flex-start',
-  },
-  infoBlock: {
-    gap: 4,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    flexWrap: 'wrap',
-  },
-  title: {
-    ...typography.h1,
-  },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-  },
-  locationText: {
-    fontSize: 13,
-  },
+  screen: { flex: 1 },
+  headerSection: { marginHorizontal: spacing.md, padding: spacing.lg, borderWidth: 1, borderRadius: radius.xxl, gap: spacing.md },
+  avatarWrap: { alignSelf: 'flex-start' }, infoBlock: { gap: 4 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' }, title: { ...typography.h1 },
+  locationCard: { marginTop: spacing.sm, borderWidth: 1, borderRadius: radius.xl, padding: spacing.sm, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  locationIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  locationCopy: { flex: 1, minWidth: 0 }, locationKicker: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.8 }, locationText: { fontSize: 12.5, lineHeight: 18, fontWeight: '700', marginTop: 2 }, locationHint: { fontSize: 10.5, lineHeight: 15, marginTop: 2 },
+  locationCopyButton: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   publicBoundary: { marginHorizontal: spacing.md, marginTop: spacing.sm, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
-  publicBoundaryIcon: { width: 42, height: 42, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
-  publicBoundaryCopy: { flex: 1, gap: 2 },
-  publicBoundaryTitle: { fontSize: 13.5, lineHeight: 18, fontWeight: '800' },
-  publicBoundaryText: { fontSize: 11.5, lineHeight: 17 },
-  statsRow: { flexDirection: 'row', gap: spacing.xs, marginHorizontal: spacing.md, marginTop: spacing.sm },
-  statCard: { flex: 1, minHeight: 58, borderWidth: 1, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
-  statValue: { fontSize: 17, lineHeight: 21, fontWeight: '900' },
-  statLabel: { fontSize: 9.5, lineHeight: 13, fontWeight: '700', marginTop: 1 },
-  actionRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  followError: {
-    fontSize: 12,
-    lineHeight: 17,
-    marginTop: spacing.xs,
-  },
-  tabsBar: {
-    paddingVertical: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  tabsRow: {
-    paddingHorizontal: spacing.md,
-    gap: spacing.sm,
-  },
-  tabContentArea: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.lg,
-  },
-  overviewStack: { gap: spacing.lg },
-  overviewSection: { gap: spacing.sm },
-  overviewKicker: { fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 0.8 },
-  cardStack: {
-    gap: spacing.md,
-  },
-  reelsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-
+  publicBoundaryIcon: { width: 42, height: 42, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' }, publicBoundaryCopy: { flex: 1, gap: 2 }, publicBoundaryTitle: { fontSize: 13.5, lineHeight: 18, fontWeight: '800' }, publicBoundaryText: { fontSize: 11.5, lineHeight: 17 },
+  statsRow: { flexDirection: 'row', gap: spacing.xs, marginHorizontal: spacing.md, marginTop: spacing.sm }, statCard: { flex: 1, minHeight: 58, borderWidth: 1, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' }, statValue: { fontSize: 17, lineHeight: 21, fontWeight: '900' }, statLabel: { fontSize: 9.5, lineHeight: 13, fontWeight: '700', marginTop: 1 },
+  actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm }, followError: { fontSize: 12, lineHeight: 17, marginTop: spacing.xs },
+  tabsBar: { paddingVertical: spacing.sm, marginTop: spacing.sm }, tabsRow: { paddingHorizontal: spacing.md, gap: spacing.sm },
+  tabContentArea: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: spacing.lg }, overviewStack: { gap: spacing.lg }, overviewSection: { gap: spacing.sm }, overviewKicker: { fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 0.8 },
+  cardStack: { gap: spacing.md }, reelsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
 });

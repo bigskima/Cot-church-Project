@@ -60,9 +60,6 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
 
   const [normalizedFilter, setNormalizedFilter] = useState('');
   const [actionError, setActionError] = useState('');
-  // General Chat lives inside an absolute bottom-tab bar. Keep the thread
-  // composer above that bar; otherwise the input is present but hidden behind
-  // navigation after a person is opened from search or a member profile.
   const generalThreadBottomInset = embeddedExpression
     ? 0
     : 75 + Math.max(insets.bottom, Platform.OS === 'web' ? 10 : 8);
@@ -231,23 +228,20 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
 
   const list = useMemo<InboxItem[]>(() => {
     if (normalizedFilter) {
-      return (inbox.data?.people ?? []).map((person) => ({
-        kind: 'person' as const,
-        id: `p:${person.id}`,
-        person,
-      }));
+      return (inbox.data?.people ?? []).map((person) => ({ kind: 'person' as const, id: `p:${person.id}`, person }));
     }
     const conversations = (inbox.data?.conversations ?? []).map((conversation) => ({
       kind: 'conversation' as const,
       id: `c:${conversation.id}`,
       conversation,
     }));
-    if (conversations.length) return conversations;
-    return (inbox.data?.people ?? []).slice(0, 40).map((person) => ({
-      kind: 'person' as const,
-      id: `p:${person.id}`,
-      person,
-    }));
+    const conversationPeople = new Set(
+      (inbox.data?.conversations ?? []).map((conversation) => conversation.other?.id).filter(Boolean),
+    );
+    const connections = (inbox.data?.people ?? [])
+      .filter((person) => !conversationPeople.has(person.id))
+      .map((person) => ({ kind: 'person' as const, id: `p:${person.id}`, person }));
+    return [...conversations, ...connections];
   }, [inbox.data, normalizedFilter]);
 
   const displayedMessages = useMemo(() => {
@@ -281,9 +275,7 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
       <View style={[styles.center, { backgroundColor: colors.bg }]}>
         <Icon name="chatbubbles-outline" size={38} color={colors.textMuted} />
         <Text style={[styles.emptyTitle, { color: colors.text }]}>Sign in to chat</Text>
-        <Text style={[styles.emptyCopy, { color: colors.textSecondary }]}>
-          Direct messages are available to signed-in COT users.
-        </Text>
+        <Text style={[styles.emptyCopy, { color: colors.textSecondary }]}>Direct messages are available to signed-in COT users.</Text>
       </View>
     );
   }
@@ -292,52 +284,23 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
     const pinnedMessages = displayedMessages.filter((message) => message.pinned_at);
     return (
       <KeyboardAvoidingView
-        style={[
-          styles.screen,
-          {
-            backgroundColor: colors.bg,
-            paddingBottom: generalThreadBottomInset,
-          },
-        ]}
+        style={[styles.screen, { backgroundColor: colors.bg, paddingBottom: generalThreadBottomInset }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View
-          style={[
-            styles.threadHeader,
-            {
-              paddingTop: Math.max(insets.top, 10),
-              backgroundColor: colors.card,
-              borderBottomColor: colors.borderSubtle,
-            },
-          ]}
-        >
-          <Pressable onPress={() => setSelected(null)} style={styles.iconButton}>
-            <Icon name="arrow-back" size={22} color={colors.text} />
-          </Pressable>
-          <Avatar
-            url={selected.person.avatar_url ?? undefined}
-            name={selected.person.display_name || selected.person.username}
-            size="sm"
-          />
+        <View style={[styles.threadHeader, { paddingTop: Math.max(insets.top, 10), backgroundColor: colors.card, borderBottomColor: colors.borderSubtle }]}>
+          <Pressable onPress={() => setSelected(null)} style={styles.iconButton}><Icon name="arrow-back" size={22} color={colors.text} /></Pressable>
+          <Avatar url={selected.person.avatar_url ?? undefined} name={selected.person.display_name || selected.person.username} size="sm" />
           <View style={styles.headerCopy}>
-            <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-              {selected.person.display_name || `@${selected.person.username}`}
-            </Text>
-            <Text style={[styles.username, { color: colors.textSecondary }]}>
-              @{selected.person.username}
-            </Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>{selected.person.display_name || `@${selected.person.username}`}</Text>
+            <Text style={[styles.username, { color: colors.textSecondary }]}>@{selected.person.username}</Text>
           </View>
         </View>
 
         {pinnedMessages.length ? (
-          <Pressable
-            onPress={() => jumpToMessage(pinnedMessages[0].id)}
-            style={[styles.pinnedBanner, { backgroundColor: colors.primarySoft, borderBottomColor: colors.borderSubtle }]}
-          >
+          <Pressable onPress={() => jumpToMessage(pinnedMessages[0].id)} style={[styles.pinnedBanner, { backgroundColor: colors.primarySoft, borderBottomColor: colors.borderSubtle }]}>
             <Icon name="pin" size={15} color={colors.interactive} />
             <Text style={[styles.pinnedText, { color: colors.textSecondary }]} numberOfLines={1}>
-              {pinnedMessages.length === 1 ? 'Pinned: ' : `${pinnedMessages.length} pinned · `}
-              {pinnedMessages[0].body || 'Media attachment'}
+              {pinnedMessages.length === 1 ? 'Pinned: ' : `${pinnedMessages.length} pinned · `}{pinnedMessages[0].body || 'Media attachment'}
             </Text>
           </Pressable>
         ) : null}
@@ -356,12 +319,8 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.messages}
             keyboardShouldPersistTaps="handled"
-            onContentSizeChange={() => {
-              if (localMessages.length) messageListRef.current?.scrollToEnd({ animated: true });
-            }}
-            onScrollToIndexFailed={({ index, averageItemLength }) => {
-              messageListRef.current?.scrollToOffset({ offset: Math.max(0, averageItemLength * index), animated: true });
-            }}
+            onContentSizeChange={() => { if (localMessages.length) messageListRef.current?.scrollToEnd({ animated: true }); }}
+            onScrollToIndexFailed={({ index, averageItemLength }) => { messageListRef.current?.scrollToOffset({ offset: Math.max(0, averageItemLength * index), animated: true }); }}
             renderItem={({ item }) => {
               const mine = item.sender_profile_id === context?.profile?.id;
               return (
@@ -405,18 +364,14 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
         />
       ) : (
         <View style={{ paddingTop: insets.top }}>
-          <ScreenHeader
-            title="Chat"
-            kicker="DIRECT MESSAGES"
-            subtitle="Private one-to-one conversations across COT."
-          />
+          <ScreenHeader title="Chat" kicker="DIRECT MESSAGES" subtitle="Private one-to-one conversations across COT." />
         </View>
       )}
 
       <View style={[styles.scopeNote, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}>
         <Icon name="people-outline" size={16} color={colors.interactive} />
         <Text style={[styles.scopeNoteText, { color: colors.textSecondary }]}>
-          Direct chat is global. Group chat is separate and remains inside the Group.
+          Your inbox shows people you follow or who follow you. Search can find any COT account you are allowed to message. Group chat remains inside each Group.
         </Text>
       </View>
 
@@ -425,7 +380,7 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
         <TextInput
           value={filter}
           onChangeText={setFilter}
-          placeholder="Search @username or name"
+          placeholder="Search anyone by @username or name"
           placeholderTextColor={colors.textMuted}
           autoCapitalize="none"
           autoCorrect={false}
@@ -435,14 +390,9 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
 
       {actionError ? <Text style={{ color: colors.live, padding: 12 }}>{actionError}</Text> : null}
       {inbox.error ? (
-        <Pressable
-          onPress={inbox.refresh}
-          style={[styles.errorCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}
-        >
+        <Pressable onPress={inbox.refresh} style={[styles.errorCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
           <Icon name="refresh" size={18} color={colors.interactive} />
-          <Text style={[styles.errorText, { color: colors.textSecondary }]}>
-            {inbox.error} Tap to retry.
-          </Text>
+          <Text style={[styles.errorText, { color: colors.textSecondary }]}>{inbox.error} Tap to retry.</Text>
         </Pressable>
       ) : null}
 
@@ -452,7 +402,7 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 40 }]}
         ListHeaderComponent={
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-            {normalizedFilter ? 'PEOPLE' : (inbox.data?.conversations?.length ? 'MESSAGES' : 'PEOPLE')}
+            {normalizedFilter ? 'SEARCH RESULTS' : 'MESSAGES & CONNECTIONS'}
           </Text>
         }
         ListEmptyComponent={
@@ -460,13 +410,11 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
             ? <ActivityIndicator color={colors.interactive} />
             : (
               <View style={styles.empty}>
-                <Text style={[styles.emptyTitle, { color: colors.text }]}>
-                  {normalizedFilter ? 'No matching username' : 'No conversations yet'}
-                </Text>
+                <Text style={[styles.emptyTitle, { color: colors.text }]}>{normalizedFilter ? 'No matching account' : 'No chat connections yet'}</Text>
                 <Text style={[styles.emptyCopy, { color: colors.textSecondary }]}>
                   {normalizedFilter
                     ? 'Try another username or name.'
-                    : 'Search a username to start a private conversation.'}
+                    : 'People you follow or who follow you will appear here. You can still search any COT account above.'}
                 </Text>
               </View>
             )
@@ -482,18 +430,10 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
                 : void openPerson(person)}
               style={[styles.personRow, { borderBottomColor: colors.borderSubtle }]}
             >
-              <Avatar
-                url={person.avatar_url ?? undefined}
-                name={person.display_name || person.username}
-                size="md"
-              />
+              <Avatar url={person.avatar_url ?? undefined} name={person.display_name || person.username} size="md" />
               <View style={styles.personCopy}>
-                <Text style={[styles.personName, { color: colors.text }]} numberOfLines={1}>
-                  {person.display_name || `@${person.username}`}
-                </Text>
-                <Text style={[styles.personMeta, { color: colors.textSecondary }]} numberOfLines={1}>
-                  {lastMessage || `@${person.username}`}
-                </Text>
+                <Text style={[styles.personName, { color: colors.text }]} numberOfLines={1}>{person.display_name || `@${person.username}`}</Text>
+                <Text style={[styles.personMeta, { color: colors.textSecondary }]} numberOfLines={1}>{lastMessage || `@${person.username}`}</Text>
               </View>
               <Icon name="chevron-forward" size={18} color={colors.textMuted} />
             </Pressable>

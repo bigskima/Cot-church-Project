@@ -8,9 +8,11 @@ import {
   Text,
   View,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { AudioPlayer, Avatar, Icon, VideoPlayer } from '@/components';
 import { radius, spacing } from '@/design-system/tokens';
 import { useTheme } from '@/state/theme';
+import { downloadFile } from '@/utils/download-file';
 import type { ChatAttachment, RichChatMessage } from './rich-chat-types';
 
 const QUICK_REACTIONS = ['❤️', '🙏', '😂', '👍', '🔥'];
@@ -25,6 +27,8 @@ function attachmentLabel(type?: ChatAttachment['type'] | null) {
 
 function MessageAttachment({ attachment }: { attachment: ChatAttachment }) {
   const { colors } = useTheme();
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState('');
   if (!attachment.url) {
     return (
       <View style={[styles.missingMedia, { backgroundColor: colors.bgSecondary }]}>
@@ -33,8 +37,23 @@ function MessageAttachment({ attachment }: { attachment: ChatAttachment }) {
       </View>
     );
   }
+
+  const download = async () => {
+    if (downloading || !attachment.url) return;
+    setDownloading(true);
+    setDownloadError('');
+    try {
+      await downloadFile(attachment.url, attachment.fileName || `${attachmentLabel(attachment.type)} attachment`);
+    } catch (value) {
+      setDownloadError(value instanceof Error ? value.message : 'Unable to download this file.');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  let preview: React.ReactNode;
   if (attachment.type === 'image' || attachment.type === 'gif') {
-    return (
+    preview = (
       <Image
         source={{ uri: attachment.url }}
         style={styles.image}
@@ -42,24 +61,45 @@ function MessageAttachment({ attachment }: { attachment: ChatAttachment }) {
         accessibilityLabel={attachment.type === 'gif' ? 'GIF attachment' : 'Photo attachment'}
       />
     );
-  }
-  if (attachment.type === 'video') {
-    return (
+  } else if (attachment.type === 'video') {
+    preview = (
       <VideoPlayer
-        title="Video"
+        title={attachment.fileName || 'Video'}
+        sourceUrl={attachment.url}
+        durationSeconds={attachment.durationSeconds}
+        style={styles.player}
+      />
+    );
+  } else {
+    preview = (
+      <AudioPlayer
+        title={attachment.fileName || 'Voice note'}
         sourceUrl={attachment.url}
         durationSeconds={attachment.durationSeconds}
         style={styles.player}
       />
     );
   }
+
   return (
-    <AudioPlayer
-      title="Voice note"
-      sourceUrl={attachment.url}
-      durationSeconds={attachment.durationSeconds}
-      style={styles.player}
-    />
+    <View style={styles.attachmentWrap}>
+      {preview}
+      <Pressable
+        onPress={() => void download()}
+        disabled={downloading}
+        style={({ pressed }) => [
+          styles.downloadChip,
+          { backgroundColor: colors.card, borderColor: colors.borderSubtle },
+          pressed && styles.pressed,
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={`Download ${attachment.fileName || attachmentLabel(attachment.type)}`}
+      >
+        <Icon name={downloading ? 'hourglass-outline' : 'download-outline'} size={13} color={colors.interactive} />
+        <Text style={[styles.downloadText, { color: colors.textSecondary }]}>{downloading ? 'Saving…' : 'Download'}</Text>
+      </Pressable>
+      {downloadError ? <Text style={[styles.downloadError, { color: colors.live }]}>{downloadError}</Text> : null}
+    </View>
   );
 }
 
@@ -84,6 +124,7 @@ export function RichMessageBubble({
 }) {
   const { colors } = useTheme();
   const [actionsOpen, setActionsOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const translateX = useRef(new Animated.Value(0)).current;
   const senderName = message.sender?.display_name || message.sender?.username || 'Member';
   const panResponder = useMemo(() => PanResponder.create({
@@ -101,6 +142,14 @@ export function RichMessageBubble({
       Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
     },
   }), [message, onReply, translateX]);
+
+  const copyMessage = async () => {
+    if (!message.body?.trim()) return;
+    await Clipboard.setStringAsync(message.body);
+    setCopied(true);
+    setActionsOpen(false);
+    setTimeout(() => setCopied(false), 1400);
+  };
 
   return (
     <View style={[styles.outer, mine && styles.outerMine]}>
@@ -126,7 +175,7 @@ export function RichMessageBubble({
                 borderColor: message.pinned_at ? colors.interactive : colors.borderSubtle,
               },
             ]}
-            accessibilityHint="Long press for reply, reaction, and pin actions"
+            accessibilityHint="Long press for reply, copy, reaction, and pin actions"
           >
             <View style={styles.bubbleMeta}>
               {!mine && showSender ? (
@@ -134,6 +183,7 @@ export function RichMessageBubble({
                   {message.sender?.username ? `@${message.sender.username}` : senderName}
                 </Text>
               ) : <View style={styles.flex} />}
+              {copied ? <Icon name="checkmark-outline" size={13} color={mine ? '#FFFFFF' : colors.interactive} /> : null}
               {message.pinned_at ? <Icon name="pin" size={13} color={mine ? '#FFFFFF' : colors.interactive} /> : null}
               {message.optimistic ? <Icon name="time-outline" size={13} color={mine ? '#DDEEFF' : colors.textMuted} /> : null}
             </View>
@@ -199,6 +249,12 @@ export function RichMessageBubble({
                 <Icon name="arrow-undo-outline" size={17} color={colors.textSecondary} />
                 <Text style={[styles.actionLabel, { color: colors.textSecondary }]}>Reply</Text>
               </Pressable>
+              {message.body?.trim() ? (
+                <Pressable onPress={() => void copyMessage()} style={styles.actionButton}>
+                  <Icon name="copy-outline" size={17} color={colors.textSecondary} />
+                  <Text style={[styles.actionLabel, { color: colors.textSecondary }]}>Copy</Text>
+                </Pressable>
+              ) : null}
               {QUICK_REACTIONS.map((emoji) => (
                 <Pressable key={emoji} onPress={() => { onReact(message, emoji); setActionsOpen(false); }} style={styles.emojiButton}>
                   <Text style={styles.emoji}>{emoji}</Text>
@@ -238,9 +294,13 @@ const styles = StyleSheet.create({
   replyPreview: { borderLeftWidth: 3, borderLeftColor: '#38A8FF', borderRadius: radius.sm, paddingHorizontal: 8, paddingVertical: 6, marginBottom: 6 },
   replySender: { fontSize: 10, fontWeight: '800' },
   replyBody: { fontSize: 11, lineHeight: 15, marginTop: 1 },
-  attachments: { gap: 6, marginBottom: 4 },
+  attachments: { gap: 7, marginBottom: 4 },
+  attachmentWrap: { gap: 4 },
   image: { width: 238, maxWidth: '100%', height: 190, borderRadius: radius.md, backgroundColor: '#0B1220' },
   player: { width: 270, maxWidth: '100%', marginVertical: 0 },
+  downloadChip: { alignSelf: 'flex-start', minHeight: 28, borderRadius: radius.pill, borderWidth: 1, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  downloadText: { fontSize: 9.5, fontWeight: '800' },
+  downloadError: { fontSize: 9.5, lineHeight: 13 },
   missingMedia: { minWidth: 180, minHeight: 54, borderRadius: radius.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   missingMediaText: { fontSize: 11, fontWeight: '700' },
   reactions: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: -2, marginLeft: 8 },
@@ -253,4 +313,5 @@ const styles = StyleSheet.create({
   actionLabel: { fontSize: 10, fontWeight: '800' },
   emojiButton: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
   emoji: { fontSize: 17 },
+  pressed: { opacity: 0.82 },
 });

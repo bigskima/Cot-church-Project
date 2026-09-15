@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Speech from 'expo-speech';
+import * as Clipboard from 'expo-clipboard';
 import { BottomSheet, Button, Chip, Icon, Skeleton } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useSession } from '@/state/session';
@@ -77,13 +78,15 @@ export function ProgressiveSermonReader({ sermon, initialBlocks }: Props) {
   const [visibleCount, setVisibleCount] = useState(Math.min(3, Math.max(1, blocks.length)));
   const [speaking, setSpeaking] = useState(false);
   const [speechRate, setSpeechRate] = useState(1);
+  const [copiedSermon, setCopiedSermon] = useState(false);
+  const [copiedNotes, setCopiedNotes] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiNotes, setAiNotes] = useState('');
   const [aiError, setAiError] = useState('');
   const speechRun = useRef(0);
 
-  useEffect(() => { setVisibleCount(Math.min(3, Math.max(1, blocks.length))); setAiNotes(''); setAiError(''); }, [blocks.length, sermon.id]);
+  useEffect(() => { setVisibleCount(Math.min(3, Math.max(1, blocks.length))); setAiNotes(''); setAiError(''); setCopiedSermon(false); setCopiedNotes(false); }, [blocks.length, sermon.id]);
   useEffect(() => () => { speechRun.current += 1; void Speech.stop(); }, []);
 
   const fullText = useMemo(() => sermonBlocksToPlainText(blocks), [blocks]);
@@ -106,6 +109,20 @@ export function ProgressiveSermonReader({ sermon, initialBlocks }: Props) {
     speakChunk(0);
   };
 
+  const copySermon = async () => {
+    if (!fullText.trim()) return;
+    await Clipboard.setStringAsync(fullText);
+    setCopiedSermon(true);
+    setTimeout(() => setCopiedSermon(false), 1400);
+  };
+
+  const copyAiNotes = async () => {
+    if (!aiNotes.trim()) return;
+    await Clipboard.setStringAsync(aiNotes.replace(/\*\*/g, '').replace(/^#{1,3}\s+/gm, ''));
+    setCopiedNotes(true);
+    setTimeout(() => setCopiedNotes(false), 1400);
+  };
+
   const askAi = async () => {
     setAiOpen(true);
     if (aiLoading) return;
@@ -113,9 +130,6 @@ export function ProgressiveSermonReader({ sermon, initialBlocks }: Props) {
     setAiLoading(true);
     setAiError('');
     try {
-      // The server also resolves this exact sermon by entityId. Keeping the
-      // visible notes here gives the provider useful context while the verified
-      // database copy remains the source of truth.
       const source = fullText.slice(0, 9500);
       const prompt = [
         `Help me study the published sermon “${sermon.title}”${sermon.preacher ? ` by ${sermon.preacher}` : ''}.`,
@@ -134,10 +148,11 @@ export function ProgressiveSermonReader({ sermon, initialBlocks }: Props) {
 
   return (
     <View style={styles.wrap}>
-      <View style={styles.headingRow}><View style={styles.flex}><Text style={[styles.eyebrow, { color: colors.interactive }]}>PROGRESSIVE READING</Text><Text style={[styles.title, { color: colors.text }]}>Sermon notes</Text><Text style={[styles.subtitle, { color: colors.textMuted }]}>Read a few sections at a time, listen aloud, or open the AI study helper.</Text></View></View>
+      <View style={styles.headingRow}><View style={styles.flex}><Text style={[styles.eyebrow, { color: colors.interactive }]}>PROGRESSIVE READING</Text><Text style={[styles.title, { color: colors.text }]}>Sermon notes</Text><Text style={[styles.subtitle, { color: colors.textMuted }]}>Read a few sections at a time, listen aloud, copy the text, or open the AI study helper.</Text></View></View>
 
       <View style={[styles.tools, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
         <Pressable onPress={() => void readAloud()} style={[styles.toolButton, { backgroundColor: speaking ? colors.primarySoft : colors.bgSecondary }]} accessibilityRole="button"><Icon name={speaking ? 'stop-circle-outline' : 'volume-high-outline'} size={18} color={colors.interactive} /><Text style={[styles.toolText, { color: colors.text }]}>{speaking ? 'Stop reading' : 'Read aloud'}</Text></Pressable>
+        <Pressable onPress={() => void copySermon()} style={[styles.toolButton, { backgroundColor: colors.bgSecondary }]} accessibilityRole="button" accessibilityLabel="Copy sermon notes"><Icon name={copiedSermon ? 'checkmark-outline' : 'copy-outline'} size={18} color={colors.interactive} /><Text style={[styles.toolText, { color: colors.text }]}>{copiedSermon ? 'Copied' : 'Copy sermon'}</Text></Pressable>
         <Pressable onPress={() => void askAi()} style={[styles.toolButton, { backgroundColor: colors.bgSecondary }]} accessibilityRole="button"><Icon name="sparkles-outline" size={18} color={colors.interactive} /><Text style={[styles.toolText, { color: colors.text }]}>AI study helper</Text></Pressable>
       </View>
 
@@ -154,7 +169,7 @@ export function ProgressiveSermonReader({ sermon, initialBlocks }: Props) {
       <BottomSheet visible={aiOpen} onClose={() => setAiOpen(false)} title="AI study helper" subtitle={sermon.title} maxHeightPercent={92}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.aiSheet}>
           <View style={[styles.aiSourceNotice, { backgroundColor: colors.primarySoft, borderColor: colors.primarySoftStrong }]}><Icon name="book-outline" size={18} color={colors.interactive} /><Text style={[styles.aiSourceText, { color: colors.textSecondary }]}>The helper is grounded in this sermon’s saved full notes. The published sermon remains the source of truth.</Text></View>
-          {aiLoading ? <Skeleton height={20} count={7} /> : aiError ? <View style={[styles.aiError, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Icon name="information-circle-outline" size={16} color={colors.textMuted} /><Text style={[styles.aiErrorText, { color: colors.textSecondary }]}>{aiError}</Text></View> : aiNotes ? <AiMarkdown value={aiNotes} /> : null}
+          {aiLoading ? <Skeleton height={20} count={7} /> : aiError ? <View style={[styles.aiError, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Icon name="information-circle-outline" size={16} color={colors.textMuted} /><Text style={[styles.aiErrorText, { color: colors.textSecondary }]}>{aiError}</Text></View> : aiNotes ? <><AiMarkdown value={aiNotes} /><Pressable onPress={() => void copyAiNotes()} style={[styles.notesCopy, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]} accessibilityRole="button"><Icon name={copiedNotes ? 'checkmark-outline' : 'copy-outline'} size={15} color={colors.interactive} /><Text style={[styles.notesCopyText, { color: colors.textSecondary }]}>{copiedNotes ? 'Copied study notes' : 'Copy study notes'}</Text></Pressable></> : null}
           {!aiLoading ? <Button label={aiNotes ? 'Refresh study notes' : 'Generate study notes'} onPress={() => void askAi()} variant={aiNotes ? 'outline' : 'primary'} fullWidth /> : null}
         </ScrollView>
       </BottomSheet>
@@ -170,4 +185,5 @@ const styles = StyleSheet.create({
   continueCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm }, continueText: { fontSize: 11.5, lineHeight: 17 }, continueActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   aiSheet: { gap: spacing.md, paddingBottom: spacing.xl }, aiSourceNotice: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, aiSourceText: { flex: 1, fontSize: 11.5, lineHeight: 17 }, aiMarkdown: { gap: 4 }, aiSpace: { height: 5 }, aiHeading: { fontSize: 15, lineHeight: 21, fontWeight: '900', marginTop: spacing.sm }, aiHeadingLarge: { fontSize: 18, lineHeight: 24 }, aiParagraph: { fontSize: 13.5, lineHeight: 21 }, aiBold: { fontWeight: '900' }, aiBulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, aiBullet: { fontSize: 17, lineHeight: 21, fontWeight: '900' }, aiBulletBody: { flex: 1 },
   aiError: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, aiErrorText: { flex: 1, fontSize: 11.5, lineHeight: 17 },
+  notesCopy: { minHeight: 38, alignSelf: 'flex-start', borderRadius: radius.pill, borderWidth: 1, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', gap: 6 }, notesCopyText: { fontSize: 10.5, fontWeight: '800' },
 });

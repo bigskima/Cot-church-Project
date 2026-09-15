@@ -11,11 +11,22 @@ import { toUserFacingErrorMessage } from '@/api';
 import { ExpressionManagementGate } from '@/features/expression-management/ExpressionManagementGate';
 import { useExpressionManagementAccess } from '@/features/expression-management/useExpressionManagementAccess';
 
+type ExpressionLocation = {
+  line1?: string | null;
+  line2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  landmark?: string | null;
+  mapUrl?: string | null;
+};
+
 type ExpressionRecord = {
   id: string;
   name: string;
   code: string;
   timezone?: string | null;
+  address?: ExpressionLocation | null;
   avatar_url?: string | null;
   banner_url?: string | null;
   is_active?: boolean;
@@ -23,6 +34,18 @@ type ExpressionRecord = {
 
 function validCode(value: string) {
   return /^[A-Z0-9][A-Z0-9_-]*$/.test(value);
+}
+
+function normalizeAddress(address?: ExpressionLocation | null) {
+  return {
+    line1: String(address?.line1 || '').trim(),
+    line2: String(address?.line2 || '').trim(),
+    city: String(address?.city || '').trim(),
+    state: String(address?.state || '').trim(),
+    country: String(address?.country || '').trim(),
+    landmark: String(address?.landmark || '').trim(),
+    mapUrl: String(address?.mapUrl || '').trim(),
+  };
 }
 
 export default function ExpressionSettingsScreen() {
@@ -42,6 +65,13 @@ export default function ExpressionSettingsScreen() {
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [timezone, setTimezone] = useState('');
+  const [line1, setLine1] = useState('');
+  const [line2, setLine2] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [country, setCountry] = useState('Nigeria');
+  const [landmark, setLandmark] = useState('');
+  const [mapUrl, setMapUrl] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<'avatar' | 'banner' | null>(null);
   const [feedback, setFeedback] = useState('');
@@ -49,15 +79,25 @@ export default function ExpressionSettingsScreen() {
 
   useEffect(() => {
     if (!current) return;
+    const address = normalizeAddress(current.address);
     setName(current.name ?? '');
     setCode(current.code ?? '');
     setTimezone(current.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
-  }, [current?.id, current?.name, current?.code, current?.timezone]);
+    setLine1(address.line1);
+    setLine2(address.line2);
+    setCity(address.city);
+    setState(address.state);
+    setCountry(address.country || 'Nigeria');
+    setLandmark(address.landmark);
+    setMapUrl(address.mapUrl);
+  }, [current?.id, current?.name, current?.code, current?.timezone, current?.address]);
 
+  const addressDraft = useMemo(() => normalizeAddress({ line1, line2, city, state, country, landmark, mapUrl }), [line1, line2, city, state, country, landmark, mapUrl]);
   const dirty = Boolean(current && (
     name.trim() !== current.name ||
     code.trim().toUpperCase() !== current.code ||
-    timezone.trim() !== (current.timezone ?? '')
+    timezone.trim() !== (current.timezone ?? '') ||
+    JSON.stringify(addressDraft) !== JSON.stringify(normalizeAddress(current.address))
   ));
 
   const uploadMedia = async (kind: 'avatar' | 'banner') => {
@@ -88,11 +128,7 @@ export default function ExpressionSettingsScreen() {
         const blob = await fetch(asset.uri).then((response) => response.blob());
         form.append('file', blob, asset.fileName || `${kind}.${extension}`);
       } else {
-        form.append('file', {
-          uri: asset.uri,
-          name: asset.fileName || `${kind}.${extension}`,
-          type: mimeType,
-        } as any);
+        form.append('file', { uri: asset.uri, name: asset.fileName || `${kind}.${extension}`, type: mimeType } as any);
       }
       await api.request('expression-media', { method: 'POST', body: form });
       setFeedback(kind === 'banner' ? 'Expression banner updated.' : 'Expression profile image updated.');
@@ -112,6 +148,9 @@ export default function ExpressionSettingsScreen() {
     if (!normalizedName) return setError('Enter an Expression name.');
     if (!normalizedCode || !validCode(normalizedCode)) return setError('Use a code made of letters, numbers, hyphens or underscores.');
     if (!normalizedTimezone) return setError('Enter the Expression timezone.');
+    if (addressDraft.mapUrl) {
+      try { new URL(addressDraft.mapUrl); } catch { return setError('Enter a valid map link or leave it empty.'); }
+    }
 
     setSaving(true);
     setError('');
@@ -119,9 +158,14 @@ export default function ExpressionSettingsScreen() {
     try {
       await api.request<ExpressionRecord>(`branches?id=${encodeURIComponent(id)}`, {
         method: 'PATCH',
-        body: JSON.stringify({ name: normalizedName, code: normalizedCode, timezone: normalizedTimezone }),
+        body: JSON.stringify({
+          name: normalizedName,
+          code: normalizedCode,
+          timezone: normalizedTimezone,
+          address: { ...addressDraft, mapUrl: addressDraft.mapUrl || null },
+        }),
       });
-      setFeedback('Expression settings updated.');
+      setFeedback('Expression identity, location and timezone updated.');
       records.refresh();
       refreshContext();
     } catch (value) {
@@ -139,11 +183,11 @@ export default function ExpressionSettingsScreen() {
           expressionName={expressionName}
           active="settings"
           title="Settings"
-          subtitle="This page updates the Expression name, member code and timezone, plus its banner and profile image."
+          subtitle="Update this Expression’s identity, public location, local time and imagery."
           icon="settings-outline"
         />
 
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {feedback ? (
             <View style={[styles.notice, { backgroundColor: colors.successSoft, borderColor: colors.success }]}>
               <Icon name="checkmark-circle-outline" size={18} color={colors.success} />
@@ -201,6 +245,19 @@ export default function ExpressionSettingsScreen() {
 
               <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
                 <View style={styles.sectionHeading}>
+                  <View style={[styles.sectionIcon, { backgroundColor: colors.primarySoft }]}><Icon name="location-outline" size={19} color={colors.interactive} /></View>
+                  <View style={styles.sectionCopy}><Text style={[styles.sectionTitle, { color: colors.text }]}>Public location</Text><Text style={[styles.sectionText, { color: colors.textSecondary }]}>Published only for this Expression and available to members, discovery surfaces and COT AI.</Text></View>
+                </View>
+                <InputField label="Street / building" value={line1} onChangeText={setLine1} placeholder="Street name and building" />
+                <InputField label="Address line 2 (optional)" value={line2} onChangeText={setLine2} placeholder="Area, floor or suite" />
+                <View style={styles.twoCol}><View style={styles.flex}><InputField label="City" value={city} onChangeText={setCity} placeholder="Awka" /></View><View style={styles.flex}><InputField label="State" value={state} onChangeText={setState} placeholder="Anambra" /></View></View>
+                <InputField label="Country" value={country} onChangeText={setCountry} placeholder="Nigeria" />
+                <InputField label="Landmark (optional)" value={landmark} onChangeText={setLandmark} placeholder="Near…" />
+                <InputField label="Map link (optional)" value={mapUrl} onChangeText={setMapUrl} autoCapitalize="none" autoCorrect={false} placeholder="https://…" helperText="Do not guess a map link. Save only the verified location for this Expression." />
+              </View>
+
+              <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+                <View style={styles.sectionHeading}>
                   <View style={[styles.sectionIcon, { backgroundColor: colors.primarySoft }]}><Icon name="time-outline" size={19} color={colors.interactive} /></View>
                   <View style={styles.sectionCopy}><Text style={[styles.sectionTitle, { color: colors.text }]}>Local time</Text><Text style={[styles.sectionText, { color: colors.textSecondary }]}>Used for events, schedules and date-sensitive member experiences.</Text></View>
                 </View>
@@ -208,13 +265,13 @@ export default function ExpressionSettingsScreen() {
               </View>
 
               <View style={[styles.saveCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
-                <View style={styles.saveCopy}><Text style={[styles.saveTitle, { color: colors.text }]}>Save changes</Text><Text style={[styles.saveText, { color: colors.textSecondary }]}>{dirty ? 'Review the updated identity and timezone, then save.' : 'There are no unsaved text changes.'}</Text></View>
+                <View style={styles.saveCopy}><Text style={[styles.saveTitle, { color: colors.text }]}>Save changes</Text><Text style={[styles.saveText, { color: colors.textSecondary }]}>{dirty ? 'Review the updated identity, location and timezone, then save.' : 'There are no unsaved text changes.'}</Text></View>
                 <Button label="Save" onPress={() => void save()} loading={saving} disabled={!dirty} size="md" />
               </View>
 
               <View style={[styles.boundary, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
                 <Icon name="shield-checkmark-outline" size={18} color={colors.interactive} />
-                <Text style={[styles.boundaryText, { color: colors.textSecondary }]}>These images and settings belong only to this Expression. Replacing them does not change General COT branding.</Text>
+                <Text style={[styles.boundaryText, { color: colors.textSecondary }]}>These images, address and settings belong only to this Expression. They never overwrite General COT information.</Text>
               </View>
             </>
           )}
@@ -225,8 +282,7 @@ export default function ExpressionSettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 },
-  scroll: { flex: 1 },
+  screen: { flex: 1 }, scroll: { flex: 1 }, flex: { flex: 1, minWidth: 0 }, twoCol: { flexDirection: 'row', gap: spacing.sm },
   content: { width: '100%', maxWidth: 780, alignSelf: 'center', padding: spacing.md, paddingTop: spacing.sm, paddingBottom: 90, gap: spacing.md },
   notice: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   noticeText: { flex: 1, fontSize: 12, lineHeight: 17, fontWeight: '600' },
@@ -247,14 +303,7 @@ const styles = StyleSheet.create({
   avatarShell: { width: 70, height: 70, borderRadius: 22, borderWidth: 4, marginTop: -24, overflow: 'visible', alignItems: 'center', justifyContent: 'center' },
   avatarImage: { width: '100%', height: '100%', borderRadius: 18 },
   avatarEdit: { position: 'absolute', right: -5, bottom: -5, width: 26, height: 26, borderRadius: 13, backgroundColor: '#111827', alignItems: 'center', justifyContent: 'center' },
-  previewCopy: { flex: 1, marginLeft: spacing.md, minWidth: 0 },
-  previewName: { fontSize: 17, fontWeight: '900' },
-  previewCode: { fontSize: 11, marginTop: 2 },
-  mediaFootnote: { fontSize: 10, lineHeight: 15 },
-  saveCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  saveCopy: { flex: 1, minWidth: 0 },
-  saveTitle: { fontSize: 13, lineHeight: 17, fontWeight: '900' },
-  saveText: { fontSize: 10, lineHeight: 15, marginTop: 2 },
-  boundary: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  boundaryText: { flex: 1, fontSize: 11, lineHeight: 17 },
+  previewCopy: { flex: 1, marginLeft: spacing.md, minWidth: 0 }, previewName: { fontSize: 17, fontWeight: '900' }, previewCode: { fontSize: 11, marginTop: 2 }, mediaFootnote: { fontSize: 10, lineHeight: 15 },
+  saveCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.md }, saveCopy: { flex: 1, minWidth: 0 }, saveTitle: { fontSize: 13, lineHeight: 17, fontWeight: '900' }, saveText: { fontSize: 10, lineHeight: 15, marginTop: 2 },
+  boundary: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, boundaryText: { flex: 1, fontSize: 11, lineHeight: 17 },
 });

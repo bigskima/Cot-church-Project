@@ -7,6 +7,7 @@ import { assertNoUnknownFields, assertObject, optionalString, requiredString, uu
 import { adminClient, publicClient } from "../_shared/supabase.ts";
 
 const PORTRAIT_BUCKET = "leadership-portraits";
+const LOCATION_FIELDS = ["line1", "line2", "city", "state", "country", "landmark", "mapUrl", "latitude", "longitude"];
 
 async function authorizeLeadershipScope(auth: any, expressionId: string | null) {
   if (expressionId) {
@@ -17,6 +18,49 @@ async function authorizeLeadershipScope(auth: any, expressionId: string | null) 
   } else {
     await authorizeOrganization(auth, "organization.leadership.manage");
   }
+}
+
+function textField(value: unknown, field: string, maxLength: number) {
+  if (value === undefined || value === null || value === "") return "";
+  return requiredString(value, field, maxLength);
+}
+
+function normalizeLocation(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new ApiError("VALIDATION_FAILED", "Location must be an object", 422);
+  }
+  const source = value as Record<string, unknown>;
+  assertNoUnknownFields(source, LOCATION_FIELDS);
+  const mapUrl = textField(source.mapUrl, "mapUrl", 2000);
+  if (mapUrl) {
+    try {
+      const parsed = new URL(mapUrl);
+      if (!["https:", "http:"].includes(parsed.protocol)) throw new Error("protocol");
+    } catch {
+      throw new ApiError("VALIDATION_FAILED", "Map URL must be a valid web address", 422);
+    }
+  }
+  const latitude = source.latitude === undefined || source.latitude === null || source.latitude === "" ? null : Number(source.latitude);
+  const longitude = source.longitude === undefined || source.longitude === null || source.longitude === "" ? null : Number(source.longitude);
+  if (latitude !== null && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90)) throw new ApiError("VALIDATION_FAILED", "Latitude is invalid", 422);
+  if (longitude !== null && (!Number.isFinite(longitude) || longitude < -180 || longitude > 180)) throw new ApiError("VALIDATION_FAILED", "Longitude is invalid", 422);
+  return {
+    line1: textField(source.line1, "line1", 300),
+    line2: textField(source.line2, "line2", 300),
+    city: textField(source.city, "city", 120),
+    state: textField(source.state, "state", 120),
+    country: textField(source.country, "country", 120),
+    landmark: textField(source.landmark, "landmark", 300),
+    mapUrl: mapUrl || null,
+    latitude,
+    longitude,
+  };
+}
+
+function safePublicLocation(settings: unknown) {
+  if (!settings || typeof settings !== "object" || Array.isArray(settings)) return null;
+  const value = (settings as Record<string, unknown>).public_location;
+  return value && typeof value === "object" && !Array.isArray(value) ? value : null;
 }
 
 Deno.serve(
@@ -53,7 +97,7 @@ Deno.serve(
               if (!normalized) return Boolean(profile);
               return [profile?.display_name, profile?.username]
                 .filter(Boolean)
-                .some((value) => String(value).toLowerCase().includes(normalized));
+                .some((candidate) => String(candidate).toLowerCase().includes(normalized));
             });
             return { data: candidates };
           }
@@ -71,13 +115,14 @@ Deno.serve(
             if (!normalized) return Boolean(profile);
             return [profile?.display_name, profile?.username]
               .filter(Boolean)
-              .some((value) => String(value).toLowerCase().includes(normalized));
+              .some((candidate) => String(candidate).toLowerCase().includes(normalized));
           });
           return { data: candidates };
         }
 
-        let storyData = null;
-        let leadershipData = null;
+        let storyData: any = null;
+        let leadershipData: any = null;
+        let locationData: any = null;
 
         if (view === "leadership-manage") {
           if (!auth?.user || !auth.organizationId) throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication and organization context required", 401);
@@ -121,9 +166,24 @@ Deno.serve(
           leadershipData = data ?? [];
         }
 
+        if (view === "all" || view === "location") {
+          let targetOrganizationId = organizationId ?? storyData?.organization_id ?? null;
+          const admin = adminClient();
+          if (!targetOrganizationId) {
+            const { data: activeOrganizations, error } = await admin.from("organizations").select("id").eq("status", "active").order("created_at", { ascending: true }).limit(2);
+            if (!error && (activeOrganizations ?? []).length === 1) targetOrganizationId = activeOrganizations![0].id;
+          }
+          if (targetOrganizationId) {
+            const { data: organization, error } = await admin.from("organizations").select("id,name,settings").eq("id", targetOrganizationId).eq("status", "active").maybeSingle();
+            if (error) throw new ApiError("LOCATION_FETCH_FAILED", "Unable to retrieve the church location", 500, undefined, false);
+            locationData = organization ? safePublicLocation(organization.settings) : null;
+          }
+        }
+
         if (view === "story") return { data: storyData };
         if (view === "leadership") return { data: leadershipData };
-        return { data: { story: storyData, leadership: leadershipData } };
+        if (view === "location") return { data: locationData };
+        return { data: { story: storyData, leadership: leadershipData, location: locationData } };
       }
 
       if (!auth?.user || !auth?.organizationId) throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication and organization context required", 401);
@@ -154,7 +214,7 @@ Deno.serve(
             mission: optionalString(body.mission, "mission", 5000) ?? "",
             vision: optionalString(body.vision, "vision", 5000) ?? "",
             founding_story: optionalString(body.foundingStory, "foundingStory", 20000) ?? "",
-            founding_year: body.foundingYear != null ? Number(body.foundingYear) : 2010,
+            founding_year: body.foundingYear != null && body.foundingYear !== "" ? Number(body.foundingYear) : null,
             history_milestones: Array.isArray(body.milestones) ? body.milestones : [],
             values: Array.isArray(body.values) ? body.values : [],
             banner_image_url: optionalString(body.bannerImageUrl, "bannerImageUrl", 2000),
@@ -164,6 +224,21 @@ Deno.serve(
           const { data, error } = await auth.client.from("church_story").upsert(record, { onConflict: "organization_id" }).select().single();
           if (error) throw new ApiError("STORY_SAVE_FAILED", "Unable to save church story", 500, undefined, false);
           return { data, status: 201 };
+        }
+
+        if (body.type === "location") {
+          await authorizeOrganization(auth, "organization.leadership.manage");
+          assertNoUnknownFields(body, ["type", "location"]);
+          const location = normalizeLocation(body.location);
+          const admin = adminClient();
+          const { data: organization, error: loadError } = await admin.from("organizations").select("settings").eq("id", auth.organizationId).maybeSingle();
+          if (loadError || !organization) throw new ApiError("LOCATION_SAVE_FAILED", "Unable to load church settings", 500, undefined, false);
+          const settings = organization.settings && typeof organization.settings === "object" && !Array.isArray(organization.settings)
+            ? organization.settings as Record<string, unknown>
+            : {};
+          const { error } = await admin.from("organizations").update({ settings: { ...settings, public_location: location } }).eq("id", auth.organizationId);
+          if (error) throw new ApiError("LOCATION_SAVE_FAILED", "Unable to save the church location", 500, undefined, false);
+          return { data: location };
         }
 
         const expressionId = body.expressionId ? uuid(String(body.expressionId), "expressionId", true) : null;
