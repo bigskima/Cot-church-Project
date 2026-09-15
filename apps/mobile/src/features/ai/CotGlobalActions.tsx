@@ -35,7 +35,7 @@ export function CotGlobalActions() {
   };
 
   const openNotifications = () => {
-    router.push('/general/notifications' as any);
+    router.push((expressionId ? `/expressions/${expressionId}/notifications` : '/general/notifications') as any);
   };
 
   return (
@@ -44,7 +44,7 @@ export function CotGlobalActions() {
         <Pressable
           onPress={openNotifications}
           accessibilityRole="button"
-          accessibilityLabel="Open notifications"
+          accessibilityLabel={expressionId ? `Open ${context?.expression?.name ?? 'Expression'} notifications` : 'Open notifications'}
           style={({ pressed }) => [styles.secondary, { backgroundColor: colors.cardElevated, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}
         >
           <Icon name="notifications-outline" size={20} color={colors.text} />
