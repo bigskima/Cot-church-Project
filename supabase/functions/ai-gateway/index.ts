@@ -55,6 +55,27 @@ async function readiness(organizationId: string, capability: string) {
   return { ready: false, reason: "provider_model_or_secret_unavailable" as const };
 }
 
+function appRoutes(branchId: string | null) {
+  const expressionBase = branchId ? `/expressions/${branchId}` : null;
+  return {
+    currentScope: branchId ? "expression" : "general",
+    generalHome: "/general",
+    expressions: "/expressions",
+    messages: "/general/chat",
+    notifications: "/general/notifications",
+    generalPrayer: "/general/prayer",
+    prayer: expressionBase ? `${expressionBase}/prayer` : "/general/prayer",
+    generalEvents: "/general/events",
+    events: expressionBase ? `${expressionBase}/events` : "/general/events",
+    generalSermons: "/general/sermons",
+    sermons: expressionBase ? `${expressionBase}/sermons` : "/general/sermons",
+    generalGiving: "/general/giving",
+    giving: expressionBase ? `${expressionBase}/giving` : "/general/giving",
+    groups: expressionBase ? `${expressionBase}/groups` : "/expressions",
+    expressionHome: expressionBase,
+  };
+}
+
 async function assistantContext(auth: any, entityType?: string, entityId?: string) {
   if (entityType === "sermon" && entityId) {
     // Fetch through the caller-scoped client so private Expression sermons remain
@@ -67,15 +88,57 @@ async function assistantContext(auth: any, entityType?: string, entityId?: strin
       .maybeSingle();
     if (error) throw new ApiError("AI_SERMON_CONTEXT_FAILED", "Unable to load this sermon for the study helper", 500, undefined, false);
     if (!sermon) throw new ApiError("AI_SERMON_NOT_FOUND", "This sermon is not available in your current church or Expression", 404);
-    return JSON.stringify({ focus: "sermon", sermon });
+    return JSON.stringify({ focus: "sermon", scope: auth.branchId ? "expression" : "general", routes: appRoutes(auth.branchId), sermon });
   }
 
-  const [branches, events, announcements] = await Promise.all([
-    auth.client.from("branches").select("name,timezone,address").eq("organization_id", auth.organizationId).eq("is_active", true).limit(30),
-    auth.client.from("events").select("title,starts_at,ends_at,location,visibility").eq("organization_id", auth.organizationId).gte("ends_at", new Date().toISOString()).limit(30),
-    auth.client.from("announcements").select("title,body,published_at").eq("organization_id", auth.organizationId).eq("status", "published").limit(20),
+  const profilePromise = auth.client.from("profiles").select("id,display_name,username").eq("id", auth.user.id).maybeSingle();
+  const currentExpressionPromise = auth.branchId
+    ? auth.client.from("branches").select("id,name,timezone,address").eq("organization_id", auth.organizationId).eq("id", auth.branchId).eq("is_active", true).maybeSingle()
+    : Promise.resolve({ data: null, error: null });
+
+  let eventsQuery = auth.client
+    .from("events")
+    .select("id,branch_id,title,starts_at,ends_at,location,visibility")
+    .eq("organization_id", auth.organizationId)
+    .gte("ends_at", new Date().toISOString());
+  let announcementQuery = auth.client
+    .from("announcements")
+    .select("id,branch_id,title,body,published_at")
+    .eq("organization_id", auth.organizationId)
+    .eq("status", "published");
+
+  if (auth.branchId) {
+    eventsQuery = eventsQuery.eq("branch_id", auth.branchId);
+    announcementQuery = announcementQuery.eq("branch_id", auth.branchId);
+  } else {
+    eventsQuery = eventsQuery.is("branch_id", null);
+    announcementQuery = announcementQuery.is("branch_id", null);
+  }
+
+  const [profile, currentExpression, branches, events, announcements] = await Promise.all([
+    profilePromise,
+    currentExpressionPromise,
+    auth.client.from("branches").select("id,name,timezone,address").eq("organization_id", auth.organizationId).eq("is_active", true).limit(30),
+    eventsQuery.order("starts_at", { ascending: true }).limit(30),
+    announcementQuery.order("published_at", { ascending: false }).limit(20),
   ]);
-  return JSON.stringify({ focus: "church", branches: branches.data ?? [], events: events.data ?? [], announcements: announcements.data ?? [] });
+
+  return JSON.stringify({
+    focus: "church",
+    scope: auth.branchId ? "expression" : "general",
+    member: profile.data ? { displayName: profile.data.display_name, username: profile.data.username } : null,
+    currentExpression: currentExpression.data ?? null,
+    routes: appRoutes(auth.branchId),
+    availableExpressions: (branches.data ?? []).map((branch: any) => ({ id: branch.id, name: branch.name, timezone: branch.timezone })),
+    events: events.data ?? [],
+    announcements: announcements.data ?? [],
+    guidance: {
+      prayer: auth.branchId
+        ? "When a member asks how to send prayer, direct them to routes.prayer for the active Expression and mention routes.generalPrayer as the church-wide alternative. Do not tell them vaguely to find a prayer link."
+        : "When a member asks how to send prayer, direct them to routes.generalPrayer. If they specifically want an Expression prayer request, direct them to routes.expressions first.",
+      navigation: "When the member asks where or how to do something in COT, name the exact verified destination from routes. Never invent a route or say only 'go to the Expression' when a specific route is available.",
+    },
+  });
 }
 
 Deno.serve(createHandler(
@@ -108,7 +171,7 @@ Deno.serve(createHandler(
     const entityId = body.entityId ? uuid(String(body.entityId), "entityId", true) : undefined;
     const verifiedContext = capability === "assistant.answer" ? await assistantContext(auth, entityType, entityId) : "";
     const sermonRule = entityType === "sermon" ? " The verified context contains the exact saved sermon. Base the answer on that sermon, including its content_blocks/description/transcript, and never claim that only a fragment was supplied when the verified sermon contains more content." : "";
-    const system = `You are the church platform assistant. Use only verified tenant-scoped context. Never invent people, times, policies or pastoral claims. Never reveal private prayer, counselling, giving or attendance records. If uncertain, say so.${sermonRule} Verified context: ${verifiedContext}`;
+    const system = `You are COT AI, the conversational assistant inside City of Transformation. Be natural and useful for ordinary everyday conversation. For church-specific facts, schedules, people, announcements, permissions and navigation, rely on the verified tenant-scoped context and never invent facts or routes. When a verified route exists, tell the member the exact destination in plain language; the app will render matching action buttons. Keep the active General/Expression scope clear. Never reveal private prayer, counselling, giving or attendance records. Do not pretend to be a pastor or replace human pastoral care. If a church-specific fact is uncertain, say so.${sermonRule} Verified context: ${verifiedContext}`;
 
     const result = await runAi({
       organizationId: auth.organizationId,
