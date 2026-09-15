@@ -74,7 +74,7 @@ function navigationActions(prompt: string, expressionId?: string): AssistantActi
       ? [{ label: 'Expression sermons', route: `${expression}/sermons`, icon: 'book-outline' }, { label: 'General sermons', route: '/general/sermons', icon: 'globe-outline' }]
       : [{ label: 'Open sermons', route: '/general/sermons', icon: 'book-outline' }];
   }
-  if (/notification|alert|update/.test(text)) return [{ label: 'Open notifications', route: '/general/notifications', icon: 'notifications-outline' }];
+  if (/notification|alert|update/.test(text)) return [{ label: 'Open notifications', route: expressionId ? `${expression}/notifications` : '/general/notifications', icon: 'notifications-outline' }];
   if (/give|giving|offering|donat/.test(text)) {
     return expressionId
       ? [{ label: 'Expression giving', route: `${expression}/giving`, icon: 'gift-outline' }, { label: 'General giving', route: '/general/giving', icon: 'globe-outline' }]
