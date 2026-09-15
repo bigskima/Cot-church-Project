@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Clipboard from 'expo-clipboard';
+import * as Speech from 'expo-speech';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { Badge, Button, Chip, Icon, ScreenHeader, Skeleton } from '@/components';
@@ -43,11 +45,98 @@ type AiReadiness = {
 
 const suggestedPrompts = [
   'How do I send a prayer request?',
-  'What can I do in this part of COT?',
+  'Who are the current COT leaders?',
+  'Where is my Expression located?',
   'What church events are coming up?',
-  'I need someone to talk to today.',
   'What was the latest sermon about?',
 ];
+
+function markdownToPlainText(value: string) {
+  return value
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^[-*•]\s+/gm, '• ')
+    .replace(/^\d+[.)]\s+/gm, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '$1')
+    .replace(/(?<!_)_([^_]+)_(?!_)/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
+    .trim();
+}
+
+function splitSpeech(text: string, maximum: number) {
+  const safeMaximum = Math.max(500, Math.min(maximum || 3000, 3500));
+  const paragraphs = text.split(/\n+/).map((item) => item.trim()).filter(Boolean);
+  const chunks: string[] = [];
+  let current = '';
+  for (const paragraph of paragraphs) {
+    if (!current) current = paragraph;
+    else if (`${current}\n${paragraph}`.length <= safeMaximum) current = `${current}\n${paragraph}`;
+    else { chunks.push(current); current = paragraph; }
+  }
+  if (current) chunks.push(current);
+  return chunks.flatMap((chunk) => chunk.length <= safeMaximum
+    ? [chunk]
+    : Array.from({ length: Math.ceil(chunk.length / safeMaximum) }, (_, index) => chunk.slice(index * safeMaximum, (index + 1) * safeMaximum)));
+}
+
+function InlineMarkdown({ text, color }: { text: string; color: string }) {
+  const parts = text.split(/(\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_|`[^`]+`)/g).filter(Boolean);
+  return (
+    <Text style={[styles.markdownText, { color }]}>
+      {parts.map((part, index) => {
+        if ((part.startsWith('**') && part.endsWith('**')) || (part.startsWith('__') && part.endsWith('__'))) {
+          return <Text key={`${index}-${part}`} style={styles.markdownBold}>{part.slice(2, -2)}</Text>;
+        }
+        if ((part.startsWith('*') && part.endsWith('*')) || (part.startsWith('_') && part.endsWith('_'))) {
+          return <Text key={`${index}-${part}`} style={styles.markdownItalic}>{part.slice(1, -1)}</Text>;
+        }
+        if (part.startsWith('`') && part.endsWith('`')) {
+          return <Text key={`${index}-${part}`} style={styles.markdownCode}>{part.slice(1, -1)}</Text>;
+        }
+        return <Text key={`${index}-${part}`}>{part}</Text>;
+      })}
+    </Text>
+  );
+}
+
+function AssistantMarkdown({ value }: { value: string }) {
+  const { colors } = useTheme();
+  const lines = value.replace(/\r/g, '').split('\n');
+  return (
+    <View style={styles.markdownWrap}>
+      {lines.map((raw, index) => {
+        const line = raw.trim();
+        if (!line) return <View key={`space-${index}`} style={styles.markdownSpace} />;
+        const heading = line.match(/^(#{1,4})\s+(.+)$/);
+        if (heading) {
+          return <Text key={`heading-${index}`} style={[styles.markdownHeading, heading[1].length === 1 && styles.markdownHeadingLarge, { color: colors.text }]}>{markdownToPlainText(heading[2])}</Text>;
+        }
+        const bullet = line.match(/^[-*•]\s+(.+)$/);
+        if (bullet) {
+          return (
+            <View key={`bullet-${index}`} style={styles.markdownBulletRow}>
+              <Text style={[styles.markdownBullet, { color: colors.interactive }]}>•</Text>
+              <View style={styles.markdownBulletBody}><InlineMarkdown text={bullet[1]} color={colors.text} /></View>
+            </View>
+          );
+        }
+        const numbered = line.match(/^\d+[.)]\s+(.+)$/);
+        if (numbered) {
+          const number = line.match(/^(\d+)/)?.[1] ?? '';
+          return (
+            <View key={`number-${index}`} style={styles.markdownBulletRow}>
+              <Text style={[styles.markdownNumber, { color: colors.interactive }]}>{number}.</Text>
+              <View style={styles.markdownBulletBody}><InlineMarkdown text={numbered[1]} color={colors.text} /></View>
+            </View>
+          );
+        }
+        return <InlineMarkdown key={`line-${index}`} text={line} color={colors.text} />;
+      })}
+    </View>
+  );
+}
 
 function navigationActions(prompt: string, expressionId?: string): AssistantAction[] {
   const text = prompt.toLowerCase();
@@ -74,6 +163,9 @@ function navigationActions(prompt: string, expressionId?: string): AssistantActi
       ? [{ label: 'Expression sermons', route: `${expression}/sermons`, icon: 'book-outline' }, { label: 'General sermons', route: '/general/sermons', icon: 'globe-outline' }]
       : [{ label: 'Open sermons', route: '/general/sermons', icon: 'book-outline' }];
   }
+  if (/leader|leadership|pastor|our story|history|mission|vision|address|location|where.*church|where.*cot/.test(text)) {
+    return [{ label: 'Our Story & Leadership', route: '/general/church-story', icon: 'library-outline', description: 'Open the published COT story, leaders and location.' }];
+  }
   if (/notification|alert|update/.test(text)) return [{ label: 'Open notifications', route: expressionId ? `${expression}/notifications` : '/general/notifications', icon: 'notifications-outline' }];
   if (/give|giving|offering|donat/.test(text)) {
     return expressionId
@@ -94,12 +186,13 @@ export function AssistantScreen() {
   const expressionName = context?.expression?.name;
   const displayName = context?.profile?.display_name?.trim() || 'there';
   const scopeLabel = expressionId ? expressionName || 'this Expression' : 'General COT';
+  const speechRun = useRef(0);
 
   const welcome = useMemo<Message>(() => ({
     id: 'welcome',
     role: 'assistant',
-    text: `Hi ${displayName}. I’m COT AI. I can chat with you, explain what is happening in ${scopeLabel}, and take you directly to the right COT screen when you want to pray, give, find an event, open a sermon, message someone, or navigate the app.`,
-  }), [displayName, scopeLabel]);
+    text: `Hi ${displayName}. I’m COT AI. I can chat with you, explain verified COT leaders, locations, sermons, events, groups and announcements, and take you directly to the right screen.`,
+  }), [displayName]);
 
   const [readiness, setReadiness] = useState<AiReadiness | null>(null);
   const [checkingReadiness, setCheckingReadiness] = useState(true);
@@ -108,10 +201,13 @@ export function AssistantScreen() {
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [speakingId, setSpeakingId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
     setMessages((previous) => previous.length === 1 && previous[0]?.id === 'welcome' ? [welcome] : previous);
   }, [welcome]);
+  useEffect(() => () => { speechRun.current += 1; void Speech.stop(); }, []);
 
   const loadReadiness = async () => {
     if (mode !== 'authenticated') {
@@ -132,9 +228,37 @@ export function AssistantScreen() {
     }
   };
 
-  useEffect(() => {
-    void loadReadiness();
-  }, [api, mode, expressionId]);
+  useEffect(() => { void loadReadiness(); }, [api, mode, expressionId]);
+
+  const copyResponse = async (message: Message) => {
+    await Clipboard.setStringAsync(markdownToPlainText(message.text));
+    setCopiedId(message.id);
+    setTimeout(() => setCopiedId((current) => current === message.id ? null : current), 1600);
+  };
+
+  const readResponse = async (message: Message) => {
+    if (speakingId === message.id) {
+      speechRun.current += 1;
+      setSpeakingId(null);
+      await Speech.stop();
+      return;
+    }
+    await Speech.stop();
+    const run = ++speechRun.current;
+    const chunks = splitSpeech(markdownToPlainText(message.text), Speech.maxSpeechInputLength);
+    setSpeakingId(message.id);
+    const speakChunk = (index: number) => {
+      if (run !== speechRun.current) return;
+      if (index >= chunks.length) { setSpeakingId(null); return; }
+      Speech.speak(chunks[index], {
+        rate: 0.98,
+        onDone: () => speakChunk(index + 1),
+        onStopped: () => setSpeakingId(null),
+        onError: () => setSpeakingId(null),
+      });
+    };
+    speakChunk(0);
+  };
 
   async function handleSend(customPrompt?: string) {
     const promptToSend = (customPrompt || text).trim();
@@ -144,7 +268,7 @@ export function AssistantScreen() {
     const pendingMsg: Message = {
       id: `pending_${Date.now()}`,
       role: 'assistant',
-      text: `Checking ${scopeLabel} and the COT pathways available to you…`,
+      text: `Checking ${scopeLabel} and the verified COT information available to you…`,
       pending: true,
     };
     const actions = navigationActions(promptToSend, expressionId);
@@ -156,7 +280,7 @@ export function AssistantScreen() {
       `Current member space: ${expressionId ? `Expression ${expressionName || expressionId}` : 'General COT'}.`,
       recentConversation ? `Recent conversation:\n${recentConversation}` : '',
       `Current member message: ${promptToSend}`,
-      'Answer naturally for everyday conversation when appropriate. When the member is asking how to do something in COT, use the verified navigation paths in your context and name the exact destination instead of inventing a generic link.',
+      'Answer naturally. Use the verified COT context for church facts. If the member asks about a leader, location, event, sermon, group, story or announcement, use the saved database information and clearly say when that information has not yet been published. Use clean Markdown only when it improves readability.',
     ].filter(Boolean).join('\n\n');
 
     setMessages((previous) => [...previous, userMsg, pendingMsg]);
@@ -192,7 +316,7 @@ export function AssistantScreen() {
         <View style={styles.stateWrap}>
           <View style={[styles.stateIcon, { backgroundColor: colors.primarySoft }]}><Icon name="sparkles" size={30} color={colors.interactive} /></View>
           <Text style={[styles.stateTitle, { color: colors.text }]}>Sign in to use COT AI</Text>
-          <Text style={[styles.stateBody, { color: colors.textSecondary }]}>Your signed-in church and Expression context is what lets COT AI guide you to the correct private or General destination.</Text>
+          <Text style={[styles.stateBody, { color: colors.textSecondary }]}>Your signed-in church and Expression context lets COT AI answer from the correct COT data without crossing private boundaries.</Text>
           <Button label="Sign in" onPress={() => router.push({ pathname: '/(auth)/login', params: { returnTo: '/assistant' } } as any)} variant="primary" size="lg" />
         </View>
       </View>
@@ -253,9 +377,25 @@ export function AssistantScreen() {
               <View style={[styles.bubbleRow, isUser ? styles.userRow : styles.assistantRow]}>
                 {!isUser ? <View style={[styles.assistantIcon, { backgroundColor: colors.primarySoft }]}><Icon name="sparkles" size={16} color={colors.interactive} /></View> : null}
                 <View style={[styles.bubble, isUser ? { backgroundColor: colors.interactive } : { backgroundColor: colors.card, borderColor: colors.borderSubtle, borderWidth: 1 }, isUser ? shadows.none : shadows.sm]}>
-                  <Text style={[styles.bubbleText, { color: isUser ? '#FFFFFF' : colors.text }, item.pending && { color: colors.textMuted, fontStyle: 'italic' }]}>{item.text}</Text>
+                  {isUser || item.pending
+                    ? <Text style={[styles.bubbleText, { color: isUser ? '#FFFFFF' : colors.textMuted }, item.pending && { fontStyle: 'italic' }]}>{item.text}</Text>
+                    : <AssistantMarkdown value={item.text} />}
                 </View>
               </View>
+
+              {!isUser && !item.pending ? (
+                <View style={styles.responseTools}>
+                  <Pressable onPress={() => void copyResponse(item)} style={({ pressed }) => [styles.responseTool, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Copy AI response">
+                    <Icon name={copiedId === item.id ? 'checkmark-outline' : 'copy-outline'} size={14} color={colors.interactive} />
+                    <Text style={[styles.responseToolText, { color: colors.textSecondary }]}>{copiedId === item.id ? 'Copied' : 'Copy'}</Text>
+                  </Pressable>
+                  <Pressable onPress={() => void readResponse(item)} style={({ pressed }) => [styles.responseTool, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel={speakingId === item.id ? 'Stop reading response' : 'Read AI response aloud'}>
+                    <Icon name={speakingId === item.id ? 'stop-circle-outline' : 'volume-high-outline'} size={14} color={colors.interactive} />
+                    <Text style={[styles.responseToolText, { color: colors.textSecondary }]}>{speakingId === item.id ? 'Stop' : 'Read aloud'}</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+
               {!isUser && item.actions?.length ? (
                 <View style={styles.actionList}>
                   {item.actions.map((action) => (
@@ -310,8 +450,13 @@ const styles = StyleSheet.create({
   bubbleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs },
   userRow: { justifyContent: 'flex-end' }, assistantRow: { justifyContent: 'flex-start' },
   assistantIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
-  bubble: { maxWidth: '84%', paddingHorizontal: 14, paddingVertical: 11, borderRadius: radius.xl },
+  bubble: { maxWidth: '88%', paddingHorizontal: 14, paddingVertical: 11, borderRadius: radius.xl },
   bubbleText: { fontSize: 14, lineHeight: 20 },
+  markdownWrap: { gap: 3 }, markdownSpace: { height: 5 }, markdownText: { fontSize: 14, lineHeight: 21 },
+  markdownBold: { fontWeight: '900' }, markdownItalic: { fontStyle: 'italic' }, markdownCode: { fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }), fontSize: 13 },
+  markdownHeading: { fontSize: 15, lineHeight: 21, fontWeight: '900', marginTop: 4 }, markdownHeadingLarge: { fontSize: 18, lineHeight: 24 },
+  markdownBulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 }, markdownBullet: { width: 12, fontSize: 17, lineHeight: 21, fontWeight: '900' }, markdownNumber: { minWidth: 20, fontSize: 13, lineHeight: 21, fontWeight: '900' }, markdownBulletBody: { flex: 1 },
+  responseTools: { marginLeft: 40, flexDirection: 'row', gap: 6, flexWrap: 'wrap' }, responseTool: { minHeight: 32, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 5 }, responseToolText: { fontSize: 10.5, fontWeight: '800' },
   actionList: { marginLeft: 40, gap: 7, maxWidth: 520 },
   routeAction: { minHeight: 54, borderWidth: 1, borderRadius: radius.lg, padding: 9, flexDirection: 'row', alignItems: 'center', gap: 9 },
   routeIcon: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
