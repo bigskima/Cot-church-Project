@@ -131,6 +131,20 @@ Deno.serve(createHandler(
       }
 
       const safety = await loadSafetyProfileSets(admin, viewerId);
+      const search = (url.searchParams.get("search") ?? "").trim().replace(/^@/, "").toLowerCase();
+
+      const [{ data: followingRows, error: followingError }, { data: followerRows, error: followerError }] = await Promise.all([
+        admin.from("follows").select("target_profile_id").eq("profile_id", viewerId).not("target_profile_id", "is", null).limit(1000),
+        admin.from("follows").select("profile_id").eq("target_profile_id", viewerId).limit(1000),
+      ]);
+      if (followingError || followerError) {
+        throw new ApiError("CHAT_RELATIONSHIPS_FAILED", "We couldn’t load your chat connections right now.", 500, undefined, false);
+      }
+      const relationshipIds = new Set<string>();
+      for (const row of followingRows ?? []) if (row.target_profile_id) relationshipIds.add(row.target_profile_id);
+      for (const row of followerRows ?? []) if (row.profile_id) relationshipIds.add(row.profile_id);
+      for (const blocked of safety.blockedProfiles) relationshipIds.delete(blocked);
+
       const { data: conversations, error: conversationError } = await admin
         .from("direct_conversations")
         .select("id,participant_low,participant_high,created_at,updated_at")
@@ -139,19 +153,22 @@ Deno.serve(createHandler(
         .limit(100);
       if (conversationError) throw new ApiError("CHAT_LOAD_FAILED", "We couldn’t load your conversations.", 500, undefined, false);
 
-      const rows = conversations ?? [];
-      const otherIds = [...new Set(rows.map((conversation: any) =>
+      const relationshipConversations = (conversations ?? []).filter((conversation: any) => {
+        const otherId = conversation.participant_low === viewerId ? conversation.participant_high : conversation.participant_low;
+        return relationshipIds.has(otherId);
+      });
+      const conversationOtherIds = [...new Set(relationshipConversations.map((conversation: any) =>
         conversation.participant_low === viewerId ? conversation.participant_high : conversation.participant_low
       ))];
 
       const [{ data: conversationProfiles }, { data: recentMessages }] = await Promise.all([
-        otherIds.length
-          ? admin.from("profiles").select("id,username,display_name,avatar_url,banner_url").in("id", otherIds)
+        conversationOtherIds.length
+          ? admin.from("profiles").select("id,username,display_name,avatar_url,banner_url").in("id", conversationOtherIds)
           : Promise.resolve({ data: [] as any[] }),
-        rows.length
+        relationshipConversations.length
           ? admin.from("direct_messages")
               .select("conversation_id,body,attachment_ids,sent_at,sender_profile_id")
-              .in("conversation_id", rows.map((row: any) => row.id))
+              .in("conversation_id", relationshipConversations.map((row: any) => row.id))
               .order("sent_at", { ascending: false })
               .limit(1000)
           : Promise.resolve({ data: [] as any[] }),
@@ -163,23 +180,28 @@ Deno.serve(createHandler(
         if (!recentMap.has(message.conversation_id)) recentMap.set(message.conversation_id, message);
       }
 
-      const search = (url.searchParams.get("search") ?? "").trim().replace(/^@/, "").toLowerCase();
       const directoryQuery = () => admin.from("profiles")
         .select("id,username,display_name,avatar_url,banner_url")
-        .neq("id", viewerId).not("username", "is", null).order("display_name").limit(search ? 100 : 40);
-      // Escape pattern characters and search both indexed identities directly;
-      // do not scan an arbitrary first 300 users to find a display name.
-      const pattern = `%${search.replace(/[\\%_]/g, "\\$&")}%`;
-      const results = search
-        ? await Promise.all([
-            directoryQuery().eq("username", search),
-            directoryQuery().ilike("username", pattern),
-            directoryQuery().ilike("display_name", pattern),
-          ])
-        : [await directoryQuery()];
-      if (results.some((result) => result.error)) throw new ApiError("CHAT_DIRECTORY_FAILED", "We couldn’t load people right now.", 500, undefined, false);
+        .neq("id", viewerId).not("username", "is", null).order("display_name").limit(search ? 100 : 100);
+
+      let directoryResults: Array<{ data: any[] | null; error: any }> = [];
+      if (search) {
+        // Search remains global by design: users can discover and start a DM with
+        // any non-blocked account even when neither account follows the other.
+        const pattern = `%${search.replace(/[\\%_]/g, "\\$&")}%`;
+        directoryResults = await Promise.all([
+          directoryQuery().eq("username", search),
+          directoryQuery().ilike("username", pattern),
+          directoryQuery().ilike("display_name", pattern),
+        ]);
+      } else if (relationshipIds.size) {
+        directoryResults = [await directoryQuery().in("id", [...relationshipIds])];
+      }
+      if (directoryResults.some((result) => result.error)) {
+        throw new ApiError("CHAT_DIRECTORY_FAILED", "We couldn’t load people right now.", 500, undefined, false);
+      }
       const matched = new Map<string, any>();
-      for (const result of results) for (const profile of result.data ?? []) {
+      for (const result of directoryResults) for (const profile of result.data ?? []) {
         if (!safety.blockedProfiles.has(profile.id)) matched.set(profile.id, profile);
       }
       const people = [...matched.values()].sort((a, b) =>
@@ -190,12 +212,11 @@ Deno.serve(createHandler(
       return {
         data: {
           people: people.map(publicProfile),
-          conversations: rows
+          conversations: relationshipConversations
             .map((conversation: any) => {
               const otherId = conversation.participant_low === viewerId
                 ? conversation.participant_high
                 : conversation.participant_low;
-              if (safety.blockedProfiles.has(otherId)) return null;
               return {
                 id: conversation.id,
                 created_at: conversation.created_at,
@@ -209,7 +230,7 @@ Deno.serve(createHandler(
                   : null,
               };
             })
-            .filter(Boolean),
+            .filter((conversation: any) => conversation.other),
         },
       };
     }
