@@ -38,7 +38,6 @@ export function GeneralTopBar({ organizationName, authenticated, avatarUrl, disp
   const { width } = useWindowDimensions();
   const { colors } = useTheme();
   const wide = width >= 720;
-  const roomForUtilities = width >= 430;
 
   return (
     <View style={[styles.wrap, { paddingTop: insets.top + spacing.xs }]}>
@@ -80,16 +79,16 @@ export function GeneralTopBar({ organizationName, authenticated, avatarUrl, disp
 
           <View style={styles.actions}>
             {!wide ? <HeaderButton icon="search-outline" label="Search General COT" onPress={() => router.push('/general/explore')} /> : null}
-            {authenticated && roomForUtilities ? <HeaderButton icon="notifications-outline" label="Notifications" onPress={() => router.push('/general/notifications')} /> : null}
-            {authenticated && canManage ? <HeaderButton icon="shield-checkmark-outline" label="Leadership tools" onPress={() => router.push('/general/leadership')} accent /> : null}
+            {authenticated ? <HeaderButton icon="notifications-outline" label="Notifications" onPress={() => router.push('/general/notifications')} /> : null}
+            {authenticated && canManage && wide ? <HeaderButton icon="shield-checkmark-outline" label="Leadership tools" onPress={() => router.push('/general/leadership')} accent /> : null}
             {authenticated && wide ? <HeaderButton icon="ellipsis-horizontal" label="General COT tools and settings" onPress={() => router.push('/general/tools')} /> : null}
-            {authenticated ? (
+            {authenticated && wide ? (
               <Pressable onPress={() => router.push('/general/profile')} accessibilityRole="button" accessibilityLabel="Open your profile" style={({ pressed }) => [styles.avatarButton, pressed && styles.pressed]}>
                 <Avatar url={avatarUrl} name={displayName || 'COT member'} size="sm" />
               </Pressable>
-            ) : (
+            ) : !authenticated ? (
               <HeaderButton icon="person-outline" label="Sign in" onPress={() => router.push('/(auth)/login' as any)} accent />
-            )}
+            ) : null}
           </View>
         </View>
       </TourAnchor>
@@ -100,9 +99,9 @@ export function GeneralTopBar({ organizationName, authenticated, avatarUrl, disp
 const styles = StyleSheet.create({
   wrap: { paddingHorizontal: spacing.md, paddingBottom: spacing.xs },
   bar: { width: '100%', maxWidth: 1040, alignSelf: 'center', minHeight: 62, borderWidth: 1, borderRadius: radius.xxl, paddingHorizontal: spacing.sm, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  identity: { minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  identity: { minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 1 },
   brand: { width: 42, height: 42, borderRadius: 15, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  identityCopy: { minWidth: 0, maxWidth: 250 },
+  identityCopy: { minWidth: 0, maxWidth: 250, flexShrink: 1 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   title: { fontSize: 16, lineHeight: 20, fontWeight: '900', letterSpacing: -0.42, flexShrink: 1 },
   meta: { fontSize: 10.5, lineHeight: 14, fontWeight: '600', marginTop: 1 },
