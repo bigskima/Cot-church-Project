@@ -56,7 +56,7 @@ export default function GeneralLayout() {
   const [leaving, setLeaving] = useState(false);
   const [boundaryError, setBoundaryError] = useState('');
 
-  // Opening General COT always resolves access first by clearing the private Expression context.
+  // Opening General COT always resolves access first by Clearing the private Expression context.
   useEffect(() => {
     if (mode !== 'authenticated' || !accessReady || !context?.expression?.id || leaving) return;
     let cancelled = false;
@@ -106,11 +106,7 @@ export default function GeneralLayout() {
   );
 
   return (
-    <Tabs
-      screenOptions={screenOptions}
-      backBehavior="history"
-      tabBar={showPrimaryNavigation ? (props) => <PrimaryGeneralTabBar {...props} /> : () => null}
-    >
+    <Tabs screenOptions={screenOptions} backBehavior="history" tabBar={showPrimaryNavigation ? (props) => <PrimaryGeneralTabBar {...props} /> : () => null}>
       <Tabs.Screen name="index" options={{ title: 'Home', tabBarAccessibilityLabel: 'General COT Home', tabBarIcon: renderIcon('home', 'home-outline') }} />
       <Tabs.Screen name="explore" options={{ title: 'Discover', tabBarAccessibilityLabel: 'Discover General COT', tabBarIcon: renderIcon('compass', 'compass-outline') }} />
       <Tabs.Screen name="reels" options={{ title: 'Reels', tabBarAccessibilityLabel: 'General COT Reels', tabBarIcon: renderIcon('play', 'play-outline', true) }} />
