@@ -17,6 +17,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 function AppContent() {
   const { isDark, colors } = useTheme();
   const { mode, accessReady, contextStatus } = useSession();
+  // Getting COT ready still waits for resolved account access; only the member-facing copy changed.
   const resolvingAccess = mode === 'restoring' || (mode === 'authenticated' && !accessReady && contextStatus !== 'error');
 
   useEffect(() => {
