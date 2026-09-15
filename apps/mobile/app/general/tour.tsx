@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, ScreenHeader } from '@/components';
-import { useAppTour } from '@/features/tour/AppTourProvider';
+import { TourAnchor, useAppTour } from '@/features/tour/AppTourProvider';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -12,6 +12,7 @@ export default function AppTourSettingsScreen() {
   const { colors } = useTheme();
   const { context } = useSession();
   const { startTour, active } = useAppTour();
+  const scrollRef = React.useRef<ScrollView>(null);
   const [busyKey, setBusyKey] = React.useState('');
   const [error, setError] = React.useState('');
   const expressions = (context?.expressions ?? []).filter((item) => item.status === 'active');
@@ -31,7 +32,7 @@ export default function AppTourSettingsScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 80 }]}>
+      <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 80 }]}>
         <ScreenHeader title="App tour & help" kicker="ACCOUNT" subtitle="Restart a guided walk through the real COT screens at any time." showBack />
 
         <View style={[styles.infoCard, { backgroundColor: colors.primarySoft, borderColor: colors.primarySoftStrong }]}>
@@ -62,41 +63,45 @@ export default function AppTourSettingsScreen() {
           </View>
         </Pressable>
 
-        <View style={styles.sectionHeading}>
-          <View style={styles.flex}>
-            <Text style={[styles.sectionEyebrow, { color: colors.interactive }]}>YOUR EXPRESSIONS</Text>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Tour a private Expression</Text>
-            <Text style={[styles.sectionCopy, { color: colors.textMuted }]}>An Expression tour only opens after you already belong to that Expression.</Text>
-          </View>
-        </View>
+        <TourAnchor targetKey="general.tour.restart" reveal={() => scrollRef.current?.scrollTo({ y: 250, animated: true })}>
+          <View style={styles.restartArea}>
+            <View style={styles.sectionHeading}>
+              <View style={styles.flex}>
+                <Text style={[styles.sectionEyebrow, { color: colors.interactive }]}>YOUR EXPRESSIONS</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Tour a private Expression</Text>
+                <Text style={[styles.sectionCopy, { color: colors.textMuted }]}>An Expression tour only opens after you already belong to that Expression.</Text>
+              </View>
+            </View>
 
-        {expressions.length ? (
-          <View style={styles.list}>
-            {expressions.map((expression) => (
-              <Pressable
-                key={expression.id}
-                onPress={() => void start('expression', expression.id)}
-                disabled={active || !!busyKey}
-                accessibilityRole="button"
-                style={({ pressed }) => [styles.expressionCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, pressed && styles.pressed]}
-              >
-                <View style={[styles.expressionIcon, { backgroundColor: colors.primarySoft }]}><Icon name="people-circle-outline" size={19} color={colors.interactive} /></View>
-                <View style={styles.flex}>
-                  <Text style={[styles.expressionName, { color: colors.text }]} numberOfLines={1}>{expression.name}</Text>
-                  <Text style={[styles.expressionMeta, { color: colors.textMuted }]} numberOfLines={1}>Home, feed and General discussion</Text>
-                </View>
-                <Text style={[styles.expressionStart, { color: colors.interactive }]}>{busyKey === expression.id ? 'Opening…' : 'Start tour'}</Text>
-                <Icon name="chevron-forward" size={15} color={colors.textMuted} />
-              </Pressable>
-            ))}
+            {expressions.length ? (
+              <View style={styles.list}>
+                {expressions.map((expression) => (
+                  <Pressable
+                    key={expression.id}
+                    onPress={() => void start('expression', expression.id)}
+                    disabled={active || !!busyKey}
+                    accessibilityRole="button"
+                    style={({ pressed }) => [styles.expressionCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, pressed && styles.pressed]}
+                  >
+                    <View style={[styles.expressionIcon, { backgroundColor: colors.primarySoft }]}><Icon name="people-circle-outline" size={19} color={colors.interactive} /></View>
+                    <View style={styles.flex}>
+                      <Text style={[styles.expressionName, { color: colors.text }]} numberOfLines={1}>{expression.name}</Text>
+                      <Text style={[styles.expressionMeta, { color: colors.textMuted }]} numberOfLines={1}>Home, feed and General discussion</Text>
+                    </View>
+                    <Text style={[styles.expressionStart, { color: colors.interactive }]}>{busyKey === expression.id ? 'Opening…' : 'Start tour'}</Text>
+                    <Icon name="chevron-forward" size={15} color={colors.textMuted} />
+                  </Pressable>
+                ))}
+              </View>
+            ) : (
+              <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+                <Icon name="people-outline" size={26} color={colors.textMuted} />
+                <Text style={[styles.emptyTitle, { color: colors.text }]}>No Expression tour available yet</Text>
+                <Text style={[styles.emptyCopy, { color: colors.textMuted }]}>After you join an Expression, it will appear here and its tour will also be offered when you first open it.</Text>
+              </View>
+            )}
           </View>
-        ) : (
-          <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
-            <Icon name="people-outline" size={26} color={colors.textMuted} />
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>No Expression tour available yet</Text>
-            <Text style={[styles.emptyCopy, { color: colors.textMuted }]}>After you join an Expression, it will appear here and its tour will also be offered when you first open it.</Text>
-          </View>
-        )}
+        </TourAnchor>
       </ScrollView>
     </View>
   );
@@ -119,6 +124,7 @@ const styles = StyleSheet.create({
   cardCopy: { fontSize: 10.5, lineHeight: 15, marginTop: 3 },
   startPill: { minHeight: 36, borderRadius: radius.pill, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 4 },
   startText: { fontSize: 10.5, fontWeight: '900' },
+  restartArea: { gap: spacing.md },
   sectionHeading: { marginTop: spacing.md, flexDirection: 'row', alignItems: 'flex-end' },
   sectionTitle: { fontSize: 20, lineHeight: 24, fontWeight: '900', letterSpacing: -0.4, marginTop: 3 },
   sectionCopy: { fontSize: 10.5, lineHeight: 15, marginTop: 3 },
