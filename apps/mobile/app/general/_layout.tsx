@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Tabs, usePathname } from 'expo-router';
-import { ActivityIndicator, Platform, StyleSheet, Text, View, type ColorValue } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/primitives/Icon';
 import { radius, shadows, spacing } from '@/design-system/tokens';
@@ -10,16 +10,53 @@ import { useTheme } from '@/state/theme';
 const TAB_ICON_SIZE = 22;
 const hidden = { href: null } as const;
 const PRIMARY_GENERAL_PATHS = new Set(['/general', '/general/explore', '/general/reels', '/general/chat', '/general/profile']);
+const PRIMARY_TAB_NAMES = ['index', 'explore', 'reels', 'chat', 'profile'] as const;
+
+function PrimaryGeneralTabBar({ state, descriptors, navigation }: any) {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, Platform.OS === 'web' ? 9 : 7);
+  const routes = state.routes.filter((route: any) => PRIMARY_TAB_NAMES.includes(route.name));
+
+  return (
+    <View style={[styles.tabBar, { backgroundColor: colors.glass, borderColor: colors.borderSubtle, minHeight: 64 + bottomInset, paddingBottom: bottomInset }, shadows.floating]}>
+      {routes.map((route: any) => {
+        const routeIndex = state.routes.findIndex((candidate: any) => candidate.key === route.key);
+        const focused = state.index === routeIndex;
+        const options = descriptors[route.key]?.options ?? {};
+        const label = typeof options.tabBarLabel === 'string' ? options.tabBarLabel : options.title ?? route.name;
+        const color = focused ? colors.interactive : colors.textMuted;
+        const icon = options.tabBarIcon?.({ focused, color, size: TAB_ICON_SIZE });
+        return (
+          <Pressable
+            key={route.key}
+            accessibilityRole="button"
+            accessibilityState={focused ? { selected: true } : {}}
+            accessibilityLabel={options.tabBarAccessibilityLabel ?? label}
+            onPress={() => {
+              const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+              if (!focused && !event.defaultPrevented) navigation.navigate(route.name, route.params);
+            }}
+            onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })}
+            style={({ pressed }) => [styles.customTabItem, pressed && styles.pressedTab]}
+          >
+            {icon}
+            <Text style={[styles.label, { color: focused ? colors.text : colors.textMuted }]} numberOfLines={1}>{label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
 
 export default function GeneralLayout() {
   const { colors } = useTheme();
   const { mode, accessReady, context, leaveExpression } = useSession();
-  const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const [leaving, setLeaving] = useState(false);
   const [boundaryError, setBoundaryError] = useState('');
 
-  // Opening General COT always resolves access first by Clearing the private Expression context.
+  // Opening General COT always resolves access first by clearing the private Expression context.
   useEffect(() => {
     if (mode !== 'authenticated' || !accessReady || !context?.expression?.id || leaving) return;
     let cancelled = false;
@@ -45,8 +82,6 @@ export default function GeneralLayout() {
     );
   }
 
-  const bottomInset = Math.max(insets.bottom, Platform.OS === 'web' ? 9 : 7);
-  const barHeight = 64 + bottomInset;
   const normalizedPath = pathname.replace(/\/+$/, '') || '/general';
   const showPrimaryNavigation = PRIMARY_GENERAL_PATHS.has(normalizedPath);
   const screenOptions = {
@@ -56,9 +91,6 @@ export default function GeneralLayout() {
     tabBarInactiveTintColor: colors.textMuted,
     tabBarLabelStyle: styles.label,
     tabBarHideOnKeyboard: true,
-    tabBarStyle: showPrimaryNavigation
-      ? [styles.tabBar, { backgroundColor: colors.glass, borderColor: colors.borderSubtle, height: barHeight, paddingBottom: bottomInset }] as any
-      : styles.hiddenTabBar,
     tabBarItemStyle: styles.item,
     tabBarIconStyle: styles.icon,
     sceneStyle: { backgroundColor: colors.bg } as any,
@@ -74,7 +106,11 @@ export default function GeneralLayout() {
   );
 
   return (
-    <Tabs screenOptions={screenOptions} backBehavior="history">
+    <Tabs
+      screenOptions={screenOptions}
+      backBehavior="history"
+      tabBar={showPrimaryNavigation ? (props) => <PrimaryGeneralTabBar {...props} /> : () => null}
+    >
       <Tabs.Screen name="index" options={{ title: 'Home', tabBarAccessibilityLabel: 'General COT Home', tabBarIcon: renderIcon('home', 'home-outline') }} />
       <Tabs.Screen name="explore" options={{ title: 'Discover', tabBarAccessibilityLabel: 'Discover General COT', tabBarIcon: renderIcon('compass', 'compass-outline') }} />
       <Tabs.Screen name="reels" options={{ title: 'Reels', tabBarAccessibilityLabel: 'General COT Reels', tabBarIcon: renderIcon('play', 'play-outline', true) }} />
@@ -110,6 +146,7 @@ export default function GeneralLayout() {
       <Tabs.Screen name="leadership/pastoral-triage" options={hidden as any} />
       <Tabs.Screen name="leadership/church-leadership" options={hidden as any} />
       <Tabs.Screen name="leadership/announcements-manage" options={hidden as any} />
+      <Tabs.Screen name="leadership/urgent-updates" options={hidden as any} />
       <Tabs.Screen name="leadership/feed-ranking" options={hidden as any} />
       <Tabs.Screen name="leadership/watch-categories" options={hidden as any} />
       <Tabs.Screen name="leadership/giving-manage" options={hidden as any} />
@@ -138,6 +175,7 @@ const styles = StyleSheet.create({
   iconStack: { height: 36, alignItems: 'center', justifyContent: 'center', gap: 2 },
   iconShell: { minWidth: 42, height: 31, borderRadius: 13, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 9 },
   activeDot: { width: 4, height: 4, borderRadius: 2 },
-  tabBar: { position: 'absolute', left: 14, right: 14, bottom: 10, maxWidth: 620, alignSelf: 'center', borderTopWidth: 0, borderWidth: 1, borderRadius: 28, overflow: 'hidden', paddingHorizontal: 4, ...shadows.floating },
-  hiddenTabBar: { display: 'none' },
+  tabBar: { position: 'absolute', left: 14, right: 14, bottom: 10, maxWidth: 620, alignSelf: 'center', borderWidth: 1, borderRadius: 28, overflow: 'hidden', paddingHorizontal: 4, paddingTop: 5, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-around' },
+  customTabItem: { flex: 1, minHeight: 58, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 2 },
+  pressedTab: { opacity: 0.72, transform: [{ scale: 0.97 }] },
 });
