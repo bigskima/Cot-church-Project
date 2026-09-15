@@ -18,6 +18,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 function AppContent() {
   const { isDark, colors } = useTheme();
   const { mode, accessReady, contextStatus } = useSession();
+  // Getting COT ready remains an access-gate invariant; the visible copy is intentionally user-facing.
   const resolvingAccess = mode === 'restoring' || (mode === 'authenticated' && !accessReady && contextStatus !== 'error');
 
   useEffect(() => {
