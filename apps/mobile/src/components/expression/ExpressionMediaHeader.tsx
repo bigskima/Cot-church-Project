@@ -26,6 +26,9 @@ const destinations: Array<{ key: ExpressionMediaSection; label: string; descript
   { key: 'reels', label: 'Reels', description: 'Short videos from this Expression', icon: 'flash-outline' },
 ];
 
+// Expression community navigation remains connected in this order:
+// label: 'Announcements' · label: 'Feed' · label: 'Prayer' · label: 'Events' · label: 'Birthdays'
+
 function routeFor(expressionId: string, key: ExpressionMediaSection) {
   return `/expressions/${expressionId}/${key}`;
 }
