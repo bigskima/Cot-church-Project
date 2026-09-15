@@ -43,15 +43,17 @@ export function GeneralHomeActionDeck({ onComposePost, onComposeVoice }: Props) 
   return (
     <TourAnchor targetKey="general.home.actions">
       <View style={styles.root}>
-        <View style={[styles.feedIntro, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
-          <View style={[styles.feedIcon, { backgroundColor: colors.primarySoft }]}><Icon name="layers-outline" size={20} color={colors.interactive} /></View>
-          <View style={styles.flex}>
-            <Text style={[styles.kicker, { color: colors.interactive }]}>YOUR COT FEED</Text>
-            <Text style={[styles.title, { color: colors.text }]}>Everything happening in General COT</Text>
-            <Text style={[styles.copy, { color: colors.textMuted }]}>Posts, sermons, events, announcements, Reels and videos are layered below in one feed.</Text>
+        <TourAnchor targetKey="general.home.feed">
+          <View style={[styles.feedIntro, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+            <View style={[styles.feedIcon, { backgroundColor: colors.primarySoft }]}><Icon name="layers-outline" size={20} color={colors.interactive} /></View>
+            <View style={styles.flex}>
+              <Text style={[styles.kicker, { color: colors.interactive }]}>YOUR COT FEED</Text>
+              <Text style={[styles.title, { color: colors.text }]}>Everything happening in General COT</Text>
+              <Text style={[styles.copy, { color: colors.textMuted }]}>Posts, sermons, events, announcements, Reels and videos are layered below in one feed.</Text>
+            </View>
+            {hasMinistryAccess ? <Pressable onPress={() => router.push('/general/leadership' as any)} style={[styles.workspaceButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]} accessibilityRole="button"><Icon name="shield-checkmark-outline" size={17} color={colors.interactive} /><Text style={[styles.workspaceText, { color: colors.text }]}>Ministry</Text></Pressable> : null}
           </View>
-          {hasMinistryAccess ? <Pressable onPress={() => router.push('/general/leadership' as any)} style={[styles.workspaceButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]} accessibilityRole="button"><Icon name="shield-checkmark-outline" size={17} color={colors.interactive} /><Text style={[styles.workspaceText, { color: colors.text }]}>Ministry</Text></Pressable> : null}
-        </View>
+        </TourAnchor>
 
         <View style={styles.actionRow}>
           {authenticated ? <>
