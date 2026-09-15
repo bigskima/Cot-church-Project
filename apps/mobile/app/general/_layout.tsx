@@ -8,7 +8,7 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 
 const TAB_ICON_SIZE = 22;
-const hidden = { href: null, tabBarButton: () => null } as const;
+const hidden = { href: null } as const;
 const PRIMARY_GENERAL_PATHS = new Set(['/general', '/general/explore', '/general/reels', '/general/chat', '/general/profile']);
 
 export default function GeneralLayout() {
@@ -19,6 +19,7 @@ export default function GeneralLayout() {
   const [leaving, setLeaving] = useState(false);
   const [boundaryError, setBoundaryError] = useState('');
 
+  // Opening General COT always resolves access first by Clearing the private Expression context.
   useEffect(() => {
     if (mode !== 'authenticated' || !accessReady || !context?.expression?.id || leaving) return;
     let cancelled = false;
