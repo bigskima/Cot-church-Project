@@ -13,6 +13,10 @@ type PublicBadge = {
   priority: number;
 };
 
+function nestedItem(value: any) {
+  return Array.isArray(value) ? value[0] ?? null : value ?? null;
+}
+
 async function enrichMembershipAuthors<T extends MembershipAuthoredRow>(rows: T[]): Promise<Array<T & Record<string, unknown>>> {
   if (!rows.length) return rows;
   const admin = adminClient();
@@ -104,7 +108,81 @@ async function enrichMembershipAuthors<T extends MembershipAuthoredRow>(rows: T[
   });
 }
 
-export const enrichSocialPosts = enrichMembershipAuthors;
+async function enrichReelReferences<T extends Record<string, any>>(rows: T[]) {
+  const reelIds = [...new Set(rows.flatMap((row) => Array.isArray(row.media)
+    ? row.media.filter((item: any) => item?.type === "reel_reference" && typeof item.reelId === "string").map((item: any) => item.reelId)
+    : []))] as string[];
+  if (!reelIds.length) return rows;
+
+  const admin = adminClient();
+  const { data: reels, error } = await admin
+    .from("reels")
+    .select("id,caption,media_asset_id,content_items!inner(id,visibility,status),media_assets(id,media_type,duration_seconds,source_storage_path,media_renditions(rendition_kind,storage_path),media_thumbnails(storage_path,is_primary))")
+    .in("id", reelIds)
+    .eq("content_items.visibility", "public")
+    .eq("content_items.status", "published");
+  if (error) return rows;
+
+  const previewByReel = new Map<string, any>();
+  await Promise.all((reels ?? []).map(async (reel: any) => {
+    const asset = nestedItem(reel.media_assets);
+    if (!asset) return;
+    const renditions = Array.isArray(asset.media_renditions) ? asset.media_renditions : [];
+    const thumbnails = Array.isArray(asset.media_thumbnails) ? asset.media_thumbnails : [];
+    const stream = renditions.find((item: any) => item.rendition_kind === "video_stream") ?? renditions[0];
+    const thumbnail = thumbnails.find((item: any) => item.is_primary) ?? thumbnails[0];
+    const videoPath = stream?.storage_path ?? asset.source_storage_path ?? null;
+    const thumbnailPath = thumbnail?.storage_path ?? null;
+
+    const [videoSigned, thumbnailSigned] = await Promise.all([
+      typeof videoPath === "string" && videoPath
+        ? admin.storage.from("content-media").createSignedUrl(videoPath, 3600)
+        : Promise.resolve({ data: null, error: null }),
+      typeof thumbnailPath === "string" && thumbnailPath
+        ? admin.storage.from("content-media").createSignedUrl(thumbnailPath, 3600)
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+
+    const videoUrl = videoSigned.error ? null : videoSigned.data?.signedUrl ?? null;
+    const thumbnailUrl = thumbnailSigned.error ? null : thumbnailSigned.data?.signedUrl ?? null;
+    if (!videoUrl && !thumbnailUrl) return;
+
+    previewByReel.set(reel.id, videoUrl ? {
+      id: `reel-preview-${reel.id}`,
+      type: "video",
+      media_type: "video",
+      url: videoUrl,
+      thumbnailUrl,
+      duration_seconds: asset.duration_seconds ?? null,
+      alt: reel.caption?.trim() || "Original COT Reel",
+      quotedReelId: reel.id,
+    } : {
+      id: `reel-preview-${reel.id}`,
+      type: "image",
+      media_type: "image",
+      url: thumbnailUrl,
+      alt: reel.caption?.trim() || "Original COT Reel preview",
+      quotedReelId: reel.id,
+    });
+  }));
+
+  return rows.map((row) => {
+    if (!Array.isArray(row.media)) return row;
+    const media: any[] = [];
+    for (const item of row.media) {
+      media.push(item);
+      if (item?.type !== "reel_reference" || typeof item.reelId !== "string") continue;
+      const preview = previewByReel.get(item.reelId);
+      if (preview) media.push(preview);
+    }
+    return { ...row, media };
+  });
+}
+
+export async function enrichSocialPosts<T extends MembershipAuthoredRow>(rows: T[]) {
+  const authored = await enrichMembershipAuthors(rows);
+  return enrichReelReferences(authored);
+}
 export const enrichSocialComments = enrichMembershipAuthors;
 
 function nestedContentItem(value: any) {
@@ -177,7 +255,6 @@ export async function enrichContentCreators<T extends { content_items?: any }>(r
     };
   });
 }
-
 
 export async function enrichContentEngagement<T extends { id: string }>(
   rows: T[],

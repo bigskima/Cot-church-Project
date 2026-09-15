@@ -17,6 +17,7 @@ import {
 import { ParticipationHomeShelf } from '@/features/community/ParticipationHomeShelf';
 import { GeneralTopBar } from './GeneralTopBar';
 import { GeneralHomeActionDeck } from './GeneralHomeActionDeck';
+import { UrgentUpdatesRail } from './UrgentUpdatesRail';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 import { getRuntimeSupabase } from '@/services/runtime-supabase';
@@ -262,6 +263,7 @@ export default function GeneralHomeExperience() {
   const header = (
     <View style={[styles.headerContent, { width: contentWidth }]}>
       <GeneralHomeActionDeck onComposePost={() => openGeneralComposer('post')} onComposeVoice={() => openGeneralComposer('audio')} />
+      <UrgentUpdatesRail announcements={announcements} />
       {degradedSections.length ? <Pressable onPress={resource.refresh} style={[styles.degradedBanner, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><View style={[styles.degradedIcon, { backgroundColor: colors.card }]}><Icon name="refresh-outline" size={16} color={colors.interactive} /></View><View style={styles.flex}><Text style={[styles.degradedTitle, { color: colors.text }]}>A few sections need another try</Text><Text style={[styles.degradedText, { color: colors.textMuted }]}>Your Home remains usable. Tap here to refresh only the missing pieces.</Text></View></Pressable> : null}
       {activeStream ? <View style={styles.liveSection}><FeedSectionHeading eyebrow={activeStream.status === 'live' ? 'LIVE NOW' : 'NEXT LIVE'} title={activeStream.status === 'live' ? 'Join what is happening now' : 'Coming up live'} subtitle="Open the broadcast without leaving Home discovery." actionLabel="Live" onAction={() => router.push('/general/live' as any)} /><HeroLiveCard stream={activeStream} onPress={() => router.push(`/general/live/${activeStream.id}` as any)} /></View> : null}
       <ParticipationHomeShelf scope="general" />

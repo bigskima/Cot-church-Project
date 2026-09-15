@@ -10,6 +10,7 @@ import { BrandingProvider } from '@/state/branding';
 import { OnboardingGate } from '@/components/OnboardingGate';
 import { RealtimeBridge } from '@/components/RealtimeBridge';
 import { AppTourProvider } from '@/features/tour/AppTourProvider';
+import { CotGlobalActions } from '@/features/ai/CotGlobalActions';
 import { fetchPlatformBranding } from '@/services/branding';
 import { palette, radius, spacing } from '@/design-system/tokens';
 
@@ -79,6 +80,7 @@ function AppContent() {
         <Stack.Screen name="leadership/directory" options={{ headerShown: false }} />
         <Stack.Screen name="leadership/invite-codes" options={{ headerShown: false }} />
       </Stack>
+      <CotGlobalActions />
     </AppTourProvider>
   );
 }
