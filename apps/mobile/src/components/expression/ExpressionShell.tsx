@@ -72,7 +72,8 @@ function ExpressionNavigation({ expressionId, onNavigate }: { expressionId: stri
 
   const communityItems = useMemo<NavItem[]>(
     () => [
-      { key: 'feed', label: 'Feed', icon: 'chatbubbles-outline', active: pathname === `${basePath}/feed`, onPress: () => router.push(`${basePath}/feed` as any) },
+      { key: 'discussion', label: 'General discussion', icon: 'chatbubble-ellipses-outline', active: pathname === `${basePath}/chat`, onPress: () => router.push(`${basePath}/chat` as any) },
+      { key: 'feed', label: 'Expression feed', icon: 'chatbubbles-outline', active: pathname === `${basePath}/feed`, onPress: () => router.push(`${basePath}/feed` as any) },
       { key: 'prayer', label: 'Prayer', icon: 'heart-outline', active: pathname === `${basePath}/prayer`, onPress: () => router.push(`${basePath}/prayer` as any) },
       { key: 'testimonies', label: 'Testimonies', icon: 'sparkles-outline', active: pathname === `${basePath}/testimonies`, onPress: () => router.push(`${basePath}/testimonies` as any) },
       { key: 'events', label: 'Events', icon: 'calendar-outline', active: pathname === `${basePath}/events`, onPress: () => router.push(`${basePath}/events` as any) },
@@ -178,7 +179,7 @@ function ExpressionNavigation({ expressionId, onNavigate }: { expressionId: stri
         <NavButton onNavigate={onNavigate} item={{ key: 'switch', label: 'My Expressions', icon: 'grid-outline', onPress: () => router.push('/expressions') }} />
 
         <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>COT</Text>
-        <NavButton onNavigate={onNavigate} item={{ key: 'direct-messages', label: 'Direct Messages', icon: 'chatbubble-ellipses-outline', active: pathname === `${basePath}/chat`, onPress: () => router.push(`${basePath}/chat` as any) }} />
+        <NavButton onNavigate={onNavigate} item={{ key: 'direct-messages', label: 'Direct Messages', icon: 'chatbubbles-outline', onPress: () => router.push('/general/chat' as any) }} />
         <NavButton onNavigate={onNavigate} item={{ key: 'general', label: 'Return to General COT', icon: 'globe-outline', onPress: () => router.replace('/general') }} />
       </ScrollView>
     </View>
