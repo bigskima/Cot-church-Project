@@ -62,7 +62,7 @@ function appRoutes(branchId: string | null) {
     generalHome: "/general",
     expressions: "/expressions",
     messages: "/general/chat",
-    notifications: "/general/notifications",
+    notifications: expressionBase ? `${expressionBase}/notifications` : "/general/notifications",
     generalPrayer: "/general/prayer",
     prayer: expressionBase ? `${expressionBase}/prayer` : "/general/prayer",
     generalEvents: "/general/events",
