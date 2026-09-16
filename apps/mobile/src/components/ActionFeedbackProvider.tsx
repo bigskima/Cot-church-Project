@@ -20,10 +20,11 @@ export function ActionFeedbackProvider({ children }: React.PropsWithChildren) {
 
   const retry = async () => {
     if (!feedback?.retry || retrying) return;
+    const action = feedback.retry;
     setRetrying(true);
+    setFeedback(null);
     try {
-      await feedback.retry();
-      setFeedback(null);
+      await action();
     } catch {
       // The retried request emits its own fresh failure feedback if it still fails.
     } finally {
