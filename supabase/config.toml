@@ -108,6 +108,13 @@ verify_jwt = false
 [functions.home-feed]
 verify_jwt = false
 
+# The moving General COT header update is intentionally public for reads. Create,
+# update, disable and delete paths validate a real bearer session and the
+# church-wide announcements.manage capability inside the function before using
+# the service-role client. No Expression scope is accepted by this endpoint.
+[functions.general-home-notices]
+verify_jwt = false
+
 # Public post/media threads are readable before sign-in. Engagement mutations
 # still require a verified user inside the function, and scoped content access
 # is checked before comments, reactions, bookmarks, or playback are accepted.
