@@ -9,6 +9,7 @@ import { ThemeProvider, useTheme } from '@/state/theme';
 import { BrandingProvider } from '@/state/branding';
 import { OnboardingGate } from '@/components/OnboardingGate';
 import { RealtimeBridge } from '@/components/RealtimeBridge';
+import { ActionFeedbackProvider } from '@/components/ActionFeedbackProvider';
 import { AppTourProvider } from '@/features/tour/AppTourProvider';
 import { CotGlobalActions } from '@/features/ai/CotGlobalActions';
 import { fetchPlatformBranding } from '@/services/branding';
@@ -111,7 +112,9 @@ export default function RootLayout() {
       <ThemeProvider>
         <SessionProvider>
           <BrandingProvider>
-            <AppContent />
+            <ActionFeedbackProvider>
+              <AppContent />
+            </ActionFeedbackProvider>
           </BrandingProvider>
         </SessionProvider>
       </ThemeProvider>

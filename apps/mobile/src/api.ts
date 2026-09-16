@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import { invalidateAfterMutation } from './services/resource-invalidation';
+import { defaultMutationSuccess, emitActionFeedback, shouldShowMutationFeedback } from './services/action-feedback';
 import * as SecureStore from 'expo-secure-store';
 
 const SESSION_KEY = 'church-os-session';
@@ -17,6 +18,17 @@ export interface StoredAuth {
   organizationId?: string;
   branchId?: string;
 }
+
+type RequestFeedback = false | {
+  successTitle?: string;
+  successMessage?: string;
+  failureTitle?: string;
+};
+
+type ApiRequestInit = RequestInit & {
+  context?: 'current' | 'public';
+  feedback?: RequestFeedback;
+};
 
 function isStoredAuth(value: unknown): value is StoredAuth {
   if (!value || typeof value !== 'object') return false;
@@ -162,15 +174,18 @@ export function toUserFacingErrorMessage(
 export class ApiClient {
   constructor(private baseUrl: string, private getAuth: () => StoredAuth | null) {}
 
-  async request<T>(path: string, init: RequestInit & { context?: 'current' | 'public' } = {}) {
+  async request<T>(path: string, init: ApiRequestInit = {}) {
     const cleanBase = this.baseUrl.trim().replace(/\/+$/, '');
     if (!cleanBase) {
       throw new ApiError('API_NOT_CONFIGURED', userFacingApiMessage('API_NOT_CONFIGURED', 0), 0);
     }
 
     const auth = this.getAuth();
-    const { context: requestContext = 'current', ...fetchInit } = init;
+    const { context: requestContext = 'current', feedback = undefined, ...fetchInit } = init;
     const cleanPath = path.replace(/^\/+/, '');
+    const method = (fetchInit.method ?? 'GET').toUpperCase();
+    const isMutation = ['POST', 'PATCH', 'PUT', 'DELETE'].includes(method);
+    const feedbackEnabled = isMutation && feedback !== false && shouldShowMutationFeedback(cleanPath);
     const controller = new AbortController();
     let timedOut = false;
     const timeoutId = setTimeout(() => {
@@ -192,7 +207,6 @@ export class ApiClient {
         signal: controller.signal,
         headers: {
           Accept: 'application/json',
-          // Never set multipart Content-Type manually: fetch must add the boundary.
           ...(fetchInit.body && !isFormData ? { 'Content-Type': 'application/json' } : {}),
           ...(auth?.session?.accessToken ? { Authorization: `Bearer ${auth.session.accessToken}` } : {}),
           ...(requestContext === 'current' && auth?.organizationId ? { 'X-Organization-Id': auth.organizationId } : {}),
@@ -212,17 +226,39 @@ export class ApiClient {
         const code = payload.error?.code ?? 'REQUEST_FAILED';
         throw new ApiError(code, userFacingApiMessage(code, response.status, payload.error?.message), response.status);
       }
-      if (['POST', 'PATCH', 'PUT', 'DELETE'].includes((fetchInit.method ?? 'GET').toUpperCase())) {
+      if (isMutation) {
         invalidateAfterMutation(cleanPath, fetchInit.body);
+        if (feedbackEnabled) {
+          const config = feedback && typeof feedback === 'object' ? feedback : {};
+          emitActionFeedback({
+            kind: 'success',
+            title: config.successTitle ?? 'Done',
+            message: config.successMessage ?? defaultMutationSuccess(cleanPath, method),
+          });
+        }
       }
       return payload.data as T;
     } catch (error) {
-      if (error instanceof ApiError) throw error;
-      if (error instanceof Error && error.name === 'AbortError') {
-        if (timedOut) throw new ApiError('REQUEST_TIMEOUT', userFacingApiMessage('REQUEST_TIMEOUT', 0), 0);
-        throw new ApiError('REQUEST_CANCELLED', 'The request was cancelled.', 0);
+      let normalized: ApiError;
+      if (error instanceof ApiError) normalized = error;
+      else if (error instanceof Error && error.name === 'AbortError') {
+        normalized = timedOut
+          ? new ApiError('REQUEST_TIMEOUT', userFacingApiMessage('REQUEST_TIMEOUT', 0), 0)
+          : new ApiError('REQUEST_CANCELLED', 'The request was cancelled.', 0);
+      } else {
+        normalized = new ApiError('NETWORK_ERROR', userFacingApiMessage('NETWORK_ERROR', 0), 0);
       }
-      throw new ApiError('NETWORK_ERROR', userFacingApiMessage('NETWORK_ERROR', 0), 0);
+
+      if (feedbackEnabled && normalized.code !== 'REQUEST_CANCELLED') {
+        const config = feedback && typeof feedback === 'object' ? feedback : {};
+        emitActionFeedback({
+          kind: 'error',
+          title: config.failureTitle ?? 'We couldn’t complete that',
+          message: normalized.message,
+          retry: () => this.request<T>(path, init),
+        });
+      }
+      throw normalized;
     } finally {
       clearTimeout(timeoutId);
       callerSignal?.removeEventListener('abort', abortFromCaller);

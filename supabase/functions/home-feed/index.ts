@@ -12,8 +12,11 @@ function nestedItem(value: any) {
 }
 
 function inSelectedExperience(row: any, selectedExpressionId: string | null, key: string) {
-  if (!selectedExpressionId) return true;
   const value = key === "content_items" ? nestedItem(row.content_items)?.expression_id : row[key];
+  // General COT must only return church-wide rows. A public Expression item can
+  // still be public, but it belongs to that Expression and must not leak into
+  // the General Home feed where its detail route may have different access rules.
+  if (!selectedExpressionId) return value == null;
   return value === selectedExpressionId;
 }
 
@@ -117,7 +120,6 @@ Deno.serve(createHandler(
       if (branchError || !branch) throw new ApiError("EXPRESSION_NOT_FOUND", "This Expression is unavailable", 404);
       selectedExpression = { id: branch.id, name: branch.name, avatar_url: branch.avatar_url, banner_url: branch.banner_url };
     }
-
     // General mode deliberately uses the anonymous client even when a valid session is
     // present, so it can never leak member-only rows. Expression mode uses the caller's
     // JWT, with the exact membership check above and RLS remaining authoritative.

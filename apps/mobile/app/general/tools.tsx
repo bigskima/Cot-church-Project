@@ -69,31 +69,15 @@ export default function GeneralToolsScreen() {
           <Text style={[styles.toolTitle, { color: colors.text }]}>{title}</Text>
           {badge ? <Badge label={badge} variant="primary" /> : null}
         </View>
-        <Text style={[styles.toolSubtitle, { color: colors.textSecondary }]} numberOfLines={2}>
-          {subtitle}
-        </Text>
+        <Text style={[styles.toolSubtitle, { color: colors.textSecondary }]} numberOfLines={2}>{subtitle}</Text>
       </View>
     </Pressable>
   );
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.content,
-          {
-            paddingTop: insets.top + spacing.sm,
-            paddingBottom: insets.bottom + 120,
-          },
-        ]}
-      >
-        <ScreenHeader
-          title="General COT"
-          kicker="TOOLS & SETTINGS"
-          subtitle="Create, connect and manage your COT experience from one simple place."
-          showBack
-        />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 120 }]}>
+        <ScreenHeader title="General COT" kicker="TOOLS & SETTINGS" subtitle="Create, connect and manage your COT experience from one simple place." showBack />
 
         {mode === 'authenticated' ? (
           <View style={styles.section}>
@@ -105,14 +89,8 @@ export default function GeneralToolsScreen() {
                 ['flash-outline', 'Reel', () => router.push('/general/studio/reel')],
                 ['videocam-outline', 'Video', () => router.push('/general/studio/video')],
               ].map(([icon, label, onPress]) => (
-                <Pressable
-                  key={label as string}
-                  onPress={onPress as () => void}
-                  style={({ pressed }) => [styles.createAction, pressed && styles.pressed]}
-                >
-                  <View style={[styles.createIcon, { backgroundColor: colors.primarySoft }]}>
-                    <Icon name={icon as string} size={19} color={colors.interactive} />
-                  </View>
+                <Pressable key={label as string} onPress={onPress as () => void} style={({ pressed }) => [styles.createAction, pressed && styles.pressed]}>
+                  <View style={[styles.createIcon, { backgroundColor: colors.primarySoft }]}><Icon name={icon as string} size={19} color={colors.interactive} /></View>
                   <Text style={[styles.createLabel, { color: colors.text }]}>{label as string}</Text>
                 </Pressable>
               ))}
@@ -120,13 +98,8 @@ export default function GeneralToolsScreen() {
           </View>
         ) : (
           <View style={[styles.signInCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
-            <View style={[styles.signInIcon, { backgroundColor: colors.primarySoft }]}>
-              <Icon name="person-add-outline" size={22} color={colors.interactive} />
-            </View>
-            <View style={styles.signInCopy}>
-              <Text style={[styles.signInTitle, { color: colors.text }]}>Sign in for your COT tools</Text>
-              <Text style={[styles.signInText, { color: colors.textSecondary }]}>Public content stays open. Sign in to create, message, vote, save and manage your account.</Text>
-            </View>
+            <View style={[styles.signInIcon, { backgroundColor: colors.primarySoft }]}><Icon name="person-add-outline" size={22} color={colors.interactive} /></View>
+            <View style={styles.signInCopy}><Text style={[styles.signInTitle, { color: colors.text }]}>Sign in for your COT tools</Text><Text style={[styles.signInText, { color: colors.textSecondary }]}>Public content stays open. Sign in to create, message, vote, save and manage your account.</Text></View>
             <Button label="Sign in" variant="primary" size="sm" onPress={() => router.push({ pathname: '/(auth)/login', params: { returnTo: '/general/tools' } } as any)} />
           </View>
         )}
@@ -136,6 +109,7 @@ export default function GeneralToolsScreen() {
           <View style={styles.toolsGrid}>
             {mode === 'authenticated' ? toolTile({ icon: 'chatbubbles-outline', title: 'Messages', subtitle: 'Private direct messages across COT', onPress: () => router.push('/general/chat') }) : null}
             {toolTile({ icon: 'radio-outline', title: 'Live', subtitle: 'Watch current and upcoming broadcasts', onPress: () => router.push('/general/live' as any) })}
+            {toolTile({ icon: 'location-outline', title: 'Church location', subtitle: 'Official General COT address and Google Maps preview', badge: 'PUBLIC', onPress: () => router.push('/general/location' as any) })}
             {mode === 'authenticated' ? toolTile({ icon: 'stats-chart-outline', title: 'Polls & giveaways', subtitle: 'Vote in official polls or host and join giveaways', badge: 'ENGAGE', onPress: () => router.push('/general/participate' as any) }) : null}
             {mode === 'authenticated' ? toolTile({ icon: 'bookmark-outline', title: 'Saved', subtitle: 'Posts, Reels, videos and sermons you kept', onPress: () => router.push('/general/saved') }) : null}
             {toolTile({ icon: 'heart-outline', title: 'Prayer', subtitle: 'Prayer wall and private petitions', onPress: () => router.push('/general/prayer') })}
