@@ -14,6 +14,7 @@ import { router, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
+import { useResource } from '@/hooks/use-resource';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useExpressionManagementAccess } from '@/features/expression-management/useExpressionManagementAccess';
@@ -29,6 +30,19 @@ type NavItem = {
   onPress: () => void;
   active?: boolean;
 };
+
+type PublicExpressionPayload = { expression?: { address?: unknown } | null };
+
+function addressDisplay(value: unknown) {
+  if (typeof value === 'string') return value.trim();
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return '';
+  const address = value as Record<string, unknown>;
+  const locality = [address.city, address.state].filter(Boolean).join(', ');
+  return [address.line1, address.line2, locality, address.country]
+    .map((part) => String(part || '').trim())
+    .filter(Boolean)
+    .join(', ');
+}
 
 function NavButton({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }) {
   const { colors } = useTheme();
@@ -53,18 +67,24 @@ function NavButton({ item, onNavigate }: { item: NavItem; onNavigate?: () => voi
 
 function ExpressionNavigation({ expressionId, onNavigate }: { expressionId: string; onNavigate?: () => void }) {
   const { colors } = useTheme();
-  const { context } = useSession();
+  const { context, api } = useSession();
   const pathname = usePathname();
   const management = useExpressionManagementAccess();
   const expression = context?.expressions?.find((item) => item.id === expressionId)
     ?? (context?.expression?.id === expressionId
       ? { id: expressionId, name: context.expression.name, code: undefined, avatar_url: context.expression.avatar_url, banner_url: context.expression.banner_url }
       : undefined);
+  const publicExpression = useResource<PublicExpressionPayload>(
+    `expression:shell:public:${expressionId}`,
+    (signal) => api.request<PublicExpressionPayload>(`public-content?type=expression&expressionId=${encodeURIComponent(expressionId)}`, { signal, context: 'public' }),
+  );
+  const publicAddress = addressDisplay(publicExpression.data?.expression?.address);
 
   const basePath = `/expressions/${expressionId}`;
   const overviewItems = useMemo<NavItem[]>(
     () => [
       { key: 'home', label: 'Home', icon: 'home-outline', active: pathname === basePath || pathname === `${basePath}/`, onPress: () => router.replace(basePath as any) },
+      { key: 'location', label: 'Location', icon: 'location-outline', active: pathname === `${basePath}/location`, onPress: () => router.push(`${basePath}/location` as any) },
       { key: 'announcements', label: 'Announcements', icon: 'megaphone-outline', active: pathname === `${basePath}/announcements`, onPress: () => router.push(`${basePath}/announcements` as any) },
     ],
     [basePath, pathname],
@@ -107,6 +127,7 @@ function ExpressionNavigation({ expressionId, onNavigate }: { expressionId: stri
       return [
         { key: 'manage', label: 'Tools', icon: 'settings-outline', active: pathname === manageBase, onPress: () => router.push(manageBase as any), enabled: management.canManageAny },
         { key: 'manage-studio', label: 'Content Studio', icon: 'color-wand-outline', active: pathname === `${manageBase}/studio` || pathname === `${manageBase}/reel` || pathname === `${manageBase}/video`, onPress: () => router.push(`${manageBase}/studio` as any), enabled: management.canUseContentStudio },
+        { key: 'manage-announcements', label: 'Manage Announcements', icon: 'megaphone-outline', active: pathname === `${manageBase}/announcements`, onPress: () => router.push(`${manageBase}/announcements` as any), enabled: management.canManageAnnouncements },
         { key: 'manage-live', label: 'Live Studio', icon: 'radio-outline', active: pathname === `${manageBase}/live`, onPress: () => router.push(`${manageBase}/live` as any), enabled: management.canManageLive },
         { key: 'manage-sermons', label: 'Manage Sermons', icon: 'book-outline', active: pathname === `${manageBase}/sermons`, onPress: () => router.push(`${manageBase}/sermons` as any), enabled: management.canManageSermons },
         { key: 'manage-events', label: 'Manage Events', icon: 'calendar-outline', active: pathname === `${manageBase}/events`, onPress: () => router.push(`${manageBase}/events` as any), enabled: management.canManageEvents },
@@ -126,6 +147,7 @@ function ExpressionNavigation({ expressionId, onNavigate }: { expressionId: stri
     [
       basePath,
       management.canManageAccess,
+      management.canManageAnnouncements,
       management.canManageAny,
       management.canManageEvents,
       management.canManageGiving,
@@ -152,6 +174,12 @@ function ExpressionNavigation({ expressionId, onNavigate }: { expressionId: stri
         <View style={styles.identityCopy}>
           <Text style={[styles.identityName, { color: colors.text }]} numberOfLines={2}>{expression?.name ?? 'Expression'}</Text>
           <Text style={[styles.identityMeta, { color: colors.textMuted }]} numberOfLines={1}>{expression?.code || 'Private COT community'}</Text>
+          {publicAddress ? (
+            <Pressable onPress={() => { router.push(`${basePath}/location` as any); onNavigate?.(); }} style={styles.identityLocation} accessibilityRole="button">
+              <Icon name="location-outline" size={12} color={colors.interactive} />
+              <Text style={[styles.identityLocationText, { color: colors.textSecondary }]} numberOfLines={2}>{publicAddress}</Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
 
@@ -262,12 +290,14 @@ const styles = StyleSheet.create({
   headerMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   headerMeta: { fontSize: 11, lineHeight: 14, fontWeight: '700' },
   navRoot: { flex: 1 },
-  identityCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
+  identityCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.md },
   identityImage: { width: '100%', height: '100%' },
   identityMark: { width: 44, height: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   identityCopy: { flex: 1, minWidth: 0 },
   identityName: { fontSize: 15, lineHeight: 19, fontWeight: '800', letterSpacing: -0.2 },
   identityMeta: { fontSize: 11, lineHeight: 15, marginTop: 2 },
+  identityLocation: { flexDirection: 'row', alignItems: 'flex-start', gap: 4, marginTop: 6 },
+  identityLocationText: { flex: 1, fontSize: 9.5, lineHeight: 13, fontWeight: '600' },
   navScrollContent: { paddingBottom: spacing.xl },
   sectionLabel: { fontSize: 10, lineHeight: 14, fontWeight: '800', letterSpacing: 0.9, marginTop: spacing.md, marginBottom: spacing.xs, paddingHorizontal: spacing.sm },
   navItem: { minHeight: 48, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: 4 },
