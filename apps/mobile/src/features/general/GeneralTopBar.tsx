@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, BrandMark, Icon } from '@/components';
 import { TourAnchor } from '@/features/tour/AppTourProvider';
+import { GeneralHomeNoticeStrip } from './GeneralHomeNoticeStrip';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useTheme } from '@/state/theme';
 
@@ -92,12 +93,13 @@ export function GeneralTopBar({ organizationName, authenticated, avatarUrl, disp
           </View>
         </View>
       </TourAnchor>
+      <GeneralHomeNoticeStrip />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { paddingHorizontal: spacing.md, paddingBottom: spacing.xs },
+  wrap: { paddingHorizontal: spacing.md, paddingBottom: spacing.xs, gap: 6 },
   bar: { width: '100%', maxWidth: 1040, alignSelf: 'center', minHeight: 62, borderWidth: 1, borderRadius: radius.xxl, paddingHorizontal: spacing.sm, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   identity: { minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 1 },
   brand: { width: 42, height: 42, borderRadius: 15, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
