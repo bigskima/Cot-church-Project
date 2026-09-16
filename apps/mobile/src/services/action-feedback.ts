@@ -11,7 +11,9 @@ const listeners = new Set<Listener>();
 
 export function subscribeActionFeedback(listener: Listener) {
   listeners.add(listener);
-  return () => listeners.delete(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 export function emitActionFeedback(feedback: Omit<ActionFeedback, 'id'>) {
