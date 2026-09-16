@@ -16,6 +16,12 @@ function timestamp(value: unknown, field: string) {
   return text;
 }
 
+function assertFutureSchedule(value: string | null | undefined) {
+  if (!value) throw new ApiError("VALIDATION_FAILED", "Choose when this announcement should be published", 422);
+  const time = Date.parse(value);
+  if (!Number.isFinite(time) || time <= Date.now()) throw new ApiError("VALIDATION_FAILED", "Choose a future time for the scheduled announcement", 422);
+}
+
 Deno.serve(createHandler(
   { methods: ["GET", "POST", "PATCH"], authentication: "required", organization: "required" },
   async ({ request, auth }) => {
@@ -25,6 +31,13 @@ Deno.serve(createHandler(
       const url = new URL(request.url);
       const requestedBranchId = url.searchParams.get("branchId");
       const memberFeed = url.searchParams.get("view") === "feed";
+
+      // Cron remains the primary scheduler. This reconciliation makes scheduled
+      // delivery resilient if a cron run is delayed: the next announcement read
+      // publishes any due records before the list is returned.
+      const admin = adminClient();
+      await admin.rpc("publish_due_announcements", { reference_time: new Date().toISOString() });
+
       let query = auth.client
         .from("announcements")
         .select("id,organization_id,branch_id,title,body,status,audience,channels,scheduled_for,published_at,banner_url,created_at,updated_at")
@@ -37,7 +50,7 @@ Deno.serve(createHandler(
       } else if (!auth.branchId) {
         query = query.is("branch_id", null);
       }
-      if (memberFeed) query = query.eq("status","published");
+      if (memberFeed) query = query.eq("status", "published");
       const { data, error } = await query.order("created_at", { ascending: false }).limit(100);
       if (error) throw new ApiError("ANNOUNCEMENT_LIST_FAILED", "Unable to retrieve announcements", 500, undefined, false);
       return { data: data ?? [] };
@@ -87,11 +100,17 @@ Deno.serve(createHandler(
     if (body.status !== undefined) {
       const status = optionalString(body.status, "status", 20) ?? "draft";
       if (!statuses.has(status)) throw new ApiError("VALIDATION_FAILED", "Invalid announcement status", 422);
+      if (status === "scheduled") {
+        const scheduleValue = body.scheduledFor !== undefined ? (record.scheduled_for as string | null) : null;
+        assertFutureSchedule(scheduleValue);
+      }
       record.status = status;
+      if (status !== "scheduled" && body.scheduledFor === undefined) record.scheduled_for = null;
     }
     if (body.bannerUrl !== undefined) record.banner_url = optionalString(body.bannerUrl, "bannerUrl", 2000);
 
     if (request.method === "POST") {
+      if (record.status === "scheduled") assertFutureSchedule(record.scheduled_for as string | null | undefined);
       Object.assign(record, { organization_id: auth.organizationId, created_by: auth.user.id });
       const { data, error } = await auth.client.from("announcements").insert(record).select().single();
       if (error) throw new ApiError("ANNOUNCEMENT_CREATE_FAILED", "Unable to create announcement", 500, undefined, false);
