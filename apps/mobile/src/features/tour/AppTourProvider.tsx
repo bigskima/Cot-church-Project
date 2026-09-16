@@ -96,12 +96,30 @@ function clampRect(rect: LayoutRectangle, screenWidth: number, screenHeight: num
   return { x, y, width: Math.max(1, right - x), height: Math.max(1, bottom - y) };
 }
 
+function routeSpotlight(targetKey: string, width: number, height: number): LayoutRectangle {
+  const horizontal = Math.max(12, Math.min(24, width * 0.035));
+  if (targetKey.includes('.top') || targetKey.includes(':top')) {
+    return { x: horizontal, y: 92, width: Math.max(1, width - horizontal * 2), height: Math.min(210, height * 0.27) };
+  }
+  if (targetKey.includes('.bottom') || targetKey.includes(':bottom')) {
+    const boxHeight = Math.min(190, height * 0.24);
+    return { x: horizontal, y: Math.max(90, height - boxHeight - 92), width: Math.max(1, width - horizontal * 2), height: boxHeight };
+  }
+  return {
+    x: horizontal,
+    y: Math.max(82, height * 0.14),
+    width: Math.max(1, width - horizontal * 2),
+    height: Math.max(150, Math.min(height * 0.48, 430)),
+  };
+}
+
 export function AppTourProvider({ children }: React.PropsWithChildren) {
   const { api, auth, mode } = useSession();
   const { colors } = useTheme();
   const pathname = usePathname();
   const anchors = React.useRef(new Map<string, AnchorRegistration>());
   const attempted = React.useRef(new Set<string>());
+  const navigatingTo = React.useRef<string | null>(null);
   const [tour, setTour] = React.useState<ActiveTour | null>(null);
   const [stepIndex, setStepIndex] = React.useState(0);
   const [targetRect, setTargetRect] = React.useState<LayoutRectangle | null>(null);
@@ -136,6 +154,7 @@ export function AppTourProvider({ children }: React.PropsWithChildren) {
     return api.request<TourPayload>('app-tour', {
       method: 'POST',
       context: 'public',
+      feedback: false,
       body: JSON.stringify({
         action,
         scope: payload.payload.experience.scope,
@@ -147,9 +166,10 @@ export function AppTourProvider({ children }: React.PropsWithChildren) {
   }, [api]);
 
   const activate = React.useCallback(async (payload: TourPayload, expressionId?: string, manual = false) => {
-    if (!payload.active || !payload.experience || !payload.steps.length || !payload.eligible) return;
+    if (!payload.active || !payload.experience || !payload.steps.length || (!manual && !payload.eligible)) return;
     const activeTour: ActiveTour = { payload, expressionId, manual };
     const nextIndex = manual ? 0 : Math.max(0, Math.min(payload.steps.length - 1, payload.progress?.currentStep ?? 0));
+    navigatingTo.current = null;
     setTour(activeTour);
     setStepIndex(nextIndex);
     setShowOptions(false);
@@ -158,7 +178,9 @@ export function AppTourProvider({ children }: React.PropsWithChildren) {
     setTargetRect(null);
     try {
       const updated = await postTour(manual ? 'restart' : 'start', activeTour);
-      if (updated) setTour({ ...activeTour, payload: updated });
+      if (updated?.experience && updated.steps.length) {
+        setTour((current) => current ? { ...current, payload: updated } : current);
+      }
     } catch {
       // The visual guide can still run if recording the start moment fails briefly.
     }
@@ -215,9 +237,18 @@ export function AppTourProvider({ children }: React.PropsWithChildren) {
 
   const measureCurrentTarget = React.useCallback(async () => {
     if (!currentStep) return;
+    const screen = Dimensions.get('window');
     const anchor = anchors.current.get(currentStep.targetKey);
     if (!anchor?.ref.current) {
-      setTargetRect(null);
+      if (currentStep.targetKey.startsWith('screen.') || currentStep.targetKey.startsWith('screen:')) {
+        setTargetRect(routeSpotlight(currentStep.targetKey, screen.width, screen.height));
+      } else {
+        setTargetRect(null);
+        setTimeout(() => {
+          const delayed = anchors.current.get(currentStep.targetKey)?.ref.current;
+          if (!delayed) setTargetRect(routeSpotlight(currentStep.targetKey, screen.width, screen.height));
+        }, 950);
+      }
       return;
     }
     try {
@@ -230,7 +261,7 @@ export function AppTourProvider({ children }: React.PropsWithChildren) {
       const node = anchors.current.get(currentStep.targetKey)?.ref.current;
       if (!node) {
         if (attempt++ < 7) setTimeout(measure, 120);
-        else setTargetRect(null);
+        else setTargetRect(routeSpotlight(currentStep.targetKey, screen.width, screen.height));
         return;
       }
       node.measureInWindow((x, y, width, height) => {
@@ -238,25 +269,31 @@ export function AppTourProvider({ children }: React.PropsWithChildren) {
           setTimeout(measure, 120);
           return;
         }
-        setTargetRect({ x, y, width, height });
+        setTargetRect(width && height ? { x, y, width, height } : routeSpotlight(currentStep.targetKey, screen.width, screen.height));
       });
     };
-    setTimeout(measure, 180);
+    setTimeout(measure, 220);
   }, [currentStep]);
 
   React.useEffect(() => {
     if (!tour || !currentStep || !currentRoute) return;
     setTargetRect(null);
     if (!sameRoute(pathname, currentRoute)) {
-      router.replace(currentRoute as any);
+      if (navigatingTo.current !== currentRoute) {
+        navigatingTo.current = currentRoute;
+        router.push(currentRoute as any);
+      }
       return;
     }
-    void measureCurrentTarget();
+    navigatingTo.current = null;
+    const timer = setTimeout(() => void measureCurrentTarget(), 120);
+    return () => clearTimeout(timer);
   }, [currentRoute, currentStep, measureCurrentTarget, pathname, tour]);
 
   const moveTo = React.useCallback(async (nextIndex: number) => {
     if (!tour) return;
     const bounded = Math.max(0, Math.min(tour.payload.steps.length - 1, nextIndex));
+    navigatingTo.current = null;
     setStepIndex(bounded);
     setTargetRect(null);
     setError('');
@@ -275,6 +312,7 @@ export function AppTourProvider({ children }: React.PropsWithChildren) {
       await postTour('complete', tour);
       setTour(null);
       setTargetRect(null);
+      navigatingTo.current = null;
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to finish the tour right now.');
     } finally {
@@ -291,6 +329,7 @@ export function AppTourProvider({ children }: React.PropsWithChildren) {
       setTour(null);
       setShowOptions(false);
       setTargetRect(null);
+      navigatingTo.current = null;
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to save that reminder.');
     } finally {
@@ -307,6 +346,7 @@ export function AppTourProvider({ children }: React.PropsWithChildren) {
       setTour(null);
       setShowOptions(false);
       setTargetRect(null);
+      navigatingTo.current = null;
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to save that preference.');
     } finally {
@@ -318,6 +358,7 @@ export function AppTourProvider({ children }: React.PropsWithChildren) {
     setTour(null);
     setShowOptions(false);
     setTargetRect(null);
+    navigatingTo.current = null;
   }, []);
 
   const contextValue = React.useMemo<TourContextValue>(() => ({ registerAnchor, startTour, active: Boolean(tour) }), [registerAnchor, startTour, tour]);
@@ -369,7 +410,7 @@ export function AppTourProvider({ children }: React.PropsWithChildren) {
               <Text style={[styles.coachBody, { color: colors.textSecondary }]}>{currentStep?.body}</Text>
               {!spotlight ? <Text style={[styles.findingTarget, { color: colors.textMuted }]}>Opening the right screen and locating this control…</Text> : null}
               {error ? <Text style={[styles.errorText, { color: colors.live }]}>{error}</Text> : null}
-              <View style={styles.progressRow}>{tour?.payload.steps.map((step, index) => <View key={step.id} style={[styles.progressDot, { backgroundColor: index === stepIndex ? colors.interactive : colors.borderSubtle }, index === stepIndex && styles.progressDotActive]} />)}</View>
+              <ScrollProgress steps={tour?.payload.steps.length ?? 0} active={stepIndex} activeColor={colors.interactive} idleColor={colors.borderSubtle} />
               <View style={styles.actions}>
                 <Pressable onPress={() => void moveTo(stepIndex - 1)} disabled={stepIndex === 0 || busy} style={[styles.secondaryButton, { borderColor: colors.borderSubtle, opacity: stepIndex === 0 ? 0.45 : 1 }]}><Icon name="arrow-back" size={16} color={colors.textSecondary} /><Text style={[styles.secondaryText, { color: colors.textSecondary }]}>Back</Text></Pressable>
                 {stepIndex < (tour?.payload.steps.length ?? 1) - 1 ? (
@@ -403,6 +444,21 @@ export function AppTourProvider({ children }: React.PropsWithChildren) {
   );
 }
 
+function ScrollProgress({ steps, active, activeColor, idleColor }: { steps: number; active: number; activeColor: string; idleColor: string }) {
+  const visible = Math.min(steps, 12);
+  const page = steps > visible ? Math.floor(active / visible) : 0;
+  const start = page * visible;
+  const end = Math.min(steps, start + visible);
+  return (
+    <View style={styles.progressRow}>
+      {Array.from({ length: end - start }, (_, offset) => start + offset).map((index) => (
+        <View key={index} style={[styles.progressDot, { backgroundColor: index === active ? activeColor : idleColor }, index === active && styles.progressDotActive]} />
+      ))}
+      {steps > visible ? <Text style={[styles.progressMore, { color: idleColor }]}>{active + 1}/{steps}</Text> : null}
+    </View>
+  );
+}
+
 export function TourAnchor({ targetKey, children, style, reveal }: React.PropsWithChildren<{ targetKey: string; style?: StyleProp<ViewStyle>; reveal?: () => void | Promise<void> }>) {
   const context = React.useContext(TourContext);
   const ref = React.useRef<View>(null);
@@ -418,9 +474,9 @@ export function useAppTour() {
 
 const styles = StyleSheet.create({
   overlayRoot: { flex: 1 },
-  scrim: { position: 'absolute', backgroundColor: 'rgba(1, 7, 16, 0.78)' },
-  fullScrim: { backgroundColor: 'rgba(1, 7, 16, 0.78)' },
-  spotlightBorder: { position: 'absolute', borderWidth: 2, borderRadius: 18, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 12, elevation: 8 },
+  scrim: { position: 'absolute', backgroundColor: 'rgba(1, 7, 16, 0.62)' },
+  fullScrim: { backgroundColor: 'rgba(1, 7, 16, 0.62)' },
+  spotlightBorder: { position: 'absolute', borderWidth: 2, borderRadius: 18, shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 12, elevation: 8 },
   coachCard: { position: 'absolute', borderWidth: 1, borderRadius: radius.xxl, padding: spacing.lg },
   coachTopRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   coachIcon: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
@@ -435,6 +491,7 @@ const styles = StyleSheet.create({
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: spacing.md },
   progressDot: { width: 6, height: 6, borderRadius: 3 },
   progressDotActive: { width: 18 },
+  progressMore: { marginLeft: 3, fontSize: 9, fontWeight: '800' },
   actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
   secondaryButton: { minHeight: 42, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
   secondaryText: { fontSize: 11, fontWeight: '800' },
