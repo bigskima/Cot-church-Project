@@ -58,6 +58,7 @@
     },
     "android": {
       "package": "com.cot.app",
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#091733"
