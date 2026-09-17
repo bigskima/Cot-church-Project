@@ -5,6 +5,7 @@ import * as SecureStore from 'expo-secure-store';
 
 const SESSION_KEY = 'church-os-session';
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
+const MAX_REQUEST_TIMEOUT_MS = 120_000;
 
 export interface Session {
   accessToken: string;
@@ -28,6 +29,7 @@ type RequestFeedback = false | {
 type ApiRequestInit = RequestInit & {
   context?: 'current' | 'public';
   feedback?: RequestFeedback;
+  timeoutMs?: number;
 };
 
 function isStoredAuth(value: unknown): value is StoredAuth {
@@ -181,17 +183,18 @@ export class ApiClient {
     }
 
     const auth = this.getAuth();
-    const { context: requestContext = 'current', feedback = undefined, ...fetchInit } = init;
+    const { context: requestContext = 'current', feedback = undefined, timeoutMs, ...fetchInit } = init;
     const cleanPath = path.replace(/^\/+/, '');
     const method = (fetchInit.method ?? 'GET').toUpperCase();
     const isMutation = ['POST', 'PATCH', 'PUT', 'DELETE'].includes(method);
     const feedbackEnabled = isMutation && feedback !== false && shouldShowMutationFeedback(cleanPath);
     const controller = new AbortController();
+    const requestTimeoutMs = Math.max(1_000, Math.min(timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS, MAX_REQUEST_TIMEOUT_MS));
     let timedOut = false;
     const timeoutId = setTimeout(() => {
       timedOut = true;
       controller.abort();
-    }, DEFAULT_REQUEST_TIMEOUT_MS);
+    }, requestTimeoutMs);
 
     const callerSignal = fetchInit.signal;
     const abortFromCaller = () => controller.abort();
