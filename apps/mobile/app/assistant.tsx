@@ -17,6 +17,7 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { Badge, Button, Chip, Icon, ScreenHeader, Skeleton } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
+import { PLATFORM_KEYBOARD_BEHAVIOR, PLATFORM_KEYBOARD_DISMISS_MODE, PLATFORM_KEYBOARD_VERTICAL_OFFSET } from '@/utils/keyboard';
 
 type AssistantAction = {
   label: string;
@@ -349,7 +350,11 @@ export function AssistantScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={[styles.screen, { backgroundColor: colors.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView
+      style={[styles.screen, { backgroundColor: colors.bg }]}
+      behavior={PLATFORM_KEYBOARD_BEHAVIOR}
+      keyboardVerticalOffset={PLATFORM_KEYBOARD_VERTICAL_OFFSET}
+    >
       <View style={[styles.assistantHeader, { paddingTop: insets.top + spacing.sm, backgroundColor: colors.glass, borderColor: colors.borderSubtle }, shadows.sm]}>
         <ScreenHeader title="COT AI" kicker={expressionId ? 'EXPRESSION-AWARE AI' : 'GENERAL COT AI'} subtitle={`Talking with you in ${scopeLabel}.`} showBack />
         <View style={styles.providerRow}>
@@ -364,6 +369,7 @@ export function AssistantScreen() {
         contentContainerStyle={styles.chatList}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={PLATFORM_KEYBOARD_DISMISS_MODE}
         ListFooterComponent={() => messages.length <= 2 ? (
           <View style={styles.suggestionsWrap}>
             <Text style={[styles.suggestionsLabel, { color: colors.textMuted }]}>Ask anything or try one of these</Text>
