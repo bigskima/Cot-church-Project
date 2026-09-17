@@ -16,7 +16,7 @@
     "userInterfaceStyle": "automatic",
     "icon": "./assets/icon.png",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/cot-family-logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#091733"
     },
@@ -44,7 +44,7 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#091733",
-          "image": "./assets/splash.png",
+          "image": "./assets/cot-family-logo.png",
           "imageWidth": 240
         }
       ]
@@ -66,13 +66,13 @@
       "splash": {
         "backgroundColor": "#091733",
         "resizeMode": "contain",
-        "image": "./assets/splash.png"
+        "image": "./assets/cot-family-logo.png"
       }
     },
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/splash.png"
+      "favicon": "./assets/cot-family-logo.png"
     },
     "extra": {
       "eas": {
