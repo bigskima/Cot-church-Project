@@ -182,15 +182,30 @@ export function defaultMutationSuccess(path: string, method: string) {
 }
 
 const SILENT_MUTATION_PREFIXES = [
+  // Conversational / continuous interactions have their own inline UI state.
   'chat',
   'group-chat',
   'expression-chat',
   'engagement',
   'live-interactions',
+  'ai-gateway',
+
+  // Session/auth flows already present dedicated screen-level confirmation or errors.
+  'login',
+  'signup',
+  'verify-otp',
+  'password-recovery',
+  'password-reset',
+  'logout',
+
+  // Transport, upload, playback and presence steps are intermediate operations,
+  // not user-facing actions that should each open a modal.
+  'stream-access',
   'stream-presence',
   'realtime-config',
   'content-playback',
-  'content-media?action=playback',
+  'content-media',
+  'community-media',
   'notification-dispatch',
   'workflow-dispatch',
 ];
