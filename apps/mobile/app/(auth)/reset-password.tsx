@@ -15,6 +15,7 @@ import { BrandMark, Button, Icon, InputField } from '@/components';
 import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
+import { PLATFORM_KEYBOARD_BEHAVIOR, PLATFORM_KEYBOARD_DISMISS_MODE, PLATFORM_KEYBOARD_VERTICAL_OFFSET } from '@/utils/keyboard';
 
 function tokenFromUrl(value?: string | null) {
   if (!value) return null;
@@ -122,11 +123,13 @@ export default function ResetPasswordScreen() {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={PLATFORM_KEYBOARD_BEHAVIOR}
+      keyboardVerticalOffset={PLATFORM_KEYBOARD_VERTICAL_OFFSET}
       style={[styles.screen, { backgroundColor: colors.bg }]}
     >
       <ScrollView
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={PLATFORM_KEYBOARD_DISMISS_MODE}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
