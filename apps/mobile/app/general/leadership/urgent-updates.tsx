@@ -1,1 +1,1 @@
-export { default } from '@/features/general/GeneralAnnouncementsManageExperience';
+export { default } from '@/features/general/GeneralHomeNoticeManageExperience';
