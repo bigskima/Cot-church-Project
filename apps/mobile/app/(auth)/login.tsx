@@ -117,7 +117,8 @@ export default function LoginScreen() {
           { paddingTop: insets.top + spacing.xxl, paddingBottom: insets.bottom + spacing.xxl },
         ]}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
+        keyboardShouldPersistTaps="always"
+        keyboardDismissMode="none"
       >
         <View style={styles.brandMarkContainer}>
           <BrandMark variant="auth" size={72} />
@@ -167,91 +168,97 @@ export default function LoginScreen() {
         </View>
 
         <View style={[styles.authCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
-        {registrationComplete && !errorMsg ? (
-          <View style={[styles.successBanner, { backgroundColor: colors.successSoft }]}>
-            <Icon name="checkmark-circle" size={18} color={colors.success} style={{ marginRight: 8 }} />
-            <Text style={[styles.successText, { color: colors.success }]}>Your account is ready. Sign in to continue.</Text>
+          {registrationComplete && !errorMsg ? (
+            <View style={[styles.successBanner, { backgroundColor: colors.successSoft }]}>
+              <Icon name="checkmark-circle" size={18} color={colors.success} style={{ marginRight: 8 }} />
+              <Text style={[styles.successText, { color: colors.success }]}>Your account is ready. Sign in to continue.</Text>
+            </View>
+          ) : null}
+          {errorMsg ? (
+            <View
+              style={[styles.errorBanner, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}
+              accessibilityRole="alert"
+            >
+              <Icon name="alert-circle" size={18} color="#EF4444" style={{ marginRight: 8 }} />
+              <Text style={[styles.errorText, { color: '#EF4444' }]}>{errorMsg}</Text>
+            </View>
+          ) : null}
+
+          <View style={styles.form}>
+            <InputField
+              label="Email or phone number"
+              value={identifier}
+              onChangeText={(value) => {
+                setIdentifier(value);
+                if (errorMsg) setErrorMsg('');
+              }}
+              placeholder="name@example.com or +country code"
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="username"
+              textContentType="username"
+              keyboardType={identifierKeyboard}
+              editable={!loading && !guestLoading}
+              returnKeyType="next"
+              containerStyle={styles.sharedField}
+              leftIcon={<Icon name="person-outline" size={18} color={colors.textMuted} />}
+            />
+
+            <InputField
+              label="Password"
+              value={password}
+              onChangeText={(value) => {
+                setPassword(value);
+                if (errorMsg) setErrorMsg('');
+              }}
+              placeholder="Enter your password"
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="current-password"
+              textContentType="password"
+              keyboardType="default"
+              editable={!loading && !guestLoading}
+              returnKeyType="done"
+              onSubmitEditing={() => void handleLogin()}
+              containerStyle={styles.sharedField}
+              leftIcon={<Icon name="lock-closed-outline" size={18} color={colors.textMuted} />}
+              rightIcon={(
+                <Pressable
+                  onPress={() => setShowPassword((value) => !value)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  <Icon
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={19}
+                    color={colors.textMuted}
+                  />
+                </Pressable>
+              )}
+            />
+
+            <Pressable
+              onPress={() => router.push('/(auth)/forgot-password')}
+              hitSlop={8}
+              style={styles.forgotPassword}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.forgotPasswordText, { color: colors.interactive }]}>Forgot password?</Text>
+            </Pressable>
+
+            <Button
+              label="Sign in"
+              onPress={handleLogin}
+              loading={loading}
+              disabled={guestLoading}
+              variant="primary"
+              size="lg"
+              fullWidth
+              style={{ marginTop: spacing.xs }}
+            />
           </View>
-        ) : null}
-        {errorMsg ? (
-          <View
-            style={[styles.errorBanner, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}
-            accessibilityRole="alert"
-          >
-            <Icon name="alert-circle" size={18} color="#EF4444" style={{ marginRight: 8 }} />
-            <Text style={[styles.errorText, { color: '#EF4444' }]}>{errorMsg}</Text>
-          </View>
-        ) : null}
-
-        <View style={styles.form}>
-          <InputField
-            label="Email or phone number"
-            value={identifier}
-            onChangeText={(value) => {
-              setIdentifier(value);
-              if (errorMsg) setErrorMsg('');
-            }}
-            placeholder="name@example.com or +country code"
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType={identifierKeyboard}
-            editable={!loading && !guestLoading}
-            returnKeyType="next"
-            containerStyle={styles.sharedField}
-            leftIcon={<Icon name="person-outline" size={18} color={colors.textMuted} />}
-          />
-
-          <InputField
-            label="Password"
-            value={password}
-            onChangeText={(value) => {
-              setPassword(value);
-              if (errorMsg) setErrorMsg('');
-            }}
-            placeholder="Enter your password"
-            secureTextEntry={!showPassword}
-            editable={!loading && !guestLoading}
-            returnKeyType="done"
-            onSubmitEditing={() => void handleLogin()}
-            containerStyle={styles.sharedField}
-            leftIcon={<Icon name="lock-closed-outline" size={18} color={colors.textMuted} />}
-            rightIcon={(
-              <Pressable
-                onPress={() => setShowPassword(!showPassword)}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
-              >
-                <Icon
-                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                  size={19}
-                  color={colors.textMuted}
-                />
-              </Pressable>
-            )}
-          />
-
-          <Pressable
-            onPress={() => router.push('/(auth)/forgot-password')}
-            hitSlop={8}
-            style={styles.forgotPassword}
-            accessibilityRole="button"
-          >
-            <Text style={[styles.forgotPasswordText, { color: colors.interactive }]}>Forgot password?</Text>
-          </Pressable>
-
-          <Button
-            label="Sign in"
-            onPress={handleLogin}
-            loading={loading}
-            disabled={guestLoading}
-            variant="primary"
-            size="lg"
-            fullWidth
-            style={{ marginTop: spacing.xs }}
-          />
-        </View>
-
         </View>
 
         <View style={styles.footer}>
