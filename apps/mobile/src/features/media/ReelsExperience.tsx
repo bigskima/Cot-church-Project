@@ -65,8 +65,11 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
     const playbackUrl = source?.renditions?.find((rendition) => rendition.kind === 'video_stream')?.playbackUrl;
     return playbackUrl ? { ...reel, media_assets: { ...reel.media_assets, url: playbackUrl } } as ReelWithViewerState : reel;
   });
-  const waitingForInitialPlayback = playbackIds.length > 0 && playback.loading && !playback.data && !playback.error;
-  const initialSurfaceLoading = (reelsResource.loading && !reelsResource.data) || waitingForInitialPlayback;
+  // Playback signing may be slower than the public Reel catalogue. Do not leave the
+  // whole screen behind a dark loading surface while those URLs are being prepared.
+  // ReelPlayer can render its poster/fallback immediately and upgrade to playback
+  // as soon as the signed rendition arrives.
+  const initialSurfaceLoading = reelsResource.loading && !reelsResource.data;
   const canShareToGeneral = mode === 'authenticated';
 
   useEffect(() => {
@@ -202,7 +205,7 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
           decelerationRate="fast"
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
-          refreshControl={<RefreshControl refreshing={reelsResource.loading} onRefresh={reelsResource.refresh} tintColor={colors.interactive} />}
+          refreshControl={<RefreshControl refreshing={reelsResource.refreshing} onRefresh={reelsResource.refresh} tintColor={colors.interactive} />}
           renderItem={({ item, index }) => <ReelPlayer reel={item} expressionName={expressionName} isActive={index === activeIndex} initialLiked={Boolean(item.viewerReaction)} initialSaved={item.viewerBookmarked === true} onLike={(currentlyLiked) => handleLikeReel(item, currentlyLiked)} onSave={(currentlySaved) => handleSaveReel(item, currentlySaved)} onOpenComments={() => handleOpenComments(item)} onShare={() => handleShareReel(item)} onReport={() => handleReportReel(item)} onPressCreator={item.content_items?.author?.username ? () => router.push({ pathname: '/general/member/[username]', params: { username: item.content_items!.author!.username! } } as any) : undefined} />}
         />
       )}
