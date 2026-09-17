@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
+  Platform,
   Pressable,
   StyleProp,
   StyleSheet,
@@ -10,7 +11,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { useTheme } from '@/state/theme';
-import { radius, shadows, spacing, typography } from '@/design-system/tokens';
+import { radius, spacing, typography } from '@/design-system/tokens';
 import { Icon } from './primitives/Icon';
 
 export interface InputFieldProps extends TextInputProps {
@@ -31,22 +32,14 @@ export function InputField({
   rightIcon,
   containerStyle,
   style,
-  onFocus,
-  onBlur,
   ...props
 }: InputFieldProps) {
   const { colors } = useTheme();
-  const [isFocused, setIsFocused] = useState(false);
 
   return (
     <View style={[styles.container, containerStyle]}>
       {label ? (
-        <Text
-          style={[
-            styles.label,
-            { color: error ? colors.live : isFocused ? colors.interactive : colors.textSecondary },
-          ]}
-        >
+        <Text style={[styles.label, { color: error ? colors.live : colors.textSecondary }]}>
           {label}
         </Text>
       ) : null}
@@ -54,25 +47,18 @@ export function InputField({
         style={[
           styles.inputWrapper,
           {
-            backgroundColor: isFocused ? colors.cardElevated : colors.inputBg,
-            borderColor: error ? colors.live : isFocused ? colors.inputBorderFocus : colors.inputBorder,
-            borderWidth: isFocused ? 1.5 : 1,
+            backgroundColor: colors.inputBg,
+            borderColor: error ? colors.live : colors.inputBorder,
           },
-          isFocused && [styles.focusedInput, { shadowColor: colors.interactive }],
         ]}
       >
-        {leftIcon ? <View style={styles.iconLeft}>{leftIcon}</View> : null}
+        {leftIcon ? <View pointerEvents="none" style={styles.iconLeft}>{leftIcon}</View> : null}
         <TextInput
           placeholderTextColor={colors.textMuted}
+          selectionColor={colors.interactive}
+          cursorColor={Platform.OS === 'android' ? colors.interactive : undefined}
+          underlineColorAndroid="transparent"
           style={[styles.input, { color: colors.text }, style]}
-          onFocus={(e) => {
-            setIsFocused(true);
-            onFocus?.(e);
-          }}
-          onBlur={(e) => {
-            setIsFocused(false);
-            onBlur?.(e);
-          }}
           {...props}
         />
         {rightIcon ? <View style={styles.iconRight}>{rightIcon}</View> : null}
@@ -110,7 +96,6 @@ export function SearchBar({
   style,
 }: SearchBarProps) {
   const { colors } = useTheme();
-  const [focused, setFocused] = useState(false);
 
   const handleClear = () => {
     onChangeText('');
@@ -122,28 +107,30 @@ export function SearchBar({
       style={[
         styles.searchContainer,
         {
-          backgroundColor: focused ? colors.cardElevated : colors.card,
-          borderColor: focused ? colors.inputBorderFocus : colors.borderSubtle,
-          borderWidth: focused ? 1.5 : 1,
+          backgroundColor: colors.card,
+          borderColor: colors.borderSubtle,
         },
-        focused && [styles.searchFocused, { shadowColor: colors.interactive }],
         style,
       ]}
     >
-      <View style={[styles.searchIconWrap, { backgroundColor: focused ? colors.primarySoft : colors.bgSecondary }]}>
-        <Icon name="search" size={17} color={focused ? colors.interactive : colors.textMuted} />
+      <View pointerEvents="none" style={[styles.searchIconWrap, { backgroundColor: colors.bgSecondary }]}>
+        <Icon name="search" size={17} color={colors.textMuted} />
       </View>
       <TextInput
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={colors.textMuted}
+        selectionColor={colors.interactive}
+        cursorColor={Platform.OS === 'android' ? colors.interactive : undefined}
+        underlineColorAndroid="transparent"
         style={[styles.searchInput, { color: colors.text }]}
         returnKeyType="search"
         onSubmitEditing={onSubmitEditing}
         autoFocus={autoFocus}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
+        autoCapitalize="none"
+        autoCorrect={false}
+        spellCheck={false}
       />
       {value.length > 0 ? (
         <Pressable
@@ -151,7 +138,7 @@ export function SearchBar({
           hitSlop={8}
           style={({ pressed }) => [
             styles.clearButton,
-            { backgroundColor: focused ? colors.primarySoft : colors.bgSecondary },
+            { backgroundColor: colors.bgSecondary },
             pressed && { backgroundColor: colors.pressed },
           ]}
           accessibilityRole="button"
@@ -180,9 +167,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     minHeight: 50,
   },
-  focusedInput: { ...shadows.sm },
   input: {
     flex: 1,
+    minWidth: 0,
     fontSize: 15,
     lineHeight: 20,
     paddingVertical: 12,
@@ -211,7 +198,6 @@ const styles = StyleSheet.create({
     minHeight: 48,
     borderWidth: 1,
   },
-  searchFocused: { ...shadows.sm },
   searchIconWrap: {
     width: 34,
     height: 34,
@@ -222,6 +208,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
+    minWidth: 0,
     fontSize: 14,
     paddingVertical: 10,
   },
