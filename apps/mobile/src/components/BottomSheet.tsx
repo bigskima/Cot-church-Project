@@ -26,6 +26,13 @@ export interface BottomSheetProps {
   style?: StyleProp<ViewStyle>;
 }
 
+const KEYBOARD_BEHAVIOR = Platform.select({
+  ios: 'padding' as const,
+  android: 'height' as const,
+  web: 'padding' as const,
+  default: 'padding' as const,
+});
+
 export function BottomSheet({
   visible,
   onClose,
@@ -48,7 +55,7 @@ export function BottomSheet({
           accessibilityLabel="Close sheet"
         />
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
+          behavior={KEYBOARD_BEHAVIOR}
           keyboardVerticalOffset={0}
           style={[
             styles.sheetContainer,
