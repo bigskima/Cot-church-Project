@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,6 +17,7 @@ import { Icon } from '@/components/primitives/Icon';
 import { Button } from '@/components/Button';
 import { InputField } from '@/components/Input';
 import { radius, shadows, spacing, typography } from '@/design-system/tokens';
+import { PLATFORM_KEYBOARD_BEHAVIOR, PLATFORM_KEYBOARD_VERTICAL_OFFSET } from '@/utils/keyboard';
 
 function safeReturnTo(value?: string) {
   if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('://') || value.startsWith('/(auth)')) {
@@ -108,7 +108,8 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={PLATFORM_KEYBOARD_BEHAVIOR}
+      keyboardVerticalOffset={PLATFORM_KEYBOARD_VERTICAL_OFFSET}
       style={[styles.screen, { backgroundColor: colors.bg }]}
     >
       <ScrollView

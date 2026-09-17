@@ -8,6 +8,7 @@ import { useResource } from '@/hooks/use-resource';
 import { invalidate } from '@/services/query-cache';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
+import { PLATFORM_KEYBOARD_BEHAVIOR, PLATFORM_KEYBOARD_DISMISS_MODE } from '@/utils/keyboard';
 import { RichChatComposer } from './RichChatComposer';
 import { RichMessageBubble } from './RichMessageBubble';
 import type { ChatReaction, ChatReply, ChatSendPayload, RichChatMessage } from './rich-chat-types';
@@ -181,7 +182,11 @@ export function ExpressionChatExperience({ expressionId }: { expressionId: strin
 
   const expressionName = resource.data?.expression.name ?? context?.expression?.name ?? 'Expression';
   return (
-    <KeyboardAvoidingView style={[styles.screen, { backgroundColor: colors.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}>
+    <KeyboardAvoidingView
+      style={[styles.screen, { backgroundColor: colors.bg }]}
+      behavior={PLATFORM_KEYBOARD_BEHAVIOR}
+      keyboardVerticalOffset={Platform.select({ ios: insets.top, android: 0, web: 0, default: 0 })}
+    >
       <ExpressionPeopleHeader expressionId={expressionId} expressionName={expressionName} active="chat" title="General discussion" subtitle="One conversation for everyone in this Expression." icon="chatbubbles-outline" />
       <View style={[styles.scope, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}>
         <Icon name="people-circle-outline" size={17} color={colors.interactive} />
@@ -222,7 +227,7 @@ export function ExpressionChatExperience({ expressionId }: { expressionId: strin
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.messages}
         keyboardShouldPersistTaps="always"
-        keyboardDismissMode="none"
+        keyboardDismissMode={PLATFORM_KEYBOARD_DISMISS_MODE}
         onContentSizeChange={() => { if (!normalizedSearch && !pinnedOnly) listRef.current?.scrollToEnd({ animated: true }); }}
         onScrollToIndexFailed={({ index, averageItemLength }) => listRef.current?.scrollToOffset({ offset: averageItemLength * index, animated: true })}
         ListEmptyComponent={<View style={styles.empty}><Icon name={normalizedSearch || pinnedOnly ? 'search-outline' : 'chatbubbles-outline'} size={34} color={colors.textMuted} /><Text style={[styles.emptyTitle, { color: colors.text }]}>{normalizedSearch || pinnedOnly ? 'No matching messages' : 'Start the Expression discussion'}</Text><Text style={[styles.emptyCopy, { color: colors.textMuted }]}>{normalizedSearch || pinnedOnly ? 'Try another search or turn off the pinned filter.' : 'Messages, photos, videos, reactions and voice notes stay inside this Expression.'}</Text></View>}

@@ -9,7 +9,9 @@ import { useTheme } from '@/state/theme';
 
 const TAB_ICON_SIZE = 22;
 const hidden = { href: null } as const;
-const PRIMARY_GENERAL_PATHS = new Set(['/general', '/general/explore', '/general/reels', '/general/chat', '/general/profile']);
+// Reels is intentionally excluded: immersive playback owns the full screen and
+// supplies its own Back/Create controls instead of the primary bottom bar.
+const PRIMARY_GENERAL_PATHS = new Set(['/general', '/general/explore', '/general/chat', '/general/profile']);
 const PRIMARY_TAB_NAMES = ['index', 'explore', 'reels', 'chat', 'profile'] as const;
 
 function PrimaryGeneralTabBar({ state, descriptors, navigation }: any) {
@@ -143,6 +145,7 @@ export default function GeneralLayout() {
       <Tabs.Screen name="leadership/church-leadership" options={hidden as any} />
       <Tabs.Screen name="leadership/announcements-manage" options={hidden as any} />
       <Tabs.Screen name="leadership/urgent-updates" options={hidden as any} />
+      <Tabs.Screen name="leadership/home-updates-manage" options={hidden as any} />
       <Tabs.Screen name="leadership/feed-ranking" options={hidden as any} />
       <Tabs.Screen name="leadership/watch-categories" options={hidden as any} />
       <Tabs.Screen name="leadership/giving-manage" options={hidden as any} />
@@ -150,6 +153,9 @@ export default function GeneralLayout() {
       <Tabs.Screen name="leadership/sermons-manage" options={hidden as any} />
       <Tabs.Screen name="leadership/events-manage" options={hidden as any} />
       <Tabs.Screen name="leadership/expressions-manage" options={hidden as any} />
+      <Tabs.Screen name="leadership/roles-access" options={hidden as any} />
+      <Tabs.Screen name="leadership/platform-admin/index" options={hidden as any} />
+      <Tabs.Screen name="leadership/platform-admin/[module]" options={hidden as any} />
       <Tabs.Screen name="studio/index" options={hidden as any} />
       <Tabs.Screen name="studio/reel" options={hidden as any} />
       <Tabs.Screen name="studio/video" options={hidden as any} />

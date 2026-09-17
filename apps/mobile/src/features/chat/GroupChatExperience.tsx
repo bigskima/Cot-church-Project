@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, KeyboardAvoidingView, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, ResourceError, ScreenHeader } from '@/components';
@@ -8,6 +8,7 @@ import { useResource } from '@/hooks/use-resource';
 import { invalidate } from '@/services/query-cache';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
+import { PLATFORM_KEYBOARD_BEHAVIOR, PLATFORM_KEYBOARD_DISMISS_MODE, PLATFORM_KEYBOARD_VERTICAL_OFFSET } from '@/utils/keyboard';
 import { RichChatComposer } from './RichChatComposer';
 import { RichMessageBubble } from './RichMessageBubble';
 import type { ChatReaction, ChatReply, ChatSendPayload, RichChatMessage } from './rich-chat-types';
@@ -116,7 +117,11 @@ export function GroupChatExperience({ groupId, sectionId }: { groupId: string; s
   const pinned = messages.filter((message) => message.pinned_at);
 
   return (
-    <KeyboardAvoidingView style={[styles.screen, { backgroundColor: colors.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView
+      style={[styles.screen, { backgroundColor: colors.bg }]}
+      behavior={PLATFORM_KEYBOARD_BEHAVIOR}
+      keyboardVerticalOffset={PLATFORM_KEYBOARD_VERTICAL_OFFSET}
+    >
       <View style={{ paddingTop: insets.top }}><ScreenHeader title={resource.data?.activeSection?.name ?? resource.data?.group.name ?? 'Group chat'} kicker={sectionId ? 'PRIVATE GROUP ROOM' : 'GROUP CHAT'} subtitle={resource.data?.activeSection?.description || 'Replies, media, voice notes, reactions and pins.'} showBack /></View>
       <View style={[styles.scope, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}>
         <Icon name='people-circle-outline' size={17} color={colors.interactive} />
@@ -130,6 +135,7 @@ export function GroupChatExperience({ groupId, sectionId }: { groupId: string; s
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.messages}
         keyboardShouldPersistTaps='handled'
+        keyboardDismissMode={PLATFORM_KEYBOARD_DISMISS_MODE}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
         onScrollToIndexFailed={({ index, averageItemLength }) => listRef.current?.scrollToOffset({ offset: averageItemLength * index, animated: true })}
         ListEmptyComponent={<View style={styles.empty}><Icon name='chatbubbles-outline' size={30} color={colors.textMuted} /><Text style={[styles.emptyTitle, { color: colors.text }]}>No messages yet</Text></View>}

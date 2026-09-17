@@ -25,11 +25,32 @@ function resultText(result: AiResult) {
   return result.text || result.response || 'No study notes were returned.';
 }
 
-function plainAiText(value: string) {
+function normalizeAiMarkdown(value: string) {
   return value
-    .replace(/\*\*/g, '')
-    .replace(/^#{1,3}\s+/gm, '')
-    .replace(/^[-*•]\s+/gm, '')
+    .replace(/\r/g, '')
+    // Models sometimes return markdown separators as visible content. They are
+    // layout hints, not study-note text, so remove them before rendering.
+    .replace(/^\s*(?:[-*_]{3,}|\.{3,})\s*$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function cleanInlineText(value: string) {
+  return value
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/_+/g, '')
+    .replace(/\*+/g, '')
+    .trim();
+}
+
+function plainAiText(value: string) {
+  return normalizeAiMarkdown(value)
+    .replace(/^#{1,6}\s*/gm, '')
+    .replace(/^[-+*•]\s+/gm, '')
+    .replace(/^\d+[.)]\s+/gm, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[`*_]+/g, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
@@ -53,29 +74,43 @@ function InlineMarkdown({ text, color, boldColor }: { text: string; color: strin
   return (
     <Text style={[styles.aiParagraph, { color }]}>
       {parts.map((part, index) => part.startsWith('**') && part.endsWith('**')
-        ? <Text key={`${index}-${part}`} style={[styles.aiBold, { color: boldColor }]}>{part.slice(2, -2)}</Text>
-        : <Text key={`${index}-${part}`}>{part}</Text>)}
+        ? <Text key={`${index}-${part}`} style={[styles.aiBold, { color: boldColor }]}>{cleanInlineText(part.slice(2, -2))}</Text>
+        : <Text key={`${index}-${part}`}>{cleanInlineText(part)}</Text>)}
     </Text>
   );
 }
 
 function AiMarkdown({ value }: { value: string }) {
   const { colors } = useTheme();
-  const lines = value.replace(/\r/g, '').split('\n');
+  const lines = normalizeAiMarkdown(value).split('\n');
   const nodes: React.ReactNode[] = [];
   lines.forEach((raw, index) => {
     const line = raw.trim();
     if (!line) { nodes.push(<View key={`space-${index}`} style={styles.aiSpace} />); return; }
-    const heading = line.match(/^(#{1,3})\s+(.+)$/);
+    if (/^(?:[-*_]{3,}|\.{3,})$/.test(line)) return;
+
+    const heading = line.match(/^(#{1,6})\s*(.+)$/);
     if (heading) {
-      nodes.push(<Text key={`h-${index}`} style={[styles.aiHeading, heading[1].length === 1 && styles.aiHeadingLarge, { color: colors.text }]}>{heading[2].replace(/\*\*/g, '')}</Text>);
+      nodes.push(
+        <Text key={`h-${index}`} style={[styles.aiHeading, heading[1].length === 1 && styles.aiHeadingLarge, { color: colors.text }]}>
+          {cleanInlineText(heading[2])}
+        </Text>,
+      );
       return;
     }
-    const bullet = line.match(/^[-*•]\s+(.+)$/);
+
+    const bullet = line.match(/^[-+*•]\s+(.+)$/);
     if (bullet) {
       nodes.push(<View key={`b-${index}`} style={styles.aiBulletRow}><Text style={[styles.aiBullet, { color: colors.interactive }]}>•</Text><View style={styles.aiBulletBody}><InlineMarkdown text={bullet[1]} color={colors.textSecondary} boldColor={colors.text} /></View></View>);
       return;
     }
+
+    const ordered = line.match(/^(\d+)[.)]\s+(.+)$/);
+    if (ordered) {
+      nodes.push(<View key={`o-${index}`} style={styles.aiBulletRow}><Text style={[styles.aiNumber, { color: colors.interactive }]}>{ordered[1]}.</Text><View style={styles.aiBulletBody}><InlineMarkdown text={ordered[2]} color={colors.textSecondary} boldColor={colors.text} /></View></View>);
+      return;
+    }
+
     nodes.push(<InlineMarkdown key={`p-${index}`} text={line} color={colors.textSecondary} boldColor={colors.text} />);
   });
   return <View style={styles.aiMarkdown}>{nodes}</View>;
@@ -177,7 +212,7 @@ export function ProgressiveSermonReader({ sermon, initialBlocks }: Props) {
       const prompt = [
         `Help me study the published sermon “${sermon.title}”${sermon.preacher ? ` by ${sermon.preacher}` : ''}.`,
         sermon.scripture_references?.length ? `Scriptures: ${sermon.scripture_references.join(', ')}.` : '',
-        'Use the full verified sermon notes. Give a short overview, clear subheadings for the main points, practical takeaways, and reflection questions. Do not invent facts beyond the sermon.',
+        'Use the full verified sermon notes. Give a short overview, clear subheadings for the main points, practical takeaways, and reflection questions. Do not invent facts beyond the sermon. Return clean Markdown using headings, bullets and bold text only; do not emit decorative separator lines.',
         source ? `Visible sermon notes:\n${source}` : '',
       ].filter(Boolean).join('\n\n');
       const result = await api.request<AiResult>('ai-gateway', {
@@ -231,7 +266,7 @@ const styles = StyleSheet.create({
   speedRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.xs }, speedLabel: { fontSize: 10.5, fontWeight: '700', marginRight: 3 }, blocks: { gap: spacing.sm }, paragraphCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.lg, gap: spacing.xs }, progressLabel: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.9 }, paragraphText: { fontSize: 15, lineHeight: 24 },
   highlight: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.lg, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, highlightIcon: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }, boldGlyph: { fontSize: 16, fontWeight: '900' }, highlightText: { flex: 1, fontSize: 16, lineHeight: 24, fontWeight: '900' },
   continueCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm }, continueText: { fontSize: 11.5, lineHeight: 17 }, continueActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  aiSheet: { gap: spacing.md, paddingBottom: spacing.xl }, aiSourceNotice: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, aiSourceText: { flex: 1, fontSize: 11.5, lineHeight: 17 }, aiMarkdown: { gap: 4 }, aiSpace: { height: 5 }, aiHeading: { fontSize: 15, lineHeight: 21, fontWeight: '900', marginTop: spacing.sm }, aiHeadingLarge: { fontSize: 18, lineHeight: 24 }, aiParagraph: { fontSize: 13.5, lineHeight: 21 }, aiBold: { fontWeight: '900' }, aiBulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, aiBullet: { fontSize: 17, lineHeight: 21, fontWeight: '900' }, aiBulletBody: { flex: 1 },
+  aiSheet: { gap: spacing.md, paddingBottom: spacing.xl }, aiSourceNotice: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, aiSourceText: { flex: 1, fontSize: 11.5, lineHeight: 17 }, aiMarkdown: { gap: 4 }, aiSpace: { height: 5 }, aiHeading: { fontSize: 15, lineHeight: 21, fontWeight: '900', marginTop: spacing.sm }, aiHeadingLarge: { fontSize: 18, lineHeight: 24 }, aiParagraph: { fontSize: 13.5, lineHeight: 21 }, aiBold: { fontWeight: '900' }, aiBulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, aiBullet: { fontSize: 17, lineHeight: 21, fontWeight: '900' }, aiNumber: { minWidth: 22, fontSize: 12.5, lineHeight: 21, fontWeight: '900', textAlign: 'right' }, aiBulletBody: { flex: 1 },
   aiError: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, aiErrorText: { flex: 1, fontSize: 11.5, lineHeight: 17 },
   notesActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, notesAction: { minHeight: 38, borderRadius: radius.pill, borderWidth: 1, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', gap: 6 }, notesActionText: { fontSize: 10.5, fontWeight: '800' },
 });

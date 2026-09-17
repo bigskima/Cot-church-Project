@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Dimensions, FlatList, Pressable, RefreshControl, StyleSheet, Text, View, ViewToken } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Dimensions, FlatList, Platform, Pressable, RefreshControl, StyleSheet, Text, View, ViewToken } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
@@ -33,42 +33,58 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
   const expressionId = scope === 'expression' ? context?.expression?.id : undefined;
   const returnTo = expressionId ? `/expressions/${expressionId}/reels` : '/general/reels';
 
-  const reelsResource = useResource<ReelWithViewerState[]>(`reels:immersive:${expressionId ? `expression:${expressionId}` : `public:${organizationId || 'auto'}`}:${mode}`, async (signal) => {
-    const reels = expressionId
-      ? (await api.request<{ reels: Reel[] }>(`home-feed?organizationId=${encodeURIComponent(organizationId)}&expressionId=${encodeURIComponent(expressionId)}`, { signal })).reels
-      : await api.request<Reel[]>(`public-content?type=reels${organizationId ? `&organizationId=${encodeURIComponent(organizationId)}` : ''}`, { signal });
-    const contentIds = reels.map((reel) => reel.content_items?.id).filter(Boolean) as string[];
-    if (!contentIds.length) return reels as ReelWithViewerState[];
+  // Fetch the Reel catalogue first. Viewer engagement and signed playback URLs are
+  // intentionally separate requests so a slower authenticated/mobile request can
+  // no longer keep the entire immersive surface black.
+  const reelsResource = useResource<Reel[]>(`reels:immersive:${expressionId ? `expression:${expressionId}` : `public:${organizationId || 'auto'}`}:${mode}`, async (signal) => expressionId
+    ? (await api.request<{ reels: Reel[] }>(`home-feed?organizationId=${encodeURIComponent(organizationId)}&expressionId=${encodeURIComponent(expressionId)}`, { signal })).reels
+    : api.request<Reel[]>(`public-content?type=reels${organizationId ? `&organizationId=${encodeURIComponent(organizationId)}` : ''}`, { signal }));
+
+  const catalogue = reelsResource.data ?? [];
+  const contentIds = useMemo(
+    () => catalogue.map((reel) => reel.content_items?.id).filter(Boolean) as string[],
+    [catalogue],
+  );
+
+  const engagement = useResource<EngagementBatchEntry[]>(`reels:engagement:${expressionId ?? 'public'}:${mode}:${contentIds.join(',')}`, async (signal) => {
+    if (mode !== 'authenticated' || !contentIds.length) return [];
     const batches: string[][] = [];
     for (let i = 0; i < contentIds.length; i += 30) batches.push(contentIds.slice(i, i + 30));
-    const states = mode === 'authenticated'
-      ? (await Promise.all(batches.map((ids) => api.request<EngagementBatchEntry[]>(`engagement?view=states&contentIds=${encodeURIComponent(ids.join(','))}`, { signal, context: expressionId ? 'current' : 'public' })))).flat()
-      : [];
-    const engagementMap = new Map(states.map((item) => [item.contentId, item]));
-    return reels.map((reel) => {
-      const contentId = reel.content_items?.id;
-      if (!contentId) return reel as ReelWithViewerState;
-      const engagement = engagementMap.get(contentId);
-      return { ...reel, viewerReaction: engagement?.reaction ?? null, viewerBookmarked: engagement?.bookmarked ?? false } as ReelWithViewerState;
-    });
+    return (await Promise.all(batches.map((ids) => api.request<EngagementBatchEntry[]>(`engagement?view=states&contentIds=${encodeURIComponent(ids.join(','))}`, { signal, context: expressionId ? 'current' : 'public' })))).flat();
   });
 
-  const playbackIds = (reelsResource.data ?? []).map((reel) => reel.content_items?.id).filter(Boolean) as string[];
+  const engagementMap = useMemo(() => new Map((engagement.data ?? []).map((item) => [item.contentId, item])), [engagement.data]);
+  const reelsWithViewerState = useMemo<ReelWithViewerState[]>(() => catalogue.map((reel) => {
+    const contentId = reel.content_items?.id;
+    const state = contentId ? engagementMap.get(contentId) : undefined;
+    return {
+      ...reel,
+      viewerReaction: state?.reaction ?? null,
+      viewerBookmarked: state?.bookmarked ?? false,
+    } as ReelWithViewerState;
+  }), [catalogue, engagementMap]);
+
+  // On native devices only the active Reel and its immediate neighbours need a
+  // signed stream URL. Signing every Reel up front was expensive on mobile and
+  // also encouraged many VideoPlayer instances to compete for network/buffer.
+  const playbackIds = useMemo(() => {
+    if (!reelsWithViewerState.length) return [] as string[];
+    const first = Math.max(0, activeIndex - 1);
+    const last = Math.min(reelsWithViewerState.length, activeIndex + 2);
+    return reelsWithViewerState.slice(first, last).map((reel) => reel.content_items?.id).filter(Boolean) as string[];
+  }, [activeIndex, reelsWithViewerState]);
+
   const playback = useResource<PlaybackBatchEntry[]>(`playback:reels:${expressionId ?? 'public'}:${mode}:${playbackIds.join(',')}`, async (signal) => {
-    const batches: string[][] = [];
-    for (let i = 0; i < playbackIds.length; i += 30) batches.push(playbackIds.slice(i, i + 30));
-    return (await Promise.all(batches.map((ids) => api.request<PlaybackBatchEntry[]>(`content-media?action=playback_batch&contentIds=${encodeURIComponent(ids.join(','))}`, { signal, context: expressionId ? 'current' : 'public' })))).flat();
+    if (!playbackIds.length) return [];
+    return api.request<PlaybackBatchEntry[]>(`content-media?action=playback_batch&contentIds=${encodeURIComponent(playbackIds.join(','))}`, { signal, context: expressionId ? 'current' : 'public' });
   });
-  const playbackMap = new Map((playback.data ?? []).map((item) => [item.contentId, item]));
-  const reels = (reelsResource.data ?? []).map((reel) => {
+  const playbackMap = useMemo(() => new Map((playback.data ?? []).map((item) => [item.contentId, item])), [playback.data]);
+  const reels = useMemo(() => reelsWithViewerState.map((reel) => {
     const source = playbackMap.get(reel.content_items?.id ?? '');
     const playbackUrl = source?.renditions?.find((rendition) => rendition.kind === 'video_stream')?.playbackUrl;
     return playbackUrl ? { ...reel, media_assets: { ...reel.media_assets, url: playbackUrl } } as ReelWithViewerState : reel;
-  });
-  // Playback signing may be slower than the public Reel catalogue. Do not leave the
-  // whole screen behind a dark loading surface while those URLs are being prepared.
-  // ReelPlayer can render its poster/fallback immediately and upgrade to playback
-  // as soon as the signed rendition arrives.
+  }), [playbackMap, reelsWithViewerState]);
+
   const initialSurfaceLoading = reelsResource.loading && !reelsResource.data;
   const canShareToGeneral = mode === 'authenticated';
 
@@ -164,10 +180,11 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
     return (
       <View style={styles.screen}>
         <Skeleton height={windowHeight} />
-        <View style={[styles.closeButton, { top: insets.top + 8 }]}>
-          <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close Reels" style={styles.closeBtnInner}>
-            <Icon name="close" size={22} color="#FFFFFF" />
+        <View style={[styles.loadingHeader, { top: insets.top + 8 }]}>
+          <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Back from Reels" style={styles.backButton}>
+            <Icon name="arrow-back" size={21} color="#FFFFFF" />
           </Pressable>
+          <View style={styles.loadingPill}><Text style={styles.loadingText}>Opening Reels…</Text></View>
         </View>
       </View>
     );
@@ -175,22 +192,33 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
 
   return (
     <View style={styles.screen}>
-      {expressionId ? (
-        <View style={[styles.expressionScope, { top: insets.top + 8 }]}>
-          <View style={styles.expressionScopePill}><Icon name="lock-closed-outline" size={12} color="#FFFFFF" /><View style={styles.expressionScopeCopy}><Text style={styles.expressionScopeLabel}>EXPRESSION REELS</Text><Text style={styles.expressionScopeName} numberOfLines={1}>{expressionName ?? 'Members only'}</Text></View></View>
-          <Pressable onPress={() => router.push(`/expressions/${expressionId}/videos` as any)} style={({ pressed }) => [styles.mediaLibraryButton, pressed ? styles.overlayPressed : null]} accessibilityRole="button" accessibilityLabel="Open Expression media library"><Icon name="grid-outline" size={15} color="#FFFFFF" /><Text style={styles.mediaLibraryText}>Media</Text></Pressable>
-        </View>
-      ) : null}
+      <View style={[styles.reelsHeader, { top: insets.top + 8 }]}>
+        <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Back from Reels" style={({ pressed }) => [styles.backButton, pressed && styles.overlayPressed]}>
+          <Icon name="arrow-back" size={21} color="#FFFFFF" />
+        </Pressable>
 
-      {!expressionId ? (
-        <View style={[styles.generalScope, { top: insets.top + 8 }]}>
-          <View style={styles.generalScopePill}><Icon name="globe-outline" size={13} color="#FFFFFF" /><View style={styles.expressionScopeCopy}><Text style={styles.expressionScopeLabel}>GENERAL REELS</Text><Text style={styles.expressionScopeName}>Public COT discovery</Text></View></View>
-          {mode === 'authenticated' ? <Pressable onPress={() => router.push('/general/studio/reel' as any)} style={({ pressed }) => [styles.mediaLibraryButton, pressed ? styles.overlayPressed : null]} accessibilityRole="button" accessibilityLabel="Create Reel"><Icon name="add-outline" size={16} color="#FFFFFF" /><Text style={styles.mediaLibraryText}>Create</Text></Pressable> : null}
+        <View style={styles.scopePill}>
+          <Icon name={expressionId ? 'lock-closed-outline' : 'globe-outline'} size={14} color="#FFFFFF" />
+          <View style={styles.scopeCopy}>
+            <Text style={styles.scopeLabel}>{expressionId ? 'EXPRESSION REELS' : 'GENERAL REELS'}</Text>
+            <Text style={styles.scopeName} numberOfLines={1}>{expressionId ? expressionName ?? 'Members only' : 'Public COT discovery'}</Text>
+          </View>
         </View>
-      ) : null}
 
-      <View style={[styles.closeButton, { top: insets.top + 8 }]}><Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close Reels" style={styles.closeBtnInner}><Icon name="close" size={22} color="#FFFFFF" /></Pressable></View>
-      {actionError ? <Pressable onPress={() => setActionError('')} style={[styles.errorToast, { top: insets.top + 58 }]} accessibilityRole="button" accessibilityLabel="Dismiss Reel error"><Icon name="alert-circle-outline" size={15} color="#FFFFFF" /><Text style={styles.errorToastText} numberOfLines={2}>{actionError}</Text><Icon name="close" size={14} color="rgba(255,255,255,0.86)" /></Pressable> : null}
+        {expressionId ? (
+          <Pressable onPress={() => router.push(`/expressions/${expressionId}/videos` as any)} style={({ pressed }) => [styles.headerAction, pressed && styles.overlayPressed]} accessibilityRole="button" accessibilityLabel="Open Expression media library">
+            <Icon name="grid-outline" size={17} color="#FFFFFF" />
+            <Text style={styles.headerActionText}>Media</Text>
+          </Pressable>
+        ) : mode === 'authenticated' ? (
+          <Pressable onPress={() => router.push('/general/studio/reel' as any)} style={({ pressed }) => [styles.createAction, pressed && styles.overlayPressed]} accessibilityRole="button" accessibilityLabel="Create Reel">
+            <Icon name="add" size={18} color="#061321" />
+            <Text style={styles.createActionText}>Create</Text>
+          </Pressable>
+        ) : null}
+      </View>
+
+      {actionError ? <Pressable onPress={() => setActionError('')} style={[styles.errorToast, { top: insets.top + 64 }]} accessibilityRole="button" accessibilityLabel="Dismiss Reel error"><Icon name="alert-circle-outline" size={15} color="#FFFFFF" /><Text style={styles.errorToastText} numberOfLines={2}>{actionError}</Text><Icon name="close" size={14} color="rgba(255,255,255,0.86)" /></Pressable> : null}
 
       {reelsResource.error && !reels.length ? <View style={styles.centerWrapper}><ResourceError message={reelsResource.error} retry={reelsResource.refresh} /></View> : reels.length === 0 ? <View style={styles.centerWrapper}><ResourceError message="No Reels Yet" retry={reelsResource.refresh} /></View> : (
         <FlatList
@@ -203,10 +231,15 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
           snapToInterval={windowHeight}
           snapToAlignment="start"
           decelerationRate="fast"
+          initialNumToRender={1}
+          maxToRenderPerBatch={2}
+          windowSize={3}
+          updateCellsBatchingPeriod={80}
+          removeClippedSubviews={Platform.OS === 'android'}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
           refreshControl={<RefreshControl refreshing={reelsResource.refreshing} onRefresh={reelsResource.refresh} tintColor={colors.interactive} />}
-          renderItem={({ item, index }) => <ReelPlayer reel={item} expressionName={expressionName} isActive={index === activeIndex} initialLiked={Boolean(item.viewerReaction)} initialSaved={item.viewerBookmarked === true} onLike={(currentlyLiked) => handleLikeReel(item, currentlyLiked)} onSave={(currentlySaved) => handleSaveReel(item, currentlySaved)} onOpenComments={() => handleOpenComments(item)} onShare={() => handleShareReel(item)} onReport={() => handleReportReel(item)} onPressCreator={item.content_items?.author?.username ? () => router.push({ pathname: '/general/member/[username]', params: { username: item.content_items!.author!.username! } } as any) : undefined} />}
+          renderItem={({ item, index }) => <ReelPlayer reel={item} expressionName={expressionName} isActive={index === activeIndex} initialLiked={Boolean(item.viewerReaction)} initialSaved={item.viewerBookmarked === true} onLike={(currentlyLiked) => handleLikeReel(item, currentlyLiked)} onSave={(currentlySaved) => handleSaveReel(item, currentlySaved)} onOpenComments={() => handleOpenComments(item)} onShare={() => handleShareReel(item)} onReport={() => handleReportReel(item)} onPressCreator={item.content_items?.author?.username ? () => router.push({ pathname: '/general/member/[username]', params: { username: item.content_items!.author!.username! } } as any) : undefined} containerHeight={windowHeight} />}
         />
       )}
 
@@ -224,5 +257,25 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
 export default function GeneralReelsExperience() { return <ReelsExperience scope="general" />; }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#000000' }, expressionScope: { position: 'absolute', left: 16, right: 68, zIndex: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }, generalScope: { position: 'absolute', left: 16, right: 68, zIndex: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }, generalScopePill: { minHeight: 42, flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.52)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' }, expressionScopePill: { minHeight: 42, maxWidth: '72%', flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.52)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' }, expressionScopeCopy: { flex: 1, minWidth: 0 }, expressionScopeLabel: { color: '#FFFFFF', fontSize: 8, lineHeight: 10, fontWeight: '900', letterSpacing: 0.8 }, expressionScopeName: { color: 'rgba(255,255,255,0.72)', fontSize: 10, lineHeight: 14, fontWeight: '700', marginTop: 1 }, mediaLibraryButton: { minHeight: 42, borderRadius: 16, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.52)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' }, mediaLibraryText: { color: '#FFFFFF', fontSize: 9, fontWeight: '800' }, overlayPressed: { opacity: 0.72, transform: [{ scale: 0.98 }] }, closeButton: { position: 'absolute', right: 16, zIndex: 10 }, closeBtnInner: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.48)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' }, errorToast: { position: 'absolute', left: 16, right: 68, zIndex: 20, minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 16, backgroundColor: 'rgba(180,35,24,0.92)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' }, errorToastText: { flex: 1, color: '#FFFFFF', fontSize: 12, lineHeight: 17, fontWeight: '700' }, centerWrapper: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }, shareSheet: { gap: 12 }, privateShareNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.08)' }, privateShareText: { flex: 1, color: '#FFFFFF', fontSize: 12, lineHeight: 18, fontWeight: '600' },
+  screen: { flex: 1, backgroundColor: '#000000' },
+  reelsHeader: { position: 'absolute', left: 12, right: 12, zIndex: 30, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  loadingHeader: { position: 'absolute', left: 12, right: 12, zIndex: 30, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  backButton: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(4,12,24,0.72)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+  scopePill: { minHeight: 46, flex: 1, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 18, backgroundColor: 'rgba(4,12,24,0.72)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+  scopeCopy: { flex: 1, minWidth: 0 },
+  scopeLabel: { color: '#FFFFFF', fontSize: 9, lineHeight: 11, fontWeight: '900', letterSpacing: 0.75 },
+  scopeName: { color: 'rgba(255,255,255,0.78)', fontSize: 11, lineHeight: 15, fontWeight: '700', marginTop: 1 },
+  headerAction: { minHeight: 46, borderRadius: 18, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: 'rgba(4,12,24,0.72)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+  headerActionText: { color: '#FFFFFF', fontSize: 10.5, fontWeight: '900' },
+  createAction: { minHeight: 46, borderRadius: 18, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: 'rgba(255,255,255,0.95)' },
+  createActionText: { color: '#061321', fontSize: 10.5, fontWeight: '900' },
+  loadingPill: { minHeight: 46, flex: 1, borderRadius: 18, justifyContent: 'center', paddingHorizontal: 14, backgroundColor: 'rgba(4,12,24,0.72)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' },
+  loadingText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
+  overlayPressed: { opacity: 0.72, transform: [{ scale: 0.98 }] },
+  errorToast: { position: 'absolute', left: 12, right: 12, zIndex: 40, minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 16, backgroundColor: 'rgba(180,35,24,0.94)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)' },
+  errorToastText: { flex: 1, color: '#FFFFFF', fontSize: 12, lineHeight: 17, fontWeight: '700' },
+  centerWrapper: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  shareSheet: { gap: 12 },
+  privateShareNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.08)' },
+  privateShareText: { flex: 1, color: '#FFFFFF', fontSize: 12, lineHeight: 18, fontWeight: '600' },
 });

@@ -6,6 +6,7 @@ import { Avatar, Badge, Button, EmptyState, Icon, Skeleton } from '@/components'
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
+import { usePlatformAdministrationContext } from '@/features/platform/usePlatformAdministration';
 import { type GeneralMinistryArea, useGeneralMinistryAccess } from './useGeneralMinistryAccess';
 
 type Tool = {
@@ -57,15 +58,20 @@ export default function GeneralMinistryWorkspace() {
   const { colors } = useTheme();
   const { context, mode } = useSession();
   const access = useGeneralMinistryAccess();
+  const platformAuthority = usePlatformAdministrationContext();
   const [filter, setFilter] = useState<Filter>('All');
   const profile = context?.profile;
   const organization = context?.organization ?? context?.organizations?.[0] ?? context?.creatorOrganizations?.[0];
-  const displayName = profile?.display_name?.trim() || 'Church Member';
+  const displayName = profile?.display_name?.trim() || platformAuthority.data?.profile?.display_name?.trim() || 'Church Member';
+  const hasPlatformAdministration = Boolean(platformAuthority.data);
+  const workspaceReady = access.accessReady && !platformAuthority.loading;
+  const hasWorkspaceAccess = access.hasAnyMinistryAccess || hasPlatformAdministration;
 
   const tools = useMemo<Tool[]>(() => [
     { key: 'studio', title: 'Creator Studio', description: 'Start public posts, voice, Reels, videos and other creation flows.', icon: 'add-circle-outline', route: '/general/studio', area: 'Create', badge: 'CREATE', enabled: access.canCreatePosts || access.canPublishMedia || access.canManagePolls, priority: true },
     { key: 'sermons', title: 'Sermons', description: 'Draft, review and publish church-wide sermons and message media.', icon: 'book-outline', route: '/general/leadership/sermons-manage', area: 'Content', badge: 'MESSAGES', enabled: access.canManageSermons, priority: true },
-    { key: 'announcements', title: 'Announcements', description: 'Publish important General COT updates.', icon: 'megaphone-outline', route: '/general/leadership/announcements-manage', area: 'Content', badge: 'UPDATES', enabled: access.canManageAnnouncements },
+    { key: 'important-updates', title: 'Important updates strip', description: 'Edit the published updates that power the Important Updates strip on General COT Home.', icon: 'flash-outline', route: '/general/leadership/urgent-updates', area: 'Content', badge: 'HOME STRIP', enabled: access.canManageAnnouncements, priority: true },
+    { key: 'announcements', title: 'Announcements', description: 'Draft, schedule and publish official General COT announcements.', icon: 'megaphone-outline', route: '/general/leadership/announcements-manage', area: 'Content', badge: 'UPDATES', enabled: access.canManageAnnouncements },
     { key: 'events', title: 'Events & gatherings', description: 'Create and maintain church-wide gatherings and dates.', icon: 'calendar-outline', route: '/general/leadership/events-manage', area: 'Content', badge: 'SCHEDULE', enabled: access.canManageEvents },
     { key: 'care', title: 'Pastoral care inbox', description: 'Review prayer, testimony follow-ups and pastoral care actions.', icon: 'heart-circle-outline', route: '/general/leadership/pastoral-triage', area: 'Care', badge: 'CARE', enabled: access.canManageCare, priority: true },
     { key: 'roles', title: 'Roles & access', description: 'Assign General COT operator roles and invite Platform administrators when authorized.', icon: 'shield-checkmark-outline', route: '/general/leadership/roles-access', area: 'People', badge: 'ACCESS', enabled: access.canManageRoles, priority: true },
@@ -76,11 +82,12 @@ export default function GeneralMinistryWorkspace() {
     { key: 'live', title: 'Live Media Studio', description: 'Prepare broadcasts, go live and monitor stream operations.', icon: 'radio-outline', route: '/general/leadership/media-studio', area: 'Media', badge: 'LIVE', enabled: access.canBroadcastLive, priority: true },
     { key: 'watch', title: 'Watch categories', description: 'Organize public video discovery categories without redeploying.', icon: 'pricetags-outline', route: '/general/leadership/watch-categories', area: 'Media', badge: 'DISCOVERY', enabled: access.canManageLeadership },
     { key: 'ranking', title: 'Home feed controls', description: 'Tune church-wide discovery and feed ranking controls.', icon: 'options-outline', route: '/general/leadership/feed-ranking', area: 'Settings', badge: 'HOME', enabled: access.canManageSettings },
-  ], [access]);
+    { key: 'platform-admin', title: 'Platform Administration', description: 'Open platform organisations, accounts, moderation, roles, branding, services, features, payments, integrations and audit without leaving COT.', icon: 'grid-outline', route: '/general/leadership/platform-admin', area: 'Platform', badge: 'ADMIN', enabled: hasPlatformAdministration, priority: true },
+  ], [access, hasPlatformAdministration]);
 
   const available = tools.filter((tool) => tool.enabled);
   const visible = filter === 'All' ? available : available.filter((tool) => tool.area === filter);
-  const areas = (['Create', 'Content', 'Care', 'People', 'Finance', 'Media', 'Settings'] as GeneralMinistryArea[]).filter((area) => available.some((tool) => tool.area === area));
+  const areas = (['Create', 'Content', 'Care', 'People', 'Finance', 'Media', 'Settings', 'Platform'] as GeneralMinistryArea[]).filter((area) => available.some((tool) => tool.area === area));
   const priority = available.filter((tool) => tool.priority).slice(0, 4);
 
   if (mode !== 'authenticated') {
@@ -102,18 +109,18 @@ export default function GeneralMinistryWorkspace() {
           <View style={styles.flex}>
             <Text style={[styles.eyebrow, { color: colors.interactive }]}>GENERAL COT · MINISTRY</Text>
             <Text style={[styles.title, { color: colors.text }]}>Ministry Workspace</Text>
-            <Text style={[styles.subtitle, { color: colors.textMuted }]}>Create, care, manage access and review from one role-aware workspace.</Text>
+            <Text style={[styles.subtitle, { color: colors.textMuted }]}>Create, care, manage access and operate COT from one role-aware workspace.</Text>
           </View>
           <Pressable onPress={() => router.push('/general/profile')}>
-            <Avatar url={profile?.avatar_url} name={displayName} size="sm" />
+            <Avatar url={profile?.avatar_url ?? platformAuthority.data?.profile?.avatar_url} name={displayName} size="sm" />
           </Pressable>
         </View>
 
-        {!access.accessReady ? (
+        {!workspaceReady ? (
           <View style={styles.loading}><Skeleton height={142} borderRadius={radius.xxl} /><Skeleton height={100} count={4} /></View>
-        ) : !access.hasAnyMinistryAccess ? (
+        ) : !hasWorkspaceAccess ? (
           <View style={[styles.noAccess, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
-            <EmptyState title="No ministry tools assigned" message="Tools appear automatically when a General COT role grants them." iconName="shield-outline" />
+            <EmptyState title="No ministry tools assigned" message="Tools appear automatically when a General COT or Platform Administration role grants them." iconName="shield-outline" />
             <Button label="Back to You" variant="outline" onPress={() => router.replace('/general/profile')} />
           </View>
         ) : (
@@ -121,11 +128,11 @@ export default function GeneralMinistryWorkspace() {
             <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
               <View style={[styles.heroGlow, { backgroundColor: colors.primarySoft }]} />
               <View style={styles.heroRow}>
-                <Avatar url={profile?.avatar_url} name={displayName} size="md" />
+                <Avatar url={profile?.avatar_url ?? platformAuthority.data?.profile?.avatar_url} name={displayName} size="md" />
                 <View style={styles.flex}>
                   <Text style={[styles.heroKicker, { color: colors.interactive }]}>YOUR CURRENT ACCESS</Text>
                   <Text style={[styles.heroTitle, { color: colors.text }]}>{displayName}</Text>
-                  <Text style={[styles.heroCopy, { color: colors.textSecondary }]}>{organization?.name ? `${organization.name} · ` : ''}{available.length} ministry {available.length === 1 ? 'tool' : 'tools'} available.</Text>
+                  <Text style={[styles.heroCopy, { color: colors.textSecondary }]}>{organization?.name ? `${organization.name} · ` : ''}{available.length} {available.length === 1 ? 'tool' : 'tools'} available.</Text>
                 </View>
                 <Badge label="LIVE PERMISSIONS" variant="primary" />
               </View>
@@ -160,7 +167,7 @@ export default function GeneralMinistryWorkspace() {
 
             <View style={[styles.helpCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
               <View style={[styles.helpIcon, { backgroundColor: colors.card }]}><Icon name="information-circle-outline" size={18} color={colors.interactive} /></View>
-              <View style={styles.flex}><Text style={[styles.helpTitle, { color: colors.text }]}>Permission-aware by design</Text><Text style={[styles.helpCopy, { color: colors.textMuted }]}>When a role changes, this workspace changes with it. General, Expression and Platform Administration permissions remain separate.</Text></View>
+              <View style={styles.flex}><Text style={[styles.helpTitle, { color: colors.text }]}>Permission-aware by design</Text><Text style={[styles.helpCopy, { color: colors.textMuted }]}>When a role changes, this workspace changes with it. General, Expression and Platform Administration permissions remain separate and are resolved from their existing backend contracts.</Text></View>
             </View>
           </>
         )}
