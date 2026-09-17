@@ -6,6 +6,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
+    "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -45,10 +46,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.churchos.mobile"
+      "bundleIdentifier": "com.cot.app"
     },
     "android": {
-      "package": "com.churchos.mobile",
+      "package": "com.cot.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#091733"
+      },
       "splash": {
         "backgroundColor": "#091733",
         "resizeMode": "contain",
