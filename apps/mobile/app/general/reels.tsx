@@ -9,17 +9,19 @@ export default function GeneralReelsScreen() {
   return (
     <View style={styles.screen}>
       <ReelsExperience scope="general" />
-      <TourAnchor targetKey="general.reels.scope" style={[styles.scopeTarget, { top: insets.top + 8 }]}>
-        <View style={styles.fill} />
-      </TourAnchor>
+      <View pointerEvents="none" style={[styles.scopeTarget, { top: insets.top + 8 }]}>
+        <TourAnchor targetKey="general.reels.scope" style={styles.fill}>
+          <View style={styles.fill} />
+        </TourAnchor>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  // The tour anchor is measurement-only. Keep it below the live Reel header so it
-  // never steals taps from Create, Back or other header actions on native builds.
+  // Measurement-only tour overlay. pointerEvents="none" is important here: this
+  // target sits over the header pill and must never swallow Create/Back touches.
   scopeTarget: { position: 'absolute', left: 64, right: 112, height: 48, zIndex: 5 },
   fill: { flex: 1 },
 });
