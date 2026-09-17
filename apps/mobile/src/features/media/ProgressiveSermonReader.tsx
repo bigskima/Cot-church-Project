@@ -11,6 +11,7 @@ import { parseSermonMarkdown, sermonBlocksToPlainText, type SermonRichBlock } fr
 
 type AiResult = { content?: unknown; text?: string; response?: string };
 type Props = { sermon: Sermon; initialBlocks?: SermonRichBlock[] };
+type SpeechTarget = 'sermon' | 'ai' | null;
 
 function resultText(result: AiResult) {
   if (typeof result.content === 'string') return result.content;
@@ -22,6 +23,15 @@ function resultText(result: AiResult) {
     return JSON.stringify(result.content);
   }
   return result.text || result.response || 'No study notes were returned.';
+}
+
+function plainAiText(value: string) {
+  return value
+    .replace(/\*\*/g, '')
+    .replace(/^#{1,3}\s+/gm, '')
+    .replace(/^[-*•]\s+/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 function splitSpeech(text: string, maximum: number) {
@@ -76,7 +86,7 @@ export function ProgressiveSermonReader({ sermon, initialBlocks }: Props) {
   const { colors } = useTheme();
   const blocks = useMemo(() => initialBlocks?.length ? initialBlocks : parseSermonMarkdown(sermon.transcript || sermon.description), [initialBlocks, sermon.description, sermon.transcript]);
   const [visibleCount, setVisibleCount] = useState(Math.min(3, Math.max(1, blocks.length)));
-  const [speaking, setSpeaking] = useState(false);
+  const [speechTarget, setSpeechTarget] = useState<SpeechTarget>(null);
   const [speechRate, setSpeechRate] = useState(1);
   const [copiedSermon, setCopiedSermon] = useState(false);
   const [copiedNotes, setCopiedNotes] = useState(false);
@@ -86,28 +96,60 @@ export function ProgressiveSermonReader({ sermon, initialBlocks }: Props) {
   const [aiError, setAiError] = useState('');
   const speechRun = useRef(0);
 
-  useEffect(() => { setVisibleCount(Math.min(3, Math.max(1, blocks.length))); setAiNotes(''); setAiError(''); setCopiedSermon(false); setCopiedNotes(false); }, [blocks.length, sermon.id]);
+  useEffect(() => {
+    speechRun.current += 1;
+    setSpeechTarget(null);
+    void Speech.stop();
+    setVisibleCount(Math.min(3, Math.max(1, blocks.length)));
+    setAiNotes('');
+    setAiError('');
+    setCopiedSermon(false);
+    setCopiedNotes(false);
+  }, [blocks.length, sermon.id]);
   useEffect(() => () => { speechRun.current += 1; void Speech.stop(); }, []);
 
   const fullText = useMemo(() => sermonBlocksToPlainText(blocks), [blocks]);
   const visibleBlocks = blocks.slice(0, visibleCount);
   const hasMore = visibleCount < blocks.length;
+  const speaking = speechTarget === 'sermon';
+  const aiSpeaking = speechTarget === 'ai';
 
-  const stopSpeech = async () => { speechRun.current += 1; setSpeaking(false); await Speech.stop(); };
-  const readAloud = async () => {
-    if (speaking) { await stopSpeech(); return; }
-    if (!fullText.trim()) return;
+  const stopSpeech = async () => {
+    speechRun.current += 1;
+    setSpeechTarget(null);
     await Speech.stop();
+  };
+
+  const speakText = async (target: Exclude<SpeechTarget, null>, value: string) => {
+    if (speechTarget === target) { await stopSpeech(); return; }
+    const text = value.trim();
+    if (!text) return;
+
+    speechRun.current += 1;
+    setSpeechTarget(null);
+    await Speech.stop();
+
     const run = ++speechRun.current;
-    const chunks = splitSpeech(fullText, Speech.maxSpeechInputLength);
-    setSpeaking(true);
+    const chunks = splitSpeech(text, Speech.maxSpeechInputLength);
+    setSpeechTarget(target);
+    const finish = () => {
+      if (run === speechRun.current) setSpeechTarget(null);
+    };
     const speakChunk = (index: number) => {
       if (run !== speechRun.current) return;
-      if (index >= chunks.length) { setSpeaking(false); return; }
-      Speech.speak(chunks[index], { rate: speechRate, onDone: () => speakChunk(index + 1), onStopped: () => setSpeaking(false), onError: () => setSpeaking(false) });
+      if (index >= chunks.length) { finish(); return; }
+      Speech.speak(chunks[index], {
+        rate: speechRate,
+        onDone: () => speakChunk(index + 1),
+        onStopped: finish,
+        onError: finish,
+      });
     };
     speakChunk(0);
   };
+
+  const readAloud = () => speakText('sermon', fullText);
+  const readAiNotes = () => speakText('ai', plainAiText(aiNotes));
 
   const copySermon = async () => {
     if (!fullText.trim()) return;
@@ -118,7 +160,7 @@ export function ProgressiveSermonReader({ sermon, initialBlocks }: Props) {
 
   const copyAiNotes = async () => {
     if (!aiNotes.trim()) return;
-    await Clipboard.setStringAsync(aiNotes.replace(/\*\*/g, '').replace(/^#{1,3}\s+/gm, ''));
+    await Clipboard.setStringAsync(plainAiText(aiNotes));
     setCopiedNotes(true);
     setTimeout(() => setCopiedNotes(false), 1400);
   };
@@ -127,6 +169,7 @@ export function ProgressiveSermonReader({ sermon, initialBlocks }: Props) {
     setAiOpen(true);
     if (aiLoading) return;
     if (mode !== 'authenticated') { setAiError('Sign in to use AI study notes for sermons.'); return; }
+    if (aiSpeaking) await stopSpeech();
     setAiLoading(true);
     setAiError('');
     try {
@@ -137,7 +180,12 @@ export function ProgressiveSermonReader({ sermon, initialBlocks }: Props) {
         'Use the full verified sermon notes. Give a short overview, clear subheadings for the main points, practical takeaways, and reflection questions. Do not invent facts beyond the sermon.',
         source ? `Visible sermon notes:\n${source}` : '',
       ].filter(Boolean).join('\n\n');
-      const result = await api.request<AiResult>('ai-gateway', { method: 'POST', body: JSON.stringify({ capability: 'assistant.answer', prompt, entityType: 'sermon', entityId: sermon.id }) });
+      const result = await api.request<AiResult>('ai-gateway', {
+        method: 'POST',
+        timeoutMs: 60_000,
+        feedback: false,
+        body: JSON.stringify({ capability: 'assistant.answer', prompt, entityType: 'sermon', entityId: sermon.id }),
+      });
       setAiNotes(resultText(result));
     } catch (error) {
       setAiError(error instanceof Error ? error.message : 'AI study notes are unavailable right now.');
@@ -169,7 +217,7 @@ export function ProgressiveSermonReader({ sermon, initialBlocks }: Props) {
       <BottomSheet visible={aiOpen} onClose={() => setAiOpen(false)} title="AI study helper" subtitle={sermon.title} maxHeightPercent={92}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.aiSheet}>
           <View style={[styles.aiSourceNotice, { backgroundColor: colors.primarySoft, borderColor: colors.primarySoftStrong }]}><Icon name="book-outline" size={18} color={colors.interactive} /><Text style={[styles.aiSourceText, { color: colors.textSecondary }]}>The helper is grounded in this sermon’s saved full notes. The published sermon remains the source of truth.</Text></View>
-          {aiLoading ? <Skeleton height={20} count={7} /> : aiError ? <View style={[styles.aiError, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Icon name="information-circle-outline" size={16} color={colors.textMuted} /><Text style={[styles.aiErrorText, { color: colors.textSecondary }]}>{aiError}</Text></View> : aiNotes ? <><AiMarkdown value={aiNotes} /><Pressable onPress={() => void copyAiNotes()} style={[styles.notesCopy, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]} accessibilityRole="button"><Icon name={copiedNotes ? 'checkmark-outline' : 'copy-outline'} size={15} color={colors.interactive} /><Text style={[styles.notesCopyText, { color: colors.textSecondary }]}>{copiedNotes ? 'Copied study notes' : 'Copy study notes'}</Text></Pressable></> : null}
+          {aiLoading ? <Skeleton height={20} count={7} /> : aiError ? <View style={[styles.aiError, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Icon name="information-circle-outline" size={16} color={colors.textMuted} /><Text style={[styles.aiErrorText, { color: colors.textSecondary }]}>{aiError}</Text></View> : aiNotes ? <><AiMarkdown value={aiNotes} /><View style={styles.notesActions}><Pressable onPress={() => void readAiNotes()} style={[styles.notesAction, { backgroundColor: aiSpeaking ? colors.primarySoft : colors.bgSecondary, borderColor: aiSpeaking ? colors.primarySoftStrong : colors.borderSubtle }]} accessibilityRole="button"><Icon name={aiSpeaking ? 'stop-circle-outline' : 'volume-high-outline'} size={15} color={colors.interactive} /><Text style={[styles.notesActionText, { color: colors.textSecondary }]}>{aiSpeaking ? 'Stop reading' : 'Read AI notes aloud'}</Text></Pressable><Pressable onPress={() => void copyAiNotes()} style={[styles.notesAction, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]} accessibilityRole="button"><Icon name={copiedNotes ? 'checkmark-outline' : 'copy-outline'} size={15} color={colors.interactive} /><Text style={[styles.notesActionText, { color: colors.textSecondary }]}>{copiedNotes ? 'Copied study notes' : 'Copy study notes'}</Text></Pressable></View></> : null}
           {!aiLoading ? <Button label={aiNotes ? 'Refresh study notes' : 'Generate study notes'} onPress={() => void askAi()} variant={aiNotes ? 'outline' : 'primary'} fullWidth /> : null}
         </ScrollView>
       </BottomSheet>
@@ -185,5 +233,5 @@ const styles = StyleSheet.create({
   continueCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm }, continueText: { fontSize: 11.5, lineHeight: 17 }, continueActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   aiSheet: { gap: spacing.md, paddingBottom: spacing.xl }, aiSourceNotice: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, aiSourceText: { flex: 1, fontSize: 11.5, lineHeight: 17 }, aiMarkdown: { gap: 4 }, aiSpace: { height: 5 }, aiHeading: { fontSize: 15, lineHeight: 21, fontWeight: '900', marginTop: spacing.sm }, aiHeadingLarge: { fontSize: 18, lineHeight: 24 }, aiParagraph: { fontSize: 13.5, lineHeight: 21 }, aiBold: { fontWeight: '900' }, aiBulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, aiBullet: { fontSize: 17, lineHeight: 21, fontWeight: '900' }, aiBulletBody: { flex: 1 },
   aiError: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, aiErrorText: { flex: 1, fontSize: 11.5, lineHeight: 17 },
-  notesCopy: { minHeight: 38, alignSelf: 'flex-start', borderRadius: radius.pill, borderWidth: 1, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', gap: 6 }, notesCopyText: { fontSize: 10.5, fontWeight: '800' },
+  notesActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, notesAction: { minHeight: 38, borderRadius: radius.pill, borderWidth: 1, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', gap: 6 }, notesActionText: { fontSize: 10.5, fontWeight: '800' },
 });
