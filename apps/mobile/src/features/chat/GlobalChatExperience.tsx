@@ -19,6 +19,7 @@ import { useResource } from '@/hooks/use-resource';
 import { invalidate } from '@/services/query-cache';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
+import { PLATFORM_KEYBOARD_BEHAVIOR, PLATFORM_KEYBOARD_DISMISS_MODE, PLATFORM_KEYBOARD_VERTICAL_OFFSET } from '@/utils/keyboard';
 import { RichChatComposer } from './RichChatComposer';
 import { RichMessageBubble } from './RichMessageBubble';
 import type { ChatReaction, ChatReply, ChatSendPayload, RichChatMessage } from './rich-chat-types';
@@ -285,7 +286,8 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
     return (
       <KeyboardAvoidingView
         style={[styles.screen, { backgroundColor: colors.bg, paddingBottom: generalThreadBottomInset }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={PLATFORM_KEYBOARD_BEHAVIOR}
+        keyboardVerticalOffset={PLATFORM_KEYBOARD_VERTICAL_OFFSET}
       >
         <View style={[styles.threadHeader, { paddingTop: Math.max(insets.top, 10), backgroundColor: colors.card, borderBottomColor: colors.borderSubtle }]}>
           <Pressable onPress={() => setSelected(null)} style={styles.iconButton}><Icon name="arrow-back" size={22} color={colors.text} /></Pressable>
@@ -319,6 +321,7 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.messages}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={PLATFORM_KEYBOARD_DISMISS_MODE}
             onContentSizeChange={() => { if (localMessages.length) messageListRef.current?.scrollToEnd({ animated: true }); }}
             onScrollToIndexFailed={({ index, averageItemLength }) => { messageListRef.current?.scrollToOffset({ offset: Math.max(0, averageItemLength * index), animated: true }); }}
             renderItem={({ item }) => {
@@ -400,6 +403,8 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
         data={list}
         keyExtractor={(item) => item.id}
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 40 }]}
+        keyboardDismissMode={PLATFORM_KEYBOARD_DISMISS_MODE}
+        keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
             {normalizedFilter ? 'SEARCH RESULTS' : 'MESSAGES & CONNECTIONS'}
@@ -411,7 +416,7 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
             : (
               <View style={styles.empty}>
                 <Text style={[styles.emptyTitle, { color: colors.text }]}>{normalizedFilter ? 'No matching account' : 'No chat connections yet'}</Text>
-                <Text style={[styles.emptyCopy, { color: colors.textSecondary }]}>
+                <Text style={[styles.emptyCopy, { color: colors.textSecondary }]}> 
                   {normalizedFilter
                     ? 'Try another username or name.'
                     : 'People you follow or who follow you will appear here. You can still search any COT account above.'}
