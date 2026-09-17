@@ -23,6 +23,20 @@ export interface AppScreenProps {
   refreshControl?: React.ReactElement<any>;
 }
 
+const KEYBOARD_BEHAVIOR = Platform.select({
+  ios: 'padding' as const,
+  android: 'height' as const,
+  web: 'padding' as const,
+  default: 'padding' as const,
+});
+
+const KEYBOARD_DISMISS_MODE = Platform.select({
+  ios: 'interactive' as const,
+  android: 'on-drag' as const,
+  web: 'none' as const,
+  default: 'on-drag' as const,
+});
+
 export function AppScreen({
   children,
   scrollable = false,
@@ -59,7 +73,7 @@ export function AppScreen({
         contentContainerStyle,
       ]}
       keyboardShouldPersistTaps="handled"
-      keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+      keyboardDismissMode={KEYBOARD_DISMISS_MODE}
       showsVerticalScrollIndicator={false}
       refreshControl={refreshControl}
     >
@@ -73,7 +87,8 @@ export function AppScreen({
     return (
       <View style={[containerStyle, style]}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={KEYBOARD_BEHAVIOR}
+          keyboardVerticalOffset={0}
           style={responsiveWrapperStyle}
         >
           {content}
