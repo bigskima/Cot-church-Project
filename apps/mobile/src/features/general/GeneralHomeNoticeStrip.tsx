@@ -28,7 +28,7 @@ export type GeneralHomeNotice = {
 
 function estimateTextWidth(notice: GeneralHomeNotice) {
   const characters = `${notice.message}${notice.link_label ? ` ${notice.link_label}` : ''}`.length;
-  return Math.max(260, characters * 7.4 + 56);
+  return Math.max(300, characters * 7.8 + 80);
 }
 
 export function GeneralHomeNoticeStrip() {
@@ -36,8 +36,9 @@ export function GeneralHomeNoticeStrip() {
   const { api, context } = useSession();
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
   const [dismissedId, setDismissedId] = React.useState<string | null>(null);
-  const [trackWidth, setTrackWidth] = React.useState(Math.max(240, width - spacing.md * 2));
+  const [trackWidth, setTrackWidth] = React.useState(Math.max(240, width - spacing.xs * 2));
   const translateX = React.useRef(new Animated.Value(0)).current;
+  const stripWidth = Math.max(1, Math.min(width - spacing.xs * 2, 1280));
 
   const resource = useResource<GeneralHomeNotice | null>(
     `general-home-notice:${organizationId || 'auto'}`,
@@ -56,12 +57,18 @@ export function GeneralHomeNoticeStrip() {
   React.useEffect(() => {
     if (!notice || dismissedId === notice.id || trackWidth <= 0) return;
     const textWidth = estimateTextWidth(notice);
+    const entryReach = Math.max(72, Math.min(trackWidth * 0.2, 220));
+    const exitReach = Math.max(96, Math.min(trackWidth * 0.28, 280));
+    const startX = trackWidth + entryReach;
+    const endX = -(textWidth + exitReach);
+    const travelDistance = startX - endX;
+
     translateX.stopAnimation();
-    translateX.setValue(trackWidth);
-    const duration = Math.max(12000, (trackWidth + textWidth) * 24);
+    translateX.setValue(startX);
+    const duration = Math.max(14_000, travelDistance * 22);
     const animation = Animated.loop(
       Animated.timing(translateX, {
-        toValue: -textWidth,
+        toValue: endX,
         duration,
         easing: Easing.linear,
         useNativeDriver: Platform.OS !== 'web',
@@ -84,7 +91,7 @@ export function GeneralHomeNoticeStrip() {
     <View
       style={[
         styles.shell,
-        { backgroundColor: notice.background_color, borderColor: `${notice.accent_color}55` },
+        { width: stripWidth, backgroundColor: notice.background_color, borderColor: `${notice.accent_color}55` },
       ]}
       accessibilityRole="summary"
       accessibilityLabel={`${notice.label}. ${notice.message}`}
@@ -129,10 +136,9 @@ export function GeneralHomeNoticeStrip() {
 
 const styles = StyleSheet.create({
   shell: {
-    width: '100%',
-    maxWidth: 1040,
+    maxWidth: 1280,
     alignSelf: 'center',
-    minHeight: 42,
+    minHeight: 44,
     borderWidth: 1,
     borderRadius: radius.lg,
     flexDirection: 'row',
@@ -140,7 +146,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   leading: {
-    minHeight: 42,
+    minHeight: 44,
     paddingLeft: spacing.md,
     paddingRight: spacing.sm,
     flexDirection: 'row',
@@ -151,10 +157,10 @@ const styles = StyleSheet.create({
   pulse: { width: 7, height: 7, borderRadius: 99 },
   label: { fontSize: 9.5, lineHeight: 12, fontWeight: '900', letterSpacing: 0.9, textTransform: 'uppercase', maxWidth: 130 },
   dot: { fontSize: 12, fontWeight: '900' },
-  track: { flex: 1, minWidth: 0, height: 42, justifyContent: 'center', overflow: 'hidden' },
+  track: { flex: 1, minWidth: 0, height: 44, justifyContent: 'center', overflow: 'hidden' },
   moving: { position: 'absolute', left: 0, flexDirection: 'row', alignItems: 'center' },
-  messagePressable: { minHeight: 42, justifyContent: 'center', paddingHorizontal: spacing.sm },
+  messagePressable: { minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.sm },
   message: { fontSize: 11.5, lineHeight: 16, fontWeight: '800', letterSpacing: 0.1 },
-  close: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
+  close: { width: 42, height: 44, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   pressed: { opacity: 0.65 },
 });
