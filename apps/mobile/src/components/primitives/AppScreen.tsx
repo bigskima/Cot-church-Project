@@ -59,6 +59,7 @@ export function AppScreen({
         contentContainerStyle,
       ]}
       keyboardShouldPersistTaps="handled"
+      keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
       showsVerticalScrollIndicator={false}
       refreshControl={refreshControl}
     >
@@ -72,7 +73,7 @@ export function AppScreen({
     return (
       <View style={[containerStyle, style]}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={responsiveWrapperStyle}
         >
           {content}
