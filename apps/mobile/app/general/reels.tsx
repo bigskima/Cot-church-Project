@@ -18,6 +18,8 @@ export default function GeneralReelsScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  scopeTarget: { position: 'absolute', left: 16, right: 68, height: 44, zIndex: 30 },
+  // The tour anchor is measurement-only. Keep it below the live Reel header so it
+  // never steals taps from Create, Back or other header actions on native builds.
+  scopeTarget: { position: 'absolute', left: 64, right: 112, height: 48, zIndex: 5 },
   fill: { flex: 1 },
 });
