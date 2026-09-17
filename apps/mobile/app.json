@@ -5,6 +5,13 @@
     "owner": "0xskima",
     "scheme": "churchos",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/a4c107b0-6c97-46b9-a9d0-27b2a24838d5",
+      "fallbackToCacheTimeout": 0
+    },
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "icon": "./assets/icon.png",
