@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Redirect, router, useLocalSearchParams, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import { useTheme } from '@/state/theme';
 import { Button, Chip, Icon, InputField, ScreenHeader, VideoPlayer } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { putSignedUpload, readUploadFile, type UploadFile } from '@/services/uploads';
+import { PLATFORM_KEYBOARD_BEHAVIOR, PLATFORM_KEYBOARD_DISMISS_MODE, PLATFORM_KEYBOARD_VERTICAL_OFFSET } from '@/utils/keyboard';
 
 type ReelScope = 'public' | 'branch';
 type SelectedVideo = UploadFile & { sizeBytes: number; durationSeconds?: number };
@@ -177,8 +178,17 @@ export default function ReelCreatorScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={[styles.screen, { backgroundColor: colors.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: expressionWorkspace ? spacing.md : insets.top + spacing.sm, paddingBottom: expressionWorkspace ? insets.bottom + spacing.xl : insets.bottom + 130 }]}>
+    <KeyboardAvoidingView
+      style={[styles.screen, { backgroundColor: colors.bg }]}
+      behavior={PLATFORM_KEYBOARD_BEHAVIOR}
+      keyboardVerticalOffset={PLATFORM_KEYBOARD_VERTICAL_OFFSET}
+    >
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={PLATFORM_KEYBOARD_DISMISS_MODE}
+        contentContainerStyle={[styles.content, { paddingTop: expressionWorkspace ? spacing.md : insets.top + spacing.sm, paddingBottom: expressionWorkspace ? insets.bottom + spacing.xl : insets.bottom + 130 }]}
+      >
         {!expressionWorkspace ? (
           <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
             <ScreenHeader title="Create Reel" kicker={generalWorkspace ? "GENERAL COT" : "MEDIA STUDIO"} subtitle={expressionWorkspace ? `Publish a vertical video inside ${expression?.name ?? 'this Expression'}.` : generalWorkspace ? "Publish a vertical video to General COT." : "Upload a vertical video and choose exactly where it should appear."} showBack />
