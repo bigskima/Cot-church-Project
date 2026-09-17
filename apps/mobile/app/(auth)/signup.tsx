@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
@@ -10,6 +10,7 @@ import { Button } from '@/components/Button';
 import { InputField } from '@/components/Input';
 import { DateTimeField, formatDateOnly } from '@/components/DateTimeField';
 import { radius, shadows, spacing, typography } from '@/design-system/tokens';
+import { PLATFORM_KEYBOARD_BEHAVIOR, PLATFORM_KEYBOARD_DISMISS_MODE, PLATFORM_KEYBOARD_VERTICAL_OFFSET } from '@/utils/keyboard';
 
 type SignupStep = 'identity' | 'security';
 
@@ -224,11 +225,16 @@ export default function SignupScreen() {
   );
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.screen, { backgroundColor: colors.bg }]}>
+    <KeyboardAvoidingView
+      behavior={PLATFORM_KEYBOARD_BEHAVIOR}
+      keyboardVerticalOffset={PLATFORM_KEYBOARD_VERTICAL_OFFSET}
+      style={[styles.screen, { backgroundColor: colors.bg }]}
+    >
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + spacing.xl, paddingBottom: insets.bottom + spacing.xxl }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={PLATFORM_KEYBOARD_DISMISS_MODE}
       >
         <View style={styles.brandMarkContainer}><BrandMark variant="auth" size={64} /></View>
 
