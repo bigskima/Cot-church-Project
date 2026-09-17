@@ -52,9 +52,11 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
     async (signal) => {
       if (!id) throw new Error('This sermon is unavailable.');
       if (!expressionMode) {
-        if (!activeOrganizationId) throw new Error('Choose a church to view this sermon.');
+        const organizationSuffix = activeOrganizationId
+          ? `&organizationId=${encodeURIComponent(activeOrganizationId)}`
+          : '';
         return api.request<Sermon>(
-          `public-content?type=sermon&id=${encodeURIComponent(id)}&organizationId=${encodeURIComponent(activeOrganizationId)}`,
+          `public-content?type=sermon&id=${encodeURIComponent(id)}${organizationSuffix}`,
           { signal, context: 'public' },
         );
       }
@@ -65,13 +67,27 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
     },
   );
 
+  const sermon = resource.data;
+  const playbackOrganizationId = activeOrganizationId || sermon?.organization_id || '';
+
   const playback = useResource<SermonPlayback>(
-    `sermon:playback:${expressionMode ? `expression:${activeExpressionId ?? 'none'}` : 'public'}:${id}`,
+    `sermon:playback:${expressionMode ? `expression:${activeExpressionId ?? 'none'}` : `public:${playbackOrganizationId || 'pending'}`}:${id}`,
     (signal) => {
       if (!expressionMode) {
-        if (!activeOrganizationId) return Promise.reject(new Error('Choose a church to play this sermon.'));
+        if (!playbackOrganizationId) {
+          return Promise.resolve({
+            ready: false,
+            source: 'direct' as const,
+            status: 'awaiting-sermon-context',
+            videoUrl: null,
+            audioUrl: null,
+            posterUrl: null,
+            durationSeconds: null,
+            expiresAt: null,
+          });
+        }
         return api.request<SermonPlayback>(
-          `sermon-playback?id=${encodeURIComponent(id)}&organizationId=${encodeURIComponent(activeOrganizationId)}`,
+          `sermon-playback?id=${encodeURIComponent(id)}&organizationId=${encodeURIComponent(playbackOrganizationId)}`,
           { signal, context: 'public' },
         );
       }
@@ -80,7 +96,6 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
     },
   );
 
-  const sermon = resource.data;
   const contentId = sermon?.content_item_id;
 
   const engagement = useResource<{ progress: { progress_seconds: number; completed: boolean } | null }>(
@@ -134,7 +149,7 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
     if (contentId) setReportOpen(true);
   };
 
-  const mediaPending = Boolean(sermon?.recording_id && playback.data && !playback.data.ready);
+  const mediaPending = Boolean(sermon?.recording_id && playback.data && !playback.data.ready && playback.data.status !== 'awaiting-sermon-context');
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
