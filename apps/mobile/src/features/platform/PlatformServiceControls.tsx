@@ -203,11 +203,11 @@ export function IntegrationControls({ data, refresh, authority }: Props) {
   const payload = objectValue(data);
   const canManage = hasPlatformPermission(authority, 'platform.integrations.manage');
   const connections = arrayValue(payload.connections);
-  const jobs = [
+  const jobs = ([
     ...arrayValue(payload.notifications).map((item) => ({ ...item, _queue: 'notification' })),
     ...arrayValue(payload.workflows).map((item) => ({ ...item, _queue: 'workflow' })),
     ...arrayValue(payload.deliveries).map((item) => ({ ...item, _queue: 'integration' })),
-  ].filter((item) => item.status === 'failed' || item.status === 'dead_letter');
+  ] as AnyRecord[]).filter((item) => item.status === 'failed' || item.status === 'dead_letter');
   const [target, setTarget] = useState<AnyRecord | null>(null);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
