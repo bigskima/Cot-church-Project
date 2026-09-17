@@ -215,7 +215,7 @@ export function CotGlobalActions() {
 }
 
 const styles = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFillObject, zIndex: 80 },
+  overlay: { ...StyleSheet.absoluteFill, zIndex: 80 },
   root: { position: 'absolute', left: 0, top: 0, width: DOCK_WIDTH, alignItems: 'center', gap: 8 },
   controls: { height: 30, borderRadius: radius.pill, borderWidth: 1, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
   dragHandle: { width: 33, height: 30, alignItems: 'center', justifyContent: 'center' },
