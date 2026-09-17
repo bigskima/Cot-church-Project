@@ -1,6 +1,12 @@
 import { Platform } from 'react-native';
 import { invalidateAfterMutation } from './services/resource-invalidation';
-import { defaultMutationSuccess, emitActionFeedback, shouldShowMutationFeedback } from './services/action-feedback';
+import {
+  buildMutationFailureDetails,
+  buildMutationSuccessFeedback,
+  describeMutation,
+  emitActionFeedback,
+  shouldShowMutationFeedback,
+} from './services/action-feedback';
 import * as SecureStore from 'expo-secure-store';
 
 const SESSION_KEY = 'church-os-session';
@@ -24,6 +30,7 @@ type RequestFeedback = false | {
   successTitle?: string;
   successMessage?: string;
   failureTitle?: string;
+  failureMessage?: string;
 };
 
 type ApiRequestInit = RequestInit & {
@@ -173,6 +180,51 @@ export function toUserFacingErrorMessage(
   return message;
 }
 
+type PayloadFailure = { code: string; message?: string };
+
+function embeddedPayloadFailure(payload: any): PayloadFailure | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const records = [payload, payload.data, payload.result].filter(
+    (value): value is Record<string, any> => Boolean(value && typeof value === 'object' && !Array.isArray(value)),
+  );
+
+  for (const record of records) {
+    const explicitFailure = record.success === false || record.ok === false;
+    const errorValue = record.error;
+    const hasError = Boolean(
+      errorValue
+      && (typeof errorValue === 'string' || (typeof errorValue === 'object' && Object.keys(errorValue).length > 0)),
+    );
+    if (!explicitFailure && !hasError) continue;
+
+    const errorRecord = errorValue && typeof errorValue === 'object' ? errorValue as Record<string, unknown> : {};
+    return {
+      code: typeof errorRecord.code === 'string'
+        ? errorRecord.code
+        : typeof record.code === 'string'
+          ? record.code
+          : 'REQUEST_FAILED',
+      message: typeof errorRecord.message === 'string'
+        ? errorRecord.message
+        : typeof errorValue === 'string'
+          ? errorValue
+          : typeof record.message === 'string'
+            ? record.message
+            : undefined,
+    };
+  }
+
+  const topStatus = typeof payload.status === 'string' ? payload.status.toLowerCase() : '';
+  if ((topStatus === 'failed' || topStatus === 'error' || topStatus === 'rejected') && typeof payload.message === 'string') {
+    return {
+      code: typeof payload.code === 'string' ? payload.code : 'REQUEST_FAILED',
+      message: payload.message,
+    };
+  }
+
+  return null;
+}
+
 export class ApiClient {
   constructor(private baseUrl: string, private getAuth: () => StoredAuth | null) {}
 
@@ -225,22 +277,34 @@ export class ApiClient {
         throw new ApiError('INVALID_RESPONSE', userFacingApiMessage('INVALID_RESPONSE', response.status), response.status);
       }
 
-      if (!response.ok) {
-        const code = payload.error?.code ?? 'REQUEST_FAILED';
-        throw new ApiError(code, userFacingApiMessage(code, response.status, payload.error?.message), response.status);
+      const payloadFailure = embeddedPayloadFailure(payload);
+      if (!response.ok || payloadFailure) {
+        const errorValue = payloadFailure ?? {
+          code: payload.error?.code ?? 'REQUEST_FAILED',
+          message: payload.error?.message,
+        };
+        throw new ApiError(
+          errorValue.code,
+          userFacingApiMessage(errorValue.code, response.status, errorValue.message),
+          response.status,
+        );
       }
+
+      const responseData = Object.prototype.hasOwnProperty.call(payload, 'data') ? payload.data : payload;
       if (isMutation) {
         invalidateAfterMutation(cleanPath, fetchInit.body);
         if (feedbackEnabled) {
           const config = feedback && typeof feedback === 'object' ? feedback : {};
+          const derived = buildMutationSuccessFeedback(cleanPath, method, fetchInit.body, responseData);
           emitActionFeedback({
             kind: 'success',
-            title: config.successTitle ?? 'Done',
-            message: config.successMessage ?? defaultMutationSuccess(cleanPath, method),
+            title: config.successTitle ?? derived.title,
+            message: config.successMessage ?? derived.message,
+            details: derived.details,
           });
         }
       }
-      return payload.data as T;
+      return responseData as T;
     } catch (error) {
       let normalized: ApiError;
       if (error instanceof ApiError) normalized = error;
@@ -254,10 +318,12 @@ export class ApiClient {
 
       if (feedbackEnabled && normalized.code !== 'REQUEST_CANCELLED') {
         const config = feedback && typeof feedback === 'object' ? feedback : {};
+        const description = describeMutation(cleanPath, method, fetchInit.body);
         emitActionFeedback({
           kind: 'error',
-          title: config.failureTitle ?? 'We couldn’t complete that',
-          message: normalized.message,
+          title: config.failureTitle ?? `${description.resource[0]?.toUpperCase() ?? ''}${description.resource.slice(1)} was not changed`,
+          message: config.failureMessage ?? normalized.message,
+          details: buildMutationFailureDetails(cleanPath, method, fetchInit.body),
           retry: () => this.request<T>(path, init),
         });
       }
