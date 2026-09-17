@@ -2,6 +2,7 @@
   "expo": {
     "name": "Church Digital Platform",
     "slug": "church-platform",
+    "owner": "0xskima",
     "scheme": "churchos",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -64,6 +65,11 @@
       "bundler": "metro",
       "output": "single",
       "favicon": "./assets/splash.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "a4c107b0-6c97-46b9-a9d0-27b2a24838d5"
+      }
     }
   }
 }
