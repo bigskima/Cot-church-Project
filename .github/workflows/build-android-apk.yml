@@ -1,0 +1,58 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: EAS build profile
+        required: true
+        default: preview
+        type: choice
+        options:
+          - preview
+          - production-apk
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-apk-${{ github.ref }}-${{ inputs.profile }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Start EAS Android build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      CI: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck mobile
+        run: npm run mobile:typecheck
+
+      - name: Confirm Expo authentication
+        working-directory: apps/mobile
+        run: npx eas-cli@latest whoami --non-interactive
+
+      - name: Start Android APK build on EAS
+        working-directory: apps/mobile
+        run: npx eas-cli@latest build --platform android --profile "${{ inputs.profile }}" --non-interactive --no-wait
+
+      - name: Next step
+        run: |
+          echo "The Android build was submitted to EAS."
+          echo "Open the EAS build URL printed in the previous step to follow progress and download the APK."
