@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, ScrollView, StyleSheet, View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CommentsThread, PostCard, ResourceError, ScreenHeader, Skeleton } from '@/components';
@@ -7,6 +7,7 @@ import { useResource } from '@/hooks/use-resource';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { radius, spacing } from '@/design-system/tokens';
+import { PLATFORM_KEYBOARD_BEHAVIOR, PLATFORM_KEYBOARD_DISMISS_MODE, PLATFORM_KEYBOARD_VERTICAL_OFFSET } from '@/utils/keyboard';
 import type { ContentComment, SocialPost } from '@/types/content';
 
 type FeedScope = 'general' | 'expression';
@@ -125,10 +126,15 @@ export function CommunityPostScreen({ forcedScope }: { forcedScope?: FeedScope }
       ) : post.error && !post.data ? (
         <ResourceError message={post.error} retry={post.refresh} />
       ) : post.data ? (
-        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={PLATFORM_KEYBOARD_BEHAVIOR}
+          keyboardVerticalOffset={PLATFORM_KEYBOARD_VERTICAL_OFFSET}
+        >
           <ScrollView
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={PLATFORM_KEYBOARD_DISMISS_MODE}
             contentContainerStyle={[
               styles.content,
               { paddingBottom: Math.max(insets.bottom, spacing.md) + spacing.xxl },
