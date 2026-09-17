@@ -11,12 +11,17 @@ on:
         options:
           - preview
           - production-apk
+  push:
+    branches:
+      - main
+    paths:
+      - .github/eas-build-trigger
 
 permissions:
   contents: read
 
 concurrency:
-  group: android-apk-${{ github.ref }}-${{ inputs.profile }}
+  group: android-apk-${{ github.ref }}-${{ inputs.profile || 'preview' }}
   cancel-in-progress: false
 
 jobs:
@@ -27,6 +32,7 @@ jobs:
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       CI: "1"
+      BUILD_PROFILE: ${{ inputs.profile || 'preview' }}
 
     steps:
       - name: Checkout
@@ -50,7 +56,7 @@ jobs:
 
       - name: Start Android APK build on EAS
         working-directory: apps/mobile
-        run: npx eas-cli@latest build --platform android --profile "${{ inputs.profile }}" --non-interactive --no-wait
+        run: npx eas-cli@latest build --platform android --profile "$BUILD_PROFILE" --non-interactive --no-wait
 
       - name: Next step
         run: |
