@@ -12,6 +12,8 @@
     "build": "expo export -p web",
     "typecheck": "tsc --noEmit",
     "eas:init": "npx eas-cli@latest init",
+    "eas:preview": "npx eas-cli@latest build --platform android --profile preview",
+    "eas:update:preview": "npx eas-cli@latest update --channel preview --environment production",
     "eas:apk": "npx eas-cli@latest build --platform android --profile production-apk",
     "eas:aab": "npx eas-cli@latest build --platform android --profile production"
   },
