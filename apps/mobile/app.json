@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Church Digital Platform",
+    "name": "COT",
     "slug": "church-platform",
     "owner": "0xskima",
     "scheme": "churchos",
@@ -19,7 +19,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Church Digital Platform to access your photos so you can choose a profile picture.",
+          "photosPermission": "Allow COT to access your photos so you can choose a profile picture.",
           "cameraPermission": false,
           "microphonePermission": false
         }
@@ -27,7 +27,7 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "Allow City of Transformation to record audio that you choose to share.",
+          "microphonePermission": "Allow COT to record audio that you choose to share.",
           "recordAudioAndroid": true,
           "enableBackgroundRecording": false,
           "enableBackgroundPlayback": false
