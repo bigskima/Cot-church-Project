@@ -93,6 +93,7 @@ Deno.serve(createHandler(
       loaded.provider,
       playbackId,
       PLAYBACK_TTL_SECONDS,
+      sermon.visibility === "public" ? "public" : "signed",
     );
 
     return {
