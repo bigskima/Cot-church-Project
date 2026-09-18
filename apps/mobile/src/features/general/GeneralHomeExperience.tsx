@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   EmptyState,
@@ -21,6 +21,7 @@ import { UrgentUpdatesRail } from './UrgentUpdatesRail';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 import { getRuntimeSupabase } from '@/services/runtime-supabase';
+import { invalidate } from '@/services/query-cache';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import type { Event, LiveStream, Reel, Sermon, SocialPost, Video } from '@/types/content';
@@ -116,7 +117,8 @@ export default function GeneralHomeExperience() {
   }, [organizationId]);
 
   const resource = useResource<HomeResource>(`mobile:general-home-v2:${organizationId || 'auto'}:${mode}`, async (signal) => {
-    let payload = await api.request<HomePayload>(query, { signal, context: 'public' });
+    const freshQuery = `${query}${query.includes('?') ? '&' : '?'}fresh=${Date.now()}`;
+    let payload = await api.request<HomePayload>(freshQuery, { signal, context: 'public' });
     const mediaItems = [...(payload.reels ?? []), ...(payload.videos ?? [])];
     const contentIds = [...new Set(mediaItems.map((item) => item.content_items?.id).filter(Boolean) as string[])];
 
@@ -161,6 +163,62 @@ export default function GeneralHomeExperience() {
     }
     return { payload, plan, announcements };
   });
+
+  const lastForegroundRefresh = useRef(0);
+
+  const refreshHome = useCallback(() => {
+    // Refresh Home itself and invalidate the independently loaded shelves/strip so
+    // a pull-to-refresh represents the entire visible Home, not only the main feed.
+    invalidate('general-home-context-drawer:');
+    invalidate('general-home-notice');
+    invalidate('participation:home:general');
+    resource.refresh();
+  }, [resource.refresh]);
+
+  useFocusEffect(useCallback(() => {
+    const now = Date.now();
+    if (now - lastForegroundRefresh.current > 12_000) {
+      lastForegroundRefresh.current = now;
+      refreshHome();
+    }
+  }, [refreshHome]));
+
+  useEffect(() => {
+    if (!organizationId) return;
+    let disposed = false;
+    let channel: ReturnType<Awaited<ReturnType<typeof getRuntimeSupabase>>['channel']> | null = null;
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleFreshRead = () => {
+      if (disposed) return;
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        if (!disposed) refreshHome();
+      }, 350);
+    };
+
+    void getRuntimeSupabase(accessToken).then((supabase) => {
+      if (disposed) return;
+      channel = supabase.channel(`general-home-live:${organizationId}`);
+      const realtimeTables = ['social_posts', 'content_items', 'reels', 'videos', 'live_streams', 'events', 'sermons'] as const;
+      realtimeTables.forEach((table) => {
+        channel?.on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table, filter: `organization_id=eq.${organizationId}` },
+          scheduleFreshRead,
+        );
+      });
+      channel.subscribe();
+    }).catch(() => {
+      // Pull-to-refresh/focus refresh remain the fallback when Realtime is unavailable.
+    });
+
+    return () => {
+      disposed = true;
+      if (refreshTimer) clearTimeout(refreshTimer);
+      if (channel) void channel.unsubscribe();
+    };
+  }, [accessToken, organizationId, refreshHome]);
 
   const payload = resource.data?.payload;
   const organization = payload?.organization ?? contextOrganization;
@@ -264,10 +322,10 @@ export default function GeneralHomeExperience() {
     <View style={[styles.headerContent, { width: contentWidth }]}>
       <GeneralHomeActionDeck onComposePost={() => openGeneralComposer('post')} onComposeVoice={() => openGeneralComposer('audio')} />
       <UrgentUpdatesRail announcements={announcements} />
-      {degradedSections.length ? <Pressable onPress={resource.refresh} style={[styles.degradedBanner, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><View style={[styles.degradedIcon, { backgroundColor: colors.card }]}><Icon name="refresh-outline" size={16} color={colors.interactive} /></View><View style={styles.flex}><Text style={[styles.degradedTitle, { color: colors.text }]}>A few sections need another try</Text><Text style={[styles.degradedText, { color: colors.textMuted }]}>Your Home remains usable. Tap here to refresh only the missing pieces.</Text></View></Pressable> : null}
+      {degradedSections.length ? <Pressable onPress={refreshHome} style={[styles.degradedBanner, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><View style={[styles.degradedIcon, { backgroundColor: colors.card }]}><Icon name="refresh-outline" size={16} color={colors.interactive} /></View><View style={styles.flex}><Text style={[styles.degradedTitle, { color: colors.text }]}>A few sections need another try</Text><Text style={[styles.degradedText, { color: colors.textMuted }]}>Your Home remains usable. Tap here to refresh only the missing pieces.</Text></View></Pressable> : null}
       {activeStream ? <View style={styles.liveSection}><FeedSectionHeading eyebrow={activeStream.status === 'live' ? 'LIVE NOW' : 'NEXT LIVE'} title={activeStream.status === 'live' ? 'Join what is happening now' : 'Coming up live'} subtitle="Open the broadcast without leaving Home discovery." actionLabel="Live" onAction={() => router.push('/general/live' as any)} /><HeroLiveCard stream={activeStream} onPress={() => router.push(`/general/live/${activeStream.id}` as any)} /></View> : null}
       <ParticipationHomeShelf scope="general" />
-      {feed.length ? <FeedSectionHeading eyebrow="COMMUNITY" title={rankingMode === 'personalized' ? 'For you' : 'Latest from COT'} subtitle={rankingMode === 'personalized' ? 'A calmer timeline shaped around relevant activity and discovery.' : 'Recent public activity from the COT community.'} actionLabel="Discover" onAction={() => router.push('/general/explore')} /> : null}
+      {feed.length ? <FeedSectionHeading eyebrow="COMMUNITY FEED" title={rankingMode === 'personalized' ? 'For you' : 'Latest from COT'} subtitle={rankingMode === 'personalized' ? 'Relevant COT activity, media and conversations in one continuous feed.' : 'Fresh public activity from across the COT community.'} actionLabel="Discover" onAction={() => router.push('/general/explore')} /> : null}
     </View>
   );
 
@@ -277,7 +335,7 @@ export default function GeneralHomeExperience() {
       {resource.loading && !resource.data ? (
         <View style={[styles.loadingContainer, { width: contentWidth }]}><Skeleton height={220} borderRadius={radius.xxl} /><Skeleton height={74} count={4} /><Skeleton height={180} count={2} /></View>
       ) : resource.error && !resource.data ? (
-        <View style={[styles.errorWrap, { width: contentWidth }]}><ResourceError message={resource.error} retry={resource.refresh} /></View>
+        <View style={[styles.errorWrap, { width: contentWidth }]}><ResourceError message={resource.error} retry={refreshHome} /></View>
       ) : (
         <FlatList
           data={feed}
@@ -286,7 +344,7 @@ export default function GeneralHomeExperience() {
           ListHeaderComponent={header}
           ListEmptyComponent={<View style={[styles.emptyHome, { width: contentWidth }]}><EmptyState title="General COT is ready" message="Sermons, events, media and community activity will form focused sections here as they are published." iconName="home-outline" /></View>}
           contentContainerStyle={{ paddingBottom: insets.bottom + 132 }}
-          refreshControl={<RefreshControl refreshing={resource.refreshing} onRefresh={resource.refresh} tintColor={colors.interactive} />}
+          refreshControl={<RefreshControl refreshing={resource.refreshing} onRefresh={refreshHome} tintColor={colors.interactive} colors={[colors.interactive]} progressBackgroundColor={colors.card} />}
           renderItem={({ item }) => {
             if (item.kind === 'section') return <View style={[styles.fullWidthItem, { width: contentWidth }]}>{renderSection(item)}</View>;
             if (item.kind === 'post') return <View style={[styles.timelineItem, { width: Math.min(contentWidth, 720) }]}><PostCard post={item.post} expressionName={item.post.expression?.name} canEngage={authenticated} allowExternalShare={item.post.visibility === 'public'} onPressAuthor={item.post.author?.username ? () => router.push({ pathname: '/general/member/[username]', params: { username: item.post.author!.username! } } as any) : undefined} onPress={() => openPost(item.post.id)} onReply={() => openPost(item.post.id, true)} onReact={authenticated ? (reaction) => reactToPost(item.post.id, reaction) : undefined} onBookmark={authenticated ? (currentlySaved) => bookmarkPost(item.post.id, currentlySaved) : undefined} variant="feed" showContext={false} style={styles.homePostCard} /></View>;
@@ -301,15 +359,15 @@ export default function GeneralHomeExperience() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 }, flex: { flex: 1, minWidth: 0 },
-  headerContent: { alignSelf: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.sm, gap: spacing.xl },
+  headerContent: { alignSelf: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.sm, gap: spacing.lg },
   loadingContainer: { alignSelf: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: spacing.md },
   errorWrap: { alignSelf: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.xl },
   fullWidthItem: { alignSelf: 'center', paddingHorizontal: spacing.md, marginTop: spacing.md },
-  timelineItem: { alignSelf: 'center', paddingHorizontal: spacing.md, marginTop: spacing.sm },
-  homePostCard: { marginHorizontal: 0, marginVertical: 0, borderRadius: radius.xl },
-  feedHeading: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md, paddingTop: spacing.xs },
+  timelineItem: { alignSelf: 'center', paddingHorizontal: spacing.md, marginTop: spacing.md },
+  homePostCard: { marginHorizontal: 0, marginVertical: 0, borderRadius: radius.xxl },
+  feedHeading: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md, paddingTop: spacing.sm, paddingBottom: 2 },
   feedEyebrow: { fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 1.05 },
-  feedTitle: { fontSize: 22, lineHeight: 27, fontWeight: '900', letterSpacing: -0.55, marginTop: 3 },
+  feedTitle: { fontSize: 24, lineHeight: 29, fontWeight: '900', letterSpacing: -0.72, marginTop: 3 },
   feedSubtitle: { fontSize: 11.5, lineHeight: 17, marginTop: 3, maxWidth: 600 },
   headingAction: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 4 }, headingActionText: { fontSize: 10.5, fontWeight: '900' },
   degradedBanner: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, degradedIcon: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, degradedTitle: { fontSize: 12.5, fontWeight: '900' }, degradedText: { fontSize: 10.5, lineHeight: 15, marginTop: 2 },

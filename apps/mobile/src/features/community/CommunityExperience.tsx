@@ -37,6 +37,7 @@ import {
 } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { putSignedUpload, readUploadFile, type UploadFile } from '@/services/uploads';
+import { PLATFORM_KEYBOARD_BEHAVIOR, PLATFORM_KEYBOARD_VERTICAL_OFFSET } from '@/utils/keyboard';
 import type { SocialPost } from '@/types/content';
 
 type FeedScope = 'general' | 'expression';
@@ -638,7 +639,7 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
         title={compose === 'audio' && scope === 'general' ? 'Record a voice post' : 'Create post'}
         subtitle={compose === 'audio' && scope === 'general' ? 'Record from your microphone or attach an existing audio file.' : 'Share something meaningful with your community.'}
       >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.composerBody}>
+        <KeyboardAvoidingView behavior={PLATFORM_KEYBOARD_BEHAVIOR} keyboardVerticalOffset={PLATFORM_KEYBOARD_VERTICAL_OFFSET} style={styles.composerBody}>
           <View style={styles.destinationBlock}>
             <Text style={[styles.destinationLabel, { color: colors.textSecondary }]}>POST TO</Text>
             <View style={styles.destinationRow}>

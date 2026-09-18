@@ -2,8 +2,8 @@ import { Platform, type KeyboardAvoidingViewProps, type ScrollViewProps } from '
 
 export const PLATFORM_KEYBOARD_BEHAVIOR: KeyboardAvoidingViewProps['behavior'] = Platform.select({
   ios: 'padding',
-  android: 'height',
-  web: 'padding',
+  android: 'padding',
+  web: 'height',
   default: 'padding',
 });
 

@@ -74,7 +74,7 @@ export function PrayerExperience({ scope = 'general', embedded = false }: { scop
 
   const prayers = useResource<RoutedPrayer[]>(
     `prayer:wall:${mode}:${wallScope}:${organizationId || 'auto'}:${expression?.id || 'none'}`,
-    (signal) => api.request<RoutedPrayer[]>(buildPrayerPath(wallScope), { signal }),
+    (signal) => api.request<RoutedPrayer[]>(buildPrayerPath(wallScope), { signal, context: wallScope === 'expression' ? 'current' : 'public', cache: 'no-store' }),
   );
 
   const resetSubmission = () => {
@@ -113,6 +113,7 @@ export function PrayerExperience({ scope = 'general', embedded = false }: { scop
     try {
       const result = await api.request<RoutedPrayer>('prayer-requests', {
         method: 'POST',
+        context: destination === 'expression' ? 'current' : 'public',
         body: JSON.stringify({
           organizationId: organizationId || undefined,
           branchId: destination === 'expression' ? expression?.id : undefined,
@@ -153,6 +154,7 @@ export function PrayerExperience({ scope = 'general', embedded = false }: { scop
     try {
       await api.request<{ id: string; prayer_count: number; viewer_has_prayed: boolean }>('prayer-requests', {
         method: 'PATCH',
+        context: wallScope === 'expression' ? 'current' : 'public',
         body: JSON.stringify({ action: 'pray', id: prayer.id }),
       });
       await prayers.refresh();

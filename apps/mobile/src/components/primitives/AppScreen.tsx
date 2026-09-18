@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/state/theme';
+import { PLATFORM_KEYBOARD_BEHAVIOR, PLATFORM_KEYBOARD_DISMISS_MODE, PLATFORM_KEYBOARD_VERTICAL_OFFSET } from '@/utils/keyboard';
 
 export interface AppScreenProps {
   children: React.ReactNode;
@@ -23,19 +24,6 @@ export interface AppScreenProps {
   refreshControl?: React.ReactElement<any>;
 }
 
-const KEYBOARD_BEHAVIOR = Platform.select({
-  ios: 'padding' as const,
-  android: 'height' as const,
-  web: 'padding' as const,
-  default: 'padding' as const,
-});
-
-const KEYBOARD_DISMISS_MODE = Platform.select({
-  ios: 'interactive' as const,
-  android: 'on-drag' as const,
-  web: 'none' as const,
-  default: 'on-drag' as const,
-});
 
 export function AppScreen({
   children,
@@ -73,7 +61,7 @@ export function AppScreen({
         contentContainerStyle,
       ]}
       keyboardShouldPersistTaps="handled"
-      keyboardDismissMode={KEYBOARD_DISMISS_MODE}
+      keyboardDismissMode={PLATFORM_KEYBOARD_DISMISS_MODE}
       showsVerticalScrollIndicator={false}
       refreshControl={refreshControl}
     >
@@ -87,8 +75,8 @@ export function AppScreen({
     return (
       <View style={[containerStyle, style]}>
         <KeyboardAvoidingView
-          behavior={KEYBOARD_BEHAVIOR}
-          keyboardVerticalOffset={0}
+          behavior={PLATFORM_KEYBOARD_BEHAVIOR}
+          keyboardVerticalOffset={PLATFORM_KEYBOARD_VERTICAL_OFFSET}
           style={responsiveWrapperStyle}
         >
           {content}

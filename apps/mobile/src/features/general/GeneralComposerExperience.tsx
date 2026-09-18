@@ -16,6 +16,7 @@ import { radius, shadows, spacing } from '@/design-system/tokens';
 import { putSignedUpload, readUploadFile, type UploadFile } from '@/services/uploads';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
+import { PLATFORM_KEYBOARD_BEHAVIOR, PLATFORM_KEYBOARD_DISMISS_MODE, PLATFORM_KEYBOARD_VERTICAL_OFFSET } from '@/utils/keyboard';
 
 type ComposerMode = 'post' | 'audio';
 type MediaAttachment = {
@@ -297,7 +298,7 @@ export default function GeneralComposerExperience({ mode: composerMode = 'post' 
   }
 
   return (
-    <KeyboardAvoidingView style={[styles.screen, { backgroundColor: colors.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={[styles.screen, { backgroundColor: colors.bg }]} behavior={PLATFORM_KEYBOARD_BEHAVIOR} keyboardVerticalOffset={PLATFORM_KEYBOARD_VERTICAL_OFFSET}>
       <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm, backgroundColor: colors.bg, borderBottomColor: colors.borderSubtle }]}>
         <Pressable onPress={() => void cancel()} style={({ pressed }) => [styles.backButton, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Cancel creating post">
           <Icon name="close" size={20} color={colors.text} />
@@ -311,7 +312,7 @@ export default function GeneralComposerExperience({ mode: composerMode = 'post' 
         </Pressable>
       </View>
 
-      <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]}>
+      <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode={PLATFORM_KEYBOARD_DISMISS_MODE} showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]}>
         <View style={[styles.composerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
           <View style={styles.identityRow}>
             <Avatar url={context?.profile?.avatar_url} name={context?.profile?.display_name || 'COT member'} size="md" />

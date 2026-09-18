@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/state/theme';
+import { PLATFORM_KEYBOARD_BEHAVIOR, PLATFORM_KEYBOARD_DISMISS_MODE, PLATFORM_KEYBOARD_VERTICAL_OFFSET } from '@/utils/keyboard';
 import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 import { Icon } from './primitives/Icon';
 
@@ -26,12 +27,6 @@ export interface BottomSheetProps {
   style?: StyleProp<ViewStyle>;
 }
 
-const KEYBOARD_BEHAVIOR = Platform.select({
-  ios: 'padding' as const,
-  android: 'height' as const,
-  web: 'padding' as const,
-  default: 'padding' as const,
-});
 
 export function BottomSheet({
   visible,
@@ -55,8 +50,8 @@ export function BottomSheet({
           accessibilityLabel="Close sheet"
         />
         <KeyboardAvoidingView
-          behavior={KEYBOARD_BEHAVIOR}
-          keyboardVerticalOffset={0}
+          behavior={PLATFORM_KEYBOARD_BEHAVIOR}
+          keyboardVerticalOffset={PLATFORM_KEYBOARD_VERTICAL_OFFSET}
           style={[
             styles.sheetContainer,
             {
@@ -96,7 +91,7 @@ export function BottomSheet({
           <ScrollView
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="always"
-            keyboardDismissMode="none"
+            keyboardDismissMode={PLATFORM_KEYBOARD_DISMISS_MODE}
             nestedScrollEnabled
             contentContainerStyle={styles.contentContainer}
           >

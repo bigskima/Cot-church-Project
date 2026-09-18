@@ -52,14 +52,17 @@ export function GeneralTopBar({ organizationName, authenticated, avatarUrl, disp
             style={({ pressed }) => [styles.identity, pressed && authenticated ? styles.pressed : null]}
           >
             <View style={[styles.brand, { backgroundColor: colors.cardElevated, borderColor: colors.borderSubtle }]}>
-              <BrandMark variant="header" size={28} />
+              <BrandMark variant="header" size={34} forceCot />
             </View>
             <View style={styles.identityCopy}>
               <View style={styles.titleRow}>
                 <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>General COT</Text>
-                <View style={[styles.scopePill, { backgroundColor: colors.primarySoft }]}>
-                  <Icon name="globe-outline" size={11} color={colors.interactive} />
-                  <Text style={[styles.scopePillText, { color: colors.interactive }]}>PUBLIC</Text>
+                <View
+                  style={[styles.scopePill, { backgroundColor: colors.primarySoft, borderColor: colors.primarySoftStrong }]}
+                  accessibilityRole="image"
+                  accessibilityLabel="Public General COT"
+                >
+                  <Icon name="globe" size={13} color={colors.interactive} />
                 </View>
               </View>
               <Text style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>{organizationName || 'City of Transformation'}</Text>
@@ -82,7 +85,7 @@ export function GeneralTopBar({ organizationName, authenticated, avatarUrl, disp
             {!wide ? <HeaderButton icon="search-outline" label="Search General COT" onPress={() => router.push('/general/explore')} /> : null}
             {authenticated ? <HeaderButton icon="notifications-outline" label="Notifications" onPress={() => router.push('/general/notifications')} /> : null}
             {authenticated && canManage && wide ? <HeaderButton icon="shield-checkmark-outline" label="Leadership tools" onPress={() => router.push('/general/leadership')} accent /> : null}
-            {authenticated && wide ? <HeaderButton icon="ellipsis-horizontal" label="General COT tools and settings" onPress={() => router.push('/general/tools')} /> : null}
+            {authenticated ? <HeaderButton icon="ellipsis-horizontal" label="General COT tools and settings" onPress={() => router.push('/general/tools')} /> : null}
             {authenticated && wide ? (
               <Pressable onPress={() => router.push('/general/profile')} accessibilityRole="button" accessibilityLabel="Open your profile" style={({ pressed }) => [styles.avatarButton, pressed && styles.pressed]}>
                 <Avatar url={avatarUrl} name={displayName || 'COT member'} size="sm" />
@@ -99,22 +102,21 @@ export function GeneralTopBar({ organizationName, authenticated, avatarUrl, disp
 }
 
 const styles = StyleSheet.create({
-  wrap: { paddingHorizontal: spacing.md, paddingBottom: spacing.xs, gap: 6 },
-  bar: { width: '100%', maxWidth: 1040, alignSelf: 'center', minHeight: 62, borderWidth: 1, borderRadius: radius.xxl, paddingHorizontal: spacing.sm, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  wrap: { paddingHorizontal: spacing.md, paddingBottom: spacing.xs, gap: 7 },
+  bar: { width: '100%', maxWidth: 1040, alignSelf: 'center', minHeight: 68, borderWidth: 1, borderRadius: radius.xxl, paddingHorizontal: 9, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   identity: { minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 1 },
-  brand: { width: 42, height: 42, borderRadius: 15, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  brand: { width: 48, height: 48, borderRadius: 17, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   identityCopy: { minWidth: 0, maxWidth: 250, flexShrink: 1 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  title: { fontSize: 16, lineHeight: 20, fontWeight: '900', letterSpacing: -0.42, flexShrink: 1 },
-  meta: { fontSize: 10.5, lineHeight: 14, fontWeight: '600', marginTop: 1 },
-  scopePill: { minHeight: 20, borderRadius: radius.pill, paddingHorizontal: 7, flexDirection: 'row', alignItems: 'center', gap: 3 },
-  scopePillText: { fontSize: 8, lineHeight: 11, fontWeight: '900', letterSpacing: 0.55 },
+  title: { fontSize: 17.5, lineHeight: 21, fontWeight: '900', letterSpacing: -0.52, flexShrink: 1 },
+  meta: { fontSize: 10.5, lineHeight: 14, fontWeight: '700', marginTop: 2 },
+  scopePill: { width: 25, height: 25, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   search: { flex: 1, maxWidth: 430, minHeight: 42, borderRadius: radius.pill, borderWidth: 1, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginLeft: 'auto' },
   searchText: { flex: 1, fontSize: 11.5, fontWeight: '600' },
   searchHint: { borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 4 },
   searchHintText: { fontSize: 9, fontWeight: '800' },
   actions: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 6 },
-  iconButton: { width: 40, height: 40, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  iconButton: { width: 41, height: 41, borderRadius: 15, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   avatarButton: { width: 42, height: 42, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   pressed: { opacity: 0.78, transform: [{ scale: 0.975 }] },
 });

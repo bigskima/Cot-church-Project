@@ -13,6 +13,7 @@ export interface BrandMarkProps {
   size?: number;
   style?: StyleProp<ViewStyle>;
   imageStyle?: StyleProp<ImageStyle>;
+  forceCot?: boolean;
 }
 
 export function BrandMark({
@@ -20,6 +21,7 @@ export function BrandMark({
   size,
   style,
   imageStyle,
+  forceCot = false,
 }: BrandMarkProps) {
   const { isDark } = useTheme();
   const { primaryLogoUrl, compactLogoUrl, darkLogoUrl } = useBranding();
@@ -38,11 +40,11 @@ export function BrandMark({
   return (
     <View style={[styles.container, defaultDimensions, style]}>
       <Image
-        source={remoteUrl ? { uri: remoteUrl } : defaultCotLogo}
+        source={!forceCot && remoteUrl ? { uri: remoteUrl } : defaultCotLogo}
         style={[styles.image, defaultDimensions, imageStyle]}
         resizeMode="contain"
         accessibilityRole="image"
-        accessibilityLabel="Church Logo"
+        accessibilityLabel={forceCot ? "COT logo" : "Church logo"}
       />
     </View>
   );

@@ -30,7 +30,7 @@ function normalizeAiMarkdown(value: string) {
     .replace(/\r/g, '')
     // Models sometimes return markdown separators as visible content. They are
     // layout hints, not study-note text, so remove them before rendering.
-    .replace(/^\s*(?:[-*_]{3,}|\.{3,})\s*$/gm, '')
+    .replace(/^\s*(?:(?:[-_*—–]\s*){3,}|(?:\.\s*){3,})\s*$/gm, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
@@ -87,7 +87,7 @@ function AiMarkdown({ value }: { value: string }) {
   lines.forEach((raw, index) => {
     const line = raw.trim();
     if (!line) { nodes.push(<View key={`space-${index}`} style={styles.aiSpace} />); return; }
-    if (/^(?:[-*_]{3,}|\.{3,})$/.test(line)) return;
+    if (/^(?:(?:[-_*—–]\s*){3,}|(?:\.\s*){3,})$/.test(line)) return;
 
     const heading = line.match(/^(#{1,6})\s*(.+)$/);
     if (heading) {
@@ -157,7 +157,9 @@ export function ProgressiveSermonReader({ sermon, initialBlocks }: Props) {
 
   const speakText = async (target: Exclude<SpeechTarget, null>, value: string) => {
     if (speechTarget === target) { await stopSpeech(); return; }
-    const text = value.trim();
+    const text = value
+      .replace(/\bC(?:\s*\.?\s*)O(?:\s*\.?\s*)T\b/gi, 'C O T')
+      .trim();
     if (!text) return;
 
     speechRun.current += 1;
