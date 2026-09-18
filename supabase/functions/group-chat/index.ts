@@ -357,12 +357,14 @@ Deno.serve(createHandler(
           .eq("status", "active")
           .order("display_order")
           .order("name");
-        purposeQuery = group.branch_id
-          ? purposeQuery.or(`branch_id.is.null,branch_id.eq.${group.branch_id}`)
-          : purposeQuery.is("branch_id", null);
-        const { data, error } = await purposeQuery;
-        if (error) throw new ApiError("GROUP_CHAT_LOAD_FAILED", "Unable to load available giving destinations.", 500, undefined, false);
-        availableGivingPurposes = data ?? [];
+        if (!group.branch_id) {
+          availableGivingPurposes = [];
+        } else {
+          purposeQuery = purposeQuery.eq("branch_id", group.branch_id);
+          const { data, error } = await purposeQuery;
+          if (error) throw new ApiError("GROUP_CHAT_LOAD_FAILED", "Unable to load available giving destinations.", 500, undefined, false);
+          availableGivingPurposes = data ?? [];
+        }
       }
 
       const now = Date.now();
@@ -786,8 +788,8 @@ Deno.serve(createHandler(
         .eq("organization_id", auth.organizationId)
         .eq("status", "active")
         .maybeSingle();
-      if (purposeError || !purpose || (purpose.branch_id && purpose.branch_id !== group.branch_id)) {
-        throw new ApiError("GIVING_PURPOSE_INVALID", "Choose an active giving destination for this Expression.", 422);
+      if (purposeError || !purpose || !group.branch_id || purpose.branch_id !== group.branch_id) {
+        throw new ApiError("GIVING_PURPOSE_INVALID", "Choose an active giving destination from this Group's Expression.", 422);
       }
       const { data, error } = await admin.from("group_giving_options").upsert({
         organization_id: auth.organizationId,
