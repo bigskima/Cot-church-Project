@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: validate-application-${{ github.workflow }}-${{ github.ref }}
@@ -21,36 +21,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
 
       - name: Use Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-
-      - name: Regenerate lockfile for validation
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-
-      - name: Upload regenerated lockfile
-        uses: actions/upload-artifact@v4
-        with:
-          name: regenerated-package-lock-${{ github.run_id }}
-          path: package-lock.json
-          retention-days: 2
-
-      - name: Commit regenerated lockfile to PR branch
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package-lock.json
-          if ! git diff --cached --quiet; then
-            git commit -m "chore: regenerate streaming dependency lockfile [skip ci]"
-            git push origin HEAD:${{ github.event.pull_request.head.ref }}
-          fi
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
