@@ -81,7 +81,7 @@ async function secretReady(reference?: string | null) {
   }
 }
 
-async function streamingReadiness(organizationId: string) {
+async function streamingReadiness(organizationId: string, signedPlaybackRequired = false) {
   try {
     const loaded = await defaultStreamingConfig(organizationId);
     if (loaded.organizationId && loaded.organizationId !== organizationId) {
@@ -105,6 +105,17 @@ async function streamingReadiness(organizationId: string) {
         primarySecretReady,
         webhookSecretReady,
         signedPlaybackConfigured: signingSecretReady,
+        testMode: loaded.provider.settings?.testMode === true,
+      };
+    }
+    if (signedPlaybackRequired && !signingSecretReady) {
+      return {
+        ready: false,
+        reason: "signed_playback_not_configured" as const,
+        providerCode: loaded.provider.providerCode,
+        primarySecretReady,
+        webhookSecretReady,
+        signedPlaybackConfigured: false,
         testMode: loaded.provider.settings?.testMode === true,
       };
     }
@@ -135,7 +146,7 @@ Deno.serve(createHandler(
         ? uuid(url.searchParams.get("branchId"), "branchId", true)!
         : null;
       await assertBroadcastAuthority(auth, organizationId, branchId);
-      return { data: await streamingReadiness(organizationId) };
+      return { data: await streamingReadiness(organizationId, Boolean(branchId)) };
     }
 
     const admin = adminClient();
@@ -215,6 +226,15 @@ Deno.serve(createHandler(
       if (loaded.organizationId && loaded.organizationId !== organizationId) throw new ApiError("PROVIDER_SCOPE_DENIED", "Provider configuration is outside this organization", 403);
       if (!(await secretReady(loaded.provider.secretReference)) || !(await secretReady(loaded.provider.webhookSecretReference))) {
         throw new ApiError("STREAMING_NOT_READY", "The active streaming provider is missing required runtime secrets", 503, undefined, false);
+      }
+      if (visibility !== "public" && !(await secretReady(loaded.provider.signingKeyReference))) {
+        throw new ApiError(
+          "STREAMING_SIGNING_NOT_CONFIGURED",
+          "Secure playback must be configured before creating an Expression or private broadcast",
+          503,
+          undefined,
+          false,
+        );
       }
 
       const adapter = streamingProvider(loaded.provider.providerCode);
