@@ -72,6 +72,12 @@ function reconnectWindow(value: unknown) {
   return seconds;
 }
 
+async function numericUid(profileId: string) {
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(profileId)));
+  const value = new DataView(digest.buffer).getUint32(0, false);
+  return value === 0 ? 1 : value;
+}
+
 async function secretReady(reference?: string | null) {
   if (!reference) return false;
   try {
@@ -274,6 +280,15 @@ Deno.serve(createHandler(
       if (providerCode === "agora" && visibility === "public") {
         throw new ApiError("STREAMING_SCOPE_UNSUPPORTED", "Agora is configured for Expression broadcasts, not General COT", 422);
       }
+      if (providerCode === "agora" && loaded.provider.settings?.cohostAuthenticationEnabled !== true) {
+        throw new ApiError(
+          "AGORA_COHOST_AUTH_REQUIRED",
+          "Expression live is disabled until Agora Co-host token authentication is enabled and confirmed in Platform Administration",
+          503,
+          undefined,
+          false,
+        );
+      }
 
       const adapter = streamingProvider(providerCode);
       const title = requiredString(body.title, "title", 180).trim();
@@ -285,6 +300,22 @@ Deno.serve(createHandler(
         reconnectWindowSeconds: windowSeconds,
         record: body.record !== false,
       });
+
+      let rtcGrant: unknown = null;
+      if (providerCode === "agora") {
+        if (!adapter.createRtcGrant) {
+          throw new ApiError("STREAMING_ADAPTER_UNAVAILABLE", "Agora RTC grant support is unavailable", 500, undefined, false);
+        }
+        const ttlSetting = Number(loaded.provider.settings?.tokenTtlSeconds ?? 3600);
+        const ttlSeconds = Number.isFinite(ttlSetting) ? Math.max(300, Math.min(86400, Math.floor(ttlSetting))) : 3600;
+        rtcGrant = await adapter.createRtcGrant(
+          loaded.provider,
+          provisioned.providerBroadcastId,
+          await numericUid(auth.user.id),
+          "publisher",
+          ttlSeconds,
+        );
+      }
 
       const record = {
         organization_id: organizationId,
@@ -312,7 +343,7 @@ Deno.serve(createHandler(
         await adapter.stopBroadcast(loaded.provider, provisioned.providerBroadcastId).catch(() => {});
         throw new ApiError("BROADCAST_CREATE_FAILED", "Provider was rolled back after the broadcast record failed", 500, undefined, false);
       }
-      return { data: { stream: data, ingest: provisioned.ingest, rtc: provisioned.rtc ?? null, providerCode: loaded.provider.providerCode }, status: 201 };
+      return { data: { stream: data, ingest: provisioned.ingest, rtc: provisioned.rtc ?? null, rtcGrant, providerCode: loaded.provider.providerCode }, status: 201 };
     }
 
     assertNoUnknownFields(body, ["id", "action", "startSeconds", "endSeconds", "title"]);
@@ -355,6 +386,11 @@ Deno.serve(createHandler(
     }
 
     if (action === "refresh_status") {
+      if (loaded.provider.providerCode === "agora") {
+        // Agora RTC channels are ephemeral; COT owns the ready/live/ended
+        // lifecycle through host join/leave actions instead of provider polling.
+        return { data: { id, status: stream.status } };
+      }
       const status = await adapter.getStreamStatus(loaded.provider, stream.provider_broadcast_id);
       const { error: updateError } = await admin.from("live_streams").update({ status }).eq("id", id);
       if (updateError) throw new ApiError("STREAM_UPDATE_FAILED", "Unable to persist provider stream status", 500, undefined, false);
