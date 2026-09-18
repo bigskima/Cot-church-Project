@@ -13,5 +13,6 @@ export type AgoraLiveSessionProps = {
   role: 'publisher' | 'subscriber';
   onJoined?: () => void;
   onLeave?: () => void;
+  onRemoteLeft?: () => void;
   onError?: (message: string) => void;
 };
