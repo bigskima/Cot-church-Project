@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
@@ -172,7 +172,7 @@ export default function MediaStudioScreen() {
           description: description.trim(),
           visibility: broadcastScope === 'public' ? 'public' : 'branch',
           latencyMode,
-          record: true,
+          record: providerCode === 'agora' ? false : true,
         }),
       });
 
@@ -408,16 +408,50 @@ export default function MediaStudioScreen() {
         </View>
       </ScrollView>
 
-      <BottomSheet
-        visible={createOpen}
-        onClose={() => { if (!creating) { if (createdRtc) void finishRtcBroadcast(); else setCreateOpen(false); } }}
-        title={createdRtc ? 'Expression live broadcast' : createdIngest ? 'Streaming connection details' : 'Create live broadcast'}
-        subtitle={createdRtc ? 'Your camera and microphone publish only to this Expression.' : createdIngest ? 'Use these details only on the device or software sending the broadcast.' : `Destination: ${destinationName}`}
-        maxHeightPercent={94}
-      >
+      <Modal visible={Boolean(createdRtc)} animationType="fade" presentationStyle="fullScreen" onRequestClose={() => {}}>
         {createdRtc ? (
-          <View style={styles.rtcSheet}>
-            <View style={styles.rtcPreview}>
+          <View
+            style={[
+              styles.liveStudio,
+              {
+                paddingTop: Math.max(insets.top, spacing.md),
+                paddingBottom: Math.max(insets.bottom, spacing.md),
+              },
+            ]}
+          >
+            <View style={styles.liveStudioHeader}>
+              <View style={styles.liveStudioHeaderCopy}>
+                <View style={styles.liveStudioStatusRow}>
+                  <Badge label="LIVE STUDIO" variant="live" pulse />
+                  <Text style={styles.liveStudioScope}>EXPRESSION ONLY</Text>
+                </View>
+                <Text style={styles.liveStudioTitle} numberOfLines={1}>{title || 'Expression Live'}</Text>
+                <Text style={styles.liveStudioSubtitle} numberOfLines={1}>{destinationName} · Secure Agora RTC</Text>
+              </View>
+              <Pressable
+                onPress={() => void finishRtcBroadcast()}
+                disabled={busyId === createdRtc.streamId}
+                style={({ pressed }) => [
+                  styles.liveStudioEndTop,
+                  pressed && { opacity: 0.82 },
+                  busyId === createdRtc.streamId && { opacity: 0.55 },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="End broadcast"
+              >
+                <Icon name="stop-circle-outline" size={19} color="#FFFFFF" />
+                <Text style={styles.liveStudioEndTopText}>{busyId === createdRtc.streamId ? 'Ending…' : 'End'}</Text>
+              </Pressable>
+            </View>
+
+            {errorMsg ? (
+              <View style={styles.liveStudioError}>
+                <Icon name="alert-circle" size={18} color="#FF7A8A" />
+                <Text style={styles.liveStudioErrorText}>{errorMsg}</Text>
+              </View>
+            ) : null}
+
+            <View style={styles.liveStudioStage}>
               <AgoraLiveSession
                 grant={createdRtc.grant}
                 role="publisher"
@@ -425,10 +459,27 @@ export default function MediaStudioScreen() {
                 onError={setErrorMsg}
               />
             </View>
-            <View style={[styles.securityNotice, { backgroundColor: colors.primarySoft }]}>
-              <Icon name="shield-checkmark-outline" size={18} color={colors.interactive} />
-              <Text style={[styles.helper, { color: colors.textSecondary }]}>Only members authorized to enter this Expression can receive a viewer token for this broadcast.</Text>
+
+            <View style={styles.liveStudioDetails}>
+              <View style={styles.liveStudioDetailCard}>
+                <Icon name="shield-checkmark-outline" size={18} color="#59B7FF" />
+                <View style={styles.flex}>
+                  <Text style={styles.liveStudioDetailTitle}>Private Expression broadcast</Text>
+                  <Text style={styles.liveStudioDetailText}>Only members authorized to enter {destinationName} can receive a viewer token.</Text>
+                </View>
+              </View>
+              <View style={styles.liveStudioMetaRow}>
+                <View style={styles.liveStudioMetaPill}>
+                  <Icon name="videocam-outline" size={15} color="#DCEAFF" />
+                  <Text style={styles.liveStudioMetaText}>Camera + mic live</Text>
+                </View>
+                <View style={styles.liveStudioMetaPill}>
+                  <Icon name="flash-outline" size={15} color="#DCEAFF" />
+                  <Text style={styles.liveStudioMetaText}>{latencyMode === 'low' ? 'Ultra low latency' : latencyMode === 'reduced' ? 'Reduced latency' : 'Standard latency'}</Text>
+                </View>
+              </View>
             </View>
+
             <Button
               label="End broadcast"
               onPress={() => void finishRtcBroadcast()}
@@ -438,7 +489,17 @@ export default function MediaStudioScreen() {
               fullWidth
             />
           </View>
-        ) : createdIngest ? (
+        ) : null}
+      </Modal>
+
+      <BottomSheet
+        visible={createOpen && !createdRtc}
+        onClose={() => { if (!creating) setCreateOpen(false); }}
+        title={createdIngest ? 'Streaming connection details' : 'Create live broadcast'}
+        subtitle={createdIngest ? 'Use these details only on the device or software sending the broadcast.' : `Destination: ${destinationName}`}
+        maxHeightPercent={94}
+      >
+        {createdIngest ? (
           <View style={styles.ingestSheet}>
             <View style={[styles.securityNotice, { backgroundColor: colors.warningSoft }]}>
               <Icon name="shield-checkmark-outline" size={18} color={colors.warning} />
@@ -529,6 +590,25 @@ const styles = StyleSheet.create({
   ingestSheet: { gap: spacing.md },
   rtcSheet: { gap: spacing.md },
   rtcPreview: { height: 360, borderRadius: radius.xl, overflow: 'hidden', backgroundColor: '#000000' },
+  liveStudio: { flex: 1, backgroundColor: '#02050A', paddingHorizontal: spacing.md, gap: spacing.md },
+  liveStudioHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  liveStudioHeaderCopy: { flex: 1, minWidth: 0, gap: 4 },
+  liveStudioStatusRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  liveStudioScope: { color: '#79C5FF', fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
+  liveStudioTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: '900', letterSpacing: -0.4 },
+  liveStudioSubtitle: { color: '#9FB0C7', fontSize: 12, fontWeight: '600' },
+  liveStudioEndTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 42, paddingHorizontal: 14, borderRadius: radius.pill, backgroundColor: '#B91C3B' },
+  liveStudioEndTopText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
+  liveStudioError: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderRadius: radius.lg, backgroundColor: 'rgba(166,27,50,0.24)', borderWidth: 1, borderColor: 'rgba(255,122,138,0.36)' },
+  liveStudioErrorText: { color: '#FF9AA7', fontSize: 12, fontWeight: '700', flex: 1 },
+  liveStudioStage: { flex: 1, minHeight: 340, borderRadius: radius.xl, overflow: 'hidden', backgroundColor: '#000000', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  liveStudioDetails: { gap: spacing.sm },
+  liveStudioDetailCard: { flexDirection: 'row', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, backgroundColor: '#0A1422', borderWidth: 1, borderColor: '#17314D' },
+  liveStudioDetailTitle: { color: '#F7FAFF', fontSize: 13, fontWeight: '800', marginBottom: 2 },
+  liveStudioDetailText: { color: '#9FB0C7', fontSize: 11, lineHeight: 17 },
+  liveStudioMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  liveStudioMetaPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: '#0A101A', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  liveStudioMetaText: { color: '#DCEAFF', fontSize: 10, fontWeight: '800' },
   securityNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg },
   ingestField: { gap: 5 },
   fieldCode: { padding: spacing.md, borderRadius: radius.lg, fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
