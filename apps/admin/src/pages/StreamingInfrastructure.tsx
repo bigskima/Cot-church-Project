@@ -75,6 +75,10 @@ export function StreamingInfrastructure({ api, canManage = false, canManageSecre
   const [muxWebhookSecret, setMuxWebhookSecret] = useState('');
   const [muxSigningKeyId, setMuxSigningKeyId] = useState('');
   const [muxSigningPrivateKey, setMuxSigningPrivateKey] = useState('');
+  const [youtubeApiKey, setYoutubeApiKey] = useState('');
+  const [youtubeChannelId, setYoutubeChannelId] = useState('');
+  const [agoraAppId, setAgoraAppId] = useState('');
+  const [agoraAppCertificate, setAgoraAppCertificate] = useState('');
 
   const load = async () => {
     setLoading(true);
@@ -101,15 +105,27 @@ export function StreamingInfrastructure({ api, canManage = false, canManageSecre
     setMuxWebhookSecret('');
     setMuxSigningKeyId('');
     setMuxSigningPrivateKey('');
+    setYoutubeApiKey('');
+    setAgoraAppId('');
+    setAgoraAppCertificate('');
   };
 
   const openConfig = (provider: StreamingProvider) => {
     if (!canManage) return;
     const config = configByProvider.get(provider.id);
     setConfigProvider(provider);
-    setSecretReference(config?.secret_reference ?? (provider.code === 'mux' ? 'STREAMING_MUX_PRIMARY' : `STREAMING_${provider.code.toUpperCase()}_PRIMARY`));
-    setWebhookSecretReference(config?.webhook_secret_reference ?? (provider.code === 'mux' ? 'STREAMING_MUX_WEBHOOK_PRIMARY' : `STREAMING_${provider.code.toUpperCase()}_WEBHOOK`));
+    const defaultPrimary = provider.code === 'mux'
+      ? 'STREAMING_MUX_PRIMARY'
+      : provider.code === 'youtube'
+        ? 'STREAMING_YOUTUBE_DATA_API'
+        : provider.code === 'agora'
+          ? 'STREAMING_AGORA_PRIMARY'
+          : `STREAMING_${provider.code.toUpperCase()}_PRIMARY`;
+    const defaultWebhook = provider.code === 'mux' ? 'STREAMING_MUX_WEBHOOK_PRIMARY' : defaultPrimary;
+    setSecretReference(config?.secret_reference ?? defaultPrimary);
+    setWebhookSecretReference(config?.webhook_secret_reference ?? defaultWebhook);
     setSigningKeyReference(config?.signing_key_reference ?? (provider.code === 'mux' ? 'STREAMING_MUX_SIGNING_PRIMARY' : ''));
+    setYoutubeChannelId(provider.code === 'youtube' && typeof config?.configuration?.channelId === 'string' ? String(config.configuration.channelId) : '');
     const hasActiveDefault = data.globalConfigs.some((item) => item.is_active && item.is_default);
     setMakeDefault(Boolean(config?.is_default) || !hasActiveDefault);
     clearSecretInputs();
@@ -134,15 +150,15 @@ export function StreamingInfrastructure({ api, canManage = false, canManageSecre
 
   const saveConfig = async () => {
     if (!canManage || !configProvider) return;
-    if ((muxTokenId || muxTokenSecret || muxWebhookSecret || muxSigningKeyId || muxSigningPrivateKey) && !canManageSecrets) {
+    if ((muxTokenId || muxTokenSecret || muxWebhookSecret || muxSigningKeyId || muxSigningPrivateKey || youtubeApiKey || agoraAppId || agoraAppCertificate) && !canManageSecrets) {
       setError('Your role can configure streaming but cannot store or rotate platform secrets.');
       return;
     }
     const primaryRef = secretReference.trim().toUpperCase();
-    const webhookRef = webhookSecretReference.trim().toUpperCase();
+    const webhookRef = (webhookSecretReference.trim() || primaryRef).toUpperCase();
     const signingRef = signingKeyReference.trim().toUpperCase();
-    if (!primaryRef || !webhookRef) {
-      setError('Streaming credential names are required.');
+    if (!primaryRef) {
+      setError('Streaming credential name is required.');
       return;
     }
     if (configProvider.code === 'mux') {
@@ -154,6 +170,14 @@ export function StreamingInfrastructure({ api, canManage = false, canManageSecre
         setError('Enter both the Mux Signing Key ID and private key PEM, or leave both blank.');
         return;
       }
+    }
+    if (configProvider.code === 'youtube' && !youtubeChannelId.trim()) {
+      setError('Enter the YouTube Channel ID that General COT should follow.');
+      return;
+    }
+    if (configProvider.code === 'agora' && Boolean(agoraAppId) !== Boolean(agoraAppCertificate)) {
+      setError('Enter both the Agora App ID and App Certificate, or leave both blank to reuse the stored credential.');
+      return;
     }
 
     setActionBusy(true);
@@ -169,6 +193,19 @@ export function StreamingInfrastructure({ api, canManage = false, canManageSecre
       if (configProvider.code === 'mux' && muxSigningKeyId && muxSigningPrivateKey && signingRef) {
         await storeSecret(signingRef, JSON.stringify({ keyId: muxSigningKeyId.trim(), privateKeyPem: muxSigningPrivateKey.trim() }), 'Mux signed-playback private key');
       }
+      if (configProvider.code === 'youtube' && youtubeApiKey) {
+        await storeSecret(primaryRef, youtubeApiKey.trim(), 'YouTube Data API key used to discover the configured General COT live channel');
+      }
+      if (configProvider.code === 'agora' && agoraAppId && agoraAppCertificate) {
+        await storeSecret(primaryRef, JSON.stringify({ appId: agoraAppId.trim(), appCertificate: agoraAppCertificate.trim() }), 'Agora RTC credentials used for secure Expression livestream tokens');
+      }
+
+      const currentConfiguration = configByProvider.get(configProvider.id)?.configuration ?? {};
+      const configuration = configProvider.code === 'youtube'
+        ? { ...currentConfiguration, routingScopes: ['general'], channelId: youtubeChannelId.trim(), includeUpcoming: true }
+        : configProvider.code === 'agora'
+          ? { ...currentConfiguration, routingScopes: ['expression'], tokenTtlSeconds: Number(currentConfiguration.tokenTtlSeconds ?? 3600), freeTierMonthlyParticipantMinutes: 10000, usageWarningPercent: Number(currentConfiguration.usageWarningPercent ?? 85) }
+          : currentConfiguration;
 
       await api.request('platform-streaming', {
         method: 'PATCH',
@@ -177,8 +214,8 @@ export function StreamingInfrastructure({ api, canManage = false, canManageSecre
           providerId: configProvider.id,
           secretReference: primaryRef,
           webhookSecretReference: webhookRef,
-          signingKeyReference: signingRef || undefined,
-          configuration: configByProvider.get(configProvider.id)?.configuration ?? {},
+          signingKeyReference: configProvider.code === 'mux' ? (signingRef || undefined) : undefined,
+          configuration,
           isDefault: makeDefault,
           isActive: true,
         }),
@@ -275,7 +312,10 @@ export function StreamingInfrastructure({ api, canManage = false, canManageSecre
                   <div><h4 style={{ fontSize: 16, fontWeight: 900 }}>{provider.name}</h4><p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>{provider.code} · connection {provider.adapter_version}</p></div>
                   <Badge label={provider.is_active ? 'ENABLED' : 'DISABLED'} variant={provider.is_active ? 'active' : 'suspended'} pulse={provider.is_active} />
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>Global config: <strong style={{ color: config?.is_active ? 'var(--gold)' : 'var(--text-muted)' }}>{config?.is_active ? 'ACTIVE' : 'NOT CONFIGURED'}</strong>{config?.is_default ? ' · DEFAULT' : ''}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+                  Global config: <strong style={{ color: config?.is_active ? 'var(--gold)' : 'var(--text-muted)' }}>{config?.is_active ? 'ACTIVE' : 'NOT CONFIGURED'}</strong>{config?.is_default ? ' · DEFAULT' : ''}
+                  {Array.isArray(config?.configuration?.routingScopes) ? <> · {config.configuration!.routingScopes.map(String).join(' + ').toUpperCase()}</> : null}
+                </div>
                 {config ? <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 12, lineHeight: 1.6 }}>Credential name: <code>{config.secret_reference}</code><br />Verification name: <code>{config.webhook_secret_reference}</code>{config.signing_key_reference ? <><br />Playback signing name: <code>{config.signing_key_reference}</code></> : null}</div> : null}
                 <div className="admin-capability-tags">{provider.capabilities.map((capability) => <span key={capability} className="active">{capability}</span>)}</div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 12, borderTop: '1px solid var(--border-subtle)' }}>
@@ -315,9 +355,13 @@ export function StreamingInfrastructure({ api, canManage = false, canManageSecre
         subtitle="You may add real service credentials here. Values are encrypted and protected; only their credential names remain visible in administration."
         footer={<div style={{ display: 'flex', gap: 12 }}><Button variant="outline" size="md" disabled={actionBusy} onClick={() => { setConfigProvider(null); clearSecretInputs(); }}>Cancel</Button><Button variant="gold" size="md" loading={actionBusy} onClick={() => void saveConfig()}>{canManageSecrets ? 'Encrypt credentials & save' : 'Save configuration'}</Button></div>}
       >
-        <InputField label="Streaming credential name" value={secretReference} onChange={(event) => setSecretReference(event.target.value.toUpperCase())} placeholder="STREAMING_MUX_PRIMARY" helperText="Stable name used by COT. Leave the credential fields blank to keep the value already saved under this name." />
-        <InputField label="Delivery verification credential name" value={webhookSecretReference} onChange={(event) => setWebhookSecretReference(event.target.value.toUpperCase())} placeholder="STREAMING_MUX_WEBHOOK_PRIMARY" />
-        <InputField label="Playback signing credential name (optional)" value={signingKeyReference} onChange={(event) => setSigningKeyReference(event.target.value.toUpperCase())} placeholder="STREAMING_MUX_SIGNING_PRIMARY" />
+        <InputField label="Streaming credential name" value={secretReference} onChange={(event) => setSecretReference(event.target.value.toUpperCase())} placeholder="STREAMING_PROVIDER_PRIMARY" helperText="Stable protected credential name used by COT. Leave provider secret fields blank to keep the saved value." />
+        {configProvider?.code === 'mux' ? (
+          <>
+            <InputField label="Delivery verification credential name" value={webhookSecretReference} onChange={(event) => setWebhookSecretReference(event.target.value.toUpperCase())} placeholder="STREAMING_MUX_WEBHOOK_PRIMARY" />
+            <InputField label="Playback signing credential name (optional)" value={signingKeyReference} onChange={(event) => setSigningKeyReference(event.target.value.toUpperCase())} placeholder="STREAMING_MUX_SIGNING_PRIMARY" />
+          </>
+        ) : null}
 
         {configProvider?.code === 'mux' ? (
           <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border-subtle)' }}>
@@ -333,11 +377,27 @@ export function StreamingInfrastructure({ api, canManage = false, canManageSecre
               <span className="admin-form-helper">Required only for signed/private playback. Stored encrypted with the key ID.</span>
             </div>
           </div>
+        ) : configProvider?.code === 'youtube' ? (
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border-subtle)' }}>
+            <h4 style={{ marginBottom: 8 }}>General COT · YouTube Live</h4>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>COT does not need the YouTube account password. It follows this public channel and embeds its active or upcoming livestream.</p>
+            <InputField label="YouTube Channel ID" value={youtubeChannelId} onChange={(event) => setYoutubeChannelId(event.target.value.trim())} autoComplete="off" placeholder="UC…" helperText="Switch this later to the official COT channel without a code deployment." />
+            <InputField label="YouTube Data API key" type="password" value={youtubeApiKey} onChange={(event) => setYoutubeApiKey(event.target.value)} autoComplete="new-password" placeholder="Paste API key" helperText="Leave blank to keep the API key already stored under the credential name above." />
+            <div className="admin-info-callout">Routing: General COT only. YouTube remains the broadcaster; COT is the public viewer surface.</div>
+          </div>
+        ) : configProvider?.code === 'agora' ? (
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border-subtle)' }}>
+            <h4 style={{ marginBottom: 8 }}>Expression Live · Agora</h4>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>Agora is reserved for private Expression broadcasts. COT generates short-lived host and audience tokens server-side.</p>
+            <InputField label="Agora App ID" type="password" value={agoraAppId} onChange={(event) => setAgoraAppId(event.target.value)} autoComplete="new-password" placeholder="Paste App ID" />
+            <InputField label="Agora App Certificate" type="password" value={agoraAppCertificate} onChange={(event) => setAgoraAppCertificate(event.target.value)} autoComplete="new-password" placeholder="Paste App Certificate" helperText="The certificate is encrypted in Platform Vault and is never sent to the mobile app." />
+            <div className="admin-info-callout">Routing: Expressions only · token lifetime defaults to 60 minutes · free-tier warning target 85% of the configured monthly allowance.</div>
+          </div>
         ) : (
           <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 12 }}>Use Secure Credentials to save credentials for this service, then select the same credential names here.</p>
         )}
 
-        <label className="admin-inline-check"><input type="checkbox" checked={makeDefault} onChange={(event) => setMakeDefault(event.target.checked)} /><span>Use this provider as the global default for organisations without an override.</span></label>
+        <label className="admin-inline-check"><input type="checkbox" checked={makeDefault} onChange={(event) => setMakeDefault(event.target.checked)} /><span>Use this provider as a fallback default when no more specific streaming route is configured.</span></label>
       </Modal>
 
       <Modal
