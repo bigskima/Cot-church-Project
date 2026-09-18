@@ -1,0 +1,42 @@
+name: Validate Streaming Routing Branch
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/mobile/**"
+      - "apps/admin/**"
+      - "supabase/functions/**"
+      - "supabase/config.toml"
+      - "package.json"
+      - "package-lock.json"
+
+permissions:
+  contents: read
+
+jobs:
+  validate-streaming:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Regenerate dependency lock for validation
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Install dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Upload regenerated lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: streaming-routing-package-lock
+          path: package-lock.json
+      - name: Typecheck admin
+        run: npm run admin:typecheck
+      - name: Typecheck mobile
+        run: npm run mobile:typecheck
+      - name: Validate application invariants
+        run: npm run apps:check
+      - name: Validate provider service invariants
+        run: npm run services:check
