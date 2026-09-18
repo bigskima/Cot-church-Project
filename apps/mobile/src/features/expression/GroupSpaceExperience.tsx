@@ -10,7 +10,7 @@ import { invalidate } from '@/services/query-cache';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 
-type Permission = 'manage_members' | 'manage_chat' | 'manage_content' | 'pin_messages' | 'create_sections' | 'assign_roles';
+type Permission = 'manage_members' | 'manage_chat' | 'manage_content' | 'pin_messages' | 'create_sections' | 'assign_roles' | 'manage_giving';
 type Role = { id: string; name: string; color: string; permissions: Permission[]; is_system: boolean };
 type Member = {
   id: string; status: string; is_leader: boolean; chat_restricted_until?: string | null; banned_at?: string | null; moderation_reason?: string | null;
@@ -25,7 +25,7 @@ type Purpose = { id: string; name: string; description?: string };
 type Payload = {
   group: { id: string; name: string; description?: string; visibility: string; join_policy: string; meeting_schedule?: Record<string, unknown> };
   membership: { id: string; is_leader: boolean };
-  permissions: { manageMembers: boolean; manageChat: boolean; manageContent: boolean; pinMessages: boolean; createSections: boolean; assignRoles: boolean };
+  permissions: { manageMembers: boolean; manageChat: boolean; manageContent: boolean; pinMessages: boolean; createSections: boolean; assignRoles: boolean; manageGiving: boolean };
   sections: Section[]; members: Member[]; roles: Role[]; announcements: Announcement[]; events: Event[];
   givingOptions: GivingOption[]; availableGivingPurposes: Purpose[];
 };
@@ -34,11 +34,11 @@ type Tab = 'home' | 'announcements' | 'events' | 'giving' | 'people';
 type Sheet = 'announcement' | 'event' | 'section' | 'role' | null;
 const ROLE_PERMISSIONS: { value: Permission; label: string }[] = [
   { value: 'manage_members', label: 'Members' }, { value: 'manage_chat', label: 'Moderate chat' },
-  { value: 'manage_content', label: 'Content' }, { value: 'pin_messages', label: 'Pin' },
-  { value: 'create_sections', label: 'Rooms' }, { value: 'assign_roles', label: 'Roles' },
+  { value: 'manage_content', label: 'Content' }, { value: 'manage_giving', label: 'Giving' },
+  { value: 'pin_messages', label: 'Pin' }, { value: 'create_sections', label: 'Rooms' }, { value: 'assign_roles', label: 'Roles' },
 ];
 
-export function GroupSpaceExperience({ groupId }: { groupId: string }) {
+export function GroupSpaceExperience({ groupId, initialTab = 'home' }: { groupId: string; initialTab?: Tab }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { api, context, mode } = useSession();
@@ -48,7 +48,7 @@ export function GroupSpaceExperience({ groupId }: { groupId: string }) {
     if (mode !== 'authenticated' || !groupId) return Promise.reject(new Error('Join this Group to open its space.'));
     return api.request<Payload>(`group-chat?groupId=${encodeURIComponent(groupId)}`, { signal, context: 'current' });
   });
-  const [tab, setTab] = useState<Tab>('home');
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [busy, setBusy] = useState('');
   const [feedback, setFeedback] = useState('');
@@ -113,7 +113,8 @@ export function GroupSpaceExperience({ groupId }: { groupId: string }) {
   };
 
   const activeMembers = useMemo(() => (resource.data?.members ?? []).filter((member) => member.status === 'active' && !member.banned_at), [resource.data?.members]);
-  const canAdmin = Boolean(resource.data?.permissions.manageMembers || resource.data?.permissions.manageChat || resource.data?.permissions.assignRoles);
+  const activeSections = useMemo(() => (resource.data?.sections ?? []).filter((section) => !section.is_archived && (!section.expires_at || new Date(section.expires_at).getTime() > Date.now())), [resource.data?.sections]);
+  const canAdmin = Boolean(resource.data?.permissions.manageMembers || resource.data?.permissions.manageChat || resource.data?.permissions.assignRoles || resource.data?.permissions.manageGiving);
 
   if (resource.loading && !resource.data) return <View style={[styles.center, { backgroundColor: colors.bg }]}><Skeleton height={140} count={3} /></View>;
   if (resource.error && !resource.data) return <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top }]}><ScreenHeader title='Group space' showBack /><View style={styles.body}><ResourceError message={resource.error} retry={resource.refresh} /></View></View>;
@@ -145,19 +146,19 @@ export function GroupSpaceExperience({ groupId }: { groupId: string }) {
             <View style={styles.grid}>
               <Feature title='Announcements' value={data.announcements.length} icon='megaphone-outline' onPress={() => setTab('announcements')} />
               <Feature title='Events' value={data.events.length} icon='calendar-outline' onPress={() => setTab('events')} />
-              <Feature title='Giving' value={data.givingOptions.length} icon='gift-outline' onPress={() => setTab('giving')} />
+              <Feature title='Giving' value={data.givingOptions.length} icon='gift-outline' onPress={() => expression?.id ? router.push(`/expressions/${expression.id}/groups/${groupId}/giving` as any) : setTab('giving')} />
               <Feature title='Roles' value={data.roles.length} icon='ribbon-outline' onPress={() => setTab('people')} />
             </View>
-            <SectionHeader title='Temporary chats' badge={data.sections.filter((item) => !item.is_archived).length} subtitle='Focused conversations for selected members' />
+            <SectionHeader title='Temporary chats' badge={activeSections.length} subtitle='Focused conversations for selected members' />
             {data.permissions.createSections ? <Button label='Create temporary chat' onPress={() => setSheet('section')} variant='outline' size='sm' /> : null}
-            {data.sections.filter((item) => !item.is_archived).map((section) => <Pressable key={section.id} onPress={() => router.push(`/expressions/${expression?.id}/groups/${groupId}/chat?sectionId=${section.id}` as any)} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}><Icon name='timer-outline' size={20} color={colors.interactive} /><View style={styles.flex}><Text style={[styles.cardTitle, { color: colors.text }]}>{section.name}</Text><Text style={[styles.meta, { color: colors.textMuted }]}>Expires {section.expires_at ? new Date(section.expires_at).toLocaleString() : 'when closed'}</Text></View><Icon name='chevron-forward' size={18} color={colors.textMuted} /></Pressable>)}
+            {activeSections.map((section) => <Pressable key={section.id} onPress={() => router.push(`/expressions/${expression?.id}/groups/${groupId}/chat?sectionId=${section.id}` as any)} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}><Icon name='timer-outline' size={20} color={colors.interactive} /><View style={styles.flex}><Text style={[styles.cardTitle, { color: colors.text }]}>{section.name}</Text><Text style={[styles.meta, { color: colors.textMuted }]}>Expires {section.expires_at ? new Date(section.expires_at).toLocaleString() : 'when closed'}</Text></View><Icon name='chevron-forward' size={18} color={colors.textMuted} /></Pressable>)}
           </> : null}
 
           {tab === 'announcements' ? <><View style={styles.heading}><SectionHeader title='Announcements' badge={data.announcements.length} />{data.permissions.manageContent ? <Button label='New' onPress={() => setSheet('announcement')} size='sm' /> : null}</View>{data.announcements.length ? data.announcements.map((item) => <View key={item.id} style={[styles.contentCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}><View style={styles.heading}><Text style={[styles.cardTitle, { color: colors.text }]}>{item.title}</Text>{item.is_pinned ? <Badge label='PINNED' variant='primary' /> : null}</View><Text style={[styles.copy, { color: colors.textSecondary }]}>{item.body}</Text></View>) : <EmptyState title='No Group announcements' message='Important updates for this Group will appear here.' iconName='megaphone-outline' />}</> : null}
 
           {tab === 'events' ? <><View style={styles.heading}><SectionHeader title='Group events' badge={data.events.length} />{data.permissions.manageContent ? <Button label='New' onPress={() => setSheet('event')} size='sm' /> : null}</View>{data.events.length ? data.events.map((item) => <View key={item.id} style={[styles.contentCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}><Text style={[styles.cardTitle, { color: colors.text }]}>{item.title}</Text><Text style={[styles.accent, { color: colors.interactive }]}>{new Date(item.starts_at).toLocaleString()}</Text>{item.location?.name ? <Text style={[styles.meta, { color: colors.textMuted }]}>{item.location.name}</Text> : null}{item.description ? <Text style={[styles.copy, { color: colors.textSecondary }]}>{item.description}</Text> : null}</View>) : <EmptyState title='No Group events' message='Small-group meetings and activities will appear here.' iconName='calendar-outline' />}</> : null}
 
-          {tab === 'giving' ? <><SectionHeader title='Group giving' subtitle='Approved Expression or church giving destinations' />{data.givingOptions.map((item) => <View key={item.id} style={[styles.contentCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}><Text style={[styles.cardTitle, { color: colors.text }]}>{item.label}</Text>{item.note ? <Text style={[styles.copy, { color: colors.textSecondary }]}>{item.note}</Text> : null}<Button label='Give securely' onPress={() => router.push(`/expressions/${expression?.id}/giving` as any)} variant='outline' size='sm' />{data.permissions.manageContent ? <Button label='Remove link' onPress={() => void mutate('unlink_giving', { givingPurposeId: item.giving_purpose_id }, 'Giving link removed.')} loading={busy === 'unlink_giving'} variant='ghost' size='sm' /> : null}</View>)}{data.permissions.manageContent && data.availableGivingPurposes.filter((purpose) => !data.givingOptions.some((item) => item.giving_purpose_id === purpose.id)).length ? <><Text style={[styles.label, { color: colors.textMuted }]}>ADD AN APPROVED DESTINATION</Text>{data.availableGivingPurposes.filter((purpose) => !data.givingOptions.some((item) => item.giving_purpose_id === purpose.id)).map((purpose) => <Button key={purpose.id} label={`Add ${purpose.name}`} onPress={() => void mutate('link_giving', { givingPurposeId: purpose.id, label: purpose.name }, 'Giving destination linked.')} loading={busy === 'link_giving'} variant='ghost' size='sm' />)}</> : null}{!data.givingOptions.length ? <EmptyState title='No Group giving link' message='A Group admin can link an approved Expression giving purpose.' iconName='gift-outline' /> : null}</> : null}
+          {tab === 'giving' ? <><SectionHeader title='Group giving' subtitle='Approved Expression or church giving destinations' />{data.givingOptions.map((item) => <View key={item.id} style={[styles.contentCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}><Text style={[styles.cardTitle, { color: colors.text }]}>{item.label}</Text>{item.note ? <Text style={[styles.copy, { color: colors.textSecondary }]}>{item.note}</Text> : null}<Button label='Give securely' onPress={() => router.push(`/expressions/${expression?.id}/giving` as any)} variant='outline' size='sm' />{data.permissions.manageGiving ? <Button label='Remove link' onPress={() => void mutate('unlink_giving', { givingPurposeId: item.giving_purpose_id }, 'Giving link removed.')} loading={busy === 'unlink_giving'} variant='ghost' size='sm' /> : null}</View>)}{data.permissions.manageGiving && data.availableGivingPurposes.filter((purpose) => !data.givingOptions.some((item) => item.giving_purpose_id === purpose.id)).length ? <><Text style={[styles.label, { color: colors.textMuted }]}>ADD AN APPROVED DESTINATION</Text>{data.availableGivingPurposes.filter((purpose) => !data.givingOptions.some((item) => item.giving_purpose_id === purpose.id)).map((purpose) => <Button key={purpose.id} label={`Add ${purpose.name}`} onPress={() => void mutate('link_giving', { givingPurposeId: purpose.id, label: purpose.name }, 'Giving destination linked.')} loading={busy === 'link_giving'} variant='ghost' size='sm' />)}</> : null}{!data.givingOptions.length ? <EmptyState title='No Group giving link' message='A Group admin can link an approved Expression giving purpose.' iconName='gift-outline' /> : null}</> : null}
 
           {tab === 'people' ? <><View style={styles.heading}><SectionHeader title={canAdmin ? 'Members & admin' : 'Group members'} badge={activeMembers.length} />{data.permissions.assignRoles ? <Button label='New role' onPress={() => setSheet('role')} size='sm' /> : null}</View>{data.members.map((member) => {
             const name = member.profile?.display_name || member.profile?.username || 'Member'; const mine = member.profile?.id === context?.profile?.id; const restricted = member.chat_restricted_until && new Date(member.chat_restricted_until) > new Date();
