@@ -106,6 +106,18 @@ async function streamingReadiness(organizationId: string, routeScope: 'general' 
     const channelConfigured = providerCode !== "youtube"
       || (typeof loaded.provider.settings?.channelId === "string" && Boolean(String(loaded.provider.settings.channelId).trim()));
 
+    if (providerCode === "agora" && routeScope === "expression" && loaded.provider.settings?.cohostAuthenticationEnabled !== true) {
+      return {
+        ready: false,
+        reason: "agora_cohost_auth_required" as const,
+        providerCode,
+        primarySecretReady,
+        webhookSecretReady,
+        signedPlaybackConfigured: false,
+        operationMode: "rtc" as const,
+        testMode: false,
+      };
+    }
     if (!primarySecretReady || !webhookSecretReady || !channelConfigured) {
       return {
         ready: false,
