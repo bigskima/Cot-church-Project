@@ -162,3 +162,5 @@ web/native build checks.
 
 
 <!-- Netlify preview trigger: PR #54, 2026-09-18 -->
+
+<!-- Netlify env rebuild trigger: PR #54, 2026-09-18 -->
