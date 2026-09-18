@@ -136,6 +136,55 @@ async function streamingReadiness(organizationId: string, routeScope: 'general' 
         testMode: loaded.provider.settings?.testMode === true,
       };
     }
+    if (providerCode === "agora" && routeScope === "expression") {
+      try {
+        const adapter = streamingProvider(providerCode);
+        if (!adapter.createRtcGrant) {
+          return {
+            ready: false,
+            reason: "agora_token_runtime_unavailable" as const,
+            providerCode,
+            primarySecretReady,
+            webhookSecretReady,
+            signedPlaybackConfigured: false,
+            operationMode: "rtc" as const,
+            testMode: false,
+          };
+        }
+        const probe = await adapter.createRtcGrant(
+          loaded.provider,
+          "cot_readiness_probe",
+          1,
+          "publisher",
+          300,
+        );
+        if (!probe.token || !probe.appId || !probe.channelName) {
+          return {
+            ready: false,
+            reason: "agora_token_runtime_unavailable" as const,
+            providerCode,
+            primarySecretReady,
+            webhookSecretReady,
+            signedPlaybackConfigured: false,
+            operationMode: "rtc" as const,
+            testMode: false,
+          };
+        }
+      } catch (error) {
+        return {
+          ready: false,
+          reason: error instanceof ApiError && error.code === "AGORA_CREDENTIALS_INVALID"
+            ? "agora_credentials_invalid" as const
+            : "agora_token_generation_failed" as const,
+          providerCode,
+          primarySecretReady,
+          webhookSecretReady,
+          signedPlaybackConfigured: false,
+          operationMode: "rtc" as const,
+          testMode: false,
+        };
+      }
+    }
     if (providerCode === "mux" && routeScope === "expression" && !signingSecretReady) {
       return {
         ready: false,
