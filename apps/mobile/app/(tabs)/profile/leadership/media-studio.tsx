@@ -368,32 +368,46 @@ export default function MediaStudioScreen() {
             ) : streams.error && !streams.data ? (
               <ResourceError message={streams.error} retry={streams.refresh} />
             ) : streamList.length ? (
-              streamList.map((stream) => (
-                <View key={stream.id} style={[styles.tile, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
-                  <View style={styles.tileTop}>
-                    <View style={[styles.streamIcon, { backgroundColor: stream.status === 'live' ? colors.liveSoft : colors.primarySoft }]}>
-                      <Icon name="radio" size={19} color={stream.status === 'live' ? colors.live : colors.interactive} />
+              streamList.map((stream) => {
+                const finished = ['ended', 'cancelled'].includes(stream.status);
+                const eventTime = stream.started_at ?? stream.scheduled_start ?? stream.created_at;
+                return (
+                  <View key={stream.id} style={[styles.tile, { backgroundColor: colors.card, borderColor: stream.status === 'live' ? colors.live : colors.borderSubtle }, stream.status === 'live' ? shadows.md : shadows.sm]}>
+                    <View style={styles.tileTop}>
+                      <View style={[styles.streamIcon, { backgroundColor: stream.status === 'live' ? colors.liveSoft : colors.primarySoft }]}>
+                        <Icon name={stream.status === 'live' ? 'radio' : 'videocam-outline'} size={18} color={stream.status === 'live' ? colors.live : colors.interactive} />
+                      </View>
+                      <View style={styles.tileInfo}>
+                        <View style={styles.tileTitleRow}>
+                          <Text style={[styles.tileTitle, { color: colors.text }]} numberOfLines={1}>{stream.title}</Text>
+                          <Badge label={(stream.status ?? 'broadcast').toUpperCase()} variant={stream.status === 'live' ? 'live' : 'neutral'} pulse={stream.status === 'live'} />
+                        </View>
+                        <Text style={[styles.tileDate, { color: colors.textMuted }]} numberOfLines={1}>
+                          {eventTime ? new Date(eventTime).toLocaleString() : 'Created recently'}
+                        </Text>
+                        <View style={styles.tileMetaRow}>
+                          <View style={[styles.tileMetaPill, { backgroundColor: colors.bgSecondary }]}>
+                            <Icon name="radio-outline" size={12} color={colors.textMuted} />
+                            <Text style={[styles.tileMetaText, { color: colors.textSecondary }]}>{stream.provider === 'agora' ? 'Agora RTC' : stream.provider || 'Live'}</Text>
+                          </View>
+                          {stream.latency_mode ? (
+                            <View style={[styles.tileMetaPill, { backgroundColor: colors.bgSecondary }]}>
+                              <Icon name="flash-outline" size={12} color={colors.textMuted} />
+                              <Text style={[styles.tileMetaText, { color: colors.textSecondary }]}>{stream.latency_mode.replace(/_/g, ' ')}</Text>
+                            </View>
+                          ) : null}
+                        </View>
+                      </View>
                     </View>
-                    <View style={styles.tileInfo}>
-                      <Text style={[styles.tileTitle, { color: colors.text }]} numberOfLines={2}>{stream.title}</Text>
-                      <Text style={[styles.tileDate, { color: colors.textMuted }]}>
-                        {stream.scheduled_start
-                          ? new Date(stream.scheduled_start).toLocaleString()
-                          : stream.created_at
-                            ? new Date(stream.created_at).toLocaleString()
-                            : 'Created recently'}
-                      </Text>
-                    </View>
-                    <Badge label={(stream.status ?? 'broadcast').toUpperCase()} variant={stream.status === 'live' ? 'live' : 'neutral'} pulse={stream.status === 'live'} />
-                  </View>
-                  <View style={styles.actions}>
-                    <Button label="Refresh" onPress={() => void operateStream(stream.id, 'refresh_status')} loading={busyId === stream.id} variant="outline" size="sm" />
-                    {!['ended', 'cancelled'].includes(stream.status) ? (
-                      <Button label="End broadcast" onPress={() => void operateStream(stream.id, 'stop')} disabled={busyId === stream.id} variant="destructive" size="sm" />
+                    {!finished ? (
+                      <View style={styles.actions}>
+                        <Button label="Refresh status" onPress={() => void operateStream(stream.id, 'refresh_status')} loading={busyId === stream.id} variant="outline" size="sm" />
+                        <Button label="End" onPress={() => void operateStream(stream.id, 'stop')} disabled={busyId === stream.id} variant="destructive" size="sm" />
+                      </View>
                     ) : null}
                   </View>
-                </View>
-              ))
+                );
+              })
             ) : (
               <EmptyState
                 title="No broadcasts yet"
@@ -618,12 +632,16 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 15, fontWeight: '800', letterSpacing: -0.2 },
   helper: { fontSize: 11, lineHeight: 17 },
   listSection: { gap: spacing.sm },
-  tile: { padding: spacing.md, borderRadius: radius.xl, borderWidth: 1, gap: spacing.md, marginBottom: spacing.sm },
+  tile: { padding: spacing.md, borderRadius: radius.xl, borderWidth: 1, gap: spacing.sm, marginBottom: spacing.xs },
   tileTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   streamIcon: { width: 40, height: 40, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
-  tileInfo: { flex: 1, gap: 2 },
-  tileTitle: { fontSize: 15, fontWeight: '800', letterSpacing: -0.2 },
+  tileInfo: { flex: 1, gap: 4 },
+  tileTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  tileTitle: { flex: 1, fontSize: 15, fontWeight: '800', letterSpacing: -0.2 },
   tileDate: { fontSize: 11 },
+  tileMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, marginTop: 2 },
+  tileMetaPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 7, paddingVertical: 4, borderRadius: radius.pill },
+  tileMetaText: { fontSize: 9, fontWeight: '700', textTransform: 'capitalize' },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   form: { gap: spacing.md },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
