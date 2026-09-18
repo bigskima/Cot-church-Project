@@ -87,12 +87,14 @@ async function streamingReadiness(organizationId: string, routeScope: 'general' 
     if (loaded.organizationId && loaded.organizationId !== organizationId) {
       return { ready: false, reason: "provider_scope_invalid" as const };
     }
-    try {
-      streamingProvider(loaded.provider.providerCode);
-    } catch {
-      return { ready: false, reason: "adapter_unavailable" as const, providerCode: loaded.provider.providerCode };
-    }
     const providerCode = loaded.provider.providerCode;
+    if (providerCode !== "youtube") {
+      try {
+        streamingProvider(providerCode);
+      } catch {
+        return { ready: false, reason: "adapter_unavailable" as const, providerCode };
+      }
+    }
     const primarySecretReady = await secretReady(loaded.provider.secretReference);
     const webhookSecretReady = providerCode === "mux"
       ? await secretReady(loaded.provider.webhookSecretReference)
