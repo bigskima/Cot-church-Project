@@ -1,12 +1,24 @@
 import { ApiError } from '../errors.ts';
 import { resolveSecretJson } from '../secrets.ts';
-import * as AgoraToken from 'npm:agora-token@2.0.6';
+import { RtcRole, RtcTokenBuilder } from 'npm:agora-token@2.0.6';
 import type { BroadcastRequest, PlaybackGrant, ProviderConfiguration, ProviderWebhook, ProvisionedBroadcast, RtcGrant, StreamingProvider, StreamLifecycle } from './types.ts';
 
 type AgoraCredentials = { appId: string; appCertificate: string };
 
 async function credentials(config: ProviderConfiguration) {
-  const value = await resolveSecretJson<AgoraCredentials>(config.secretReference);
+  let value: AgoraCredentials;
+  try {
+    value = await resolveSecretJson<AgoraCredentials>(config.secretReference);
+  } catch {
+    throw new ApiError(
+      'AGORA_CREDENTIALS_INVALID',
+      'Agora credentials could not be read from the protected streaming credential',
+      503,
+      undefined,
+      false,
+    );
+  }
+
   const appId = typeof value.appId === 'string' ? value.appId.trim() : '';
   const appCertificate = typeof value.appCertificate === 'string' ? value.appCertificate.trim() : '';
   const credentialPattern = /^[0-9a-fA-F]{32}$/;
@@ -22,22 +34,6 @@ async function credentials(config: ProviderConfiguration) {
   }
 
   return { appId, appCertificate };
-}
-
-function rtcTokenApi() {
-  const token = AgoraToken as unknown as Record<string, any>;
-  const fallback = token.default && typeof token.default === 'object' ? token.default : {};
-  const RtcTokenBuilder =
-    token.RtcTokenBuilder ??
-    token.RtcTokenBuilder2 ??
-    fallback.RtcTokenBuilder ??
-    fallback.RtcTokenBuilder2;
-  // agora-token exports the enum as Role. Older wrappers used RtcRole.
-  const RtcRole = token.Role ?? token.RtcRole ?? fallback.Role ?? fallback.RtcRole;
-  if (!RtcTokenBuilder?.buildTokenWithUid || !RtcRole) {
-    throw new ApiError('STREAMING_ADAPTER_UNAVAILABLE', 'Agora token generator is unavailable', 500, undefined, false);
-  }
-  return { RtcTokenBuilder, RtcRole };
 }
 
 export class AgoraStreamingProvider implements StreamingProvider {
@@ -81,33 +77,40 @@ export class AgoraStreamingProvider implements StreamingProvider {
     ttlSeconds: number,
   ): Promise<RtcGrant> {
     const value = await credentials(config);
-    const { RtcTokenBuilder, RtcRole } = rtcTokenApi();
     const normalizedTtl = Math.max(300, Math.min(86400, Math.floor(ttlSeconds)));
-    const buildTokenWithUid = RtcTokenBuilder.buildTokenWithUid.bind(RtcTokenBuilder);
     const rtcRole = role === 'publisher' ? RtcRole.PUBLISHER : RtcRole.SUBSCRIBER;
-    // agora-token 2.x packages exist in both legacy and AccessToken2 shapes:
-    // legacy builder expects an absolute privilege expiry timestamp (6 args),
-    // while AccessToken2 expects token + privilege TTLs (7 args).
-    const token = buildTokenWithUid.length >= 7
-      ? buildTokenWithUid(
-          value.appId,
-          value.appCertificate,
-          channelName,
-          uid,
-          rtcRole,
-          normalizedTtl,
-          normalizedTtl,
-        )
-      : buildTokenWithUid(
-          value.appId,
-          value.appCertificate,
-          channelName,
-          uid,
-          rtcRole,
-          Math.floor(Date.now() / 1000) + normalizedTtl,
-        );
+
+    let token: string;
+    try {
+      // agora-token@2.0.6 exports the AccessToken2 RTC builder. Its final two
+      // arguments are TTL seconds from now, not absolute Unix timestamps.
+      token = RtcTokenBuilder.buildTokenWithUid(
+        value.appId,
+        value.appCertificate,
+        channelName,
+        uid,
+        rtcRole,
+        normalizedTtl,
+        normalizedTtl,
+      );
+    } catch {
+      throw new ApiError(
+        'AGORA_TOKEN_GENERATION_FAILED',
+        'COT could not generate a secure Agora RTC token',
+        503,
+        undefined,
+        false,
+      );
+    }
+
     if (typeof token !== 'string' || !token.trim()) {
-      throw new ApiError('STREAMING_TOKEN_GENERATION_FAILED', 'Agora returned an empty RTC token', 503, undefined, false);
+      throw new ApiError(
+        'AGORA_TOKEN_GENERATION_FAILED',
+        'COT could not generate a secure Agora RTC token',
+        503,
+        undefined,
+        false,
+      );
     }
     return {
       provider: 'agora',
