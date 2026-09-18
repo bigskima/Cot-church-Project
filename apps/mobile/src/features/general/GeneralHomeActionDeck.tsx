@@ -49,7 +49,7 @@ export function GeneralHomeActionDeck({ onComposePost, onComposeVoice }: Props) 
             <View style={styles.composerTop}>
               <Avatar
                 url={context?.profile?.avatar_url}
-                name={context?.profile?.display_name || context?.profile?.username || 'COT member'}
+                name={context?.profile?.display_name || 'COT member'}
                 size="md"
               />
               {authenticated ? (
