@@ -34,21 +34,10 @@ interface StreamAccess {
   stream: LiveStream;
   playbackUrl: string | null;
   viewerSessionId: string | null;
+  rtcGrant?: AgoraRtcGrant | null;
   canChat: boolean;
   givingEnabled: boolean;
 }
-
-type GeneralLiveSource = {
-  providerCode: string;
-  stream: LiveStream | null;
-  sourceMode?: string;
-};
-
-type RtcSessionResponse = {
-  streamId: string;
-  expressionId: string;
-  grant: AgoraRtcGrant;
-};
 
 interface LiveChatMessage {
   id: string;
@@ -164,8 +153,6 @@ export function LivePlayerExperience({ streamId: id, scope = 'general', embedded
   const [interactionError, setInteractionError] = useState('');
 
   const expressionMode = scope === 'expression';
-  const youtubeMode = !expressionMode && id.startsWith('youtube_');
-  const youtubeVideoId = youtubeMode ? id.slice('youtube_'.length) : '';
   const topInset = embedded ? 0 : insets.top;
   const activeExpressionId = expressionMode ? context?.expression?.id : undefined;
   const requestContext = expressionMode ? 'current' : 'public';
@@ -179,31 +166,20 @@ export function LivePlayerExperience({ streamId: id, scope = 'general', embedded
     const fetchStream = async () => {
       try {
         setRtcGrant(null);
-        if (youtubeMode) {
-          const source = await api.request<GeneralLiveSource>(
-            `general-live-source?videoId=${encodeURIComponent(youtubeVideoId)}`,
-            { context: 'public' },
-          );
-          if (!source.stream) throw new Error('This YouTube live service is no longer available.');
-          if (isMounted) {
-            setAccess({
-              stream: source.stream,
-              playbackUrl: null,
-              viewerSessionId: null,
-              canChat: false,
-              givingEnabled: false,
-            });
-          }
-          return;
-        }
-
         if (expressionMode && !activeExpressionId) {
           throw new Error('Enter this Expression to view its internal broadcast.');
         }
+
+        const params = new URLSearchParams();
+        params.set('id', id);
+        const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id;
+        if (!expressionMode && organizationId) params.set('organizationId', organizationId);
+
         const data = await api.request<StreamAccess>(
-          `stream-access?id=${encodeURIComponent(id)}`,
+          `stream-access?${params.toString()}`,
           { method: 'POST', context: mode === 'visitor' ? 'public' : requestContext },
         );
+
         if (expressionMode) {
           const streamExpressionId = data.stream.expression_id ?? data.stream.branch_id ?? null;
           if (streamExpressionId !== activeExpressionId) {
@@ -211,22 +187,9 @@ export function LivePlayerExperience({ streamId: id, scope = 'general', embedded
           }
         }
 
-        let grant: AgoraRtcGrant | null = null;
-        if (data.stream.provider === 'agora' && data.stream.status === 'live') {
-          if (mode !== 'authenticated') {
-            throw new Error('Sign in and enter this Expression to watch its live service.');
-          }
-          const rtc = await api.request<RtcSessionResponse>('streaming-rtc-session', {
-            method: 'POST',
-            context: requestContext,
-            body: JSON.stringify({ streamId: id, role: 'subscriber' }),
-          });
-          grant = rtc.grant;
-        }
-
         if (isMounted) {
           setAccess(data);
-          setRtcGrant(grant);
+          setRtcGrant(data.rtcGrant ?? null);
         }
       } catch (value) {
         if (isMounted) setError(value instanceof Error ? value.message : 'Unable to connect to live broadcast.');
@@ -237,7 +200,7 @@ export function LivePlayerExperience({ streamId: id, scope = 'general', embedded
 
     void fetchStream();
     return () => { isMounted = false; };
-  }, [activeExpressionId, api, expressionMode, id, mode, requestContext, youtubeMode, youtubeVideoId]);
+  }, [activeExpressionId, api, context?.organization?.id, context?.organizations, expressionMode, id, mode, requestContext]);
 
   const player = useVideoPlayer(access?.playbackUrl ?? '', (videoPlayer) => {
     videoPlayer.loop = false;
@@ -245,7 +208,7 @@ export function LivePlayerExperience({ streamId: id, scope = 'general', embedded
   });
 
   const isLive = access?.stream.status === 'live';
-  const externalYouTube = access?.stream.provider === 'youtube' || youtubeMode;
+  const externalYouTube = access?.stream.provider === 'youtube';
   const agoraRtc = access?.stream.provider === 'agora';
   const showFellowshipHistory = Boolean(access && !externalYouTube && ['live', 'ended', 'processing', 'replay_ready'].includes(access.stream.status));
   const presentation = access ? streamPresentation(access.stream) : null;
