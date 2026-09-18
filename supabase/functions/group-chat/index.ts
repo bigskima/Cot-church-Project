@@ -23,6 +23,7 @@ const GROUP_PERMISSIONS = new Set([
   "pin_messages",
   "create_sections",
   "assign_roles",
+  "manage_giving",
 ]);
 
 function optionalUuid(value: unknown, name: string) {
@@ -214,13 +215,14 @@ Deno.serve(createHandler(
     const section = await requireSection(auth, admin, groupId, sectionId);
 
     if (request.method === "GET") {
-      const [manageMembers, manageChat, manageContent, pinMessages, createSections, assignRoles] = await Promise.all([
+      const [manageMembers, manageChat, manageContent, pinMessages, createSections, assignRoles, manageGiving] = await Promise.all([
         canManage(auth, groupId, "manage_members"),
         canManage(auth, groupId, "manage_chat"),
         canManage(auth, groupId, "manage_content"),
         canManage(auth, groupId, "pin_messages"),
         canManage(auth, groupId, "create_sections"),
         canManage(auth, groupId, "assign_roles"),
+        canManage(auth, groupId, "manage_giving"),
       ]);
 
       let messagesQuery = admin.from("group_messages")
@@ -254,6 +256,8 @@ Deno.serve(createHandler(
         auth.client.from("group_chat_sections")
           .select("id,group_id,name,description,created_by_profile_id,expires_at,is_archived,created_at")
           .eq("group_id", groupId)
+          .eq("is_archived", false)
+          .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
           .order("created_at", { ascending: false }),
         auth.client.from("group_chat_section_members")
           .select("id,section_id,group_membership_id,created_at")
@@ -346,7 +350,7 @@ Deno.serve(createHandler(
       const purposeMap = new Map((linkedPurposes ?? []).map((item: any) => [item.id, item]));
 
       let availableGivingPurposes: any[] = [];
-      if (manageContent) {
+      if (manageGiving) {
         let purposeQuery = admin.from("giving_purposes")
           .select("id,branch_id,name,description,status")
           .eq("organization_id", auth.organizationId)
@@ -368,7 +372,7 @@ Deno.serve(createHandler(
         (!item.expires_at || new Date(item.expires_at).getTime() > now)
       ));
       const events = (eventRows ?? []).filter((item: any) => manageContent || item.status === "published");
-      const giving = (givingRows ?? []).filter((item: any) => manageContent || item.is_active).map((item: any) => ({
+      const giving = (givingRows ?? []).filter((item: any) => manageGiving || item.is_active).map((item: any) => ({
         ...item,
         purpose: purposeMap.get(item.giving_purpose_id) ?? null,
       }));
@@ -387,7 +391,7 @@ Deno.serve(createHandler(
             isLeader: membership.is_leader,
           },
           membership,
-          permissions: { manageMembers, manageChat, manageContent, pinMessages, createSections, assignRoles },
+          permissions: { manageMembers, manageChat, manageContent, pinMessages, createSections, assignRoles, manageGiving },
           activeSection: section,
           messages,
           pinnedMessages: messages.filter((message: any) => message.pinned_at),
@@ -765,7 +769,7 @@ Deno.serve(createHandler(
 
     if (action === "link_giving" || action === "unlink_giving") {
       assertNoUnknownFields(body, ["action", "groupId", "givingPurposeId", "label", "note"]);
-      if (!(await canManage(auth, groupId, "manage_content"))) {
+      if (!(await canManage(auth, groupId, "manage_giving"))) {
         throw new ApiError("PERMISSION_DENIED", "You cannot manage Group giving links.", 403);
       }
       const givingPurposeId = uuid(requiredString(body.givingPurposeId, "givingPurposeId", 36), "givingPurposeId", true)!;
