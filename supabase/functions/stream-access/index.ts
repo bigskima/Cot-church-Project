@@ -19,7 +19,7 @@ Deno.serve(createHandler(
 
     const { data: stream, error } = await admin
       .from("live_streams")
-      .select("id,organization_id,branch_id,title,description,status,visibility,provider_config_id,provider_metadata,playback_url,recording_url,playback_token_required,scheduled_start,started_at,ended_at")
+      .select("id,organization_id,branch_id,title,description,status,visibility,provider,provider_config_id,provider_metadata,playback_url,recording_url,playback_token_required,scheduled_start,started_at,ended_at")
       .eq("id", id)
       .single();
     if (error || !stream) throw new ApiError("STREAM_NOT_FOUND", "Broadcast not found", 404);
@@ -54,7 +54,11 @@ Deno.serve(createHandler(
       : null;
     let expiresAt: string | null = null;
 
-    if (playbackEligible && stream.provider_config_id && stream.provider_metadata?.playbackId) {
+    if (playbackEligible && stream.provider === "agora") {
+      // Agora playback is authorized separately through streaming-rtc-session.
+      // Do not force an HLS URL or signed-playback grant for RTC broadcasts.
+      playbackUrl = null;
+    } else if (playbackEligible && stream.provider_config_id && stream.provider_metadata?.playbackId) {
       const loaded = await loadStreamingConfig(stream.provider_config_id);
       const grant = await streamingProvider(loaded.provider.providerCode).createPlaybackToken(
         loaded.provider,
@@ -145,6 +149,10 @@ Deno.serve(createHandler(
           description: stream.description,
           status: stream.status,
           visibility: stream.visibility,
+          provider: stream.provider,
+          playback_kind: stream.provider === "agora" ? "agora" : "hls",
+          branch_id: stream.branch_id,
+          expression_id: stream.branch_id,
           scheduled_start: stream.scheduled_start,
           started_at: stream.started_at,
           ended_at: stream.ended_at,
