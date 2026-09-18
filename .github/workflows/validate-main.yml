@@ -28,6 +28,19 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Package tracked source snapshot
+        shell: bash
+        run: |
+          git ls-files -z | tar --null -T - -czf /tmp/cot-pr54-source.tar.gz
+
+      - name: Upload tracked source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: cot-pr54-source-${{ github.run_id }}
+          path: /tmp/cot-pr54-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
