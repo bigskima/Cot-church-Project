@@ -108,6 +108,15 @@ export default function MediaStudioScreen() {
   const providerReady = readiness.data?.ready === true;
   const operationMode = readiness.data?.operationMode ?? 'managed';
   const providerCode = readiness.data?.providerCode;
+  const readinessReason = readiness.data?.reason ?? null;
+  const readinessMessage =
+    readinessReason === 'agora_credentials_invalid'
+      ? 'Agora App ID or Primary Certificate needs correction in the protected COT streaming credential.'
+      : readinessReason === 'agora_token_generation_failed' || readinessReason === 'agora_token_runtime_unavailable'
+        ? 'COT could not generate a secure Agora access token. Check the Agora credential and try again.'
+        : readinessReason === 'agora_cohost_auth_required'
+          ? 'Agora Co-host Authentication must be active before Expression Live can start.'
+          : 'Temporarily unavailable. Existing broadcasts remain visible.';
   const canCreateBroadcast = providerReady && operationMode !== 'external';
   const streamList = streams.data ?? [];
 
@@ -334,7 +343,7 @@ export default function MediaStudioScreen() {
                       : readiness.data?.testMode
                         ? `Ready for ${destinationName} in test broadcast mode.`
                         : `Ready for ${destinationName}.`
-                  : 'Temporarily unavailable. Existing broadcasts remain visible.'}
+                  : readinessMessage}
               </Text>
             </View>
             <Badge
