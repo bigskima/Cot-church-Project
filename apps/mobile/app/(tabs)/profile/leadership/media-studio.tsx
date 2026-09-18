@@ -21,6 +21,8 @@ import {
 } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import type { LiveStream } from '@/types/content';
+import { AgoraLiveSession } from '@/features/live/AgoraLiveSession';
+import type { AgoraRtcGrant } from '@/features/live/agora-types';
 
 type StreamingReadiness = {
   ready: boolean;
@@ -28,6 +30,7 @@ type StreamingReadiness = {
   providerCode?: string;
   signedPlaybackConfigured?: boolean;
   testMode?: boolean;
+  operationMode?: 'external' | 'rtc' | 'managed';
 };
 
 type BroadcastScope = 'public' | 'expression';
@@ -58,6 +61,7 @@ export default function MediaStudioScreen() {
   const [creating, setCreating] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [createdIngest, setCreatedIngest] = useState<{ rtmpUrl: string; streamKey: string } | null>(null);
+  const [createdRtc, setCreatedRtc] = useState<{ streamId: string; grant: AgoraRtcGrant } | null>(null);
   const [showKey, setShowKey] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -102,6 +106,9 @@ export default function MediaStudioScreen() {
   );
 
   const providerReady = readiness.data?.ready === true;
+  const operationMode = readiness.data?.operationMode ?? 'managed';
+  const providerCode = readiness.data?.providerCode;
+  const canCreateBroadcast = providerReady && operationMode !== 'external';
   const streamList = streams.data ?? [];
 
   const resetCreate = () => {
@@ -109,6 +116,7 @@ export default function MediaStudioScreen() {
     setDescription('');
     setLatencyMode('reduced');
     setCreatedIngest(null);
+    setCreatedRtc(null);
     setShowKey(false);
     setErrorMsg('');
   };
@@ -139,7 +147,12 @@ export default function MediaStudioScreen() {
     setErrorMsg('');
     setActionMsg('');
     try {
-      const res = await api.request<{ stream: LiveStream; ingest: { rtmpUrl: string; streamKey: string } }>('streaming-broadcasts', {
+      const res = await api.request<{
+        stream: LiveStream;
+        ingest?: { rtmpUrl?: string; streamKey?: string };
+        rtc?: { channelName: string } | null;
+        providerCode?: string;
+      }>('streaming-broadcasts', {
         method: 'POST',
         context: 'public',
         body: JSON.stringify({
@@ -152,13 +165,62 @@ export default function MediaStudioScreen() {
           record: true,
         }),
       });
-      setCreatedIngest(res.ingest);
+
+      if (res.providerCode === 'agora') {
+        const rtc = await api.request<{ grant: AgoraRtcGrant }>('streaming-rtc-session', {
+          method: 'POST',
+          context: 'current',
+          body: JSON.stringify({ streamId: res.stream.id, role: 'publisher' }),
+        });
+        setCreatedRtc({ streamId: res.stream.id, grant: rtc.grant });
+        setCreatedIngest(null);
+      } else if (res.ingest?.rtmpUrl && res.ingest.streamKey) {
+        setCreatedIngest({ rtmpUrl: res.ingest.rtmpUrl, streamKey: res.ingest.streamKey });
+      }
       setActionMsg(`${res.stream.title} was created for ${destinationName}.`);
       streams.refresh();
     } catch (err) {
       setErrorMsg(toUserFacingErrorMessage(err, 'We couldn’t create this broadcast. Please try again.'));
     } finally {
       setCreating(false);
+    }
+  };
+
+  const markRtcLive = async (streamId: string) => {
+    try {
+      await api.request('streaming-broadcasts', {
+        method: 'PATCH',
+        context: 'current',
+        body: JSON.stringify({ id: streamId, action: 'mark_live' }),
+      });
+      setActionMsg(`${destinationName} is live now.`);
+      streams.refresh();
+    } catch (err) {
+      setErrorMsg(toUserFacingErrorMessage(err, 'Video connected, but COT could not update the live status.'));
+    }
+  };
+
+  const finishRtcBroadcast = async () => {
+    const active = createdRtc;
+    if (!active) {
+      setCreateOpen(false);
+      return;
+    }
+    setBusyId(active.streamId);
+    try {
+      await api.request('streaming-broadcasts', {
+        method: 'PATCH',
+        context: 'current',
+        body: JSON.stringify({ id: active.streamId, action: 'stop' }),
+      });
+      setActionMsg('Expression broadcast ended.');
+      setCreatedRtc(null);
+      setCreateOpen(false);
+      streams.refresh();
+    } catch (err) {
+      setErrorMsg(toUserFacingErrorMessage(err, 'We couldn’t finish this broadcast cleanly. Please try End broadcast again.'));
+    } finally {
+      setBusyId(null);
     }
   };
 
@@ -214,7 +276,7 @@ export default function MediaStudioScreen() {
                 ? 'Create live broadcasts for General COT.'
                 : `Create private broadcasts inside ${expression?.name ?? 'your Expression'}.`}
               showBack
-              rightAction={providerReady ? <Button label="New broadcast" onPress={openCreate} size="sm" /> : undefined}
+              rightAction={canCreateBroadcast ? <Button label="New broadcast" onPress={openCreate} size="sm" /> : undefined}
             />
           </View>
         ) : null}
@@ -269,14 +331,18 @@ export default function MediaStudioScreen() {
               <Text style={[styles.cardTitle, { color: colors.text }]}>Live broadcasting</Text>
               <Text style={[styles.helper, { color: colors.textSecondary }]}>
                 {providerReady
-                  ? readiness.data?.testMode
-                    ? `Ready for ${destinationName} in test broadcast mode.`
-                    : `Ready for ${destinationName}.`
+                  ? operationMode === 'external'
+                    ? `${destinationName} uses the configured YouTube channel. Start the public stream on YouTube and COT will discover it automatically.`
+                    : operationMode === 'rtc'
+                      ? `Ready for secure in-app Expression broadcasting with ${providerCode === 'agora' ? 'Agora' : 'the configured RTC service'}.`
+                      : readiness.data?.testMode
+                        ? `Ready for ${destinationName} in test broadcast mode.`
+                        : `Ready for ${destinationName}.`
                   : 'Temporarily unavailable. Existing broadcasts remain visible.'}
               </Text>
             </View>
             <Badge
-              label={providerReady ? (readiness.data?.testMode ? 'TEST MODE' : 'AVAILABLE') : 'TEMPORARILY UNAVAILABLE'}
+              label={providerReady ? (operationMode === 'external' ? 'YOUTUBE SOURCE' : operationMode === 'rtc' ? 'IN-APP LIVE' : readiness.data?.testMode ? 'TEST MODE' : 'AVAILABLE') : 'TEMPORARILY UNAVAILABLE'}
               variant={providerReady ? (readiness.data?.testMode ? 'warning' : 'active') : 'neutral'}
             />
           </View>
@@ -286,8 +352,8 @@ export default function MediaStudioScreen() {
               title={broadcastScope === 'public' ? 'Public broadcasts' : 'Expression broadcasts'}
               badge={streamList.length}
               subtitle={broadcastScope === 'public' ? 'General COT live broadcasts' : `Live broadcasts for ${expression?.name ?? 'this Expression'}`}
-              actionLabel={providerReady ? 'Create' : undefined}
-              onAction={providerReady ? openCreate : undefined}
+              actionLabel={canCreateBroadcast ? 'Create' : undefined}
+              onAction={canCreateBroadcast ? openCreate : undefined}
             />
             {streams.loading && !streams.data ? (
               <Skeleton height={112} count={2} />
@@ -323,10 +389,14 @@ export default function MediaStudioScreen() {
             ) : (
               <EmptyState
                 title="No broadcasts yet"
-                message={providerReady ? `Create the first broadcast for ${destinationName}.` : 'New broadcasts will be available again shortly.'}
+                message={providerReady && operationMode === 'external'
+                  ? 'Start the live service on the configured YouTube channel. COT will surface it automatically when YouTube reports it as live.'
+                  : providerReady
+                    ? `Create the first broadcast for ${destinationName}.`
+                    : 'New broadcasts will be available again shortly.'}
                 iconName="radio-outline"
-                actionLabel={providerReady ? 'Create broadcast' : undefined}
-                onAction={providerReady ? openCreate : undefined}
+                actionLabel={canCreateBroadcast ? 'Create broadcast' : undefined}
+                onAction={canCreateBroadcast ? openCreate : undefined}
               />
             )}
           </View>
@@ -335,12 +405,35 @@ export default function MediaStudioScreen() {
 
       <BottomSheet
         visible={createOpen}
-        onClose={() => !creating && setCreateOpen(false)}
-        title={createdIngest ? 'Streaming connection details' : 'Create live broadcast'}
-        subtitle={createdIngest ? 'Use these details only on the device or software sending the broadcast.' : `Destination: ${destinationName}`}
+        onClose={() => { if (!creating) { if (createdRtc) void finishRtcBroadcast(); else setCreateOpen(false); } }}
+        title={createdRtc ? 'Expression live broadcast' : createdIngest ? 'Streaming connection details' : 'Create live broadcast'}
+        subtitle={createdRtc ? 'Your camera and microphone publish only to this Expression.' : createdIngest ? 'Use these details only on the device or software sending the broadcast.' : `Destination: ${destinationName}`}
         maxHeightPercent={94}
       >
-        {createdIngest ? (
+        {createdRtc ? (
+          <View style={styles.rtcSheet}>
+            <View style={styles.rtcPreview}>
+              <AgoraLiveSession
+                grant={createdRtc.grant}
+                role="publisher"
+                onJoined={() => void markRtcLive(createdRtc.streamId)}
+                onError={setErrorMsg}
+              />
+            </View>
+            <View style={[styles.securityNotice, { backgroundColor: colors.primarySoft }]}>
+              <Icon name="shield-checkmark-outline" size={18} color={colors.interactive} />
+              <Text style={[styles.helper, { color: colors.textSecondary }]}>Only members authorized to enter this Expression can receive a viewer token for this broadcast.</Text>
+            </View>
+            <Button
+              label="End broadcast"
+              onPress={() => void finishRtcBroadcast()}
+              loading={busyId === createdRtc.streamId}
+              variant="destructive"
+              size="lg"
+              fullWidth
+            />
+          </View>
+        ) : createdIngest ? (
           <View style={styles.ingestSheet}>
             <View style={[styles.securityNotice, { backgroundColor: colors.warningSoft }]}>
               <Icon name="shield-checkmark-outline" size={18} color={colors.warning} />
@@ -392,7 +485,7 @@ export default function MediaStudioScreen() {
             </View>
             <Text style={[styles.helper, { color: colors.textMuted }]}>Reduced latency is the recommended default for interactive services.</Text>
 
-            <Button label="Create broadcast" onPress={() => void handleCreateBroadcast()} loading={creating} disabled={!providerReady} size="lg" fullWidth />
+            <Button label="Create broadcast" onPress={() => void handleCreateBroadcast()} loading={creating} disabled={!canCreateBroadcast} size="lg" fullWidth />
           </View>
         )}
       </BottomSheet>
@@ -429,6 +522,8 @@ const styles = StyleSheet.create({
   destinationNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1 },
   destinationTitle: { fontSize: 14, fontWeight: '800', marginBottom: 2 },
   ingestSheet: { gap: spacing.md },
+  rtcSheet: { gap: spacing.md },
+  rtcPreview: { height: 360, borderRadius: radius.xl, overflow: 'hidden', backgroundColor: '#000000' },
   securityNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg },
   ingestField: { gap: 5 },
   fieldCode: { padding: spacing.md, borderRadius: radius.lg, fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
