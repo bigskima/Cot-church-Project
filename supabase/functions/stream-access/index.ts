@@ -12,9 +12,10 @@ async function hash(value: string) {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-async function numericUid(profileId: string) {
-  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(profileId)));
-  const value = new DataView(digest.buffer).getUint32(0, false);
+function rtcSessionUid() {
+  const values = new Uint32Array(1);
+  crypto.getRandomValues(values);
+  const value = values[0] & 0x7fffffff;
   return value === 0 ? 1 : value;
 }
 
@@ -113,7 +114,7 @@ Deno.serve(createHandler(
       rtcGrant = await adapter.createRtcGrant(
         loaded.provider,
         stream.provider_broadcast_id,
-        await numericUid(auth.user.id),
+        rtcSessionUid(),
         "subscriber",
         ttlSeconds,
       );
