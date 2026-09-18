@@ -85,7 +85,7 @@ Deno.serve(
           if (expressionId) {
             const { data, error } = await admin
               .from("expression_memberships")
-              .select("profile_id,joined_at,profile:profiles(id,display_name,username,avatar_url)")
+              .select("profile_id,joined_at,profile:profiles!expression_memberships_profile_id_fkey(id,display_name,username,avatar_url)")
               .eq("organization_id", auth.organizationId)
               .eq("branch_id", expressionId)
               .eq("status", "active")
