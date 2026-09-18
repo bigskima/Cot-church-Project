@@ -25,6 +25,11 @@ type LiveHomePayload = {
   degradedSections?: string[];
 };
 
+type GeneralLiveSource = {
+  providerCode: string;
+  stream: LiveStream | null;
+};
+
 export function LiveDiscoveryExperience({ scope = 'general', embedded = false }: { scope?: 'general' | 'expression'; embedded?: boolean }) {
   const insets = useSafeAreaInsets();
   const { api, context, hasCapability, hasPublicCapability } = useSession();
@@ -48,11 +53,26 @@ export function LiveDiscoveryExperience({ scope = 'general', embedded = false }:
     (signal) => api.request<LiveHomePayload>(`home-feed${query.size ? `?${query.toString()}` : ''}`, { signal })
   );
 
+  const generalLive = useResource<GeneralLiveSource>(
+    `live:youtube-source:${organization?.id ?? 'default'}:${expressionMode ? 'skip' : 'general'}`,
+    (signal) => {
+      if (expressionMode) return Promise.resolve({ providerCode: 'expression', stream: null });
+      const params = new URLSearchParams();
+      if (organization?.id) params.set('organizationId', organization.id);
+      return api.request<GeneralLiveSource>(`general-live-source${params.size ? `?${params.toString()}` : ''}`, { signal, context: 'public' });
+    },
+  );
+
   const openStream = (id: string) => expressionMode && expressionId
     ? router.push(`/expressions/${expressionId}/live/${id}` as any)
     : router.push(`/general/live/${id}` as any);
 
-  const streams = resource.data?.streams ?? [];
+  const databaseStreams = resource.data?.streams ?? [];
+  const streams = expressionMode
+    ? databaseStreams
+    : generalLive.data?.stream
+      ? [generalLive.data.stream, ...databaseStreams.filter((item) => item.id !== generalLive.data!.stream!.id)]
+      : databaseStreams;
   const liveStreams = streams.filter((item) => item.status === 'live');
   const scheduledStreams = streams.filter((item) =>
     item.status === 'scheduled' || item.status === 'provisioning' || item.status === 'ready',
@@ -144,7 +164,7 @@ export function LiveDiscoveryExperience({ scope = 'general', embedded = false }:
             <>
               {liveStreams.length > 0 ? (
                 <View style={styles.sectionWrap}>
-                  <SectionHeader title="Broadcasting now" badge={liveStreams.length} subtitle="Current broadcasts inside this Expression." />
+                  <SectionHeader title="Broadcasting now" badge={liveStreams.length} subtitle={expressionMode ? 'Current broadcasts inside this Expression.' : 'The current public General COT live service.'} />
                   <HeroLiveCard
                     stream={liveStreams[0]}
                     onPress={() => openStream(liveStreams[0].id)}
@@ -160,7 +180,7 @@ export function LiveDiscoveryExperience({ scope = 'general', embedded = false }:
               ) : null}
 
               <View style={styles.sectionWrap}>
-                <SectionHeader title="Upcoming" badge={scheduledStreams.length} subtitle="Scheduled and preparing broadcasts." />
+                <SectionHeader title="Upcoming" badge={scheduledStreams.length} subtitle={expressionMode ? 'Scheduled and preparing Expression broadcasts.' : 'Upcoming General COT public broadcasts.'} />
                 {scheduledStreams.length > 0 ? (
                   <ScrollView
                     horizontal
@@ -174,7 +194,7 @@ export function LiveDiscoveryExperience({ scope = 'general', embedded = false }:
                 ) : (
                   <EmptyState
                     title="No upcoming broadcasts"
-                    message="Nothing has been scheduled for this Expression yet."
+                    message={expressionMode ? 'Nothing has been scheduled for this Expression yet.' : 'No General COT public livestream is scheduled right now.'}
                     iconName="radio-outline"
                   />
                 )}
