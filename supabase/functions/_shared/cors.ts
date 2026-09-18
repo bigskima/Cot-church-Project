@@ -12,6 +12,7 @@ export function corsHeaders(request: Request) {
     allowed.includes("*") ||
     allowed.includes(origin) ||
     origin.endsWith(".vercel.app") ||
+    origin.endsWith(".netlify.app") ||
     origin.startsWith("http://localhost:") ||
     origin.startsWith("http://127.0.0.1:");
 
