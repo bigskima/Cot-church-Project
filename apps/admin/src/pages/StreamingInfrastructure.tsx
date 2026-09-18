@@ -79,6 +79,7 @@ export function StreamingInfrastructure({ api, canManage = false, canManageSecre
   const [youtubeChannelId, setYoutubeChannelId] = useState('');
   const [agoraAppId, setAgoraAppId] = useState('');
   const [agoraAppCertificate, setAgoraAppCertificate] = useState('');
+  const [agoraCohostAuthEnabled, setAgoraCohostAuthEnabled] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -130,6 +131,7 @@ export function StreamingInfrastructure({ api, canManage = false, canManageSecre
     setWebhookSecretReference(config?.webhook_secret_reference ?? defaultWebhook);
     setSigningKeyReference(config?.signing_key_reference ?? (provider.code === 'mux' ? 'STREAMING_MUX_SIGNING_PRIMARY' : ''));
     setYoutubeChannelId(provider.code === 'youtube' && typeof config?.configuration?.channelId === 'string' ? String(config.configuration.channelId) : '');
+    setAgoraCohostAuthEnabled(provider.code === 'agora' && config?.configuration?.cohostAuthenticationEnabled === true);
     const hasActiveDefault = data.globalConfigs.some((item) => item.is_active && item.is_default);
     setMakeDefault(Boolean(config?.is_default) || !hasActiveDefault);
     clearSecretInputs();
@@ -208,7 +210,7 @@ export function StreamingInfrastructure({ api, canManage = false, canManageSecre
       const configuration = configProvider.code === 'youtube'
         ? { ...currentConfiguration, routingScopes: ['general'], channelId: youtubeChannelId.trim(), includeUpcoming: true }
         : configProvider.code === 'agora'
-          ? { ...currentConfiguration, routingScopes: ['expression'], tokenTtlSeconds: Number(currentConfiguration.tokenTtlSeconds ?? 3600), freeTierMonthlyParticipantMinutes: 10000, usageWarningPercent: Number(currentConfiguration.usageWarningPercent ?? 85) }
+          ? { ...currentConfiguration, routingScopes: ['expression'], tokenTtlSeconds: Number(currentConfiguration.tokenTtlSeconds ?? 3600), cohostAuthenticationEnabled: agoraCohostAuthEnabled, freeTierMonthlyParticipantMinutes: 10000, usageWarningPercent: Number(currentConfiguration.usageWarningPercent ?? 85) }
           : currentConfiguration;
 
       await api.request('platform-streaming', {
@@ -395,6 +397,10 @@ export function StreamingInfrastructure({ api, canManage = false, canManageSecre
             <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>Agora is reserved for private Expression broadcasts. COT generates short-lived host and audience tokens server-side.</p>
             <InputField label="Agora App ID" type="password" value={agoraAppId} onChange={(event) => setAgoraAppId(event.target.value)} autoComplete="new-password" placeholder="Paste App ID" />
             <InputField label="Agora App Certificate" type="password" value={agoraAppCertificate} onChange={(event) => setAgoraAppCertificate(event.target.value)} autoComplete="new-password" placeholder="Paste App Certificate" helperText="The certificate is encrypted in Platform Vault and is never sent to the mobile app." />
+            <label className="admin-inline-check">
+              <input type="checkbox" checked={agoraCohostAuthEnabled} onChange={(event) => setAgoraCohostAuthEnabled(event.target.checked)} />
+              <span>I enabled <strong>Co-host token authentication</strong> for this Agora project. COT will not enable Expression livestreaming until this is confirmed.</span>
+            </label>
             <div className="admin-info-callout">Routing: Expressions only · token lifetime defaults to 60 minutes · free-tier warning target 85% of the configured monthly allowance.</div>
           </div>
         ) : (
