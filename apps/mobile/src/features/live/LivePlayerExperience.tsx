@@ -325,7 +325,18 @@ export function LivePlayerExperience({ streamId: id, scope = 'general', embedded
         {externalYouTube && access.stream.external_id ? (
           <YouTubeLivePlayer videoId={access.stream.external_id} />
         ) : agoraRtc && rtcGrant ? (
-          <AgoraLiveSession grant={rtcGrant} role="subscriber" onError={setInteractionError} />
+          <AgoraLiveSession
+            grant={rtcGrant}
+            role="subscriber"
+            onError={setInteractionError}
+            onRemoteLeft={() => {
+              setRtcGrant(null);
+              setInteractionError('');
+              setAccess((current) => current
+                ? { ...current, stream: { ...current.stream, status: 'ended' } }
+                : current);
+            }}
+          />
         ) : access.playbackUrl ? (
           <VideoView player={player} style={styles.videoView} />
         ) : (
