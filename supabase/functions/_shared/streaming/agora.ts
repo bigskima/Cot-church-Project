@@ -25,17 +25,16 @@ async function credentials(config: ProviderConfiguration) {
 }
 
 function rtcTokenApi() {
-  const token = AgoraToken as unknown as {
-    RtcTokenBuilder?: { buildTokenWithUid: (...args: any[]) => string };
-    RtcRole?: { PUBLISHER: number; SUBSCRIBER: number };
-    default?: {
-      RtcTokenBuilder?: { buildTokenWithUid: (...args: any[]) => string };
-      RtcRole?: { PUBLISHER: number; SUBSCRIBER: number };
-    };
-  };
-  const RtcTokenBuilder = token.RtcTokenBuilder ?? token.default?.RtcTokenBuilder;
-  const RtcRole = token.RtcRole ?? token.default?.RtcRole;
-  if (!RtcTokenBuilder || !RtcRole) {
+  const token = AgoraToken as unknown as Record<string, any>;
+  const fallback = token.default && typeof token.default === 'object' ? token.default : {};
+  const RtcTokenBuilder =
+    token.RtcTokenBuilder ??
+    token.RtcTokenBuilder2 ??
+    fallback.RtcTokenBuilder ??
+    fallback.RtcTokenBuilder2;
+  // agora-token exports the enum as Role. Older wrappers used RtcRole.
+  const RtcRole = token.Role ?? token.RtcRole ?? fallback.Role ?? fallback.RtcRole;
+  if (!RtcTokenBuilder?.buildTokenWithUid || !RtcRole) {
     throw new ApiError('STREAMING_ADAPTER_UNAVAILABLE', 'Agora token generator is unavailable', 500, undefined, false);
   }
   return { RtcTokenBuilder, RtcRole };
@@ -84,15 +83,32 @@ export class AgoraStreamingProvider implements StreamingProvider {
     const value = await credentials(config);
     const { RtcTokenBuilder, RtcRole } = rtcTokenApi();
     const normalizedTtl = Math.max(300, Math.min(86400, Math.floor(ttlSeconds)));
-    const token = RtcTokenBuilder.buildTokenWithUid(
-      value.appId,
-      value.appCertificate,
-      channelName,
-      uid,
-      role === 'publisher' ? RtcRole.PUBLISHER : RtcRole.SUBSCRIBER,
-      normalizedTtl,
-      normalizedTtl,
-    );
+    const buildTokenWithUid = RtcTokenBuilder.buildTokenWithUid.bind(RtcTokenBuilder);
+    const rtcRole = role === 'publisher' ? RtcRole.PUBLISHER : RtcRole.SUBSCRIBER;
+    // agora-token 2.x packages exist in both legacy and AccessToken2 shapes:
+    // legacy builder expects an absolute privilege expiry timestamp (6 args),
+    // while AccessToken2 expects token + privilege TTLs (7 args).
+    const token = buildTokenWithUid.length >= 7
+      ? buildTokenWithUid(
+          value.appId,
+          value.appCertificate,
+          channelName,
+          uid,
+          rtcRole,
+          normalizedTtl,
+          normalizedTtl,
+        )
+      : buildTokenWithUid(
+          value.appId,
+          value.appCertificate,
+          channelName,
+          uid,
+          rtcRole,
+          Math.floor(Date.now() / 1000) + normalizedTtl,
+        );
+    if (typeof token !== 'string' || !token.trim()) {
+      throw new ApiError('STREAMING_TOKEN_GENERATION_FAILED', 'Agora returned an empty RTC token', 503, undefined, false);
+    }
     return {
       provider: 'agora',
       appId: value.appId,
