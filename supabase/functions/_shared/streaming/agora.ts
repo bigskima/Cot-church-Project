@@ -7,10 +7,21 @@ type AgoraCredentials = { appId: string; appCertificate: string };
 
 async function credentials(config: ProviderConfiguration) {
   const value = await resolveSecretJson<AgoraCredentials>(config.secretReference);
-  if (!value.appId || !value.appCertificate) {
-    throw new ApiError('STREAMING_SECRET_INVALID', 'Agora credentials require appId and appCertificate', 500, undefined, false);
+  const appId = typeof value.appId === 'string' ? value.appId.trim() : '';
+  const appCertificate = typeof value.appCertificate === 'string' ? value.appCertificate.trim() : '';
+  const credentialPattern = /^[0-9a-fA-F]{32}$/;
+
+  if (!credentialPattern.test(appId) || !credentialPattern.test(appCertificate)) {
+    throw new ApiError(
+      'AGORA_CREDENTIALS_INVALID',
+      'Agora App ID and Primary Certificate must be valid 32-character hexadecimal values',
+      503,
+      undefined,
+      false,
+    );
   }
-  return value;
+
+  return { appId, appCertificate };
 }
 
 function rtcTokenApi() {
