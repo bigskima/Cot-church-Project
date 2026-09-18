@@ -6,6 +6,7 @@ import { uuid } from "../_shared/validation.ts";
 import { diversifyFeed, rankFeedCandidates, type FeedSignals } from "../_shared/feed-ranking.ts";
 import { enrichContentCreators, enrichContentEngagement, enrichSocialPosts } from "../_shared/public-identity.ts";
 import { filterByAuthor, loadSafetyProfileSets } from "../_shared/safety.ts";
+import { resolveGeneralYouTubeLive } from "../_shared/youtube-live.ts";
 
 function nestedItem(value: any) {
   return Array.isArray(value) ? value[0] ?? null : value ?? null;
@@ -217,6 +218,22 @@ Deno.serve(createHandler(
         ? { viewer_count: activeViewerCounts.get(stream.id) ?? 0 }
         : {}),
     }));
+
+    if (!selectedExpressionId) {
+      try {
+        const externalLive = await resolveGeneralYouTubeLive(organizationId);
+        if (externalLive.stream) {
+          streams = [
+            externalLive.stream,
+            ...streams.filter((stream) => stream.id !== externalLive.stream!.id),
+          ];
+        }
+      } catch {
+        // General Home remains usable when the external YouTube source is not
+        // configured yet or temporarily unavailable.
+        degraded.push("general live source");
+      }
+    }
     let posts = resultData<any[]>(postsResult as any, "posts", degraded);
     posts = await enrichSocialPosts(posts);
     posts = filterByAuthor(posts, safety.hiddenFromFeed, (post: any) => post.author?.id);
