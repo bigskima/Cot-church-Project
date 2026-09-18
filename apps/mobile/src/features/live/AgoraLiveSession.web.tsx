@@ -40,6 +40,7 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
   const hostContainerRef = useRef<HTMLDivElement | null>(null);
   const remoteContainerRef = useRef<HTMLDivElement | null>(null);
   const joinedRef = useRef(false);
+  const qualityPresetRef = useRef<'720p_1' | '480p_1'>('720p_1');
   const callbacksRef = useRef({ onJoined, onLeave, onRemoteLeft, onError });
 
   useEffect(() => {
@@ -80,7 +81,7 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
       if (disposed || isExpectedTeardownError(value)) return;
       const text = errorText(value) || 'Unable to join the Expression live session.';
       setMessage(text);
-      callbacksRef.current.onError?.(text);
+      callbacksRef.current.callbacksRef.current.onError?.(text);
     };
 
     client.on('connection-state-change', (currentState) => {
@@ -94,6 +95,15 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
       if (disposed) return;
       const quality = role === 'publisher' ? stats.uplinkNetworkQuality : stats.downlinkNetworkQuality;
       setNetworkLabel(quality <= 2 ? 'Strong' : quality <= 4 ? 'Fair' : 'Weak');
+
+      if (role === 'publisher' && quality > 0) {
+        const track = localVideoRef.current;
+        const target = quality >= 5 ? '480p_1' : quality <= 2 ? '720p_1' : qualityPresetRef.current;
+        if (track && target !== qualityPresetRef.current) {
+          qualityPresetRef.current = target;
+          void track.setEncoderConfiguration(target).catch(() => {});
+        }
+      }
     });
 
     client.on('user-published', async (user, mediaType) => {
@@ -102,7 +112,7 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
         await client.subscribe(user, mediaType);
         if (disposed) return;
         if (mediaType === 'video' && user.videoTrack && remoteContainerRef.current) {
-          user.videoTrack.play(remoteContainerRef.current, { fit: 'cover' });
+          user.videoTrack.play(remoteContainerRef.current, { fit: 'contain' });
           setMessage('Watching live.');
         } else if (mediaType === 'audio' && user.audioTrack) {
           remoteAudioRef.current = user.audioTrack;
@@ -148,7 +158,7 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
         if (role === 'publisher') {
           const [audio, video] = await AgoraRTC.createMicrophoneAndCameraTracks(
             { AEC: true, ANS: true, AGC: true },
-            { encoderConfig: '480p_1' },
+            { encoderConfig: '720p_1' },
           );
           if (disposed) {
             audio.close();
@@ -231,7 +241,7 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
     } catch (value) {
       const text = errorText(value) || 'Unable to change microphone state.';
       setMessage(text);
-      onError?.(text);
+      callbacksRef.current.onError?.(text);
     }
   };
 
@@ -246,7 +256,7 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
     } catch (value) {
       const text = errorText(value) || 'Unable to change camera state.';
       setMessage(text);
-      onError?.(text);
+      callbacksRef.current.onError?.(text);
     }
   };
 
@@ -273,7 +283,7 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
     } catch (value) {
       const text = errorText(value) || 'Unable to switch camera.';
       setMessage(text);
-      onError?.(text);
+      callbacksRef.current.onError?.(text);
     } finally {
       setSwitchingCamera(false);
     }
