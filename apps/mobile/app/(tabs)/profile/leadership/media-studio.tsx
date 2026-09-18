@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
@@ -62,6 +63,7 @@ export default function MediaStudioScreen() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [createdIngest, setCreatedIngest] = useState<{ rtmpUrl: string; streamKey: string } | null>(null);
   const [createdRtc, setCreatedRtc] = useState<{ streamId: string; grant: AgoraRtcGrant } | null>(null);
+  const [studioFullscreen, setStudioFullscreen] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -219,6 +221,7 @@ export default function MediaStudioScreen() {
         body: JSON.stringify({ id: active.streamId, action: 'stop' }),
       });
       setActionMsg('Expression broadcast ended.');
+      setStudioFullscreen(false);
       setCreatedRtc(null);
       setCreateOpen(false);
       streams.refresh();
@@ -413,12 +416,15 @@ export default function MediaStudioScreen() {
           <View
             style={[
               styles.liveStudio,
+              studioFullscreen && styles.liveStudioFullscreen,
               {
-                paddingTop: Math.max(insets.top, spacing.md),
-                paddingBottom: Math.max(insets.bottom, spacing.md),
+                paddingTop: studioFullscreen ? 0 : Math.max(insets.top, spacing.md),
+                paddingBottom: studioFullscreen ? 0 : Math.max(insets.bottom, spacing.md),
               },
             ]}
           >
+            <StatusBar hidden={studioFullscreen} style="light" />
+            {!studioFullscreen ? (
             <View style={styles.liveStudioHeader}>
               <View style={styles.liveStudioHeaderCopy}>
                 <View style={styles.liveStudioStatusRow}>
@@ -428,30 +434,41 @@ export default function MediaStudioScreen() {
                 <Text style={styles.liveStudioTitle} numberOfLines={1}>{title || 'Expression Live'}</Text>
                 <Text style={styles.liveStudioSubtitle} numberOfLines={1}>{destinationName} · Secure Agora RTC</Text>
               </View>
-              <Pressable
-                onPress={() => void finishRtcBroadcast()}
-                disabled={busyId === createdRtc.streamId}
-                style={({ pressed }) => [
-                  styles.liveStudioEndTop,
-                  pressed && { opacity: 0.82 },
-                  busyId === createdRtc.streamId && { opacity: 0.55 },
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel="End broadcast"
-              >
-                <Icon name="stop-circle-outline" size={19} color="#FFFFFF" />
-                <Text style={styles.liveStudioEndTopText}>{busyId === createdRtc.streamId ? 'Ending…' : 'End'}</Text>
-              </Pressable>
+              <View style={styles.liveStudioHeaderActions}>
+                <Pressable
+                  onPress={() => setStudioFullscreen(true)}
+                  style={({ pressed }) => [styles.liveStudioRoundAction, pressed && { opacity: 0.82 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Enter fullscreen studio"
+                >
+                  <Icon name="expand-outline" size={19} color="#FFFFFF" />
+                </Pressable>
+                <Pressable
+                  onPress={() => void finishRtcBroadcast()}
+                  disabled={busyId === createdRtc.streamId}
+                  style={({ pressed }) => [
+                    styles.liveStudioEndTop,
+                    pressed && { opacity: 0.82 },
+                    busyId === createdRtc.streamId && { opacity: 0.55 },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="End broadcast"
+                >
+                  <Icon name="stop-circle-outline" size={19} color="#FFFFFF" />
+                  <Text style={styles.liveStudioEndTopText}>{busyId === createdRtc.streamId ? 'Ending…' : 'End'}</Text>
+                </Pressable>
+              </View>
             </View>
+            ) : null}
 
-            {errorMsg ? (
+            {!studioFullscreen && errorMsg ? (
               <View style={styles.liveStudioError}>
                 <Icon name="alert-circle" size={18} color="#FF7A8A" />
                 <Text style={styles.liveStudioErrorText}>{errorMsg}</Text>
               </View>
             ) : null}
 
-            <View style={styles.liveStudioStage}>
+            <View style={[styles.liveStudioStage, studioFullscreen && styles.liveStudioStageFullscreen]}>
               <AgoraLiveSession
                 grant={createdRtc.grant}
                 role="publisher"
@@ -460,6 +477,7 @@ export default function MediaStudioScreen() {
               />
             </View>
 
+            {!studioFullscreen ? (
             <View style={styles.liveStudioDetails}>
               <View style={styles.liveStudioDetailCard}>
                 <Icon name="shield-checkmark-outline" size={18} color="#59B7FF" />
@@ -479,7 +497,31 @@ export default function MediaStudioScreen() {
                 </View>
               </View>
             </View>
+            ) : null}
 
+            {studioFullscreen ? (
+              <View style={styles.liveStudioFullscreenActions}>
+                <Pressable
+                  onPress={() => setStudioFullscreen(false)}
+                  style={({ pressed }) => [styles.liveStudioFullscreenBtn, pressed && { opacity: 0.82 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Exit fullscreen studio"
+                >
+                  <Icon name="contract-outline" size={21} color="#FFFFFF" />
+                </Pressable>
+                <Pressable
+                  onPress={() => void finishRtcBroadcast()}
+                  disabled={busyId === createdRtc.streamId}
+                  style={({ pressed }) => [styles.liveStudioFullscreenEnd, pressed && { opacity: 0.82 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="End broadcast"
+                >
+                  <Icon name="stop-circle-outline" size={20} color="#FFFFFF" />
+                </Pressable>
+              </View>
+            ) : null}
+
+            {!studioFullscreen ? (
             <Button
               label="End broadcast"
               onPress={() => void finishRtcBroadcast()}
@@ -488,6 +530,7 @@ export default function MediaStudioScreen() {
               size="lg"
               fullWidth
             />
+            ) : null}
           </View>
         ) : null}
       </Modal>
@@ -591,7 +634,10 @@ const styles = StyleSheet.create({
   rtcSheet: { gap: spacing.md },
   rtcPreview: { height: 360, borderRadius: radius.xl, overflow: 'hidden', backgroundColor: '#000000' },
   liveStudio: { flex: 1, backgroundColor: '#02050A', paddingHorizontal: spacing.md, gap: spacing.md },
+  liveStudioFullscreen: { paddingHorizontal: 0, gap: 0 },
   liveStudioHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  liveStudioHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  liveStudioRoundAction: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0C1522', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
   liveStudioHeaderCopy: { flex: 1, minWidth: 0, gap: 4 },
   liveStudioStatusRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   liveStudioScope: { color: '#79C5FF', fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
@@ -602,6 +648,10 @@ const styles = StyleSheet.create({
   liveStudioError: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderRadius: radius.lg, backgroundColor: 'rgba(166,27,50,0.24)', borderWidth: 1, borderColor: 'rgba(255,122,138,0.36)' },
   liveStudioErrorText: { color: '#FF9AA7', fontSize: 12, fontWeight: '700', flex: 1 },
   liveStudioStage: { flex: 1, minHeight: 340, borderRadius: radius.xl, overflow: 'hidden', backgroundColor: '#000000', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  liveStudioStageFullscreen: { minHeight: 0, borderRadius: 0, borderWidth: 0 },
+  liveStudioFullscreenActions: { position: 'absolute', top: spacing.md, right: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, zIndex: 80 },
+  liveStudioFullscreenBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(5,10,18,0.74)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
+  liveStudioFullscreenEnd: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B91C3B', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
   liveStudioDetails: { gap: spacing.sm },
   liveStudioDetailCard: { flexDirection: 'row', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, backgroundColor: '#0A1422', borderWidth: 1, borderColor: '#17314D' },
   liveStudioDetailTitle: { color: '#F7FAFF', fontSize: 13, fontWeight: '800', marginBottom: 2 },
