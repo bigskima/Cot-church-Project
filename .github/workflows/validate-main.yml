@@ -28,19 +28,6 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Package tracked source snapshot
-        shell: bash
-        run: |
-          git ls-files -z | tar --null -T - -czf /tmp/cot-pr54-source.tar.gz
-
-      - name: Upload tracked source snapshot
-        uses: actions/upload-artifact@v4
-        with:
-          name: cot-pr54-source-${{ github.run_id }}
-          path: /tmp/cot-pr54-source.tar.gz
-          if-no-files-found: error
-          retention-days: 1
-
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
@@ -86,22 +73,7 @@ jobs:
         shell: bash
         run: set -o pipefail; npm run mobile:build:web 2>&1 | tee validation-mobile-build.log
         env:
-          EXPO_PUBLIC_API_URL: https://yqvkkgpffskszmmdwqxx.supabase.co/functions/v1
-          EXPO_PUBLIC_ORGANIZATION_ID: 50c5737b-5497-4f73-81e4-1a6971d6b2bf
-
-      - name: Prepare Netlify web preview artifact
-        if: steps.mobile_build.outcome == 'success'
-        shell: bash
-        run: printf '/* /index.html 200\n' > apps/mobile/dist/_redirects
-
-      - name: Upload church web preview
-        if: steps.mobile_build.outcome == 'success'
-        uses: actions/upload-artifact@v4
-        with:
-          name: cot-web-preview-${{ github.run_id }}
-          path: apps/mobile/dist
-          if-no-files-found: error
-          retention-days: 2
+          EXPO_PUBLIC_API_URL: https://example.invalid/functions/v1
 
       - name: Upload validation diagnostics
         if: always()
