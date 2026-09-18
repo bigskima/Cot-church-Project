@@ -60,7 +60,6 @@ type StreamUnit =
 type SectionUnit = { key: string; kind: 'section'; contentKind: 'sermon' | 'event' | 'announcement'; ids: string[] };
 type HomeFeedUnit = StreamUnit | SectionUnit;
 type HomeResource = { payload: HomePayload; plan: FeedPlanRow[]; announcements: Announcement[] };
-type GeneralLiveSource = { providerCode: string; stream: LiveStream | null };
 
 function timeValue(value?: string | null) {
   if (!value) return 0;
@@ -116,15 +115,6 @@ export default function GeneralHomeExperience() {
     const suffix = params.toString();
     return `home-feed${suffix ? `?${suffix}` : ''}`;
   }, [organizationId]);
-
-  const generalLive = useResource<GeneralLiveSource>(
-    `mobile:general-youtube-live:${organizationId || 'auto'}`,
-    (signal) => {
-      const params = new URLSearchParams();
-      if (organizationId) params.set('organizationId', organizationId);
-      return api.request<GeneralLiveSource>(`general-live-source${params.size ? `?${params.toString()}` : ''}`, { signal, context: 'public' });
-    },
-  );
 
   const resource = useResource<HomeResource>(`mobile:general-home-v2:${organizationId || 'auto'}:${mode}`, async (signal) => {
     const freshQuery = `${query}${query.includes('?') ? '&' : '?'}fresh=${Date.now()}`;
@@ -183,8 +173,7 @@ export default function GeneralHomeExperience() {
     invalidate('general-home-notice');
     invalidate('participation:home:general');
     resource.refresh();
-    generalLive.refresh();
-  }, [generalLive.refresh, resource.refresh]);
+  }, [resource.refresh]);
 
   useFocusEffect(useCallback(() => {
     const now = Date.now();
@@ -243,10 +232,8 @@ export default function GeneralHomeExperience() {
   const degradedSections = payload?.degradedSections ?? [];
   const rankingMode = (resource.data?.plan?.length ?? 0) > 0 || payload?.rankingMode === 'personalized' ? 'personalized' : 'recent';
   const activeStream = useMemo(
-    () => generalLive.data?.stream
-      ?? streams.find((stream) => stream.status === 'live')
-      ?? streams.find((stream) => stream.status === 'scheduled'),
-    [generalLive.data?.stream, streams],
+    () => streams.find((stream) => stream.status === 'live') ?? streams.find((stream) => stream.status === 'scheduled'),
+    [streams],
   );
 
   const feed = useMemo<HomeFeedUnit[]>(() => {
