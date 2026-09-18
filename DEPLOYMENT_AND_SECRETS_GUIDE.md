@@ -109,6 +109,7 @@ supabase secrets set \
   PAYMENT_WEBHOOK_SECRET="$(openssl rand -hex 32)" \
   STREAMING_MUX_PRIMARY='{"tokenId":"YOUR_MUX_TOKEN_ID","tokenSecret":"YOUR_MUX_TOKEN_SECRET"}' \
   STREAMING_MUX_WEBHOOK_PRIMARY="YOUR_MUX_WEBHOOK_SECRET" \
+  STREAMING_MUX_SIGNING_PRIMARY='{"keyId":"YOUR_MUX_SIGNING_KEY_ID","privateKeyPem":"YOUR_BASE64_OR_PEM_PRIVATE_KEY"}' \
   AI_OPENAI_PRIMARY="sk-proj-YOUR_OPENAI_KEY" \
   AI_GEMINI_PRIMARY="YOUR_GEMINI_KEY" \
   AI_ANTHROPIC_PRIMARY="sk-ant-YOUR_ANTHROPIC_KEY"
@@ -133,12 +134,23 @@ supabase secrets set \
 | `NOTIFICATION_WORKER_SECRET` | Terminal: `openssl rand -hex 32` | Secret key authenticating internal notification dispatch workers. |
 | `WORKFLOW_WORKER_SECRET` | Terminal: `openssl rand -hex 32` | Secret key authenticating internal background workflow jobs. |
 | `PAYMENT_WEBHOOK_SECRET` | Stripe / Paystack Webhook settings OR `openssl rand -hex 32` | HMAC SHA-256 secret for verifying inbound payment notifications. |
-| `STREAMING_MUX_PRIMARY` | [Mux Dashboard](https://dashboard.mux.com/) → **Settings** → **Access Tokens** | JSON string: `{"tokenId":"YOUR_TOKEN_ID","tokenSecret":"YOUR_TOKEN_SECRET"}` with *Mux Video: Full Access*. |
-| `STREAMING_MUX_WEBHOOK_PRIMARY` | [Mux Dashboard](https://dashboard.mux.com/) → **Settings** → **Webhooks** | The Webhook Secret generated when creating a webhook in Mux. |
-| `STREAMING_MUX_SIGNING_PRIMARY` *(Optional)* | [Mux Dashboard](https://dashboard.mux.com/) → **Settings** → **Signing Keys** | JSON string: `{"keyId":"...","privateKeyPem":"-----BEGIN PRIVATE KEY-----\n..."}` for signed streams. |
+| `STREAMING_MUX_PRIMARY` | [Mux Dashboard](https://dashboard.mux.com/) → **Settings** → **Access Tokens** | JSON string: `{"tokenId":"YOUR_TOKEN_ID","tokenSecret":"YOUR_TOKEN_SECRET"}`. Give the token **Mux Video Read + Write** in the same Mux Environment used for COT. COT's runtime Video API does not require System permissions. |
+| `STREAMING_MUX_WEBHOOK_PRIMARY` | [Mux Dashboard](https://dashboard.mux.com/) → **Settings** → **Webhooks** | The webhook signing secret generated when creating the COT webhook. Copy it when created and keep it private. |
+| `STREAMING_MUX_SIGNING_PRIMARY` | [Mux Dashboard](https://dashboard.mux.com/) → **Settings** → **Signing Keys** | Required for Expression/group/private playback. JSON string: `{"keyId":"...","privateKeyPem":"..."}`. `privateKeyPem` may be either the base64-encoded PEM returned by Mux or a PKCS#8 PEM value. |
 | `AI_OPENAI_PRIMARY` | [OpenAI Platform](https://platform.openai.com/api-keys) | API key starting with `sk-proj-...` |
 | `AI_GEMINI_PRIMARY` | [Google AI Studio](https://aistudio.google.com/app/apikey) | String API key |
 | `AI_ANTHROPIC_PRIMARY` | [Anthropic Console](https://console.anthropic.com/settings/keys) | API key starting with `sk-ant-...` |
+
+---
+
+## 🎥 Mux Live Streaming Production Notes
+
+- Create the Mux access token, webhook, and signing key in the **same Mux Environment**. Production and development credentials must not be mixed.
+- The COT server uses Mux Video API credentials only on the backend. Never put the Token Secret, webhook secret, signing key, or stream key into Expo public environment variables.
+- General COT broadcasts use a **public** Mux playback policy and must not receive a signed-token query parameter.
+- Expression, group, and private broadcasts use a **signed** playback policy. COT will refuse to create them until `STREAMING_MUX_SIGNING_PRIMARY` is available.
+- The broadcast ingest endpoint returned by COT is Mux RTMPS: `rtmps://global-live.mux.com:443/app`. The returned stream key is a per-broadcast secret and should only be entered into the approved broadcaster/encoder.
+- Mux's Free plan is for on-demand video. Production live streaming requires a Mux plan that includes live video (for example Pay as you go).
 
 ---
 
@@ -176,7 +188,7 @@ Configure these in your third-party provider dashboards so they can trigger even
 
 | Platform | Location in Dashboard | Target URL to Enter |
 | :--- | :--- | :--- |
-| **Mux Video** | [Mux Webhooks](https://dashboard.mux.com/settings/webhooks) | `https://yqvkkgpffskszmmdwqxx.supabase.co/functions/v1/streaming-webhook` |
+| **Mux Video** | Mux Dashboard → the COT **Environment** → **Settings** → **Webhooks** | `https://yqvkkgpffskszmmdwqxx.supabase.co/functions/v1/streaming-webhook` for the normal single-global-provider setup. If multiple global streaming configs are ever active, use `?configId=<streaming_provider_configs.id>` to bind a webhook explicitly. |
 | **Payment Gateway** | Stripe / Paystack Webhook settings | `https://yqvkkgpffskszmmdwqxx.supabase.co/functions/v1/payment-events` |
 
 ---
