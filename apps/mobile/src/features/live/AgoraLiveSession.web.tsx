@@ -32,7 +32,7 @@ const controlButtonStyle: React.CSSProperties = {
   backdropFilter: 'blur(14px)',
 };
 
-export function AgoraLiveSession({ grant, role, onJoined, onLeave, onError }: AgoraLiveSessionProps) {
+export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft, onError }: AgoraLiveSessionProps) {
   const clientRef = useRef<IAgoraRTCClient | null>(null);
   const localAudioRef = useRef<IMicrophoneAudioTrack | null>(null);
   const localVideoRef = useRef<ICameraVideoTrack | null>(null);
@@ -128,6 +128,7 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onError }: Ag
         remoteAudioRef.current = null;
         setAudioBlocked(false);
         setMessage('The broadcaster has left this live session.');
+        onRemoteLeft?.();
       }
     });
 
@@ -210,7 +211,7 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onError }: Ag
       clientRef.current = null;
       onLeave?.();
     };
-  }, [grant.appId, grant.channelName, grant.token, grant.uid, onError, onJoined, onLeave, role]);
+  }, [grant.appId, grant.channelName, grant.token, grant.uid, onError, onJoined, onLeave, onRemoteLeft, role]);
 
   const toggleMic = async () => {
     const track = localAudioRef.current;
