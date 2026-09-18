@@ -86,25 +86,55 @@ function resolveScopeBranch(request: Request, url: URL, scope: string) {
 
 async function identityFor(request: Request, organizationId: string, requestedBranchId?: string | null) {
   const token = bearer(request);
-  if (!token) return { token: null, user: null, client: null, membership: null };
+  if (!token) {
+    return {
+      token: null,
+      user: null,
+      client: null,
+      membership: null,
+      expressionMembership: null,
+    };
+  }
 
   const client = userClient(token);
   const { data: userData, error: userError } = await client.auth.getUser(token);
   if (userError || !userData.user) throw new ApiError("INVALID_SESSION", "Session is invalid or expired", 401);
 
-  let query = adminClient()
+  // Organisation membership and Expression membership are separate records.
+  // Expression access must never be inferred from the legacy branch_id column on
+  // memberships: invite redemption and the rest of the current Expression stack
+  // use expression_memberships as the source of truth.
+  const { data: memberships, error: membershipError } = await adminClient()
     .from("memberships")
-    .select("id,organization_id,branch_id,status")
+    .select("id,organization_id,status")
     .eq("organization_id", organizationId)
     .eq("profile_id", userData.user.id)
     .eq("status", "active")
     .order("created_at", { ascending: true })
     .limit(1);
-  if (requestedBranchId) query = query.eq("branch_id", requestedBranchId);
-  const { data: memberships, error: membershipError } = await query;
   if (membershipError) throw new ApiError("MEMBERSHIP_LOOKUP_FAILED", "Unable to resolve your church membership", 500, undefined, false);
 
-  return { token, user: userData.user, client, membership: memberships?.[0] ?? null };
+  let expressionMembership: any = null;
+  if (requestedBranchId) {
+    const { data, error } = await adminClient()
+      .from("expression_memberships")
+      .select("id,organization_id,branch_id,membership_id,status")
+      .eq("organization_id", organizationId)
+      .eq("branch_id", requestedBranchId)
+      .eq("profile_id", userData.user.id)
+      .eq("status", "active")
+      .maybeSingle();
+    if (error) throw new ApiError("MEMBERSHIP_LOOKUP_FAILED", "Unable to resolve your Expression membership", 500, undefined, false);
+    expressionMembership = data ?? null;
+  }
+
+  return {
+    token,
+    user: userData.user,
+    client,
+    membership: memberships?.[0] ?? null,
+    expressionMembership,
+  };
 }
 
 async function hasExactPermission(
@@ -151,7 +181,7 @@ Deno.serve(createHandler(
       const scope = url.searchParams.get("scope") ?? "general";
       const branchId = resolveScopeBranch(request, url, scope);
       const identity = await identityFor(request, organizationId, branchId);
-      if (scope === "expression" && !identity.membership) {
+      if (scope === "expression" && !identity.expressionMembership) {
         throw new ApiError("EXPRESSION_ACCESS_DENIED", "Join this Expression to view its prayer wall or pastoral queue", 403);
       }
 
@@ -224,7 +254,7 @@ Deno.serve(createHandler(
         60 * 60,
       );
 
-      if (branchId && !identity.membership) {
+      if (branchId && !identity.expressionMembership) {
         throw new ApiError("EXPRESSION_ACCESS_DENIED", "Join this Expression before sending a petition to its prayer ministry", 403);
       }
 
@@ -281,7 +311,7 @@ Deno.serve(createHandler(
 
       const identity = await identityFor(request, existing.organization_id, existing.branch_id);
       if (!identity.user) throw new ApiError("AUTHENTICATION_REQUIRED", "Sign in to pray with this request", 401);
-      if (existing.branch_id && !identity.membership) {
+      if (existing.branch_id && !identity.expressionMembership) {
         throw new ApiError("EXPRESSION_MEMBERSHIP_REQUIRED", "Join this Expression before interacting with its prayer wall", 403);
       }
 
