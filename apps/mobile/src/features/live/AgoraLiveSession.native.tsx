@@ -49,8 +49,8 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onError }: Ag
             setMessage('Watching live.');
           },
           onUserOffline: (_connection, uid) => {
-            if (disposed || remoteUid !== uid) return;
-            setRemoteUid(null);
+            if (disposed || role !== 'subscriber') return;
+            setRemoteUid((current) => current === uid ? null : current);
             setMessage('The broadcaster has left. Waiting for the live service to resume…');
           },
           onError: (errorCode) => {
