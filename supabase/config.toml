@@ -108,6 +108,11 @@ verify_jwt = false
 [functions.home-feed]
 verify_jwt = false
 
+# General COT live is resolved from an administrator-configured public YouTube
+# channel. The handler exposes only public video metadata and never provider secrets.
+[functions.general-live-source]
+verify_jwt = false
+
 # The moving General COT header update is intentionally public for reads. Create,
 # update, disable and delete paths validate a real bearer session and the
 # church-wide announcements.manage capability inside the function before using
