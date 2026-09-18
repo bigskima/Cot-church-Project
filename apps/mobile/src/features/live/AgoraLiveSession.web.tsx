@@ -40,6 +40,12 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
   const hostContainerRef = useRef<HTMLDivElement | null>(null);
   const remoteContainerRef = useRef<HTMLDivElement | null>(null);
   const joinedRef = useRef(false);
+  const callbacksRef = useRef({ onJoined, onLeave, onRemoteLeft, onError });
+
+  useEffect(() => {
+    callbacksRef.current = { onJoined, onLeave, onRemoteLeft, onError };
+  }, [onError, onJoined, onLeave, onRemoteLeft]);
+
   const [message, setMessage] = useState(role === 'publisher' ? 'Preparing camera and microphone…' : 'Joining live service…');
   const [joined, setJoined] = useState(false);
   const [micMuted, setMicMuted] = useState(false);
@@ -74,7 +80,7 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
       if (disposed || isExpectedTeardownError(value)) return;
       const text = errorText(value) || 'Unable to join the Expression live session.';
       setMessage(text);
-      onError?.(text);
+      callbacksRef.current.onError?.(text);
     };
 
     client.on('connection-state-change', (currentState) => {
@@ -128,7 +134,7 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
         remoteAudioRef.current = null;
         setAudioBlocked(false);
         setMessage('The broadcaster has left this live session.');
-        onRemoteLeft?.();
+        callbacksRef.current.onRemoteLeft?.();
       }
     });
 
@@ -138,7 +144,6 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
         await client.join(grant.appId, grant.channelName, grant.token, grant.uid);
         if (disposed) return;
         joinedRef.current = true;
-        setJoined(true);
 
         if (role === 'publisher') {
           const [audio, video] = await AgoraRTC.createMicrophoneAndCameraTracks(
@@ -183,12 +188,14 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
             setVideoHealthy((stats.sendFrameRate ?? stats.captureFrameRate ?? 0) > 0);
           }, 1200);
 
+          setJoined(true);
           setMessage('You are live in this Expression.');
           setNetworkLabel('Strong');
         } else {
+          setJoined(true);
           setMessage('Connected. Waiting for the broadcaster…');
         }
-        onJoined?.();
+        callbacksRef.current.onJoined?.();
       } catch (value) {
         reportError(value);
       }
@@ -209,9 +216,9 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
       remoteAudioRef.current = null;
       void client.leave().catch(() => {});
       clientRef.current = null;
-      onLeave?.();
+      callbacksRef.current.onLeave?.();
     };
-  }, [grant.appId, grant.channelName, grant.token, grant.uid, onError, onJoined, onLeave, onRemoteLeft, role]);
+  }, [grant.appId, grant.channelName, grant.token, grant.uid, role]);
 
   const toggleMic = async () => {
     const track = localAudioRef.current;
