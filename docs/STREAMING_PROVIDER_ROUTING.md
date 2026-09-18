@@ -159,3 +159,6 @@ required; this cannot be delivered only as an Expo OTA update.
 Before merging the feature branch, regenerate the root `package-lock.json` for
 the new mobile dependencies and run the repository mobile/admin typechecks plus
 web/native build checks.
+
+
+<!-- Netlify preview trigger: PR #54, 2026-09-18 -->
