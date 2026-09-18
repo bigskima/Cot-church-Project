@@ -81,7 +81,7 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
       if (disposed || isExpectedTeardownError(value)) return;
       const text = errorText(value) || 'Unable to join the Expression live session.';
       setMessage(text);
-      callbacksRef.current.callbacksRef.current.onError?.(text);
+      callbacksRef.current.onError?.(text);
     };
 
     client.on('connection-state-change', (currentState) => {
