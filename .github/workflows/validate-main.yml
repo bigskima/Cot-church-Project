@@ -28,6 +28,16 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Regenerate lockfile for validation
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Upload regenerated lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: regenerated-package-lock-${{ github.run_id }}
+          path: package-lock.json
+          retention-days: 2
+
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
