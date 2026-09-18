@@ -165,7 +165,7 @@ Deno.serve(
       const action = body.action ? requiredString(body.action, "action", 48) : null;
 
       if (action === "donate") {
-        assertNoUnknownFields(body, ["action", "campaignId", "amountMinor", "currency", "provider", "idempotencyKey", "anonymous", "note"]);
+        assertNoUnknownFields(body, ["action", "campaignId", "purposeId", "groupId", "amountMinor", "currency", "provider", "idempotencyKey", "anonymous", "note"]);
         const expressionId = auth.branchId;
         let settingsQuery = auth.client.from("giving_settings").select("online_payment_enabled,is_enabled").eq("organization_id", organizationId);
         settingsQuery = expressionId ? settingsQuery.eq("branch_id", expressionId) : settingsQuery.is("branch_id", null);
@@ -173,7 +173,10 @@ Deno.serve(
         if (!settings?.is_enabled || !settings.online_payment_enabled) {
           throw new ApiError("ONLINE_GIVING_UNAVAILABLE", "Online giving is not available for this giving destination", 409);
         }
-        const { data, error } = await auth.client.rpc("create_donation_intent", {
+
+        const targetGroupId = body.groupId ? uuid(String(body.groupId), "groupId", true)! : null;
+        const targetPurposeId = body.purposeId ? uuid(String(body.purposeId), "purposeId", true)! : null;
+        const common = {
           target_organization_id: organizationId,
           target_branch_id: expressionId,
           target_campaign_id: body.campaignId ? uuid(String(body.campaignId), "campaignId", true) : null,
@@ -183,10 +186,20 @@ Deno.serve(
           target_idempotency_key: requiredString(body.idempotencyKey, "idempotencyKey", 128),
           make_anonymous: body.anonymous === true,
           donor_message: optionalString(body.note, "note", 1000) ?? "",
-        }).single();
-        if (error?.code === "23514") throw new ApiError("IDEMPOTENCY_CONFLICT", "Idempotency key conflict", 409);
-        if (error) throw new ApiError("DONATION_INTENT_FAILED", "Unable to create donation intent", 500, undefined, false);
-        return { data, status: 201 };
+        };
+
+        const result = targetGroupId
+          ? await auth.client.rpc("create_group_donation_intent", {
+              ...common,
+              target_group_id: targetGroupId,
+              target_purpose_id: targetPurposeId,
+            }).single()
+          : await auth.client.rpc("create_donation_intent", common).single();
+
+        if (result.error?.code === "23514") throw new ApiError("IDEMPOTENCY_CONFLICT", "Idempotency key conflict", 409);
+        if (result.error?.code === "42501") throw new ApiError("PERMISSION_DENIED", result.error.message || "You cannot give through this Group", 403);
+        if (result.error) throw new ApiError("DONATION_INTENT_FAILED", "Unable to create donation intent", 500, undefined, false);
+        return { data: result.data, status: 201 };
       }
 
       const requestedScope = url.searchParams.get("scope") === "organization" ? "organization" : "expression";
