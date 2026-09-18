@@ -19,7 +19,7 @@ async function requestBroadcastPermissions() {
     && result[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] === PermissionsAndroid.RESULTS.GRANTED;
 }
 
-export function AgoraLiveSession({ grant, role, onJoined, onLeave, onError }: AgoraLiveSessionProps) {
+export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft, onError }: AgoraLiveSessionProps) {
   const engineRef = useRef<IRtcEngine | null>(null);
   const disposedRef = useRef(false);
   const [joined, setJoined] = useState(false);
@@ -64,6 +64,7 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onError }: Ag
             if (disposedRef.current || role !== 'subscriber') return;
             setRemoteUid((current) => current === uid ? null : current);
             setMessage('The broadcaster has left this live session.');
+            onRemoteLeft?.();
           },
           onNetworkQuality: (_connection, _remoteUid, txQuality, rxQuality) => {
             if (disposedRef.current) return;
@@ -118,7 +119,7 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onError }: Ag
       }
       onLeave?.();
     };
-  }, [grant.appId, grant.channelName, grant.token, grant.uid, onError, onJoined, onLeave, role]);
+  }, [grant.appId, grant.channelName, grant.token, grant.uid, onError, onJoined, onLeave, onRemoteLeft, role]);
 
   const toggleMic = () => {
     const engine = engineRef.current;
