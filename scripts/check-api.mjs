@@ -468,6 +468,21 @@ const clientSourceFiles = [
   ...await collectSourceFiles('apps/mobile'),
   ...await collectSourceFiles('apps/admin'),
 ];
+const functionSourceFiles = await collectSourceFiles('supabase/functions');
+
+const hostingProviderRuntimeReferences = [];
+for (const file of functionSourceFiles) {
+  const source = await readFile(file, 'utf8');
+  if (/(?:vercel|netlify)\.app/i.test(source)) hostingProviderRuntimeReferences.push(file);
+}
+
+const hardcodedClientFunctionHosts = [];
+for (const file of clientSourceFiles) {
+  const source = await readFile(file, 'utf8');
+  if (/https:\/\/[^\s'\"]+\.supabase\.co\/functions\/v1/i.test(source)) {
+    hardcodedClientFunctionHosts.push(file);
+  }
+}
 const endpointReferences = new Map();
 const literalRequest = /\b(?:api|platformApi)\.request(?:<[^;]{0,500}?>)?\(\s*([\`'"])([^\`'"]+)\1/gms;
 for (const file of clientSourceFiles) {
@@ -513,12 +528,14 @@ const gatewayMismatches = publicHandlerFunctions.filter((functionName) => {
   return !/verify_jwt\s*=\s*false/.test(section);
 });
 
-if (missing.length || gatewayMismatches.length || presentForbidden.length || missingEndpointFunctions.length) {
+if (missing.length || gatewayMismatches.length || presentForbidden.length || missingEndpointFunctions.length || hostingProviderRuntimeReferences.length || hardcodedClientFunctionHosts.length) {
   const failures = [
     ...missing.map(([, , label]) => label),
     ...gatewayMismatches.map((name) => `gateway verify_jwt=false for ${name}`),
     ...presentForbidden.map(([, , label]) => `remove ${label}`),
     ...missingEndpointFunctions.map((entry) => `missing Edge Function for client endpoint ${entry}`),
+    ...hostingProviderRuntimeReferences.map((file) => `hosting-provider runtime hardcode in ${file}`),
+    ...hardcodedClientFunctionHosts.map((file) => `hardcoded Supabase Functions host in client source ${file}`),
   ];
   console.error(`API check failed: ${failures.join(', ')}`);
   process.exitCode = 1;
