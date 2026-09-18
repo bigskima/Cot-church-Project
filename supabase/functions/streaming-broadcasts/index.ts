@@ -81,9 +81,9 @@ async function secretReady(reference?: string | null) {
   }
 }
 
-async function streamingReadiness(organizationId: string, signedPlaybackRequired = false) {
+async function streamingReadiness(organizationId: string, routeScope: 'general' | 'expression') {
   try {
-    const loaded = await defaultStreamingConfig(organizationId);
+    const loaded = await defaultStreamingConfig(organizationId, routeScope);
     if (loaded.organizationId && loaded.organizationId !== organizationId) {
       return { ready: false, reason: "provider_scope_invalid" as const };
     }
@@ -92,38 +92,48 @@ async function streamingReadiness(organizationId: string, signedPlaybackRequired
     } catch {
       return { ready: false, reason: "adapter_unavailable" as const, providerCode: loaded.provider.providerCode };
     }
-    const [primarySecretReady, webhookSecretReady, signingSecretReady] = await Promise.all([
-      secretReady(loaded.provider.secretReference),
-      secretReady(loaded.provider.webhookSecretReference),
-      secretReady(loaded.provider.signingKeyReference),
-    ]);
-    if (!primarySecretReady || !webhookSecretReady) {
+    const providerCode = loaded.provider.providerCode;
+    const primarySecretReady = await secretReady(loaded.provider.secretReference);
+    const webhookSecretReady = providerCode === "mux"
+      ? await secretReady(loaded.provider.webhookSecretReference)
+      : true;
+    const signingSecretReady = providerCode === "mux"
+      ? await secretReady(loaded.provider.signingKeyReference)
+      : false;
+
+    const channelConfigured = providerCode !== "youtube"
+      || (typeof loaded.provider.settings?.channelId === "string" && Boolean(String(loaded.provider.settings.channelId).trim()));
+
+    if (!primarySecretReady || !webhookSecretReady || !channelConfigured) {
       return {
         ready: false,
-        reason: "runtime_secrets_missing" as const,
-        providerCode: loaded.provider.providerCode,
+        reason: !channelConfigured ? "youtube_channel_missing" as const : "runtime_secrets_missing" as const,
+        providerCode,
         primarySecretReady,
         webhookSecretReady,
         signedPlaybackConfigured: signingSecretReady,
+        operationMode: providerCode === "youtube" ? "external" as const : providerCode === "agora" ? "rtc" as const : "managed" as const,
         testMode: loaded.provider.settings?.testMode === true,
       };
     }
-    if (signedPlaybackRequired && !signingSecretReady) {
+    if (providerCode === "mux" && routeScope === "expression" && !signingSecretReady) {
       return {
         ready: false,
         reason: "signed_playback_not_configured" as const,
-        providerCode: loaded.provider.providerCode,
+        providerCode,
         primarySecretReady,
         webhookSecretReady,
         signedPlaybackConfigured: false,
+        operationMode: "managed" as const,
         testMode: loaded.provider.settings?.testMode === true,
       };
     }
     return {
       ready: true,
       reason: null,
-      providerCode: loaded.provider.providerCode,
+      providerCode,
       signedPlaybackConfigured: signingSecretReady,
+      operationMode: providerCode === "youtube" ? "external" as const : providerCode === "agora" ? "rtc" as const : "managed" as const,
       testMode: loaded.provider.settings?.testMode === true,
     };
   } catch (error) {
@@ -146,7 +156,7 @@ Deno.serve(createHandler(
         ? uuid(url.searchParams.get("branchId"), "branchId", true)!
         : null;
       await assertBroadcastAuthority(auth, organizationId, branchId);
-      return { data: await streamingReadiness(organizationId, Boolean(branchId)) };
+      return { data: await streamingReadiness(organizationId, branchId ? 'expression' : 'general') };
     }
 
     const admin = adminClient();
@@ -222,12 +232,23 @@ Deno.serve(createHandler(
 
       const loaded = body.providerConfigId
         ? await loadStreamingConfig(uuid(String(body.providerConfigId), "providerConfigId", true)!)
-        : await defaultStreamingConfig(organizationId);
+        : await defaultStreamingConfig(organizationId, targetBranchId ? "expression" : "general");
       if (loaded.organizationId && loaded.organizationId !== organizationId) throw new ApiError("PROVIDER_SCOPE_DENIED", "Provider configuration is outside this organization", 403);
-      if (!(await secretReady(loaded.provider.secretReference)) || !(await secretReady(loaded.provider.webhookSecretReference))) {
-        throw new ApiError("STREAMING_NOT_READY", "The active streaming provider is missing required runtime secrets", 503, undefined, false);
+      const providerCode = loaded.provider.providerCode;
+      if (providerCode === "youtube") {
+        throw new ApiError(
+          "EXTERNAL_LIVE_SOURCE",
+          "General COT live video is sourced from the configured YouTube channel. Start the broadcast on YouTube; COT will discover it automatically.",
+          409,
+        );
       }
-      if (visibility !== "public" && !(await secretReady(loaded.provider.signingKeyReference))) {
+      if (!(await secretReady(loaded.provider.secretReference))) {
+        throw new ApiError("STREAMING_NOT_READY", "The active streaming provider is missing required runtime credentials", 503, undefined, false);
+      }
+      if (providerCode === "mux" && !(await secretReady(loaded.provider.webhookSecretReference))) {
+        throw new ApiError("STREAMING_NOT_READY", "Mux webhook verification is not configured", 503, undefined, false);
+      }
+      if (providerCode === "mux" && visibility !== "public" && !(await secretReady(loaded.provider.signingKeyReference))) {
         throw new ApiError(
           "STREAMING_SIGNING_NOT_CONFIGURED",
           "Secure playback must be configured before creating an Expression or private broadcast",
@@ -236,8 +257,11 @@ Deno.serve(createHandler(
           false,
         );
       }
+      if (providerCode === "agora" && visibility === "public") {
+        throw new ApiError("STREAMING_SCOPE_UNSUPPORTED", "Agora is configured for Expression broadcasts, not General COT", 422);
+      }
 
-      const adapter = streamingProvider(loaded.provider.providerCode);
+      const adapter = streamingProvider(providerCode);
       const title = requiredString(body.title, "title", 180).trim();
       const windowSeconds = reconnectWindow(body.reconnectWindowSeconds);
       const provisioned = await adapter.createBroadcast(loaded.provider, {
@@ -256,7 +280,7 @@ Deno.serve(createHandler(
         title,
         description: optionalString(body.description, "description", 10000)?.trim() ?? "",
         visibility,
-        status: "provisioning",
+        status: loaded.provider.providerCode === "agora" ? "ready" : "provisioning",
         provider: loaded.provider.providerCode,
         provider_config_id: loaded.id,
         provider_broadcast_id: provisioned.providerBroadcastId,
@@ -265,7 +289,7 @@ Deno.serve(createHandler(
         scheduled_start: body.scheduledStart ?? null,
         latency_mode: latencyMode,
         reconnect_window_seconds: windowSeconds,
-        provider_metadata: { playbackId: provisioned.playbackId },
+        provider_metadata: { playbackId: provisioned.playbackId, rtc: provisioned.rtc ?? null },
         created_by: auth.user.id,
       };
 
@@ -274,7 +298,7 @@ Deno.serve(createHandler(
         await adapter.stopBroadcast(loaded.provider, provisioned.providerBroadcastId).catch(() => {});
         throw new ApiError("BROADCAST_CREATE_FAILED", "Provider was rolled back after the broadcast record failed", 500, undefined, false);
       }
-      return { data: { stream: data, ingest: provisioned.ingest }, status: 201 };
+      return { data: { stream: data, ingest: provisioned.ingest, rtc: provisioned.rtc ?? null, providerCode: loaded.provider.providerCode }, status: 201 };
     }
 
     assertNoUnknownFields(body, ["id", "action", "startSeconds", "endSeconds", "title"]);
@@ -293,6 +317,19 @@ Deno.serve(createHandler(
     if (loaded.organizationId && loaded.organizationId !== stream.organization_id) throw new ApiError("PROVIDER_SCOPE_DENIED", "Broadcast provider configuration is outside this organization", 403);
     const adapter = streamingProvider(loaded.provider.providerCode);
     const action = requiredString(body.action, "action", 30);
+
+    if (action === "mark_live") {
+      if (loaded.provider.providerCode !== "agora") {
+        throw new ApiError("STREAMING_ACTION_UNSUPPORTED", "Only RTC broadcasts use host-driven live status", 409);
+      }
+      const startedAt = new Date().toISOString();
+      const { error: updateError } = await admin
+        .from("live_streams")
+        .update({ status: "live", started_at: startedAt, lifecycle_error: null })
+        .eq("id", id);
+      if (updateError) throw new ApiError("STREAM_UPDATE_FAILED", "Unable to mark the RTC broadcast live", 500, undefined, false);
+      return { data: { id, status: "live", startedAt } };
+    }
 
     if (action === "stop") {
       if (["ended", "cancelled", "archived"].includes(stream.status)) return { data: { id, status: stream.status } };
