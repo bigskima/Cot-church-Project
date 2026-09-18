@@ -101,8 +101,8 @@ function streamPresentation(stream: LiveStream) {
         label: 'ENDED',
         variant: 'neutral' as const,
         icon: 'time-outline' as const,
-        message: stream.provider === 'agora' && !stream.recording_url
-          ? 'The in-app live service has ended. No replay was recorded for this session.'
+        message: stream.provider === 'agora'
+          ? 'The in-app live service has ended. This session does not include an automatic replay.'
           : 'The live service has ended. Its replay will appear when recording preparation is complete.',
       };
     case 'processing':
