@@ -54,8 +54,27 @@ function base64url(bytes: Uint8Array | string) {
   return btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 }
 
+function normalizeSigningPrivateKey(value: string) {
+  const input = value.trim();
+  if (input.includes('-----BEGIN PRIVATE KEY-----')) return input;
+  try {
+    const decoded = atob(input);
+    if (decoded.includes('-----BEGIN PRIVATE KEY-----')) return decoded;
+  } catch {
+    // Fall through to the validation error below.
+  }
+  throw new ApiError(
+    'STREAMING_SIGNING_SECRET_INVALID',
+    'Mux signing private key must be a PKCS#8 PEM or the base64-encoded PEM returned by Mux',
+    500,
+    undefined,
+    false,
+  );
+}
+
 async function signJwt(payload: Record<string, unknown>, secret: SigningCredentials) {
-  const pem = secret.privateKeyPem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, '');
+  const pem = normalizeSigningPrivateKey(secret.privateKeyPem)
+    .replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, '');
   const binary = Uint8Array.from(atob(pem), (char) => char.charCodeAt(0));
   const key = await crypto.subtle.importKey('pkcs8', binary, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
   const encoded = `${base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT', kid: secret.keyId }))}.${base64url(JSON.stringify(payload))}`;
@@ -114,8 +133,14 @@ export class MuxStreamingProvider implements StreamingProvider {
   async startBroadcast() { return; }
   async stopBroadcast(config: ProviderConfiguration, broadcastId: string) { await mux(config, `/live-streams/${broadcastId}/complete`, { method: 'PUT' }); }
 
-  async createPlaybackToken(config: ProviderConfiguration, playbackId: string, ttlSeconds: number): Promise<PlaybackGrant> {
-    if (!config.signingKeyReference) return { url: `https://stream.mux.com/${playbackId}.m3u8`, expiresAt: new Date(Date.now() + ttlSeconds * 1000).toISOString() };
+  async createPlaybackToken(config: ProviderConfiguration, playbackId: string, ttlSeconds: number, playbackPolicy: 'public' | 'signed'): Promise<PlaybackGrant> {
+    const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
+    if (playbackPolicy === 'public') {
+      return { url: `https://stream.mux.com/${playbackId}.m3u8`, expiresAt };
+    }
+    if (!config.signingKeyReference) {
+      throw new ApiError('STREAMING_SIGNING_NOT_CONFIGURED', 'Secure Mux playback requires a signing key', 503, undefined, false);
+    }
     const secret = await resolveSecretJson<SigningCredentials>(config.signingKeyReference);
     if (!secret.keyId || !secret.privateKeyPem) throw new ApiError('STREAMING_SIGNING_SECRET_INVALID', 'Mux signing credentials require keyId and privateKeyPem', 500, undefined, false);
     const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
