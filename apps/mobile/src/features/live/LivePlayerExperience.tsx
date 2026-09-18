@@ -532,6 +532,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   loadingBody: { padding: spacing.lg, gap: spacing.md },
   videoContainer: { width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000000', position: 'relative' },
+  videoContainerFullscreen: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%', aspectRatio: undefined, zIndex: 1000, elevation: 1000, backgroundColor: '#000000' },
   videoView: { width: '100%', height: '100%' },
   videoPlaceholder: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, padding: spacing.xl },
   placeholderIcon: { width: 68, height: 68, borderRadius: 34, backgroundColor: 'rgba(22,143,240,0.12)', borderWidth: 1, borderColor: 'rgba(22,143,240,0.22)', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
