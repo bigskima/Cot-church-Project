@@ -151,6 +151,7 @@ export default function MediaStudioScreen() {
         stream: LiveStream;
         ingest?: { rtmpUrl?: string; streamKey?: string };
         rtc?: { channelName: string } | null;
+        rtcGrant?: AgoraRtcGrant | null;
         providerCode?: string;
       }>('streaming-broadcasts', {
         method: 'POST',
@@ -166,13 +167,8 @@ export default function MediaStudioScreen() {
         }),
       });
 
-      if (res.providerCode === 'agora') {
-        const rtc = await api.request<{ grant: AgoraRtcGrant }>('streaming-rtc-session', {
-          method: 'POST',
-          context: 'current',
-          body: JSON.stringify({ streamId: res.stream.id, role: 'publisher' }),
-        });
-        setCreatedRtc({ streamId: res.stream.id, grant: rtc.grant });
+      if (res.providerCode === 'agora' && res.rtcGrant) {
+        setCreatedRtc({ streamId: res.stream.id, grant: res.rtcGrant });
         setCreatedIngest(null);
       } else if (res.ingest?.rtmpUrl && res.ingest.streamKey) {
         setCreatedIngest({ rtmpUrl: res.ingest.rtmpUrl, streamKey: res.ingest.streamKey });
