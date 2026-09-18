@@ -65,6 +65,15 @@ Deno.serve(createHandler(
     if (loaded.provider.providerCode !== "agora") {
       throw new ApiError("STREAMING_PLAYBACK_MODE_INVALID", "This broadcast does not use Agora RTC", 409);
     }
+    if (loaded.provider.settings?.cohostAuthenticationEnabled !== true) {
+      throw new ApiError(
+        "AGORA_COHOST_AUTH_REQUIRED",
+        "Expression live is disabled until Agora Co-host token authentication is enabled and confirmed in Platform Administration",
+        503,
+        undefined,
+        false,
+      );
+    }
     const adapter = streamingProvider("agora");
     if (!adapter.createRtcGrant) {
       throw new ApiError("STREAMING_ADAPTER_UNAVAILABLE", "Agora RTC grant support is unavailable", 500, undefined, false);
