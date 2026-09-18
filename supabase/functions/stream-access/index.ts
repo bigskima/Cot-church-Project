@@ -5,21 +5,58 @@ import { adminClient } from "../_shared/supabase.ts";
 import { loadStreamingConfig } from "../_shared/streaming/configuration.ts";
 import { streamingProvider } from "../_shared/streaming/registry.ts";
 import { uuid } from "../_shared/validation.ts";
+import { resolveGeneralYouTubeVideo, resolveSingleActiveOrganizationId } from "../_shared/youtube-live.ts";
 
 async function hash(value: string) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+async function numericUid(profileId: string) {
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(profileId)));
+  const value = new DataView(digest.buffer).getUint32(0, false);
+  return value === 0 ? 1 : value;
+}
+
 Deno.serve(createHandler(
   { methods: ["POST"], authentication: "optional", organization: "optional" },
   async ({ request, auth }) => {
-    const id = uuid(new URL(request.url).searchParams.get("id"), "id", true)!;
+    const url = new URL(request.url);
+    const rawId = url.searchParams.get("id") ?? "";
     const admin = adminClient();
+
+    if (rawId.startsWith("youtube_")) {
+      const requestedOrganizationId = url.searchParams.get("organizationId");
+      const organizationId = requestedOrganizationId
+        ? uuid(requestedOrganizationId, "organizationId", true)!
+        : await resolveSingleActiveOrganizationId();
+      const external = await resolveGeneralYouTubeVideo(organizationId, rawId.slice("youtube_".length));
+
+      const { data: givingSettings } = await admin
+        .from("giving_settings")
+        .select("is_enabled")
+        .eq("organization_id", organizationId)
+        .is("branch_id", null)
+        .maybeSingle();
+
+      return {
+        data: {
+          stream: external,
+          playbackUrl: null,
+          playbackExpiresAt: null,
+          viewerSessionId: null,
+          rtcGrant: null,
+          canChat: false,
+          givingEnabled: givingSettings?.is_enabled === true,
+        },
+      };
+    }
+
+    const id = uuid(rawId, "id", true)!;
 
     const { data: stream, error } = await admin
       .from("live_streams")
-      .select("id,organization_id,branch_id,title,description,status,visibility,provider,provider_config_id,provider_metadata,playback_url,recording_url,playback_token_required,scheduled_start,started_at,ended_at")
+      .select("id,organization_id,branch_id,title,description,status,visibility,provider,provider_config_id,provider_broadcast_id,provider_metadata,playback_url,recording_url,playback_token_required,scheduled_start,started_at,ended_at")
       .eq("id", id)
       .single();
     if (error || !stream) throw new ApiError("STREAM_NOT_FOUND", "Broadcast not found", 404);
@@ -48,6 +85,40 @@ Deno.serve(createHandler(
       throw new ApiError("AUTHENTICATION_REQUIRED", "Sign in to access this broadcast", 401);
     }
 
+    let rtcGrant: unknown = null;
+    if (stream.provider === "agora" && stream.status === "live") {
+      if (!auth) throw new ApiError("AUTHENTICATION_REQUIRED", "Sign in to watch this Expression broadcast", 401);
+      if (!stream.provider_config_id || !stream.provider_broadcast_id) {
+        throw new ApiError("STREAM_PROVIDER_STATE_INVALID", "Broadcast is missing its RTC provider session", 409);
+      }
+      const loaded = await loadStreamingConfig(stream.provider_config_id);
+      if (loaded.provider.providerCode !== "agora") {
+        throw new ApiError("STREAMING_PLAYBACK_MODE_INVALID", "This broadcast does not use Agora RTC", 409);
+      }
+      if (loaded.provider.settings?.cohostAuthenticationEnabled !== true) {
+        throw new ApiError(
+          "AGORA_COHOST_AUTH_REQUIRED",
+          "Expression live is unavailable until Agora Co-host token authentication is confirmed",
+          503,
+          undefined,
+          false,
+        );
+      }
+      const adapter = streamingProvider("agora");
+      if (!adapter.createRtcGrant) {
+        throw new ApiError("STREAMING_ADAPTER_UNAVAILABLE", "Agora RTC grant support is unavailable", 500, undefined, false);
+      }
+      const ttlSetting = Number(loaded.provider.settings?.tokenTtlSeconds ?? 3600);
+      const ttlSeconds = Number.isFinite(ttlSetting) ? Math.max(300, Math.min(86400, Math.floor(ttlSetting))) : 3600;
+      rtcGrant = await adapter.createRtcGrant(
+        loaded.provider,
+        stream.provider_broadcast_id,
+        await numericUid(auth.user.id),
+        "subscriber",
+        ttlSeconds,
+      );
+    }
+
     const playbackEligible = ["live", "ended", "processing", "replay_ready"].includes(stream.status);
     let playbackUrl = playbackEligible
       ? (stream.status === "live" ? stream.playback_url : stream.recording_url)
@@ -55,7 +126,7 @@ Deno.serve(createHandler(
     let expiresAt: string | null = null;
 
     if (playbackEligible && stream.provider === "agora") {
-      // Agora playback is authorized separately through streaming-rtc-session.
+      // Agora playback is authorized in this same access response through rtcGrant.
       // Do not force an HLS URL or signed-playback grant for RTC broadcasts.
       playbackUrl = null;
     } else if (playbackEligible && stream.provider_config_id && stream.provider_metadata?.playbackId) {
@@ -160,6 +231,7 @@ Deno.serve(createHandler(
         playbackUrl,
         playbackExpiresAt: expiresAt,
         viewerSessionId,
+        rtcGrant,
         canChat: Boolean(auth) && stream.status === "live" && hasActiveMembership,
         givingEnabled,
       },
