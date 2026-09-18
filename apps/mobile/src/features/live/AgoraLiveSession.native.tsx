@@ -22,6 +22,12 @@ async function requestBroadcastPermissions() {
 export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft, onError }: AgoraLiveSessionProps) {
   const engineRef = useRef<IRtcEngine | null>(null);
   const disposedRef = useRef(false);
+  const callbacksRef = useRef({ onJoined, onLeave, onRemoteLeft, onError });
+
+  useEffect(() => {
+    callbacksRef.current = { onJoined, onLeave, onRemoteLeft, onError };
+  }, [onError, onJoined, onLeave, onRemoteLeft]);
+
   const [joined, setJoined] = useState(false);
   const [remoteUid, setRemoteUid] = useState<number | null>(null);
   const [message, setMessage] = useState(role === 'publisher' ? 'Preparing camera and microphone…' : 'Joining live service…');
@@ -36,7 +42,7 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
     const reportError = (errorMessage: string) => {
       if (disposedRef.current) return;
       setMessage(errorMessage);
-      onError?.(errorMessage);
+      callbacksRef.current.onError?.(errorMessage);
     };
 
     const start = async () => {
@@ -53,7 +59,7 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
             setJoined(true);
             setNetworkLabel('Connected');
             setMessage(role === 'publisher' ? 'You are live in this Expression.' : 'Connected to the live service.');
-            onJoined?.();
+            callbacksRef.current.onJoined?.();
           },
           onUserJoined: (_connection, uid) => {
             if (disposedRef.current || role !== 'subscriber') return;
@@ -64,7 +70,7 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
             if (disposedRef.current || role !== 'subscriber') return;
             setRemoteUid((current) => current === uid ? null : current);
             setMessage('The broadcaster has left this live session.');
-            onRemoteLeft?.();
+            callbacksRef.current.onRemoteLeft?.();
           },
           onNetworkQuality: (_connection, _remoteUid, txQuality, rxQuality) => {
             if (disposedRef.current) return;
@@ -117,9 +123,9 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
           // The engine may already have been released by the native runtime.
         }
       }
-      onLeave?.();
+      callbacksRef.current.onLeave?.();
     };
-  }, [grant.appId, grant.channelName, grant.token, grant.uid, onError, onJoined, onLeave, onRemoteLeft, role]);
+  }, [grant.appId, grant.channelName, grant.token, grant.uid, role]);
 
   const toggleMic = () => {
     const engine = engineRef.current;
@@ -130,7 +136,7 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
       setMicMuted(next);
       setMessage(next ? 'Microphone muted.' : 'Microphone live.');
     } catch {
-      onError?.('Unable to change microphone state.');
+      callbacksRef.current.onError?.('Unable to change microphone state.');
     }
   };
 
@@ -143,7 +149,7 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
       setCameraMuted(next);
       setMessage(next ? 'Camera paused.' : 'Camera live.');
     } catch {
-      onError?.('Unable to change camera state.');
+      callbacksRef.current.onError?.('Unable to change camera state.');
     }
   };
 
@@ -155,7 +161,7 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
       engine.switchCamera();
       setMessage('Camera switched.');
     } catch {
-      onError?.('Unable to switch camera.');
+      callbacksRef.current.onError?.('Unable to switch camera.');
     } finally {
       setTimeout(() => setSwitchingCamera(false), 500);
     }
