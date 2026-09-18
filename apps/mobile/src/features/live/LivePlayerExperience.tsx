@@ -101,7 +101,9 @@ function streamPresentation(stream: LiveStream) {
         label: 'ENDED',
         variant: 'neutral' as const,
         icon: 'time-outline' as const,
-        message: 'The live service has ended. Its replay will appear when recording preparation is complete.',
+        message: stream.provider === 'agora' && !stream.recording_url
+          ? 'The in-app live service has ended. No replay was recorded for this session.'
+          : 'The live service has ended. Its replay will appear when recording preparation is complete.',
       };
     case 'processing':
       return {
@@ -189,7 +191,7 @@ export function LivePlayerExperience({ streamId: id, scope = 'general', embedded
 
         if (isMounted) {
           setAccess(data);
-          setRtcGrant(data.rtcGrant ?? null);
+          setRtcGrant(data.stream.status === 'live' ? data.rtcGrant ?? null : null);
         }
       } catch (value) {
         if (isMounted) setError(value instanceof Error ? value.message : 'Unable to connect to live broadcast.');
