@@ -25,11 +25,6 @@ type LiveHomePayload = {
   degradedSections?: string[];
 };
 
-type GeneralLiveSource = {
-  providerCode: string;
-  stream: LiveStream | null;
-};
-
 export function LiveDiscoveryExperience({ scope = 'general', embedded = false }: { scope?: 'general' | 'expression'; embedded?: boolean }) {
   const insets = useSafeAreaInsets();
   const { api, context, hasCapability, hasPublicCapability } = useSession();
@@ -53,26 +48,11 @@ export function LiveDiscoveryExperience({ scope = 'general', embedded = false }:
     (signal) => api.request<LiveHomePayload>(`home-feed${query.size ? `?${query.toString()}` : ''}`, { signal })
   );
 
-  const generalLive = useResource<GeneralLiveSource>(
-    `live:youtube-source:${organization?.id ?? 'default'}:${expressionMode ? 'skip' : 'general'}`,
-    (signal) => {
-      if (expressionMode) return Promise.resolve({ providerCode: 'expression', stream: null });
-      const params = new URLSearchParams();
-      if (organization?.id) params.set('organizationId', organization.id);
-      return api.request<GeneralLiveSource>(`general-live-source${params.size ? `?${params.toString()}` : ''}`, { signal, context: 'public' });
-    },
-  );
-
   const openStream = (id: string) => expressionMode && expressionId
     ? router.push(`/expressions/${expressionId}/live/${id}` as any)
     : router.push(`/general/live/${id}` as any);
 
-  const databaseStreams = resource.data?.streams ?? [];
-  const streams = expressionMode
-    ? databaseStreams
-    : generalLive.data?.stream
-      ? [generalLive.data.stream, ...databaseStreams.filter((item) => item.id !== generalLive.data!.stream!.id)]
-      : databaseStreams;
+  const streams = resource.data?.streams ?? [];
   const liveStreams = streams.filter((item) => item.status === 'live');
   const scheduledStreams = streams.filter((item) =>
     item.status === 'scheduled' || item.status === 'provisioning' || item.status === 'ready',
@@ -91,11 +71,8 @@ export function LiveDiscoveryExperience({ scope = 'general', embedded = false }:
         ]}
         refreshControl={
           <RefreshControl
-            refreshing={resource.loading || (!expressionMode && generalLive.loading)}
-            onRefresh={() => {
-              resource.refresh();
-              if (!expressionMode) generalLive.refresh();
-            }}
+            refreshing={resource.loading}
+            onRefresh={resource.refresh}
             tintColor={colors.interactive}
           />
         }
