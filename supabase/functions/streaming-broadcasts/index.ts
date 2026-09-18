@@ -72,9 +72,10 @@ function reconnectWindow(value: unknown) {
   return seconds;
 }
 
-async function numericUid(profileId: string) {
-  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(profileId)));
-  const value = new DataView(digest.buffer).getUint32(0, false);
+function rtcSessionUid() {
+  const values = new Uint32Array(1);
+  crypto.getRandomValues(values);
+  const value = values[0] & 0x7fffffff;
   return value === 0 ? 1 : value;
 }
 
@@ -360,7 +361,7 @@ Deno.serve(createHandler(
         rtcGrant = await adapter.createRtcGrant(
           loaded.provider,
           provisioned.providerBroadcastId,
-          await numericUid(auth.user.id),
+          rtcSessionUid(),
           "publisher",
           ttlSeconds,
         );
