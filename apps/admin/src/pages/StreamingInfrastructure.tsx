@@ -98,6 +98,10 @@ export function StreamingInfrastructure({ api, canManage = false, canManageSecre
   const primaryConfig = data.globalConfigs.find((config) => config.is_default && config.is_active);
   const webhookIssues = data.recentWebhooks.filter((event) => !event.signature_valid || Boolean(event.processing_error)).length;
   const configByProvider = useMemo(() => new Map(data.globalConfigs.map((config) => [config.provider_id, config])), [data.globalConfigs]);
+  const routeLabel = (config?: ProviderConfig) => {
+    const scopes = config?.configuration?.routingScopes;
+    return Array.isArray(scopes) ? scopes.map(String).join(' + ').toUpperCase() : '';
+  };
 
   const clearSecretInputs = () => {
     setMuxTokenId('');
@@ -314,7 +318,7 @@ export function StreamingInfrastructure({ api, canManage = false, canManageSecre
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
                   Global config: <strong style={{ color: config?.is_active ? 'var(--gold)' : 'var(--text-muted)' }}>{config?.is_active ? 'ACTIVE' : 'NOT CONFIGURED'}</strong>{config?.is_default ? ' · DEFAULT' : ''}
-                  {Array.isArray(config?.configuration?.routingScopes) ? <> · {config.configuration!.routingScopes.map(String).join(' + ').toUpperCase()}</> : null}
+                  {routeLabel(config) ? <> · {routeLabel(config)}</> : null}
                 </div>
                 {config ? <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 12, lineHeight: 1.6 }}>Credential name: <code>{config.secret_reference}</code><br />Verification name: <code>{config.webhook_secret_reference}</code>{config.signing_key_reference ? <><br />Playback signing name: <code>{config.signing_key_reference}</code></> : null}</div> : null}
                 <div className="admin-capability-tags">{provider.capabilities.map((capability) => <span key={capability} className="active">{capability}</span>)}</div>
