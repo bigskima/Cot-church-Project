@@ -43,7 +43,7 @@ export function GeneralHomeNoticeStrip() {
   const resource = useResource<GeneralHomeNotice | null>(
     `general-home-notice:${organizationId || 'auto'}`,
     (signal) => api.request<GeneralHomeNotice | null>(
-      `general-home-notices${organizationId ? `?organizationId=${encodeURIComponent(organizationId)}` : ''}`,
+      `general-home-notices?${organizationId ? `organizationId=${encodeURIComponent(organizationId)}&` : ''}fresh=${Date.now()}`,
       { signal, context: 'public' },
     ),
   );
