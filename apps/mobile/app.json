@@ -54,7 +54,11 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.cot.app"
+      "bundleIdentifier": "com.cot.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow COT to use your camera when you are authorized to broadcast an Expression live service.",
+        "NSMicrophoneUsageDescription": "Allow COT to use your microphone when you are authorized to broadcast an Expression live service."
+      }
     },
     "android": {
       "package": "com.cot.app",
@@ -67,7 +71,11 @@
         "backgroundColor": "#091733",
         "resizeMode": "contain",
         "image": "./assets/cot-family-logo.png"
-      }
+      },
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO"
+      ]
     },
     "web": {
       "bundler": "metro",
