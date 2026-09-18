@@ -448,9 +448,33 @@ export function LivePlayerExperience({ streamId: id, scope = 'general', embedded
 
       {!fullscreen ? (
       <>
-      <View style={[styles.streamInfoBar, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
-        <View style={styles.infoCol}><Text style={[styles.streamTitle, { color: colors.text }]} numberOfLines={2}>{access.stream.title}</Text>{access.stream.description ? <Text style={[styles.streamDesc, { color: colors.textMuted }]} numberOfLines={2}>{access.stream.description}</Text> : null}{!isLive && presentation ? <View style={[styles.lifecycleRow, { backgroundColor: colors.bgSecondary }]}><Icon name={presentation.icon} size={14} color={colors.interactive} /><Text style={[styles.lifecycleText, { color: colors.textSecondary }]}>{presentation.message}</Text></View> : null}</View>
-        <View style={styles.actionPillsRow}>{access.givingEnabled ? <Pressable onPress={() => router.push('/(tabs)/profile/giving' as any)} style={[styles.actionPill, { backgroundColor: colors.primarySoft }]}><Icon name="gift-outline" size={14} color={colors.interactive} /><Text style={[styles.actionPillText, { color: colors.interactive }]}>Give</Text></Pressable> : null}{!externalYouTube ? <Pressable onPress={() => mode === 'visitor' ? router.push({ pathname: '/(auth)/login', params: { returnTo } } as any) : setShowSupportSheet(true)} style={[styles.actionPill, { backgroundColor: colors.bgSecondary }]}><Icon name="heart-outline" size={14} color={colors.textSecondary} /><Text style={[styles.actionPillText, { color: colors.textSecondary }]}>Care</Text></Pressable> : null}</View>
+      <View style={[styles.streamInfoBar, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+        <View style={styles.streamMetaRow}>
+          {isLive ? <Badge label="LIVE" variant="live" pulse /> : null}
+          <View style={[styles.streamMetaPill, { backgroundColor: colors.bgSecondary }]}>
+            <Icon name="eye-outline" size={13} color={colors.textMuted} />
+            <Text style={[styles.streamMetaText, { color: colors.textSecondary }]}>
+              {isLive ? `${access.stream.viewer_count ?? 0} watching` : presentation?.label ?? 'Broadcast'}
+            </Text>
+          </View>
+          {expressionMode ? (
+            <View style={[styles.streamMetaPill, { backgroundColor: colors.primarySoft }]}>
+              <Icon name="people-outline" size={13} color={colors.interactive} />
+              <Text style={[styles.streamMetaText, { color: colors.interactive }]}>Expression Live</Text>
+            </View>
+          ) : null}
+        </View>
+
+        <View style={styles.infoCol}>
+          <Text style={[styles.streamTitle, { color: colors.text }]} numberOfLines={2}>{access.stream.title}</Text>
+          {access.stream.description ? <Text style={[styles.streamDesc, { color: colors.textMuted }]} numberOfLines={2}>{access.stream.description}</Text> : null}
+          {!isLive && presentation ? <View style={[styles.lifecycleRow, { backgroundColor: colors.bgSecondary }]}><Icon name={presentation.icon} size={14} color={colors.interactive} /><Text style={[styles.lifecycleText, { color: colors.textSecondary }]}>{presentation.message}</Text></View> : null}
+        </View>
+
+        <View style={styles.actionPillsRow}>
+          {access.givingEnabled ? <Pressable onPress={() => router.push('/(tabs)/profile/giving' as any)} style={[styles.actionPill, { backgroundColor: colors.primarySoft }]}><Icon name="gift-outline" size={14} color={colors.interactive} /><Text style={[styles.actionPillText, { color: colors.interactive }]}>Give</Text></Pressable> : null}
+          {!externalYouTube ? <Pressable onPress={() => mode === 'visitor' ? router.push({ pathname: '/(auth)/login', params: { returnTo } } as any) : setShowSupportSheet(true)} style={[styles.actionPill, { backgroundColor: colors.bgSecondary }]}><Icon name="heart-outline" size={14} color={colors.textSecondary} /><Text style={[styles.actionPillText, { color: colors.textSecondary }]}>Care</Text></Pressable> : null}
+        </View>
       </View>
 
       {externalYouTube ? (
@@ -517,13 +541,16 @@ const styles = StyleSheet.create({
   playerTopBarFullscreen: { top: spacing.md },
   playerTopActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   playerIconBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0, 0, 0, 0.52)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
-  streamInfoBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: spacing.md, marginTop: spacing.md, padding: spacing.md, borderWidth: 1, borderRadius: radius.xl, gap: spacing.sm },
-  infoCol: { flex: 1, gap: 2 },
+  streamInfoBar: { marginHorizontal: spacing.md, marginTop: spacing.md, padding: spacing.md, borderWidth: 1, borderRadius: radius.xl, gap: spacing.sm },
+  streamMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
+  streamMetaPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: radius.pill },
+  streamMetaText: { fontSize: 10, fontWeight: '800' },
+  infoCol: { gap: 3 },
   streamTitle: { fontSize: 16, lineHeight: 21, fontWeight: '800', letterSpacing: -0.25 },
   streamDesc: { fontSize: 11, lineHeight: 16 },
   lifecycleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, marginTop: spacing.xs, padding: spacing.sm, borderRadius: radius.md },
   lifecycleText: { flex: 1, fontSize: 11, lineHeight: 16, fontWeight: '600' },
-  actionPillsRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  actionPillsRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.xs, marginTop: 2 },
   actionPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 7, borderRadius: radius.pill },
   actionPillText: { fontSize: 12, fontWeight: '700' },
   chatSection: { flex: 1, paddingTop: spacing.sm },
