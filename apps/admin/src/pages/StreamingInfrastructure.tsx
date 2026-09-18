@@ -96,7 +96,13 @@ export function StreamingInfrastructure({ api, canManage = false, canManageSecre
   useEffect(() => { void load(); }, [api]);
 
   const liveCount = data.streams.filter((stream) => stream.status === 'live').length;
-  const primaryConfig = data.globalConfigs.find((config) => config.is_default && config.is_active);
+  const routedConfig = (scope: 'general' | 'expression') => data.globalConfigs.find((config) =>
+    config.is_active &&
+    Array.isArray(config.configuration?.routingScopes) &&
+    config.configuration!.routingScopes.includes(scope)
+  );
+  const generalConfig = routedConfig('general');
+  const expressionConfig = routedConfig('expression');
   const webhookIssues = data.recentWebhooks.filter((event) => !event.signature_valid || Boolean(event.processing_error)).length;
   const configByProvider = useMemo(() => new Map(data.globalConfigs.map((config) => [config.provider_id, config])), [data.globalConfigs]);
   const routeLabel = (config?: ProviderConfig) => {
@@ -300,9 +306,10 @@ export function StreamingInfrastructure({ api, canManage = false, canManageSecre
   return (
     <div className="admin-page-stack">
       <div className="admin-stats-grid">
-        <StatWidget title="Active Live Broadcasts" value={liveCount} subtitle={`${data.streams.length} scheduled or active broadcasts`} trend={{ value: liveCount > 0 ? 'LIVE NOW' : 'No live feeds', isPositive: true }} icon="LIVE" variant="live" />
-        <StatWidget title="Primary streaming service" value={primaryConfig?.streaming_providers?.name ?? 'Not configured'} subtitle={primaryConfig ? `Credential name: ${primaryConfig.secret_reference}` : 'Choose the primary streaming service'} trend={{ value: primaryConfig ? 'ACTIVE' : 'ACTION REQUIRED', isPositive: Boolean(primaryConfig) }} icon="VIDEO" variant="gold" />
-        <StatWidget title="Recent delivery health" value={webhookIssues === 0 ? 'Healthy' : `${webhookIssues} issue(s)`} subtitle={`${data.recentWebhooks.length} recent service events reviewed`} trend={{ value: webhookIssues === 0 ? 'NO RECENT ERRORS' : 'REVIEW ACTIVITY', isPositive: webhookIssues === 0 }} icon="HOOKS" variant="success" />
+        <StatWidget title="Active Live Broadcasts" value={liveCount} subtitle={`${data.streams.length} scheduled or active COT-managed broadcasts`} trend={{ value: liveCount > 0 ? 'LIVE NOW' : 'No internal live feeds', isPositive: true }} icon="LIVE" variant="live" />
+        <StatWidget title="General COT live" value={generalConfig?.streaming_providers?.name ?? 'Not configured'} subtitle={generalConfig ? 'Public livestream source' : 'Assign a provider to the General route'} trend={{ value: generalConfig ? 'ROUTED' : 'ACTION REQUIRED', isPositive: Boolean(generalConfig) }} icon="VIDEO" variant="gold" />
+        <StatWidget title="Expression live" value={expressionConfig?.streaming_providers?.name ?? 'Not configured'} subtitle={expressionConfig ? 'Private Expression livestream provider' : 'Assign a provider to the Expression route'} trend={{ value: expressionConfig ? 'ROUTED' : 'ACTION REQUIRED', isPositive: Boolean(expressionConfig) }} icon="RADIO" />
+        <StatWidget title="Recent delivery health" value={webhookIssues === 0 ? 'Healthy' : `${webhookIssues} issue(s)`} subtitle={`${data.recentWebhooks.length} recent provider events reviewed`} trend={{ value: webhookIssues === 0 ? 'NO RECENT ERRORS' : 'REVIEW ACTIVITY', isPositive: webhookIssues === 0 }} icon="HOOKS" variant="success" />
       </div>
 
       {error && !providerStateTarget ? <div className="admin-inline-error" role="alert">{error}</div> : null}
