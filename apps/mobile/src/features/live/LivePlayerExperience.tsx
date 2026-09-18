@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -9,10 +9,12 @@ import {
   View,
 } from 'react-native';
 import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { AgoraLiveSession } from './AgoraLiveSession';
 import type { AgoraRtcGrant } from './agora-types';
+import { LiveReactionOverlay, type LiveReactionBurst, type LiveReactionKind } from './LiveReactionOverlay';
 import { YouTubeLivePlayer } from './YouTubeLivePlayer';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -45,6 +47,13 @@ interface LiveChatMessage {
   user: string;
   avatarUrl?: string | null;
   text: string;
+  createdAt: string;
+}
+
+interface LiveReactionEvent {
+  id: string;
+  profileId?: string | null;
+  reaction: LiveReactionKind;
   createdAt: string;
 }
 
@@ -153,6 +162,10 @@ export function LivePlayerExperience({ streamId: id, scope = 'general', embedded
   const [supportSent, setSupportSent] = useState(false);
   const [supportSubmitting, setSupportSubmitting] = useState(false);
   const [interactionError, setInteractionError] = useState('');
+  const [fullscreen, setFullscreen] = useState(false);
+  const [reactionBursts, setReactionBursts] = useState<LiveReactionBurst[]>([]);
+  const reactionCursorRef = useRef<string | null>(null);
+  const seenReactionIdsRef = useRef(new Set<string>());
 
   const expressionMode = scope === 'expression';
   const topInset = embedded ? 0 : insets.top;
@@ -242,6 +255,74 @@ export function LivePlayerExperience({ streamId: id, scope = 'general', embedded
     return () => clearInterval(interval);
   }, [access?.stream.id, isLive, loadChat, mode, showFellowshipHistory]);
 
+  const dismissReactionBurst = useCallback((burstId: string) => {
+    setReactionBursts((current) => current.filter((burst) => burst.id !== burstId));
+  }, []);
+
+  const appendReactionBursts = useCallback((events: LiveReactionEvent[]) => {
+    if (!events.length) return;
+    const next: LiveReactionBurst[] = [];
+    for (const event of events) {
+      if (seenReactionIdsRef.current.has(event.id)) continue;
+      seenReactionIdsRef.current.add(event.id);
+      next.push({ id: event.id, reaction: event.reaction });
+    }
+    if (!next.length) return;
+    setReactionBursts((current) => [...current, ...next].slice(-28));
+  }, []);
+
+  const loadReactions = useCallback(async () => {
+    if (externalYouTube || mode !== 'authenticated' || !id || !isLive) return;
+    try {
+      const params = new URLSearchParams({ streamId: id, view: 'reactions' });
+      if (reactionCursorRef.current) params.set('since', reactionCursorRef.current);
+      const events = await api.request<LiveReactionEvent[]>(
+        `live-interactions?${params.toString()}`,
+        { context: requestContext },
+      );
+      if (events.length) {
+        reactionCursorRef.current = events[events.length - 1].createdAt;
+        appendReactionBursts(events);
+      }
+    } catch {
+      // Reactions are ambient; never interrupt playback when their refresh fails.
+    }
+  }, [api, appendReactionBursts, externalYouTube, id, isLive, mode, requestContext]);
+
+  useEffect(() => {
+    reactionCursorRef.current = null;
+    seenReactionIdsRef.current.clear();
+    setReactionBursts([]);
+    if (!isLive || externalYouTube || mode !== 'authenticated') return;
+    void loadReactions();
+    const interval = setInterval(() => { void loadReactions(); }, 1200);
+    return () => clearInterval(interval);
+  }, [externalYouTube, id, isLive, loadReactions, mode]);
+
+  const handleReaction = useCallback(async (reaction: LiveReactionKind) => {
+    if (mode === 'visitor') {
+      router.push({ pathname: '/(auth)/login', params: { returnTo } } as any);
+      return;
+    }
+    if (!isLive || externalYouTube) return;
+
+    const localId = `local:${Date.now()}:${reaction}`;
+    setReactionBursts((current) => [...current, { id: localId, reaction }].slice(-28));
+    setInteractionError('');
+
+    try {
+      const accepted = await api.request<{ id?: string; created_at?: string }>('live-interactions', {
+        method: 'POST',
+        context: requestContext,
+        feedback: false,
+        body: JSON.stringify({ action: 'react', streamId: id, reaction }),
+      });
+      if (accepted?.id) seenReactionIdsRef.current.add(String(accepted.id));
+    } catch (value) {
+      setInteractionError(value instanceof Error ? value.message : 'Unable to send reaction.');
+    }
+  }, [api, externalYouTube, id, isLive, mode, requestContext, returnTo]);
+
   useEffect(() => {
     const viewerSessionId = access?.viewerSessionId;
     if (mode !== 'authenticated' || !viewerSessionId) return;
@@ -317,11 +398,12 @@ export function LivePlayerExperience({ streamId: id, scope = 'general', embedded
 
   return (
     <KeyboardAvoidingView
-      style={[styles.screen, { backgroundColor: colors.bg }]}
+      style={[styles.screen, { backgroundColor: fullscreen ? '#000000' : colors.bg }]}
       behavior={PLATFORM_KEYBOARD_BEHAVIOR}
       keyboardVerticalOffset={PLATFORM_KEYBOARD_VERTICAL_OFFSET}
     >
-      <View style={[styles.videoContainer, { marginTop: topInset }]}>
+      <StatusBar hidden={fullscreen} style="light" />
+      <View style={[styles.videoContainer, fullscreen && styles.videoContainerFullscreen, { marginTop: fullscreen ? 0 : topInset }]}>
         {externalYouTube && access.stream.external_id ? (
           <YouTubeLivePlayer videoId={access.stream.external_id} />
         ) : agoraRtc && rtcGrant ? (
@@ -342,9 +424,30 @@ export function LivePlayerExperience({ streamId: id, scope = 'general', embedded
         ) : (
           <View style={styles.videoPlaceholder}><View style={styles.placeholderIcon}><Icon name={presentation?.icon ?? 'radio-outline'} size={42} color="#168FF0" /></View><Text style={styles.placeholderTitle}>{presentation?.label ?? 'BROADCAST'}</Text><Text style={styles.placeholderText}>{agoraRtc && isLive ? 'Secure Expression live access is being prepared. Pull down and reopen the broadcast if it does not connect.' : presentation?.message ?? 'This broadcast is currently unavailable.'}</Text></View>
         )}
-        <View style={styles.playerTopBar}><Pressable onPress={() => router.back()} style={styles.playerIconBtn} accessibilityRole="button" accessibilityLabel="Close broadcast"><Icon name="chevron-down" size={22} color="#FFFFFF" /></Pressable><Badge label={presentation?.label ?? 'BROADCAST'} variant={presentation?.variant ?? 'neutral'} pulse={isLive} /></View>
+        {!externalYouTube && isLive ? (
+          <LiveReactionOverlay
+            bursts={reactionBursts}
+            disabled={mode !== 'authenticated'}
+            compact={fullscreen}
+            onReact={(reaction) => void handleReaction(reaction)}
+            onDismissBurst={dismissReactionBurst}
+          />
+        ) : null}
+        <View style={[styles.playerTopBar, fullscreen && styles.playerTopBarFullscreen]}>
+          <Pressable onPress={() => fullscreen ? setFullscreen(false) : router.back()} style={styles.playerIconBtn} accessibilityRole="button" accessibilityLabel={fullscreen ? 'Exit fullscreen' : 'Close broadcast'}>
+            <Icon name={fullscreen ? 'contract-outline' : 'chevron-down'} size={22} color="#FFFFFF" />
+          </Pressable>
+          <View style={styles.playerTopActions}>
+            <Badge label={presentation?.label ?? 'BROADCAST'} variant={presentation?.variant ?? 'neutral'} pulse={isLive} />
+            <Pressable onPress={() => setFullscreen((value) => !value)} style={styles.playerIconBtn} accessibilityRole="button" accessibilityLabel={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>
+              <Icon name={fullscreen ? 'contract-outline' : 'expand-outline'} size={20} color="#FFFFFF" />
+            </Pressable>
+          </View>
+        </View>
       </View>
 
+      {!fullscreen ? (
+      <>
       <View style={[styles.streamInfoBar, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
         <View style={styles.infoCol}><Text style={[styles.streamTitle, { color: colors.text }]} numberOfLines={2}>{access.stream.title}</Text>{access.stream.description ? <Text style={[styles.streamDesc, { color: colors.textMuted }]} numberOfLines={2}>{access.stream.description}</Text> : null}{!isLive && presentation ? <View style={[styles.lifecycleRow, { backgroundColor: colors.bgSecondary }]}><Icon name={presentation.icon} size={14} color={colors.interactive} /><Text style={[styles.lifecycleText, { color: colors.textSecondary }]}>{presentation.message}</Text></View> : null}</View>
         <View style={styles.actionPillsRow}>{access.givingEnabled ? <Pressable onPress={() => router.push('/(tabs)/profile/giving' as any)} style={[styles.actionPill, { backgroundColor: colors.primarySoft }]}><Icon name="gift-outline" size={14} color={colors.interactive} /><Text style={[styles.actionPillText, { color: colors.interactive }]}>Give</Text></Pressable> : null}{!externalYouTube ? <Pressable onPress={() => mode === 'visitor' ? router.push({ pathname: '/(auth)/login', params: { returnTo } } as any) : setShowSupportSheet(true)} style={[styles.actionPill, { backgroundColor: colors.bgSecondary }]}><Icon name="heart-outline" size={14} color={colors.textSecondary} /><Text style={[styles.actionPillText, { color: colors.textSecondary }]}>Care</Text></Pressable> : null}</View>
@@ -387,6 +490,9 @@ export function LivePlayerExperience({ streamId: id, scope = 'general', embedded
       </View>
       )}
 
+      </>
+      ) : null}
+
       <BottomSheet visible={showSupportSheet} onClose={closeSupport} title={supportSent ? 'Follow-up requested' : 'Pastoral follow-up'} subtitle={supportSent ? 'Your request is now in the appropriate ministry queue.' : 'Choose the kind of support or next step you need.'} maxHeightPercent={88}>
         {supportSent ? <View style={styles.sentWrap}><View style={[styles.sentIcon, { backgroundColor: colors.successSoft }]}><Icon name="checkmark-circle" size={34} color={colors.success} /></View><Text style={[styles.sentTitle, { color: colors.text }]}>Your request was received</Text><Text style={[styles.sentSub, { color: colors.textSecondary }]}>The ministry team will see the request with your COT profile and the broadcast it came from.</Text><Button label="Done" onPress={closeSupport} size="lg" fullWidth /></View> : <View style={styles.supportForm}>{followUpOptions.map((option) => <Pressable key={option.value} onPress={() => setSupportType(option.value)} style={[styles.supportOption, { backgroundColor: supportType === option.value ? colors.primarySoft : colors.card, borderColor: supportType === option.value ? colors.interactive : colors.borderSubtle }]}><Icon name={supportType === option.value ? 'radio-button-on' : 'radio-button-off'} size={18} color={supportType === option.value ? colors.interactive : colors.textMuted} /><View style={styles.chatCopy}><Text style={[styles.supportOptionTitle, { color: colors.text }]}>{option.label}</Text><Text style={[styles.supportOptionText, { color: colors.textSecondary }]}>{option.description}</Text></View></Pressable>)}<Button label="Request follow-up" onPress={() => void submitSupport()} loading={supportSubmitting} size="lg" fullWidth /></View>}
       </BottomSheet>
@@ -407,7 +513,9 @@ const styles = StyleSheet.create({
   placeholderIcon: { width: 68, height: 68, borderRadius: 34, backgroundColor: 'rgba(22,143,240,0.12)', borderWidth: 1, borderColor: 'rgba(22,143,240,0.22)', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   placeholderTitle: { color: '#FFFFFF', fontSize: 12, fontWeight: '900', letterSpacing: 1 },
   placeholderText: { color: '#CBD5E1', fontSize: 13, lineHeight: 19, fontWeight: '600', textAlign: 'center', maxWidth: 360 },
-  playerTopBar: { position: 'absolute', top: spacing.sm, left: spacing.sm, right: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  playerTopBar: { position: 'absolute', top: spacing.sm, left: spacing.sm, right: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 40 },
+  playerTopBarFullscreen: { top: spacing.md },
+  playerTopActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   playerIconBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0, 0, 0, 0.52)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
   streamInfoBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: spacing.md, marginTop: spacing.md, padding: spacing.md, borderWidth: 1, borderRadius: radius.xl, gap: spacing.sm },
   infoCol: { flex: 1, gap: 2 },
