@@ -60,6 +60,7 @@ Deno.serve(createHandler(
         loaded.provider,
         String(stream.provider_metadata.playbackId),
         300,
+        stream.playback_token_required ? "signed" : "public",
       );
       playbackUrl = grant.url;
       expiresAt = grant.expiresAt;
