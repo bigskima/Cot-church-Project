@@ -91,8 +91,11 @@ export function LiveDiscoveryExperience({ scope = 'general', embedded = false }:
         ]}
         refreshControl={
           <RefreshControl
-            refreshing={resource.loading}
-            onRefresh={resource.refresh}
+            refreshing={resource.loading || (!expressionMode && generalLive.loading)}
+            onRefresh={() => {
+              resource.refresh();
+              if (!expressionMode) generalLive.refresh();
+            }}
             tintColor={colors.interactive}
           />
         }
