@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
   dock: {
     position: 'absolute',
     right: 12,
-    bottom: 14,
+    bottom: 54,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
   },
-  dockCompact: { right: 8, bottom: 8, gap: 4, padding: 4 },
+  dockCompact: { right: 10, bottom: 58, gap: 4, padding: 4 },
   reactionButton: {
     width: 38,
     height: 38,
@@ -133,6 +133,6 @@ const styles = StyleSheet.create({
   reactionSymbolCompact: { fontSize: 16 },
   disabled: { opacity: 0.38 },
   pressed: { transform: [{ scale: 0.9 }], backgroundColor: 'rgba(255,255,255,0.16)' },
-  burst: { position: 'absolute', bottom: 62 },
+  burst: { position: 'absolute', bottom: 108 },
   burstText: { fontSize: 34, textShadowColor: 'rgba(0,0,0,0.44)', textShadowRadius: 6 },
 });
