@@ -11,6 +11,9 @@ import {
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { AgoraLiveSession } from './AgoraLiveSession';
+import type { AgoraRtcGrant } from './agora-types';
+import { YouTubeLivePlayer } from './YouTubeLivePlayer';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { radius, shadows, spacing } from '@/design-system/tokens';
@@ -34,6 +37,18 @@ interface StreamAccess {
   canChat: boolean;
   givingEnabled: boolean;
 }
+
+type GeneralLiveSource = {
+  providerCode: string;
+  stream: LiveStream | null;
+  sourceMode?: string;
+};
+
+type RtcSessionResponse = {
+  streamId: string;
+  expressionId: string;
+  grant: AgoraRtcGrant;
+};
 
 interface LiveChatMessage {
   id: string;
@@ -136,6 +151,7 @@ export function LivePlayerExperience({ streamId: id, scope = 'general', embedded
   const { colors } = useTheme();
 
   const [access, setAccess] = useState<StreamAccess | null>(null);
+  const [rtcGrant, setRtcGrant] = useState<AgoraRtcGrant | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [chatMessage, setChatMessage] = useState('');
@@ -148,6 +164,8 @@ export function LivePlayerExperience({ streamId: id, scope = 'general', embedded
   const [interactionError, setInteractionError] = useState('');
 
   const expressionMode = scope === 'expression';
+  const youtubeMode = !expressionMode && id.startsWith('youtube_');
+  const youtubeVideoId = youtubeMode ? id.slice('youtube_'.length) : '';
   const topInset = embedded ? 0 : insets.top;
   const activeExpressionId = expressionMode ? context?.expression?.id : undefined;
   const requestContext = expressionMode ? 'current' : 'public';
@@ -160,6 +178,25 @@ export function LivePlayerExperience({ streamId: id, scope = 'general', embedded
 
     const fetchStream = async () => {
       try {
+        setRtcGrant(null);
+        if (youtubeMode) {
+          const source = await api.request<GeneralLiveSource>(
+            `general-live-source?videoId=${encodeURIComponent(youtubeVideoId)}`,
+            { context: 'public' },
+          );
+          if (!source.stream) throw new Error('This YouTube live service is no longer available.');
+          if (isMounted) {
+            setAccess({
+              stream: source.stream,
+              playbackUrl: null,
+              viewerSessionId: null,
+              canChat: false,
+              givingEnabled: false,
+            });
+          }
+          return;
+        }
+
         if (expressionMode && !activeExpressionId) {
           throw new Error('Enter this Expression to view its internal broadcast.');
         }
@@ -173,7 +210,24 @@ export function LivePlayerExperience({ streamId: id, scope = 'general', embedded
             throw new Error('This broadcast is not part of this Expression.');
           }
         }
-        if (isMounted) setAccess(data);
+
+        let grant: AgoraRtcGrant | null = null;
+        if (data.stream.provider === 'agora' && data.stream.status === 'live') {
+          if (mode !== 'authenticated') {
+            throw new Error('Sign in and enter this Expression to watch its live service.');
+          }
+          const rtc = await api.request<RtcSessionResponse>('streaming-rtc-session', {
+            method: 'POST',
+            context: requestContext,
+            body: JSON.stringify({ streamId: id, role: 'subscriber' }),
+          });
+          grant = rtc.grant;
+        }
+
+        if (isMounted) {
+          setAccess(data);
+          setRtcGrant(grant);
+        }
       } catch (value) {
         if (isMounted) setError(value instanceof Error ? value.message : 'Unable to connect to live broadcast.');
       } finally {
@@ -183,7 +237,7 @@ export function LivePlayerExperience({ streamId: id, scope = 'general', embedded
 
     void fetchStream();
     return () => { isMounted = false; };
-  }, [activeExpressionId, api, expressionMode, id, mode, requestContext]);
+  }, [activeExpressionId, api, expressionMode, id, mode, requestContext, youtubeMode, youtubeVideoId]);
 
   const player = useVideoPlayer(access?.playbackUrl ?? '', (videoPlayer) => {
     videoPlayer.loop = false;
@@ -191,11 +245,13 @@ export function LivePlayerExperience({ streamId: id, scope = 'general', embedded
   });
 
   const isLive = access?.stream.status === 'live';
-  const showFellowshipHistory = Boolean(access && ['live', 'ended', 'processing', 'replay_ready'].includes(access.stream.status));
+  const externalYouTube = access?.stream.provider === 'youtube' || youtubeMode;
+  const agoraRtc = access?.stream.provider === 'agora';
+  const showFellowshipHistory = Boolean(access && !externalYouTube && ['live', 'ended', 'processing', 'replay_ready'].includes(access.stream.status));
   const presentation = access ? streamPresentation(access.stream) : null;
 
   const loadChat = useCallback(async (showLoading = false) => {
-    if (mode !== 'authenticated' || !id || !showFellowshipHistory) return;
+    if (externalYouTube || mode !== 'authenticated' || !id || !showFellowshipHistory) return;
     if (showLoading) setChatLoading(true);
     try {
       const messages = await api.request<LiveChatMessage[]>(
@@ -208,7 +264,7 @@ export function LivePlayerExperience({ streamId: id, scope = 'general', embedded
     } finally {
       if (showLoading) setChatLoading(false);
     }
-  }, [api, id, mode, requestContext, showFellowshipHistory]);
+  }, [api, externalYouTube, id, mode, requestContext, showFellowshipHistory]);
 
   useEffect(() => {
     if (mode !== 'authenticated' || !access?.stream.id || !showFellowshipHistory) {
@@ -301,15 +357,32 @@ export function LivePlayerExperience({ streamId: id, scope = 'general', embedded
       keyboardVerticalOffset={PLATFORM_KEYBOARD_VERTICAL_OFFSET}
     >
       <View style={[styles.videoContainer, { marginTop: topInset }]}>
-        {access.playbackUrl ? <VideoView player={player} style={styles.videoView} /> : <View style={styles.videoPlaceholder}><View style={styles.placeholderIcon}><Icon name={presentation?.icon ?? 'radio-outline'} size={42} color="#168FF0" /></View><Text style={styles.placeholderTitle}>{presentation?.label ?? 'BROADCAST'}</Text><Text style={styles.placeholderText}>{presentation?.message ?? 'This broadcast is currently unavailable.'}</Text></View>}
+        {externalYouTube && access.stream.external_id ? (
+          <YouTubeLivePlayer videoId={access.stream.external_id} />
+        ) : agoraRtc && rtcGrant ? (
+          <AgoraLiveSession grant={rtcGrant} role="subscriber" onError={setInteractionError} />
+        ) : access.playbackUrl ? (
+          <VideoView player={player} style={styles.videoView} />
+        ) : (
+          <View style={styles.videoPlaceholder}><View style={styles.placeholderIcon}><Icon name={presentation?.icon ?? 'radio-outline'} size={42} color="#168FF0" /></View><Text style={styles.placeholderTitle}>{presentation?.label ?? 'BROADCAST'}</Text><Text style={styles.placeholderText}>{agoraRtc && isLive ? 'Secure Expression live access is being prepared. Pull down and reopen the broadcast if it does not connect.' : presentation?.message ?? 'This broadcast is currently unavailable.'}</Text></View>
+        )}
         <View style={styles.playerTopBar}><Pressable onPress={() => router.back()} style={styles.playerIconBtn} accessibilityRole="button" accessibilityLabel="Close broadcast"><Icon name="chevron-down" size={22} color="#FFFFFF" /></Pressable><Badge label={presentation?.label ?? 'BROADCAST'} variant={presentation?.variant ?? 'neutral'} pulse={isLive} /></View>
       </View>
 
       <View style={[styles.streamInfoBar, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
         <View style={styles.infoCol}><Text style={[styles.streamTitle, { color: colors.text }]} numberOfLines={2}>{access.stream.title}</Text>{access.stream.description ? <Text style={[styles.streamDesc, { color: colors.textMuted }]} numberOfLines={2}>{access.stream.description}</Text> : null}{!isLive && presentation ? <View style={[styles.lifecycleRow, { backgroundColor: colors.bgSecondary }]}><Icon name={presentation.icon} size={14} color={colors.interactive} /><Text style={[styles.lifecycleText, { color: colors.textSecondary }]}>{presentation.message}</Text></View> : null}</View>
-        <View style={styles.actionPillsRow}>{access.givingEnabled ? <Pressable onPress={() => router.push('/(tabs)/profile/giving' as any)} style={[styles.actionPill, { backgroundColor: colors.primarySoft }]}><Icon name="gift-outline" size={14} color={colors.interactive} /><Text style={[styles.actionPillText, { color: colors.interactive }]}>Give</Text></Pressable> : null}<Pressable onPress={() => mode === 'visitor' ? router.push({ pathname: '/(auth)/login', params: { returnTo } } as any) : setShowSupportSheet(true)} style={[styles.actionPill, { backgroundColor: colors.bgSecondary }]}><Icon name="heart-outline" size={14} color={colors.textSecondary} /><Text style={[styles.actionPillText, { color: colors.textSecondary }]}>Care</Text></Pressable></View>
+        <View style={styles.actionPillsRow}>{access.givingEnabled ? <Pressable onPress={() => router.push('/(tabs)/profile/giving' as any)} style={[styles.actionPill, { backgroundColor: colors.primarySoft }]}><Icon name="gift-outline" size={14} color={colors.interactive} /><Text style={[styles.actionPillText, { color: colors.interactive }]}>Give</Text></Pressable> : null}{!externalYouTube ? <Pressable onPress={() => mode === 'visitor' ? router.push({ pathname: '/(auth)/login', params: { returnTo } } as any) : setShowSupportSheet(true)} style={[styles.actionPill, { backgroundColor: colors.bgSecondary }]}><Icon name="heart-outline" size={14} color={colors.textSecondary} /><Text style={[styles.actionPillText, { color: colors.textSecondary }]}>Care</Text></Pressable> : null}</View>
       </View>
 
+      {externalYouTube ? (
+        <View style={[styles.externalLiveNotice, { backgroundColor: colors.card, borderColor: colors.borderSubtle, marginBottom: Math.max(insets.bottom, spacing.md) }]}>
+          <Icon name="logo-youtube" size={20} color={colors.live} />
+          <View style={styles.chatCopy}>
+            <Text style={[styles.chatHeadingText, { color: colors.text }]}>General COT on YouTube Live</Text>
+            <Text style={[styles.memberChatNoticeText, { color: colors.textSecondary }]}>The public service is streamed by the configured YouTube channel. Expression live fellowship and private COT chat remain inside their own spaces.</Text>
+          </View>
+        </View>
+      ) : (
       <View style={styles.chatSection}>
         <View style={styles.chatHeading}><Text style={[styles.chatHeadingText, { color: colors.text }]}>Live fellowship</Text>{chatLoading ? <Text style={[styles.chatStatus, { color: colors.textMuted }]}>Loading…</Text> : null}</View>
         {interactionError ? <View style={[styles.interactionErrorCard, { backgroundColor: colors.liveSoft }]}><Icon name="alert-circle-outline" size={15} color={colors.live} /><Text style={[styles.interactionError, { color: colors.live }]} accessibilityRole="alert">{interactionError}</Text></View> : null}
@@ -336,6 +409,7 @@ export function LivePlayerExperience({ streamId: id, scope = 'general', embedded
           <View style={[styles.memberChatNotice, { backgroundColor: colors.card, borderColor: colors.borderSubtle, marginBottom: Math.max(insets.bottom, spacing.sm) }]}><Icon name="people-outline" size={16} color={colors.textMuted} /><Text style={[styles.memberChatNoticeText, { color: colors.textSecondary }]}>Chat posting is available to active members during a live broadcast.</Text></View>
         )}
       </View>
+      )}
 
       <BottomSheet visible={showSupportSheet} onClose={closeSupport} title={supportSent ? 'Follow-up requested' : 'Pastoral follow-up'} subtitle={supportSent ? 'Your request is now in the appropriate ministry queue.' : 'Choose the kind of support or next step you need.'} maxHeightPercent={88}>
         {supportSent ? <View style={styles.sentWrap}><View style={[styles.sentIcon, { backgroundColor: colors.successSoft }]}><Icon name="checkmark-circle" size={34} color={colors.success} /></View><Text style={[styles.sentTitle, { color: colors.text }]}>Your request was received</Text><Text style={[styles.sentSub, { color: colors.textSecondary }]}>The ministry team will see the request with your COT profile and the broadcast it came from.</Text><Button label="Done" onPress={closeSupport} size="lg" fullWidth /></View> : <View style={styles.supportForm}>{followUpOptions.map((option) => <Pressable key={option.value} onPress={() => setSupportType(option.value)} style={[styles.supportOption, { backgroundColor: supportType === option.value ? colors.primarySoft : colors.card, borderColor: supportType === option.value ? colors.interactive : colors.borderSubtle }]}><Icon name={supportType === option.value ? 'radio-button-on' : 'radio-button-off'} size={18} color={supportType === option.value ? colors.interactive : colors.textMuted} /><View style={styles.chatCopy}><Text style={[styles.supportOptionTitle, { color: colors.text }]}>{option.label}</Text><Text style={[styles.supportOptionText, { color: colors.textSecondary }]}>{option.description}</Text></View></Pressable>)}<Button label="Request follow-up" onPress={() => void submitSupport()} loading={supportSubmitting} size="lg" fullWidth /></View>}
@@ -389,6 +463,7 @@ const styles = StyleSheet.create({
   signInChat: { minHeight: 52, marginHorizontal: spacing.md, borderWidth: 1, borderRadius: radius.xxl, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingVertical: spacing.sm },
   signInChatText: { fontSize: 13, fontWeight: '700' },
   memberChatNotice: { minHeight: 52, marginHorizontal: spacing.md, borderWidth: 1, borderRadius: radius.xxl, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingHorizontal: spacing.md },
+  externalLiveNotice: { minHeight: 72, marginHorizontal: spacing.md, borderWidth: 1, borderRadius: radius.xxl, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, padding: spacing.md },
   memberChatNoticeText: { flex: 1, fontSize: 12, lineHeight: 17 },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: spacing.md },
   backText: { fontSize: 14, fontWeight: '600' },
