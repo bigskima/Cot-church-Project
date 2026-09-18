@@ -8,7 +8,7 @@ export interface StreamingProvider{
  readonly code:string;createBroadcast(config:ProviderConfiguration,request:BroadcastRequest):Promise<ProvisionedBroadcast>;
  createIngestEndpoint(config:ProviderConfiguration,broadcastId:string):Promise<ProvisionedBroadcast['ingest']>;getStreamStatus(config:ProviderConfiguration,broadcastId:string):Promise<StreamLifecycle>;
  startBroadcast(config:ProviderConfiguration,broadcastId:string):Promise<void>;stopBroadcast(config:ProviderConfiguration,broadcastId:string):Promise<void>;
- createPlaybackToken(config:ProviderConfiguration,playbackId:string,ttlSeconds:number):Promise<PlaybackGrant>;
+ createPlaybackToken(config:ProviderConfiguration,playbackId:string,ttlSeconds:number,playbackPolicy:'public'|'signed'):Promise<PlaybackGrant>;
  verifyWebhook(config:ProviderConfiguration,rawBody:string,headers:Headers):Promise<ProviderWebhook>;
  getRecording(config:ProviderConfiguration,assetId:string):Promise<Record<string,unknown>>;createClip(config:ProviderConfiguration,assetId:string,startSeconds:number,endSeconds:number):Promise<{providerClipId:string}>;
  getAnalytics(config:ProviderConfiguration,broadcastId:string):Promise<Record<string,unknown>>;
