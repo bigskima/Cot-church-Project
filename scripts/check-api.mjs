@@ -89,12 +89,15 @@ const requiredFiles = [
   'supabase/functions/public-profile/index.ts',
   'supabase/functions/profile-banner/index.ts',
   'supabase/functions/realtime-config/index.ts',
+  'supabase/functions/public-event-detail/index.ts',
 ];
 
 await Promise.all(requiredFiles.map((file) => access(file)));
 
 const supabaseConfig = await readFile('supabase/config.toml', 'utf8');
 const handler = await readFile('supabase/functions/_shared/handler.ts', 'utf8');
+const cors = await readFile('supabase/functions/_shared/cors.ts', 'utf8');
+const publicEventDetail = await readFile('supabase/functions/public-event-detail/index.ts', 'utf8');
 const authContext = await readFile('supabase/functions/_shared/context.ts', 'utf8');
 const response = await readFile('supabase/functions/_shared/response.ts', 'utf8');
 const signup = await readFile('supabase/functions/signup/index.ts', 'utf8');
@@ -188,6 +191,10 @@ const invariants = [
   [socialChatContracts, /targetProfileId|target_profile_id/, 'individual member follow target contract'],
   [socialChatContracts, /banner_url|profile-banners/, 'member profile banner contract'],
   [handler, /request\.method === "OPTIONS"/, 'CORS preflight handling'],
+  [handler, /await corsHeaders\(request\)/, 'CORS policy resolves asynchronous runtime configuration'],
+  [cors, /platform_web_origins/, 'provider-agnostic database origin configuration'],
+  [cors, /originMatchesPattern/, 'generic exact and wildcard browser-origin matching'],
+  [publicEventDetail, /createHandler/, 'public event detail uses shared request and CORS infrastructure'],
   [handler, /authenticate\(request/, 'central authentication'],
   [handler, /options\.organization \?\? "optional"/, 'handler preserves explicit organisation context mode'],
   [authContext, /organizationMode === "none"[\s\S]*?organizationId[\s\S]*?null/, 'organisation-independent endpoints ignore stale organisation headers'],
@@ -433,6 +440,8 @@ const invariants = [
 
 const missing = invariants.filter(([source, pattern]) => !pattern.test(source));
 const forbidden = [
+  [cors, /(?:vercel|netlify)\.app/i, 'hosting-provider-specific shared CORS rule'],
+  [publicEventDetail, /(?:vercel|netlify)\.app/i, 'hosting-provider-specific public event CORS rule'],
   [organizations, /Main Campus/, 'stale Campus default in organization provisioning'],
   [platformGiving, /platform\.giving\.(?:read|manage)|authorizePlatform/, 'retired Platform Giving authorization path'],
   [churchStory, /Foundation & First Gathering|Multi-Expression Expansion|Global Digital Ministry/, 'fabricated church story fallback'],
