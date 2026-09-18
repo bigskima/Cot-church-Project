@@ -52,8 +52,19 @@ const suggestedPrompts = [
   'What was the latest sermon about?',
 ];
 
+function normalizeAssistantMarkdown(value: string) {
+  const cleaned = value
+    .replace(/\r/g, '')
+    .split('\n')
+    .filter((line) => !/^\s*(?:(?:[-_*—–]\s*){3,}|(?:\.\s*){3,})\s*$/.test(line))
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  return cleaned;
+}
+
 function markdownToPlainText(value: string) {
-  return value
+  return normalizeAssistantMarkdown(value)
     .replace(/^#{1,6}\s+/gm, '')
     .replace(/^[-*•]\s+/gm, '• ')
     .replace(/^\d+[.)]\s+/gm, '')
@@ -63,6 +74,14 @@ function markdownToPlainText(value: string) {
     .replace(/(?<!_)_([^_]+)_(?!_)/g, '$1')
     .replace(/`([^`]+)`/g, '$1')
     .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
+    .trim();
+}
+
+function assistantSpeechText(value: string) {
+  return markdownToPlainText(value)
+    .replace(/^•\s*/gm, '')
+    .replace(/\bC(?:\s*\.?\s*)O(?:\s*\.?\s*)T\b/gi, 'C O T')
+    .replace(/[ \t]{2,}/g, ' ')
     .trim();
 }
 
@@ -104,7 +123,7 @@ function InlineMarkdown({ text, color }: { text: string; color: string }) {
 
 function AssistantMarkdown({ value }: { value: string }) {
   const { colors } = useTheme();
-  const lines = value.replace(/\r/g, '').split('\n');
+  const lines = normalizeAssistantMarkdown(value).split('\n');
   return (
     <View style={styles.markdownWrap}>
       {lines.map((raw, index) => {
@@ -246,7 +265,7 @@ export function AssistantScreen() {
     }
     await Speech.stop();
     const run = ++speechRun.current;
-    const chunks = splitSpeech(markdownToPlainText(message.text), Speech.maxSpeechInputLength);
+    const chunks = splitSpeech(assistantSpeechText(message.text), Speech.maxSpeechInputLength);
     setSpeakingId(message.id);
     const speakChunk = (index: number) => {
       if (run !== speechRun.current) return;
@@ -281,7 +300,7 @@ export function AssistantScreen() {
       `Current member space: ${expressionId ? `Expression ${expressionName || expressionId}` : 'General COT'}.`,
       recentConversation ? `Recent conversation:\n${recentConversation}` : '',
       `Current member message: ${promptToSend}`,
-      'Answer naturally. Use the verified COT context for church facts. If the member asks about a leader, location, event, sermon, group, story or announcement, use the saved database information and clearly say when that information has not yet been published. Use clean Markdown only when it improves readability.',
+      'Answer naturally. Use the verified COT context for church facts. If the member asks about a leader, location, event, sermon, group, story or announcement, use the saved database information and clearly say when that information has not yet been published. Use clean Markdown only when it improves readability. Never output decorative separator lines made from dashes, underscores, asterisks or dots.',
     ].filter(Boolean).join('\n\n');
 
     setMessages((previous) => [...previous, userMsg, pendingMsg]);
