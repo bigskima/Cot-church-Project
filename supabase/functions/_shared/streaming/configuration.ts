@@ -1,6 +1,6 @@
 import { ApiError } from '../errors.ts';
 import { adminClient } from '../supabase.ts';
-import type { ProviderConfiguration } from './types.ts';
+import type { ProviderConfiguration, StreamingRouteScope } from './types.ts';
 
 export type LoadedStreamingConfig = {
   id: string;
@@ -30,16 +30,23 @@ export async function loadStreamingConfig(configId: string) {
       secretReference: data.secret_reference,
       webhookSecretReference: data.webhook_secret_reference,
       signingKeyReference: data.signing_key_reference,
-      settings: data.configuration as Record<string, unknown>,
+      settings: (data.configuration ?? {}) as Record<string, unknown>,
     },
   } as LoadedStreamingConfig;
 }
 
-async function scopedStreamingConfigId(organizationId: string | null) {
+function routingScopes(configuration: unknown): StreamingRouteScope[] {
+  if (!configuration || typeof configuration !== 'object' || Array.isArray(configuration)) return [];
+  const value = (configuration as Record<string, unknown>).routingScopes;
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is StreamingRouteScope => item === 'general' || item === 'expression');
+}
+
+async function scopedStreamingConfigId(organizationId: string | null, routeScope?: StreamingRouteScope) {
   const client = adminClient();
   let query = client
     .from('streaming_provider_configs')
-    .select('id,is_default')
+    .select('id,is_default,configuration,updated_at')
     .eq('is_active', true);
 
   query = organizationId === null
@@ -49,36 +56,52 @@ async function scopedStreamingConfigId(organizationId: string | null) {
   const { data, error } = await query
     .order('is_default', { ascending: false })
     .order('updated_at', { ascending: false })
-    .limit(2);
+    .limit(20);
 
   if (error) {
     throw new ApiError('STREAMING_CONFIG_LOOKUP_FAILED', 'Unable to resolve streaming provider configuration', 500, undefined, false);
   }
 
   const rows = data ?? [];
-  const explicitDefaults = rows.filter((row) => row.is_default);
+  let candidates = rows;
 
+  if (routeScope) {
+    const explicit = rows.filter((row) => routingScopes(row.configuration).includes(routeScope));
+    if (explicit.length) {
+      candidates = explicit;
+    } else if (rows.some((row) => routingScopes(row.configuration).length > 0)) {
+      // Once routing has been configured explicitly, never silently fall back
+      // to a provider assigned to the other surface.
+      return null;
+    }
+  }
+
+  const explicitDefaults = candidates.filter((row) => row.is_default);
   if (explicitDefaults.length === 1) return explicitDefaults[0].id;
   if (explicitDefaults.length > 1) {
     throw new ApiError('STREAMING_NOT_CONFIGURED', 'Multiple default streaming providers are configured for the same scope', 503, undefined, false);
   }
 
-  // A single active configuration is unambiguous and should remain usable even
-  // when an older admin save omitted the default flag.
-  if (rows.length === 1) return rows[0].id;
-  if (rows.length > 1) {
-    throw new ApiError('STREAMING_NOT_CONFIGURED', 'Choose a default streaming provider before creating broadcasts', 503, undefined, false);
+  if (candidates.length === 1) return candidates[0].id;
+  if (candidates.length > 1) {
+    throw new ApiError('STREAMING_NOT_CONFIGURED', 'Choose a default streaming provider for this broadcast scope', 503, undefined, false);
   }
 
   return null;
 }
 
-export async function defaultStreamingConfig(organizationId: string) {
-  const tenantConfigId = await scopedStreamingConfigId(organizationId);
+export async function defaultStreamingConfig(organizationId: string, routeScope?: StreamingRouteScope) {
+  const tenantConfigId = await scopedStreamingConfigId(organizationId, routeScope);
   if (tenantConfigId) return loadStreamingConfig(tenantConfigId);
 
-  const globalConfigId = await scopedStreamingConfigId(null);
-  if (!globalConfigId) throw new ApiError('STREAMING_NOT_CONFIGURED', 'No active streaming provider is configured', 503);
+  const globalConfigId = await scopedStreamingConfigId(null, routeScope);
+  if (!globalConfigId) {
+    throw new ApiError(
+      'STREAMING_NOT_CONFIGURED',
+      routeScope ? `No active streaming provider is configured for ${routeScope} broadcasts` : 'No active streaming provider is configured',
+      503,
+    );
+  }
 
   return loadStreamingConfig(globalConfigId);
 }
