@@ -123,6 +123,14 @@ Deno.serve(
         if (body.configuration !== undefined && (!body.configuration || typeof body.configuration !== "object" || Array.isArray(body.configuration))) {
           throw new ApiError("VALIDATION_FAILED", "configuration must be an object", 422);
         }
+        if (body.configuration && typeof body.configuration === "object" && !Array.isArray(body.configuration)) {
+          const routingScopes = (body.configuration as Record<string, unknown>).routingScopes;
+          if (routingScopes !== undefined) {
+            if (!Array.isArray(routingScopes) || routingScopes.length === 0 || routingScopes.some((scope) => scope !== "general" && scope !== "expression")) {
+              throw new ApiError("VALIDATION_FAILED", "routingScopes must contain general and/or expression", 422);
+            }
+          }
+        }
         const requestedDefault = body.isDefault === undefined ? false : body.isDefault;
         const isActive = body.isActive === undefined ? true : body.isActive;
         if (typeof requestedDefault !== "boolean" || typeof isActive !== "boolean") {
