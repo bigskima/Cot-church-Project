@@ -52,7 +52,7 @@ export function ExpressionIdentityBadgesExperience() {
   const resource = useResource<Payload>(
     `identity-badges:expression:${branchId || 'none'}`,
     (signal) => branchId && canManage
-      ? api.request<Payload>(`identity-badges?branchId=${encodeURIComponent(branchId)}`, { signal, context: 'current' })
+      ? api.request<Payload>(`church-story?view=badges&expressionId=${encodeURIComponent(branchId)}`, { signal, context: 'current' })
       : Promise.resolve({ definitions: [], assignments: [], members: [], branchId } as Payload),
   );
 
@@ -102,12 +102,12 @@ export function ExpressionIdentityBadgesExperience() {
     setErrorMsg('');
     try {
       const editing = editor !== null && editor !== 'new';
-      await api.request('identity-badges', {
+      await api.request('church-story', {
         method: editing ? 'PATCH' : 'POST',
         context: 'current',
         body: JSON.stringify({
-          action: editing ? 'update_definition' : 'create_definition',
-          branchId,
+          action: editing ? 'badge_update_definition' : 'badge_create_definition',
+          expressionId: branchId,
           ...(editing ? { definitionId: editor.id } : {}),
           label: label.trim(),
           backgroundColor,
@@ -134,12 +134,12 @@ export function ExpressionIdentityBadgesExperience() {
     setBusy(true);
     setErrorMsg('');
     try {
-      await api.request('identity-badges', {
-        method: assigned ? 'DELETE' : 'POST',
+      await api.request('church-story', {
+        method: 'POST',
         context: 'current',
         body: JSON.stringify({
-          action: assigned ? 'revoke' : 'assign',
-          branchId,
+          action: assigned ? 'badge_revoke' : 'badge_assign',
+          expressionId: branchId,
           profileId: selectedProfileId,
           definitionId: definition.id,
         }),
