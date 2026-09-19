@@ -14,10 +14,8 @@ import {
   Skeleton,
   VideoCard,
 } from '@/components';
-import { ParticipationHomeShelf } from '@/features/community/ParticipationHomeShelf';
 import { GeneralTopBar } from './GeneralTopBar';
 import { GeneralHomeActionDeck } from './GeneralHomeActionDeck';
-import { UrgentUpdatesRail } from './UrgentUpdatesRail';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 import { getRuntimeSupabase } from '@/services/runtime-supabase';
@@ -325,15 +323,10 @@ export default function GeneralHomeExperience() {
     <View style={[styles.headerContent, { width: contentWidth }]}>
       <GeneralHomeActionDeck onComposePost={() => openGeneralComposer('post')} onComposeVoice={() => openGeneralComposer('audio')} />
 
-      <View style={styles.homeUtilities}>
-        <UrgentUpdatesRail announcements={announcements} />
-        <ParticipationHomeShelf scope="general" />
-      </View>
-
       {degradedSections.length ? <Pressable onPress={refreshHome} style={[styles.degradedBanner, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><View style={[styles.degradedIcon, { backgroundColor: colors.card }]}><Icon name="refresh-outline" size={16} color={colors.interactive} /></View><View style={styles.flex}><Text style={[styles.degradedTitle, { color: colors.text }]}>A few sections need another try</Text><Text style={[styles.degradedText, { color: colors.textMuted }]}>Your Home remains usable. Tap here to refresh only the missing pieces.</Text></View></Pressable> : null}
       {activeStream ? <View style={styles.liveSection}><FeedSectionHeading eyebrow={activeStream.status === 'live' ? 'LIVE NOW' : 'NEXT LIVE'} title={activeStream.status === 'live' ? 'Join what is happening now' : 'Coming up live'} subtitle="Open the broadcast without leaving Home discovery." actionLabel="Live" onAction={() => router.push('/general/live' as any)} /><HeroLiveCard stream={activeStream} onPress={() => router.push(`/general/live/${activeStream.id}` as any)} /></View> : null}
 
-      {feed.length ? <FeedSectionHeading eyebrow="COMMUNITY FEED" title={rankingMode === 'personalized' ? 'For you' : 'Latest from COT'} subtitle={rankingMode === 'personalized' ? 'Relevant COT activity, media and conversations in one continuous feed.' : 'Fresh public activity from across the COT community.'} actionLabel="Discover" onAction={() => router.push('/general/explore')} /> : null}
+      {feed.length ? <FeedSectionHeading eyebrow="COMMUNITY FEED" title={rankingMode === 'personalized' ? 'For you' : 'Latest from COT'} actionLabel="Discover" onAction={() => router.push('/general/explore')} /> : null}
     </View>
   );
 
@@ -379,7 +372,6 @@ const styles = StyleSheet.create({
   feedSubtitle: { fontSize: 11.5, lineHeight: 17, marginTop: 3, maxWidth: 600 },
   headingAction: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 4 }, headingActionText: { fontSize: 10.5, fontWeight: '900' },
   degradedBanner: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, degradedIcon: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, degradedTitle: { fontSize: 12.5, fontWeight: '900' }, degradedText: { fontSize: 10.5, lineHeight: 15, marginTop: 2 },
-  homeUtilities: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: spacing.sm },
   liveSection: { gap: spacing.sm },
   discoverySection: { borderWidth: 1, borderRadius: radius.xxl, paddingVertical: spacing.lg, overflow: 'hidden' },
   discoveryHeadingRow: { paddingHorizontal: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
