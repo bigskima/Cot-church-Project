@@ -108,6 +108,7 @@ export default function GeneralToolsScreen() {
           <SectionHeader title="COT tools" subtitle="Everything useful without crowding Home" />
           <View style={styles.toolsGrid}>
             {mode === 'authenticated' ? toolTile({ icon: 'chatbubbles-outline', title: 'Messages', subtitle: 'Private direct messages across COT', onPress: () => router.push('/general/chat') }) : null}
+            {mode === 'authenticated' ? toolTile({ icon: 'people-circle-outline', title: 'Groups', subtitle: 'Create or join church-wide prayer, fellowship and discussion Groups', badge: 'COMMUNITY', onPress: () => router.push('/general/groups' as any) }) : null}
             {toolTile({ icon: 'radio-outline', title: 'Live', subtitle: 'Watch current and upcoming broadcasts', onPress: () => router.push('/general/live' as any) })}
             {toolTile({ icon: 'location-outline', title: 'Church location', subtitle: 'Official General COT address and Google Maps preview', badge: 'PUBLIC', onPress: () => router.push('/general/location' as any) })}
             {mode === 'authenticated' ? toolTile({ icon: 'stats-chart-outline', title: 'Polls & giveaways', subtitle: 'Vote in official polls or host and join giveaways', badge: 'ENGAGE', onPress: () => router.push('/general/participate' as any) }) : null}
