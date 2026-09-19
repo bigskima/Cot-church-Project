@@ -264,51 +264,6 @@ export default function NotificationSettingsScreen() {
                 <View style={[styles.sectionIcon, { backgroundColor: colors.primarySoft }]}>
                   <Icon name="phone-portrait-outline" size={19} color={colors.interactive} />
                 </View>
-
-            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
-              <View style={styles.sectionHeading}>
-                <View style={[styles.sectionIcon, { backgroundColor: colors.primarySoft }]}>
-                  <Icon name="options-outline" size={19} color={colors.interactive} />
-                </View>
-                <View style={styles.flex}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>What should alert me?</Text>
-                  <Text style={[styles.cardBody, { color: colors.textSecondary }]}>Choose which activity may create an outside-app alert. Your in-app Notifications inbox still keeps supported updates.</Text>
-                </View>
-              </View>
-              <PreferenceRow
-                icon="radio-outline"
-                title="COT goes live"
-                description="Alert me when General COT or one of my joined Expressions starts a live broadcast."
-                value={liveAlertsEnabled}
-                onChange={setLiveAlertsEnabled}
-                colors={colors}
-              />
-              <PreferenceRow
-                icon="person-add-outline"
-                title="Posts from people I follow"
-                description="Alert me when someone I follow publishes a post I am allowed to see."
-                value={followedPostsEnabled}
-                onChange={setFollowedPostsEnabled}
-                colors={colors}
-              />
-              <PreferenceRow
-                icon="ribbon-outline"
-                title="Priority ministry updates"
-                description="Alert me when a person carrying a priority public ministry badge publishes in my church or Expression."
-                value={priorityLeadershipPostsEnabled}
-                onChange={setPriorityLeadershipPostsEnabled}
-                colors={colors}
-              />
-              <PreferenceRow
-                icon="warning-outline"
-                title="Urgent platform alerts"
-                description="Allow audited emergency or service-critical notices. These can bypass quiet hours, but never override Push alerts being turned off."
-                value={urgentPlatformAlertsEnabled}
-                onChange={setUrgentPlatformAlertsEnabled}
-                colors={colors}
-                last
-              />
-            </View>
                 <View style={styles.flex}>
                   <Text style={[styles.cardTitle, { color: colors.text }]}>This device</Text>
                   <Text style={[styles.cardBody, { color: colors.textSecondary }]}>
@@ -338,6 +293,22 @@ export default function NotificationSettingsScreen() {
                   />
                 </View>
               ) : null}
+            </View>
+
+            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+              <View style={styles.sectionHeading}>
+                <View style={[styles.sectionIcon, { backgroundColor: colors.primarySoft }]}>
+                  <Icon name="options-outline" size={19} color={colors.interactive} />
+                </View>
+                <View style={styles.flex}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>What should alert me?</Text>
+                  <Text style={[styles.cardBody, { color: colors.textSecondary }]}>Choose which activity may create an outside-app alert. Your in-app Notifications inbox still keeps supported updates.</Text>
+                </View>
+              </View>
+              <PreferenceRow icon="radio-outline" title="COT goes live" description="Alert me when General COT or one of my joined Expressions starts a live broadcast." value={liveAlertsEnabled} onChange={setLiveAlertsEnabled} colors={colors} />
+              <PreferenceRow icon="person-add-outline" title="Posts from people I follow" description="Alert me when someone I follow publishes a post I am allowed to see." value={followedPostsEnabled} onChange={setFollowedPostsEnabled} colors={colors} />
+              <PreferenceRow icon="ribbon-outline" title="Priority ministry updates" description="Alert me when a person carrying a priority public ministry badge publishes in my church or Expression." value={priorityLeadershipPostsEnabled} onChange={setPriorityLeadershipPostsEnabled} colors={colors} />
+              <PreferenceRow icon="warning-outline" title="Urgent platform alerts" description="Allow audited emergency or service-critical notices. These can bypass quiet hours, but never override Push alerts being turned off." value={urgentPlatformAlertsEnabled} onChange={setUrgentPlatformAlertsEnabled} colors={colors} last />
             </View>
 
             <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
