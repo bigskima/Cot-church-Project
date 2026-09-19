@@ -95,6 +95,7 @@ export function RichChatComposer({
   bottomInset?: number;
   onCancelReply: () => void;
   onSend: (payload: ChatSendPayload) => Promise<unknown>;
+  initialText?: string;
 }) {
   const { api } = useSession();
   const { colors } = useTheme();
