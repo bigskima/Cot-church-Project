@@ -96,8 +96,10 @@ export function GroupGivingExperience({ groupId, scope = 'expression' }: { group
     return api.request<GroupGivingPayload>(`group-chat?groupId=${encodeURIComponent(groupId)}`, { signal, ...requestScope });
   });
 
-  const expressionId = group.data?.group.branch_id ?? context?.expression?.id ?? null;
   const generalGroup = Boolean(group.data && !group.data.group.branch_id);
+  const expressionId = scope === 'general'
+    ? null
+    : (group.data?.group.branch_id ?? context?.expression?.id ?? null);
   const expressionGiving = useResource<PublicGivingDetails>(
     `group-giving:scope:${organizationId || 'none'}:${expressionId ?? 'general'}`,
     (signal) => {
@@ -278,5 +280,6 @@ const styles = StyleSheet.create({
   reference: { fontSize: 13, fontWeight: '800' },
   notice: { borderRadius: radius.lg, padding: spacing.sm },
   manager: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm },
+  setupCard: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm },
   manageRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
 });
