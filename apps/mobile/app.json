@@ -12,7 +12,7 @@
       "url": "https://u.expo.dev/a4c107b0-6c97-46b9-a9d0-27b2a24838d5",
       "fallbackToCacheTimeout": 0
     },
-    "orientation": "portrait",
+    "orientation": "default",
     "userInterfaceStyle": "automatic",
     "icon": "./assets/icon.png",
     "splash": {
