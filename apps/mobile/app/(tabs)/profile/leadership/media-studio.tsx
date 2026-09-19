@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,6 +38,7 @@ type BroadcastScope = 'public' | 'expression';
 
 export default function MediaStudioScreen() {
   const insets = useSafeAreaInsets();
+  const viewport = useWindowDimensions();
   const pathname = usePathname();
   const expressionWorkspace = pathname.startsWith('/expressions/');
   const { api, context, hasCapability, hasPublicCapability } = useSession();
@@ -81,6 +82,10 @@ export default function MediaStudioScreen() {
   const destinationName = broadcastScope === 'expression'
     ? expression?.name ?? 'Expression'
     : 'General Community';
+  const widescreenAspect = 16 / 9;
+  const studioFullscreenFrame = viewport.width / Math.max(viewport.height, 1) >= widescreenAspect
+    ? { width: viewport.height * widescreenAspect, height: viewport.height }
+    : { width: viewport.width, height: viewport.width / widescreenAspect };
 
   const readiness = useResource<StreamingReadiness>(
     `leadership:streaming-readiness:${broadcastScope}:${organizationId || 'auto'}:${targetExpressionId ?? 'none'}`,
@@ -482,7 +487,7 @@ export default function MediaStudioScreen() {
               </View>
             ) : null}
 
-            <View style={[styles.liveStudioStage, studioFullscreen && styles.liveStudioStageFullscreen]}>
+            <View style={[styles.liveStudioStage, studioFullscreen && styles.liveStudioStageFullscreen, studioFullscreen && studioFullscreenFrame]}>
               <AgoraLiveSession
                 grant={createdRtc.grant}
                 role="publisher"
@@ -652,7 +657,7 @@ const styles = StyleSheet.create({
   rtcSheet: { gap: spacing.md },
   rtcPreview: { height: 360, borderRadius: radius.xl, overflow: 'hidden', backgroundColor: '#000000' },
   liveStudio: { flex: 1, backgroundColor: '#02050A', paddingHorizontal: spacing.md, gap: spacing.md },
-  liveStudioFullscreen: { paddingHorizontal: 0, gap: 0 },
+  liveStudioFullscreen: { paddingHorizontal: 0, gap: 0, alignItems: 'center', justifyContent: 'center' },
   liveStudioHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   liveStudioHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   liveStudioRoundAction: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0C1522', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
@@ -666,7 +671,7 @@ const styles = StyleSheet.create({
   liveStudioError: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderRadius: radius.lg, backgroundColor: 'rgba(166,27,50,0.24)', borderWidth: 1, borderColor: 'rgba(255,122,138,0.36)' },
   liveStudioErrorText: { color: '#FF9AA7', fontSize: 12, fontWeight: '700', flex: 1 },
   liveStudioStage: { flex: 1, minHeight: 340, borderRadius: radius.xl, overflow: 'hidden', backgroundColor: '#000000', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-  liveStudioStageFullscreen: { minHeight: 0, borderRadius: 0, borderWidth: 0 },
+  liveStudioStageFullscreen: { flex: 0, minHeight: 0, borderRadius: 0, borderWidth: 0 },
   liveStudioFullscreenActions: { position: 'absolute', top: spacing.md, right: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, zIndex: 80 },
   liveStudioFullscreenBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(5,10,18,0.74)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
   liveStudioFullscreenEnd: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B91C3B', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
