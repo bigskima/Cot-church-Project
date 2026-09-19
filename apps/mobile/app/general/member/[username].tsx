@@ -12,11 +12,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Avatar,
   Button,
+  EmptyState,
   Icon,
   ResourceError,
   ScreenHeader,
+  SectionHeader,
   Skeleton,
 } from '@/components';
+import { PostCard } from '@/components/community/PostCard';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 import { invalidate } from '@/services/query-cache';
@@ -42,6 +45,7 @@ type PublicProfilePayload = {
     isFollowing: boolean;
     canMessage: boolean;
   };
+  posts?: any[];
 };
 
 export default function PublicMemberProfileScreen() {
@@ -222,18 +226,28 @@ export default function PublicMemberProfileScreen() {
               ) : null}
 
               <View style={styles.stats}>
-                <View style={styles.stat}>
+                <Pressable
+                  onPress={() => router.push({ pathname: '/general/member-connections', params: { username: profile.username, type: 'followers' } } as any)}
+                  style={({ pressed }) => [styles.stat, pressed && styles.pressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`View ${resource.data?.counts.followers ?? 0} followers`}
+                >
                   <Text style={[styles.statNumber, { color: colors.text }]}>
                     {(resource.data?.counts.followers ?? 0).toLocaleString()}
                   </Text>
                   <Text style={[styles.statLabel, { color: colors.textMuted }]}>Followers</Text>
-                </View>
-                <View style={styles.stat}>
+                </Pressable>
+                <Pressable
+                  onPress={() => router.push({ pathname: '/general/member-connections', params: { username: profile.username, type: 'following' } } as any)}
+                  style={({ pressed }) => [styles.stat, pressed && styles.pressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`View ${resource.data?.counts.following ?? 0} following`}
+                >
                   <Text style={[styles.statNumber, { color: colors.text }]}>
                     {(resource.data?.counts.following ?? 0).toLocaleString()}
                   </Text>
                   <Text style={[styles.statLabel, { color: colors.textMuted }]}>Following</Text>
-                </View>
+                </Pressable>
               </View>
 
               {actionError ? (
@@ -250,22 +264,33 @@ export default function PublicMemberProfileScreen() {
             </View>
           </View>
 
-          <View
-            style={[
-              styles.futureCard,
-              { backgroundColor: colors.card, borderColor: colors.borderSubtle },
-              shadows.sm,
-            ]}
-          >
-            <View style={[styles.futureIcon, { backgroundColor: colors.primarySoft }]}>
-              <Icon name="people-outline" size={20} color={colors.interactive} />
-            </View>
-            <View style={styles.futureCopy}>
-              <Text style={[styles.futureTitle, { color: colors.text }]}>Connected on COT</Text>
-              <Text style={[styles.futureText, { color: colors.textSecondary }]}>
-                Follow people whose posts, Reels and ministry updates you want to keep up with in General COT.
-              </Text>
-            </View>
+          <View style={styles.postsSection}>
+            <SectionHeader
+              title={`Published by @${profile.username}`}
+              subtitle="Only this member's public General COT posts appear here."
+              badge={resource.data?.posts?.length ?? 0}
+            />
+            {(resource.data?.posts ?? []).length ? (
+              (resource.data?.posts ?? []).map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  authorName={profile.display_name || `@${profile.username}`}
+                  authorHandle={profile.username}
+                  authorAvatar={profile.avatar_url ?? null}
+                  canEngage={mode === 'authenticated'}
+                  onPress={() => router.push(`/general/post/${post.id}` as any)}
+                  onPressAuthor={() => undefined}
+                  allowExternalShare
+                />
+              ))
+            ) : (
+              <EmptyState
+                title="No public posts yet"
+                message={viewer?.isSelf ? 'Your published General COT posts will appear here.' : `@${profile.username} has not published any General COT posts yet.`}
+                iconName="newspaper-outline"
+              />
+            )}
           </View>
         </ScrollView>
       ) : null}
@@ -314,10 +339,6 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 12, fontWeight: '600' },
   error: { marginTop: spacing.md, borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm, flexDirection: 'row', gap: spacing.xs, alignItems: 'center' },
   errorText: { flex: 1, fontSize: 12, fontWeight: '600' },
-  futureCard: { margin: spacing.md, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },
-  futureIcon: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  futureCopy: { flex: 1 },
-  futureTitle: { fontSize: 13, fontWeight: '800' },
-  futureText: { fontSize: 11, lineHeight: 17, marginTop: 2 },
+  postsSection: { marginTop: spacing.md, paddingHorizontal: spacing.md, gap: spacing.xs },
   pressed: { opacity: 0.84 },
 });
