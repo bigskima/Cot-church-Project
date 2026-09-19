@@ -69,7 +69,7 @@ export function ParticipationHomeShelf({ scope, expressionId }: { scope: 'genera
         style={({ pressed }) => [styles.compactTrigger, pressed && styles.pressed]}
       >
         <View style={[styles.icon, { backgroundColor: colors.primarySoft, borderColor: colors.primarySoftStrong }]}>
-          <Icon name="sparkles-outline" size={17} color={colors.interactive} />
+          <Icon name="chatbubbles-outline" size={17} color={colors.interactive} />
         </View>
         <View style={styles.titleCopy}>
           <Text style={[styles.compactTitle, { color: colors.text }]}>Community participation</Text>
