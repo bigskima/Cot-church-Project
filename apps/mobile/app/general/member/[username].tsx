@@ -20,6 +20,7 @@ import {
   Skeleton,
 } from '@/components';
 import { PostCard } from '@/components/community/PostCard';
+import { FullIdentityBadge, type PublicIdentityBadge } from '@/components/identity/PublicIdentityBadge';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 import { invalidate } from '@/services/query-cache';
@@ -35,6 +36,7 @@ type PublicProfilePayload = {
     banner_url?: string | null;
     bio?: string | null;
     created_at?: string;
+    badges?: PublicIdentityBadge[];
   };
   counts: {
     followers: number;
@@ -218,6 +220,12 @@ export default function PublicMemberProfileScreen() {
               <Text style={[styles.username, { color: colors.textSecondary }]}>
                 @{profile.username}
               </Text>
+
+              {profile.badges?.length ? (
+                <View style={styles.publicBadges}>
+                  {profile.badges.map((badge) => <FullIdentityBadge key={badge.id || badge.code || badge.label} badge={badge} />)}
+                </View>
+              ) : null}
 
               {profile.bio ? (
                 <Text style={[styles.bio, { color: colors.textSecondary }]}>
