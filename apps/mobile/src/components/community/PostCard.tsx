@@ -107,9 +107,14 @@ export function PostCard({
   const [preview, setPreview] = useState<PreviewableMedia | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [bodyExpanded, setBodyExpanded] = useState(false);
 
   const likePending = useRef(false);
   const savePending = useRef(false);
+
+  useEffect(() => {
+    setBodyExpanded(false);
+  }, [post.id]);
 
   useEffect(() => {
     if (!likePending.current) {
@@ -184,6 +189,11 @@ export function PostCard({
     if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
     return `${Math.floor(diff / 86400)}d`;
   };
+
+  const body = post.body?.trim() ?? '';
+  const bodyLineCount = body ? body.split(/\r?\n/).length : 0;
+  const collapsibleBody = resolvedVariant === 'feed' && (body.length > 420 || bodyLineCount > 8);
+  const collapsedBodyLines = media.length ? 6 : 8;
 
   const identityHeader = (
     <View style={styles.headerRow}>
@@ -270,7 +280,31 @@ export function PostCard({
           </>
         ) : null}
 
-        {post.body?.trim() ? <Text style={[styles.bodyText, resolvedVariant === 'feed' && styles.feedBodyText, { color: colors.text }]}>{post.body}</Text> : null}
+        {body ? (
+          <View style={styles.bodyBlock}>
+            <Text
+              style={[styles.bodyText, resolvedVariant === 'feed' && styles.feedBodyText, { color: colors.text }]}
+              numberOfLines={collapsibleBody && !bodyExpanded ? collapsedBodyLines : undefined}
+            >
+              {body}
+            </Text>
+            {collapsibleBody ? (
+              <Pressable
+                onPress={(event) => {
+                  event.stopPropagation?.();
+                  setBodyExpanded((value) => !value);
+                }}
+                hitSlop={6}
+                style={({ pressed }) => [styles.showMoreButton, pressed && { opacity: 0.7 }]}
+                accessibilityRole="button"
+                accessibilityLabel={bodyExpanded ? 'Show less of this post' : 'Show more of this post'}
+              >
+                <Text style={[styles.showMoreText, { color: colors.interactive }]}>{bodyExpanded ? 'Show less' : 'Show more'}</Text>
+                <Icon name={bodyExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={colors.interactive} />
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
 
         {media.length ? (
           <View style={styles.mediaList}>
@@ -336,8 +370,11 @@ const styles = StyleSheet.create({
   identityMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, marginTop: 2 },
   identityBadge: { borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3 },
   identityBadgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.2 },
+  bodyBlock: { gap: 5 },
   bodyText: { fontSize: 15, lineHeight: 23, marginTop: spacing.md, letterSpacing: -0.08 },
   feedBodyText: { fontSize: 16, lineHeight: 25, marginTop: 0, letterSpacing: -0.12 },
+  showMoreButton: { alignSelf: 'flex-start', minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 4, paddingRight: 6 },
+  showMoreText: { fontSize: 11.5, lineHeight: 16, fontWeight: '900' },
   mediaList: { gap: spacing.sm, marginTop: spacing.md, marginHorizontal: -4 },
   mediaFrame: { width: '100%', aspectRatio: 16 / 10, borderRadius: radius.xl, overflow: 'hidden' },
   mediaImage: { width: '100%', height: '100%' },
