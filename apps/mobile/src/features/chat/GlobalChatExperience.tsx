@@ -50,7 +50,7 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
   const insets = useSafeAreaInsets();
   const { api, context, mode } = useSession();
   const expression = context?.expression;
-  const routeParams = useLocalSearchParams<{ username?: string }>();
+  const routeParams = useLocalSearchParams<{ username?: string; forwardText?: string }>();
   const [selected, setSelected] = useState<{ id: string; person: Person } | null>(null);
   const [filter, setFilter] = useState('');
   const [autoOpened, setAutoOpened] = useState('');
@@ -61,6 +61,15 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
 
   const [normalizedFilter, setNormalizedFilter] = useState('');
   const [actionError, setActionError] = useState('');
+  const [pendingForwardText, setPendingForwardText] = useState(
+    typeof routeParams.forwardText === 'string' ? routeParams.forwardText : '',
+  );
+
+  useEffect(() => {
+    if (typeof routeParams.forwardText === 'string' && routeParams.forwardText.trim()) {
+      setPendingForwardText(routeParams.forwardText);
+    }
+  }, [routeParams.forwardText]);
   const generalThreadBottomInset = embeddedExpression
     ? 0
     : 75 + Math.max(insets.bottom, Platform.OS === 'web' ? 10 : 8);
@@ -166,6 +175,7 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
       setLocalMessages((current) => current.map((message) => message.id === optimisticId ? created : message));
       invalidate(threadKey);
       invalidate('chat:global:');
+      if (pendingForwardText) setPendingForwardText('');
     } catch (error) {
       setLocalMessages((current) => current.filter((message) => message.id !== optimisticId));
       setActionError(error instanceof Error ? error.message : 'Message was not sent. Please try again.');
@@ -349,6 +359,7 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
           bottomInset={embeddedExpression ? Math.max(insets.bottom, 10) : 8}
           onCancelReply={() => setReplyTo(null)}
           onSend={send}
+          initialText={pendingForwardText}
         />
       </KeyboardAvoidingView>
     );
@@ -374,7 +385,9 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
       <View style={[styles.scopeNote, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}>
         <Icon name="people-outline" size={16} color={colors.interactive} />
         <Text style={[styles.scopeNoteText, { color: colors.textSecondary }]}>
-          Your inbox shows people you follow or who follow you. Search can find any COT account you are allowed to message. Group chat remains inside each Group.
+          {pendingForwardText
+            ? 'Choose a person below to forward this message. You can edit it before sending.'
+            : 'Your inbox shows people you follow or who follow you. Search can find any COT account you are allowed to message. Group chat remains inside each Group.'}
         </Text>
       </View>
 
