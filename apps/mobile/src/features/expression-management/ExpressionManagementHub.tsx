@@ -103,6 +103,14 @@ export function ExpressionManagementHub() {
         enabled: access.canManageLeadership,
       },
       {
+        key: 'badges',
+        title: 'Titles & badges',
+        description: 'Public ministry titles that do not grant permissions.',
+        iconName: 'ribbon-outline',
+        route: `${base}/badges`,
+        enabled: access.canManageLeadership,
+      },
+      {
         key: 'invite-codes',
         title: 'Invite Codes',
         description: 'Create revocable joining codes.',
