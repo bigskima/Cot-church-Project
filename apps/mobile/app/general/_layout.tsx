@@ -166,6 +166,7 @@ export default function GeneralLayout() {
       <Tabs.Screen name="assistant" options={hidden as any} />
       <Tabs.Screen name="expression/[id]" options={hidden as any} />
       <Tabs.Screen name="member/[username]" options={hidden as any} />
+      <Tabs.Screen name="member-connections" options={hidden as any} />
     </Tabs>
   );
 }
