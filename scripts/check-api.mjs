@@ -41,6 +41,7 @@ const requiredFiles = [
   'supabase/functions/notifications/index.ts',
   'supabase/functions/notification-dispatch/index.ts',
   'supabase/functions/governance-invitations/index.ts',
+  'supabase/functions/platform-admin-invitations/index.ts',
   'supabase/functions/membership-invitations/index.ts',
   'supabase/functions/expression-memberships/index.ts',
   'supabase/functions/_shared/rate-limit.ts',
@@ -81,6 +82,7 @@ const requiredFiles = [
   'supabase/functions/platform-admin-guide/index.ts',
   'supabase/functions/platform-features/index.ts',
   'supabase/functions/platform-integrations/index.ts',
+  'supabase/functions/platform-public-directory/index.ts',
   'supabase/functions/platform-payments/index.ts',
   'supabase/functions/platform-giving/index.ts',
   'supabase/functions/search/index.ts',
@@ -165,7 +167,12 @@ const notificationSettings = await readFile('supabase/functions/notification-set
 const mobileNotificationSettingsPage = await readFile('apps/mobile/app/(tabs)/profile/notification-settings.tsx', 'utf8');
 const mobileSavedLibrary = await readFile('apps/mobile/app/(tabs)/profile/saved.tsx', 'utf8');
 const governanceInvitations = await readFile('supabase/functions/governance-invitations/index.ts', 'utf8');
+const platformAdminInvitations = await readFile('supabase/functions/platform-admin-invitations/index.ts', 'utf8');
+const platformPublicDirectory = await readFile('supabase/functions/platform-public-directory/index.ts', 'utf8');
+const ministryBoundaryMigration = await readFile('supabase/migrations/20260919170000_restore_ministry_owned_operations.sql', 'utf8');
 const mobileNotificationsPage = await readFile('apps/mobile/app/(tabs)/profile/notifications.tsx', 'utf8');
+const mobileNotificationsExperience = await readFile('apps/mobile/src/features/notifications/NotificationsExperience.tsx', 'utf8');
+const adminLoginPage = await readFile('apps/admin/src/components/Login.tsx', 'utf8');
 const adminAiPage = await readFile('apps/admin/src/pages/AiInfrastructure.tsx', 'utf8');
 const adminStreamingPage = await readFile('apps/admin/src/pages/StreamingInfrastructure.tsx', 'utf8');
 const adminPaymentsPage = await readFile('apps/admin/src/pages/PaymentInfrastructure.tsx', 'utf8');
@@ -389,10 +396,22 @@ const invariants = [
   [engagement, /social_posts[\s\S]*reels[\s\S]*videos[\s\S]*sermons/, 'Saved Library typed content hydration'],
   [mobileSavedLibrary, /engagement\?view=saved/, 'mobile Saved Library API contract'],
   [mobileSavedLibrary, /action:\s*'bookmark'/, 'Saved Library remove action'],
-  [mobileNotificationsPage, /api\.request\('governance-invitations',\s*\{[\s\S]*?method:\s*'POST'[\s\S]*?JSON\.stringify\(\{\s*invitationId:\s*invitation\.id,\s*decision\s*\}\)/, 'Mobile governance invitation response client payload'],
+  [mobileNotificationsPage, /api\.request\('governance-invitations',\s*\{[\s\S]*?method:\s*'POST'[\s\S]*?JSON\.stringify\(\{\s*invitationId:\s*invitation\.id,\s*decision\s*\}\)/, 'Mobile Expression invitation response client payload'],
+  [mobileNotificationsExperience, /invitation\.kind === 'platform_role'[\s\S]*PLATFORM_ADMIN_URL|invitation\.kind === 'platform_role'[\s\S]*openPlatformAdministration/, 'Mobile Platform Administrator invitations are web handoffs'],
+  [mobileNotificationsExperience, /Platform Administrator invitations can only be accepted or declined on the administration website[\s\S]*return;/, 'Mobile blocks Platform Administrator invitation responses before the mutation callback'],
   [governanceInvitations, /methods:\s*\[\s*"GET"\s*,\s*"POST"\s*\]/, 'Governance invitation backend methods'],
   [governanceInvitations, /assertNoUnknownFields\(body,\s*\[\s*"invitationId"\s*,\s*"decision"\s*\]\)/, 'Governance invitation backend payload fields'],
   [governanceInvitations, /new Set\(\[\s*"accept"\s*,\s*"decline"\s*\]\)/, 'Governance invitation decision values'],
+  [governanceInvitations, /PLATFORM_INVITATION_WEB_ONLY/, 'General invitation endpoint rejects Platform Administrator responses'],
+  [platformAdminInvitations, /view"\) === "pending"/, 'Existing web-admin invitation endpoint exposes the invited user pending view'],
+  [platformAdminInvitations, /respond_platform_role_invitation/, 'Web-admin invitation endpoint uses the server-only Platform Administrator response RPC'],
+  [adminLoginPage, /platform-admin-invitations\?view=pending[\s\S]*Accept and continue/, 'Platform Administration login completes pending administrator invitations'],
+  [ministryBoundaryMigration, /'platform_role_invitation'[\s\S]*'\/general\/notifications\?view=actions'/, 'Platform Administrator invitations create an app delivery notice and web handoff route'],
+  [ministryBoundaryMigration, /respond_governance_invitation[\s\S]*invitation\.kind='platform_role'[\s\S]*Platform Administration website/, 'Database general invitation RPC rejects Platform Administrator responses'],
+  [ministryBoundaryMigration, /respond_platform_role_invitation\(uuid,uuid,text\)[\s\S]*from public,anon,authenticated[\s\S]*to service_role/, 'Platform Administrator response RPC is server-only'],
+  [ministryBoundaryMigration, /delete from public\.platform_role_permissions[\s\S]*platform\.notifications\.broadcast[\s\S]*platform\.identity_badges\.manage[\s\S]*platform\.public_directory\.manage/, 'Retired ministry-authoring permissions are removed from platform roles'],
+  [churchStory, /view === "badges"[\s\S]*authorizeLeadershipScope\(auth, expressionId \?\? null\)[\s\S]*organizationBadgeMembers/, 'General and Expression presentation titles use scoped ministry authorization'],
+  [platformPublicDirectory, /PLATFORM_PUBLIC_DIRECTORY_RETIRED/, 'Platform public-directory ministry authoring endpoint is retired'],
   [adminAiPage, /action:\s*'configure_provider'/, 'Admin AI configure-provider client action'],
   [platformAi, /action === "configure_provider"/, 'Admin AI configure-provider backend action'],
   [platformAi, /credential_configured/, 'Admin AI provider credential readiness state'],
@@ -448,6 +467,8 @@ const forbidden = [
   [organizations, /Main Campus/, 'stale Campus default in organization provisioning'],
   [platformGiving, /platform\.giving\.(?:read|manage)|authorizePlatform/, 'retired Platform Giving authorization path'],
   [churchStory, /Foundation & First Gathering|Multi-Expression Expansion|Global Digital Ministry/, 'fabricated church story fallback'],
+  [platformIntegrations, /notification_broadcast|notification-broadcasts|platform\.notifications\.broadcast/, 'Platform Administration church-notification authoring path'],
+  [platformPublicDirectory, /identity_badge_definitions|identity_badge_assignments|leadership_profiles|church_story/, 'retired Platform Administration church-directory data access'],
   [signup, /password\(body\.password\)/, 'hardcoded signup password policy'],
   [signup, /length\s*<\s*\d+.*password|password.*length\s*<\s*\d+/s, 'hardcoded signup password length rule'],
 ];

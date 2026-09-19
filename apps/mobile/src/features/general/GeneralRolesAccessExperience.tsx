@@ -44,8 +44,6 @@ type RoleAssignment = {
   role?: Role | Role[] | null;
 };
 type Permission = { code: string; name: string; description: string; category: string };
-type PlatformRole = { code: string; name: string; description: string };
-type PlatformInvitationPayload = { roles: PlatformRole[]; invitations: Array<{ id: string; target_email: string; platform_role_code: string; status: string }> };
 
 type AccessResource = {
   memberships: Membership[];
@@ -102,9 +100,6 @@ export default function GeneralRolesAccessExperience() {
   const [roleCode, setRoleCode] = useState('');
   const [roleDescription, setRoleDescription] = useState('');
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
-  const [platformOpen, setPlatformOpen] = useState(false);
-  const [platformEmail, setPlatformEmail] = useState('');
-  const [platformRoleCode, setPlatformRoleCode] = useState('');
 
   const resource = useResource<AccessResource>(
     `general:roles-access:${organization?.id ?? 'none'}:${canRead}`,
@@ -117,18 +112,6 @@ export default function GeneralRolesAccessExperience() {
         api.request<Permission[]>('permissions', { signal }),
       ]);
       return { memberships, roles, assignments, permissions };
-    },
-  );
-
-  const platform = useResource<PlatformInvitationPayload | null>(
-    `general:platform-admin-invitations:${mode}`,
-    async (signal) => {
-      if (mode !== 'authenticated') return null;
-      try {
-        return await api.request<PlatformInvitationPayload>('platform-admin-invitations', { signal, context: 'public' });
-      } catch {
-        return null;
-      }
     },
   );
 
@@ -216,23 +199,6 @@ export default function GeneralRolesAccessExperience() {
     } finally { setBusyKey(''); }
   };
 
-  const invitePlatformAdmin = async () => {
-    if (!platform.data || !platformEmail.trim() || !platformRoleCode || busyKey) return;
-    setBusyKey('platform-invite'); setError(''); setNotice('');
-    try {
-      await api.request('platform-admin-invitations', {
-        method: 'POST',
-        context: 'public',
-        body: JSON.stringify({ email: platformEmail.trim(), roleCode: platformRoleCode, validityHours: 168, message: 'Platform Administration access invited from the COT mobile General admin workspace.' }),
-      });
-      setPlatformOpen(false); setPlatformEmail(''); setPlatformRoleCode('');
-      setNotice('Platform Administration invitation created. That Level-1 role remains separate from General COT ministry access.');
-      await platform.refresh();
-    } catch (value) {
-      setError(value instanceof Error ? value.message : 'Unable to create this Platform Administration invitation.');
-    } finally { setBusyKey(''); }
-  };
-
   if (!organization) {
     return <View style={[styles.center, { backgroundColor: colors.bg }]}><EmptyState title="Choose a church" message="General COT roles are managed inside a church organization." iconName="business-outline" /></View>;
   }
@@ -243,11 +209,11 @@ export default function GeneralRolesAccessExperience() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 100 }]}>
-        <ScreenHeader title="Roles & Access" kicker="GENERAL COT · ADMIN" subtitle="Give people the exact General COT responsibilities they need without leaking Expression or Platform authority." showBack rightAction={canManage ? <Button label="New role" size="sm" onPress={() => setRoleComposerOpen(true)} /> : undefined} />
+        <ScreenHeader title="Roles & Access" kicker="GENERAL COT · ADMIN" subtitle="Give people the exact church-wide ministry responsibilities they need without leaking Expression or platform authority." showBack rightAction={canManage ? <Button label="New role" size="sm" onPress={() => setRoleComposerOpen(true)} /> : undefined} />
 
         <View style={[styles.scopeCard, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}>
           <Icon name="shield-checkmark-outline" size={20} color={colors.interactive} />
-          <View style={styles.flex}><Text style={[styles.scopeTitle, { color: colors.text }]}>Three access layers stay separate</Text><Text style={[styles.scopeText, { color: colors.textSecondary }]}>General COT roles control church-wide operators. Expression roles stay inside an Expression. Platform Administration is Level-1 software governance and is invited separately below when your account has that authority.</Text></View>
+          <View style={styles.flex}><Text style={[styles.scopeTitle, { color: colors.text }]}>This screen grants ministry access only</Text><Text style={[styles.scopeText, { color: colors.textSecondary }]}>General COT roles control church-wide ministry work. Expression roles stay inside an Expression. Platform administrator invitations and operations belong only to the separate administration website.</Text></View>
         </View>
 
         {notice ? <Pressable onPress={() => setNotice('')} style={[styles.notice, { backgroundColor: colors.successSoft, borderColor: colors.success }]}><Icon name="checkmark-circle" size={18} color={colors.success} /><Text style={[styles.noticeText, { color: colors.success }]}>{notice}</Text></Pressable> : null}
@@ -279,8 +245,6 @@ export default function GeneralRolesAccessExperience() {
                 }) : <EmptyState title="Select a member" message="Their General COT roles and operator access will appear here." iconName="person-circle-outline" />}
               </View>
             </View>
-
-            {platform.data ? <View style={[styles.platformCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}><View style={[styles.platformIcon, { backgroundColor: colors.primarySoft }]}><Icon name="hardware-chip-outline" size={22} color={colors.interactive} /></View><View style={styles.flex}><Text style={[styles.platformTitle, { color: colors.text }]}>Platform Administration</Text><Text style={[styles.platformText, { color: colors.textSecondary }]}>Your account can invite Level-1 Platform administrators. This does not automatically give pastoral, finance or Expression access inside General COT.</Text></View><Button label="Invite admin" variant="outline" onPress={() => { setPlatformRoleCode(platform.data?.roles?.[0]?.code || ''); setPlatformOpen(true); }} /></View> : null}
           </>
         )}
       </ScrollView>
@@ -300,16 +264,6 @@ export default function GeneralRolesAccessExperience() {
           <Button label="Create role" fullWidth size="lg" loading={busyKey === 'create-role'} disabled={!roleName.trim() || !roleCode.trim() || Boolean(busyKey && busyKey !== 'create-role')} onPress={() => void createRole()} />
         </View>
       </BottomSheet>
-
-      <BottomSheet visible={platformOpen} onClose={() => { if (!busyKey) setPlatformOpen(false); }} title="Invite Platform administrator" subtitle="Level-1 software governance" maxHeightPercent={85}>
-        <View style={styles.form}>
-          <View style={[styles.scopeCard, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}><Icon name="information-circle-outline" size={18} color={colors.interactive} /><Text style={[styles.scopeText, { color: colors.textSecondary, flex: 1 }]}>Platform roles are deliberately separate from General COT roles. Give a person both only when they truly need both responsibilities.</Text></View>
-          <InputField label="Account email" value={platformEmail} onChangeText={setPlatformEmail} keyboardType="email-address" autoCapitalize="none" placeholder="operator@example.com" />
-          <Text style={[styles.fieldTitle, { color: colors.textSecondary }]}>PLATFORM ROLE</Text>
-          <View style={styles.chips}>{(platform.data?.roles ?? []).map((role) => <Chip key={role.code} label={role.name} selected={platformRoleCode === role.code} onPress={() => setPlatformRoleCode(role.code)} />)}</View>
-          <Button label="Send admin invitation" fullWidth size="lg" loading={busyKey === 'platform-invite'} disabled={!platformEmail.trim() || !platformRoleCode} onPress={() => void invitePlatformAdmin()} />
-        </View>
-      </BottomSheet>
     </View>
   );
 }
@@ -320,6 +274,5 @@ const styles = StyleSheet.create({
   notice: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md }, noticeText: { flex: 1, fontSize: 12, lineHeight: 18, fontWeight: '700' },
   twoColumn: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }, panel: { flex: 1, minWidth: 310, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.md }, memberList: { gap: spacing.xs }, memberRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm }, memberName: { fontSize: 13.5, fontWeight: '800' }, memberMeta: { fontSize: 10.5, lineHeight: 15, marginTop: 2 },
   roleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md }, roleHeading: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }, roleName: { fontSize: 13.5, fontWeight: '900' }, roleDescription: { fontSize: 10.5, lineHeight: 16, marginTop: 3 },
-  platformCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderRadius: radius.xl, padding: spacing.lg }, platformIcon: { width: 48, height: 48, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' }, platformTitle: { fontSize: 15, fontWeight: '900' }, platformText: { fontSize: 11.5, lineHeight: 17, marginTop: 3 },
   form: { gap: spacing.md }, fieldTitle: { fontSize: 9, fontWeight: '900', letterSpacing: 0.9 }, chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }, permissionList: { gap: spacing.xs }, permissionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm }, permissionName: { fontSize: 12.5, fontWeight: '800' }, permissionMeta: { fontSize: 9.5, lineHeight: 14, marginTop: 2 },
 });

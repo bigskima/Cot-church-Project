@@ -158,6 +158,7 @@ export default function GeneralLayout() {
       <Tabs.Screen name="leadership/events-manage" options={hidden as any} />
       <Tabs.Screen name="leadership/expressions-manage" options={hidden as any} />
       <Tabs.Screen name="leadership/roles-access" options={hidden as any} />
+      <Tabs.Screen name="leadership/titles-badges" options={hidden as any} />
       <Tabs.Screen name="leadership/platform-admin/index" options={hidden as any} />
       <Tabs.Screen name="leadership/platform-admin/[module]" options={hidden as any} />
       <Tabs.Screen name="studio/index" options={hidden as any} />

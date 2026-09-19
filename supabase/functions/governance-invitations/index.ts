@@ -14,8 +14,24 @@ Deno.serve(createHandler(
       assertNoUnknownFields(body, ["invitationId", "decision"]);
       const decision = requiredString(body.decision, "decision", 16).toLowerCase();
       if (!new Set(["accept", "decline"]).has(decision)) throw new ApiError("VALIDATION_FAILED", "Decision must be accept or decline", 422);
+      const invitationId = uuid(requiredString(body.invitationId, "invitationId", 64), "invitationId", true)!;
+      const { data: invitation, error: invitationError } = await adminClient()
+        .from("governance_invitations")
+        .select("id,kind,target_profile_id")
+        .eq("id", invitationId)
+        .maybeSingle();
+      if (invitationError) throw new ApiError("INVITATION_RESPONSE_FAILED", "Unable to inspect invitation", 500, undefined, false);
+      if (!invitation) throw new ApiError("INVITATION_NOT_FOUND", "Invitation not found", 404);
+      if (invitation.target_profile_id !== auth.user.id) throw new ApiError("INVITATION_ACCESS_DENIED", "This invitation does not belong to you", 403);
+      if (invitation.kind === "platform_role") {
+        throw new ApiError(
+          "PLATFORM_INVITATION_WEB_ONLY",
+          "Platform Administrator invitations must be completed in the Platform Administration website",
+          403,
+        );
+      }
       const { data, error } = await auth.client.rpc("respond_governance_invitation", {
-        target_invitation_id: uuid(requiredString(body.invitationId, "invitationId", 64), "invitationId", true),
+        target_invitation_id: invitationId,
         decision,
       }).single();
       if (error?.code === "P0002") throw new ApiError("INVITATION_NOT_FOUND", "Invitation not found", 404);

@@ -18,7 +18,6 @@ const guides: Record<string, Guide> = {
   "admin-invitations":{title:"Administrator Access",purpose:"Invite trusted people into Platform Administration.",boundaries:["Administration authority is separate from normal church membership."]},
   "expression-creators":{title:"Expression Creation Access",purpose:"Choose who may create new Expressions.",boundaries:["Creation access does not grant wider platform administration."]},
   branding:{title:"Branding & Identity",purpose:"Control official COT names, logos and appearance.",boundaries:["Keep official identity consistent across COT."]},
-  "public-directory":{title:"Community Directory",purpose:"Control information people can discover publicly.",boundaries:["Only publish information intended for the public."]},
   features:{title:"Feature Availability",purpose:"Choose which product features are currently available.",boundaries:["Keep unfinished or unapproved features unavailable."]},
   credentials:{title:"Secure Credentials",purpose:"Store protected keys used by approved external services.",boundaries:["Never place credentials in descriptions, notes or screenshots."]},
   streaming:{title:"Streaming Services",purpose:"Prepare and monitor services used for live broadcasts.",boundaries:["Test service readiness before relying on it for a programme."]},

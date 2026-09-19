@@ -148,7 +148,7 @@ export function RolesAccess({ api, canManage = false }: { api: ApiClient; canMan
     <div className="admin-page-stack">
       <Card
         title="Roles & Access"
-        subtitle="Assign top-level public COT capabilities without mixing them with Expression roles."
+        subtitle="Assign global platform/public capabilities without mixing them with church ministry roles, titles, or Expression roles."
         headerAction={
           <div className="admin-header-actions">
             <SearchBar value={search} onChange={setSearch} placeholder="Search account name, email, or phone..." />
@@ -226,7 +226,7 @@ export function RolesAccess({ api, canManage = false }: { api: ApiClient; canMan
       {selected ? (
         <Card
           title={selectedLabel}
-          subtitle="Public COT roles are global capabilities. Expression and church roles remain managed inside their own scope."
+          subtitle="Global platform/public capabilities live here. Church ministry roles and presentation titles remain in General COT; Expression roles remain inside their Expression."
           headerAction={<Badge label={selected.account_status === 'banned' ? 'BANNED' : 'ACTIVE ACCOUNT'} variant={selected.account_status === 'banned' ? 'suspended' : 'active'} />}
         >
           {loadingAccess ? (
@@ -257,7 +257,7 @@ export function RolesAccess({ api, canManage = false }: { api: ApiClient; canMan
                 </Card>
               </div>
 
-              <Card title="General Community capabilities" subtitle="Explicit top-level permissions for signed-in COT users.">
+              <Card title="Global public capabilities" subtitle="Explicit platform-level public capabilities for signed-in COT users; these are not church ministry titles or roles.">
                 <div style={{ display: 'grid', gap: 12 }}>
                   {(access?.capabilities ?? []).map((capability) => {
                     const enabled = activeAssignments.has(capability.code);

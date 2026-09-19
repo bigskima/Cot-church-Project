@@ -69,7 +69,7 @@ export function AdminInvitations({ api }: { api: ApiClient }) {
         body: JSON.stringify({ email: email.trim(), roleCode, message: customMessage.trim() }),
       });
       setCreateOpen(false);
-      setSuccess(`Invitation sent to ${email.trim()} for the ${selectedRole?.name ?? roleCode} role. Access begins only after acceptance.`);
+      setSuccess(`Invitation sent to ${email.trim()} for the ${selectedRole?.name ?? roleCode} role. The app delivers the notice; acceptance happens only on this administration website.`);
       setEmail('');
       setCustomMessage('');
       await load();
@@ -102,7 +102,7 @@ export function AdminInvitations({ api }: { api: ApiClient }) {
 
       <Card
         title="Administrator invitations"
-        subtitle="Role offers for registered COT accounts. Permissions are granted only after the invited user accepts."
+        subtitle="Role offers created only here. The COT app may deliver the system notice, but the invited user must accept on this administration website."
         headerAction={<div className="admin-header-actions"><Button variant="outline" size="sm" loading={loading} onClick={() => void load()}>Refresh</Button><Button variant="gold" size="sm" onClick={openCreate}>New invitation</Button></div>}
       >
         <Table
@@ -146,7 +146,7 @@ export function AdminInvitations({ api }: { api: ApiClient }) {
         isOpen={createOpen}
         onClose={() => { if (!busy) setCreateOpen(false); }}
         title="Invite administrator"
-        subtitle="Choose the administration role this person should receive after accepting the invitation."
+        subtitle="Choose the administration role. The recipient signs in to this website to accept or decline."
         maxWidth="md"
         footer={
           <>

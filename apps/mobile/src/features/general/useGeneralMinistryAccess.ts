@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useSession } from '@/state/session';
 
-export type GeneralMinistryArea = 'Create' | 'Content' | 'Care' | 'People' | 'Finance' | 'Media' | 'Settings' | 'Platform';
+export type GeneralMinistryArea = 'Create' | 'Content' | 'Care' | 'People' | 'Finance' | 'Media' | 'Settings';
 
 export function useGeneralMinistryAccess() {
   const { mode, accessReady, context, hasOrganizationCapability, hasPublicCapability } = useSession();
