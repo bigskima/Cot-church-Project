@@ -513,10 +513,29 @@ Deno.serve(createHandler(
             .filter(Boolean) as string[];
         }
       }
-      const recipients = [...new Set([
+      const candidateRecipients = [...new Set([
         ...mentionRecipientIds,
         ...(replyTarget?.sender_profile_id ? [replyTarget.sender_profile_id] : []),
       ])].filter((profileId) => profileId !== auth.user.id);
+      let recipients: string[] = [];
+      if (candidateRecipients.length) {
+        const { data: memberRows } = await admin.from("memberships")
+          .select("id,profile_id")
+          .eq("organization_id", auth.organizationId)
+          .eq("status", "active")
+          .in("profile_id", candidateRecipients);
+        const profileByMembership = new Map((memberRows ?? []).map((row: any) => [row.id, row.profile_id]));
+        if (profileByMembership.size) {
+          const { data: groupRows } = await admin.from("group_memberships")
+            .select("membership_id")
+            .eq("organization_id", auth.organizationId)
+            .eq("group_id", groupId)
+            .eq("status", "active")
+            .is("banned_at", null)
+            .in("membership_id", [...profileByMembership.keys()]);
+          recipients = [...new Set((groupRows ?? []).map((row: any) => profileByMembership.get(row.membership_id)).filter(Boolean))] as string[];
+        }
+      }
 
       if (recipients.length) {
         const sender = await senderIdentity(admin, auth.user.id);
