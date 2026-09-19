@@ -29,15 +29,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
-
-      - name: Upload generated dependency lock
-        uses: actions/upload-artifact@v4
-        with:
-          name: generated-package-lock-${{ github.run_id }}
-          path: package-lock.json
-          if-no-files-found: error
-          retention-days: 1
+        run: npm ci --no-audit --no-fund
 
       - name: Validate API structure
         id: api_check
