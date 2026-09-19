@@ -26,6 +26,7 @@ export * from './media/AudioPlayer';
 export * from './media/VideoPlayer';
 export * from './media/MediaPlayer';
 export * from './media/MediaPreviewModal';
+export * from './media/AdaptiveMediaImage';
 export * from './media/ReelPlayer';
 export * from './cards/VideoCard';
 export * from './cards/ReelCard';
@@ -34,3 +35,5 @@ export * from './engagement/InlineCommentsSheet';
 export * from './engagement/ContentReportSheet';
 export * from './engagement/ReactionDrawer';
 export * from './workflow/ProgressiveFlow';
+
+export * from './profile/SocialProfileHero';
