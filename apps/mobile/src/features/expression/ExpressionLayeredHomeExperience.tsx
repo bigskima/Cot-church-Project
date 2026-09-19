@@ -23,7 +23,6 @@ import {
   Skeleton,
   VideoCard,
 } from '@/components';
-import { ParticipationHomeShelf } from '@/features/community/ParticipationHomeShelf';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 import { getRuntimeSupabase } from '@/services/runtime-supabase';
@@ -296,14 +295,10 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
           <QuickLink label="Updates" hint="Important updates" icon="megaphone-outline" onPress={() => router.push(`/expressions/${expressionId}/announcements` as any)} />
           <QuickLink label="Prayer" hint="Pray together" icon="heart-outline" onPress={() => router.push(`/expressions/${expressionId}/prayer` as any)} />
           <QuickLink label="Events" hint="Gatherings" icon="calendar-outline" onPress={() => router.push(`/expressions/${expressionId}/events` as any)} />
-          <QuickLink label="Engage" hint="Polls & giveaways" icon="gift-outline" onPress={() => router.push(`/expressions/${expressionId}/participate` as any)} />
+          <QuickLink label="Join in" hint="Polls & giveaways" icon="chatbubbles-outline" onPress={() => router.push(`/expressions/${expressionId}/participate` as any)} />
           <QuickLink label="Groups" hint="Smaller circles" icon="people-circle-outline" onPress={() => router.push(`/expressions/${expressionId}/groups` as any)} />
           <QuickLink label="Chat" hint="Direct messages" icon="chatbubble-ellipses-outline" onPress={() => router.push(`/expressions/${expressionId}/chat` as any)} />
         </ScrollView>
-      </View>
-
-      <View style={styles.expressionUtilities}>
-        <ParticipationHomeShelf scope="expression" expressionId={expressionId} />
       </View>
 
       {payload?.degradedSections?.length ? <Pressable onPress={resource.refresh} style={[styles.notice, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Icon name="alert-circle-outline" size={17} color={colors.textSecondary} /><Text style={[styles.noticeText, { color: colors.textSecondary }]}>Some Expression sections are still loading. Tap to retry.</Text><Icon name="refresh-outline" size={15} color={colors.textMuted} /></Pressable> : null}
@@ -359,12 +354,11 @@ const styles = StyleSheet.create({
   quickHeading: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingHorizontal: 2 },
   quickHeadingTitle: { fontSize: 12.5, fontWeight: '900' },
   quickHeadingMeta: { fontSize: 9, fontWeight: '700' },
-  quickGrid: { gap: spacing.md, paddingRight: spacing.lg, paddingHorizontal: 2, paddingBottom: 2 },
+  quickGrid: { gap: spacing.sm, paddingRight: spacing.md, paddingHorizontal: 2, paddingBottom: 2 },
   quickLink: { minWidth: 54, alignItems: 'center', gap: 5 },
   quickIcon: { width: 42, height: 42, borderRadius: 15, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   quickLabel: { fontSize: 9.5, fontWeight: '800' },
   quickHint: { fontSize: 9, marginTop: 1 },
-  expressionUtilities: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   notice: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   noticeText: { flex: 1, fontSize: 11.5, lineHeight: 17 },
   liveWrap: { marginTop: spacing.xs },
