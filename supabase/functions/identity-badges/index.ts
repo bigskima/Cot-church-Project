@@ -187,29 +187,35 @@ Deno.serve(createHandler(
       if (!definition) throw new ApiError("BADGE_NOT_FOUND", "Choose an active public title from this scope", 404);
 
       if (action === "assign") {
-        const { data, error } = await admin.from("identity_badge_assignments").upsert({
+        let existingQuery = admin.from("identity_badge_assignments")
+          .select("id")
+          .eq("organization_id", auth.organizationId)
+          .eq("profile_id", profileId)
+          .eq("badge_definition_id", definitionId);
+        existingQuery = branchId ? existingQuery.eq("branch_id", branchId) : existingQuery.is("branch_id", null);
+        const { data: existing, error: existingError } = await existingQuery.maybeSingle();
+        if (existingError) throw new ApiError("BADGE_ASSIGN_FAILED", "Unable to inspect this public title assignment", 500, undefined, false);
+
+        if (existing?.id) {
+          const updated = await admin.from("identity_badge_assignments")
+            .update({ is_active: true, assigned_by: auth.user.id })
+            .eq("id", existing.id)
+            .select()
+            .single();
+          if (updated.error) throw new ApiError("BADGE_ASSIGN_FAILED", "Unable to assign this public title", 500, undefined, false);
+          return { data: updated.data };
+        }
+
+        const inserted = await admin.from("identity_badge_assignments").insert({
           organization_id: auth.organizationId,
           branch_id: branchId,
           profile_id: profileId,
           badge_definition_id: definitionId,
           assigned_by: auth.user.id,
           is_active: true,
-        }, { onConflict: branchId ? "branch_id,profile_id,badge_definition_id" : "organization_id,profile_id,badge_definition_id" }).select().single();
-        if (error) {
-          const { data: existing } = await admin.from("identity_badge_assignments")
-            .select("id")
-            .eq("organization_id", auth.organizationId)
-            .eq("profile_id", profileId)
-            .eq("badge_definition_id", definitionId)
-            .is("branch_id", branchId)
-            .maybeSingle();
-          if (existing?.id) {
-            const updated = await admin.from("identity_badge_assignments").update({ is_active: true, assigned_by: auth.user.id }).eq("id", existing.id).select().single();
-            if (!updated.error) return { data: updated.data };
-          }
-          throw new ApiError("BADGE_ASSIGN_FAILED", "Unable to assign this public title", 500, undefined, false);
-        }
-        return { data };
+        }).select().single();
+        if (inserted.error) throw new ApiError("BADGE_ASSIGN_FAILED", "Unable to assign this public title", 500, undefined, false);
+        return { data: inserted.data };
       }
 
       let revokeQuery = admin.from("identity_badge_assignments")
