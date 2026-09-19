@@ -53,7 +53,7 @@ type GroupPayload = {
 
 export function ExpressionGroupsExperience({ embedded = false, focusGroupId, scope = 'expression' }: { embedded?: boolean; focusGroupId?: string; scope?: 'expression' | 'church' }) {
   const insets = useSafeAreaInsets();
-  const { api, context, mode, hasCapability, hasOrganizationCapability } = useSession();
+  const { api, context, mode, hasCapability } = useSession();
   const { colors } = useTheme();
   const expression = context?.expression;
   const churchWide = scope === 'church';
