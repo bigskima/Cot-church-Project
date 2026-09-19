@@ -185,8 +185,72 @@ export function PostCard({
     return `${Math.floor(diff / 86400)}d`;
   };
 
+  const identityHeader = (
+    <View style={styles.headerRow}>
+      <Pressable onPress={onPressAuthor || onPress} hitSlop={4}>
+        <Avatar name={displayName} url={avatarUrl} size="md" />
+      </Pressable>
+      <View style={styles.identityColumn}>
+        <View style={styles.authorLine}>
+          <Pressable onPress={onPressAuthor || onPress} style={styles.nameGroup}>
+            <Text style={[styles.displayName, { color: colors.text }]} numberOfLines={1}>{displayName}</Text>
+            {isVerified ? <Icon name="checkmark-circle" size={15} color={colors.interactive} /> : null}
+          </Pressable>
+          <Text style={[styles.timestamp, { color: colors.textMuted }]}>{formatTime()}</Text>
+        </View>
+        {handle ? <Text style={[styles.handleText, { color: colors.textMuted }]} numberOfLines={1}>@{handle}</Text> : null}
+      </View>
+      {onMore || canEngage ? (
+        <Pressable
+          onPress={onMore ?? (() => setReportOpen(true))}
+          hitSlop={8}
+          style={({ pressed }) => [styles.moreButton, pressed ? { backgroundColor: colors.bgSecondary } : null]}
+          accessibilityRole="button"
+          accessibilityLabel={onMore ? 'More post actions' : 'Report post'}
+        >
+          <Icon name="ellipsis-horizontal" size={19} color={colors.textMuted} />
+        </Pressable>
+      ) : null}
+    </View>
+  );
+
+  const contextRow = showContextRow ? (
+    <View style={styles.contextRow}>
+      <View style={[styles.contextPill, { backgroundColor: isExpressionPost ? colors.primarySoft : colors.bgSecondary }]}>
+        <Icon name={isExpressionPost ? 'people-outline' : 'globe-outline'} size={12} color={isExpressionPost ? colors.interactive : colors.textSecondary} />
+        <Text style={[styles.contextText, { color: isExpressionPost ? colors.interactive : colors.textSecondary }]} numberOfLines={1}>
+          {isExpressionPost ? expressionLabel || 'Expression' : 'General COT'}
+        </Text>
+      </View>
+      {isExpressionPost ? (
+        <View style={[styles.privatePill, { backgroundColor: colors.bgSecondary }]}>
+          <Icon name="lock-closed-outline" size={11} color={colors.textMuted} />
+          <Text style={[styles.privateText, { color: colors.textMuted }]}>Members</Text>
+        </View>
+      ) : null}
+    </View>
+  ) : null;
+
+  const identityBadges = badges.length ? (
+    <View style={styles.identityMetaRow}>
+      {badges.map((badge, index) => (
+        <View key={badge.id || badge.code || `${badge.label}-${index}`} style={[styles.identityBadge, { backgroundColor: badge.backgroundColor }]}>
+          <Text style={[styles.identityBadgeText, { color: badge.textColor }]}>{badge.label}</Text>
+        </View>
+      ))}
+    </View>
+  ) : null;
+
   return (
     <>
+      {resolvedVariant === 'feed' ? (
+        <View style={styles.detachedIdentity}>
+          {identityHeader}
+          {contextRow}
+          {identityBadges}
+        </View>
+      ) : null}
+
       <Pressable
         onPress={onPress}
         style={({ pressed }) => [
@@ -198,29 +262,13 @@ export function PostCard({
           style,
         ]}
       >
-        {showContextRow ? (
-          <View style={styles.contextRow}>
-            <View style={[styles.contextPill, { backgroundColor: isExpressionPost ? colors.primarySoft : colors.bgSecondary }]}>
-              <Icon name={isExpressionPost ? 'people-outline' : 'globe-outline'} size={12} color={isExpressionPost ? colors.interactive : colors.textSecondary} />
-              <Text style={[styles.contextText, { color: isExpressionPost ? colors.interactive : colors.textSecondary }]} numberOfLines={1}>{isExpressionPost ? expressionLabel || 'Expression' : 'General COT'}</Text>
-            </View>
-            {isExpressionPost ? <View style={[styles.privatePill, { backgroundColor: colors.bgSecondary }]}><Icon name="lock-closed-outline" size={11} color={colors.textMuted} /><Text style={[styles.privateText, { color: colors.textMuted }]}>Members</Text></View> : null}
-          </View>
+        {resolvedVariant !== 'feed' ? (
+          <>
+            {contextRow}
+            {identityHeader}
+            {identityBadges}
+          </>
         ) : null}
-
-        <View style={styles.headerRow}>
-          <Pressable onPress={onPressAuthor || onPress} hitSlop={4}><Avatar name={displayName} url={avatarUrl} size="md" /></Pressable>
-          <View style={styles.identityColumn}>
-            <View style={styles.authorLine}>
-              <Pressable onPress={onPressAuthor || onPress} style={styles.nameGroup}><Text style={[styles.displayName, { color: colors.text }]} numberOfLines={1}>{displayName}</Text>{isVerified ? <Icon name="checkmark-circle" size={15} color={colors.interactive} /> : null}</Pressable>
-              <Text style={[styles.timestamp, { color: colors.textMuted }]}>{formatTime()}</Text>
-            </View>
-            {handle ? <Text style={[styles.handleText, { color: colors.textMuted }]} numberOfLines={1}>@{handle}</Text> : null}
-          </View>
-          {onMore || canEngage ? <Pressable onPress={onMore ?? (() => setReportOpen(true))} hitSlop={8} style={({ pressed }) => [styles.moreButton, pressed ? { backgroundColor: colors.bgSecondary } : null]} accessibilityRole="button" accessibilityLabel={onMore ? 'More post actions' : 'Report post'}><Icon name="ellipsis-horizontal" size={19} color={colors.textMuted} /></Pressable> : null}
-        </View>
-
-        {badges.length ? <View style={styles.identityMetaRow}>{badges.map((badge, index) => <View key={badge.id || badge.code || `${badge.label}-${index}`} style={[styles.identityBadge, { backgroundColor: badge.backgroundColor }]}><Text style={[styles.identityBadgeText, { color: badge.textColor }]}>{badge.label}</Text></View>)}</View> : null}
 
         {post.body?.trim() ? <Text style={[styles.bodyText, resolvedVariant === 'feed' && styles.feedBodyText, { color: colors.text }]}>{post.body}</Text> : null}
 
@@ -268,10 +316,11 @@ export function PostCard({
 
 const styles = StyleSheet.create({
   container: { marginHorizontal: spacing.md, marginVertical: spacing.sm, padding: spacing.lg, borderWidth: 1, borderRadius: radius.card },
-  feedContainer: { marginHorizontal: 0, padding: spacing.md, borderRadius: radius.xxl },
+  feedContainer: { marginHorizontal: 0, marginTop: 7, paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.sm, borderRadius: radius.xxl },
+  detachedIdentity: { paddingHorizontal: 2, gap: 6 },
   publicCard: { ...shadows.sm },
   expressionCard: { ...shadows.md },
-  contextRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginBottom: spacing.md },
+  contextRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginTop: 2, marginBottom: 2 },
   contextPill: { minHeight: 26, maxWidth: '72%', borderRadius: radius.pill, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', gap: 5 },
   contextText: { fontSize: 10, lineHeight: 14, fontWeight: '800', letterSpacing: 0.15, flexShrink: 1 },
   privatePill: { minHeight: 26, borderRadius: radius.pill, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 4 },
@@ -284,12 +333,12 @@ const styles = StyleSheet.create({
   timestamp: { fontSize: 10.5, fontWeight: '600' },
   handleText: { fontSize: 10.5, marginTop: 2 },
   moreButton: { width: 34, height: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  identityMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, marginTop: spacing.sm },
+  identityMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, marginTop: 2 },
   identityBadge: { borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3 },
   identityBadgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.2 },
   bodyText: { fontSize: 15, lineHeight: 23, marginTop: spacing.md, letterSpacing: -0.08 },
-  feedBodyText: { fontSize: 15.5, lineHeight: 24 },
-  mediaList: { gap: spacing.sm, marginTop: spacing.md },
+  feedBodyText: { fontSize: 16, lineHeight: 25, marginTop: 0, letterSpacing: -0.12 },
+  mediaList: { gap: spacing.sm, marginTop: spacing.md, marginHorizontal: -4 },
   mediaFrame: { width: '100%', aspectRatio: 16 / 10, borderRadius: radius.xl, overflow: 'hidden' },
   mediaImage: { width: '100%', height: '100%' },
   richMediaFrame: { width: '100%', overflow: 'hidden', borderRadius: radius.xl, borderWidth: 1, position: 'relative' },
@@ -308,7 +357,7 @@ const styles = StyleSheet.create({
   reelReferenceKicker: { fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
   reelReferenceTitle: { fontSize: 14, lineHeight: 19, fontWeight: '800', marginTop: 2 },
   reelReferenceMeta: { fontSize: 10, marginTop: 3 },
-  actionRail: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, minHeight: 42 },
+  actionRail: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, minHeight: 46 },
   actionGroup: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   guestGroup: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 },
   actionButton: { minWidth: 42, height: 36, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 8 },
