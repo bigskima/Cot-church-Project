@@ -108,6 +108,12 @@ verify_jwt = false
 [functions.home-feed]
 verify_jwt = false
 
+# Public General COT live playback and authenticated Expression playback share
+# this endpoint. The handler performs optional bearer validation and enforces
+# stream visibility / exact Expression access before issuing playback grants.
+[functions.stream-access]
+verify_jwt = false
+
 # The moving General COT header update is intentionally public for reads. Create,
 # update, disable and delete paths validate a real bearer session and the
 # church-wide announcements.manage capability inside the function before using

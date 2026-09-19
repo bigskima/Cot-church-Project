@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Icon, ResourceError, ScreenHeader } from '@/components';
+import { Button, Icon, ResourceError, ScreenHeader } from '@/components';
 import { radius, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 import { invalidate } from '@/services/query-cache';
@@ -108,6 +108,18 @@ export function GroupChatExperience({ groupId, sectionId }: { groupId: string; s
   };
 
   if (resource.loading && !resource.data) return <View style={[styles.center, { backgroundColor: colors.bg }]}><ActivityIndicator color={colors.interactive} /></View>;
+  const sectionExpired = Boolean(sectionId && resource.error?.toLowerCase().includes('temporary chat is no longer available'));
+  if (sectionExpired && !resource.data) {
+    return <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+      <View style={{ paddingTop: insets.top }}><ScreenHeader title='Temporary chat' showBack /></View>
+      <View style={[styles.state, { alignItems: 'center', justifyContent: 'center', gap: spacing.sm }]}>
+        <Icon name='timer-outline' size={34} color={colors.textMuted} />
+        <Text style={[styles.emptyTitle, { color: colors.text }]}>This temporary chat has expired</Text>
+        <Text style={{ color: colors.textMuted, textAlign: 'center' }}>Its time window has ended, so it is no longer available inside this Group.</Text>
+        <Button label='Back to Group' onPress={() => context?.expression?.id ? router.replace(`/expressions/${context.expression.id}/groups/${groupId}` as any) : router.back()} />
+      </View>
+    </View>;
+  }
   if (resource.error && !resource.data) return <View style={[styles.screen, { backgroundColor: colors.bg }]}><View style={{ paddingTop: insets.top }}><ScreenHeader title='Group chat' showBack /></View><View style={styles.state}><ResourceError message={resource.error} retry={resource.refresh} /></View></View>;
 
   const restrictedUntil = resource.data?.membership.chat_restricted_until;

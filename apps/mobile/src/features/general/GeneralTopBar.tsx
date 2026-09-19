@@ -102,8 +102,8 @@ export function GeneralTopBar({ organizationName, authenticated, avatarUrl, disp
 }
 
 const styles = StyleSheet.create({
-  wrap: { paddingHorizontal: spacing.md, paddingBottom: spacing.xs, gap: 7 },
-  bar: { width: '100%', maxWidth: 1040, alignSelf: 'center', minHeight: 68, borderWidth: 1, borderRadius: radius.xxl, paddingHorizontal: 9, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  wrap: { paddingHorizontal: spacing.sm, paddingBottom: spacing.xs, gap: 7 },
+  bar: { width: '100%', maxWidth: 1120, alignSelf: 'center', minHeight: 70, borderWidth: 1, borderRadius: radius.xl, paddingHorizontal: 10, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   identity: { minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 1 },
   brand: { width: 48, height: 48, borderRadius: 17, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   identityCopy: { minWidth: 0, maxWidth: 250, flexShrink: 1 },

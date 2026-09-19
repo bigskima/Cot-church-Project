@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { Badge, Icon, Skeleton } from '@/components';
@@ -22,6 +22,7 @@ function dateLabel(value?: string | null) {
 export function ParticipationHomeShelf({ scope, expressionId }: { scope: 'general' | 'expression'; expressionId?: string }) {
   const { auth, context, mode } = useSession();
   const { colors } = useTheme();
+  const [expanded, setExpanded] = useState(false);
   const organizationId = scope === 'expression'
     ? context?.expressions?.find((item) => item.id === expressionId)?.organizationId ?? context?.organization?.id ?? ''
     : context?.organization?.id ?? context?.organizations?.[0]?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
@@ -55,14 +56,38 @@ export function ParticipationHomeShelf({ scope, expressionId }: { scope: 'genera
   if (!resource.loading && !items.length) return null;
 
   return (
-    <View style={[styles.shelf, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+    <View style={[
+      styles.shelf,
+      expanded
+        ? [styles.shelfExpanded, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]
+        : styles.shelfCollapsed,
+    ]}>
+      <Pressable
+        onPress={() => setExpanded((value) => !value)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        style={({ pressed }) => [styles.compactTrigger, pressed && styles.pressed]}
+      >
+        <View style={[styles.icon, { backgroundColor: colors.primarySoft, borderColor: colors.primarySoftStrong }]}>
+          <Icon name="chatbubbles-outline" size={17} color={colors.interactive} />
+        </View>
+        <View style={styles.titleCopy}>
+          <Text style={[styles.compactTitle, { color: colors.text }]}>Community participation</Text>
+          {expanded ? <Text style={[styles.subtitle, { color: colors.textMuted }]}>Polls and giveaways open in this community</Text> : null}
+        </View>
+        {items.length ? <View style={[styles.countPill, { backgroundColor: colors.primarySoft }]}><Text style={[styles.countText, { color: colors.interactive }]}>{items.length}</Text></View> : null}
+        <View style={[styles.triggerChevron, { backgroundColor: colors.card }]}>
+          <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textSecondary} />
+        </View>
+      </Pressable>
+
+      {expanded ? (
+      <>
       <View style={styles.header}>
         <View style={styles.titleRow}>
-          <View style={[styles.icon, { backgroundColor: colors.primarySoft }]}><Icon name="sparkles-outline" size={18} color={colors.interactive} /></View>
           <View style={styles.titleCopy}>
             <Text style={[styles.eyebrow, { color: colors.interactive }]}>JOIN IN</Text>
-            <Text style={[styles.title, { color: colors.text }]}>Community participation</Text>
-            <Text style={[styles.subtitle, { color: colors.textMuted }]}>Polls, giveaways and lightweight ways to take part.</Text>
+            <Text style={[styles.title, { color: colors.text }]}>Open participation</Text>
           </View>
         </View>
         <Pressable onPress={() => router.push(route as any)} accessibilityRole="button" style={({ pressed }) => [styles.seeAllButton, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, pressed && styles.pressed]}>
@@ -92,15 +117,24 @@ export function ParticipationHomeShelf({ scope, expressionId }: { scope: 'genera
           ))}
         </ScrollView>
       )}
+      </>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  shelf: { width: '100%', alignSelf: 'center', borderWidth: 1, borderRadius: radius.xxl, paddingVertical: spacing.lg },
-  header: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  shelf: { alignSelf: 'flex-start', overflow: 'hidden' },
+  shelfCollapsed: { borderRadius: radius.pill },
+  shelfExpanded: { width: '100%', alignSelf: 'center', borderWidth: 1, borderRadius: radius.xxl, paddingBottom: spacing.lg },
+  compactTrigger: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: spacing.xs, paddingVertical: 4 },
+  compactTitle: { fontSize: 11.5, lineHeight: 16, fontWeight: '900' },
+  countPill: { minWidth: 24, height: 24, borderRadius: 12, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
+  countText: { fontSize: 9.5, fontWeight: '900' },
+  triggerChevron: { width: 30, height: 30, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  header: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   titleRow: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, titleCopy: { flex: 1, minWidth: 0 },
-  icon: { width: 42, height: 42, borderRadius: 15, alignItems: 'center', justifyContent: 'center' }, eyebrow: { fontSize: 8.5, lineHeight: 11, fontWeight: '900', letterSpacing: 0.95 }, title: { fontSize: 18, lineHeight: 23, fontWeight: '900', letterSpacing: -0.35, marginTop: 2 }, subtitle: { fontSize: 10.5, lineHeight: 15, marginTop: 2 },
+  icon: { width: 36, height: 36, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center' }, eyebrow: { fontSize: 8.5, lineHeight: 11, fontWeight: '900', letterSpacing: 0.95 }, title: { fontSize: 18, lineHeight: 23, fontWeight: '900', letterSpacing: -0.35, marginTop: 2 }, subtitle: { fontSize: 10.5, lineHeight: 15, marginTop: 2 },
   seeAllButton: { minHeight: 38, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: 5 }, seeAll: { fontSize: 10.5, fontWeight: '800' },
   loading: { paddingHorizontal: spacing.lg, flexDirection: 'row', gap: spacing.sm }, rail: { paddingHorizontal: spacing.lg, gap: spacing.sm, paddingBottom: 2 },
   card: { width: 238, minHeight: 150, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: 5 }, cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, smallIcon: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }, cardKicker: { fontSize: 8, lineHeight: 11, fontWeight: '900', letterSpacing: 0.8, marginTop: 2 }, cardTitle: { fontSize: 14, lineHeight: 19, fontWeight: '900', letterSpacing: -0.18 }, prize: { fontSize: 11, lineHeight: 16, fontWeight: '700' },

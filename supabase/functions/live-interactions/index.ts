@@ -25,6 +25,44 @@ Deno.serve(createHandler(
       }
 
       const admin = adminClient();
+      const view = (url.searchParams.get("view") ?? "chat").trim().toLowerCase();
+
+      if (view === "reactions") {
+        const since = url.searchParams.get("since");
+        let query = admin
+          .from("stream_reactions")
+          .select("id,profile_id,reaction,created_at")
+          .eq("stream_id", streamId)
+          .order("created_at", { ascending: true })
+          .limit(80);
+
+        if (since) {
+          const parsed = Date.parse(since);
+          if (!Number.isFinite(parsed)) {
+            throw new ApiError("VALIDATION_FAILED", "Invalid reaction cursor", 422);
+          }
+          query = query.gt("created_at", new Date(parsed).toISOString());
+        } else {
+          query = query.gte("created_at", new Date(Date.now() - 15_000).toISOString());
+        }
+
+        const { data: reactions, error: reactionError } = await query;
+        if (reactionError) throw new ApiError("REACTION_FETCH_FAILED", "Unable to load live reactions", 500, undefined, false);
+
+        return {
+          data: (reactions ?? []).map((row: any) => ({
+            id: String(row.id),
+            profileId: row.profile_id ?? null,
+            reaction: row.reaction,
+            createdAt: row.created_at,
+          })),
+        };
+      }
+
+      if (view !== "chat") {
+        throw new ApiError("VALIDATION_FAILED", "Invalid live interaction view", 422);
+      }
+
       const { data: rows, error } = await admin
         .from("stream_messages")
         .select("id,membership_id,body,created_at")

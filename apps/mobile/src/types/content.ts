@@ -252,6 +252,9 @@ export type LiveStream = {
   organization_id?: string;
   expression_id?: string | null;
   branch_id?: string | null;
+  external_id?: string;
+  provider?: 'youtube' | 'agora' | 'mux' | string;
+  playback_kind?: 'youtube' | 'agora' | 'hls' | string;
   title: string;
   description: string;
   status: 'draft' | 'scheduled' | 'provisioning' | 'ready' | 'live' | 'ended' | 'processing' | 'replay_ready' | 'failed' | 'cancelled' | 'archived';

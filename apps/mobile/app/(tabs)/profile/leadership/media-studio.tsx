@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
@@ -21,6 +22,8 @@ import {
 } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import type { LiveStream } from '@/types/content';
+import { AgoraLiveSession } from '@/features/live/AgoraLiveSession';
+import type { AgoraRtcGrant } from '@/features/live/agora-types';
 
 type StreamingReadiness = {
   ready: boolean;
@@ -28,12 +31,14 @@ type StreamingReadiness = {
   providerCode?: string;
   signedPlaybackConfigured?: boolean;
   testMode?: boolean;
+  operationMode?: 'external' | 'rtc' | 'managed';
 };
 
 type BroadcastScope = 'public' | 'expression';
 
 export default function MediaStudioScreen() {
   const insets = useSafeAreaInsets();
+  const viewport = useWindowDimensions();
   const pathname = usePathname();
   const expressionWorkspace = pathname.startsWith('/expressions/');
   const { api, context, hasCapability, hasPublicCapability } = useSession();
@@ -58,6 +63,8 @@ export default function MediaStudioScreen() {
   const [creating, setCreating] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [createdIngest, setCreatedIngest] = useState<{ rtmpUrl: string; streamKey: string } | null>(null);
+  const [createdRtc, setCreatedRtc] = useState<{ streamId: string; grant: AgoraRtcGrant } | null>(null);
+  const [studioFullscreen, setStudioFullscreen] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -75,6 +82,10 @@ export default function MediaStudioScreen() {
   const destinationName = broadcastScope === 'expression'
     ? expression?.name ?? 'Expression'
     : 'General Community';
+  const widescreenAspect = 16 / 9;
+  const studioFullscreenFrame = viewport.width / Math.max(viewport.height, 1) >= widescreenAspect
+    ? { width: viewport.height * widescreenAspect, height: viewport.height }
+    : { width: viewport.width, height: viewport.width / widescreenAspect };
 
   const readiness = useResource<StreamingReadiness>(
     `leadership:streaming-readiness:${broadcastScope}:${organizationId || 'auto'}:${targetExpressionId ?? 'none'}`,
@@ -102,6 +113,18 @@ export default function MediaStudioScreen() {
   );
 
   const providerReady = readiness.data?.ready === true;
+  const operationMode = readiness.data?.operationMode ?? 'managed';
+  const providerCode = readiness.data?.providerCode;
+  const readinessReason = readiness.data?.reason ?? null;
+  const readinessMessage =
+    readinessReason === 'agora_credentials_invalid'
+      ? 'Agora App ID or Primary Certificate needs correction in the protected COT streaming credential.'
+      : readinessReason === 'agora_token_generation_failed' || readinessReason === 'agora_token_runtime_unavailable'
+        ? 'COT could not generate a secure Agora access token. Check the Agora credential and try again.'
+        : readinessReason === 'agora_cohost_auth_required'
+          ? 'Agora Co-host Authentication must be active before Expression Live can start.'
+          : 'Temporarily unavailable. Existing broadcasts remain visible.';
+  const canCreateBroadcast = providerReady && operationMode !== 'external';
   const streamList = streams.data ?? [];
 
   const resetCreate = () => {
@@ -109,6 +132,7 @@ export default function MediaStudioScreen() {
     setDescription('');
     setLatencyMode('reduced');
     setCreatedIngest(null);
+    setCreatedRtc(null);
     setShowKey(false);
     setErrorMsg('');
   };
@@ -139,7 +163,13 @@ export default function MediaStudioScreen() {
     setErrorMsg('');
     setActionMsg('');
     try {
-      const res = await api.request<{ stream: LiveStream; ingest: { rtmpUrl: string; streamKey: string } }>('streaming-broadcasts', {
+      const res = await api.request<{
+        stream: LiveStream;
+        ingest?: { rtmpUrl?: string; streamKey?: string };
+        rtc?: { channelName: string } | null;
+        rtcGrant?: AgoraRtcGrant | null;
+        providerCode?: string;
+      }>('streaming-broadcasts', {
         method: 'POST',
         context: 'public',
         body: JSON.stringify({
@@ -149,16 +179,61 @@ export default function MediaStudioScreen() {
           description: description.trim(),
           visibility: broadcastScope === 'public' ? 'public' : 'branch',
           latencyMode,
-          record: true,
+          record: providerCode === 'agora' ? false : true,
         }),
       });
-      setCreatedIngest(res.ingest);
+
+      if (res.providerCode === 'agora' && res.rtcGrant) {
+        setCreatedRtc({ streamId: res.stream.id, grant: res.rtcGrant });
+        setCreatedIngest(null);
+      } else if (res.ingest?.rtmpUrl && res.ingest.streamKey) {
+        setCreatedIngest({ rtmpUrl: res.ingest.rtmpUrl, streamKey: res.ingest.streamKey });
+      }
       setActionMsg(`${res.stream.title} was created for ${destinationName}.`);
       streams.refresh();
     } catch (err) {
       setErrorMsg(toUserFacingErrorMessage(err, 'We couldn’t create this broadcast. Please try again.'));
     } finally {
       setCreating(false);
+    }
+  };
+
+  const markRtcLive = async (streamId: string) => {
+    try {
+      await api.request('streaming-broadcasts', {
+        method: 'PATCH',
+        context: 'current',
+        body: JSON.stringify({ id: streamId, action: 'mark_live' }),
+      });
+      setActionMsg(`${destinationName} is live now.`);
+      streams.refresh();
+    } catch (err) {
+      setErrorMsg(toUserFacingErrorMessage(err, 'Video connected, but COT could not update the live status.'));
+    }
+  };
+
+  const finishRtcBroadcast = async () => {
+    const active = createdRtc;
+    if (!active) {
+      setCreateOpen(false);
+      return;
+    }
+    setBusyId(active.streamId);
+    try {
+      await api.request('streaming-broadcasts', {
+        method: 'PATCH',
+        context: 'current',
+        body: JSON.stringify({ id: active.streamId, action: 'stop' }),
+      });
+      setActionMsg('Expression broadcast ended.');
+      setStudioFullscreen(false);
+      setCreatedRtc(null);
+      setCreateOpen(false);
+      streams.refresh();
+    } catch (err) {
+      setErrorMsg(toUserFacingErrorMessage(err, 'We couldn’t finish this broadcast cleanly. Please try End broadcast again.'));
+    } finally {
+      setBusyId(null);
     }
   };
 
@@ -214,7 +289,7 @@ export default function MediaStudioScreen() {
                 ? 'Create live broadcasts for General COT.'
                 : `Create private broadcasts inside ${expression?.name ?? 'your Expression'}.`}
               showBack
-              rightAction={providerReady ? <Button label="New broadcast" onPress={openCreate} size="sm" /> : undefined}
+              rightAction={canCreateBroadcast ? <Button label="New broadcast" onPress={openCreate} size="sm" /> : undefined}
             />
           </View>
         ) : null}
@@ -269,14 +344,18 @@ export default function MediaStudioScreen() {
               <Text style={[styles.cardTitle, { color: colors.text }]}>Live broadcasting</Text>
               <Text style={[styles.helper, { color: colors.textSecondary }]}>
                 {providerReady
-                  ? readiness.data?.testMode
-                    ? `Ready for ${destinationName} in test broadcast mode.`
-                    : `Ready for ${destinationName}.`
-                  : 'Temporarily unavailable. Existing broadcasts remain visible.'}
+                  ? operationMode === 'external'
+                    ? `${destinationName} uses the configured YouTube channel. Start the public stream on YouTube and COT will discover it automatically.`
+                    : operationMode === 'rtc'
+                      ? `Ready for secure in-app Expression broadcasting with ${providerCode === 'agora' ? 'Agora' : 'the configured RTC service'}.`
+                      : readiness.data?.testMode
+                        ? `Ready for ${destinationName} in test broadcast mode.`
+                        : `Ready for ${destinationName}.`
+                  : readinessMessage}
               </Text>
             </View>
             <Badge
-              label={providerReady ? (readiness.data?.testMode ? 'TEST MODE' : 'AVAILABLE') : 'TEMPORARILY UNAVAILABLE'}
+              label={providerReady ? (operationMode === 'external' ? 'YOUTUBE SOURCE' : operationMode === 'rtc' ? 'IN-APP LIVE' : readiness.data?.testMode ? 'TEST MODE' : 'AVAILABLE') : 'TEMPORARILY UNAVAILABLE'}
               variant={providerReady ? (readiness.data?.testMode ? 'warning' : 'active') : 'neutral'}
             />
           </View>
@@ -286,56 +365,198 @@ export default function MediaStudioScreen() {
               title={broadcastScope === 'public' ? 'Public broadcasts' : 'Expression broadcasts'}
               badge={streamList.length}
               subtitle={broadcastScope === 'public' ? 'General COT live broadcasts' : `Live broadcasts for ${expression?.name ?? 'this Expression'}`}
-              actionLabel={providerReady ? 'Create' : undefined}
-              onAction={providerReady ? openCreate : undefined}
+              actionLabel={canCreateBroadcast ? 'Create' : undefined}
+              onAction={canCreateBroadcast ? openCreate : undefined}
             />
             {streams.loading && !streams.data ? (
               <Skeleton height={112} count={2} />
             ) : streams.error && !streams.data ? (
               <ResourceError message={streams.error} retry={streams.refresh} />
             ) : streamList.length ? (
-              streamList.map((stream) => (
-                <View key={stream.id} style={[styles.tile, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
-                  <View style={styles.tileTop}>
-                    <View style={[styles.streamIcon, { backgroundColor: stream.status === 'live' ? colors.liveSoft : colors.primarySoft }]}>
-                      <Icon name="radio" size={19} color={stream.status === 'live' ? colors.live : colors.interactive} />
+              streamList.map((stream) => {
+                const finished = ['ended', 'cancelled'].includes(stream.status);
+                const eventTime = stream.started_at ?? stream.scheduled_start ?? stream.created_at;
+                return (
+                  <View key={stream.id} style={[styles.tile, { backgroundColor: colors.card, borderColor: stream.status === 'live' ? colors.live : colors.borderSubtle }, stream.status === 'live' ? shadows.md : shadows.sm]}>
+                    <View style={styles.tileTop}>
+                      <View style={[styles.streamIcon, { backgroundColor: stream.status === 'live' ? colors.liveSoft : colors.primarySoft }]}>
+                        <Icon name={stream.status === 'live' ? 'radio' : 'videocam-outline'} size={18} color={stream.status === 'live' ? colors.live : colors.interactive} />
+                      </View>
+                      <View style={styles.tileInfo}>
+                        <View style={styles.tileTitleRow}>
+                          <Text style={[styles.tileTitle, { color: colors.text }]} numberOfLines={1}>{stream.title}</Text>
+                          <Badge label={(stream.status ?? 'broadcast').toUpperCase()} variant={stream.status === 'live' ? 'live' : 'neutral'} pulse={stream.status === 'live'} />
+                        </View>
+                        <Text style={[styles.tileDate, { color: colors.textMuted }]} numberOfLines={1}>
+                          {eventTime ? new Date(eventTime).toLocaleString() : 'Created recently'}
+                        </Text>
+                        <View style={styles.tileMetaRow}>
+                          <View style={[styles.tileMetaPill, { backgroundColor: colors.bgSecondary }]}>
+                            <Icon name="radio-outline" size={12} color={colors.textMuted} />
+                            <Text style={[styles.tileMetaText, { color: colors.textSecondary }]}>{stream.provider === 'agora' ? 'Agora RTC' : stream.provider || 'Live'}</Text>
+                          </View>
+                          {stream.latency_mode ? (
+                            <View style={[styles.tileMetaPill, { backgroundColor: colors.bgSecondary }]}>
+                              <Icon name="flash-outline" size={12} color={colors.textMuted} />
+                              <Text style={[styles.tileMetaText, { color: colors.textSecondary }]}>{stream.latency_mode.replace(/_/g, ' ')}</Text>
+                            </View>
+                          ) : null}
+                        </View>
+                      </View>
                     </View>
-                    <View style={styles.tileInfo}>
-                      <Text style={[styles.tileTitle, { color: colors.text }]} numberOfLines={2}>{stream.title}</Text>
-                      <Text style={[styles.tileDate, { color: colors.textMuted }]}>
-                        {stream.scheduled_start
-                          ? new Date(stream.scheduled_start).toLocaleString()
-                          : stream.created_at
-                            ? new Date(stream.created_at).toLocaleString()
-                            : 'Created recently'}
-                      </Text>
-                    </View>
-                    <Badge label={(stream.status ?? 'broadcast').toUpperCase()} variant={stream.status === 'live' ? 'live' : 'neutral'} pulse={stream.status === 'live'} />
-                  </View>
-                  <View style={styles.actions}>
-                    <Button label="Refresh" onPress={() => void operateStream(stream.id, 'refresh_status')} loading={busyId === stream.id} variant="outline" size="sm" />
-                    {!['ended', 'cancelled'].includes(stream.status) ? (
-                      <Button label="End broadcast" onPress={() => void operateStream(stream.id, 'stop')} disabled={busyId === stream.id} variant="destructive" size="sm" />
+                    {!finished ? (
+                      <View style={styles.actions}>
+                        <Button label="Refresh status" onPress={() => void operateStream(stream.id, 'refresh_status')} loading={busyId === stream.id} variant="outline" size="sm" />
+                        <Button label="End" onPress={() => void operateStream(stream.id, 'stop')} disabled={busyId === stream.id} variant="destructive" size="sm" />
+                      </View>
                     ) : null}
                   </View>
-                </View>
-              ))
+                );
+              })
             ) : (
               <EmptyState
                 title="No broadcasts yet"
-                message={providerReady ? `Create the first broadcast for ${destinationName}.` : 'New broadcasts will be available again shortly.'}
+                message={providerReady && operationMode === 'external'
+                  ? 'Start the live service on the configured YouTube channel. COT will surface it automatically when YouTube reports it as live.'
+                  : providerReady
+                    ? `Create the first broadcast for ${destinationName}.`
+                    : 'New broadcasts will be available again shortly.'}
                 iconName="radio-outline"
-                actionLabel={providerReady ? 'Create broadcast' : undefined}
-                onAction={providerReady ? openCreate : undefined}
+                actionLabel={canCreateBroadcast ? 'Create broadcast' : undefined}
+                onAction={canCreateBroadcast ? openCreate : undefined}
               />
             )}
           </View>
         </View>
       </ScrollView>
 
+      <Modal visible={Boolean(createdRtc)} animationType="fade" presentationStyle="fullScreen" onRequestClose={() => {}}>
+        {createdRtc ? (
+          <View
+            style={[
+              styles.liveStudio,
+              studioFullscreen && styles.liveStudioFullscreen,
+              {
+                paddingTop: studioFullscreen ? 0 : Math.max(insets.top, spacing.md),
+                paddingBottom: studioFullscreen ? 0 : Math.max(insets.bottom, spacing.md),
+              },
+            ]}
+          >
+            <StatusBar hidden={studioFullscreen} style="light" />
+            {!studioFullscreen ? (
+            <View style={styles.liveStudioHeader}>
+              <View style={styles.liveStudioHeaderCopy}>
+                <View style={styles.liveStudioStatusRow}>
+                  <Badge label="LIVE STUDIO" variant="live" pulse />
+                  <Text style={styles.liveStudioScope}>EXPRESSION ONLY</Text>
+                </View>
+                <Text style={styles.liveStudioTitle} numberOfLines={1}>{title || 'Expression Live'}</Text>
+                <Text style={styles.liveStudioSubtitle} numberOfLines={1}>{destinationName} · Secure Agora RTC</Text>
+              </View>
+              <View style={styles.liveStudioHeaderActions}>
+                <Pressable
+                  onPress={() => setStudioFullscreen(true)}
+                  style={({ pressed }) => [styles.liveStudioRoundAction, pressed && { opacity: 0.82 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Enter fullscreen studio"
+                >
+                  <Icon name="expand-outline" size={19} color="#FFFFFF" />
+                </Pressable>
+                <Pressable
+                  onPress={() => void finishRtcBroadcast()}
+                  disabled={busyId === createdRtc.streamId}
+                  style={({ pressed }) => [
+                    styles.liveStudioEndTop,
+                    pressed && { opacity: 0.82 },
+                    busyId === createdRtc.streamId && { opacity: 0.55 },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="End broadcast"
+                >
+                  <Icon name="stop-circle-outline" size={19} color="#FFFFFF" />
+                  <Text style={styles.liveStudioEndTopText}>{busyId === createdRtc.streamId ? 'Ending…' : 'End'}</Text>
+                </Pressable>
+              </View>
+            </View>
+            ) : null}
+
+            {!studioFullscreen && errorMsg ? (
+              <View style={styles.liveStudioError}>
+                <Icon name="alert-circle" size={18} color="#FF7A8A" />
+                <Text style={styles.liveStudioErrorText}>{errorMsg}</Text>
+              </View>
+            ) : null}
+
+            <View style={[styles.liveStudioStage, studioFullscreen && styles.liveStudioStageFullscreen, studioFullscreen && studioFullscreenFrame]}>
+              <AgoraLiveSession
+                grant={createdRtc.grant}
+                role="publisher"
+                onJoined={() => void markRtcLive(createdRtc.streamId)}
+                onError={setErrorMsg}
+              />
+            </View>
+
+            {!studioFullscreen ? (
+            <View style={styles.liveStudioDetails}>
+              <View style={styles.liveStudioDetailCard}>
+                <Icon name="shield-checkmark-outline" size={18} color="#59B7FF" />
+                <View style={styles.flex}>
+                  <Text style={styles.liveStudioDetailTitle}>Private Expression broadcast</Text>
+                  <Text style={styles.liveStudioDetailText}>Only members authorized to enter {destinationName} can receive a viewer token.</Text>
+                </View>
+              </View>
+              <View style={styles.liveStudioMetaRow}>
+                <View style={styles.liveStudioMetaPill}>
+                  <Icon name="videocam-outline" size={15} color="#DCEAFF" />
+                  <Text style={styles.liveStudioMetaText}>Camera + mic live</Text>
+                </View>
+                <View style={styles.liveStudioMetaPill}>
+                  <Icon name="flash-outline" size={15} color="#DCEAFF" />
+                  <Text style={styles.liveStudioMetaText}>{latencyMode === 'low' ? 'Ultra low latency' : latencyMode === 'reduced' ? 'Reduced latency' : 'Standard latency'}</Text>
+                </View>
+              </View>
+            </View>
+            ) : null}
+
+            {studioFullscreen ? (
+              <View style={styles.liveStudioFullscreenActions}>
+                <Pressable
+                  onPress={() => setStudioFullscreen(false)}
+                  style={({ pressed }) => [styles.liveStudioFullscreenBtn, pressed && { opacity: 0.82 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Exit fullscreen studio"
+                >
+                  <Icon name="contract-outline" size={21} color="#FFFFFF" />
+                </Pressable>
+                <Pressable
+                  onPress={() => void finishRtcBroadcast()}
+                  disabled={busyId === createdRtc.streamId}
+                  style={({ pressed }) => [styles.liveStudioFullscreenEnd, pressed && { opacity: 0.82 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="End broadcast"
+                >
+                  <Icon name="stop-circle-outline" size={20} color="#FFFFFF" />
+                </Pressable>
+              </View>
+            ) : null}
+
+            {!studioFullscreen ? (
+            <Button
+              label="End broadcast"
+              onPress={() => void finishRtcBroadcast()}
+              loading={busyId === createdRtc.streamId}
+              variant="destructive"
+              size="lg"
+              fullWidth
+            />
+            ) : null}
+          </View>
+        ) : null}
+      </Modal>
+
       <BottomSheet
-        visible={createOpen}
-        onClose={() => !creating && setCreateOpen(false)}
+        visible={createOpen && !createdRtc}
+        onClose={() => { if (!creating) setCreateOpen(false); }}
         title={createdIngest ? 'Streaming connection details' : 'Create live broadcast'}
         subtitle={createdIngest ? 'Use these details only on the device or software sending the broadcast.' : `Destination: ${destinationName}`}
         maxHeightPercent={94}
@@ -392,7 +613,7 @@ export default function MediaStudioScreen() {
             </View>
             <Text style={[styles.helper, { color: colors.textMuted }]}>Reduced latency is the recommended default for interactive services.</Text>
 
-            <Button label="Create broadcast" onPress={() => void handleCreateBroadcast()} loading={creating} disabled={!providerReady} size="lg" fullWidth />
+            <Button label="Create broadcast" onPress={() => void handleCreateBroadcast()} loading={creating} disabled={!canCreateBroadcast} size="lg" fullWidth />
           </View>
         )}
       </BottomSheet>
@@ -416,12 +637,16 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 15, fontWeight: '800', letterSpacing: -0.2 },
   helper: { fontSize: 11, lineHeight: 17 },
   listSection: { gap: spacing.sm },
-  tile: { padding: spacing.md, borderRadius: radius.xl, borderWidth: 1, gap: spacing.md, marginBottom: spacing.sm },
+  tile: { padding: spacing.md, borderRadius: radius.xl, borderWidth: 1, gap: spacing.sm, marginBottom: spacing.xs },
   tileTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   streamIcon: { width: 40, height: 40, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
-  tileInfo: { flex: 1, gap: 2 },
-  tileTitle: { fontSize: 15, fontWeight: '800', letterSpacing: -0.2 },
+  tileInfo: { flex: 1, gap: 4 },
+  tileTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  tileTitle: { flex: 1, fontSize: 15, fontWeight: '800', letterSpacing: -0.2 },
   tileDate: { fontSize: 11 },
+  tileMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, marginTop: 2 },
+  tileMetaPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 7, paddingVertical: 4, borderRadius: radius.pill },
+  tileMetaText: { fontSize: 9, fontWeight: '700', textTransform: 'capitalize' },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   form: { gap: spacing.md },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
@@ -429,6 +654,34 @@ const styles = StyleSheet.create({
   destinationNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1 },
   destinationTitle: { fontSize: 14, fontWeight: '800', marginBottom: 2 },
   ingestSheet: { gap: spacing.md },
+  rtcSheet: { gap: spacing.md },
+  rtcPreview: { height: 360, borderRadius: radius.xl, overflow: 'hidden', backgroundColor: '#000000' },
+  liveStudio: { flex: 1, backgroundColor: '#02050A', paddingHorizontal: spacing.md, gap: spacing.md },
+  liveStudioFullscreen: { paddingHorizontal: 0, gap: 0, alignItems: 'center', justifyContent: 'center' },
+  liveStudioHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  liveStudioHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  liveStudioRoundAction: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0C1522', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+  liveStudioHeaderCopy: { flex: 1, minWidth: 0, gap: 4 },
+  liveStudioStatusRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  liveStudioScope: { color: '#79C5FF', fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
+  liveStudioTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: '900', letterSpacing: -0.4 },
+  liveStudioSubtitle: { color: '#9FB0C7', fontSize: 12, fontWeight: '600' },
+  liveStudioEndTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 42, paddingHorizontal: 14, borderRadius: radius.pill, backgroundColor: '#B91C3B' },
+  liveStudioEndTopText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
+  liveStudioError: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderRadius: radius.lg, backgroundColor: 'rgba(166,27,50,0.24)', borderWidth: 1, borderColor: 'rgba(255,122,138,0.36)' },
+  liveStudioErrorText: { color: '#FF9AA7', fontSize: 12, fontWeight: '700', flex: 1 },
+  liveStudioStage: { flex: 1, minHeight: 340, borderRadius: radius.xl, overflow: 'hidden', backgroundColor: '#000000', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  liveStudioStageFullscreen: { flex: 0, minHeight: 0, borderRadius: 0, borderWidth: 0 },
+  liveStudioFullscreenActions: { position: 'absolute', top: spacing.md, right: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, zIndex: 80 },
+  liveStudioFullscreenBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(5,10,18,0.74)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
+  liveStudioFullscreenEnd: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B91C3B', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
+  liveStudioDetails: { gap: spacing.sm },
+  liveStudioDetailCard: { flexDirection: 'row', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, backgroundColor: '#0A1422', borderWidth: 1, borderColor: '#17314D' },
+  liveStudioDetailTitle: { color: '#F7FAFF', fontSize: 13, fontWeight: '800', marginBottom: 2 },
+  liveStudioDetailText: { color: '#9FB0C7', fontSize: 11, lineHeight: 17 },
+  liveStudioMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  liveStudioMetaPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: '#0A101A', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  liveStudioMetaText: { color: '#DCEAFF', fontSize: 10, fontWeight: '800' },
   securityNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg },
   ingestField: { gap: 5 },
   fieldCode: { padding: spacing.md, borderRadius: radius.lg, fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },

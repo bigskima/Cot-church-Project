@@ -89,12 +89,17 @@ const requiredFiles = [
   'supabase/functions/public-profile/index.ts',
   'supabase/functions/profile-banner/index.ts',
   'supabase/functions/realtime-config/index.ts',
+  'supabase/functions/public-event-detail/index.ts',
+  'supabase/functions/expression-media/index.ts',
 ];
 
 await Promise.all(requiredFiles.map((file) => access(file)));
 
 const supabaseConfig = await readFile('supabase/config.toml', 'utf8');
 const handler = await readFile('supabase/functions/_shared/handler.ts', 'utf8');
+const cors = await readFile('supabase/functions/_shared/cors.ts', 'utf8');
+const publicEventDetail = await readFile('supabase/functions/public-event-detail/index.ts', 'utf8');
+const expressionMedia = await readFile('supabase/functions/expression-media/index.ts', 'utf8');
 const authContext = await readFile('supabase/functions/_shared/context.ts', 'utf8');
 const response = await readFile('supabase/functions/_shared/response.ts', 'utf8');
 const signup = await readFile('supabase/functions/signup/index.ts', 'utf8');
@@ -188,6 +193,11 @@ const invariants = [
   [socialChatContracts, /targetProfileId|target_profile_id/, 'individual member follow target contract'],
   [socialChatContracts, /banner_url|profile-banners/, 'member profile banner contract'],
   [handler, /request\.method === "OPTIONS"/, 'CORS preflight handling'],
+  [handler, /await corsHeaders\(request\)/, 'CORS policy resolves asynchronous runtime configuration'],
+  [cors, /platform_web_origins/, 'provider-agnostic database origin configuration'],
+  [cors, /originMatchesPattern/, 'generic exact and wildcard browser-origin matching'],
+  [publicEventDetail, /createHandler/, 'public event detail uses shared request and CORS infrastructure'],
+  [expressionMedia, /createHandler/, 'Expression media uses shared request and CORS infrastructure'],
   [handler, /authenticate\(request/, 'central authentication'],
   [handler, /options\.organization \?\? "optional"/, 'handler preserves explicit organisation context mode'],
   [authContext, /organizationMode === "none"[\s\S]*?organizationId[\s\S]*?null/, 'organisation-independent endpoints ignore stale organisation headers'],
@@ -324,7 +334,7 @@ const invariants = [
   [organizations, /Main Expression/, 'canonical initial Expression provisioning'],
   [memberships, /update_membership_status/, 'protected membership lifecycle'],
   [memberships, /view === "expression-directory"[\s\S]*requestedExpressionId[\s\S]*auth\.branchId[\s\S]*EXPRESSION_CONTEXT_MISMATCH/, 'Expression member directory binds to exact active Expression'],
-  [memberships, /expression_memberships[\s\S]*profile:profiles\(id,display_name,username,avatar_url\)/, 'Expression member directory exposes safe profile fields only'],
+  [memberships, /expression_memberships[\s\S]*profile:profiles(?:![^(]+)?\(id,display_name,username,avatar_url\)/, 'Expression member directory exposes safe profile fields only'],
   [memberships, /exactMembership[\s\S]*profile_id[\s\S]*auth\.user\.id[\s\S]*status", "active"/, 'Expression member directory verifies caller active membership'],
   [roles, /create_custom_role/, 'custom role administration'],
   [events, /events\.create/, 'event authorization'],
@@ -433,6 +443,8 @@ const invariants = [
 
 const missing = invariants.filter(([source, pattern]) => !pattern.test(source));
 const forbidden = [
+  [cors, /(?:vercel|netlify)\.app/i, 'hosting-provider-specific shared CORS rule'],
+  [publicEventDetail, /(?:vercel|netlify)\.app/i, 'hosting-provider-specific public event CORS rule'],
   [organizations, /Main Campus/, 'stale Campus default in organization provisioning'],
   [platformGiving, /platform\.giving\.(?:read|manage)|authorizePlatform/, 'retired Platform Giving authorization path'],
   [churchStory, /Foundation & First Gathering|Multi-Expression Expansion|Global Digital Ministry/, 'fabricated church story fallback'],
@@ -456,6 +468,21 @@ const clientSourceFiles = [
   ...await collectSourceFiles('apps/mobile'),
   ...await collectSourceFiles('apps/admin'),
 ];
+const functionSourceFiles = await collectSourceFiles('supabase/functions');
+
+const hostingProviderRuntimeReferences = [];
+for (const file of functionSourceFiles) {
+  const source = await readFile(file, 'utf8');
+  if (/(?:vercel|netlify)\.app/i.test(source)) hostingProviderRuntimeReferences.push(file);
+}
+
+const hardcodedClientFunctionHosts = [];
+for (const file of clientSourceFiles) {
+  const source = await readFile(file, 'utf8');
+  if (/https:\/\/[^\s'\"]+\.supabase\.co\/functions\/v1/i.test(source)) {
+    hardcodedClientFunctionHosts.push(file);
+  }
+}
 const endpointReferences = new Map();
 const literalRequest = /\b(?:api|platformApi)\.request(?:<[^;]{0,500}?>)?\(\s*([\`'"])([^\`'"]+)\1/gms;
 for (const file of clientSourceFiles) {
@@ -501,12 +528,14 @@ const gatewayMismatches = publicHandlerFunctions.filter((functionName) => {
   return !/verify_jwt\s*=\s*false/.test(section);
 });
 
-if (missing.length || gatewayMismatches.length || presentForbidden.length || missingEndpointFunctions.length) {
+if (missing.length || gatewayMismatches.length || presentForbidden.length || missingEndpointFunctions.length || hostingProviderRuntimeReferences.length || hardcodedClientFunctionHosts.length) {
   const failures = [
     ...missing.map(([, , label]) => label),
     ...gatewayMismatches.map((name) => `gateway verify_jwt=false for ${name}`),
     ...presentForbidden.map(([, , label]) => `remove ${label}`),
     ...missingEndpointFunctions.map((entry) => `missing Edge Function for client endpoint ${entry}`),
+    ...hostingProviderRuntimeReferences.map((file) => `hosting-provider runtime hardcode in ${file}`),
+    ...hardcodedClientFunctionHosts.map((file) => `hardcoded Supabase Functions host in client source ${file}`),
   ];
   console.error(`API check failed: ${failures.join(', ')}`);
   process.exitCode = 1;

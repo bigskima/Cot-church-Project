@@ -98,16 +98,20 @@ export function GivingScreen({ initialScope = 'church', lockedScope = false }: {
   const { colors } = useTheme();
   const publicOrganizationId = process.env.EXPO_PUBLIC_ORGANIZATION_ID?.trim();
   const organizationId = context?.organization?.id ?? publicOrganizationId ?? '';
-  const expressionId = lockedScope ? null : context?.expression?.id ?? null;
-  const expressionName = lockedScope ? 'My Expression' : context?.expression?.name ?? 'My Expression';
+  const expressionId = context?.expression?.id ?? null;
+  const expressionName = context?.expression?.name ?? 'My Expression';
 
-  const [scope, setScope] = useState<GivingScope>(lockedScope ? 'church' : initialScope);
+  const [scope, setScope] = useState<GivingScope>(initialScope);
   const [currency, setCurrency] = useState<string | null>(null);
   const [purposeId, setPurposeId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (lockedScope || mode === 'visitor') setScope('church');
-  }, [lockedScope, mode]);
+    if (mode === 'visitor') {
+      setScope('church');
+      return;
+    }
+    if (lockedScope) setScope(initialScope);
+  }, [lockedScope, initialScope, mode]);
 
   const query = useMemo(() => {
     if (!organizationId) return '';
@@ -165,7 +169,7 @@ export function GivingScreen({ initialScope = 'church', lockedScope = false }: {
         contentContainerStyle={{ paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 130 }}
       >
         <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
-          <ScreenHeader title={title} kicker="GIVING" subtitle={subtitle || (lockedScope ? 'Church-wide giving details.' : 'Church and Expression giving details.')} showBack />
+          <ScreenHeader title={title} kicker="GIVING" subtitle={subtitle || (lockedScope ? (scope === 'expression' ? 'Expression giving details.' : 'Church-wide giving details.') : 'Church and Expression giving details.')} showBack />
         </View>
 
         <View style={styles.body}>

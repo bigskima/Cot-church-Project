@@ -45,7 +45,7 @@ Deno.serve(createHandler(
 
         const { data, error } = await admin
           .from("expression_memberships")
-          .select("id,profile_id,joined_at,profile:profiles(id,display_name,username,avatar_url)")
+          .select("id,profile_id,joined_at,profile:profiles!expression_memberships_profile_id_fkey(id,display_name,username,avatar_url)")
           .eq("organization_id", auth.organizationId)
           .eq("branch_id", auth.branchId)
           .eq("status", "active")

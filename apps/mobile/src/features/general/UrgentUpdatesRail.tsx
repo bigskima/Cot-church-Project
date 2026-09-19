@@ -88,23 +88,27 @@ export function UrgentUpdatesRail({ announcements }: { announcements: UrgentHome
   const events = resource.data?.events ?? [];
 
   return (
-    <View style={[styles.shell, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+    <View style={[
+      styles.shell,
+      expanded
+        ? [styles.shellExpanded, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]
+        : styles.shellCollapsed,
+    ]}>
       <Pressable
         onPress={() => setExpanded((value) => !value)}
         accessibilityRole="button"
         accessibilityState={{ expanded }}
         style={({ pressed }) => [styles.trigger, pressed && styles.pressed]}
       >
-        <View style={[styles.triggerIcon, { backgroundColor: colors.primarySoft }]}>
-          <Icon name="sparkles-outline" size={18} color={colors.interactive} />
+        <View style={[styles.triggerIcon, { backgroundColor: colors.primarySoft, borderColor: colors.primarySoftStrong }]}>
+          <Icon name="notifications-outline" size={17} color={colors.interactive} />
         </View>
         <View style={styles.flex}>
-          <Text style={[styles.eyebrow, { color: colors.interactive }]}>GENERAL COT</Text>
           <Text style={[styles.triggerTitle, { color: colors.text }]}>Updates & gatherings</Text>
-          <Text style={[styles.triggerCopy, { color: colors.textMuted }]}>{expanded ? 'Choose announcements or events below.' : 'Open only when you want church notices or upcoming events.'}</Text>
+          {expanded ? <Text style={[styles.triggerCopy, { color: colors.textMuted }]}>Announcements and upcoming church events</Text> : null}
         </View>
-        <View style={[styles.chevron, { backgroundColor: colors.bgSecondary }]}>
-          <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={17} color={colors.text} />
+        <View style={[styles.chevron, { backgroundColor: expanded ? colors.bgSecondary : colors.card }]}>
+          <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textSecondary} />
         </View>
       </Pressable>
 
@@ -218,14 +222,16 @@ export function UrgentUpdatesRail({ announcements }: { announcements: UrgentHome
 }
 
 const styles = StyleSheet.create({
-  shell: { borderWidth: 1, borderRadius: radius.xl, overflow: 'hidden' },
-  trigger: { minHeight: 82, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  triggerIcon: { width: 42, height: 42, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  shell: { overflow: 'hidden' },
+  shellCollapsed: { alignSelf: 'flex-start', borderRadius: radius.pill },
+  shellExpanded: { width: '100%', borderWidth: 1, borderRadius: radius.xl },
+  trigger: { minHeight: 46, paddingHorizontal: spacing.xs, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  triggerIcon: { width: 36, height: 36, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   flex: { flex: 1, minWidth: 0 },
   eyebrow: { fontSize: 8.5, lineHeight: 11, fontWeight: '900', letterSpacing: 1 },
-  triggerTitle: { fontSize: 15.5, lineHeight: 20, fontWeight: '900', letterSpacing: -0.25, marginTop: 2 },
-  triggerCopy: { fontSize: 10.5, lineHeight: 15, marginTop: 2 },
-  chevron: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  triggerTitle: { fontSize: 11.5, lineHeight: 16, fontWeight: '900', letterSpacing: -0.1 },
+  triggerCopy: { fontSize: 9.5, lineHeight: 14, marginTop: 1 },
+  chevron: { width: 30, height: 30, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   expanded: { borderTopWidth: StyleSheet.hairlineWidth, padding: spacing.md, paddingTop: spacing.sm, gap: spacing.md },
   toolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, flexWrap: 'wrap' },
   segment: { flexDirection: 'row', borderWidth: 1, borderRadius: radius.pill, padding: 3, gap: 2 },

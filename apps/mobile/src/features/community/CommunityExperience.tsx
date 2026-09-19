@@ -111,6 +111,7 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
 
   const [activeTab, setActiveTab] = useState<FeedScope>(scope);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [shareMenuOpen, setShareMenuOpen] = useState(false);
   const [postText, setPostText] = useState('');
   const [postDestination, setPostDestination] = useState<FeedScope>(scope);
   const [attachments, setAttachments] = useState<MediaAttachment[]>([]);
@@ -560,40 +561,53 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
 
       {canPostCurrent ? (
         <View style={[styles.composerSurface, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
-          <Pressable onPress={openComposer} style={({ pressed }) => [styles.composerStrip, pressed && styles.composerPressed]}>
+          <View style={styles.composerStrip}>
             <Avatar url={context?.profile?.avatar_url} name={context?.profile?.display_name || 'Me'} size="sm" />
-            <View style={styles.composerCopy}>
-              <Text style={[styles.composerPrompt, { color: colors.text }]}>{activeTab === 'general' ? 'Share to General COT' : 'Share with the community'}</Text>
-              <Text style={[styles.composerPlaceholder, { color: colors.textMuted }]}>
-                {activeTab === 'general' ? 'Post, photo, video, Reel or voice' : 'Text, photos, video or audio'}
+            <Pressable onPress={openComposer} style={({ pressed }) => [styles.composerCopy, pressed && styles.composerPressed]}>
+              <Text style={[styles.composerPrompt, { color: colors.text }]}>
+                {activeTab === 'general' ? 'Share to General COT' : `Share inside ${expression?.name ?? 'this Expression'}`}
               </Text>
-            </View>
-            <View style={[styles.composeActionIcon, { backgroundColor: colors.primarySoft }]}>
-              <Icon name="create-outline" size={18} color={colors.interactive} />
-            </View>
-          </Pressable>
-          <View style={[styles.quickCreateRow, { borderTopColor: colors.borderSubtle }]}>
-            <Pressable onPress={openComposer} style={({ pressed }) => [styles.quickCreateButton, pressed && styles.composerPressed]}>
-              <Icon name="chatbubble-ellipses-outline" size={15} color={colors.interactive} />
-              <Text style={[styles.quickCreateText, { color: colors.textSecondary }]}>Post</Text>
+              <Text style={[styles.composerPlaceholder, { color: colors.textMuted }]}>Start a post</Text>
             </Pressable>
-            <Pressable onPress={openComposer} style={({ pressed }) => [styles.quickCreateButton, pressed && styles.composerPressed]}>
-              <Icon name="images-outline" size={15} color={colors.interactive} />
-              <Text style={[styles.quickCreateText, { color: colors.textSecondary }]}>Photo / video</Text>
+            <Pressable
+              onPress={() => setShareMenuOpen((value) => !value)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: shareMenuOpen }}
+              accessibilityLabel={shareMenuOpen ? 'Close sharing options' : 'Open sharing options'}
+              style={({ pressed }) => [
+                styles.composeActionIcon,
+                { backgroundColor: shareMenuOpen ? colors.interactive : colors.primarySoft },
+                pressed && styles.composerPressed,
+              ]}
+            >
+              <Icon name={shareMenuOpen ? 'close' : 'add'} size={20} color={shareMenuOpen ? '#FFFFFF' : colors.interactive} />
             </Pressable>
-            {activeTab === 'general' ? (
-              <Pressable onPress={openComposer} style={({ pressed }) => [styles.quickCreateButton, pressed && styles.composerPressed]}>
-                <Icon name="mic-outline" size={15} color={colors.interactive} />
-                <Text style={[styles.quickCreateText, { color: colors.textSecondary }]}>Voice</Text>
-              </Pressable>
-            ) : null}
-            {canCreateReel ? (
-              <Pressable onPress={() => router.push((scope === 'expression' && expression?.id ? `/expressions/${expression.id}/manage/reel` : '/general/studio/reel') as any)} style={({ pressed }) => [styles.quickCreateButton, pressed && styles.composerPressed]}>
-                <Icon name="flash-outline" size={15} color={colors.interactive} />
-                <Text style={[styles.quickCreateText, { color: colors.textSecondary }]}>Reel</Text>
-              </Pressable>
-            ) : null}
           </View>
+
+          {shareMenuOpen ? (
+            <View style={[styles.quickCreateRow, { borderTopColor: colors.borderSubtle }]}>
+              <Pressable onPress={() => { setShareMenuOpen(false); openComposer(); }} style={({ pressed }) => [styles.quickCreateButton, pressed && styles.composerPressed]}>
+                <Icon name="chatbubble-ellipses-outline" size={15} color={colors.interactive} />
+                <Text style={[styles.quickCreateText, { color: colors.textSecondary }]}>Post</Text>
+              </Pressable>
+              <Pressable onPress={() => { setShareMenuOpen(false); openComposer(); }} style={({ pressed }) => [styles.quickCreateButton, pressed && styles.composerPressed]}>
+                <Icon name="images-outline" size={15} color={colors.interactive} />
+                <Text style={[styles.quickCreateText, { color: colors.textSecondary }]}>Media</Text>
+              </Pressable>
+              {activeTab === 'general' ? (
+                <Pressable onPress={() => { setShareMenuOpen(false); openComposer(); }} style={({ pressed }) => [styles.quickCreateButton, pressed && styles.composerPressed]}>
+                  <Icon name="mic-outline" size={15} color={colors.interactive} />
+                  <Text style={[styles.quickCreateText, { color: colors.textSecondary }]}>Voice</Text>
+                </Pressable>
+              ) : null}
+              {canCreateReel ? (
+                <Pressable onPress={() => { setShareMenuOpen(false); router.push((scope === 'expression' && expression?.id ? `/expressions/${expression.id}/manage/reel` : '/general/studio/reel') as any); }} style={({ pressed }) => [styles.quickCreateButton, pressed && styles.composerPressed]}>
+                  <Icon name="flash-outline" size={15} color={colors.interactive} />
+                  <Text style={[styles.quickCreateText, { color: colors.textSecondary }]}>Reel</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
         </View>
       ) : null}
 
@@ -622,6 +636,9 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
               onReply={() => router.push(activeTab === 'general' ? { pathname: '/general/post/[id]', params: { id: item.id, focus: 'comments' } } as any : { pathname: `/expressions/${expression?.id}/post/[id]`, params: { id: item.id, focus: 'comments' } } as any)}
               onReact={canEngage ? (reaction) => reactToPost(item.id, reaction, activeTab) : undefined}
               onBookmark={canEngage ? (currentlySaved) => bookmarkPost(item.id, currentlySaved, activeTab) : undefined}
+              variant="feed"
+              showContext={activeTab === 'expression'}
+              style={styles.feedPostCard}
             />
           )}
         />
@@ -847,17 +864,18 @@ const styles = StyleSheet.create({
   tabTextActive: { fontWeight: '800' },
   feedError: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.md, marginTop: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderRadius: radius.lg },
   feedErrorText: { flex: 1, fontSize: 12, lineHeight: 17, fontWeight: '700' },
-  composerSurface: { marginHorizontal: spacing.md, marginVertical: spacing.sm, borderWidth: 1, borderRadius: radius.xl, overflow: 'hidden' },
-  composerStrip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.md, gap: spacing.md },
-  composeActionIcon: { width: 34, height: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  composerSurface: { marginHorizontal: spacing.sm, marginVertical: spacing.sm, borderWidth: 1, borderRadius: radius.xl, overflow: 'hidden' },
+  composerStrip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.sm, paddingVertical: 9, gap: spacing.sm },
+  composeActionIcon: { width: 38, height: 38, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   quickCreateRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.sm, paddingVertical: 7, borderTopWidth: StyleSheet.hairlineWidth, gap: 2 },
   quickCreateButton: { flex: 1, minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: radius.pill, paddingHorizontal: spacing.xs },
   quickCreateText: { fontSize: 10.5, fontWeight: '700' },
   composerPressed: { opacity: 0.88, transform: [{ scale: 0.992 }] },
   composerCopy: { flex: 1, minWidth: 0 },
-  composerPrompt: { fontSize: 14, fontWeight: '700', letterSpacing: -0.15 },
-  composerPlaceholder: { fontSize: 11, marginTop: 2 },
+  composerPrompt: { fontSize: 13, fontWeight: '800', letterSpacing: -0.15 },
+  composerPlaceholder: { fontSize: 10, marginTop: 1 },
   loadingContainer: { padding: spacing.lg, gap: spacing.md },
+  feedPostCard: { marginHorizontal: spacing.sm, borderRadius: radius.xl },
   composerBody: { gap: spacing.md },
   destinationBlock: { gap: spacing.xs },
   destinationLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },

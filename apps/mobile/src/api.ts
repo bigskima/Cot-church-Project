@@ -149,6 +149,8 @@ function userFacingApiMessage(code: string, status: number, serverMessage?: stri
     STREAMING_RUNTIME_SECRETS_MISSING: 'Live broadcasting is temporarily unavailable. Please try again later.',
     STREAMING_PROVIDER_SCOPE_INVALID: 'Live broadcasting is temporarily unavailable. Please try again later.',
     STREAMING_ADAPTER_UNAVAILABLE: 'Live broadcasting is temporarily unavailable. Please try again later.',
+    AGORA_CREDENTIALS_INVALID: 'Expression Live needs its Agora credentials corrected before broadcasting can start.',
+    AGORA_COHOST_AUTH_REQUIRED: 'Expression Live is waiting for Agora Co-host Authentication to finish activating.',
   };
 
   if (known[code]) return known[code];

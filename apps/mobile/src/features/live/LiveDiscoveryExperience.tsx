@@ -144,7 +144,7 @@ export function LiveDiscoveryExperience({ scope = 'general', embedded = false }:
             <>
               {liveStreams.length > 0 ? (
                 <View style={styles.sectionWrap}>
-                  <SectionHeader title="Broadcasting now" badge={liveStreams.length} subtitle="Current broadcasts inside this Expression." />
+                  <SectionHeader title="Broadcasting now" badge={liveStreams.length} subtitle={expressionMode ? 'Current broadcasts inside this Expression.' : 'The current public General COT live service.'} />
                   <HeroLiveCard
                     stream={liveStreams[0]}
                     onPress={() => openStream(liveStreams[0].id)}
@@ -160,7 +160,7 @@ export function LiveDiscoveryExperience({ scope = 'general', embedded = false }:
               ) : null}
 
               <View style={styles.sectionWrap}>
-                <SectionHeader title="Upcoming" badge={scheduledStreams.length} subtitle="Scheduled and preparing broadcasts." />
+                <SectionHeader title="Upcoming" badge={scheduledStreams.length} subtitle={expressionMode ? 'Scheduled and preparing Expression broadcasts.' : 'Upcoming General COT public broadcasts.'} />
                 {scheduledStreams.length > 0 ? (
                   <ScrollView
                     horizontal
@@ -174,7 +174,7 @@ export function LiveDiscoveryExperience({ scope = 'general', embedded = false }:
                 ) : (
                   <EmptyState
                     title="No upcoming broadcasts"
-                    message="Nothing has been scheduled for this Expression yet."
+                    message={expressionMode ? 'Nothing has been scheduled for this Expression yet.' : 'No General COT public livestream is scheduled right now.'}
                     iconName="radio-outline"
                   />
                 )}

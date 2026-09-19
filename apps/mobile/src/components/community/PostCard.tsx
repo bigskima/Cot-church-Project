@@ -14,6 +14,40 @@ import { ContentReportSheet } from '../engagement/ContentReportSheet';
 import { InlineCommentsSheet } from '../engagement/InlineCommentsSheet';
 import type { MediaAsset, Post, SocialPost } from '@/types/content';
 
+const postRevealSteps = new Map<string, number>();
+const POST_REVEAL_CHARS = 620;
+const POST_REVEAL_LINES = 8;
+
+function revealPostBody(body: string, step: number) {
+  const maxChars = Math.max(POST_REVEAL_CHARS, POST_REVEAL_CHARS * step);
+  const maxLines = Math.max(POST_REVEAL_LINES, POST_REVEAL_LINES * step);
+  const lines = body.split(/\r?\n/);
+  const selected: string[] = [];
+  let usedChars = 0;
+
+  for (const line of lines) {
+    if (selected.length >= maxLines) break;
+    const separatorCost = selected.length ? 1 : 0;
+    const nextCost = line.length + separatorCost;
+    if (usedChars + nextCost <= maxChars) {
+      selected.push(line);
+      usedChars += nextCost;
+      continue;
+    }
+
+    if (!selected.length) {
+      const raw = line.slice(0, maxChars);
+      const wordBreak = raw.lastIndexOf(' ');
+      selected.push(wordBreak > maxChars * 0.72 ? raw.slice(0, wordBreak) : raw);
+    }
+    break;
+  }
+
+  const text = selected.join('\n').trimEnd();
+  const hasMore = text.length < body.length || selected.length < lines.length;
+  return { text: hasMore ? text : body, hasMore };
+}
+
 type PublicIdentityBadge = {
   id?: string;
   code?: string;
@@ -107,9 +141,14 @@ export function PostCard({
   const [preview, setPreview] = useState<PreviewableMedia | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [bodyRevealStep, setBodyRevealStep] = useState(() => postRevealSteps.get(post.id) ?? 1);
 
   const likePending = useRef(false);
   const savePending = useRef(false);
+
+  useEffect(() => {
+    setBodyRevealStep(postRevealSteps.get(post.id) ?? 1);
+  }, [post.id]);
 
   useEffect(() => {
     if (!likePending.current) {
@@ -185,8 +224,77 @@ export function PostCard({
     return `${Math.floor(diff / 86400)}d`;
   };
 
+  const body = post.body?.trim() ?? '';
+  const bodyLineCount = body ? body.split(/\r?\n/).length : 0;
+  const progressiveBody = body.length > 700 || bodyLineCount > POST_REVEAL_LINES;
+  const revealedBody = progressiveBody ? revealPostBody(body, bodyRevealStep) : { text: body, hasMore: false };
+
+  const identityHeader = (
+    <View style={styles.headerRow}>
+      <Pressable onPress={onPressAuthor || onPress} hitSlop={4}>
+        <Avatar name={displayName} url={avatarUrl} size="md" />
+      </Pressable>
+      <View style={styles.identityColumn}>
+        <View style={styles.authorLine}>
+          <Pressable onPress={onPressAuthor || onPress} style={styles.nameGroup}>
+            <Text style={[styles.displayName, { color: colors.text }]} numberOfLines={1}>{displayName}</Text>
+            {isVerified ? <Icon name="checkmark-circle" size={15} color={colors.interactive} /> : null}
+          </Pressable>
+          <Text style={[styles.timestamp, { color: colors.textMuted }]}>{formatTime()}</Text>
+        </View>
+        {handle ? <Text style={[styles.handleText, { color: colors.textMuted }]} numberOfLines={1}>@{handle}</Text> : null}
+      </View>
+      {onMore || canEngage ? (
+        <Pressable
+          onPress={onMore ?? (() => setReportOpen(true))}
+          hitSlop={8}
+          style={({ pressed }) => [styles.moreButton, pressed ? { backgroundColor: colors.bgSecondary } : null]}
+          accessibilityRole="button"
+          accessibilityLabel={onMore ? 'More post actions' : 'Report post'}
+        >
+          <Icon name="ellipsis-horizontal" size={19} color={colors.textMuted} />
+        </Pressable>
+      ) : null}
+    </View>
+  );
+
+  const contextRow = showContextRow ? (
+    <View style={styles.contextRow}>
+      <View style={[styles.contextPill, { backgroundColor: isExpressionPost ? colors.primarySoft : colors.bgSecondary }]}>
+        <Icon name={isExpressionPost ? 'people-outline' : 'globe-outline'} size={12} color={isExpressionPost ? colors.interactive : colors.textSecondary} />
+        <Text style={[styles.contextText, { color: isExpressionPost ? colors.interactive : colors.textSecondary }]} numberOfLines={1}>
+          {isExpressionPost ? expressionLabel || 'Expression' : 'General COT'}
+        </Text>
+      </View>
+      {isExpressionPost ? (
+        <View style={[styles.privatePill, { backgroundColor: colors.bgSecondary }]}>
+          <Icon name="lock-closed-outline" size={11} color={colors.textMuted} />
+          <Text style={[styles.privateText, { color: colors.textMuted }]}>Members</Text>
+        </View>
+      ) : null}
+    </View>
+  ) : null;
+
+  const identityBadges = badges.length ? (
+    <View style={styles.identityMetaRow}>
+      {badges.map((badge, index) => (
+        <View key={badge.id || badge.code || `${badge.label}-${index}`} style={[styles.identityBadge, { backgroundColor: badge.backgroundColor }]}>
+          <Text style={[styles.identityBadgeText, { color: badge.textColor }]}>{badge.label}</Text>
+        </View>
+      ))}
+    </View>
+  ) : null;
+
   return (
     <>
+      {resolvedVariant === 'feed' ? (
+        <View style={styles.detachedIdentity}>
+          {identityHeader}
+          {contextRow}
+          {identityBadges}
+        </View>
+      ) : null}
+
       <Pressable
         onPress={onPress}
         style={({ pressed }) => [
@@ -198,31 +306,47 @@ export function PostCard({
           style,
         ]}
       >
-        {showContextRow ? (
-          <View style={styles.contextRow}>
-            <View style={[styles.contextPill, { backgroundColor: isExpressionPost ? colors.primarySoft : colors.bgSecondary }]}>
-              <Icon name={isExpressionPost ? 'people-outline' : 'globe-outline'} size={12} color={isExpressionPost ? colors.interactive : colors.textSecondary} />
-              <Text style={[styles.contextText, { color: isExpressionPost ? colors.interactive : colors.textSecondary }]} numberOfLines={1}>{isExpressionPost ? expressionLabel || 'Expression' : 'General COT'}</Text>
-            </View>
-            {isExpressionPost ? <View style={[styles.privatePill, { backgroundColor: colors.bgSecondary }]}><Icon name="lock-closed-outline" size={11} color={colors.textMuted} /><Text style={[styles.privateText, { color: colors.textMuted }]}>Members</Text></View> : null}
-          </View>
+        {resolvedVariant !== 'feed' ? (
+          <>
+            {contextRow}
+            {identityHeader}
+            {identityBadges}
+          </>
         ) : null}
 
-        <View style={styles.headerRow}>
-          <Pressable onPress={onPressAuthor || onPress} hitSlop={4}><Avatar name={displayName} url={avatarUrl} size="md" /></Pressable>
-          <View style={styles.identityColumn}>
-            <View style={styles.authorLine}>
-              <Pressable onPress={onPressAuthor || onPress} style={styles.nameGroup}><Text style={[styles.displayName, { color: colors.text }]} numberOfLines={1}>{displayName}</Text>{isVerified ? <Icon name="checkmark-circle" size={15} color={colors.interactive} /> : null}</Pressable>
-              <Text style={[styles.timestamp, { color: colors.textMuted }]}>{formatTime()}</Text>
-            </View>
-            {handle ? <Text style={[styles.handleText, { color: colors.textMuted }]} numberOfLines={1}>@{handle}</Text> : null}
+        {body ? (
+          <View style={styles.bodyBlock}>
+            <Text style={[styles.bodyText, resolvedVariant === 'feed' && styles.feedBodyText, { color: colors.text }]}>
+              {revealedBody.text}
+              {revealedBody.hasMore ? '…' : ''}
+            </Text>
+
+            {progressiveBody ? (
+              <Pressable
+                onPress={(event) => {
+                  event.stopPropagation?.();
+                  if (revealedBody.hasMore) {
+                    const nextStep = bodyRevealStep + 1;
+                    postRevealSteps.set(post.id, nextStep);
+                    setBodyRevealStep(nextStep);
+                  } else {
+                    postRevealSteps.set(post.id, 1);
+                    setBodyRevealStep(1);
+                  }
+                }}
+                hitSlop={6}
+                style={({ pressed }) => [styles.showMoreButton, pressed && { opacity: 0.7 }]}
+                accessibilityRole="button"
+                accessibilityLabel={revealedBody.hasMore ? 'Show more of this post' : 'Collapse this post'}
+              >
+                <Text style={[styles.showMoreText, { color: colors.interactive }]}>
+                  {revealedBody.hasMore ? 'Show more' : 'Show less'}
+                </Text>
+                <Icon name={revealedBody.hasMore ? 'chevron-down' : 'chevron-up'} size={14} color={colors.interactive} />
+              </Pressable>
+            ) : null}
           </View>
-          {onMore || canEngage ? <Pressable onPress={onMore ?? (() => setReportOpen(true))} hitSlop={8} style={({ pressed }) => [styles.moreButton, pressed ? { backgroundColor: colors.bgSecondary } : null]} accessibilityRole="button" accessibilityLabel={onMore ? 'More post actions' : 'Report post'}><Icon name="ellipsis-horizontal" size={19} color={colors.textMuted} /></Pressable> : null}
-        </View>
-
-        {badges.length ? <View style={styles.identityMetaRow}>{badges.map((badge, index) => <View key={badge.id || badge.code || `${badge.label}-${index}`} style={[styles.identityBadge, { backgroundColor: badge.backgroundColor }]}><Text style={[styles.identityBadgeText, { color: badge.textColor }]}>{badge.label}</Text></View>)}</View> : null}
-
-        {post.body?.trim() ? <Text style={[styles.bodyText, resolvedVariant === 'feed' && styles.feedBodyText, { color: colors.text }]}>{post.body}</Text> : null}
+        ) : null}
 
         {media.length ? (
           <View style={styles.mediaList}>
@@ -268,10 +392,11 @@ export function PostCard({
 
 const styles = StyleSheet.create({
   container: { marginHorizontal: spacing.md, marginVertical: spacing.sm, padding: spacing.lg, borderWidth: 1, borderRadius: radius.card },
-  feedContainer: { marginHorizontal: 0, padding: spacing.md, borderRadius: radius.xxl },
+  feedContainer: { marginHorizontal: 0, marginTop: 7, paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.sm, borderRadius: radius.xxl },
+  detachedIdentity: { paddingHorizontal: 2, gap: 6 },
   publicCard: { ...shadows.sm },
   expressionCard: { ...shadows.md },
-  contextRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginBottom: spacing.md },
+  contextRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginTop: 2, marginBottom: 2 },
   contextPill: { minHeight: 26, maxWidth: '72%', borderRadius: radius.pill, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', gap: 5 },
   contextText: { fontSize: 10, lineHeight: 14, fontWeight: '800', letterSpacing: 0.15, flexShrink: 1 },
   privatePill: { minHeight: 26, borderRadius: radius.pill, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 4 },
@@ -284,12 +409,15 @@ const styles = StyleSheet.create({
   timestamp: { fontSize: 10.5, fontWeight: '600' },
   handleText: { fontSize: 10.5, marginTop: 2 },
   moreButton: { width: 34, height: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  identityMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, marginTop: spacing.sm },
+  identityMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, marginTop: 2 },
   identityBadge: { borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3 },
   identityBadgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.2 },
+  bodyBlock: { gap: 5 },
   bodyText: { fontSize: 15, lineHeight: 23, marginTop: spacing.md, letterSpacing: -0.08 },
-  feedBodyText: { fontSize: 15.5, lineHeight: 24 },
-  mediaList: { gap: spacing.sm, marginTop: spacing.md },
+  feedBodyText: { fontSize: 16, lineHeight: 25, marginTop: 0, letterSpacing: -0.12 },
+  showMoreButton: { alignSelf: 'flex-start', minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 4, paddingRight: 6 },
+  showMoreText: { fontSize: 11.5, lineHeight: 16, fontWeight: '900' },
+  mediaList: { gap: spacing.sm, marginTop: spacing.md, marginHorizontal: -4 },
   mediaFrame: { width: '100%', aspectRatio: 16 / 10, borderRadius: radius.xl, overflow: 'hidden' },
   mediaImage: { width: '100%', height: '100%' },
   richMediaFrame: { width: '100%', overflow: 'hidden', borderRadius: radius.xl, borderWidth: 1, position: 'relative' },
@@ -308,7 +436,7 @@ const styles = StyleSheet.create({
   reelReferenceKicker: { fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
   reelReferenceTitle: { fontSize: 14, lineHeight: 19, fontWeight: '800', marginTop: 2 },
   reelReferenceMeta: { fontSize: 10, marginTop: 3 },
-  actionRail: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, minHeight: 42 },
+  actionRail: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, minHeight: 46 },
   actionGroup: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   guestGroup: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 },
   actionButton: { minWidth: 42, height: 36, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 8 },

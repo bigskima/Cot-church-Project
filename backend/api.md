@@ -109,7 +109,7 @@ Authenticated endpoints require `Authorization: Bearer <access-token>`. Tenant e
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY` (only functions using the admin client)
-- `ALLOWED_ORIGINS` as a comma-separated exact-origin allowlist
+- `ALLOWED_ORIGINS` as a comma-separated exact/wildcard origin allowlist. Hosting providers are not hardcoded in runtime code; additional active patterns may be supplied by server-only `platform_web_origins` rows.
 - `PASSWORD_RECOVERY_REDIRECT_URL`
 - `NOTIFICATION_WORKER_SECRET`
 - `RATE_LIMIT_PEPPER`
