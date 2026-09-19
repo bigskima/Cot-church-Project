@@ -148,7 +148,7 @@ export function GroupSpaceExperience({ groupId, initialTab = 'home', scope = 'ex
             <View style={styles.grid}>
               <Feature title='Announcements' value={data.announcements.length} icon='megaphone-outline' onPress={() => setTab('announcements')} />
               <Feature title='Events' value={data.events.length} icon='calendar-outline' onPress={() => setTab('events')} />
-              <Feature title='Giving' value={data.givingOptions.length} icon='gift-outline' onPress={() => expression?.id ? router.push(`${routeBase}/${groupId}/giving` as any) : setTab('giving')} />
+              <Feature title='Giving' value={data.givingOptions.length} icon='gift-outline' onPress={() => generalGroup || expression?.id ? router.push(`${routeBase}/${groupId}/giving` as any) : setTab('giving')} />
               <Feature title='Roles' value={data.roles.length} icon='ribbon-outline' onPress={() => setTab('people')} />
             </View>
             <SectionHeader title='Temporary chats' badge={activeSections.length} subtitle='Focused conversations for selected members' />
