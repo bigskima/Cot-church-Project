@@ -155,11 +155,12 @@ Deno.serve(createHandler(
     let targetBranchId: string | null;
     let existingCreatedBy: string | null = null;
     if (request.method === "POST") {
+      const branchWasExplicit = Object.prototype.hasOwnProperty.call(body, "branchId");
       const suppliedBranch = body.branchId === undefined || body.branchId === null ? null : uuid(String(body.branchId), "branchId", true)!;
       if (auth.branchId && suppliedBranch && suppliedBranch !== auth.branchId) {
         throw new ApiError("EXPRESSION_SCOPE_DENIED", "Create this group only inside the currently selected Expression", 403);
       }
-      targetBranchId = auth.branchId ?? suppliedBranch;
+      targetBranchId = branchWasExplicit ? suppliedBranch : (auth.branchId ?? null);
     } else {
       const id = uuid(requiredString(body.id, "id", 36), "id", true)!;
       const { data: existing, error: existingError } = await admin
