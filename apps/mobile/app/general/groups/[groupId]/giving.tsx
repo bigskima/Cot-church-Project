@@ -6,5 +6,5 @@ export default function GeneralGroupGivingRoute() {
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
   const id = typeof groupId === 'string' ? groupId : '';
   if (!id) return null;
-  return <GroupGivingExperience groupId={id} />;
+  return <GroupGivingExperience groupId={id} scope="general" />;
 }
