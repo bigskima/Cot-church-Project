@@ -56,7 +56,11 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId, sco
   const { api, context, mode, hasCapability } = useSession();
   const { colors } = useTheme();
   const expression = context?.expression;
+  const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
   const churchWide = scope === 'church';
+  const requestScope = churchWide
+    ? { context: 'public' as const, headers: organizationId ? { 'X-Organization-Id': organizationId } : undefined }
+    : { context: 'current' as const };
   const canManageGroups = churchWide ? mode === 'authenticated' : hasCapability('groups.manage');
   const includeManagement = '&includeManagement=true';
   const routeBase = churchWide ? '/general/groups' : `/expressions/${expression?.id}/groups`;
@@ -67,7 +71,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId, sco
       if (mode !== 'authenticated' || (!churchWide && !expression?.id)) {
         return Promise.resolve({ scope, groups: [], pendingRequests: [] });
       }
-      return api.request<GroupPayload>(`groups?scope=${scope}${includeManagement}`, { signal });
+      return api.request<GroupPayload>(`groups?scope=${scope}${includeManagement}`, { signal, ...requestScope });
     }
   );
 
@@ -116,6 +120,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId, sco
     try {
       await api.request('groups', {
         method: 'POST',
+        ...requestScope,
         body: JSON.stringify({ action: 'review_membership', groupMembershipId: requestId, approved }),
       });
       setFeedback(approved ? 'Group membership approved.' : 'Group membership declined.');
@@ -144,6 +149,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId, sco
     try {
       await api.request('groups', {
         method: 'POST',
+        ...requestScope,
         body: JSON.stringify({
           name: name.trim(),
           description: description.trim(),
