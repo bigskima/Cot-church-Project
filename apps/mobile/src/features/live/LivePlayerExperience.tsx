@@ -2,10 +2,12 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { router } from 'expo-router';
@@ -147,6 +149,7 @@ function streamPresentation(stream: LiveStream) {
 
 export function LivePlayerExperience({ streamId: id, scope = 'general', embedded = false }: { streamId: string; scope?: 'general' | 'expression'; embedded?: boolean }) {
   const insets = useSafeAreaInsets();
+  const viewport = useWindowDimensions();
   const { api, mode, context } = useSession();
   const { colors } = useTheme();
 
@@ -172,6 +175,10 @@ export function LivePlayerExperience({ streamId: id, scope = 'general', embedded
   const activeExpressionId = expressionMode ? context?.expression?.id : undefined;
   const requestContext = expressionMode ? 'current' : 'public';
   const returnTo = expressionMode && activeExpressionId ? `/expressions/${activeExpressionId}/live/${id}` : `/live/${id}`;
+  const widescreenAspect = 16 / 9;
+  const fullscreenFrame = viewport.width / Math.max(viewport.height, 1) >= widescreenAspect
+    ? { width: viewport.height * widescreenAspect, height: viewport.height }
+    : { width: viewport.width, height: viewport.width / widescreenAspect };
 
   useEffect(() => {
     let isMounted = true;
@@ -403,7 +410,19 @@ export function LivePlayerExperience({ streamId: id, scope = 'general', embedded
       keyboardVerticalOffset={PLATFORM_KEYBOARD_VERTICAL_OFFSET}
     >
       <StatusBar hidden={fullscreen} style="light" />
-      <View style={[styles.videoContainer, fullscreen && styles.videoContainerFullscreen, { marginTop: fullscreen ? 0 : topInset }]}>
+      <View
+        style={[
+          fullscreen ? styles.fullscreenBackdrop : styles.videoStageWrap,
+          fullscreen && Platform.OS === 'web' ? ({ position: 'fixed' } as any) : null,
+        ]}
+      >
+      <View
+        style={[
+          styles.videoContainer,
+          fullscreen && styles.videoContainerFullscreen,
+          fullscreen ? fullscreenFrame : { marginTop: topInset },
+        ]}
+      >
         {externalYouTube && access.stream.external_id ? (
           <YouTubeLivePlayer videoId={access.stream.external_id} />
         ) : agoraRtc && rtcGrant ? (
@@ -444,6 +463,7 @@ export function LivePlayerExperience({ streamId: id, scope = 'general', embedded
             </Pressable>
           </View>
         </View>
+      </View>
       </View>
 
       {!fullscreen ? (
@@ -531,8 +551,10 @@ export default function GeneralLivePlayerExperience({ streamId }: { streamId: st
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   loadingBody: { padding: spacing.lg, gap: spacing.md },
-  videoContainer: { width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000000', position: 'relative' },
-  videoContainerFullscreen: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%', aspectRatio: undefined, zIndex: 1000, elevation: 1000, backgroundColor: '#000000' },
+  videoStageWrap: { width: '100%' },
+  fullscreenBackdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 1000, elevation: 1000, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center' },
+  videoContainer: { width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000000', position: 'relative', overflow: 'hidden' },
+  videoContainerFullscreen: { aspectRatio: undefined, marginTop: 0, backgroundColor: '#000000' },
   videoView: { width: '100%', height: '100%' },
   videoPlaceholder: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, padding: spacing.xl },
   placeholderIcon: { width: 68, height: 68, borderRadius: 34, backgroundColor: 'rgba(22,143,240,0.12)', borderWidth: 1, borderColor: 'rgba(22,143,240,0.22)', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
