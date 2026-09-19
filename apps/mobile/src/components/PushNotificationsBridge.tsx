@@ -10,9 +10,14 @@ export function PushNotificationsBridge() {
 
   React.useEffect(() => {
     if (Platform.OS === 'web' || mode !== 'authenticated' || !accessReady || !context?.organization?.id) return;
-    void api.request<{ push_enabled?: boolean }>('notification-settings', { feedback: false })
-      .then((preferences) => preferences.push_enabled === false ? undefined : syncPushDeviceIfGranted(api))
-      .catch(() => undefined);
+    const refreshRegistration = () => {
+      void api.request<{ push_enabled?: boolean }>('notification-settings', { feedback: false })
+        .then((preferences) => preferences.push_enabled === false ? undefined : syncPushDeviceIfGranted(api))
+        .catch(() => undefined);
+    };
+    refreshRegistration();
+    const tokenSubscription = Notifications.addPushTokenListener(() => refreshRegistration());
+    return () => tokenSubscription.remove();
   }, [accessReady, api, context?.organization?.id, mode]);
 
   const openResponse = React.useCallback(async (response: Notifications.NotificationResponse | null) => {
