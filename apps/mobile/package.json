@@ -22,6 +22,7 @@
     "@expo/metro-runtime": "latest",
     "@expo/vector-icons": "^15.1.1",
     "@supabase/supabase-js": "^2.57.4",
+    "agora-rtc-sdk-ng": "4.24.8",
     "expo": "latest",
     "expo-audio": "~57.0.4",
     "expo-clipboard": "^57.0.1",
@@ -30,6 +31,7 @@
     "expo-image-picker": "~57.0.15",
     "expo-linear-gradient": "latest",
     "expo-linking": "^57.0.8",
+    "expo-notifications": "~57.0.20",
     "expo-print": "~57.0.1",
     "expo-router": "latest",
     "expo-secure-store": "latest",
@@ -42,10 +44,9 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
+    "react-native-agora": "4.6.4",
     "react-native-safe-area-context": "latest",
     "react-native-web": "~0.21.0",
-    "agora-rtc-sdk-ng": "4.24.8",
-    "react-native-agora": "4.6.4",
     "react-native-webview": "14.0.1"
   },
   "devDependencies": {
