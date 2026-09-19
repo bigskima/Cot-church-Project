@@ -11,6 +11,7 @@ type PublicBadge = {
   backgroundColor: string;
   textColor: string;
   priority: number;
+  badgeVariant?: string;
 };
 
 function nestedItem(value: any) {
@@ -47,10 +48,10 @@ async function enrichMembershipAuthors<T extends MembershipAuthoredRow>(rows: T[
       ? admin.from("profiles").select("id,display_name,username,avatar_url,banner_url,bio").in("id", profileIds)
       : Promise.resolve({ data: [] as any[] }),
     organizationIds.length
-      ? admin.from("identity_badge_definitions").select("id,organization_id,code,label,background_color,text_color,priority").in("organization_id", organizationIds).eq("is_membership_default", true).eq("is_active", true)
+      ? admin.from("identity_badge_definitions").select("id,organization_id,branch_id,code,label,background_color,text_color,priority,badge_variant").in("organization_id", organizationIds).eq("is_membership_default", true).eq("is_active", true)
       : Promise.resolve({ data: [] as any[] }),
     profileIds.length
-      ? admin.from("identity_badge_assignments").select("profile_id,branch_id,identity_badge_definitions!inner(id,code,label,background_color,text_color,priority,is_active)").in("profile_id", profileIds).eq("is_active", true).eq("identity_badge_definitions.is_active", true)
+      ? admin.from("identity_badge_assignments").select("organization_id,profile_id,branch_id,identity_badge_definitions!inner(id,organization_id,branch_id,code,label,background_color,text_color,priority,badge_variant,is_active)").in("profile_id", profileIds).eq("is_active", true).eq("identity_badge_definitions.is_active", true)
       : Promise.resolve({ data: [] as any[] }),
     branchIds.length
       ? admin.from("branches").select("id,name,code").in("id", branchIds)
@@ -74,6 +75,7 @@ async function enrichMembershipAuthors<T extends MembershipAuthoredRow>(rows: T[
     backgroundColor: definition.background_color,
     textColor: definition.text_color,
     priority: Number(definition.priority ?? 0),
+    badgeVariant: definition.badge_variant ?? 'default',
   });
 
   return rows.map((row) => {
@@ -81,15 +83,28 @@ async function enrichMembershipAuthors<T extends MembershipAuthoredRow>(rows: T[
     const profileId = membership?.profile_id ?? profileAuthorMap.get(row.id);
     const profile = profileId ? profileMap.get(profileId) : null;
     const badges: PublicBadge[] = [];
-    if (membership) {
-      const membershipDefault = defaultByOrg.get(membership.organization_id);
+    const organizationId = membership?.organization_id ?? row.organization_id ?? null;
+    if (profileId && organizationId) {
+      const membershipDefault = defaultByOrg.get(organizationId);
       if (row.branch_id && membershipDefault) badges.push(toBadge(membershipDefault));
-      for (const assignment of assignedByProfile.get(membership.profile_id) ?? []) {
-        if (assignment.branch_id !== row.branch_id) continue;
+      for (const assignment of assignedByProfile.get(profileId) ?? []) {
+        if (assignment.organization_id !== organizationId) continue;
+        if (row.branch_id) {
+          if (assignment.branch_id !== null && assignment.branch_id !== row.branch_id) continue;
+        } else if (assignment.branch_id !== null) {
+          continue;
+        }
         const definition = Array.isArray(assignment.identity_badge_definitions) ? assignment.identity_badge_definitions[0] : assignment.identity_badge_definitions;
         if (definition) badges.push(toBadge(definition));
       }
+      const seen = new Set<string>();
       badges.sort((a, b) => b.priority - a.priority);
+      for (let index = badges.length - 1; index >= 0; index -= 1) {
+        const badge = badges[index];
+        const key = badge.id || badge.code || badge.label;
+        if (seen.has(key)) badges.splice(index, 1);
+        else seen.add(key);
+      }
     }
 
     return {
