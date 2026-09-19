@@ -20,6 +20,8 @@ export function GeneralHomeActionDeck({ onComposePost, onComposeVoice }: Props) 
   const quickActions = useMemo<QuickAction[]>(() => [
     { key: 'sermons', label: 'Sermons', icon: 'book-outline', route: '/general/sermons' },
     { key: 'events', label: 'Events', icon: 'calendar-outline', route: '/general/events' },
+    { key: 'updates', label: 'Updates', icon: 'notifications-outline', route: '/general/announcements' },
+    { key: 'participate', label: 'Join in', icon: 'chatbubbles-outline', route: '/general/participate' },
     { key: 'prayer', label: 'Prayer', icon: 'heart-outline', route: '/general/prayer' },
     { key: 'giving', label: 'Giving', icon: 'gift-outline', route: '/general/giving' },
   ], []);
@@ -213,8 +215,8 @@ const styles = StyleSheet.create({
   },
   quickHeadingTitle: { fontSize: 12.5, fontWeight: '900', letterSpacing: -0.15 },
   quickHeadingMeta: { fontSize: 9, fontWeight: '700' },
-  quickRail: { gap: spacing.md, paddingHorizontal: 2, paddingRight: spacing.lg, paddingBottom: 2 },
-  quickAction: { minWidth: 52, alignItems: 'center', gap: 5 },
+  quickRail: { gap: spacing.sm, paddingHorizontal: 2, paddingRight: spacing.md, paddingBottom: 2 },
+  quickAction: { minWidth: 50, alignItems: 'center', gap: 5 },
   quickIcon: {
     width: 42,
     height: 42,
