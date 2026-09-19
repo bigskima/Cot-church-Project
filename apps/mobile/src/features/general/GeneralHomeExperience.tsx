@@ -97,8 +97,8 @@ export default function GeneralHomeExperience() {
   const accessToken = auth?.session.accessToken ?? null;
   const authenticated = mode === 'authenticated';
   const wide = width >= 820;
-  const contentWidth = Math.min(Math.max(width - spacing.md * 2, 280), 1040);
-  const reelWidth = Math.max(280, Math.min(wide ? 620 : width - spacing.md * 2, 620));
+  const contentWidth = Math.min(Math.max(width - spacing.sm * 2, 300), 1120);
+  const reelWidth = Math.max(300, Math.min(wide ? 720 : contentWidth, 720));
 
   const canManageAny = authenticated && (
     hasOrganizationCapability('sermons.create') || hasOrganizationCapability('sermons.manage') ||
@@ -324,10 +324,15 @@ export default function GeneralHomeExperience() {
   const header = (
     <View style={[styles.headerContent, { width: contentWidth }]}>
       <GeneralHomeActionDeck onComposePost={() => openGeneralComposer('post')} onComposeVoice={() => openGeneralComposer('audio')} />
-      <UrgentUpdatesRail announcements={announcements} />
+
+      <View style={styles.homeUtilities}>
+        <UrgentUpdatesRail announcements={announcements} />
+        <ParticipationHomeShelf scope="general" />
+      </View>
+
       {degradedSections.length ? <Pressable onPress={refreshHome} style={[styles.degradedBanner, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><View style={[styles.degradedIcon, { backgroundColor: colors.card }]}><Icon name="refresh-outline" size={16} color={colors.interactive} /></View><View style={styles.flex}><Text style={[styles.degradedTitle, { color: colors.text }]}>A few sections need another try</Text><Text style={[styles.degradedText, { color: colors.textMuted }]}>Your Home remains usable. Tap here to refresh only the missing pieces.</Text></View></Pressable> : null}
       {activeStream ? <View style={styles.liveSection}><FeedSectionHeading eyebrow={activeStream.status === 'live' ? 'LIVE NOW' : 'NEXT LIVE'} title={activeStream.status === 'live' ? 'Join what is happening now' : 'Coming up live'} subtitle="Open the broadcast without leaving Home discovery." actionLabel="Live" onAction={() => router.push('/general/live' as any)} /><HeroLiveCard stream={activeStream} onPress={() => router.push(`/general/live/${activeStream.id}` as any)} /></View> : null}
-      <ParticipationHomeShelf scope="general" />
+
       {feed.length ? <FeedSectionHeading eyebrow="COMMUNITY FEED" title={rankingMode === 'personalized' ? 'For you' : 'Latest from COT'} subtitle={rankingMode === 'personalized' ? 'Relevant COT activity, media and conversations in one continuous feed.' : 'Fresh public activity from across the COT community.'} actionLabel="Discover" onAction={() => router.push('/general/explore')} /> : null}
     </View>
   );
@@ -350,9 +355,9 @@ export default function GeneralHomeExperience() {
           refreshControl={<RefreshControl refreshing={resource.refreshing} onRefresh={refreshHome} tintColor={colors.interactive} colors={[colors.interactive]} progressBackgroundColor={colors.card} />}
           renderItem={({ item }) => {
             if (item.kind === 'section') return <View style={[styles.fullWidthItem, { width: contentWidth }]}>{renderSection(item)}</View>;
-            if (item.kind === 'post') return <View style={[styles.timelineItem, { width: Math.min(contentWidth, 720) }]}><PostCard post={item.post} expressionName={item.post.expression?.name} canEngage={authenticated} allowExternalShare={item.post.visibility === 'public'} onPressAuthor={item.post.author?.username ? () => router.push({ pathname: '/general/member/[username]', params: { username: item.post.author!.username! } } as any) : undefined} onPress={() => openPost(item.post.id)} onReply={() => openPost(item.post.id, true)} onReact={authenticated ? (reaction) => reactToPost(item.post.id, reaction) : undefined} onBookmark={authenticated ? (currentlySaved) => bookmarkPost(item.post.id, currentlySaved) : undefined} variant="feed" showContext={false} style={styles.homePostCard} /></View>;
-            if (item.kind === 'reel') return <View style={[styles.timelineItem, { width: Math.min(contentWidth, 720) }]}><ReelCard reel={item.reel} width={reelWidth} variant="feed" commentContext="public" onPress={() => router.push({ pathname: '/general/reels', params: { reelId: item.reel.id } } as any)} onOpenComments={item.reel.content_items?.id ? () => router.push({ pathname: '/general/comments/[contentId]', params: { contentId: item.reel.content_items!.id } } as any) : undefined} /></View>;
-            return <View style={[styles.timelineItem, { width: Math.min(contentWidth, 720) }]}><VideoCard video={item.video} variant="feed" commentContext="public" onPress={() => router.push(`/general/watch/${item.video.id}` as any)} onPressCreator={item.video.content_items?.author?.username ? () => router.push({ pathname: '/general/member/[username]', params: { username: item.video.content_items!.author!.username! } } as any) : undefined} onOpenComments={item.video.content_items?.id ? () => router.push({ pathname: '/general/comments/[contentId]', params: { contentId: item.video.content_items!.id } } as any) : undefined} /></View>;
+            if (item.kind === 'post') return <View style={[styles.timelineItem, { width: Math.min(contentWidth, 780) }]}><PostCard post={item.post} expressionName={item.post.expression?.name} canEngage={authenticated} allowExternalShare={item.post.visibility === 'public'} onPressAuthor={item.post.author?.username ? () => router.push({ pathname: '/general/member/[username]', params: { username: item.post.author!.username! } } as any) : undefined} onPress={() => openPost(item.post.id)} onReply={() => openPost(item.post.id, true)} onReact={authenticated ? (reaction) => reactToPost(item.post.id, reaction) : undefined} onBookmark={authenticated ? (currentlySaved) => bookmarkPost(item.post.id, currentlySaved) : undefined} variant="feed" showContext={false} style={styles.homePostCard} /></View>;
+            if (item.kind === 'reel') return <View style={[styles.timelineItem, { width: Math.min(contentWidth, 780) }]}><ReelCard reel={item.reel} width={reelWidth} variant="feed" commentContext="public" onPress={() => router.push({ pathname: '/general/reels', params: { reelId: item.reel.id } } as any)} onOpenComments={item.reel.content_items?.id ? () => router.push({ pathname: '/general/comments/[contentId]', params: { contentId: item.reel.content_items!.id } } as any) : undefined} /></View>;
+            return <View style={[styles.timelineItem, { width: Math.min(contentWidth, 780) }]}><VideoCard video={item.video} variant="feed" commentContext="public" onPress={() => router.push(`/general/watch/${item.video.id}` as any)} onPressCreator={item.video.content_items?.author?.username ? () => router.push({ pathname: '/general/member/[username]', params: { username: item.video.content_items!.author!.username! } } as any) : undefined} onOpenComments={item.video.content_items?.id ? () => router.push({ pathname: '/general/comments/[contentId]', params: { contentId: item.video.content_items!.id } } as any) : undefined} /></View>;
           }}
         />
       )}
@@ -362,18 +367,19 @@ export default function GeneralHomeExperience() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 }, flex: { flex: 1, minWidth: 0 },
-  headerContent: { alignSelf: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.sm, gap: spacing.lg },
-  loadingContainer: { alignSelf: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: spacing.md },
-  errorWrap: { alignSelf: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.xl },
-  fullWidthItem: { alignSelf: 'center', paddingHorizontal: spacing.md, marginTop: spacing.md },
-  timelineItem: { alignSelf: 'center', paddingHorizontal: spacing.md, marginTop: spacing.md },
-  homePostCard: { marginHorizontal: 0, marginVertical: 0, borderRadius: radius.xxl },
-  feedHeading: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md, paddingTop: spacing.sm, paddingBottom: 2 },
+  headerContent: { alignSelf: 'center', paddingTop: spacing.sm, gap: spacing.md },
+  loadingContainer: { alignSelf: 'center', paddingTop: spacing.md, gap: spacing.md },
+  errorWrap: { alignSelf: 'center', paddingTop: spacing.xl },
+  fullWidthItem: { alignSelf: 'center', marginTop: spacing.md },
+  timelineItem: { alignSelf: 'center', marginTop: spacing.lg },
+  homePostCard: { marginHorizontal: 0, marginVertical: 0, borderRadius: radius.xl },
+  feedHeading: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md, paddingTop: 2, paddingBottom: 0 },
   feedEyebrow: { fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 1.05 },
-  feedTitle: { fontSize: 24, lineHeight: 29, fontWeight: '900', letterSpacing: -0.72, marginTop: 3 },
+  feedTitle: { fontSize: 20, lineHeight: 25, fontWeight: '900', letterSpacing: -0.5, marginTop: 2 },
   feedSubtitle: { fontSize: 11.5, lineHeight: 17, marginTop: 3, maxWidth: 600 },
   headingAction: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 4 }, headingActionText: { fontSize: 10.5, fontWeight: '900' },
   degradedBanner: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, degradedIcon: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, degradedTitle: { fontSize: 12.5, fontWeight: '900' }, degradedText: { fontSize: 10.5, lineHeight: 15, marginTop: 2 },
+  homeUtilities: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: spacing.sm },
   liveSection: { gap: spacing.sm },
   discoverySection: { borderWidth: 1, borderRadius: radius.xxl, paddingVertical: spacing.lg, overflow: 'hidden' },
   discoveryHeadingRow: { paddingHorizontal: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
