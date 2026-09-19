@@ -251,7 +251,7 @@ returns jsonb
 language plpgsql
 security definer
 set search_path=''
-as $body$
+as $legacy_badge$
 declare
   normalized_email text;
   target_profile uuid;
@@ -260,8 +260,85 @@ begin
   if not public.has_permission(target_organization_id,'expression.leadership.manage',target_branch_id) then
     raise exception using errcode='42501',message='Permission denied';
   end if;
+
   normalized_email:=lower(trim(target_email));
-  if normalized_email !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+
+  if char_length(normalized_email) < 5
+     or position('@' in normalized_email) <= 1
+     or position('.' in split_part(normalized_email,'@',2)) <= 0 then
+    raise exception using errcode='22023',message='Invalid email';
+  end if;
+
+  select id into target_profile
+  from auth.users
+  where lower(email)=normalized_email;
+  if target_profile is null then
+    raise exception using errcode='P0002',message='Registered user not found';
+  end if;
+
+  if not exists(
+    select 1 from public.expression_memberships
+    where organization_id=target_organization_id
+      and branch_id=target_branch_id
+      and profile_id=target_profile
+      and status='active'
+  ) then
+    raise exception using errcode='42501',message='User is not an active member of this Expression';
+  end if;
+
+  select * into badge
+  from public.identity_badge_definitions
+  where id=target_badge_definition_id
+    and organization_id=target_organization_id
+    and branch_id=target_branch_id
+    and is_active
+    and not is_membership_default;
+  if not found then
+    raise exception using errcode='P0002',message='Expression badge definition not found';
+  end if;
+
+  if enable_badge then
+    update public.identity_badge_assignments
+    set is_active=true,assigned_by=auth.uid()
+    where organization_id=target_organization_id
+      and branch_id=target_branch_id
+      and profile_id=target_profile
+      and badge_definition_id=target_badge_definition_id;
+
+    if not found then
+      insert into public.identity_badge_assignments(
+        organization_id,branch_id,profile_id,badge_definition_id,assigned_by,is_active
+      ) values(
+        target_organization_id,target_branch_id,target_profile,target_badge_definition_id,auth.uid(),true
+      );
+    end if;
+  else
+    update public.identity_badge_assignments
+    set is_active=false,assigned_by=auth.uid()
+    where organization_id=target_organization_id
+      and branch_id=target_branch_id
+      and profile_id=target_profile
+      and badge_definition_id=target_badge_definition_id;
+  end if;
+
+  insert into public.audit_log(
+    organization_id,branch_id,actor_profile_id,action,target_type,target_id,new_values
+  ) values(
+    target_organization_id,target_branch_id,auth.uid(),
+    case when enable_badge then 'assign' else 'revoke' end,
+    'identity_badge',target_profile::text,
+    jsonb_build_object('badgeId',target_badge_definition_id,'email',normalized_email)
+  );
+
+  return jsonb_build_object(
+    'profileId',target_profile,
+    'badgeId',target_badge_definition_id,
+    'active',enable_badge
+  );
+end;
+$legacy_badge$;
+
+revoke all on function public.set_expression_identity_badge(uuid,uuid,text,uuid,boolean) from public,anon;
+grant execute on function public.set_expression_identity_badge(uuid,uuid,text,uuid,boolean) to authenticated,service_role;
 insert into public.identity_badge_definitions(
   organization_id,branch_id,code,label,background_color,text_color,priority,is_membership_default,badge_variant,notify_priority_posts
 )
