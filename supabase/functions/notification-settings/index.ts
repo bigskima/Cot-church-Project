@@ -5,7 +5,7 @@ import { jsonBody } from "../_shared/request.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString } from "../_shared/validation.ts";
 
-const preferenceSelect = "email_enabled,sms_enabled,push_enabled,quiet_hours,timezone,push_preview,push_sound_enabled,updated_at";
+const preferenceSelect = "email_enabled,sms_enabled,push_enabled,quiet_hours,timezone,push_preview,push_sound_enabled,live_alerts_enabled,followed_posts_enabled,priority_leadership_posts_enabled,urgent_platform_alerts_enabled,updated_at";
 const TIME_PATTERN = /^([01]\\d|2[0-3]):[0-5]\\d$/;
 const PUSH_PREVIEWS = new Set(["full", "sender_only", "private"]);
 const EXPO_PUSH_TOKEN_PATTERN = /^(?:Exponent|Expo)PushToken\\[[A-Za-z0-9_-]+\\]$/;
@@ -62,6 +62,10 @@ function defaultPreferences() {
     timezone: "UTC",
     push_preview: "full",
     push_sound_enabled: true,
+    live_alerts_enabled: true,
+    followed_posts_enabled: true,
+    priority_leadership_posts_enabled: true,
+    urgent_platform_alerts_enabled: true,
     updated_at: null,
   };
 }
@@ -131,8 +135,12 @@ Deno.serve(
         "timezone",
         "pushPreview",
         "pushSoundEnabled",
+        "liveAlertsEnabled",
+        "followedPostsEnabled",
+        "priorityLeadershipPostsEnabled",
+        "urgentPlatformAlertsEnabled",
       ]);
-      for (const key of ["emailEnabled", "smsEnabled", "pushEnabled", "pushSoundEnabled"]) {
+      for (const key of ["emailEnabled", "smsEnabled", "pushEnabled", "pushSoundEnabled", "liveAlertsEnabled", "followedPostsEnabled", "priorityLeadershipPostsEnabled", "urgentPlatformAlertsEnabled"]) {
         if (body[key] !== undefined && typeof body[key] !== "boolean") {
           throw new ApiError("VALIDATION_FAILED", `${key} must be boolean`, 422);
         }
@@ -160,6 +168,10 @@ Deno.serve(
         timezone: normalizedTimezone ?? existing.timezone,
         push_preview: normalizedPreview ?? existing.push_preview,
         push_sound_enabled: body.pushSoundEnabled ?? existing.push_sound_enabled,
+        live_alerts_enabled: body.liveAlertsEnabled ?? existing.live_alerts_enabled,
+        followed_posts_enabled: body.followedPostsEnabled ?? existing.followed_posts_enabled,
+        priority_leadership_posts_enabled: body.priorityLeadershipPostsEnabled ?? existing.priority_leadership_posts_enabled,
+        urgent_platform_alerts_enabled: body.urgentPlatformAlertsEnabled ?? existing.urgent_platform_alerts_enabled,
       };
       const { data, error } = await auth.client
         .from("notification_preferences")
