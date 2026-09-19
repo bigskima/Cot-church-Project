@@ -339,6 +339,7 @@ const styles = StyleSheet.create({
   },
   messageButtonText: { fontSize: 12, fontWeight: '800' },
   name: { fontSize: 23, lineHeight: 28, fontWeight: '900', letterSpacing: -0.5, marginTop: spacing.md },
+  publicBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm, justifyContent: 'center' },
   username: { fontSize: 13, marginTop: 1 },
   bio: { fontSize: 14, lineHeight: 20, marginTop: spacing.md },
   stats: { flexDirection: 'row', gap: spacing.xl, marginTop: spacing.lg },
