@@ -47,7 +47,7 @@ export function NotificationBroadcasts({ api }: { api: ApiClient }) {
     setError('');
     try {
       const suffix = requestedOrganizationId ? `?organizationId=${encodeURIComponent(requestedOrganizationId)}` : '';
-      const data = await api.request<Payload>(`platform-notifications${suffix}`);
+      const data = await api.request<Payload>(`platform-integrations?view=notification-broadcasts${suffix ? `&${suffix.slice(1)}` : ''}`);
       setOrganizations(data.organizations ?? []);
       setBranches(data.branches ?? []);
       setBroadcasts(data.broadcasts ?? []);
@@ -86,9 +86,10 @@ export function NotificationBroadcasts({ api }: { api: ApiClient }) {
     setError('');
     setMessage('');
     try {
-      const result = await api.request<{ broadcastId: string; recipientCount: number; scope: string; urgent: boolean }>('platform-notifications', {
+      const result = await api.request<{ broadcastId: string; recipientCount: number; scope: string; urgent: boolean }>('platform-integrations', {
         method: 'POST',
         body: JSON.stringify({
+          action: 'notification_broadcast',
           organizationId,
           branchId: branchId || null,
           title: title.trim(),
