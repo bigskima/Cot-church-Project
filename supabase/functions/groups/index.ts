@@ -153,17 +153,19 @@ Deno.serve(createHandler(
     assertNoUnknownFields(body, ["id", "name", "description", "branchId", "ministryId", "visibility", "joinPolicy", "capacity", "meetingSchedule", "isActive"]);
 
     let targetBranchId: string | null;
+    let existingCreatedBy: string | null = null;
     if (request.method === "POST") {
+      const branchWasExplicit = Object.prototype.hasOwnProperty.call(body, "branchId");
       const suppliedBranch = body.branchId === undefined || body.branchId === null ? null : uuid(String(body.branchId), "branchId", true)!;
       if (auth.branchId && suppliedBranch && suppliedBranch !== auth.branchId) {
         throw new ApiError("EXPRESSION_SCOPE_DENIED", "Create this group only inside the currently selected Expression", 403);
       }
-      targetBranchId = auth.branchId ?? suppliedBranch;
+      targetBranchId = branchWasExplicit ? suppliedBranch : (auth.branchId ?? null);
     } else {
       const id = uuid(requiredString(body.id, "id", 36), "id", true)!;
       const { data: existing, error: existingError } = await admin
         .from("groups")
-        .select("id,branch_id")
+        .select("id,branch_id,created_by")
         .eq("id", id)
         .eq("organization_id", auth.organizationId)
         .maybeSingle();
@@ -172,13 +174,16 @@ Deno.serve(createHandler(
         throw new ApiError("EXPRESSION_SCOPE_DENIED", "This group belongs to another scope", 403);
       }
       targetBranchId = existing.branch_id;
+      existingCreatedBy = existing.created_by;
       if (body.branchId !== undefined) {
         const suppliedBranch = body.branchId === null ? null : uuid(String(body.branchId), "branchId", true)!;
         if (suppliedBranch !== targetBranchId) throw new ApiError("GROUP_SCOPE_IMMUTABLE", "Move a group by creating it in the new scope instead", 409);
       }
     }
 
-    if (!(await hasScopedPermission(auth, "groups.manage", targetBranchId))) {
+    const churchMemberMayCreate = request.method === "POST" && targetBranchId === null;
+    const creatorMayUpdate = request.method === "PATCH" && existingCreatedBy === auth.user.id;
+    if (!churchMemberMayCreate && !creatorMayUpdate && !(await hasScopedPermission(auth, "groups.manage", targetBranchId))) {
       throw new ApiError("PERMISSION_DENIED", "You do not have permission to manage groups in this scope", 403);
     }
 

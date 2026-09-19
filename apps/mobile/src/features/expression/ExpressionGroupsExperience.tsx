@@ -51,21 +51,27 @@ type GroupPayload = {
   pendingRequests: PendingRequest[];
 };
 
-export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: { embedded?: boolean; focusGroupId?: string }) {
+export function ExpressionGroupsExperience({ embedded = false, focusGroupId, scope = 'expression' }: { embedded?: boolean; focusGroupId?: string; scope?: 'expression' | 'church' }) {
   const insets = useSafeAreaInsets();
   const { api, context, mode, hasCapability } = useSession();
   const { colors } = useTheme();
   const expression = context?.expression;
-  const canManageGroups = hasCapability('groups.manage');
+  const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
+  const churchWide = scope === 'church';
+  const requestScope = churchWide
+    ? { context: 'public' as const, headers: organizationId ? { 'X-Organization-Id': organizationId } : undefined }
+    : { context: 'current' as const };
+  const canManageGroups = churchWide ? mode === 'authenticated' : hasCapability('groups.manage');
   const includeManagement = '&includeManagement=true';
+  const routeBase = churchWide ? '/general/groups' : `/expressions/${expression?.id}/groups`;
 
   const resource = useResource<GroupPayload>(
-    `expression:groups:${expression?.id ?? 'none'}:${includeManagement}`,
+    `${scope}:groups:${churchWide ? (context?.organization?.id ?? 'church') : (expression?.id ?? 'none')}:${includeManagement}`,
     (signal) => {
-      if (mode !== 'authenticated' || !expression?.id) {
-        return Promise.resolve({ scope: 'expression', groups: [], pendingRequests: [] });
+      if (mode !== 'authenticated' || (!churchWide && !expression?.id)) {
+        return Promise.resolve({ scope, groups: [], pendingRequests: [] });
       }
-      return api.request<GroupPayload>(`groups?scope=expression${includeManagement}`, { signal });
+      return api.request<GroupPayload>(`groups?scope=${scope}${includeManagement}`, { signal, ...requestScope });
     }
   );
 
@@ -114,6 +120,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: {
     try {
       await api.request('groups', {
         method: 'POST',
+        ...requestScope,
         body: JSON.stringify({ action: 'review_membership', groupMembershipId: requestId, approved }),
       });
       setFeedback(approved ? 'Group membership approved.' : 'Group membership declined.');
@@ -142,6 +149,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: {
     try {
       await api.request('groups', {
         method: 'POST',
+        ...requestScope,
         body: JSON.stringify({
           name: name.trim(),
           description: description.trim(),
@@ -149,6 +157,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: {
           joinPolicy: visibility === 'private' ? 'invite' : joinPolicy,
           capacity: parsedCapacity,
           meetingSchedule: meetingNote.trim() ? { summary: meetingNote.trim() } : {},
+          branchId: churchWide ? null : expression?.id,
         }),
       });
       setName('');
@@ -158,7 +167,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: {
       setVisibility('members');
       setJoinPolicy('open');
       setCreateOpen(false);
-      setFeedback(`Group created inside ${expression?.name ?? 'this Expression'}.`);
+      setFeedback(churchWide ? 'Church-wide Group created in General COT.' : `Group created inside ${expression?.name ?? 'this Expression'}.`);
       resource.refresh();
     } catch (value) {
       setActionError(value instanceof Error ? value.message : 'Unable to create the group.');
@@ -167,12 +176,12 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: {
     }
   };
 
-  if (mode !== 'authenticated' || !expression?.id) {
+  if (mode !== 'authenticated' || (!churchWide && !expression?.id)) {
     return (
       <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top + spacing.sm }]}>
-        <ScreenHeader title="Groups" subtitle="Expression community groups." showBack />
+        <ScreenHeader title="Groups" subtitle={churchWide ? 'Church-wide communities in General COT.' : 'Expression community groups.'} showBack />
         <View style={styles.body}>
-          <EmptyState title="Join an Expression first" message="Expression groups are available only to members of that specific Expression." iconName="people-outline" />
+          <EmptyState title={churchWide ? 'Sign in with your church membership' : 'Join an Expression first'} message={churchWide ? 'General COT Groups are available to active church members.' : 'Expression groups are available only to members of that specific Expression.'} iconName="people-outline" />
         </View>
       </View>
     );
@@ -186,7 +195,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      {embedded ? (
+      {embedded && !churchWide && expression?.id ? (
         <ExpressionPeopleHeader
           expressionId={expression.id}
           expressionName={expression.name}
@@ -204,7 +213,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: {
         contentContainerStyle={{ paddingTop: embedded ? spacing.sm : insets.top + spacing.sm, paddingBottom: embedded ? insets.bottom + spacing.xl : insets.bottom + 130 }}
       >
         {!embedded ? (
-          <ScreenHeader title={focusedGroup?.name ?? (focusGroupId ? 'Group' : 'Groups')} kicker={expression.name.toUpperCase()} subtitle={focusGroupId ? 'A smaller community inside this Expression.' : 'Smaller communities inside this Expression.'} showBack />
+          <ScreenHeader title={focusedGroup?.name ?? (focusGroupId ? 'Group' : 'Groups')} kicker={churchWide ? 'GENERAL COT' : (expression?.name ?? 'EXPRESSION').toUpperCase()} subtitle={focusGroupId ? (churchWide ? 'A church-wide community in General COT.' : 'A smaller community inside this Expression.') : (churchWide ? 'Member-created communities for prayer, fellowship, service and discussion across the church.' : 'Smaller communities inside this Expression.')} showBack />
         ) : null}
 
         <View style={styles.body}>
@@ -244,7 +253,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: {
               subtitle={focusGroupId ? 'Membership, meeting details and requests' : 'Choose a smaller space to connect more closely'}
             />
             {focusGroupId ? (
-              <Button label="All groups" onPress={() => router.replace(`/expressions/${expression.id}/groups` as any)} variant="ghost" size="sm" />
+              <Button label="All groups" onPress={() => router.replace(routeBase as any)} variant="ghost" size="sm" />
             ) : canManageGroups ? (
               <Button label="New group" onPress={() => setCreateOpen(true)} variant="primary" size="sm" />
             ) : null}
@@ -294,8 +303,8 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: {
                 <View style={styles.actionRow}>
                   {!membership && group.visibility === 'members' && group.join_policy !== 'invite' ? <Button label={group.join_policy === 'open' ? 'Join group' : 'Request to join'} onPress={() => void requestMembership(group.id)} loading={busyId === group.id} variant="primary" size="sm" /> : null}
                   {(membership?.status === 'declined' || membership?.status === 'removed') && group.visibility !== 'private' && group.join_policy !== 'invite' ? <Button label="Request Again" onPress={() => void requestMembership(group.id)} loading={busyId === group.id} variant="outline" size="sm" /> : null}
-                  {joined ? <Button label="Group chat" onPress={() => router.push(`/expressions/${expression.id}/groups/${group.id}/chat` as any)} variant="primary" size="sm" /> : null}
-                  {!focusGroupId && joined ? <Button label="Open group" onPress={() => router.push(`/expressions/${expression.id}/groups/${group.id}` as any)} variant="ghost" size="sm" /> : null}
+                  {joined ? <Button label="Group chat" onPress={() => router.push(`${routeBase}/${group.id}/chat` as any)} variant="primary" size="sm" /> : null}
+                  {!focusGroupId && joined ? <Button label="Open group" onPress={() => router.push(`${routeBase}/${group.id}` as any)} variant="ghost" size="sm" /> : null}
                 </View>
 
                 {group.canManageMembers && requests.length ? (
@@ -309,7 +318,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: {
                     </View>
                     {requests.map((request) => {
                       const profile = request.member?.profile;
-                      const label = profile?.display_name || profile?.username || 'Expression member';
+                      const label = profile?.display_name || profile?.username || (churchWide ? 'Church member' : 'Expression member');
                       return (
                         <View key={request.id} style={[styles.requestRow, { backgroundColor: colors.bgSecondary }]}>
                           <View style={styles.flex}>
@@ -328,23 +337,23 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: {
           }) : (
             <EmptyState
               title={focusGroupId ? 'Group unavailable' : 'No groups yet'}
-              message={focusGroupId ? 'This group does not belong to the active Expression or is no longer available.' : canManageGroups ? 'Create the first group for this Expression.' : 'Expression leaders have not published any member groups yet.'}
+              message={focusGroupId ? (churchWide ? 'This Group is unavailable or is not church-wide.' : 'This group does not belong to the active Expression or is no longer available.') : churchWide ? 'Create or join a General COT Group for prayer, fellowship, service or discussion.' : canManageGroups ? 'Create the first group for this Expression.' : 'Expression leaders have not published any member groups yet.'}
               iconName="people-outline"
             />
           )}
         </View>
       </ScrollView>
 
-      <BottomSheet visible={createOpen} onClose={() => !saving && setCreateOpen(false)} title="Create group" subtitle={`Inside ${expression.name}`}>
+      <BottomSheet visible={createOpen} onClose={() => !saving && setCreateOpen(false)} title="Create group" subtitle={churchWide ? 'General COT · Church-wide' : `Inside ${expression?.name ?? 'this Expression'}`}>
         <View style={styles.form}>
           <View style={[styles.formIntro, { backgroundColor: colors.primarySoft }]}>
             <Icon name="lock-closed-outline" size={17} color={colors.interactive} />
-            <Text style={[styles.helper, { color: colors.textSecondary }]}>This group will be permanently scoped to the currently selected Expression.</Text>
+            <Text style={[styles.helper, { color: colors.textSecondary }]}>{churchWide ? 'This Group belongs to the church-wide General COT space and is separate from Expression Groups.' : 'This group will be permanently scoped to the currently selected Expression.'}</Text>
           </View>
           <InputField label="Group Name" value={name} onChangeText={setName} placeholder="e.g. Young Adults Fellowship" />
           <InputField label="Description" value={description} onChangeText={setDescription} placeholder="What is this group for?" multiline numberOfLines={3} />
           <Text style={[styles.label, { color: colors.textSecondary }]}>VISIBILITY</Text>
-          <View style={styles.chips}><Chip label="Expression Members" selected={visibility === 'members'} onPress={() => setVisibility('members')} /><Chip label="Private / Invite-led" selected={visibility === 'private'} onPress={() => setVisibility('private')} /></View>
+          <View style={styles.chips}><Chip label={churchWide ? 'Church Members' : 'Expression Members'} selected={visibility === 'members'} onPress={() => setVisibility('members')} /><Chip label="Private / Invite-led" selected={visibility === 'private'} onPress={() => setVisibility('private')} /></View>
           {visibility === 'members' ? (
             <View style={styles.actionRow}>
               <Chip label="Open joining" selected={joinPolicy === 'open'} onPress={() => setJoinPolicy('open')} />
@@ -353,7 +362,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId }: {
           ) : null}
           <InputField label="Capacity (Optional)" value={capacity} onChangeText={setCapacity} placeholder="Leave blank for no limit" keyboardType="number-pad" />
           <InputField label="Meeting Note (Optional)" value={meetingNote} onChangeText={setMeetingNote} placeholder="e.g. Saturdays, 5:00 PM · Fellowship Hall" />
-          <Button label="Create Expression Group" onPress={() => void createGroup()} loading={saving} variant="primary" size="lg" />
+          <Button label={churchWide ? 'Create General COT Group' : 'Create Expression Group'} onPress={() => void createGroup()} loading={saving} variant="primary" size="lg" />
         </View>
       </BottomSheet>
     </View>

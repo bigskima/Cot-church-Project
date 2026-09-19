@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import { Badge, Button, Chip, EmptyState, Icon, ResourceError, ScreenHeader, SectionHeader, Skeleton } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
@@ -75,11 +76,14 @@ function AccountCard({ account, reference }: { account: BankAccount; reference: 
   );
 }
 
-export function GroupGivingExperience({ groupId }: { groupId: string }) {
+export function GroupGivingExperience({ groupId, scope = 'expression' }: { groupId: string; scope?: 'expression' | 'general' }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { api, context, mode } = useSession();
-  const organizationId = context?.organization?.id ?? '';
+  const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
+  const requestScope = scope === 'general'
+    ? { context: 'public' as const, headers: organizationId ? { 'X-Organization-Id': organizationId } : undefined }
+    : { context: 'current' as const };
   const groupKey = `group-chat:${groupId}:giving`;
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const [currency, setCurrency] = useState<string | null>(null);
@@ -89,15 +93,19 @@ export function GroupGivingExperience({ groupId }: { groupId: string }) {
 
   const group = useResource<GroupGivingPayload>(groupKey, (signal) => {
     if (mode !== 'authenticated' || !groupId) return Promise.reject(new Error('Join this Group to open Group Giving.'));
-    return api.request<GroupGivingPayload>(`group-chat?groupId=${encodeURIComponent(groupId)}`, { signal, context: 'current' });
+    return api.request<GroupGivingPayload>(`group-chat?groupId=${encodeURIComponent(groupId)}`, { signal, ...requestScope });
   });
 
-  const expressionId = group.data?.group.branch_id ?? context?.expression?.id ?? null;
+  const generalGroup = Boolean(group.data && !group.data.group.branch_id);
+  const expressionId = scope === 'general'
+    ? null
+    : (group.data?.group.branch_id ?? context?.expression?.id ?? null);
   const expressionGiving = useResource<PublicGivingDetails>(
-    `group-giving:expression:${organizationId || 'none'}:${expressionId ?? 'none'}`,
+    `group-giving:scope:${organizationId || 'none'}:${expressionId ?? 'general'}`,
     (signal) => {
-      if (!organizationId || !expressionId) return Promise.reject(new Error('This Group is not attached to an Expression giving scope.'));
-      const params = new URLSearchParams({ organizationId, expressionId });
+      if (!organizationId) return Promise.reject(new Error('Church giving scope is unavailable.'));
+      const params = new URLSearchParams({ organizationId });
+      if (expressionId) params.set('expressionId', expressionId);
       return api.request<PublicGivingDetails>(`public-giving?${params.toString()}`, { signal });
     },
   );
@@ -135,7 +143,7 @@ export function GroupGivingExperience({ groupId }: { groupId: string }) {
       const givingPurposeId = action === 'link_giving' ? purpose.id : (purpose as GroupGivingOption).giving_purpose_id;
       await api.request('group-chat', {
         method: 'POST',
-        context: 'current',
+        ...requestScope,
         body: JSON.stringify({
           action,
           groupId,
@@ -166,7 +174,9 @@ export function GroupGivingExperience({ groupId }: { groupId: string }) {
         <ScreenHeader
           title='Group Giving'
           kicker='GROUP · GIVING'
-          subtitle={`Giving inside ${groupName}. Payment destinations remain owned by this Group's Expression.`}
+          subtitle={generalGroup
+            ? `Giving inside ${groupName}. Payment destinations remain owned by General COT.`
+            : `Giving inside ${groupName}. Payment destinations remain owned by this Group's Expression.`}
           showBack
         />
         <View style={styles.body}>
@@ -174,7 +184,7 @@ export function GroupGivingExperience({ groupId }: { groupId: string }) {
             <View style={[styles.iconBubble, { backgroundColor: colors.primarySoft }]}><Icon name='gift-outline' size={22} color={colors.interactive} /></View>
             <View style={styles.flex}>
               <Text style={[styles.heroTitle, { color: colors.text }]}>{groupName}</Text>
-              <Text style={[styles.copy, { color: colors.textSecondary }]}>Group gifts stay attributed to this Group and its Expression.</Text>
+              <Text style={[styles.copy, { color: colors.textSecondary }]}>{generalGroup ? 'Group gifts stay attributed to this Group inside General COT.' : 'Group gifts stay attributed to this Group and its Expression.'}</Text>
             </View>
             {group.data.permissions.manageGiving ? <Badge label='GIVING MANAGER' variant='active' /> : null}
           </View>
@@ -182,7 +192,7 @@ export function GroupGivingExperience({ groupId }: { groupId: string }) {
           {feedback ? <View style={[styles.notice, { backgroundColor: colors.successSoft }]}><Text style={{ color: colors.success }}>{feedback}</Text></View> : null}
           {actionError ? <View style={[styles.notice, { backgroundColor: colors.liveSoft }]}><Text style={{ color: colors.live }}>{actionError}</Text></View> : null}
 
-          <SectionHeader title='Group giving purposes' badge={options.length} subtitle='Only purposes approved in this Expression and enabled for this Group appear here.' />
+          <SectionHeader title='Group giving purposes' badge={options.length} subtitle={generalGroup ? 'Only church-wide purposes approved in General COT and enabled for this Group appear here.' : 'Only purposes approved in this Expression and enabled for this Group appear here.'} />
           {options.length ? (
             <>
               <View style={styles.chips}>
@@ -191,7 +201,7 @@ export function GroupGivingExperience({ groupId }: { groupId: string }) {
               {selectedOption?.note ? <Text style={[styles.copy, { color: colors.textSecondary }]}>{selectedOption.note}</Text> : expressionPurpose?.description ? <Text style={[styles.copy, { color: colors.textSecondary }]}>{expressionPurpose.description}</Text> : null}
             </>
           ) : (
-            <EmptyState title='Group Giving is not configured yet' message='A Group Giving Manager can enable an approved purpose from this Expression.' iconName='gift-outline' />
+            <EmptyState title='Group Giving is not configured yet' message={generalGroup ? 'A Group Giving Manager can enable an approved church-wide purpose.' : 'A Group Giving Manager can enable an approved purpose from this Expression.'} iconName='gift-outline' />
           )}
 
           {options.length && expressionGiving.loading ? <Skeleton height={120} count={2} /> : null}
@@ -199,12 +209,12 @@ export function GroupGivingExperience({ groupId }: { groupId: string }) {
 
           {options.length && expressionGiving.data ? (
             <>
-              <SectionHeader title='Give to this Group' subtitle='Use the Expression-approved payment destination below. Your Group reference keeps the gift identifiable.' />
+              <SectionHeader title='Give to this Group' subtitle={generalGroup ? 'Use the General COT-approved payment destination below. Your Group reference keeps the gift identifiable.' : 'Use the Expression-approved payment destination below. Your Group reference keeps the gift identifiable.'} />
               {currencies.length > 1 ? <View style={styles.chips}>{currencies.map((code) => <Chip key={code} label={code} selected={currency === code} onPress={() => setCurrency(code)} />)}</View> : null}
               {expressionGiving.data.methods.manualBankTransfer && accounts.length ? (
                 accounts.map((account) => <AccountCard key={account.id} account={account} reference={referenceLabel} />)
               ) : (
-                <EmptyState title='No active transfer destination' message='This Expression has not published an active bank-transfer destination for Group Giving.' iconName='business-outline' />
+                <EmptyState title='No active transfer destination' message={generalGroup ? 'General COT has not published an active bank-transfer destination for Group Giving.' : 'This Expression has not published an active bank-transfer destination for Group Giving.'} iconName='business-outline' />
               )}
             </>
           ) : null}
@@ -218,6 +228,22 @@ export function GroupGivingExperience({ groupId }: { groupId: string }) {
                   <Button label='Remove' variant='ghost' size='sm' loading={busy === `unlink_giving:${item.giving_purpose_id}`} onPress={() => void mutate('unlink_giving', item)} />
                 </View>
               ))}
+              {!group.data.availableGivingPurposes.length ? (
+                <View style={[styles.setupCard, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}>
+                  <View style={styles.flex}>
+                    <Text style={[styles.cardTitle, { color: colors.text }]}>No approved giving purpose exists in this scope yet</Text>
+                    <Text style={[styles.meta, { color: colors.textSecondary }]}>
+                      Your Group Giving role is active. A purpose must first be published in {generalGroup ? 'General COT' : 'this Expression'} before it can be linked here.
+                    </Text>
+                  </View>
+                  <Button
+                    label='Open Giving Setup'
+                    variant='outline'
+                    size='sm'
+                    onPress={() => router.push((generalGroup ? '/general/leadership/giving-manage' : `/expressions/${expressionId}/manage/giving`) as any)}
+                  />
+                </View>
+              ) : null}
               {group.data.availableGivingPurposes.filter((purpose) => !options.some((item) => item.giving_purpose_id === purpose.id)).map((purpose) => (
                 <View key={purpose.id} style={styles.manageRow}>
                   <View style={styles.flex}><Text style={[styles.cardTitle, { color: colors.text }]}>{purpose.name}</Text>{purpose.description ? <Text style={[styles.meta, { color: colors.textMuted }]}>{purpose.description}</Text> : null}</View>
@@ -254,5 +280,6 @@ const styles = StyleSheet.create({
   reference: { fontSize: 13, fontWeight: '800' },
   notice: { borderRadius: radius.lg, padding: spacing.sm },
   manager: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm },
+  setupCard: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm },
   manageRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
 });

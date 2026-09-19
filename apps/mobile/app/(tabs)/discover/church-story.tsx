@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -76,6 +77,7 @@ function TextCard({ kicker, text, secondary = false }: { kicker: string; text: s
 
 export default function ChurchStoryScreen() {
   const insets = useSafeAreaInsets();
+  const routeParams = useLocalSearchParams<{ edit?: string }>();
   const { api, context } = useSession();
   const { colors } = useTheme();
   const access = useGeneralMinistryAccess();
@@ -85,6 +87,13 @@ export default function ChurchStoryScreen() {
   const [savingLocation, setSavingLocation] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (routeParams.edit === 'location' && access.canManageLeadership) {
+      setEditing(true);
+      setActiveTab('story');
+    }
+  }, [routeParams.edit, access.canManageLeadership]);
 
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
   const orgParam = organizationId ? `?organizationId=${encodeURIComponent(organizationId)}` : '';

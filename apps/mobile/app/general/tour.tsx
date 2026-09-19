@@ -1,11 +1,13 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, ScreenHeader } from '@/components';
 import { TourAnchor, useAppTour } from '@/features/tour/AppTourProvider';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
+
+const COT_USER_GUIDE_URL = 'https://docs.google.com/document/d/1UucR5xhl40vSqQSeeUA9HqpSkJWpmSazUn_AlWV024s/edit?usp=drivesdk';
 
 export default function AppTourSettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -44,6 +46,20 @@ export default function AppTourSettingsScreen() {
         </View>
 
         {error ? <View style={[styles.errorCard, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}><Icon name="alert-circle-outline" size={16} color={colors.live} /><Text style={[styles.errorText, { color: colors.live }]}>{error}</Text></View> : null}
+
+        <Pressable
+          onPress={() => void Linking.openURL(COT_USER_GUIDE_URL)}
+          accessibilityRole="link"
+          accessibilityLabel="Open the complete COT app user guide"
+          style={({ pressed }) => [styles.guideCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}
+        >
+          <View style={[styles.cardIcon, { backgroundColor: colors.primarySoft }]}><Icon name="book-outline" size={21} color={colors.interactive} /></View>
+          <View style={styles.flex}>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>Read the complete COT guide</Text>
+            <Text style={[styles.cardCopy, { color: colors.textMuted }]}>If the guided tour is not enough, open the full user and ministry operations documentation.</Text>
+          </View>
+          <Icon name="open-outline" size={18} color={colors.interactive} />
+        </Pressable>
 
         <Text style={[styles.sectionEyebrow, { color: colors.interactive }]}>GENERAL COT</Text>
         <Pressable
@@ -118,6 +134,7 @@ const styles = StyleSheet.create({
   errorCard: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: 7 },
   errorText: { flex: 1, fontSize: 11, lineHeight: 16, fontWeight: '700' },
   sectionEyebrow: { fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 1 },
+  guideCard: { minHeight: 82, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   tourCard: { minHeight: 92, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   cardIcon: { width: 46, height: 46, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   cardTitle: { fontSize: 15, lineHeight: 19, fontWeight: '900' },

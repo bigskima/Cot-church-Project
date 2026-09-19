@@ -3,11 +3,13 @@ import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-n
 import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { EmptyState, Icon, ResourceError, ScreenHeader, Skeleton } from '@/components';
+import { router } from 'expo-router';
+import { Button, EmptyState, Icon, ResourceError, ScreenHeader, Skeleton } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
+import { useGeneralMinistryAccess } from '@/features/general/useGeneralMinistryAccess';
 
 type LocationRecord = {
   line1?: string | null;
@@ -63,6 +65,7 @@ export function PublicLocationExperience({ scope, expressionId }: { scope: 'gene
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { api, context } = useSession();
+  const generalAccess = useGeneralMinistryAccess();
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
   const [copied, setCopied] = React.useState(false);
 
@@ -105,6 +108,14 @@ export function PublicLocationExperience({ scope, expressionId }: { scope: 'gene
         kicker={scope === 'expression' ? 'EXPRESSION' : 'GENERAL COT'}
         subtitle={resource.data?.name ? `Official published location for ${resource.data.name}.` : 'Official published church location.'}
         showBack
+        rightAction={scope === 'general' && generalAccess.canManageLeadership ? (
+          <Button
+            label={location ? 'Edit location' : 'Publish location'}
+            variant="outline"
+            size="sm"
+            onPress={() => router.push({ pathname: '/general/church-story', params: { edit: 'location' } } as any)}
+          />
+        ) : undefined}
       />
 
       {resource.loading && !resource.data ? (
@@ -116,6 +127,10 @@ export function PublicLocationExperience({ scope, expressionId }: { scope: 'gene
           title="Location has not been published yet"
           message={scope === 'expression' ? 'An authorized Expression leader can add the official address in Expression Settings.' : 'An authorized General COT leader can publish the official church location from Our Story & Location.'}
           iconName="location-outline"
+          actionLabel={scope === 'general' && generalAccess.canManageLeadership ? 'Publish location' : undefined}
+          onAction={scope === 'general' && generalAccess.canManageLeadership
+            ? () => router.push({ pathname: '/general/church-story', params: { edit: 'location' } } as any)
+            : undefined}
         />
       ) : (
         <>

@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import { router } from 'expo-router';
 import { AudioPlayer, Avatar, Icon, VideoPlayer } from '@/components';
 import { radius, spacing } from '@/design-system/tokens';
 import { useTheme } from '@/state/theme';
@@ -16,6 +17,32 @@ import { downloadFile } from '@/utils/download-file';
 import type { ChatAttachment, RichChatMessage } from './rich-chat-types';
 
 const QUICK_REACTIONS = ['❤️', '🙏', '😂', '👍', '🔥'];
+const MENTION_PATTERN = /(@[a-z0-9][a-z0-9._]{2,29})/gi;
+const MENTION_ONLY_PATTERN = /^@[a-z0-9][a-z0-9._]{2,29}$/i;
+
+function MentionAwareMessage({ body, mine }: { body: string; mine: boolean }) {
+  const { colors } = useTheme();
+  const parts = body.split(MENTION_PATTERN);
+  return (
+    <Text style={[styles.messageText, { color: mine ? '#FFFFFF' : colors.text }]}>
+      {parts.map((part, index) => {
+        if (!MENTION_ONLY_PATTERN.test(part)) return <React.Fragment key={`${index}-text`}>{part}</React.Fragment>;
+        const username = part.slice(1).toLowerCase();
+        return (
+          <Text
+            key={`${index}-mention`}
+            onPress={() => router.push(`/general/member/${encodeURIComponent(username)}` as any)}
+            style={[styles.mentionText, { color: mine ? '#FFFFFF' : colors.interactive }]}
+            accessibilityRole="link"
+            accessibilityLabel={`Open @${username}'s profile`}
+          >
+            {part}
+          </Text>
+        );
+      })}
+    </Text>
+  );
+}
 
 function attachmentLabel(type?: ChatAttachment['type'] | null) {
   if (type === 'audio') return 'Voice or audio message';
@@ -143,6 +170,17 @@ export function RichMessageBubble({
     },
   }), [message, onReply, translateX]);
 
+  const forwardMessage = () => {
+    const attachmentLines = (message.attachments ?? [])
+      .map((attachment) => attachment.url?.trim())
+      .filter(Boolean);
+    const source = message.sender?.username ? `@${message.sender.username}` : senderName;
+    const content = [`Forwarded from ${source}`, message.body?.trim(), ...attachmentLines].filter(Boolean).join('\n');
+    if (!content) return;
+    setActionsOpen(false);
+    router.push({ pathname: '/general/chat', params: { forwardText: content } } as any);
+  };
+
   const copyMessage = async () => {
     if (!message.body?.trim()) return;
     await Clipboard.setStringAsync(message.body);
@@ -175,7 +213,7 @@ export function RichMessageBubble({
                 borderColor: message.pinned_at ? colors.interactive : colors.borderSubtle,
               },
             ]}
-            accessibilityHint="Long press for reply, copy, reaction, and pin actions"
+            accessibilityHint="Long press for reply, copy, forward, reaction, and pin actions"
           >
             <View style={styles.bubbleMeta}>
               {!mine && showSender ? (
@@ -213,11 +251,7 @@ export function RichMessageBubble({
               </View>
             ) : null}
 
-            {message.body ? (
-              <Text style={[styles.messageText, { color: mine ? '#FFFFFF' : colors.text }]}>
-                {message.body}
-              </Text>
-            ) : null}
+            {message.body ? <MentionAwareMessage body={message.body} mine={mine} /> : null}
             <Text style={[styles.time, { color: mine ? '#DDEEFF' : colors.textMuted }]}>
               {new Date(message.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </Text>
@@ -255,6 +289,12 @@ export function RichMessageBubble({
                   <Text style={[styles.actionLabel, { color: colors.textSecondary }]}>Copy</Text>
                 </Pressable>
               ) : null}
+              {(message.body?.trim() || (message.attachments ?? []).some((attachment) => attachment.url)) ? (
+                <Pressable onPress={forwardMessage} style={styles.actionButton}>
+                  <Icon name="arrow-redo-outline" size={17} color={colors.textSecondary} />
+                  <Text style={[styles.actionLabel, { color: colors.textSecondary }]}>Forward</Text>
+                </Pressable>
+              ) : null}
               {QUICK_REACTIONS.map((emoji) => (
                 <Pressable key={emoji} onPress={() => { onReact(message, emoji); setActionsOpen(false); }} style={styles.emojiButton}>
                   <Text style={styles.emoji}>{emoji}</Text>
@@ -290,6 +330,7 @@ const styles = StyleSheet.create({
   bubbleMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 13 },
   senderName: { flex: 1, fontSize: 10, fontWeight: '800', marginBottom: 2 },
   messageText: { fontSize: 15, lineHeight: 20, marginTop: 3 },
+  mentionText: { fontWeight: '900', textDecorationLine: 'underline' },
   time: { fontSize: 9, lineHeight: 12, alignSelf: 'flex-end', marginTop: 3 },
   replyPreview: { borderLeftWidth: 3, borderLeftColor: '#38A8FF', borderRadius: radius.sm, paddingHorizontal: 8, paddingVertical: 6, marginBottom: 6 },
   replySender: { fontSize: 10, fontWeight: '800' },
