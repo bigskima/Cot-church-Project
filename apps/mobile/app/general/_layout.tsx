@@ -137,6 +137,10 @@ export default function GeneralLayout() {
       <Tabs.Screen name="notifications" options={hidden as any} />
       <Tabs.Screen name="notification-settings" options={hidden as any} />
       <Tabs.Screen name="saved" options={hidden as any} />
+      <Tabs.Screen name="groups/index" options={hidden as any} />
+      <Tabs.Screen name="groups/[groupId]" options={hidden as any} />
+      <Tabs.Screen name="groups/[groupId]/chat" options={hidden as any} />
+      <Tabs.Screen name="groups/[groupId]/giving" options={hidden as any} />
       <Tabs.Screen name="tools" options={hidden as any} />
       <Tabs.Screen name="leadership" options={hidden as any} />
       <Tabs.Screen name="leadership/index" options={hidden as any} />
