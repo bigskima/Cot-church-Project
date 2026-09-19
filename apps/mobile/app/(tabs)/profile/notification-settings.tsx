@@ -19,6 +19,10 @@ type NotificationPreferences = {
   timezone?: string;
   push_preview?: 'full' | 'sender_only' | 'private';
   push_sound_enabled?: boolean;
+  live_alerts_enabled?: boolean;
+  followed_posts_enabled?: boolean;
+  priority_leadership_posts_enabled?: boolean;
+  urgent_platform_alerts_enabled?: boolean;
   updated_at?: string | null;
 };
 
@@ -37,6 +41,10 @@ export default function NotificationSettingsScreen() {
   const [quietEnd, setQuietEnd] = React.useState('07:00');
   const [pushPreview, setPushPreview] = React.useState<'full' | 'sender_only' | 'private'>('full');
   const [pushSoundEnabled, setPushSoundEnabled] = React.useState(true);
+  const [liveAlertsEnabled, setLiveAlertsEnabled] = React.useState(true);
+  const [followedPostsEnabled, setFollowedPostsEnabled] = React.useState(true);
+  const [priorityLeadershipPostsEnabled, setPriorityLeadershipPostsEnabled] = React.useState(true);
+  const [urgentPlatformAlertsEnabled, setUrgentPlatformAlertsEnabled] = React.useState(true);
   const [deviceStatus, setDeviceStatus] = React.useState<PushDeviceStatus | null>(null);
   const [deviceBusy, setDeviceBusy] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
@@ -57,6 +65,10 @@ export default function NotificationSettingsScreen() {
     setQuietEnd(typeof quiet.endTime === 'string' && TIME_PATTERN.test(quiet.endTime) ? quiet.endTime : '07:00');
     setPushPreview(['full', 'sender_only', 'private'].includes(String(data.push_preview)) ? data.push_preview as 'full' | 'sender_only' | 'private' : 'full');
     setPushSoundEnabled(data.push_sound_enabled !== false);
+    setLiveAlertsEnabled(data.live_alerts_enabled !== false);
+    setFollowedPostsEnabled(data.followed_posts_enabled !== false);
+    setPriorityLeadershipPostsEnabled(data.priority_leadership_posts_enabled !== false);
+    setUrgentPlatformAlertsEnabled(data.urgent_platform_alerts_enabled !== false);
   }, []);
 
   const load = React.useCallback(async () => {
@@ -107,6 +119,10 @@ export default function NotificationSettingsScreen() {
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
           pushPreview,
           pushSoundEnabled,
+          liveAlertsEnabled,
+          followedPostsEnabled,
+          priorityLeadershipPostsEnabled,
+          urgentPlatformAlertsEnabled,
         }),
       });
       applyPreferences(data);
@@ -248,6 +264,51 @@ export default function NotificationSettingsScreen() {
                 <View style={[styles.sectionIcon, { backgroundColor: colors.primarySoft }]}>
                   <Icon name="phone-portrait-outline" size={19} color={colors.interactive} />
                 </View>
+
+            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+              <View style={styles.sectionHeading}>
+                <View style={[styles.sectionIcon, { backgroundColor: colors.primarySoft }]}>
+                  <Icon name="options-outline" size={19} color={colors.interactive} />
+                </View>
+                <View style={styles.flex}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>What should alert me?</Text>
+                  <Text style={[styles.cardBody, { color: colors.textSecondary }]}>Choose which activity may create an outside-app alert. Your in-app Notifications inbox still keeps supported updates.</Text>
+                </View>
+              </View>
+              <PreferenceRow
+                icon="radio-outline"
+                title="COT goes live"
+                description="Alert me when General COT or one of my joined Expressions starts a live broadcast."
+                value={liveAlertsEnabled}
+                onChange={setLiveAlertsEnabled}
+                colors={colors}
+              />
+              <PreferenceRow
+                icon="person-add-outline"
+                title="Posts from people I follow"
+                description="Alert me when someone I follow publishes a post I am allowed to see."
+                value={followedPostsEnabled}
+                onChange={setFollowedPostsEnabled}
+                colors={colors}
+              />
+              <PreferenceRow
+                icon="ribbon-outline"
+                title="Priority ministry updates"
+                description="Alert me when a person carrying a priority public ministry badge publishes in my church or Expression."
+                value={priorityLeadershipPostsEnabled}
+                onChange={setPriorityLeadershipPostsEnabled}
+                colors={colors}
+              />
+              <PreferenceRow
+                icon="warning-outline"
+                title="Urgent platform alerts"
+                description="Allow audited emergency or service-critical notices. These can bypass quiet hours, but never override Push alerts being turned off."
+                value={urgentPlatformAlertsEnabled}
+                onChange={setUrgentPlatformAlertsEnabled}
+                colors={colors}
+                last
+              />
+            </View>
                 <View style={styles.flex}>
                   <Text style={[styles.cardTitle, { color: colors.text }]}>This device</Text>
                   <Text style={[styles.cardBody, { color: colors.textSecondary }]}>
