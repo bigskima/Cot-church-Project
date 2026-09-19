@@ -85,6 +85,7 @@ export function RichChatComposer({
   bottomInset = 10,
   onCancelReply,
   onSend,
+  initialText = '',
 }: {
   endpoint: ChatEndpoint;
   requestContext: 'public' | 'current';
@@ -98,6 +99,14 @@ export function RichChatComposer({
   const { api } = useSession();
   const { colors } = useTheme();
   const [draft, setDraft] = useState('');
+  const appliedInitialText = useRef('');
+
+  useEffect(() => {
+    const value = initialText.trim();
+    if (!value || appliedInitialText.current === value) return;
+    appliedInitialText.current = value;
+    setDraft((current) => current.trim() ? current : value);
+  }, [initialText]);
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [emojisOpen, setEmojisOpen] = useState(false);
