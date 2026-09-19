@@ -249,21 +249,24 @@ async function sendExpo(client: any, job: OutboxJob, preference: PreferenceRow) 
     return { delivered: 0, skipped: 1, failed: 0 };
   }
 
-  if (quietHoursActive(preference)) {
+  const content = await notificationContent(client, job);
+  if (!content) {
+    await deliverJob(client, job, { skipped: "notification_content_unavailable" });
+    return { delivered: 0, skipped: 1, failed: 0 };
+  }
+
+  const urgent = content.data?.urgent === true;
+  if (!urgent && quietHoursActive(preference)) {
     await deferForQuietHours(client, job);
     return { delivered: 0, skipped: 1, failed: 0, deferred: 1 };
   }
 
-  const [{ data: devices, error: deviceError }, content] = await Promise.all([
-    client.from("push_devices")
+  const { data: devices, error: deviceError } = await client.from("push_devices")
       .select("id,expo_push_token,platform")
       .eq("profile_id", job.recipient_profile_id)
       .eq("is_active", true)
       .order("last_seen_at", { ascending: false })
-      .limit(20),
-    notificationContent(client, job),
-  ]);
-
+      .limit(20);
   if (deviceError) {
     await failJob(client, job, "Unable to resolve registered push devices.");
     return { delivered: 0, skipped: 0, failed: 1 };
@@ -271,11 +274,6 @@ async function sendExpo(client: any, job: OutboxJob, preference: PreferenceRow) 
 
   if (!devices?.length) {
     await deliverJob(client, job, { skipped: "no_active_device" });
-    return { delivered: 0, skipped: 1, failed: 0 };
-  }
-
-  if (!content) {
-    await deliverJob(client, job, { skipped: "notification_content_unavailable" });
     return { delivered: 0, skipped: 1, failed: 0 };
   }
 
@@ -292,7 +290,7 @@ async function sendExpo(client: any, job: OutboxJob, preference: PreferenceRow) 
     body: preview.body,
     sound: soundEnabled ? "default" : null,
     channelId: soundEnabled ? "cot-default" : "cot-silent",
-    priority: "high",
+    priority: urgent ? "high" : "default",
     data: {
       ...content.data,
       notificationId: content.notificationId,
