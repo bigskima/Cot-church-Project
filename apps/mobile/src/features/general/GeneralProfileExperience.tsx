@@ -7,6 +7,7 @@ import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useGeneralMinistryAccess } from './useGeneralMinistryAccess';
+import { setFloatingActionsHidden } from '@/features/ai/floatingActionsPreference';
 
 type HubLink = {
   key: string;
@@ -75,6 +76,13 @@ export default function GeneralProfileExperience() {
     signOut,
   } = useSession();
   const ministry = useGeneralMinistryAccess();
+  const [floatingMenuRestored, setFloatingMenuRestored] = React.useState(false);
+
+  const restoreFloatingMenu = async () => {
+    await setFloatingActionsHidden(false);
+    setFloatingMenuRestored(true);
+    setTimeout(() => setFloatingMenuRestored(false), 1800);
+  };
 
   const profile = context?.profile;
   const organization = context?.organization ?? context?.organizations?.[0] ?? context?.creatorOrganizations?.[0];
@@ -167,6 +175,48 @@ export default function GeneralProfileExperience() {
             <View style={styles.section}>
               <SectionTitle eyebrow="EVERYDAY" title="Your COT" subtitle="The things you are most likely to come back for." />
               <View style={styles.grid}>{everydayLinks.map((item) => <HubCard key={item.key} item={item} />)}</View>
+            </View>
+
+            <View style={styles.section}>
+              <SectionTitle eyebrow="APP" title="Guide & floating controls" subtitle="Help lives in your account instead of covering the app." />
+              <View style={styles.grid}>
+                <Pressable
+                  onPress={() => router.push('/general/tour' as any)}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [styles.hubCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}
+                >
+                  <View style={[styles.hubIcon, { backgroundColor: colors.primarySoft }]}>
+                    <Icon name="navigate-circle-outline" size={20} color={colors.interactive} />
+                  </View>
+                  <View style={styles.flex}>
+                    <Text style={[styles.hubTitle, { color: colors.text }]}>App tour</Text>
+                    <Text style={[styles.hubSubtitle, { color: colors.textMuted }]}>Open the guided COT walkthrough when you want it.</Text>
+                  </View>
+                  <View style={[styles.hubArrow, { backgroundColor: colors.bgSecondary }]}>
+                    <Icon name="arrow-forward" size={14} color={colors.textSecondary} />
+                  </View>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => void restoreFloatingMenu()}
+                  accessibilityRole="button"
+                  accessibilityLabel="Restore floating COT controls"
+                  style={({ pressed }) => [styles.hubCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}
+                >
+                  <View style={[styles.hubIcon, { backgroundColor: colors.primarySoft }]}>
+                    <Icon name="move-outline" size={20} color={colors.interactive} />
+                  </View>
+                  <View style={styles.flex}>
+                    <Text style={[styles.hubTitle, { color: colors.text }]}>{floatingMenuRestored ? 'Floating menu restored' : 'Floating menu'}</Text>
+                    <Text style={[styles.hubSubtitle, { color: colors.textMuted }]}>
+                      {floatingMenuRestored ? 'It is visible again and can be dragged directly.' : 'Restore it here after using Hide menu.'}
+                    </Text>
+                  </View>
+                  <View style={[styles.hubArrow, { backgroundColor: colors.bgSecondary }]}>
+                    <Icon name={floatingMenuRestored ? 'checkmark' : 'eye-outline'} size={14} color={floatingMenuRestored ? colors.interactive : colors.textSecondary} />
+                  </View>
+                </Pressable>
+              </View>
             </View>
 
             <View style={styles.section}>
