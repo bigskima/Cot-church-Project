@@ -25,6 +25,7 @@ type PreferenceRow = {
   timezone?: string | null;
   push_preview?: "full" | "sender_only" | "private" | string | null;
   push_sound_enabled?: boolean | null;
+  urgent_platform_alerts_enabled?: boolean | null;
 };
 
 function secureEqual(left: string, right: string) {
@@ -256,6 +257,10 @@ async function sendExpo(client: any, job: OutboxJob, preference: PreferenceRow) 
   }
 
   const urgent = content.data?.urgent === true;
+  if (urgent && preference.urgent_platform_alerts_enabled === false) {
+    await deliverJob(client, job, { skipped: "urgent_platform_alerts_disabled" });
+    return { delivered: 0, skipped: 1, failed: 0 };
+  }
   if (!urgent && quietHoursActive(preference)) {
     await deferForQuietHours(client, job);
     return { delivered: 0, skipped: 1, failed: 0, deferred: 1 };
@@ -457,7 +462,7 @@ Deno.serve(createHandler(
       for (const job of jobs ?? []) {
         const { data: preference } = job.recipient_profile_id
           ? await client.from("notification_preferences")
-              .select("push_enabled,quiet_hours,timezone,push_preview,push_sound_enabled")
+              .select("push_enabled,quiet_hours,timezone,push_preview,push_sound_enabled,urgent_platform_alerts_enabled")
               .eq("profile_id", job.recipient_profile_id)
               .eq("organization_id", job.organization_id)
               .maybeSingle()
