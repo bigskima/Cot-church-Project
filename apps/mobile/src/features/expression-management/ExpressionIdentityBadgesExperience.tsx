@@ -24,17 +24,21 @@ type Definition = {
 };
 type Assignment = { id: string; profile_id: string; badge_definition_id: string; is_active: boolean };
 type Member = { id: string; display_name?: string | null; username?: string | null; avatar_url?: string | null };
-type Payload = { definitions: Definition[]; assignments: Assignment[]; members: Member[]; branchId: string };
+type Payload = { definitions: Definition[]; assignments: Assignment[]; members: Member[]; branchId: string | null; scope?: 'general' | 'expression' };
 
 const variants = ['default','teal','blue','gold','silver','custom'] as const;
 
-export function ExpressionIdentityBadgesExperience() {
+function ScopedIdentityBadgesExperience({ scope }: { scope: 'general' | 'expression' }) {
   const { expressionId } = useLocalSearchParams<{ expressionId?: string }>();
-  const branchId = typeof expressionId === 'string' ? expressionId : '';
+  const expressionScope = scope === 'expression';
+  const branchId = expressionScope && typeof expressionId === 'string' ? expressionId : '';
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
-  const { api, context, hasCapability } = useSession();
-  const canManage = Boolean(branchId) && hasCapability('expression.leadership.manage');
+  const { api, context, hasCapability, hasOrganizationCapability } = useSession();
+  const canManage = expressionScope
+    ? Boolean(branchId) && hasCapability('expression.leadership.manage')
+    : hasOrganizationCapability('organization.leadership.manage');
+  const scopeLabel = expressionScope ? 'Expression' : 'General COT';
 
   const [editor, setEditor] = useState<Definition | 'new' | null>(null);
   const [label, setLabel] = useState('');
@@ -50,10 +54,10 @@ export function ExpressionIdentityBadgesExperience() {
   const [successMsg, setSuccessMsg] = useState('');
 
   const resource = useResource<Payload>(
-    `identity-badges:expression:${branchId || 'none'}`,
-    (signal) => branchId && canManage
-      ? api.request<Payload>(`church-story?view=badges&expressionId=${encodeURIComponent(branchId)}`, { signal, context: 'current' })
-      : Promise.resolve({ definitions: [], assignments: [], members: [], branchId } as Payload),
+    `identity-badges:${scope}:${branchId || 'organization'}`,
+    (signal) => canManage && (!expressionScope || branchId)
+      ? api.request<Payload>(`church-story?view=badges${expressionScope ? `&expressionId=${encodeURIComponent(branchId)}` : ''}`, { signal, context: 'current' })
+      : Promise.resolve({ definitions: [], assignments: [], members: [], branchId: branchId || null, scope } as Payload),
   );
 
   const definitions = (resource.data?.definitions ?? []).filter((item) => !item.is_membership_default);
@@ -97,7 +101,7 @@ export function ExpressionIdentityBadgesExperience() {
   };
 
   const saveDefinition = async () => {
-    if (!branchId || !label.trim()) return;
+    if ((expressionScope && !branchId) || !label.trim()) return;
     setBusy(true);
     setErrorMsg('');
     try {
@@ -107,7 +111,7 @@ export function ExpressionIdentityBadgesExperience() {
         context: 'current',
         body: JSON.stringify({
           action: editing ? 'badge_update_definition' : 'badge_create_definition',
-          expressionId: branchId,
+          ...(expressionScope ? { expressionId: branchId } : {}),
           ...(editing ? { definitionId: editor.id } : {}),
           label: label.trim(),
           backgroundColor,
@@ -119,7 +123,7 @@ export function ExpressionIdentityBadgesExperience() {
         }),
       });
       setEditor(null);
-      setSuccessMsg(editing ? 'Expression title updated.' : 'Expression title created.');
+      setSuccessMsg(editing ? `${scopeLabel} title updated.` : `${scopeLabel} title created.`);
       await resource.refresh();
     } catch (value) {
       setErrorMsg(value instanceof Error ? value.message : 'Unable to save this public title.');
@@ -139,7 +143,7 @@ export function ExpressionIdentityBadgesExperience() {
         context: 'current',
         body: JSON.stringify({
           action: assigned ? 'badge_revoke' : 'badge_assign',
-          expressionId: branchId,
+          ...(expressionScope ? { expressionId: branchId } : {}),
           profileId: selectedProfileId,
           definitionId: definition.id,
         }),
@@ -153,14 +157,14 @@ export function ExpressionIdentityBadgesExperience() {
     }
   };
 
-  if (!branchId || !canManage) {
-    return <View style={[styles.center, { backgroundColor: colors.bg }]}><EmptyState title="Public-title management unavailable" message="Only authorized Expression leadership can manage presentation badges here." iconName="lock-closed-outline" /></View>;
+  if ((expressionScope && !branchId) || !canManage) {
+    return <View style={[styles.center, { backgroundColor: colors.bg }]}><EmptyState title="Title management unavailable" message={expressionScope ? 'Only authorized Expression leadership can manage presentation badges here.' : 'Only authorized General COT ministry leadership can manage church-wide presentation badges here.'} iconName="lock-closed-outline" /></View>;
   }
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 90 }]}>
-        <ScreenHeader title="Titles & badges" kicker="EXPRESSION IDENTITY" subtitle="Presentation-only titles for this Expression. They never grant permissions." showBack rightAction={<Button label="New title" size="sm" onPress={openCreate} />} />
+        <ScreenHeader title="Titles & badges" kicker={expressionScope ? 'EXPRESSION IDENTITY' : 'GENERAL COT IDENTITY'} subtitle={expressionScope ? 'Presentation-only titles for this Expression. They never grant permissions.' : 'Church-wide presentation titles managed by ministry leadership. They never grant permissions.'} showBack rightAction={<Button label="New title" size="sm" onPress={openCreate} />} />
         {successMsg ? <View style={[styles.banner, { backgroundColor: colors.successSoft, borderColor: colors.success }]}><Icon name="checkmark-circle" size={18} color={colors.success} /><Text style={[styles.bannerText, { color: colors.success }]}>{successMsg}</Text></View> : null}
         {errorMsg && !editor ? <View style={[styles.banner, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}><Icon name="alert-circle" size={18} color={colors.live} /><Text style={[styles.bannerText, { color: colors.live }]}>{errorMsg}</Text></View> : null}
 
@@ -169,7 +173,7 @@ export function ExpressionIdentityBadgesExperience() {
           <Text style={[styles.ruleText, { color: colors.textSecondary }]}>A person can have a church-wide title and a different Expression title. The highest-priority applicable badge becomes the compact mark beside their name.</Text>
         </View>
 
-        <SectionHeader title="Expression title definitions" badge={definitions.length} subtitle="Defaults are editable and you can create additional ministry titles." />
+        <SectionHeader title={`${scopeLabel} title definitions`} badge={definitions.length} subtitle="Defaults are editable and you can create additional ministry titles." />
         {resource.loading && !resource.data ? <Skeleton height={86} count={3} /> : resource.error && !resource.data ? <ResourceError message={resource.error} retry={resource.refresh} /> : definitions.length ? (
           <View style={styles.stack}>
             {definitions.map((definition) => (
@@ -184,10 +188,10 @@ export function ExpressionIdentityBadgesExperience() {
               </View>
             ))}
           </View>
-        ) : <EmptyState title="No Expression titles" message="Create the first presentation title for this Expression." iconName="ribbon-outline" actionLabel="Create title" onAction={openCreate} />}
+        ) : <EmptyState title={`No ${scopeLabel} titles`} message={`Create the first presentation title for ${expressionScope ? 'this Expression' : 'General COT'}.`} iconName="ribbon-outline" actionLabel="Create title" onAction={openCreate} />}
 
         <SectionHeader title="Assign to a member" subtitle="Search an active member, then tap the titles that should appear on their identity." />
-        <LeaderMemberPicker scope="expression" expressionId={branchId} selectedProfileId={selectedProfileId} onSelect={selectCandidate} />
+        <LeaderMemberPicker scope={expressionScope ? 'expression' : 'organization'} expressionId={expressionScope ? branchId : undefined} selectedProfileId={selectedProfileId} onSelect={selectCandidate} />
         {selectedMember ? (
           <View style={[styles.assignmentCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
             <View style={styles.assignmentHeading}>
@@ -203,7 +207,7 @@ export function ExpressionIdentityBadgesExperience() {
         ) : null}
       </ScrollView>
 
-      <BottomSheet visible={editor !== null} onClose={() => { if (!busy) setEditor(null); }} title={editor === 'new' ? 'Create Expression title' : 'Edit Expression title'} subtitle={context?.expression?.name ?? 'Expression'} maxHeightPercent={94}>
+      <BottomSheet visible={editor !== null} onClose={() => { if (!busy) setEditor(null); }} title={editor === 'new' ? `Create ${scopeLabel} title` : `Edit ${scopeLabel} title`} subtitle={expressionScope ? context?.expression?.name ?? 'Expression' : context?.organization?.name ?? 'General COT'} maxHeightPercent={94}>
         <View style={styles.form}>
           {errorMsg ? <View style={[styles.banner, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}><Icon name="alert-circle" size={18} color={colors.live} /><Text style={[styles.bannerText, { color: colors.live }]}>{errorMsg}</Text></View> : null}
           <InputField label="Title" value={label} onChangeText={setLabel} placeholder="Expression Pastor, Youth Leader…" />
@@ -220,6 +224,14 @@ export function ExpressionIdentityBadgesExperience() {
       </BottomSheet>
     </View>
   );
+}
+
+export function ExpressionIdentityBadgesExperience() {
+  return <ScopedIdentityBadgesExperience scope="expression" />;
+}
+
+export function GeneralIdentityBadgesExperience() {
+  return <ScopedIdentityBadgesExperience scope="general" />;
 }
 
 const styles = StyleSheet.create({

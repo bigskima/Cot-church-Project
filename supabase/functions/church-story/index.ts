@@ -59,6 +59,29 @@ async function expressionBadgeMembers(organizationId: string, expressionId: stri
   return data ?? [];
 }
 
+async function organizationBadgeMembers(organizationId: string) {
+  const admin = adminClient();
+  const { data: memberships, error } = await admin.from("memberships")
+    .select("profile_id")
+    .eq("organization_id", organizationId)
+    .eq("status", "active")
+    .limit(2000);
+  if (error) throw new ApiError("BADGE_MEMBERS_FAILED", "Unable to load church members", 500, undefined, false);
+  const ids = [...new Set((memberships ?? []).map((row: any) => row.profile_id).filter(Boolean))];
+  if (!ids.length) return [];
+  const { data, error: profileError } = await admin.from("profiles")
+    .select("id,display_name,username,avatar_url")
+    .in("id", ids)
+    .order("display_name")
+    .limit(2000);
+  if (profileError) throw new ApiError("BADGE_MEMBERS_FAILED", "Unable to load church member profiles", 500, undefined, false);
+  return data ?? [];
+}
+
+function inBadgeScope(query: any, expressionId: string | null) {
+  return expressionId ? query.eq("branch_id", expressionId) : query.is("branch_id", null);
+}
+
 function textField(value: unknown, field: string, maxLength: number) {
   if (value === undefined || value === null || value === "") return "";
   return requiredString(value, field, maxLength);
@@ -160,31 +183,29 @@ Deno.serve(
         }
 
         if (view === "badges") {
-          if (!auth?.user || !auth.organizationId || !expressionId) {
-            throw new ApiError("AUTHENTICATION_REQUIRED", "Enter an Expression before managing its public titles", 401);
+          if (!auth?.user || !auth.organizationId) {
+            throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication and organization context required", 401);
           }
-          await authorizeLeadershipScope(auth, expressionId);
+          await authorizeLeadershipScope(auth, expressionId ?? null);
           const admin = adminClient();
           const [definitionsResult, assignmentsResult, members] = await Promise.all([
-            admin.from("identity_badge_definitions")
+            inBadgeScope(admin.from("identity_badge_definitions")
               .select("id,organization_id,branch_id,code,label,background_color,text_color,priority,is_membership_default,is_active,badge_variant,notify_priority_posts")
-              .eq("organization_id", auth.organizationId)
-              .eq("branch_id", expressionId)
+              .eq("organization_id", auth.organizationId), expressionId ?? null)
               .order("priority", { ascending: false }),
-            admin.from("identity_badge_assignments")
+            inBadgeScope(admin.from("identity_badge_assignments")
               .select("id,organization_id,branch_id,profile_id,badge_definition_id,is_active,created_at,identity_badge_definitions!inner(id,label,background_color,text_color,priority,badge_variant)")
-              .eq("organization_id", auth.organizationId)
-              .eq("branch_id", expressionId)
+              .eq("organization_id", auth.organizationId), expressionId ?? null)
               .eq("is_active", true),
-            expressionBadgeMembers(auth.organizationId, expressionId),
+            expressionId ? expressionBadgeMembers(auth.organizationId, expressionId) : organizationBadgeMembers(auth.organizationId),
           ]);
           if (definitionsResult.error || assignmentsResult.error) {
-            throw new ApiError("BADGE_LOAD_FAILED", "Unable to load Expression public titles", 500, undefined, false);
+            throw new ApiError("BADGE_LOAD_FAILED", `Unable to load ${expressionId ? "Expression" : "General COT"} public titles`, 500, undefined, false);
           }
           return {
             data: {
-              scope: "expression",
-              branchId: expressionId,
+              scope: expressionId ? "expression" : "general",
+              branchId: expressionId ?? null,
               definitions: definitionsResult.data ?? [],
               assignments: assignmentsResult.data ?? [],
               members,
@@ -263,9 +284,10 @@ Deno.serve(
 
       if (typeof body.action === "string" && body.action.startsWith("badge_")) {
         const action = requiredString(body.action, "action", 48);
-        const expressionId = uuid(requiredString(body.expressionId, "expressionId", 36), "expressionId", true)!;
+        const expressionId = body.expressionId ? uuid(String(body.expressionId), "expressionId", true)! : null;
         await authorizeLeadershipScope(auth, expressionId);
         const admin = adminClient();
+        const scopeLabel = expressionId ? "Expression" : "General COT";
 
         if (action === "badge_create_definition") {
           assertNoUnknownFields(body, ["action", "expressionId", "label", "backgroundColor", "textColor", "priority", "badgeVariant", "notifyPriorityPosts"]);
@@ -286,20 +308,19 @@ Deno.serve(
             notify_priority_posts: body.notifyPriorityPosts === true,
             created_by: auth.user.id,
           }).select().single();
-          if (error) throw new ApiError("BADGE_CREATE_FAILED", "Unable to create this Expression title", 500, undefined, false);
+          if (error) throw new ApiError("BADGE_CREATE_FAILED", `Unable to create this ${scopeLabel} title`, 500, undefined, false);
           return { data, status: 201 };
         }
 
         if (action === "badge_update_definition") {
           assertNoUnknownFields(body, ["action", "expressionId", "definitionId", "label", "backgroundColor", "textColor", "priority", "badgeVariant", "notifyPriorityPosts", "isActive"]);
           const definitionId = uuid(requiredString(body.definitionId, "definitionId", 36), "definitionId", true)!;
-          const { data: current } = await admin.from("identity_badge_definitions")
+          const { data: current } = await inBadgeScope(admin.from("identity_badge_definitions")
             .select("id,is_membership_default")
             .eq("id", definitionId)
-            .eq("organization_id", auth.organizationId)
-            .eq("branch_id", expressionId)
+            .eq("organization_id", auth.organizationId), expressionId)
             .maybeSingle();
-          if (!current || current.is_membership_default) throw new ApiError("BADGE_NOT_FOUND", "This Expression title cannot be edited here", 404);
+          if (!current || current.is_membership_default) throw new ApiError("BADGE_NOT_FOUND", `This ${scopeLabel} title cannot be edited here`, 404);
           const variant = body.badgeVariant === undefined ? undefined : requiredString(body.badgeVariant, "badgeVariant", 20);
           if (variant && !BADGE_VARIANTS.has(variant)) throw new ApiError("VALIDATION_FAILED", "Invalid badge style", 422);
           const updates: Record<string, unknown> = {};
@@ -310,14 +331,13 @@ Deno.serve(
           if (variant) updates.badge_variant = variant;
           if (body.notifyPriorityPosts !== undefined) updates.notify_priority_posts = body.notifyPriorityPosts === true;
           if (body.isActive !== undefined) updates.is_active = body.isActive === true;
-          const { data, error } = await admin.from("identity_badge_definitions")
+          const { data, error } = await inBadgeScope(admin.from("identity_badge_definitions")
             .update(updates)
             .eq("id", definitionId)
-            .eq("organization_id", auth.organizationId)
-            .eq("branch_id", expressionId)
+            .eq("organization_id", auth.organizationId), expressionId)
             .select()
             .single();
-          if (error) throw new ApiError("BADGE_UPDATE_FAILED", "Unable to update this Expression title", 500, undefined, false);
+          if (error) throw new ApiError("BADGE_UPDATE_FAILED", `Unable to update this ${scopeLabel} title`, 500, undefined, false);
           return { data };
         }
 
@@ -325,29 +345,24 @@ Deno.serve(
           assertNoUnknownFields(body, ["action", "expressionId", "profileId", "definitionId"]);
           const profileId = uuid(requiredString(body.profileId, "profileId", 36), "profileId", true)!;
           const definitionId = uuid(requiredString(body.definitionId, "definitionId", 36), "definitionId", true)!;
-          const { data: member } = await admin.from("expression_memberships")
-            .select("id")
-            .eq("organization_id", auth.organizationId)
-            .eq("branch_id", expressionId)
-            .eq("profile_id", profileId)
-            .eq("status", "active")
-            .maybeSingle();
-          if (!member) throw new ApiError("MEMBER_NOT_FOUND", "Choose an active member of this Expression", 404);
-          const { data: definition } = await admin.from("identity_badge_definitions")
+          const memberQuery = expressionId
+            ? admin.from("expression_memberships").select("id").eq("organization_id", auth.organizationId).eq("branch_id", expressionId)
+            : admin.from("memberships").select("id").eq("organization_id", auth.organizationId);
+          const { data: member } = await memberQuery.eq("profile_id", profileId).eq("status", "active").maybeSingle();
+          if (!member) throw new ApiError("MEMBER_NOT_FOUND", `Choose an active member of ${expressionId ? "this Expression" : "this church"}`, 404);
+          const { data: definition } = await inBadgeScope(admin.from("identity_badge_definitions")
             .select("id")
             .eq("id", definitionId)
             .eq("organization_id", auth.organizationId)
-            .eq("branch_id", expressionId)
-            .eq("is_active", true)
+            .eq("is_active", true), expressionId)
             .maybeSingle();
-          if (!definition) throw new ApiError("BADGE_NOT_FOUND", "Choose an active title from this Expression", 404);
+          if (!definition) throw new ApiError("BADGE_NOT_FOUND", `Choose an active title from ${expressionId ? "this Expression" : "General COT"}`, 404);
 
-          const { data: existing, error: existingError } = await admin.from("identity_badge_assignments")
+          const { data: existing, error: existingError } = await inBadgeScope(admin.from("identity_badge_assignments")
             .select("id")
             .eq("organization_id", auth.organizationId)
-            .eq("branch_id", expressionId)
             .eq("profile_id", profileId)
-            .eq("badge_definition_id", definitionId)
+            .eq("badge_definition_id", definitionId), expressionId)
             .maybeSingle();
           if (existingError) throw new ApiError("BADGE_ASSIGN_FAILED", "Unable to inspect this title assignment", 500, undefined, false);
 
@@ -362,18 +377,18 @@ Deno.serve(
                   assigned_by: auth.user.id,
                   is_active: true,
                 }).select().single();
-            if (result.error) throw new ApiError("BADGE_ASSIGN_FAILED", "Unable to assign this Expression title", 500, undefined, false);
+            if (result.error) throw new ApiError("BADGE_ASSIGN_FAILED", `Unable to assign this ${scopeLabel} title`, 500, undefined, false);
             return { data: result.data };
           }
 
           if (existing?.id) {
             const { error } = await admin.from("identity_badge_assignments").update({ is_active: false, assigned_by: auth.user.id }).eq("id", existing.id);
-            if (error) throw new ApiError("BADGE_REVOKE_FAILED", "Unable to remove this Expression title", 500, undefined, false);
+            if (error) throw new ApiError("BADGE_REVOKE_FAILED", `Unable to remove this ${scopeLabel} title`, 500, undefined, false);
           }
           return { data: { active: false } };
         }
 
-        throw new ApiError("VALIDATION_FAILED", "Unsupported Expression title action", 422);
+        throw new ApiError("VALIDATION_FAILED", `Unsupported ${scopeLabel} title action`, 422);
       }
 
       if (request.method === "POST" && body.action === "create_portrait_upload") {

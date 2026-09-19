@@ -26,25 +26,6 @@ Deno.serve(
       const admin = adminClient();
 
       if (request.method === "GET") {
-        const url = new URL(request.url);
-        const view = url.searchParams.get("view") ?? "";
-        if (view === "notification-broadcasts") {
-          await authorizePlatform(auth, "platform.notifications.broadcast");
-          const organizationParam = url.searchParams.get("organizationId");
-          const organizationId = organizationParam ? uuid(organizationParam, "organizationId", true)! : null;
-          const [organizationsResult, branchesResult, broadcastsResult] = await Promise.all([
-            admin.from("organizations").select("id,name,slug,status").eq("status", "active").order("name").limit(200),
-            organizationId
-              ? admin.from("branches").select("id,organization_id,name,code,is_active").eq("organization_id", organizationId).eq("is_active", true).order("name").limit(500)
-              : Promise.resolve({ data: [], error: null }),
-            admin.from("platform_notification_broadcasts").select("id,organization_id,branch_id,title,body,route,is_urgent,expires_at,created_by,created_at").order("created_at", { ascending: false }).limit(100),
-          ]);
-          if (organizationsResult.error || branchesResult.error || broadcastsResult.error) {
-            throw new ApiError("PLATFORM_NOTIFICATIONS_LOAD_FAILED", "Unable to load notification broadcast controls", 500, undefined, false);
-          }
-          return { data: { organizations: organizationsResult.data ?? [], branches: branchesResult.data ?? [], broadcasts: broadcastsResult.data ?? [] } };
-        }
-
         await authorizePlatform(auth, "platform.integrations.read");
 
         const [
@@ -125,46 +106,6 @@ Deno.serve(
 
       const body = assertObject(await jsonBody(request));
       const action = requiredString(body.action, "action", 48);
-
-      if (action === "notification_broadcast") {
-        await authorizePlatform(auth, "platform.notifications.broadcast");
-        assertNoUnknownFields(body, ["action", "organizationId", "branchId", "title", "body", "route", "urgent", "expiresAt"]);
-        const organizationId = uuid(requiredString(body.organizationId, "organizationId", 64), "organizationId", true)!;
-        const branchId = body.branchId ? uuid(String(body.branchId), "branchId", true)! : null;
-        const title = requiredString(body.title, "title", 160).trim();
-        const message = requiredString(body.body, "body", 1200).trim();
-        const route = optionalString(body.route, "route", 500);
-        if (route && (!route.startsWith("/") || route.startsWith("//"))) {
-          throw new ApiError("VALIDATION_FAILED", "Destination must be an in-app COT route", 422);
-        }
-        let expiresAt: string | null = null;
-        if (body.expiresAt) {
-          const parsed = new Date(requiredString(body.expiresAt, "expiresAt", 64));
-          if (Number.isNaN(parsed.getTime())) throw new ApiError("VALIDATION_FAILED", "Invalid expiry time", 422);
-          expiresAt = parsed.toISOString();
-        }
-        const urgent = body.urgent === true;
-        const { data, error } = await admin.rpc("create_platform_notification_broadcast", {
-          target_organization_id: organizationId,
-          target_branch_id: branchId,
-          notice_title: title,
-          notice_body: message,
-          target_route: route,
-          urgent_notice: urgent,
-          target_expires_at: expiresAt,
-          actor_profile_id: auth.user.id,
-        });
-        if (error) throw new ApiError("PLATFORM_BROADCAST_FAILED", "Unable to publish this notification broadcast", 500, undefined, false);
-        await admin.from("platform_audit_log").insert({
-          actor_profile_id: auth.user.id,
-          action: urgent ? "notification.broadcast_urgent" : "notification.broadcast",
-          target_type: "platform_notification_broadcast",
-          target_id: data?.broadcastId ?? null,
-          request_id: requestId,
-          metadata: { organizationId, branchId, route, urgent, recipientCount: data?.recipientCount ?? 0 },
-        });
-        return { data, status: 201 };
-      }
 
       await authorizePlatform(auth, "platform.integrations.manage");
 

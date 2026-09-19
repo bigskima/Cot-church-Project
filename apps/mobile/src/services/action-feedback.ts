@@ -48,19 +48,6 @@ function readable(value: unknown) {
 function resourceName(path: string) {
   const clean = path.split('?')[0].replace(/^\/+/, '');
   const matches: Array<[string, string]> = [
-    ['platform-admin-invitations', 'administrator invitation'],
-    ['platform-public-directory', 'public directory'],
-    ['platform-organizations', 'church organisation'],
-    ['platform-expressions', 'Expression'],
-    ['platform-moderation', 'moderation setting'],
-    ['platform-roles-access', 'role or access setting'],
-    ['expression-creators', 'Expression creation access'],
-    ['platform-features', 'feature availability'],
-    ['platform-streaming', 'streaming service'],
-    ['platform-integrations', 'integration'],
-    ['platform-payments', 'payment service'],
-    ['platform-secrets', 'secure credential'],
-    ['platform-ai', 'AI service'],
     ['announcements', 'announcement'],
     ['event-registrations', 'event registration'],
     ['events', 'event'],

@@ -32,6 +32,15 @@ const files = [
   'apps/mobile/app/general/giving.tsx',
   'apps/mobile/app/general/prayer.tsx',
   'apps/mobile/app/general/leadership/index.tsx',
+  'apps/mobile/app/general/leadership/roles-access.tsx',
+  'apps/mobile/app/general/leadership/titles-badges.tsx',
+  'apps/mobile/app/general/leadership/platform-admin/index.tsx',
+  'apps/mobile/app/general/leadership/platform-admin/[module].tsx',
+  'apps/mobile/src/features/general/GeneralMinistryWorkspace.tsx',
+  'apps/mobile/src/features/general/GeneralRolesAccessExperience.tsx',
+  'apps/mobile/src/features/notifications/NotificationsExperience.tsx',
+  'apps/mobile/src/features/expression-management/ExpressionIdentityBadgesExperience.tsx',
+  'apps/mobile/src/services/action-feedback.ts',
   'apps/mobile/app/general/studio/index.tsx',
   'apps/mobile/app/index.tsx',
   'apps/mobile/app/(auth)/login.tsx',
@@ -140,6 +149,8 @@ const files = [
   'apps/admin/src/pages/ModerationCenter.tsx',
   'apps/admin/src/pages/ExpressionsGovernance.tsx',
   'apps/admin/src/components/Shell.tsx',
+  'apps/admin/src/components/Login.tsx',
+  'apps/admin/src/pages/AdminInvitations.tsx',
   'apps/admin/src/pages/IntegrationsJobs.tsx',
   'apps/admin/src/pages/PaymentInfrastructure.tsx',
   'apps/admin/src/api.ts',
@@ -165,6 +176,20 @@ const prayerUi = [
 ].join('\n');
 const integrationsUi = sources.get('apps/admin/src/pages/IntegrationsJobs.tsx') ?? '';
 const platformShellUi = sources.get('apps/admin/src/components/Shell.tsx') ?? '';
+const mobilePlatformBoundaryUi = [
+  sources.get('apps/mobile/src/features/general/GeneralMinistryWorkspace.tsx') ?? '',
+  sources.get('apps/mobile/src/features/general/GeneralRolesAccessExperience.tsx') ?? '',
+  sources.get('apps/mobile/src/features/notifications/NotificationsExperience.tsx') ?? '',
+  sources.get('apps/mobile/app/general/leadership/platform-admin/index.tsx') ?? '',
+  sources.get('apps/mobile/app/general/leadership/platform-admin/[module].tsx') ?? '',
+  sources.get('apps/mobile/src/services/action-feedback.ts') ?? '',
+].join('\n');
+const adminPlatformBoundaryUi = [
+  sources.get('apps/admin/src/components/Shell.tsx') ?? '',
+  sources.get('apps/admin/src/components/Login.tsx') ?? '',
+  sources.get('apps/admin/src/pages/AdminInvitations.tsx') ?? '',
+].join('\n');
+const identityBadgeUi = sources.get('apps/mobile/src/features/expression-management/ExpressionIdentityBadgesExperience.tsx') ?? '';
 const paymentInfrastructureUi = sources.get('apps/admin/src/pages/PaymentInfrastructure.tsx') ?? '';
 const profileSettingsUi = sources.get('apps/mobile/app/(tabs)/profile/settings.tsx') ?? '';
 const sessionUi = sources.get('apps/mobile/src/state/session.tsx') ?? '';
@@ -449,6 +474,17 @@ const checks = [
   [/EXPRESSION_MEMBERSHIP_REQUIRED/, 'not-a-member state mapping'],
 ];
 
+const boundaryChecks = [
+  [mobilePlatformBoundaryUi, /This screen grants ministry access only[\s\S]*Platform administrator invitations and operations belong only to the separate administration website/, 'General Roles & Access states the ministry/platform boundary'],
+  [mobilePlatformBoundaryUi, /route: '\/general\/leadership\/titles-badges'[\s\S]*enabled: access\.canManageLeadership/, 'General ministry leadership owns church-wide title management'],
+  [mobilePlatformBoundaryUi, /SEPARATE WEB WORKSPACE[\s\S]*Open administration website/, 'legacy mobile Platform Administration routes provide only a web handoff'],
+  [mobilePlatformBoundaryUi, /invitation\.kind === 'platform_role'[\s\S]*Open administration website/, 'mobile Platform Administrator invitations provide only the web action'],
+  [identityBadgeUi, /GeneralIdentityBadgesExperience[\s\S]*scope="general"/, 'General COT identity badges use the scoped ministry experience'],
+  [identityBadgeUi, /hasOrganizationCapability\('organization\.leadership\.manage'\)/, 'General COT identity badges require ministry leadership authority'],
+  [adminPlatformBoundaryUi, /platform-admin-invitations\?view=pending[\s\S]*Accept and continue/, 'web admin accepts pending Platform Administrator invitations'],
+  [adminPlatformBoundaryUi, /The app delivers the notice; acceptance happens only on this administration website/, 'web admin invitation UI explains the app-delivery-only boundary'],
+];
+
 const forbiddenGivingPatterns = [
   [/card_mock_provider/, 'mock payment provider'],
   [/giving\/checkout/, 'nonexistent online giving checkout route'],
@@ -533,6 +569,12 @@ const forbiddenPrayerPatterns = [
 
 const forbiddenPlatformBoundaryPatterns = [
   [/platform\.giving\.(?:read|manage)|GivingConfiguration|key:\s*['"]giving['"]/, 'platform-owned church giving route'],
+  [/key:\s*['"](?:public-directory|public-titles|notifications)['"]|platform\.(?:public_directory\.manage|identity_badges\.manage|notifications\.broadcast)/, 'Platform Administration church directory, title, or notification authoring route'],
+];
+
+const forbiddenMobilePlatformOperationPatterns = [
+  [/\bapi\.request(?:<[^>]+>)?\(\s*[`'"]platform-/, 'mobile Platform Administration API operation'],
+  [/platform-admin-invitations/, 'mobile Platform Administrator invitation creation endpoint'],
 ];
 
 const forbiddenIntegrationPatterns = [
@@ -546,6 +588,7 @@ const paymentCredentialChecks = [
 ];
 
 const missing = checks.filter(([pattern]) => !pattern.test(joined));
+const missingBoundaries = boundaryChecks.filter(([source, pattern]) => !pattern.test(source));
 const forbidden = forbiddenGivingPatterns.filter(([pattern]) => pattern.test(givingUi));
 const forbiddenPrayer = forbiddenPrayerPatterns.filter(([pattern]) => pattern.test(prayerUi));
 const forbiddenPermissionGates = forbiddenPermissionGatePatterns.filter(([pattern]) => pattern.test(joined));
@@ -561,12 +604,14 @@ const forbiddenSocialCopy = forbiddenSocialCopyPatterns.filter(([pattern]) => pa
 const forbiddenModalComments = forbiddenModalCommentPatterns.filter(([pattern]) => pattern.test(commentProductUi));
 const forbiddenWatchCopy = forbiddenWatchCopyPatterns.filter(([pattern]) => pattern.test(sources.get('apps/mobile/app/watch/[id].tsx') ?? ''));
 const forbiddenPlatformBoundaries = forbiddenPlatformBoundaryPatterns.filter(([pattern]) => pattern.test(platformShellUi));
+const forbiddenMobilePlatformOperations = forbiddenMobilePlatformOperationPatterns.filter(([pattern]) => pattern.test(mobilePlatformBoundaryUi));
 const forbiddenIntegrations = forbiddenIntegrationPatterns.filter(([pattern]) => pattern.test(integrationsUi));
 const missingPaymentCredentialChecks = paymentCredentialChecks.filter(([pattern]) => !pattern.test(paymentInfrastructureUi));
 
-if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenPermissionGates.length || forbiddenExpressionRouting.length || forbiddenGeneralHome.length || forbiddenGeneralProfile.length || forbiddenGeneralShell.length || forbiddenGeneralGivingRoute.length || forbiddenGeneralStudioRoute.length || forbiddenProductionCopy.length || forbiddenLegacyExpressionLinks.length || forbiddenSocialCopy.length || forbiddenModalComments.length || forbiddenWatchCopy.length || forbiddenPlatformBoundaries.length || forbiddenIntegrations.length || missingPaymentCredentialChecks.length) {
+if (missing.length || missingBoundaries.length || forbidden.length || forbiddenPrayer.length || forbiddenPermissionGates.length || forbiddenExpressionRouting.length || forbiddenGeneralHome.length || forbiddenGeneralProfile.length || forbiddenGeneralShell.length || forbiddenGeneralGivingRoute.length || forbiddenGeneralStudioRoute.length || forbiddenProductionCopy.length || forbiddenLegacyExpressionLinks.length || forbiddenSocialCopy.length || forbiddenModalComments.length || forbiddenWatchCopy.length || forbiddenPlatformBoundaries.length || forbiddenMobilePlatformOperations.length || forbiddenIntegrations.length || missingPaymentCredentialChecks.length) {
   const failures = [
     ...missing.map(([, name]) => name),
+    ...missingBoundaries.map(([, , name]) => name),
     ...forbidden.map(([, name]) => `remove ${name}`),
     ...forbiddenPrayer.map(([, name]) => `remove ${name}`),
     ...forbiddenPermissionGates.map(([, name]) => `remove ${name}`),
@@ -582,6 +627,7 @@ if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenPer
     ...forbiddenModalComments.map(([, name]) => `remove ${name}`),
     ...forbiddenWatchCopy.map(([, name]) => `remove ${name}`),
     ...forbiddenPlatformBoundaries.map(([, name]) => `remove ${name}`),
+    ...forbiddenMobilePlatformOperations.map(([, name]) => `remove ${name}`),
     ...forbiddenIntegrations.map(([, name]) => `remove ${name}`),
     ...missingPaymentCredentialChecks.map(([, name]) => name),
   ];
@@ -590,5 +636,5 @@ if (missing.length || forbidden.length || forbiddenPrayer.length || forbiddenPer
 }
 
 console.log(
-  `Application check passed (${files.length} files, ${checks.length} production invariants, ${forbiddenGivingPatterns.length + forbiddenPrayerPatterns.length + forbiddenPermissionGatePatterns.length + forbiddenExpressionRoutingPatterns.length + forbiddenGeneralHomePatterns.length + forbiddenGeneralProfilePatterns.length + forbiddenGeneralShellPatterns.length + forbiddenGeneralGivingRoutePatterns.length + forbiddenGeneralStudioRoutePatterns.length + forbiddenProductionCopyPatterns.length + forbiddenLegacyExpressionLinkPatterns.length + forbiddenSocialCopyPatterns.length + forbiddenModalCommentPatterns.length + forbiddenWatchCopyPatterns.length + forbiddenPlatformBoundaryPatterns.length + forbiddenIntegrationPatterns.length} anti-hardcode/boundary checks, ${paymentCredentialChecks.length} payment contract checks).`,
+  `Application check passed (${files.length} files, ${checks.length + boundaryChecks.length} production invariants, ${forbiddenGivingPatterns.length + forbiddenPrayerPatterns.length + forbiddenPermissionGatePatterns.length + forbiddenExpressionRoutingPatterns.length + forbiddenGeneralHomePatterns.length + forbiddenGeneralProfilePatterns.length + forbiddenGeneralShellPatterns.length + forbiddenGeneralGivingRoutePatterns.length + forbiddenGeneralStudioRoutePatterns.length + forbiddenProductionCopyPatterns.length + forbiddenLegacyExpressionLinkPatterns.length + forbiddenSocialCopyPatterns.length + forbiddenModalCommentPatterns.length + forbiddenWatchCopyPatterns.length + forbiddenPlatformBoundaryPatterns.length + forbiddenMobilePlatformOperationPatterns.length + forbiddenIntegrationPatterns.length} anti-hardcode/boundary checks, ${paymentCredentialChecks.length} payment contract checks).`,
 );

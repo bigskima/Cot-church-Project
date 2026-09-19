@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Badge, Button, Chip, EmptyState, Icon, ResourceError, ScreenHeader, SectionHeader, Skeleton } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
@@ -47,6 +47,8 @@ type NotificationItem = {
 type InboxView = 'actions' | 'updates' | 'history';
 type ScopeView = 'expression' | 'general';
 
+const platformAdminUrl = process.env.EXPO_PUBLIC_PLATFORM_ADMIN_URL?.trim() || 'https://cot-admin.vercel.app';
+
 type NotificationsExperienceProps = {
   forcedExpressionId?: string;
   onRespondInvitation?: (invitation: { id: string }, decision: 'accept' | 'decline') => Promise<void>;
@@ -74,13 +76,14 @@ function inferredRoute(item: NotificationItem) {
 }
 
 export function NotificationsExperience({ forcedExpressionId, onRespondInvitation, onMarkNotificationRead }: NotificationsExperienceProps) {
+  const params = useLocalSearchParams<{ view?: string }>();
   const insets = useSafeAreaInsets();
   const { api, mode, context, auth, selectContext } = useSession();
   const { colors } = useTheme();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [busyNotificationId, setBusyNotificationId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
-  const [activeView, setActiveView] = useState<InboxView>('updates');
+  const [activeView, setActiveView] = useState<InboxView>(params.view === 'actions' || params.view === 'history' ? params.view : 'updates');
   const [scope, setScope] = useState<ScopeView>(forcedExpressionId ? 'expression' : 'general');
   const organizationId = context?.organization?.id ?? auth?.organizationId ?? '';
 
@@ -102,11 +105,19 @@ export function NotificationsExperience({ forcedExpressionId, onRespondInvitatio
   }), [forcedExpressionId, notifications.data, scope]);
   const unread = scopedNotifications.filter((item) => !item.read_at);
 
+  useEffect(() => {
+    if (params.view === 'actions' || params.view === 'history' || params.view === 'updates') setActiveView(params.view);
+  }, [params.view]);
+
   const expressionName = (branchId?: string | null) => context?.expressions?.find((item) => item.id === branchId)?.name
     ?? (context?.expression?.id === branchId ? context?.expression?.name : undefined)
     ?? 'Expression';
 
   const respond = async (invitation: GovernanceInvitation, decision: 'accept' | 'decline') => {
+    if (invitation.kind === 'platform_role') {
+      setMessage('Platform Administrator invitations can only be accepted or declined on the administration website.');
+      return;
+    }
     setBusyId(invitation.id); setMessage('');
     try {
       if (onRespondInvitation) await onRespondInvitation(invitation, decision);
@@ -119,6 +130,15 @@ export function NotificationsExperience({ forcedExpressionId, onRespondInvitatio
       }
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to respond to invitation.'); }
     finally { setBusyId(null); }
+  };
+
+  const openPlatformAdministration = async () => {
+    setMessage('');
+    try {
+      await Linking.openURL(platformAdminUrl);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Unable to open Platform Administration.');
+    }
   };
 
   const markRead = async (item: NotificationItem) => {
@@ -197,15 +217,15 @@ export function NotificationsExperience({ forcedExpressionId, onRespondInvitatio
 
           {activeView === 'actions' ? (
             <View style={styles.section}>
-              <SectionHeader title="Invitations" badge={pending.length} subtitle="Accept or decline ministry access requests." />
-              {invitations.loading ? <Skeleton height={140} count={2} /> : invitations.error && !invitations.data ? <ResourceError message={invitations.error} retry={invitations.refresh} /> : pending.length ? pending.map((invite) => <View key={invite.id} style={[styles.inviteCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}><View style={styles.inviteTop}><View style={[styles.inviteIcon, { backgroundColor: colors.primarySoft }]}><Icon name={invite.kind === 'expression_role' ? 'people-outline' : 'shield-checkmark-outline'} size={19} color={colors.interactive} /></View><View style={styles.flex}><Text style={[styles.inviteTitle, { color: colors.text }]}>{invite.role?.name || 'Ministry invitation'}</Text><Text style={[styles.inviteMeta, { color: colors.textMuted }]}>{invite.expression?.name || 'General COT'} · expires {new Date(invite.expires_at).toLocaleDateString()}</Text></View><Badge label="PENDING" variant="primary" /></View>{invite.message ? <Text style={[styles.inviteBody, { color: colors.textSecondary }]}>{invite.message}</Text> : null}<View style={styles.actions}><Button label="Decline" variant="outline" size="sm" disabled={busyId === invite.id} onPress={() => void respond(invite, 'decline')} /><Button label="Accept" size="sm" loading={busyId === invite.id} onPress={() => void respond(invite, 'accept')} /></View></View>) : <EmptyState title="No invitations waiting" message="New Expression or ministry invitations will appear here." iconName="checkmark-circle-outline" />}
+              <SectionHeader title="Invitations" badge={pending.length} subtitle="Expression ministry invites are completed here. Platform Administrator invites are completed on the administration website." />
+              {invitations.loading ? <Skeleton height={140} count={2} /> : invitations.error && !invitations.data ? <ResourceError message={invitations.error} retry={invitations.refresh} /> : pending.length ? pending.map((invite) => <View key={invite.id} style={[styles.inviteCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}><View style={styles.inviteTop}><View style={[styles.inviteIcon, { backgroundColor: colors.primarySoft }]}><Icon name={invite.kind === 'expression_role' ? 'people-outline' : 'shield-checkmark-outline'} size={19} color={colors.interactive} /></View><View style={styles.flex}><Text style={[styles.inviteTitle, { color: colors.text }]}>{invite.role?.name || (invite.kind === 'platform_role' ? 'Platform Administrator invitation' : 'Ministry invitation')}</Text><Text style={[styles.inviteMeta, { color: colors.textMuted }]}>{invite.kind === 'platform_role' ? 'Platform Administration' : invite.expression?.name || 'Expression'} · expires {new Date(invite.expires_at).toLocaleDateString()}</Text></View><Badge label="PENDING" variant="primary" /></View>{invite.message ? <Text style={[styles.inviteBody, { color: colors.textSecondary }]}>{invite.message}</Text> : null}{invite.kind === 'platform_role' ? <><Text style={[styles.inviteBody, { color: colors.textSecondary }]}>For security, review and respond after signing in to the separate administration website.</Text><View style={styles.actions}><Button label="Open administration website" icon="open-outline" size="sm" onPress={() => void openPlatformAdministration()} /></View></> : <View style={styles.actions}><Button label="Decline" variant="outline" size="sm" disabled={busyId === invite.id} onPress={() => void respond(invite, 'decline')} /><Button label="Accept" size="sm" loading={busyId === invite.id} onPress={() => void respond(invite, 'accept')} /></View>}</View>) : <EmptyState title="No invitations waiting" message="New Expression or Platform Administration invitations will appear here." iconName="checkmark-circle-outline" />}
             </View>
           ) : null}
 
           {activeView === 'history' ? (
             <View style={styles.section}>
               <SectionHeader title="Invitation history" badge={history.length} />
-              {history.length ? history.map((invite) => <View key={invite.id} style={[styles.historyRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}><View style={styles.flex}><Text style={[styles.inviteTitle, { color: colors.text }]}>{invite.role?.name || 'Ministry invitation'}</Text><Text style={[styles.inviteMeta, { color: colors.textMuted }]}>{invite.expression?.name || 'General COT'}</Text></View><Badge label={invite.status.toUpperCase()} variant={invite.status === 'accepted' ? 'success' : 'neutral'} /></View>) : <EmptyState title="No invitation history" message="Completed invitations will remain here for reference." iconName="time-outline" />}
+              {history.length ? history.map((invite) => <View key={invite.id} style={[styles.historyRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}><View style={styles.flex}><Text style={[styles.inviteTitle, { color: colors.text }]}>{invite.role?.name || (invite.kind === 'platform_role' ? 'Platform Administrator invitation' : 'Ministry invitation')}</Text><Text style={[styles.inviteMeta, { color: colors.textMuted }]}>{invite.kind === 'platform_role' ? 'Platform Administration' : invite.expression?.name || 'Expression'}</Text></View><Badge label={invite.status.toUpperCase()} variant={invite.status === 'accepted' ? 'success' : 'neutral'} /></View>) : <EmptyState title="No invitation history" message="Completed invitations will remain here for reference." iconName="time-outline" />}
             </View>
           ) : null}
         </View>
