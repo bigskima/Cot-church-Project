@@ -42,7 +42,7 @@ returns jsonb
 language plpgsql
 security definer
 set search_path=''
-as $
+as $body$
 declare
   broadcast_id uuid;
   recipient_count integer := 0;
@@ -129,7 +129,7 @@ begin
     'urgent',coalesce(urgent_notice,false)
   );
 end;
-$;
+$body$;
 
 revoke all on function public.create_platform_notification_broadcast(uuid,uuid,text,text,text,boolean,timestamptz,uuid)
 from public,anon,authenticated;
@@ -214,7 +214,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path=''
-as $
+as $body$
 declare
   definition_branch uuid;
 begin
@@ -232,7 +232,7 @@ begin
   end if;
   return new;
 end;
-$;
+$body$;
 
 drop trigger if exists identity_badge_assignment_scope_guard on public.identity_badge_assignments;
 create trigger identity_badge_assignment_scope_guard
@@ -251,7 +251,7 @@ returns jsonb
 language plpgsql
 security definer
 set search_path=''
-as $
+as $body$
 declare
   normalized_email text;
   target_profile uuid;
@@ -304,7 +304,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path=''
-as $
+as $body$
 begin
   insert into public.identity_badge_definitions(
     organization_id,branch_id,code,label,background_color,text_color,priority,is_membership_default,badge_variant,notify_priority_posts
@@ -316,7 +316,7 @@ begin
   on conflict do nothing;
   return new;
 end;
-$;
+$body$;
 
 drop trigger if exists branches_seed_identity_badges on public.branches;
 create trigger branches_seed_identity_badges
@@ -674,7 +674,7 @@ comment on table public.platform_notification_broadcasts is
   );
   return jsonb_build_object('profileId',target_profile,'badgeId',target_badge_definition_id,'active',enable_badge);
 end;
-$;
+$body$;
 
 revoke all on function public.set_expression_identity_badge(uuid,uuid,text,uuid,boolean) from public,anon;
 grant execute on function public.set_expression_identity_badge(uuid,uuid,text,uuid,boolean) to authenticated,service_role;
@@ -722,7 +722,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path=''
-as $
+as $body$
 begin
   insert into public.identity_badge_definitions(
     organization_id,branch_id,code,label,background_color,text_color,priority,is_membership_default,badge_variant,notify_priority_posts
@@ -734,7 +734,7 @@ begin
   on conflict do nothing;
   return new;
 end;
-$;
+$body$;
 
 drop trigger if exists branches_seed_identity_badges on public.branches;
 create trigger branches_seed_identity_badges
