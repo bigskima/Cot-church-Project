@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { ApiClient, ApiError, apiUrl, loadAuth, saveAuth, type StoredAuth } from '../api';
 import type { MembershipContext } from '../types/content';
 import { evict } from '../services/query-cache';
+import { deactivateStoredPushDevice } from '@/services/push-notifications';
 
 type Mode = 'restoring' | 'visitor' | 'authenticated';
 type ContextStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -409,6 +410,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
   };
 
   const signOut = async () => {
+    await deactivateStoredPushDevice(api).catch(() => undefined);
     clearContextResources();
     setContext(null);
     setContextStatus('idle');
@@ -444,6 +446,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
         setSession,
         login,
         continueAsVisitor: async () => {
+          await deactivateStoredPushDevice(api).catch(() => undefined);
           clearContextResources();
           setContext(null);
           setContextStatus('idle');
@@ -452,6 +455,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
           await persist(null);
         },
         enterAsVisitor: async () => {
+          await deactivateStoredPushDevice(api).catch(() => undefined);
           clearContextResources();
           setContext(null);
           await persist(null);
