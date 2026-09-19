@@ -60,7 +60,7 @@ export function PublicTitlesBadges({ api }: { api: ApiClient }) {
     setError('');
     try {
       const suffix = orgId ? `?organizationId=${encodeURIComponent(orgId)}` : '';
-      const data = await api.request<Payload>(`platform-identity-badges${suffix}`);
+      const data = await api.request<Payload>(`platform-public-directory?view=badges${suffix ? `&${suffix.slice(1)}` : ''}`);
       setOrganizations(data.organizations ?? []);
       setDefinitions(data.definitions ?? []);
       setAssignments(data.assignments ?? []);
@@ -127,10 +127,10 @@ export function PublicTitlesBadges({ api }: { api: ApiClient }) {
     setError('');
     try {
       const editing = editor !== 'new' && editor !== null;
-      await api.request('platform-identity-badges', {
+      await api.request('platform-public-directory', {
         method: editing ? 'PATCH' : 'POST',
         body: JSON.stringify({
-          action: editing ? 'update_definition' : 'create_definition',
+          action: editing ? 'badge_update_definition' : 'badge_create_definition',
           organizationId,
           ...(editing ? { definitionId: editor.id } : {}),
           label: label.trim(),
@@ -157,10 +157,10 @@ export function PublicTitlesBadges({ api }: { api: ApiClient }) {
     setSaving(true);
     setError('');
     try {
-      await api.request('platform-identity-badges', {
+      await api.request('platform-public-directory', {
         method: assign ? 'POST' : 'DELETE',
         body: JSON.stringify({
-          action: assign ? 'assign' : 'revoke',
+          action: assign ? 'badge_assign' : 'badge_revoke',
           organizationId,
           profileId: selectedMemberId,
           definitionId,
