@@ -236,6 +236,51 @@ update public.identity_badge_definitions
 set badge_variant='default'
 where code in ('leader','member');
 
+create or replace function public.seed_expression_identity_badges()
+returns trigger
+language plpgsql
+security definer
+set search_path=''
+as $
+begin
+  insert into public.identity_badge_definitions(
+    organization_id,branch_id,code,label,background_color,text_color,priority,is_membership_default,badge_variant,notify_priority_posts
+  )
+  values
+    (new.organization_id,new.id,'expression_pastor','Expression Pastor','#0F766E','#FFFFFF',110,false,'teal',true),
+    (new.organization_id,new.id,'pastor','Pastor','#2563EB','#FFFFFF',90,false,'blue',false),
+    (new.organization_id,new.id,'leader','Leader','#475569','#FFFFFF',60,false,'default',false)
+  on conflict do nothing;
+  return new;
+end;
+$;
+
+drop trigger if exists branches_seed_identity_badges on public.branches;
+create trigger branches_seed_identity_badges
+after insert on public.branches
+for each row execute function public.seed_expression_identity_badges();
+
+insert into public.identity_badge_definitions(
+  organization_id,branch_id,code,label,background_color,text_color,priority,is_membership_default,badge_variant,notify_priority_posts
+)
+select b.organization_id,b.id,'expression_pastor','Expression Pastor','#0F766E','#FFFFFF',110,false,'teal',true
+from public.branches b
+on conflict do nothing;
+
+insert into public.identity_badge_definitions(
+  organization_id,branch_id,code,label,background_color,text_color,priority,is_membership_default,badge_variant,notify_priority_posts
+)
+select b.organization_id,b.id,'pastor','Pastor','#2563EB','#FFFFFF',90,false,'blue',false
+from public.branches b
+on conflict do nothing;
+
+insert into public.identity_badge_definitions(
+  organization_id,branch_id,code,label,background_color,text_color,priority,is_membership_default,badge_variant,notify_priority_posts
+)
+select b.organization_id,b.id,'leader','Leader','#475569','#FFFFFF',60,false,'default',false
+from public.branches b
+on conflict do nothing;
+
 create or replace function public.notify_live_stream_started()
 returns trigger
 language plpgsql
