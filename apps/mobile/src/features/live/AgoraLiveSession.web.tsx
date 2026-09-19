@@ -17,6 +17,19 @@ function isExpectedTeardownError(value: unknown) {
   return /WS_ABORT.*LEAVE|ERR_SUBSCRIBE_REQUEST_INVALID|no such stream id/i.test(text);
 }
 
+type CameraFacing = 'front' | 'rear';
+
+function inferCameraFacing(device?: MediaDeviceInfo, facingMode?: string): CameraFacing | null {
+  const facing = String(facingMode ?? '').toLowerCase();
+  if (facing === 'user') return 'front';
+  if (facing === 'environment') return 'rear';
+
+  const label = String(device?.label ?? '').toLowerCase();
+  if (/front|user|facetime|selfie/.test(label)) return 'front';
+  if (/back|rear|environment|world/.test(label)) return 'rear';
+  return null;
+}
+
 const controlButtonStyle: React.CSSProperties = {
   appearance: 'none',
   border: '1px solid rgba(255,255,255,0.16)',
@@ -40,7 +53,7 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
   const hostContainerRef = useRef<HTMLDivElement | null>(null);
   const remoteContainerRef = useRef<HTMLDivElement | null>(null);
   const joinedRef = useRef(false);
-  const qualityPresetRef = useRef<'720p_1' | '480p_1'>('720p_1');
+  const qualityPresetRef = useRef<'1080p_2' | '720p_1'>('1080p_2');
   const callbacksRef = useRef({ onJoined, onLeave, onRemoteLeft, onError });
 
   useEffect(() => {
@@ -52,7 +65,7 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
   const [micMuted, setMicMuted] = useState(false);
   const [cameraMuted, setCameraMuted] = useState(false);
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
-  const [cameraIndex, setCameraIndex] = useState(0);
+  const [cameraFacing, setCameraFacing] = useState<CameraFacing>('front');
   const [switchingCamera, setSwitchingCamera] = useState(false);
   const [audioBlocked, setAudioBlocked] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
@@ -98,7 +111,7 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
 
       if (role === 'publisher' && quality > 0) {
         const track = localVideoRef.current;
-        const target = quality >= 5 ? '480p_1' : quality <= 2 ? '720p_1' : qualityPresetRef.current;
+        const target = quality >= 5 ? '720p_1' : quality <= 2 ? '1080p_2' : qualityPresetRef.current;
         if (track && target !== qualityPresetRef.current) {
           qualityPresetRef.current = target;
           void track.setEncoderConfiguration(target).catch(() => {});
@@ -158,7 +171,7 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
         if (role === 'publisher') {
           const [audio, video] = await AgoraRTC.createMicrophoneAndCameraTracks(
             { AEC: true, ANS: true, AGC: true },
-            { encoderConfig: '720p_1' },
+            { encoderConfig: '1080p_2' },
           );
           if (disposed) {
             audio.close();
@@ -174,16 +187,21 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
           if (!hostContainerRef.current) {
             throw new Error('Camera preview could not attach to the studio.');
           }
-          video.play(hostContainerRef.current, { fit: 'cover', mirror: true });
+          video.play(hostContainerRef.current, { fit: 'contain', mirror: true });
           await client.publish([audio, video]);
           if (disposed) return;
 
           const availableCameras = await AgoraRTC.getCameras().catch(() => [] as MediaDeviceInfo[]);
           setCameras(availableCameras);
           const currentTrack = video.getMediaStreamTrack();
-          const currentDeviceId = currentTrack.getSettings().deviceId;
-          const currentIndex = availableCameras.findIndex((device) => device.deviceId === currentDeviceId);
-          if (currentIndex >= 0) setCameraIndex(currentIndex);
+          const currentSettings = currentTrack.getSettings();
+          const currentDevice = availableCameras.find((device) => device.deviceId === currentSettings.deviceId);
+          const initialFacing = inferCameraFacing(currentDevice, currentSettings.facingMode) ?? 'front';
+          setCameraFacing(initialFacing);
+          if (hostContainerRef.current) {
+            video.stop();
+            video.play(hostContainerRef.current, { fit: 'contain', mirror: initialFacing === 'front' });
+          }
 
           levelTimer = setInterval(() => {
             const track = localAudioRef.current;
@@ -271,15 +289,38 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
         setMessage('No second camera was detected on this device.');
         return;
       }
-      const nextIndex = (cameraIndex + 1) % available.length;
-      await track.setDevice(available[nextIndex].deviceId);
+
+      const currentSettings = track.getMediaStreamTrack().getSettings();
+      const currentDeviceId = currentSettings.deviceId;
+      const actualCurrent = inferCameraFacing(
+        available.find((device) => device.deviceId === currentDeviceId),
+        currentSettings.facingMode,
+      ) ?? cameraFacing;
+      const desiredFacing: CameraFacing = actualCurrent === 'front' ? 'rear' : 'front';
+
+      // Mobile browsers often expose several rear lenses. Cycling by array index can
+      // therefore go rear -> another rear lens instead of returning to the front camera.
+      const target = available.find((device) =>
+        device.deviceId !== currentDeviceId && inferCameraFacing(device) === desiredFacing
+      ) ?? available.find((device) => device.deviceId !== currentDeviceId);
+
+      if (!target) {
+        setMessage('No alternate camera was detected on this device.');
+        return;
+      }
+
+      await track.setDevice(target.deviceId);
       setCameras(available);
-      setCameraIndex(nextIndex);
+
+      const updatedSettings = track.getMediaStreamTrack().getSettings();
+      const actualFacing = inferCameraFacing(target, updatedSettings.facingMode) ?? desiredFacing;
+      setCameraFacing(actualFacing);
+
       if (hostContainerRef.current) {
         track.stop();
-        track.play(hostContainerRef.current, { fit: 'cover', mirror: !/back|rear|environment/i.test(available[nextIndex].label) });
+        track.play(hostContainerRef.current, { fit: 'contain', mirror: actualFacing === 'front' });
       }
-      setMessage(`Camera switched to ${available[nextIndex].label || `camera ${nextIndex + 1}`}.`);
+      setMessage(actualFacing === 'front' ? 'Front camera live.' : 'Rear camera live.');
     } catch (value) {
       const text = errorText(value) || 'Unable to switch camera.';
       setMessage(text);
