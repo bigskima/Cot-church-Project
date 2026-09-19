@@ -14,6 +14,40 @@ import { ContentReportSheet } from '../engagement/ContentReportSheet';
 import { InlineCommentsSheet } from '../engagement/InlineCommentsSheet';
 import type { MediaAsset, Post, SocialPost } from '@/types/content';
 
+const postRevealSteps = new Map<string, number>();
+const POST_REVEAL_CHARS = 620;
+const POST_REVEAL_LINES = 8;
+
+function revealPostBody(body: string, step: number) {
+  const maxChars = Math.max(POST_REVEAL_CHARS, POST_REVEAL_CHARS * step);
+  const maxLines = Math.max(POST_REVEAL_LINES, POST_REVEAL_LINES * step);
+  const lines = body.split(/\r?\n/);
+  const selected: string[] = [];
+  let usedChars = 0;
+
+  for (const line of lines) {
+    if (selected.length >= maxLines) break;
+    const separatorCost = selected.length ? 1 : 0;
+    const nextCost = line.length + separatorCost;
+    if (usedChars + nextCost <= maxChars) {
+      selected.push(line);
+      usedChars += nextCost;
+      continue;
+    }
+
+    if (!selected.length) {
+      const raw = line.slice(0, maxChars);
+      const wordBreak = raw.lastIndexOf(' ');
+      selected.push(wordBreak > maxChars * 0.72 ? raw.slice(0, wordBreak) : raw);
+    }
+    break;
+  }
+
+  const text = selected.join('\n').trimEnd();
+  const hasMore = text.length < body.length || selected.length < lines.length;
+  return { text: hasMore ? text : body, hasMore };
+}
+
 type PublicIdentityBadge = {
   id?: string;
   code?: string;
@@ -107,13 +141,13 @@ export function PostCard({
   const [preview, setPreview] = useState<PreviewableMedia | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
-  const [bodyExpanded, setBodyExpanded] = useState(false);
+  const [bodyRevealStep, setBodyRevealStep] = useState(() => postRevealSteps.get(post.id) ?? 1);
 
   const likePending = useRef(false);
   const savePending = useRef(false);
 
   useEffect(() => {
-    setBodyExpanded(false);
+    setBodyRevealStep(postRevealSteps.get(post.id) ?? 1);
   }, [post.id]);
 
   useEffect(() => {
@@ -192,8 +226,8 @@ export function PostCard({
 
   const body = post.body?.trim() ?? '';
   const bodyLineCount = body ? body.split(/\r?\n/).length : 0;
-  const collapsibleBody = resolvedVariant === 'feed' && (body.length > 420 || bodyLineCount > 8);
-  const collapsedBodyLines = media.length ? 6 : 8;
+  const progressiveBody = body.length > 700 || bodyLineCount > POST_REVEAL_LINES;
+  const revealedBody = progressiveBody ? revealPostBody(body, bodyRevealStep) : { text: body, hasMore: false };
 
   const identityHeader = (
     <View style={styles.headerRow}>
@@ -282,25 +316,33 @@ export function PostCard({
 
         {body ? (
           <View style={styles.bodyBlock}>
-            <Text
-              style={[styles.bodyText, resolvedVariant === 'feed' && styles.feedBodyText, { color: colors.text }]}
-              numberOfLines={collapsibleBody && !bodyExpanded ? collapsedBodyLines : undefined}
-            >
-              {body}
+            <Text style={[styles.bodyText, resolvedVariant === 'feed' && styles.feedBodyText, { color: colors.text }]}>
+              {revealedBody.text}
+              {revealedBody.hasMore ? '…' : ''}
             </Text>
-            {collapsibleBody ? (
+
+            {progressiveBody ? (
               <Pressable
                 onPress={(event) => {
                   event.stopPropagation?.();
-                  setBodyExpanded((value) => !value);
+                  if (revealedBody.hasMore) {
+                    const nextStep = bodyRevealStep + 1;
+                    postRevealSteps.set(post.id, nextStep);
+                    setBodyRevealStep(nextStep);
+                  } else {
+                    postRevealSteps.set(post.id, 1);
+                    setBodyRevealStep(1);
+                  }
                 }}
                 hitSlop={6}
                 style={({ pressed }) => [styles.showMoreButton, pressed && { opacity: 0.7 }]}
                 accessibilityRole="button"
-                accessibilityLabel={bodyExpanded ? 'Show less of this post' : 'Show more of this post'}
+                accessibilityLabel={revealedBody.hasMore ? 'Show more of this post' : 'Collapse this post'}
               >
-                <Text style={[styles.showMoreText, { color: colors.interactive }]}>{bodyExpanded ? 'Show less' : 'Show more'}</Text>
-                <Icon name={bodyExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={colors.interactive} />
+                <Text style={[styles.showMoreText, { color: colors.interactive }]}>
+                  {revealedBody.hasMore ? 'Show more' : 'Show less'}
+                </Text>
+                <Icon name={revealedBody.hasMore ? 'chevron-down' : 'chevron-up'} size={14} color={colors.interactive} />
               </Pressable>
             ) : null}
           </View>
