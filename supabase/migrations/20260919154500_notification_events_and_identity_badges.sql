@@ -28,6 +28,114 @@ create table if not exists public.platform_notification_broadcasts (
 alter table public.platform_notification_broadcasts enable row level security;
 revoke all on table public.platform_notification_broadcasts from anon,authenticated;
 
+create or replace function public.create_platform_notification_broadcast(
+  target_organization_id uuid,
+  target_branch_id uuid,
+  notice_title text,
+  notice_body text,
+  target_route text,
+  urgent_notice boolean,
+  target_expires_at timestamptz,
+  actor_profile_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path=''
+as $
+declare
+  broadcast_id uuid;
+  recipient_count integer := 0;
+  scope_name text;
+begin
+  if not exists(
+    select 1 from public.organizations
+    where id=target_organization_id and status='active'
+  ) then
+    raise exception using errcode='P0002',message='Active church organization not found';
+  end if;
+
+  if target_branch_id is not null and not exists(
+    select 1 from public.branches
+    where id=target_branch_id
+      and organization_id=target_organization_id
+      and is_active
+  ) then
+    raise exception using errcode='P0002',message='Active Expression not found';
+  end if;
+
+  insert into public.platform_notification_broadcasts(
+    organization_id,branch_id,title,body,route,is_urgent,expires_at,created_by
+  )
+  values(
+    target_organization_id,target_branch_id,trim(notice_title),trim(notice_body),
+    nullif(trim(target_route),''),coalesce(urgent_notice,false),target_expires_at,actor_profile_id
+  )
+  returning id into broadcast_id;
+
+  if target_branch_id is null then
+    scope_name := 'general';
+    insert into public.notifications(organization_id,recipient_profile_id,type,title,body,data)
+    select
+      target_organization_id,
+      recipient.profile_id,
+      case when urgent_notice then 'platform_urgent' else 'platform_notice' end,
+      trim(notice_title),
+      trim(notice_body),
+      jsonb_build_object(
+        'scope','general',
+        'entityType','platform_broadcast',
+        'broadcastId',broadcast_id,
+        'urgent',coalesce(urgent_notice,false),
+        'route',coalesce(nullif(trim(target_route),''),'/general/notifications'),
+        'dedupKey','platform-broadcast:'||broadcast_id::text
+      )
+    from (
+      select distinct m.profile_id
+      from public.memberships m
+      where m.organization_id=target_organization_id and m.status='active'
+    ) recipient
+    on conflict do nothing;
+  else
+    scope_name := 'expression';
+    insert into public.notifications(organization_id,recipient_profile_id,type,title,body,data)
+    select
+      target_organization_id,
+      em.profile_id,
+      case when urgent_notice then 'platform_urgent' else 'platform_notice' end,
+      trim(notice_title),
+      trim(notice_body),
+      jsonb_build_object(
+        'scope','expression',
+        'branchId',target_branch_id,
+        'entityType','platform_broadcast',
+        'broadcastId',broadcast_id,
+        'urgent',coalesce(urgent_notice,false),
+        'route',coalesce(nullif(trim(target_route),''),'/expressions/'||target_branch_id::text||'/notifications'),
+        'dedupKey','platform-broadcast:'||broadcast_id::text
+      )
+    from public.expression_memberships em
+    where em.organization_id=target_organization_id
+      and em.branch_id=target_branch_id
+      and em.status='active'
+    on conflict do nothing;
+  end if;
+
+  get diagnostics recipient_count = row_count;
+  return jsonb_build_object(
+    'broadcastId',broadcast_id,
+    'recipientCount',recipient_count,
+    'scope',scope_name,
+    'urgent',coalesce(urgent_notice,false)
+  );
+end;
+$;
+
+revoke all on function public.create_platform_notification_broadcast(uuid,uuid,text,text,text,boolean,timestamptz,uuid)
+from public,anon,authenticated;
+grant execute on function public.create_platform_notification_broadcast(uuid,uuid,text,text,text,boolean,timestamptz,uuid)
+to service_role;
+
 insert into public.permissions(code,name,description,category)
 values(
   'platform.notifications.broadcast',
