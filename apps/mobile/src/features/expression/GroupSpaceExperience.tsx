@@ -44,11 +44,15 @@ export function GroupSpaceExperience({ groupId, initialTab = 'home', scope = 'ex
   const { api, context, mode } = useSession();
   const expression = context?.expression;
   const generalGroup = scope === 'general';
+  const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
+  const requestScope = generalGroup
+    ? { context: 'public' as const, headers: organizationId ? { 'X-Organization-Id': organizationId } : undefined }
+    : { context: 'current' as const };
   const routeBase = generalGroup ? '/general/groups' : `/expressions/${expression?.id}/groups`;
   const key = `group-chat:${groupId}:space`;
   const resource = useResource<Payload>(key, (signal) => {
     if (mode !== 'authenticated' || !groupId) return Promise.reject(new Error('Join this Group to open its space.'));
-    return api.request<Payload>(`group-chat?groupId=${encodeURIComponent(groupId)}`, { signal, context: 'current' });
+    return api.request<Payload>(`group-chat?groupId=${encodeURIComponent(groupId)}`, { signal, ...requestScope });
   });
   const [tab, setTab] = useState<Tab>(initialTab);
   const [sheet, setSheet] = useState<Sheet>(null);
@@ -70,7 +74,7 @@ export function GroupSpaceExperience({ groupId, initialTab = 'home', scope = 'ex
     setActionError('');
     setFeedback('');
     try {
-      const result = await api.request<any>('group-chat', { method: 'POST', context: 'current', body: JSON.stringify({ action, groupId, ...values }) });
+      const result = await api.request<any>('group-chat', { method: 'POST', ...requestScope, body: JSON.stringify({ action, groupId, ...values }) });
       setFeedback(success);
       invalidate(`group-chat:${groupId}:`);
       resource.refresh();
