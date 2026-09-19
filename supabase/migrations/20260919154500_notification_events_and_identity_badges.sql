@@ -137,18 +137,29 @@ grant execute on function public.create_platform_notification_broadcast(uuid,uui
 to service_role;
 
 insert into public.permissions(code,name,description,category)
-values(
-  'platform.notifications.broadcast',
-  'Broadcast platform notifications',
-  'Send audited urgent or informational notifications to a selected church or Expression.',
-  'platform'
-)
+values
+  (
+    'platform.notifications.broadcast',
+    'Broadcast platform notifications',
+    'Send audited urgent or informational notifications to a selected church or Expression.',
+    'platform'
+  ),
+  (
+    'platform.identity_badges.manage',
+    'Manage public titles and badges',
+    'Create and assign non-permission public ministry titles for church identities.',
+    'platform'
+  )
 on conflict(code) do update
 set name=excluded.name,description=excluded.description,category=excluded.category,is_active=true;
 
 insert into public.platform_role_permissions(role_code,permission_code)
-select r.code,'platform.notifications.broadcast'
+select r.code,p.permission_code
 from public.platform_roles r
+cross join (values
+  ('platform.notifications.broadcast'),
+  ('platform.identity_badges.manage')
+) p(permission_code)
 where r.code in ('admin','super_admin')
 on conflict do nothing;
 
