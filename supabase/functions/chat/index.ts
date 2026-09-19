@@ -11,6 +11,7 @@ import {
 } from "../_shared/chat-media.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
+import { commonOrganizationId, createNotifications, notificationPreview, senderIdentity } from "../_shared/notifications.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { assertProfilesMayInteract, loadSafetyProfileSets } from "../_shared/safety.ts";
 import { assertNoUnknownFields, assertObject, requiredString, uuid } from "../_shared/validation.ts";
@@ -339,6 +340,9 @@ Deno.serve(createHandler(
         : null;
 
       const conversation = await requireConversation(admin, conversationId, viewerId);
+      const otherProfileId = conversation.participant_low === viewerId
+        ? conversation.participant_high
+        : conversation.participant_low;
       await assertConversationInteraction(admin, conversation, viewerId);
       await validateChatUploads(admin, viewerId, attachmentIds, { conversationId });
 
@@ -375,6 +379,30 @@ Deno.serve(createHandler(
         .from("direct_conversations")
         .update({ updated_at: new Date().toISOString() })
         .eq("id", conversationId);
+
+      const [sender, organizationId] = await Promise.all([
+        senderIdentity(admin, viewerId),
+        commonOrganizationId(admin, viewerId, otherProfileId),
+      ]);
+      if (organizationId) {
+        await createNotifications(admin, {
+          organizationId,
+          recipientProfileIds: [otherProfileId],
+          senderProfileId: viewerId,
+          type: "direct_message",
+          title: sender.display_name || (sender.username ? `@${sender.username}` : "New message"),
+          body: notificationPreview(messageBody, attachmentIds.length ? "Sent you an attachment." : "Sent you a message."),
+          data: {
+            scope: "general",
+            entityType: "direct_message",
+            conversationId,
+            messageId: created.id,
+            senderProfileId: viewerId,
+            senderUsername: sender.username,
+            route: sender.username ? `/general/chat?username=${encodeURIComponent(sender.username)}` : "/general/chat",
+          },
+        });
+      }
 
       return {
         data: (await hydrateChatMessages(
