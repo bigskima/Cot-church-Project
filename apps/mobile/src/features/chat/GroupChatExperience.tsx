@@ -21,10 +21,14 @@ type GroupChatPayload = {
   messages: RichChatMessage[];
 };
 
-export function GroupChatExperience({ groupId, sectionId }: { groupId: string; sectionId?: string | null }) {
+export function GroupChatExperience({ groupId, sectionId, scope = 'expression' }: { groupId: string; sectionId?: string | null; scope?: 'expression' | 'general' }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { api, context, mode } = useSession();
+  const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
+  const requestScope = scope === 'general'
+    ? { context: 'public' as const, headers: organizationId ? { 'X-Organization-Id': organizationId } : undefined }
+    : { context: 'current' as const };
   const [messages, setMessages] = useState<RichChatMessage[]>([]);
   const [replyTo, setReplyTo] = useState<ChatReply | null>(null);
   const [actionError, setActionError] = useState('');
@@ -35,7 +39,7 @@ export function GroupChatExperience({ groupId, sectionId }: { groupId: string; s
     if (mode !== 'authenticated' || !groupId) return Promise.reject(new Error('Join this Group to use its chat.'));
     const query = new URLSearchParams({ groupId });
     if (sectionId) query.set('sectionId', sectionId);
-    return api.request<GroupChatPayload>(`group-chat?${query.toString()}`, { signal, context: 'current' });
+    return api.request<GroupChatPayload>(`group-chat?${query.toString()}`, { signal, ...requestScope });
   });
 
   useEffect(() => {
@@ -60,7 +64,7 @@ export function GroupChatExperience({ groupId, sectionId }: { groupId: string; s
     try {
       const created = await api.request<RichChatMessage>('group-chat', {
         method: 'POST',
-        context: 'current',
+        ...requestScope,
         body: JSON.stringify({ action: 'send', groupId, sectionId, body: payload.body, replyToId: payload.replyToId, attachmentIds: payload.attachments.map((item) => item.uploadId) }),
       });
       setMessages((current) => current.map((item) => item.id === optimisticId ? created : item));
@@ -81,7 +85,7 @@ export function GroupChatExperience({ groupId, sectionId }: { groupId: string; s
         : [...before, { emoji, count: 1, reactedByMe: true }];
     setMessages((current) => current.map((item) => item.id === message.id ? { ...item, reactions: next } : item));
     try {
-      await api.request('group-chat', { method: 'POST', context: 'current', body: JSON.stringify({ action: 'react', groupId, sectionId, messageId: message.id, emoji }) });
+      await api.request('group-chat', { method: 'POST', ...requestScope, body: JSON.stringify({ action: 'react', groupId, sectionId, messageId: message.id, emoji }) });
       invalidate(key);
     } catch (error) {
       setMessages((current) => current.map((item) => item.id === message.id ? { ...item, reactions: before } : item));
@@ -93,7 +97,7 @@ export function GroupChatExperience({ groupId, sectionId }: { groupId: string; s
     const before = { pinned_at: message.pinned_at, pinned_by_profile_id: message.pinned_by_profile_id };
     setMessages((current) => current.map((item) => item.id === message.id ? { ...item, pinned_at: pinned ? new Date().toISOString() : null, pinned_by_profile_id: pinned ? context?.profile?.id ?? null : null } : item));
     try {
-      await api.request('group-chat', { method: 'POST', context: 'current', body: JSON.stringify({ action: 'pin', groupId, sectionId, messageId: message.id, pinned }) });
+      await api.request('group-chat', { method: 'POST', ...requestScope, body: JSON.stringify({ action: 'pin', groupId, sectionId, messageId: message.id, pinned }) });
       invalidate(key);
     } catch (error) {
       setMessages((current) => current.map((item) => item.id === message.id ? { ...item, ...before } : item));
