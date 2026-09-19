@@ -11,6 +11,7 @@ import {
 } from "../_shared/chat-media.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
+import { createNotifications, mentionUsernames, notificationPreview, profileIdsForUsernames, senderIdentity } from "../_shared/notifications.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { filterByAuthor, loadSafetyProfileSets } from "../_shared/safety.ts";
 import { assertNoUnknownFields, assertObject, requiredString, uuid } from "../_shared/validation.ts";
@@ -139,7 +140,7 @@ async function requireSection(auth: any, admin: any, groupId: string, sectionId:
 
 async function requireMessage(admin: any, groupId: string, sectionId: string | null, messageId: string) {
   let query = admin.from("group_messages")
-    .select("id")
+    .select("id,sender_profile_id")
     .eq("id", messageId)
     .eq("group_id", groupId);
   query = sectionId ? query.eq("section_id", sectionId) : query.is("section_id", null);
@@ -465,7 +466,7 @@ Deno.serve(createHandler(
         groupId,
         sectionId,
       });
-      if (replyToId) await requireMessage(admin, groupId, sectionId, replyToId);
+      const replyTarget = replyToId ? await requireMessage(admin, groupId, sectionId, replyToId) : null;
 
       const { data: created, error: sendError } = await admin
         .from("group_messages")
@@ -488,6 +489,79 @@ Deno.serve(createHandler(
       } catch (error) {
         await admin.from("group_messages").delete().eq("id", created.id);
         throw error;
+      }
+
+      const mentionedProfiles = await profileIdsForUsernames(admin, mentionUsernames(messageBody));
+      let mentionRecipientIds: string[] = [];
+      if (mentionedProfiles.length) {
+        const { data: mentionedMemberships } = await admin.from("memberships")
+          .select("id,profile_id")
+          .eq("organization_id", auth.organizationId)
+          .eq("status", "active")
+          .in("profile_id", mentionedProfiles.map((profile) => profile.id));
+        const membershipById = new Map((mentionedMemberships ?? []).map((row: any) => [row.id, row.profile_id]));
+        if (membershipById.size) {
+          const { data: activeGroupMentions } = await admin.from("group_memberships")
+            .select("membership_id")
+            .eq("organization_id", auth.organizationId)
+            .eq("group_id", groupId)
+            .eq("status", "active")
+            .is("banned_at", null)
+            .in("membership_id", [...membershipById.keys()]);
+          mentionRecipientIds = (activeGroupMentions ?? [])
+            .map((row: any) => membershipById.get(row.membership_id))
+            .filter(Boolean) as string[];
+        }
+      }
+      const candidateRecipients = [...new Set([
+        ...mentionRecipientIds,
+        ...(replyTarget?.sender_profile_id ? [replyTarget.sender_profile_id] : []),
+      ])].filter((profileId) => profileId !== auth.user.id);
+      let recipients: string[] = [];
+      if (candidateRecipients.length) {
+        const { data: memberRows } = await admin.from("memberships")
+          .select("id,profile_id")
+          .eq("organization_id", auth.organizationId)
+          .eq("status", "active")
+          .in("profile_id", candidateRecipients);
+        const profileByMembership = new Map((memberRows ?? []).map((row: any) => [row.id, row.profile_id]));
+        if (profileByMembership.size) {
+          const { data: groupRows } = await admin.from("group_memberships")
+            .select("membership_id")
+            .eq("organization_id", auth.organizationId)
+            .eq("group_id", groupId)
+            .eq("status", "active")
+            .is("banned_at", null)
+            .in("membership_id", [...profileByMembership.keys()]);
+          recipients = [...new Set((groupRows ?? []).map((row: any) => profileByMembership.get(row.membership_id)).filter(Boolean))] as string[];
+        }
+      }
+
+      if (recipients.length) {
+        const sender = await senderIdentity(admin, auth.user.id);
+        const baseRoute = group.branch_id
+          ? `/expressions/${group.branch_id}/groups/${groupId}/chat`
+          : `/general/groups/${groupId}/chat`;
+        const route = sectionId ? `${baseRoute}?sectionId=${encodeURIComponent(sectionId)}` : baseRoute;
+        await createNotifications(admin, {
+          organizationId: auth.organizationId,
+          recipientProfileIds: recipients,
+          senderProfileId: auth.user.id,
+          type: "group_chat_activity",
+          title: `${sender.display_name || (sender.username ? `@${sender.username}` : "A member")} · ${group.name}`,
+          body: notificationPreview(messageBody, attachmentIds.length ? "Mentioned or replied to you with an attachment." : "Mentioned or replied to you in this Group."),
+          data: {
+            scope: group.branch_id ? "expression" : "general",
+            branchId: group.branch_id,
+            groupId,
+            sectionId,
+            entityType: "group_chat",
+            messageId: created.id,
+            senderProfileId: auth.user.id,
+            senderUsername: sender.username,
+            route,
+          },
+        });
       }
 
       return {

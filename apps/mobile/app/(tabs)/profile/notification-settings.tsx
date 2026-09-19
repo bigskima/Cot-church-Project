@@ -1,10 +1,11 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button, EmptyState, Icon, ResourceError, ScreenHeader, Skeleton } from '@/components';
+import { Button, Chip, EmptyState, Icon, ResourceError, ScreenHeader, Skeleton } from '@/components';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { radius, shadows, spacing, typography } from '@/design-system/tokens';
+import { deactivateStoredPushDevice, pushDeviceStatus, registerPushDevice, type PushDeviceStatus } from '@/services/push-notifications';
 
 type NotificationPreferences = {
   email_enabled: boolean;
@@ -15,6 +16,13 @@ type NotificationPreferences = {
     startTime?: string;
     endTime?: string;
   } | Record<string, unknown>;
+  timezone?: string;
+  push_preview?: 'full' | 'sender_only' | 'private';
+  push_sound_enabled?: boolean;
+  live_alerts_enabled?: boolean;
+  followed_posts_enabled?: boolean;
+  priority_leadership_posts_enabled?: boolean;
+  urgent_platform_alerts_enabled?: boolean;
   updated_at?: string | null;
 };
 
@@ -31,6 +39,14 @@ export default function NotificationSettingsScreen() {
   const [quietEnabled, setQuietEnabled] = React.useState(false);
   const [quietStart, setQuietStart] = React.useState('22:00');
   const [quietEnd, setQuietEnd] = React.useState('07:00');
+  const [pushPreview, setPushPreview] = React.useState<'full' | 'sender_only' | 'private'>('full');
+  const [pushSoundEnabled, setPushSoundEnabled] = React.useState(true);
+  const [liveAlertsEnabled, setLiveAlertsEnabled] = React.useState(true);
+  const [followedPostsEnabled, setFollowedPostsEnabled] = React.useState(true);
+  const [priorityLeadershipPostsEnabled, setPriorityLeadershipPostsEnabled] = React.useState(true);
+  const [urgentPlatformAlertsEnabled, setUrgentPlatformAlertsEnabled] = React.useState(true);
+  const [deviceStatus, setDeviceStatus] = React.useState<PushDeviceStatus | null>(null);
+  const [deviceBusy, setDeviceBusy] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState('');
@@ -47,6 +63,12 @@ export default function NotificationSettingsScreen() {
     setQuietEnabled(quiet.enabled === true);
     setQuietStart(typeof quiet.startTime === 'string' && TIME_PATTERN.test(quiet.startTime) ? quiet.startTime : '22:00');
     setQuietEnd(typeof quiet.endTime === 'string' && TIME_PATTERN.test(quiet.endTime) ? quiet.endTime : '07:00');
+    setPushPreview(['full', 'sender_only', 'private'].includes(String(data.push_preview)) ? data.push_preview as 'full' | 'sender_only' | 'private' : 'full');
+    setPushSoundEnabled(data.push_sound_enabled !== false);
+    setLiveAlertsEnabled(data.live_alerts_enabled !== false);
+    setFollowedPostsEnabled(data.followed_posts_enabled !== false);
+    setPriorityLeadershipPostsEnabled(data.priority_leadership_posts_enabled !== false);
+    setUrgentPlatformAlertsEnabled(data.urgent_platform_alerts_enabled !== false);
   }, []);
 
   const load = React.useCallback(async () => {
@@ -57,8 +79,12 @@ export default function NotificationSettingsScreen() {
     setLoading(true);
     setError('');
     try {
-      const data = await api.request<NotificationPreferences>('notification-settings');
+      const [data, localStatus] = await Promise.all([
+        api.request<NotificationPreferences>('notification-settings'),
+        pushDeviceStatus(),
+      ]);
       applyPreferences(data);
+      setDeviceStatus(localStatus);
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to load notification preferences.');
     } finally {
@@ -90,14 +116,56 @@ export default function NotificationSettingsScreen() {
             startTime: quietStart,
             endTime: quietEnd,
           },
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+          pushPreview,
+          pushSoundEnabled,
+          liveAlertsEnabled,
+          followedPostsEnabled,
+          priorityLeadershipPostsEnabled,
+          urgentPlatformAlertsEnabled,
         }),
       });
       applyPreferences(data);
-      setSuccess('Notification preferences saved.');
+
+      if (Platform.OS !== 'web') {
+        if (pushEnabled) {
+          const status = await registerPushDevice(api, true);
+          setDeviceStatus(status);
+          setSuccess(status.state === 'registered'
+            ? 'Preferences saved and push alerts are active on this device.'
+            : 'Preferences saved. This device has not granted notification access yet.');
+        } else {
+          await deactivateStoredPushDevice(api).catch(() => undefined);
+          setDeviceStatus(await pushDeviceStatus());
+          setSuccess('Notification preferences saved. Push alerts are off on this device.');
+        }
+      } else {
+        setSuccess('Notification preferences saved.');
+      }
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to save notification preferences.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const enableThisDevice = async () => {
+    setDeviceBusy(true);
+    setError('');
+    setSuccess('');
+    try {
+      const status = await registerPushDevice(api, true);
+      setDeviceStatus(status);
+      if (status.state === 'registered') {
+        setPushEnabled(true);
+        setSuccess('This device is registered for COT push alerts. Save preferences to keep your delivery choices.');
+      } else if (status.state === 'disabled') {
+        setError('Notification permission is off for COT on this device. Enable it in your phone settings, then try again.');
+      } else if (status.state === 'error') {
+        setError(status.message);
+      }
+    } finally {
+      setDeviceBusy(false);
     }
   };
 
@@ -186,6 +254,91 @@ export default function NotificationSettingsScreen() {
                 description="Allow selected time-sensitive updates by text when that channel is available."
                 value={smsEnabled}
                 onChange={setSmsEnabled}
+                colors={colors}
+                last
+              />
+            </View>
+
+            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+              <View style={styles.sectionHeading}>
+                <View style={[styles.sectionIcon, { backgroundColor: colors.primarySoft }]}>
+                  <Icon name="phone-portrait-outline" size={19} color={colors.interactive} />
+                </View>
+                <View style={styles.flex}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>This device</Text>
+                  <Text style={[styles.cardBody, { color: colors.textSecondary }]}>
+                    {Platform.OS === 'web'
+                      ? 'Push device registration is available in the installed COT mobile app.'
+                      : deviceStatus?.state === 'registered'
+                        ? 'Push alerts are registered on this phone.'
+                        : 'This phone is not registered for COT push alerts yet.'}
+                  </Text>
+                </View>
+                {Platform.OS !== 'web' ? (
+                  <Icon
+                    name={deviceStatus?.state === 'registered' ? 'checkmark-circle' : 'notifications-off-outline'}
+                    size={22}
+                    color={deviceStatus?.state === 'registered' ? colors.success : colors.textMuted}
+                  />
+                ) : null}
+              </View>
+              {Platform.OS !== 'web' ? (
+                <View style={styles.deviceAction}>
+                  <Button
+                    label={deviceStatus?.state === 'registered' ? 'Refresh device registration' : 'Enable on this device'}
+                    variant="outline"
+                    size="sm"
+                    loading={deviceBusy}
+                    onPress={() => void enableThisDevice()}
+                  />
+                </View>
+              ) : null}
+            </View>
+
+            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+              <View style={styles.sectionHeading}>
+                <View style={[styles.sectionIcon, { backgroundColor: colors.primarySoft }]}>
+                  <Icon name="options-outline" size={19} color={colors.interactive} />
+                </View>
+                <View style={styles.flex}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>What should alert me?</Text>
+                  <Text style={[styles.cardBody, { color: colors.textSecondary }]}>Choose which activity may create an outside-app alert. Your in-app Notifications inbox still keeps supported updates.</Text>
+                </View>
+              </View>
+              <PreferenceRow icon="radio-outline" title="COT goes live" description="Alert me when General COT or one of my joined Expressions starts a live broadcast." value={liveAlertsEnabled} onChange={setLiveAlertsEnabled} colors={colors} />
+              <PreferenceRow icon="person-add-outline" title="Posts from people I follow" description="Alert me when someone I follow publishes a post I am allowed to see." value={followedPostsEnabled} onChange={setFollowedPostsEnabled} colors={colors} />
+              <PreferenceRow icon="ribbon-outline" title="Priority ministry updates" description="Alert me when a person carrying a priority public ministry badge publishes in my church or Expression." value={priorityLeadershipPostsEnabled} onChange={setPriorityLeadershipPostsEnabled} colors={colors} />
+              <PreferenceRow icon="warning-outline" title="Urgent platform alerts" description="Allow audited emergency or service-critical notices. These can bypass quiet hours, but never override Push alerts being turned off." value={urgentPlatformAlertsEnabled} onChange={setUrgentPlatformAlertsEnabled} colors={colors} last />
+            </View>
+
+            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+              <View style={styles.sectionHeading}>
+                <View style={[styles.sectionIcon, { backgroundColor: colors.primarySoft }]}>
+                  <Icon name="lock-closed-outline" size={19} color={colors.interactive} />
+                </View>
+                <View style={styles.flex}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>Lock-screen privacy</Text>
+                  <Text style={[styles.cardBody, { color: colors.textSecondary }]}>Choose how much message or ministry detail appears before you open COT.</Text>
+                </View>
+              </View>
+              <View style={styles.previewChips}>
+                <Chip label="Full preview" selected={pushPreview === 'full'} onPress={() => setPushPreview('full')} />
+                <Chip label="Reduced" selected={pushPreview === 'sender_only'} onPress={() => setPushPreview('sender_only')} />
+                <Chip label="Private" selected={pushPreview === 'private'} onPress={() => setPushPreview('private')} />
+              </View>
+              <Text style={[styles.previewHelp, { color: colors.textMuted }]}>
+                {pushPreview === 'full'
+                  ? 'Shows the notification title and message preview.'
+                  : pushPreview === 'sender_only'
+                    ? 'Shows the notification title but hides the message content.'
+                    : 'Shows only that COT has a notification waiting for you.'}
+              </Text>
+              <PreferenceRow
+                icon="volume-high-outline"
+                title="Notification sound"
+                description="Allow a sound for COT push alerts. Quiet hours still delay non-urgent delivery."
+                value={pushSoundEnabled}
+                onChange={setPushSoundEnabled}
                 colors={colors}
                 last
               />
@@ -320,6 +473,9 @@ const styles = StyleSheet.create({
   preferenceTitle: { fontSize: 14, fontWeight: '800', marginBottom: 3 },
   preferenceBody: { fontSize: 12, lineHeight: 17, maxWidth: 430 },
   sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  deviceAction: { marginTop: spacing.md, alignItems: 'flex-start' },
+  previewChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.md },
+  previewHelp: { fontSize: 11, lineHeight: 16, marginTop: spacing.sm },
   sectionIcon: { width: 42, height: 42, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
   timePanel: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, borderRadius: radius.xl, padding: spacing.md, marginTop: spacing.lg },
   timeField: { flex: 1, gap: 5 },

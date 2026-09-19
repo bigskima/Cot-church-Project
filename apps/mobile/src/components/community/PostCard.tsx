@@ -13,6 +13,7 @@ import { MediaPreviewModal, type PreviewableMedia } from '../media/MediaPreviewM
 import { ContentReportSheet } from '../engagement/ContentReportSheet';
 import { InlineCommentsSheet } from '../engagement/InlineCommentsSheet';
 import type { MediaAsset, Post, SocialPost } from '@/types/content';
+import { CompactIdentityBadge, type PublicIdentityBadge } from '@/components/identity/PublicIdentityBadge';
 
 const postRevealSteps = new Map<string, number>();
 const POST_REVEAL_CHARS = 620;
@@ -47,15 +48,6 @@ function revealPostBody(body: string, step: number) {
   const hasMore = text.length < body.length || selected.length < lines.length;
   return { text: hasMore ? text : body, hasMore };
 }
-
-type PublicIdentityBadge = {
-  id?: string;
-  code?: string;
-  label: string;
-  backgroundColor: string;
-  textColor: string;
-  priority?: number;
-};
 
 export interface PostCardProps {
   post: Post | SocialPost;
@@ -238,6 +230,7 @@ export function PostCard({
         <View style={styles.authorLine}>
           <Pressable onPress={onPressAuthor || onPress} style={styles.nameGroup}>
             <Text style={[styles.displayName, { color: colors.text }]} numberOfLines={1}>{displayName}</Text>
+            {badges[0] ? <CompactIdentityBadge badge={badges[0]} size={17} /> : null}
             {isVerified ? <Icon name="checkmark-circle" size={15} color={colors.interactive} /> : null}
           </Pressable>
           <Text style={[styles.timestamp, { color: colors.textMuted }]}>{formatTime()}</Text>
@@ -275,15 +268,6 @@ export function PostCard({
     </View>
   ) : null;
 
-  const identityBadges = badges.length ? (
-    <View style={styles.identityMetaRow}>
-      {badges.map((badge, index) => (
-        <View key={badge.id || badge.code || `${badge.label}-${index}`} style={[styles.identityBadge, { backgroundColor: badge.backgroundColor }]}>
-          <Text style={[styles.identityBadgeText, { color: badge.textColor }]}>{badge.label}</Text>
-        </View>
-      ))}
-    </View>
-  ) : null;
 
   return (
     <>
@@ -291,7 +275,6 @@ export function PostCard({
         <View style={styles.detachedIdentity}>
           {identityHeader}
           {contextRow}
-          {identityBadges}
         </View>
       ) : null}
 
@@ -310,7 +293,6 @@ export function PostCard({
           <>
             {contextRow}
             {identityHeader}
-            {identityBadges}
           </>
         ) : null}
 

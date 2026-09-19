@@ -20,6 +20,7 @@ import {
   Skeleton,
 } from '@/components';
 import { PostCard } from '@/components/community/PostCard';
+import { FullIdentityBadge, type PublicIdentityBadge } from '@/components/identity/PublicIdentityBadge';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 import { invalidate } from '@/services/query-cache';
@@ -35,6 +36,7 @@ type PublicProfilePayload = {
     banner_url?: string | null;
     bio?: string | null;
     created_at?: string;
+    badges?: PublicIdentityBadge[];
   };
   counts: {
     followers: number;
@@ -219,6 +221,12 @@ export default function PublicMemberProfileScreen() {
                 @{profile.username}
               </Text>
 
+              {profile.badges?.length ? (
+                <View style={styles.publicBadges}>
+                  {profile.badges.map((badge) => <FullIdentityBadge key={badge.id || badge.code || badge.label} badge={badge} />)}
+                </View>
+              ) : null}
+
               {profile.bio ? (
                 <Text style={[styles.bio, { color: colors.textSecondary }]}>
                   {profile.bio}
@@ -331,6 +339,7 @@ const styles = StyleSheet.create({
   },
   messageButtonText: { fontSize: 12, fontWeight: '800' },
   name: { fontSize: 23, lineHeight: 28, fontWeight: '900', letterSpacing: -0.5, marginTop: spacing.md },
+  publicBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm, justifyContent: 'center' },
   username: { fontSize: 13, marginTop: 1 },
   bio: { fontSize: 14, lineHeight: 20, marginTop: spacing.md },
   stats: { flexDirection: 'row', gap: spacing.xl, marginTop: spacing.lg },

@@ -3,6 +3,7 @@ import { ApiError } from "../_shared/errors.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { assertProfilesMayInteract } from "../_shared/safety.ts";
+import { enrichSocialPosts } from "../_shared/public-identity.ts";
 import { uuid } from "../_shared/validation.ts";
 
 Deno.serve(createHandler(
@@ -58,6 +59,38 @@ Deno.serve(createHandler(
     if (followersResult.error || followingResult.error || viewerFollowResult.error) {
       throw new ApiError("PROFILE_SOCIAL_GRAPH_FAILED", "Unable to load follow information", 500, undefined, false);
     }
+
+    const { data: badgeRows, error: badgeError } = await admin
+      .from("identity_badge_assignments")
+      .select("organization_id,branch_id,identity_badge_definitions!inner(id,code,label,background_color,text_color,priority,badge_variant,is_active),organizations(name)")
+      .eq("profile_id", profile.id)
+      .is("branch_id", null)
+      .eq("is_active", true)
+      .eq("identity_badge_definitions.is_active", true)
+      .limit(20);
+    if (badgeError) {
+      throw new ApiError("PROFILE_BADGES_FAILED", "Unable to load this member's public ministry titles", 500, undefined, false);
+    }
+    const publicBadges = (badgeRows ?? [])
+      .map((row: any) => {
+        const definition = Array.isArray(row.identity_badge_definitions) ? row.identity_badge_definitions[0] : row.identity_badge_definitions;
+        const organization = Array.isArray(row.organizations) ? row.organizations[0] : row.organizations;
+        return definition ? {
+          id: definition.id,
+          code: definition.code,
+          label: definition.label,
+          backgroundColor: definition.background_color,
+          textColor: definition.text_color,
+          priority: Number(definition.priority ?? 0),
+          badgeVariant: definition.badge_variant ?? "default",
+          organizationId: row.organization_id,
+          organizationName: organization?.name ?? null,
+        } : null;
+      })
+      .filter(Boolean)
+      .sort((a: any, b: any) => b.priority - a.priority);
+
+    const profileWithBadges = { ...profile, badges: publicBadges };
 
     const counts = {
       followers: followersResult.count ?? 0,
@@ -118,7 +151,7 @@ Deno.serve(createHandler(
           viewerFollows: auth?.user?.id === person.id ? null : viewerFollows.has(person.id),
           isSelf: auth?.user?.id === person.id,
         }));
-      return { data: { profile, counts, viewer, view, people } };
+      return { data: { profile: profileWithBadges, counts, viewer, view, people } };
     }
 
     const { data: memberships, error: membershipsError } = await admin
@@ -145,12 +178,13 @@ Deno.serve(createHandler(
       throw new ApiError("PROFILE_POSTS_FAILED", "Unable to load this member's published content", 500, undefined, false);
     }
 
+    const enrichedPosts = await enrichSocialPosts(posts ?? []);
     return {
       data: {
-        profile,
+        profile: profileWithBadges,
         counts,
         viewer,
-        posts: posts ?? [],
+        posts: enrichedPosts,
       },
     };
   },
