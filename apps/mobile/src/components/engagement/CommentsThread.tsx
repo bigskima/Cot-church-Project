@@ -6,6 +6,7 @@ import type { ContentComment } from '@/types/content';
 import { Avatar } from '../primitives/Avatar';
 import { Icon } from '../primitives/Icon';
 import { ContentReportSheet, type ContentReportContext } from './ContentReportSheet';
+import { CompactIdentityBadge } from '@/components/identity/PublicIdentityBadge';
 
 const MAX_COMMENT_LENGTH = 3000;
 
@@ -138,20 +139,11 @@ export function CommentsThread({
           <View style={styles.commentMeta}>
             <View style={styles.identityLine}>
               <Text style={[styles.authorName, { color: colors.text }]} numberOfLines={1}>{identity.displayName}</Text>
+              {identity.badges[0] ? <CompactIdentityBadge badge={identity.badges[0]} size={15} /> : null}
               {identity.username ? <Text style={[styles.username, { color: colors.textMuted }]} numberOfLines={1}>@{identity.username}</Text> : null}
             </View>
             <Text style={[styles.time, { color: colors.textMuted }]}>{commentTime(item.created_at)}</Text>
           </View>
-
-          {identity.badges.length ? (
-            <View style={styles.badges}>
-              {identity.badges.slice(0, 3).map((badge: any, index: number) => (
-                <View key={badge.id || badge.code || `${badge.label}-${index}`} style={[styles.badge, { backgroundColor: badge.backgroundColor }]}>
-                  <Text style={[styles.badgeText, { color: badge.textColor }]}>{badge.label}</Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
 
           <Text style={[styles.bodyText, { color: colors.text }]}>{item.body}</Text>
 
