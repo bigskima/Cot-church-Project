@@ -79,10 +79,16 @@ function chunks<T>(items: T[], size: number) {
 function QuickLink({ label, hint, icon, onPress }: { label: string; hint: string; icon: string; onPress: () => void }) {
   const { colors } = useTheme();
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.quickLink, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, pressed && styles.pressed]}>
-      <View style={[styles.quickIcon, { backgroundColor: colors.primarySoft }]}><Icon name={icon as any} size={19} color={colors.interactive} /></View>
-      <View style={styles.flex}><Text style={[styles.quickLabel, { color: colors.text }]} numberOfLines={1}>{label}</Text><Text style={[styles.quickHint, { color: colors.textMuted }]} numberOfLines={1}>{hint}</Text></View>
-      <Icon name="chevron-forward" size={15} color={colors.textMuted} />
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}. ${hint}`}
+      style={({ pressed }) => [styles.quickLink, pressed && styles.pressed]}
+    >
+      <View style={[styles.quickIcon, { backgroundColor: colors.primarySoft, borderColor: colors.primarySoftStrong }]}>
+        <Icon name={icon as any} size={18} color={colors.interactive} />
+      </View>
+      <Text style={[styles.quickLabel, { color: colors.textSecondary }]} numberOfLines={1}>{label}</Text>
     </Pressable>
   );
 }
@@ -94,7 +100,7 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
   const membership = context?.expressions?.find((item) => item.id === expressionId && item.status === 'active');
   const organizationId = membership?.organizationId ?? context?.organization?.id ?? '';
   const accessToken = auth?.session.accessToken ?? null;
-  const reelWidth = Math.max(270, Math.min(width - spacing.md * 2, 520));
+  const reelWidth = Math.max(300, Math.min(width - spacing.sm * 2, 680));
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
@@ -249,28 +255,61 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
 
   const header = (
     <View style={styles.headerWrap}>
-      <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
-        <View style={[styles.identityBanner, { backgroundColor: colors.primarySoft }]}>{expression?.banner_url ? <Image source={{ uri: expression.banner_url }} style={styles.identityBannerImage} resizeMode="cover" /> : <View style={styles.identityFallback}><Icon name="people-circle-outline" size={38} color={colors.interactive} /></View>}</View>
-        <View style={styles.heroTopRow}><View style={[styles.heroAvatar, { backgroundColor: colors.cardElevated, borderColor: colors.card }]}>{expression?.avatar_url ? <Image source={{ uri: expression.avatar_url }} style={styles.avatarImage} /> : <Icon name="people" size={28} color={colors.interactive} />}</View><View style={[styles.privatePill, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Icon name="lock-closed" size={12} color={colors.interactive} /><Text style={[styles.privateText, { color: colors.textSecondary }]}>Members only</Text></View></View>
-        <Text style={[styles.heroEyebrow, { color: colors.interactive }]}>YOUR EXPRESSION</Text>
-        <Text style={[styles.heroTitle, { color: colors.text }]}>{expression?.name ?? 'Your Expression'}</Text>
-        <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>Conversations and media flow vertically while sermons, events, announcements, polls and giveaways appear in focused discovery layers.</Text>
-        <View style={styles.heroActions}><Pressable onPress={() => router.push(`/expressions/${expressionId}/feed` as any)} style={[styles.primaryAction, { backgroundColor: colors.interactive }]}><Icon name="chatbubbles" size={17} color="#fff" /><Text style={styles.primaryActionText}>Community feed</Text></Pressable><Pressable onPress={() => router.replace('/general')} style={[styles.secondaryAction, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Icon name="globe-outline" size={17} color={colors.text} /><Text style={[styles.secondaryActionText, { color: colors.text }]}>General COT</Text></Pressable></View>
+      <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+        <View style={[styles.identityBanner, { backgroundColor: colors.primarySoft }]}>
+          {expression?.banner_url ? <Image source={{ uri: expression.banner_url }} style={styles.identityBannerImage} resizeMode="cover" /> : null}
+        </View>
+        <View style={styles.heroIdentityRow}>
+          <View style={[styles.heroAvatar, { backgroundColor: colors.cardElevated, borderColor: colors.card }]}>
+            {expression?.avatar_url ? <Image source={{ uri: expression.avatar_url }} style={styles.avatarImage} /> : <Icon name="people" size={22} color={colors.interactive} />}
+          </View>
+          <View style={styles.flex}>
+            <Text style={[styles.heroEyebrow, { color: colors.interactive }]}>YOUR EXPRESSION</Text>
+            <Text style={[styles.heroTitle, { color: colors.text }]} numberOfLines={1}>{expression?.name ?? 'Your Expression'}</Text>
+            <View style={styles.privateInline}>
+              <Icon name="lock-closed" size={11} color={colors.textMuted} />
+              <Text style={[styles.privateText, { color: colors.textMuted }]}>Members-only home</Text>
+            </View>
+          </View>
+          <Pressable onPress={() => router.replace('/general')} style={[styles.heroIconAction, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]} accessibilityRole="button" accessibilityLabel="Open General COT">
+            <Icon name="globe-outline" size={18} color={colors.text} />
+          </Pressable>
+        </View>
+
+        <Pressable
+          onPress={() => router.push(`/expressions/${expressionId}/feed` as any)}
+          style={({ pressed }) => [styles.expressionFeedTrigger, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.pressed]}
+          accessibilityRole="button"
+        >
+          <Icon name="chatbubbles-outline" size={17} color={colors.interactive} />
+          <Text style={[styles.expressionFeedTriggerText, { color: colors.textSecondary }]}>Open community feed or share something</Text>
+          <Icon name="arrow-forward" size={15} color={colors.interactive} />
+        </Pressable>
       </View>
 
-      <View style={styles.quickGrid}>
-        <QuickLink label="Announcements" hint="Important updates" icon="megaphone-outline" onPress={() => router.push(`/expressions/${expressionId}/announcements` as any)} />
-        <QuickLink label="Prayer" hint="Pray together" icon="heart-outline" onPress={() => router.push(`/expressions/${expressionId}/prayer` as any)} />
-        <QuickLink label="Events" hint="Gatherings" icon="calendar-outline" onPress={() => router.push(`/expressions/${expressionId}/events` as any)} />
-        <QuickLink label="Engage" hint="Polls & giveaways" icon="gift-outline" onPress={() => router.push(`/expressions/${expressionId}/participate` as any)} />
-        <QuickLink label="Groups" hint="Smaller circles" icon="people-circle-outline" onPress={() => router.push(`/expressions/${expressionId}/groups` as any)} />
-        <QuickLink label="Chat" hint="Direct messages" icon="chatbubble-ellipses-outline" onPress={() => router.push(`/expressions/${expressionId}/chat` as any)} />
+      <View style={styles.quickSection}>
+        <View style={styles.quickHeading}>
+          <Text style={[styles.quickHeadingTitle, { color: colors.text }]}>Inside this Expression</Text>
+          <Text style={[styles.quickHeadingMeta, { color: colors.textMuted }]}>Quick access</Text>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickGrid}>
+          <QuickLink label="Updates" hint="Important updates" icon="megaphone-outline" onPress={() => router.push(`/expressions/${expressionId}/announcements` as any)} />
+          <QuickLink label="Prayer" hint="Pray together" icon="heart-outline" onPress={() => router.push(`/expressions/${expressionId}/prayer` as any)} />
+          <QuickLink label="Events" hint="Gatherings" icon="calendar-outline" onPress={() => router.push(`/expressions/${expressionId}/events` as any)} />
+          <QuickLink label="Engage" hint="Polls & giveaways" icon="gift-outline" onPress={() => router.push(`/expressions/${expressionId}/participate` as any)} />
+          <QuickLink label="Groups" hint="Smaller circles" icon="people-circle-outline" onPress={() => router.push(`/expressions/${expressionId}/groups` as any)} />
+          <QuickLink label="Chat" hint="Direct messages" icon="chatbubble-ellipses-outline" onPress={() => router.push(`/expressions/${expressionId}/chat` as any)} />
+        </ScrollView>
+      </View>
+
+      <View style={styles.expressionUtilities}>
+        <ParticipationHomeShelf scope="expression" expressionId={expressionId} />
       </View>
 
       {payload?.degradedSections?.length ? <Pressable onPress={resource.refresh} style={[styles.notice, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Icon name="alert-circle-outline" size={17} color={colors.textSecondary} /><Text style={[styles.noticeText, { color: colors.textSecondary }]}>Some Expression sections are still loading. Tap to retry.</Text><Icon name="refresh-outline" size={15} color={colors.textMuted} /></Pressable> : null}
       {activeStream ? <View style={styles.liveWrap}><HeroLiveCard stream={activeStream} onPress={() => router.push(`/expressions/${expressionId}/live/${activeStream.id}` as any)} /></View> : null}
-      <ParticipationHomeShelf scope="expression" expressionId={expressionId} />
-      {feed.length ? <View style={styles.feedHeading}><View><Text style={[styles.feedEyebrow, { color: colors.interactive }]}>EXPRESSION HOME</Text><Text style={[styles.feedTitle, { color: colors.text }]}>For this community</Text></View><Pressable onPress={() => router.push(`/expressions/${expressionId}/feed` as any)}><Text style={[styles.seeAll, { color: colors.interactive }]}>Open full feed</Text></Pressable></View> : null}
+
+      {feed.length ? <View style={styles.feedHeading}><View><Text style={[styles.feedEyebrow, { color: colors.interactive }]}>EXPRESSION HOME</Text><Text style={[styles.feedTitle, { color: colors.text }]}>For this community</Text></View><Pressable onPress={() => router.push(`/expressions/${expressionId}/feed` as any)}><Text style={[styles.seeAll, { color: colors.interactive }]}>Full feed</Text></Pressable></View> : null}
     </View>
   );
 
@@ -289,7 +328,7 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
       refreshControl={<RefreshControl refreshing={resource.refreshing} onRefresh={resource.refresh} tintColor={colors.interactive} />}
       renderItem={({ item }) => {
         if (item.kind === 'section') return renderSection(item);
-        if (item.kind === 'post') return <View style={styles.feedCard}><PostCard post={item.post} expressionName={expression?.name} canEngage={mode === 'authenticated'} allowExternalShare={false} onPress={() => router.push({ pathname: `/expressions/${expressionId}/post/[id]`, params: { id: item.post.id } } as any)} onReply={() => router.push({ pathname: `/expressions/${expressionId}/post/[id]`, params: { id: item.post.id, focus: 'comments' } } as any)} /></View>;
+        if (item.kind === 'post') return <View style={styles.feedCard}><PostCard post={item.post} expressionName={expression?.name} canEngage={mode === 'authenticated'} allowExternalShare={false} onPress={() => router.push({ pathname: `/expressions/${expressionId}/post/[id]`, params: { id: item.post.id } } as any)} onReply={() => router.push({ pathname: `/expressions/${expressionId}/post/[id]`, params: { id: item.post.id, focus: 'comments' } } as any)} variant="feed" showContext={false} style={styles.homePostCard} /></View>;
         if (item.kind === 'reel') return <View style={styles.feedCard}><ReelCard reel={item.reel} width={reelWidth} commentContext="current" onPress={() => router.push({ pathname: `/expressions/${expressionId}/reels`, params: { reelId: item.reel.id } } as any)} onOpenComments={item.reel.content_items?.id ? () => router.push({ pathname: `/expressions/${expressionId}/comments/[contentId]`, params: { contentId: item.reel.content_items!.id } } as any) : undefined} /></View>;
         return <View style={styles.feedCard}><VideoCard video={item.video} commentContext="current" onPress={() => router.push(`/expressions/${expressionId}/videos/${item.video.id}` as any)} onOpenComments={item.video.content_items?.id ? () => router.push({ pathname: `/expressions/${expressionId}/comments/[contentId]`, params: { contentId: item.video.content_items!.id } } as any) : undefined} /></View>;
       }}
@@ -298,39 +337,42 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
 }
 
 const styles = StyleSheet.create({
-  content: { width: '100%', maxWidth: 980, alignSelf: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: 120, gap: spacing.sm },
+  content: { width: '100%', maxWidth: 1060, alignSelf: 'center', paddingHorizontal: spacing.sm, paddingTop: spacing.sm, paddingBottom: 120, gap: spacing.sm },
   stateWrap: { flex: 1, padding: spacing.lg, gap: spacing.md },
-  headerWrap: { gap: spacing.md },
+  headerWrap: { gap: spacing.sm },
   flex: { flex: 1, minWidth: 0 },
-  hero: { borderWidth: 1, borderRadius: radius.xxl, padding: spacing.xl, overflow: 'hidden' },
-  identityBanner: { height: 132, marginHorizontal: -24, marginTop: -24, marginBottom: -34, overflow: 'hidden' },
+  hero: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.sm, overflow: 'hidden' },
+  identityBanner: { height: 42, marginHorizontal: -12, marginTop: -12, marginBottom: 9, overflow: 'hidden', opacity: 0.7 },
   identityBannerImage: { width: '100%', height: '100%' },
-  identityFallback: { flex: 1, alignItems: 'flex-end', padding: spacing.lg },
-  heroTopRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: spacing.md },
-  heroAvatar: { width: 72, height: 72, borderRadius: 22, borderWidth: 4, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  identityFallback: { flex: 1, alignItems: 'flex-end', padding: spacing.sm },
+  heroIdentityRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  heroAvatar: { width: 50, height: 50, borderRadius: 16, borderWidth: 3, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   avatarImage: { width: '100%', height: '100%' },
-  privatePill: { borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 5 },
-  privateText: { fontSize: 10.5, fontWeight: '700' },
-  heroEyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1 },
-  heroTitle: { fontSize: 26, lineHeight: 31, fontWeight: '900', letterSpacing: -0.6, marginTop: 3 },
-  heroSubtitle: { fontSize: 12.5, lineHeight: 19, marginTop: 5 },
-  heroActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
-  primaryAction: { minHeight: 42, borderRadius: radius.pill, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', gap: 7 },
-  primaryActionText: { color: '#fff', fontSize: 11.5, fontWeight: '800' },
-  secondaryAction: { minHeight: 42, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', gap: 7 },
-  secondaryActionText: { fontSize: 11.5, fontWeight: '800' },
-  quickGrid: { gap: spacing.sm },
-  quickLink: { minHeight: 62, borderWidth: 1, borderRadius: radius.xl, padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  quickIcon: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  quickLabel: { fontSize: 12.5, fontWeight: '800' },
-  quickHint: { fontSize: 10.5, marginTop: 2 },
+  privateInline: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  privateText: { fontSize: 9.5, fontWeight: '700' },
+  heroEyebrow: { fontSize: 8, fontWeight: '900', letterSpacing: 0.9 },
+  heroTitle: { fontSize: 19, lineHeight: 23, fontWeight: '900', letterSpacing: -0.4, marginTop: 1 },
+  heroIconAction: { width: 40, height: 40, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  expressionFeedTrigger: { minHeight: 44, marginTop: spacing.sm, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  expressionFeedTriggerText: { flex: 1, fontSize: 11, fontWeight: '800' },
+  quickSection: { gap: 6 },
+  quickHeading: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingHorizontal: 2 },
+  quickHeadingTitle: { fontSize: 12.5, fontWeight: '900' },
+  quickHeadingMeta: { fontSize: 9, fontWeight: '700' },
+  quickGrid: { gap: spacing.md, paddingRight: spacing.lg, paddingHorizontal: 2, paddingBottom: 2 },
+  quickLink: { minWidth: 54, alignItems: 'center', gap: 5 },
+  quickIcon: { width: 42, height: 42, borderRadius: 15, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  quickLabel: { fontSize: 9.5, fontWeight: '800' },
+  quickHint: { fontSize: 9, marginTop: 1 },
+  expressionUtilities: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   notice: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   noticeText: { flex: 1, fontSize: 11.5, lineHeight: 17 },
   liveWrap: { marginTop: spacing.xs },
   feedHeading: { marginTop: spacing.md, marginBottom: spacing.xs, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.sm },
   feedEyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1 },
   feedTitle: { fontSize: 20, lineHeight: 24, fontWeight: '900', marginTop: 2 },
-  feedCard: { paddingVertical: 6 },
+  feedCard: { width: '100%', maxWidth: 780, alignSelf: 'center', paddingVertical: spacing.sm },
+  homePostCard: { marginHorizontal: 0, marginVertical: 0, borderRadius: radius.xl },
   shelf: { borderWidth: 1, borderRadius: radius.xl, paddingVertical: spacing.md, marginVertical: 7 },
   shelfHeader: { paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   shelfTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
