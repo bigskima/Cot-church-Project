@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { ApiError } from "../_shared/errors.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
+import { createNotifications, mentionUsernames, notificationPreview, profileIdsForUsernames, senderIdentity } from "../_shared/notifications.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { loadSafetyProfileSets } from "../_shared/safety.ts";
 import { assertObject, requiredString, uuid } from "../_shared/validation.ts";
@@ -265,13 +266,52 @@ Deno.serve(createHandler(
         if (error || (uploads ?? []).length !== ids.length) throw new ApiError("INVALID_CHAT_ATTACHMENTS", "One or more attachments are unavailable.", 422);
       }
       const replyToId = optionalUuid(body.replyToId, "replyToId");
+      let replyRecipientProfileId: string | null = null;
       if (replyToId) {
-        const { data: reply } = await admin.from("expression_chat_messages").select("id").eq("id", replyToId).eq("organization_id", auth.organizationId).eq("branch_id", branchId).maybeSingle();
+        const { data: reply } = await admin.from("expression_chat_messages").select("id,sender_profile_id").eq("id", replyToId).eq("organization_id", auth.organizationId).eq("branch_id", branchId).maybeSingle();
         if (!reply) throw new ApiError("MESSAGE_NOT_FOUND", "The message you are replying to is unavailable.", 404);
+        replyRecipientProfileId = reply.sender_profile_id ?? null;
       }
       const { data: created, error } = await admin.from("expression_chat_messages").insert({ organization_id: auth.organizationId, branch_id: branchId, sender_profile_id: auth.user.id, body: messageBody, reply_to_id: replyToId, attachment_ids: ids }).select("id,organization_id,branch_id,sender_profile_id,body,reply_to_id,attachment_ids,pinned_at,pinned_by_profile_id,sent_at,edited_at,redacted_at").single();
       if (error || !created) throw new ApiError("EXPRESSION_CHAT_SEND_FAILED", "Unable to send this message.", 500, undefined, false);
       if (ids.length) await admin.from("expression_chat_uploads").update({ status: "attached", attached_at: new Date().toISOString() }).in("id", ids).eq("status", "uploaded");
+
+      const mentionedProfiles = await profileIdsForUsernames(admin, mentionUsernames(messageBody));
+      let mentionRecipientIds: string[] = [];
+      if (mentionedProfiles.length) {
+        const { data: eligibleMentions } = await admin.from("expression_memberships")
+          .select("profile_id")
+          .eq("organization_id", auth.organizationId)
+          .eq("branch_id", branchId)
+          .eq("status", "active")
+          .in("profile_id", mentionedProfiles.map((profile) => profile.id));
+        mentionRecipientIds = (eligibleMentions ?? []).map((row: any) => row.profile_id);
+      }
+      const recipients = [...new Set([
+        ...mentionRecipientIds,
+        ...(replyRecipientProfileId ? [replyRecipientProfileId] : []),
+      ])].filter((profileId) => profileId !== auth.user.id);
+
+      if (recipients.length) {
+        const sender = await senderIdentity(admin, auth.user.id);
+        await createNotifications(admin, {
+          organizationId: auth.organizationId,
+          recipientProfileIds: recipients,
+          senderProfileId: auth.user.id,
+          type: "expression_chat_activity",
+          title: `${sender.display_name || (sender.username ? `@${sender.username}` : "A member")} · ${branch.name}`,
+          body: notificationPreview(messageBody, ids.length ? "Mentioned or replied to you with an attachment." : "Mentioned or replied to you in General discussion."),
+          data: {
+            scope: "expression",
+            branchId,
+            entityType: "expression_chat",
+            messageId: created.id,
+            senderProfileId: auth.user.id,
+            senderUsername: sender.username,
+            route: `/expressions/${branchId}/chat`,
+          },
+        });
+      }
       return { data: (await hydrate(admin, [created], auth.user.id))[0] };
     }
 
