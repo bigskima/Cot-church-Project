@@ -183,7 +183,8 @@ begin
             limit 1
           )
         ),
-        body := '{"action":"process_push","batchSize":50}'::jsonb
+        body := '{"action":"process_push","batchSize":20}'::jsonb,
+        timeout_milliseconds := 30000
       );
     $cron$
   );
