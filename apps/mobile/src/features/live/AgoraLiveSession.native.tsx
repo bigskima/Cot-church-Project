@@ -4,7 +4,10 @@ import {
   ChannelProfileType,
   ClientRoleType,
   createAgoraRtcEngine,
+  DegradationPreference,
   type IRtcEngine,
+  OrientationMode,
+  RenderModeType,
   RtcSurfaceView,
 } from 'react-native-agora';
 import type { AgoraLiveSessionProps } from './agora-types';
@@ -33,6 +36,7 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
   const [message, setMessage] = useState(role === 'publisher' ? 'Preparing camera and microphone…' : 'Joining live service…');
   const [micMuted, setMicMuted] = useState(false);
   const [cameraMuted, setCameraMuted] = useState(false);
+  const [cameraFacing, setCameraFacing] = useState<'front' | 'rear'>('front');
   const [switchingCamera, setSwitchingCamera] = useState(false);
   const [networkLabel, setNetworkLabel] = useState('Connecting');
 
@@ -89,6 +93,15 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
         engine.enableVideo();
 
         if (role === 'publisher') {
+          // Expression Live is a widescreen broadcast, not a portrait/reel capture.
+          // Agora may adapt downward on devices or networks that cannot sustain this target.
+          engine.setVideoEncoderConfiguration({
+            dimensions: { width: 1920, height: 1080 },
+            frameRate: 30,
+            bitrate: 0,
+            orientationMode: OrientationMode.OrientationModeAdaptive,
+            degradationPreference: DegradationPreference.MaintainBalanced,
+          });
           engine.setClientRole(ClientRoleType.ClientRoleBroadcaster);
           engine.startPreview();
         } else {
@@ -158,12 +171,14 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
     if (!engine || switchingCamera) return;
     setSwitchingCamera(true);
     try {
-      engine.switchCamera();
-      setMessage('Camera switched.');
+      const result = engine.switchCamera();
+      if (result < 0) throw new Error(`Agora camera switch failed (${result}).`);
+      setCameraFacing((current) => current === 'front' ? 'rear' : 'front');
+      setMessage(cameraFacing === 'front' ? 'Rear camera live.' : 'Front camera live.');
     } catch {
       callbacksRef.current.onError?.('Unable to switch camera.');
     } finally {
-      setTimeout(() => setSwitchingCamera(false), 500);
+      setTimeout(() => setSwitchingCamera(false), 650);
     }
   };
 
@@ -176,10 +191,14 @@ export function AgoraLiveSession({ grant, role, onJoined, onLeave, onRemoteLeft,
             <Text style={styles.placeholderText}>{message}</Text>
           </View>
         ) : (
-          <RtcSurfaceView canvas={{ uid: 0 }} style={styles.video} />
+          <RtcSurfaceView
+            key={`local-${cameraFacing}`}
+            canvas={{ uid: 0, renderMode: RenderModeType.RenderModeFit }}
+            style={styles.video}
+          />
         )
       ) : remoteUid ? (
-        <RtcSurfaceView canvas={{ uid: remoteUid }} style={styles.video} />
+        <RtcSurfaceView canvas={{ uid: remoteUid, renderMode: RenderModeType.RenderModeFit }} style={styles.video} />
       ) : (
         <View style={styles.placeholder}>
           <Text style={styles.placeholderText}>{message}</Text>
