@@ -287,10 +287,19 @@ Deno.serve(createHandler(
           .in("profile_id", mentionedProfiles.map((profile) => profile.id));
         mentionRecipientIds = (eligibleMentions ?? []).map((row: any) => row.profile_id);
       }
-      const recipients = [...new Set([
+      const candidateRecipients = [...new Set([
         ...mentionRecipientIds,
         ...(replyRecipientProfileId ? [replyRecipientProfileId] : []),
       ])].filter((profileId) => profileId !== auth.user.id);
+      const { data: eligibleRecipients } = candidateRecipients.length
+        ? await admin.from("expression_memberships")
+            .select("profile_id")
+            .eq("organization_id", auth.organizationId)
+            .eq("branch_id", branchId)
+            .eq("status", "active")
+            .in("profile_id", candidateRecipients)
+        : { data: [] as any[] };
+      const recipients = [...new Set((eligibleRecipients ?? []).map((row: any) => row.profile_id))];
 
       if (recipients.length) {
         const sender = await senderIdentity(admin, auth.user.id);
