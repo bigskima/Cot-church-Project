@@ -76,11 +76,14 @@ function AccountCard({ account, reference }: { account: BankAccount; reference: 
   );
 }
 
-export function GroupGivingExperience({ groupId }: { groupId: string }) {
+export function GroupGivingExperience({ groupId, scope = 'expression' }: { groupId: string; scope?: 'expression' | 'general' }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { api, context, mode } = useSession();
-  const organizationId = context?.organization?.id ?? '';
+  const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
+  const requestScope = scope === 'general'
+    ? { context: 'public' as const, headers: organizationId ? { 'X-Organization-Id': organizationId } : undefined }
+    : { context: 'current' as const };
   const groupKey = `group-chat:${groupId}:giving`;
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const [currency, setCurrency] = useState<string | null>(null);
@@ -90,7 +93,7 @@ export function GroupGivingExperience({ groupId }: { groupId: string }) {
 
   const group = useResource<GroupGivingPayload>(groupKey, (signal) => {
     if (mode !== 'authenticated' || !groupId) return Promise.reject(new Error('Join this Group to open Group Giving.'));
-    return api.request<GroupGivingPayload>(`group-chat?groupId=${encodeURIComponent(groupId)}`, { signal, context: 'current' });
+    return api.request<GroupGivingPayload>(`group-chat?groupId=${encodeURIComponent(groupId)}`, { signal, ...requestScope });
   });
 
   const expressionId = group.data?.group.branch_id ?? context?.expression?.id ?? null;
@@ -138,7 +141,7 @@ export function GroupGivingExperience({ groupId }: { groupId: string }) {
       const givingPurposeId = action === 'link_giving' ? purpose.id : (purpose as GroupGivingOption).giving_purpose_id;
       await api.request('group-chat', {
         method: 'POST',
-        context: 'current',
+        ...requestScope,
         body: JSON.stringify({
           action,
           groupId,
