@@ -5,6 +5,24 @@ import { jsonBody } from "../_shared/request.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString } from "../_shared/validation.ts";
 
 const preferenceSelect = "email_enabled,sms_enabled,push_enabled,quiet_hours,updated_at";
+const TIME_PATTERN = /^([01]\\d|2[0-3]):[0-5]\\d$/;
+
+function normalizeQuietHours(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new ApiError("VALIDATION_FAILED", "quietHours must be an object", 422);
+  }
+  const quiet = value as Record<string, unknown>;
+  assertNoUnknownFields(quiet, ["enabled", "startTime", "endTime"]);
+  if (quiet.enabled !== undefined && typeof quiet.enabled !== "boolean") {
+    throw new ApiError("VALIDATION_FAILED", "quietHours.enabled must be boolean", 422);
+  }
+  const startTime = quiet.startTime === undefined ? "22:00" : requiredString(quiet.startTime, "quietHours.startTime", 5);
+  const endTime = quiet.endTime === undefined ? "07:00" : requiredString(quiet.endTime, "quietHours.endTime", 5);
+  if (!TIME_PATTERN.test(startTime) || !TIME_PATTERN.test(endTime)) {
+    throw new ApiError("VALIDATION_FAILED", "Quiet hours must use 24-hour HH:MM time", 422);
+  }
+  return { enabled: quiet.enabled === true, startTime, endTime };
+}
 
 function defaultPreferences() {
   return {
@@ -77,12 +95,7 @@ Deno.serve(
           throw new ApiError("VALIDATION_FAILED", `${key} must be boolean`, 422);
         }
       }
-      if (
-        body.quietHours !== undefined &&
-        (!body.quietHours || typeof body.quietHours !== "object" || Array.isArray(body.quietHours))
-      ) {
-        throw new ApiError("VALIDATION_FAILED", "quietHours must be an object", 422);
-      }
+      const normalizedQuietHours = body.quietHours === undefined ? undefined : normalizeQuietHours(body.quietHours);
 
       const { data: current, error: currentError } = await auth.client
         .from("notification_preferences")
@@ -99,11 +112,11 @@ Deno.serve(
         email_enabled: body.emailEnabled ?? existing.email_enabled,
         sms_enabled: body.smsEnabled ?? existing.sms_enabled,
         push_enabled: body.pushEnabled ?? existing.push_enabled,
-        quiet_hours: body.quietHours ?? existing.quiet_hours,
+        quiet_hours: normalizedQuietHours ?? existing.quiet_hours,
       };
       const { data, error } = await auth.client
         .from("notification_preferences")
-        .upsert(values)
+        .upsert(values, { onConflict: "profile_id,organization_id" })
         .select(preferenceSelect)
         .single();
       if (error) throw new ApiError("PREFERENCES_UPDATE_FAILED", "Unable to update preferences", 500, undefined, false);
