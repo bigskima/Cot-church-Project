@@ -248,7 +248,6 @@ export function ExpressionShell({ expressionId, children }: Props) {
         </View>
         <View style={styles.headerCopy}>
           <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>{expressionName}</Text>
-          <View style={styles.headerMetaRow}><Icon name="people-outline" size={12} color={colors.interactive} /><Text style={[styles.headerMeta, { color: colors.textSecondary }]}>Expression</Text></View>
         </View>
         <Pressable onPress={() => router.push('/expressions')} accessibilityRole="button" accessibilityLabel="Switch Expression" style={({ pressed }) => [styles.headerButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed ? styles.pressed : null]}>
           <Icon name="swap-horizontal-outline" size={20} color={colors.text} />
@@ -280,15 +279,13 @@ const styles = StyleSheet.create({
   desktopSidebar: { width: 280, borderRightWidth: 1, paddingHorizontal: spacing.md, paddingBottom: spacing.lg },
   desktopContent: { flex: 1, minWidth: 0 },
   mobileRoot: { flex: 1 },
-  mobileHeader: { minHeight: 68, marginHorizontal: spacing.sm, marginTop: Platform.OS === 'web' ? spacing.xs : 0, paddingHorizontal: spacing.sm, paddingBottom: spacing.sm, borderWidth: 1, borderRadius: radius.xxl, flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, zIndex: 10 },
+  mobileHeader: { minHeight: 56, marginHorizontal: spacing.sm, marginTop: Platform.OS === 'web' ? spacing.xs : 0, paddingHorizontal: 7, paddingBottom: 6, borderWidth: 1, borderRadius: radius.lg, flexDirection: 'row', alignItems: 'flex-end', gap: 7, zIndex: 10 },
   mobileContent: { flex: 1 },
-  headerButton: { width: 40, height: 40, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  headerAvatar: { width: 34, height: 34, borderRadius: 12, borderWidth: 1, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  headerButton: { width: 38, height: 38, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  headerAvatar: { width: 32, height: 32, borderRadius: 11, borderWidth: 1, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   headerAvatarImage: { width: '100%', height: '100%' },
   headerCopy: { flex: 1, minWidth: 0, justifyContent: 'center', paddingBottom: 2 },
-  headerTitle: { fontSize: 16, lineHeight: 20, fontWeight: '800', letterSpacing: -0.3 },
-  headerMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  headerMeta: { fontSize: 11, lineHeight: 14, fontWeight: '700' },
+  headerTitle: { fontSize: 15, lineHeight: 19, fontWeight: '900', letterSpacing: -0.25 },
   navRoot: { flex: 1 },
   identityCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.md },
   identityImage: { width: '100%', height: '100%' },
