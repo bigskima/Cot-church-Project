@@ -11,6 +11,7 @@ export function AgoraCallSession({ grant, kind, scope, otherName, onJoined, onEr
   const [micMuted, setMicMuted] = useState(false);
   const [cameraMuted, setCameraMuted] = useState(kind === 'audio');
   const [status, setStatus] = useState('Connecting…');
+  const [directLocalPrimary, setDirectLocalPrimary] = useState(false);
 
   useEffect(() => {
     let disposed = false;
@@ -122,18 +123,43 @@ export function AgoraCallSession({ grant, kind, scope, otherName, onJoined, onEr
         scope === 'direct' ? (
           <div style={{ flex: 1, position: 'relative', minHeight: 0, overflow: 'hidden', background: '#070D16' }}>
             {remotePrimary ? (
-              <div id={`cot-call-remote-${remotePrimary}`} style={{ position: 'absolute', inset: 0, overflow: 'hidden', background: '#0B111B' }} />
+              <div
+                id={`cot-call-remote-${remotePrimary}`}
+                role='button'
+                tabIndex={0}
+                aria-label={directLocalPrimary ? 'Make the other person large' : 'Other person is large. Tap to swap'}
+                onClick={() => setDirectLocalPrimary((current) => !current)}
+                onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setDirectLocalPrimary((current) => !current); }}
+                style={directLocalPrimary ? directPipStyle : directPrimaryStyle}
+              >
+                <div style={tileLabelStyle}>{directLocalPrimary ? (otherName || 'Other person') : `${otherName || 'Other person'} · tap to swap`}</div>
+              </div>
             ) : (
-              <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', background: 'radial-gradient(circle at center,#14243a 0%,#050910 65%)' }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ width: 104, height: 104, borderRadius: 999, background: '#172335', display: 'grid', placeItems: 'center', margin: '0 auto 14px', fontSize: 30, fontWeight: 900 }}>{(otherName || 'C').slice(0, 1).toUpperCase()}</div>
-                  <div style={{ fontSize: 18, fontWeight: 900 }}>{otherName || 'Waiting for answer'}</div>
-                  <div style={{ color: '#93A4B8', fontSize: 12, marginTop: 6 }}>{remoteUids.length ? 'Connected' : 'Waiting for the other person…'}</div>
+              <div
+                style={directLocalPrimary ? directWaitingPipStyle : directPrimaryStyle}
+                onClick={() => directLocalPrimary && setDirectLocalPrimary(false)}
+              >
+                <div style={{ height: '100%', display: 'grid', placeItems: 'center', background: 'radial-gradient(circle at center,#14243a 0%,#050910 65%)' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ width: directLocalPrimary ? 54 : 104, height: directLocalPrimary ? 54 : 104, borderRadius: 999, background: '#172335', display: 'grid', placeItems: 'center', margin: '0 auto 10px', fontSize: directLocalPrimary ? 18 : 30, fontWeight: 900 }}>{(otherName || 'C').slice(0, 1).toUpperCase()}</div>
+                    {!directLocalPrimary ? <div style={{ fontSize: 18, fontWeight: 900 }}>{otherName || 'Waiting for answer'}</div> : null}
+                    <div style={{ color: '#93A4B8', fontSize: directLocalPrimary ? 9 : 12, marginTop: 4 }}>Waiting…</div>
+                  </div>
                 </div>
               </div>
             )}
-            <div id='cot-call-local' style={{ position: 'absolute', right: 14, bottom: 86, width: 'clamp(108px,24vw,190px)', aspectRatio: '3 / 4', borderRadius: 20, overflow: 'hidden', background: '#111827', border: '1px solid rgba(255,255,255,.16)', boxShadow: '0 12px 30px rgba(0,0,0,.4)' }}>
+
+            <div
+              id='cot-call-local'
+              role='button'
+              tabIndex={0}
+              aria-label={directLocalPrimary ? 'Your video is large. Tap to swap' : 'Make your video large'}
+              onClick={() => setDirectLocalPrimary((current) => !current)}
+              onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setDirectLocalPrimary((current) => !current); }}
+              style={directLocalPrimary ? directPrimaryStyle : directPipStyle}
+            >
               {cameraMuted ? <div style={{ height: '100%', display: 'grid', placeItems: 'center', fontWeight: 800, color: '#AAB5C4' }}>Camera off</div> : null}
+              <div style={tileLabelStyle}>{directLocalPrimary ? 'You · tap to swap' : 'You · tap to enlarge'}</div>
             </div>
           </div>
         ) : (
@@ -166,6 +192,9 @@ export function AgoraCallSession({ grant, kind, scope, otherName, onJoined, onEr
     </div>
   );
 }
+const directPrimaryStyle: React.CSSProperties = { position: 'absolute', inset: 0, overflow: 'hidden', background: '#0B111B', cursor: 'pointer' };
+const directPipStyle: React.CSSProperties = { position: 'absolute', right: 14, bottom: 86, width: 'clamp(108px,24vw,190px)', aspectRatio: '3 / 4', borderRadius: 20, overflow: 'hidden', background: '#111827', border: '1px solid rgba(255,255,255,.16)', boxShadow: '0 12px 30px rgba(0,0,0,.4)', cursor: 'pointer', zIndex: 4 };
+const directWaitingPipStyle: React.CSSProperties = { ...directPipStyle, cursor: 'default' };
 const tileStyle: React.CSSProperties = { minHeight: 190, borderRadius: 18, overflow: 'hidden', background: '#111827', position: 'relative' };
 const placeholderStyle: React.CSSProperties = { height: '100%', minHeight: 190, display: 'grid', placeItems: 'center', fontWeight: 800, color: '#AAB5C4' };
 const tileLabelStyle: React.CSSProperties = { position: 'absolute', left: 10, bottom: 9, padding: '4px 8px', borderRadius: 999, background: 'rgba(0,0,0,.5)', color: '#fff', fontSize: 10, fontWeight: 800, pointerEvents: 'none' };
