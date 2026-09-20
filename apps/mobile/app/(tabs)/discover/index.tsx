@@ -8,6 +8,7 @@ import { useResource } from '@/hooks/use-resource';
 import {
   BrandMark,
   Chip,
+  CompactRouteGrid,
   ChurchPickerModal,
   EmptyState,
   EventCard,
@@ -113,12 +114,8 @@ export default function DiscoverScreen() {
               <Text style={[styles.discoverBrandTitle, { color: colors.text }]}>Discover</Text>
             </View>
           </View>
-          <View style={styles.headerTitleRow}>
-            <View style={styles.titleCopy}>
-              <Text style={[styles.title, { color: colors.text }]}>Explore what’s happening</Text>
-              <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Teachings, people, Expressions, events and stories in one place.</Text>
-            </View>
-            {churches.data && churches.data.length > 1 ? (
+          {churches.data && churches.data.length > 1 ? (
+            <View style={styles.churchSelectorRow}>
               <Pressable
                 onPress={() => setShowChurchPicker(true)}
                 style={({ pressed }) => [
@@ -133,8 +130,8 @@ export default function DiscoverScreen() {
                 </Text>
                 <Icon name="chevron-down" size={14} color={colors.textMuted} />
               </Pressable>
-            ) : null}
-          </View>
+            </View>
+          ) : null}
 
           <SearchBar
             value={query}
@@ -157,34 +154,15 @@ export default function DiscoverScreen() {
         </View>
 
         <View style={styles.discoveryDeck}>
-          <Pressable onPress={() => router.push('/general/watch')} style={({ pressed }) => [styles.discoveryTile, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}>
-            <View style={[styles.discoveryIcon, { backgroundColor: colors.primarySoft }]}>
-              <Icon name="play-circle-outline" size={21} color={colors.interactive} />
-            </View>
-            <Text style={[styles.discoveryTitle, { color: colors.text }]}>Watch</Text>
-            <Text style={[styles.discoveryMeta, { color: colors.textMuted }]}>Long-form media</Text>
-          </Pressable>
-          <Pressable onPress={() => router.push('/general/reels')} style={({ pressed }) => [styles.discoveryTile, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}>
-            <View style={[styles.discoveryIcon, { backgroundColor: colors.liveSoft }]}>
-              <Icon name="flash-outline" size={21} color={colors.live} />
-            </View>
-            <Text style={[styles.discoveryTitle, { color: colors.text }]}>Reels</Text>
-            <Text style={[styles.discoveryMeta, { color: colors.textMuted }]}>Quick discovery</Text>
-          </Pressable>
-          <Pressable onPress={() => router.push('/general')} style={({ pressed }) => [styles.discoveryTile, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}>
-            <View style={[styles.discoveryIcon, { backgroundColor: colors.primarySoft }]}>
-              <Icon name="people-outline" size={21} color={colors.interactive} />
-            </View>
-            <Text style={[styles.discoveryTitle, { color: colors.text }]}>Community</Text>
-            <Text style={[styles.discoveryMeta, { color: colors.textMuted }]}>Public conversations</Text>
-          </Pressable>
-          <Pressable onPress={() => router.push('/general/church-story' as any)} style={({ pressed }) => [styles.discoveryTile, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}>
-            <View style={[styles.discoveryIcon, { backgroundColor: colors.bgSecondary }]}>
-              <Icon name="library-outline" size={21} color={colors.interactive} />
-            </View>
-            <Text style={[styles.discoveryTitle, { color: colors.text }]}>Our Story</Text>
-            <Text style={[styles.discoveryMeta, { color: colors.textMuted }]}>Church & leaders</Text>
-          </Pressable>
+          <CompactRouteGrid
+            compact
+            items={[
+              { key: 'watch', label: 'Watch', icon: 'play-circle-outline', accessibilityLabel: 'Watch. Long-form media', onPress: () => router.push('/general/watch') },
+              { key: 'reels', label: 'Reels', icon: 'flash-outline', accessibilityLabel: 'Reels. Short videos', onPress: () => router.push('/general/reels') },
+              { key: 'community', label: 'Community', icon: 'people-outline', accessibilityLabel: 'Community. Public conversations', onPress: () => router.push('/general') },
+              { key: 'story', label: 'Our Story', icon: 'library-outline', accessibilityLabel: 'Our Story. Church and leaders', onPress: () => router.push('/general/church-story' as any) },
+            ]}
+          />
         </View>
 
         {initialLoading ? (
@@ -197,7 +175,7 @@ export default function DiscoverScreen() {
           <View style={styles.body}>
             {deferredQuery.length >= 2 ? (
               <View style={styles.sectionWrap}>
-                <SectionHeader title="Search results" subtitle="Across public COT content" />
+                <SectionHeader title="Search results" compact />
                 {search.loading && !search.data ? <Skeleton height={58} count={3} /> : search.error ? <ResourceError message={search.error} retry={search.refresh} /> : (
                   <>
                     {(search.data?.videos ?? []).map((video) => <Pressable key={`video-${video.id}`} accessibilityRole="button" onPress={() => router.push(`/general/watch/${video.id}` as any)} style={({ pressed }) => [styles.searchRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}><Icon name="play-circle-outline" size={20} color={colors.interactive} /><View style={styles.searchCopy}><Text style={[styles.searchTitle, { color: colors.text }]}>{video.title}</Text><Text style={[styles.searchMeta, { color: colors.textMuted }]}>VIDEO · {video.category}</Text></View><Icon name="chevron-forward" size={17} color={colors.textMuted} /></Pressable>)}
@@ -299,6 +277,7 @@ const styles = StyleSheet.create({
   title: { ...typography.display },
   subtitle: { ...typography.bodySmall, marginTop: 3, maxWidth: 420 },
   searchBar: { marginTop: spacing.md, height: 48, borderRadius: radius.lg },
+  churchSelectorRow: { flexDirection: 'row', justifyContent: 'flex-end' },
   churchSelectorPill: { flexDirection: 'row', alignItems: 'center', paddingVertical: 7, paddingHorizontal: 10, borderRadius: radius.pill, borderWidth: 1, gap: 4, maxWidth: 160 },
   churchSelectorText: { fontSize: 12, fontWeight: '600', flex: 1 },
   chipsRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm, flexWrap: 'wrap' },
