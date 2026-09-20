@@ -153,7 +153,7 @@ export function ExpressionManagementHeader({
         </Pressable>
       </View>
 
-      <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)} title="Manage" maxHeightPercent={76}>
+      <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)} title="Manage" maxHeightPercent={76} compact>
         <CompactRouteGrid
           compact
           items={visibleTabs.map((destination) => ({
