@@ -50,6 +50,15 @@ export type JoinedCallPayload = ActiveCallPayload & {
   grant: ChatCallGrant;
 };
 
+export type CallHistoryEntry = {
+  call: ChatCall;
+  participants: ChatCallParticipant[];
+};
+
+export type CallHistoryPayload = {
+  history: CallHistoryEntry[];
+};
+
 export type AgoraCallSessionProps = {
   grant: ChatCallGrant;
   kind: ChatCallKind;
@@ -57,4 +66,5 @@ export type AgoraCallSessionProps = {
   otherName?: string | null;
   onJoined?: () => void;
   onError?: (message: string) => void;
+  overlayBottomInset?: number;
 };
