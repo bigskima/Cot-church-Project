@@ -5,6 +5,7 @@ import {
   buildMutationSuccessFeedback,
   describeMutation,
   emitActionFeedback,
+  mutationFeedbackKey,
   shouldShowMutationFeedback,
 } from './services/action-feedback';
 import * as SecureStore from 'expo-secure-store';
@@ -228,6 +229,8 @@ function embeddedPayloadFailure(payload: any): PayloadFailure | null {
 }
 
 export class ApiClient {
+  private feedbackSequence = new Map<string, number>();
+
   constructor(private baseUrl: string, private getAuth: () => StoredAuth | null) {}
 
   async request<T>(path: string, init: ApiRequestInit = {}) {
@@ -242,6 +245,10 @@ export class ApiClient {
     const method = (fetchInit.method ?? 'GET').toUpperCase();
     const isMutation = ['POST', 'PATCH', 'PUT', 'DELETE'].includes(method);
     const feedbackEnabled = isMutation && feedback !== false && shouldShowMutationFeedback(cleanPath);
+    const operationKey = feedbackEnabled ? mutationFeedbackKey(cleanPath, method, fetchInit.body) : '';
+    const operationSequence = feedbackEnabled ? (this.feedbackSequence.get(operationKey) ?? 0) + 1 : 0;
+    if (feedbackEnabled) this.feedbackSequence.set(operationKey, operationSequence);
+    const isLatestFeedbackOperation = () => !feedbackEnabled || this.feedbackSequence.get(operationKey) === operationSequence;
     const controller = new AbortController();
     const requestTimeoutMs = Math.max(1_000, Math.min(timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS, MAX_REQUEST_TIMEOUT_MS));
     let timedOut = false;
@@ -295,7 +302,7 @@ export class ApiClient {
       const responseData = Object.prototype.hasOwnProperty.call(payload, 'data') ? payload.data : payload;
       if (isMutation) {
         invalidateAfterMutation(cleanPath, fetchInit.body);
-        if (feedbackEnabled) {
+        if (feedbackEnabled && isLatestFeedbackOperation()) {
           const config = feedback && typeof feedback === 'object' ? feedback : {};
           const derived = buildMutationSuccessFeedback(cleanPath, method, fetchInit.body, responseData);
           emitActionFeedback({
@@ -303,6 +310,7 @@ export class ApiClient {
             title: config.successTitle ?? derived.title,
             message: config.successMessage ?? derived.message,
             details: derived.details,
+            operationKey,
           });
         }
       }
@@ -318,15 +326,17 @@ export class ApiClient {
         normalized = new ApiError('NETWORK_ERROR', userFacingApiMessage('NETWORK_ERROR', 0), 0);
       }
 
-      if (feedbackEnabled && normalized.code !== 'REQUEST_CANCELLED') {
+      if (feedbackEnabled && normalized.code !== 'REQUEST_CANCELLED' && isLatestFeedbackOperation()) {
         const config = feedback && typeof feedback === 'object' ? feedback : {};
         const description = describeMutation(cleanPath, method, fetchInit.body);
+        const resourceLabel = `${description.resource[0]?.toUpperCase() ?? ''}${description.resource.slice(1)}`;
         emitActionFeedback({
           kind: 'error',
-          title: config.failureTitle ?? `${description.resource[0]?.toUpperCase() ?? ''}${description.resource.slice(1)} was not changed`,
+          title: config.failureTitle ?? `${resourceLabel} update failed`,
           message: config.failureMessage ?? normalized.message,
           details: buildMutationFailureDetails(cleanPath, method, fetchInit.body),
           retry: () => this.request<T>(path, init),
+          operationKey,
         });
       }
       throw normalized;
