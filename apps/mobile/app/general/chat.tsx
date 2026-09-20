@@ -9,9 +9,11 @@ export default function GeneralChatScreen() {
   return (
     <View style={styles.screen}>
       <GlobalChatExperience />
-      <TourAnchor targetKey="general.messages.header" style={[styles.headerTarget, { top: insets.top }]}>
-        <View style={styles.fill} />
-      </TourAnchor>
+      <View pointerEvents="none" style={[styles.headerTarget, { top: insets.top }]}>
+        <TourAnchor targetKey="general.messages.header" style={styles.fill}>
+          <View style={styles.fill} />
+        </TourAnchor>
+      </View>
     </View>
   );
 }

@@ -10,9 +10,11 @@ export default function ExpressionChatRoute() {
   return (
     <View style={styles.screen}>
       <ExpressionChatExperience expressionId={id} />
-      <TourAnchor targetKey="expression.discussion.header" style={styles.headerTarget}>
-        <View style={styles.fill} />
-      </TourAnchor>
+      <View pointerEvents="none" style={styles.headerTarget}>
+        <TourAnchor targetKey="expression.discussion.header" style={styles.fill}>
+          <View style={styles.fill} />
+        </TourAnchor>
+      </View>
     </View>
   );
 }

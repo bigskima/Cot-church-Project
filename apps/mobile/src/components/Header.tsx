@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 import { useTheme } from '@/state/theme';
 import { radius, spacing, typography } from '@/design-system/tokens';
 import { Icon } from './primitives/Icon';
@@ -17,6 +17,13 @@ interface ScreenHeaderProps {
   compact?: boolean;
 }
 
+function fallbackRoute(pathname: string) {
+  const expressionMatch = pathname.match(/^\/expressions\/([^/]+)/);
+  if (expressionMatch?.[1]) return `/expressions/${expressionMatch[1]}`;
+  if (pathname.startsWith('/general')) return '/general';
+  return '/general';
+}
+
 export function ScreenHeader({
   title,
   subtitle,
@@ -28,10 +35,18 @@ export function ScreenHeader({
   compact = false,
 }: ScreenHeaderProps) {
   const { colors } = useTheme();
+  const pathname = usePathname();
 
   const handleBack = () => {
-    if (onBack) onBack();
-    else router.back();
+    if (onBack) {
+      onBack();
+      return;
+    }
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace(fallbackRoute(pathname) as any);
   };
 
   const accessibleContext = [title, kicker, subtitle].filter(Boolean).join('. ');
