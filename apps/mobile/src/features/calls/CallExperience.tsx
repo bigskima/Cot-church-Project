@@ -17,7 +17,7 @@ export function CallExperience({ callId }: { callId: string }) {
 
   useEffect(() => {
     let disposed = false;
-    void api.request<JoinedCallPayload>('chat-calls', {
+    void api.request<JoinedCallPayload>('noop?service=calls', {
       method: 'POST',
       context: 'public',
       body: JSON.stringify({ action: 'join', callId }),
@@ -30,7 +30,7 @@ export function CallExperience({ callId }: { callId: string }) {
       disposed = true;
       if (!leftRef.current) {
         leftRef.current = true;
-        void api.request('chat-calls', { method: 'POST', context: 'public', body: JSON.stringify({ action: 'leave', callId }) }).catch(() => {});
+        void api.request('noop?service=calls', { method: 'POST', context: 'public', body: JSON.stringify({ action: 'leave', callId }) }).catch(() => {});
       }
     };
   }, [api, callId]);
@@ -40,7 +40,7 @@ export function CallExperience({ callId }: { callId: string }) {
     setLeaving(true);
     leftRef.current = true;
     try {
-      await api.request('chat-calls', {
+      await api.request('noop?service=calls', {
         method: 'POST',
         context: 'public',
         body: JSON.stringify({ action: endForEveryone ? 'end' : 'leave', callId }),
