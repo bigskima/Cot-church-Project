@@ -378,18 +378,16 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
         />
       ) : (
         <View style={{ paddingTop: insets.top }}>
-          <ScreenHeader title="Chat" kicker="DIRECT MESSAGES" subtitle="Private one-to-one conversations across COT." />
+          <ScreenHeader title="Messages" compact />
         </View>
       )}
 
-      <View style={[styles.scopeNote, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}>
-        <Icon name="people-outline" size={16} color={colors.interactive} />
-        <Text style={[styles.scopeNoteText, { color: colors.textSecondary }]}>
-          {pendingForwardText
-            ? 'Choose a person below to forward this message. You can edit it before sending.'
-            : 'Your inbox shows people you follow or who follow you. Search can find any COT account you are allowed to message. Group chat remains inside each Group.'}
-        </Text>
-      </View>
+      {pendingForwardText ? (
+        <View style={[styles.forwardNote, { backgroundColor: colors.primarySoft }]}>
+          <Icon name="arrow-redo-outline" size={15} color={colors.interactive} />
+          <Text style={[styles.forwardNoteText, { color: colors.textSecondary }]}>Choose a person to forward this message.</Text>
+        </View>
+      ) : null}
 
       <View style={[styles.search, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
         <Icon name="search" size={18} color={colors.textMuted} />
@@ -418,11 +416,9 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 40 }]}
         keyboardDismissMode={PLATFORM_KEYBOARD_DISMISS_MODE}
         keyboardShouldPersistTaps="handled"
-        ListHeaderComponent={
-          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-            {normalizedFilter ? 'SEARCH RESULTS' : 'MESSAGES & CONNECTIONS'}
-          </Text>
-        }
+        ListHeaderComponent={normalizedFilter ? (
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>SEARCH RESULTS</Text>
+        ) : null}
         ListEmptyComponent={
           inbox.loading
             ? <ActivityIndicator color={colors.interactive} />
@@ -465,13 +461,13 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.sm },
-  scopeNote: { marginHorizontal: spacing.lg, marginBottom: spacing.sm, borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  scopeNoteText: { flex: 1, fontSize: 11, lineHeight: 16, fontWeight: '600' },
-  search: { marginHorizontal: spacing.lg, minHeight: 48, borderWidth: 1, borderRadius: radius.xl, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, gap: spacing.sm },
+  forwardNote: { marginHorizontal: spacing.sm, marginBottom: 4, minHeight: 36, borderRadius: radius.lg, paddingHorizontal: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  forwardNoteText: { flex: 1, fontSize: 10.5, lineHeight: 14, fontWeight: '700' },
+  search: { marginHorizontal: spacing.sm, minHeight: 44, borderWidth: 1, borderRadius: radius.xl, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, gap: spacing.sm },
   searchInput: { flex: 1, fontSize: 15, paddingVertical: 10 },
   errorCard: { margin: spacing.lg, padding: spacing.md, borderWidth: 1, borderRadius: radius.lg, flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
   errorText: { flex: 1, fontSize: 13 },
-  list: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
+  list: { paddingHorizontal: spacing.sm, paddingTop: spacing.sm },
   sectionTitle: { fontSize: 11, fontWeight: '800', letterSpacing: 0.8, marginBottom: spacing.sm },
   personRow: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth },
   personCopy: { flex: 1, minWidth: 0 },
@@ -480,14 +476,14 @@ const styles = StyleSheet.create({
   empty: { paddingVertical: 48, alignItems: 'center', gap: 6 },
   emptyTitle: { fontSize: 18, fontWeight: '800' },
   emptyCopy: { fontSize: 13, textAlign: 'center', maxWidth: 320 },
-  threadHeader: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingBottom: 10, borderBottomWidth: StyleSheet.hairlineWidth },
+  threadHeader: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, paddingBottom: 7, borderBottomWidth: StyleSheet.hairlineWidth },
   iconButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerCopy: { flex: 1, minWidth: 0 },
   headerTitle: { fontSize: 16, fontWeight: '800' },
   username: { fontSize: 11, marginTop: 1 },
   pinnedBanner: { minHeight: 38, borderBottomWidth: StyleSheet.hairlineWidth, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', gap: 7 },
   pinnedText: { flex: 1, fontSize: 11, fontWeight: '700' },
-  messages: { padding: spacing.md, gap: spacing.sm, flexGrow: 1, justifyContent: 'flex-end' },
+  messages: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, gap: spacing.xs, flexGrow: 1, justifyContent: 'flex-end' },
   bubble: { maxWidth: '84%', borderWidth: 1, borderRadius: 18, paddingHorizontal: 13, paddingVertical: 9 },
   mine: { alignSelf: 'flex-end', borderBottomRightRadius: 5 },
   theirs: { alignSelf: 'flex-start', borderBottomLeftRadius: 5 },
