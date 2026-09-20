@@ -97,6 +97,7 @@ function MessageAttachment({ attachment }: { attachment: ChatAttachment }) {
         title={attachment.fileName || 'Video'}
         sourceUrl={attachment.url}
         durationSeconds={attachment.durationSeconds}
+        aspectRatio={attachment.width && attachment.height ? attachment.width / attachment.height : undefined}
         style={styles.player}
       />
     );
@@ -230,7 +231,7 @@ export function RichMessageBubble({
                   <Text style={[styles.senderName, { color: colors.interactive }]} numberOfLines={1}>
                     {message.sender?.username ? `@${message.sender.username}` : senderName}
                   </Text>
-                  {senderBadge ? <CompactIdentityBadge badge={senderBadge} size={14} /> : null}
+                  {senderBadge ? <CompactIdentityBadge badge={senderBadge as any} size={14} /> : null}
                 </Pressable>
               ) : <View style={styles.flex} />}
               {copied ? <Icon name="checkmark-outline" size={13} color={mine ? '#FFFFFF' : colors.interactive} /> : null}
