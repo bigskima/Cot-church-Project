@@ -96,7 +96,7 @@ export function SectionHeader({ title, subtitle, badge, actionLabel, onAction, s
             </View>
           ) : null}
         </View>
-        {subtitle ? <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>{subtitle}</Text> : null}
+        {subtitle ? <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]} numberOfLines={1}>{subtitle}</Text> : null}
       </View>
 
       {actionLabel && onAction ? (
@@ -147,9 +147,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    marginTop: spacing.xxl,
-    marginBottom: spacing.md,
+    paddingHorizontal: spacing.sm,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
   },
   sectionCopy: { flex: 1, minWidth: 0 },
   sectionTitleRow: {
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  sectionTitle: { ...typography.h2 },
+  sectionTitle: { fontSize: 17, lineHeight: 22, fontWeight: '900', letterSpacing: -0.3 },
   sectionBadge: {
     minWidth: 24,
     minHeight: 22,
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
   },
   sectionSubtitle: {
     ...typography.caption,
-    marginTop: 3,
+    marginTop: 1,
   },
   actionButton: {
     flexDirection: 'row',
