@@ -168,7 +168,7 @@ Deno.serve(createHandler(
 
       const { data: conversations, error: conversationError } = await admin
         .from("direct_conversations")
-        .select("id,participant_low,participant_high,created_at,updated_at")
+        .select("id,participant_low,participant_high,participant_low_unread_count,participant_high_unread_count,participant_low_last_read_at,participant_high_last_read_at,created_at,updated_at")
         .or(`participant_low.eq.${viewerId},participant_high.eq.${viewerId}`)
         .order("updated_at", { ascending: false })
         .limit(100);
