@@ -162,7 +162,7 @@ Deno.serve(createHandler(
             ministry: leader.ministry,
             is_founder: leader.is_founder,
             display_order: leader.display_order,
-          })),
+          })) : [],
         },
       };
     }
@@ -346,7 +346,7 @@ Deno.serve(createHandler(
           ])
         : [true, true, true, true, true];
       const visibleSermons = searchSermons ? await filterSermonsBySafety(admin, sermonsRes.data ?? [], safety.hiddenFromFeed) : [];
-      const visibleVideos = searchVideos ? filterByAuthor(videosRes.data ?? [], safety.hiddenFromFeed, (row: any) => nestedItem(row.content_items)?.author_profile_id);
+      const visibleVideos = searchVideos ? filterByAuthor(videosRes.data ?? [], safety.hiddenFromFeed, (row: any) => nestedItem(row.content_items)?.author_profile_id) : [];
       const visibleReels = searchReels ? filterByAuthor(reelsRes.data ?? [], safety.hiddenFromFeed, (row: any) => nestedItem(row.content_items)?.author_profile_id) : [];
       const visibleLeaders = searchLeaders ? filterByAuthor(leadersRes.data ?? [], safety.hiddenFromFeed, (row: any) => row.profile_id) : [];
       return {
