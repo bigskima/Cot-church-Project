@@ -47,11 +47,13 @@ type Conversation = {
   other?: Person | null;
   lastMessage?: { body: string; sent_at: string; sender_profile_id?: string } | null;
   updated_at: string;
+  unreadCount?: number;
 };
 
 type InboxPayload = { people: Person[]; conversations: Conversation[] };
 type MessagesPayload = { conversation?: Conversation; messages: RichChatMessage[]; pinnedMessages?: RichChatMessage[] };
 type InboxItem =
+  | { kind: 'label'; id: string; label: string }
   | { kind: 'person'; id: string; person: Person }
   | { kind: 'conversation'; id: string; conversation: Conversation };
 
@@ -262,7 +264,16 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
     const connections = (inbox.data?.people ?? [])
       .filter((person) => !conversationPeople.has(person.id))
       .map((person) => ({ kind: 'person' as const, id: `p:${person.id}`, person }));
-    return [...conversations, ...connections];
+    const items: InboxItem[] = [];
+    if (conversations.length) {
+      items.push({ kind: 'label', id: 'label:recent', label: 'RECENT MESSAGES' });
+      items.push(...conversations);
+    }
+    if (connections.length) {
+      items.push({ kind: 'label', id: 'label:connections', label: 'PEOPLE YOU KNOW' });
+      items.push(...connections);
+    }
+    return items;
   }, [inbox.data, normalizedFilter]);
 
   const displayedMessages = useMemo(() => {
@@ -455,15 +466,19 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
                 <Text style={[styles.emptyCopy, { color: colors.textSecondary }]}> 
                   {normalizedFilter
                     ? 'Try another username or name.'
-                    : 'People you follow or who follow you will appear here. You can still search any COT account above.'}
+                    : 'People you have messaged will appear here automatically. You can also search any COT account above.'}
                 </Text>
               </View>
             )
         }
         renderItem={({ item }) => {
+          if (item.kind === 'label') {
+            return <Text style={[styles.inboxLabel, { color: colors.textMuted }]}>{item.label}</Text>;
+          }
           const person = item.kind === 'conversation' ? item.conversation.other : item.person;
           if (!person) return null;
           const lastMessage = item.kind === 'conversation' ? item.conversation.lastMessage?.body : null;
+          const unreadCount = item.kind === 'conversation' ? Number(item.conversation.unreadCount ?? 0) : 0;
           return (
             <Pressable
               onPress={() => item.kind === 'conversation'
@@ -473,9 +488,14 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
             >
               <Avatar url={person.avatar_url ?? undefined} name={person.display_name || person.username} size="md" />
               <View style={styles.personCopy}>
-                <Text style={[styles.personName, { color: colors.text }]} numberOfLines={1}>{person.display_name || `@${person.username}`}</Text>
-                <Text style={[styles.personMeta, { color: colors.textSecondary }]} numberOfLines={1}>{lastMessage || `@${person.username}`}</Text>
+                <Text style={[styles.personName, unreadCount > 0 && styles.personNameUnread, { color: colors.text }]} numberOfLines={1}>{person.display_name || `@${person.username}`}</Text>
+                <Text style={[styles.personMeta, unreadCount > 0 && styles.personMetaUnread, { color: unreadCount > 0 ? colors.text : colors.textSecondary }]} numberOfLines={1}>{lastMessage || `@${person.username}`}</Text>
               </View>
+              {unreadCount > 0 ? (
+                <View style={[styles.unreadBadge, { backgroundColor: colors.interactive }]}>
+                  <Text style={styles.unreadText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+                </View>
+              ) : null}
               <Icon name="chevron-forward" size={18} color={colors.textMuted} />
             </Pressable>
           );
@@ -496,10 +516,15 @@ const styles = StyleSheet.create({
   errorText: { flex: 1, fontSize: 13 },
   list: { paddingHorizontal: spacing.sm, paddingTop: spacing.sm },
   sectionTitle: { fontSize: 11, fontWeight: '800', letterSpacing: 0.8, marginBottom: spacing.sm },
+  inboxLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 1.05, paddingTop: spacing.md, paddingBottom: 7 },
   personRow: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth },
   personCopy: { flex: 1, minWidth: 0 },
   personName: { fontSize: 15, fontWeight: '800' },
+  personNameUnread: { fontWeight: '900' },
   personMeta: { fontSize: 12, marginTop: 3 },
+  personMetaUnread: { fontWeight: '800' },
+  unreadBadge: { minWidth: 24, height: 24, borderRadius: 12, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
+  unreadText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900', fontVariant: ['tabular-nums'] },
   empty: { paddingVertical: 48, alignItems: 'center', gap: 6 },
   emptyTitle: { fontSize: 18, fontWeight: '800' },
   emptyCopy: { fontSize: 13, textAlign: 'center', maxWidth: 320 },
