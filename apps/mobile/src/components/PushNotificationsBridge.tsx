@@ -3,13 +3,16 @@ import { router } from 'expo-router';
 import { Platform } from 'react-native';
 import { useSession } from '@/state/session';
 import { Notifications, clearLastPushResponse, safeNotificationRoute, syncPushDeviceIfGranted } from '@/services/push-notifications';
+import { useFeatureControls } from '@/features/availability/useFeatureControls';
 
 export function PushNotificationsBridge() {
   const { api, mode, accessReady, auth, context, selectContext } = useSession();
+  const features = useFeatureControls();
+  const pushAvailable = features.isEnabled('notifications') && features.isEnabled('push_notifications');
   const handling = React.useRef(new Set<string>());
 
   React.useEffect(() => {
-    if (Platform.OS === 'web' || mode !== 'authenticated' || !accessReady || !context?.organization?.id) return;
+    if (Platform.OS === 'web' || mode !== 'authenticated' || !accessReady || !context?.organization?.id || !pushAvailable) return;
     const refreshRegistration = () => {
       void api.request<{ push_enabled?: boolean }>('notification-settings', { feedback: false })
         .then((preferences) => preferences.push_enabled === false ? undefined : syncPushDeviceIfGranted(api))
@@ -18,7 +21,7 @@ export function PushNotificationsBridge() {
     refreshRegistration();
     const tokenSubscription = Notifications.addPushTokenListener(() => refreshRegistration());
     return () => tokenSubscription.remove();
-  }, [accessReady, api, context?.organization?.id, mode]);
+  }, [accessReady, api, context?.organization?.id, mode, pushAvailable]);
 
   const openResponse = React.useCallback(async (response: Notifications.NotificationResponse | null) => {
     if (!response?.notification || mode !== 'authenticated') return;
