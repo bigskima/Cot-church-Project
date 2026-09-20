@@ -133,10 +133,7 @@ export default function GeneralMinistryWorkspace() {
               }))}
             />
 
-            <View style={styles.scopeLine}>
-              <Icon name="shield-checkmark-outline" size={14} color={colors.textMuted} />
-              <Text style={[styles.scopeText, { color: colors.textMuted }]}>General COT ministry</Text>
-            </View>
+
           </>
         )}
       </ScrollView>
@@ -170,8 +167,6 @@ const styles = StyleSheet.create({
   filters: { gap: 7, paddingRight: spacing.md },
   filterPill: { minHeight: 34, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
   filterText: { fontSize: 10.5, fontWeight: '800' },
-  scopeLine: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 5, paddingTop: spacing.sm },
-  scopeText: { fontSize: 9.5, fontWeight: '800' },
   skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.lg },
   skeletonItem: { width: '25%', alignItems: 'center', gap: 6 },
 });
