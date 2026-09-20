@@ -120,9 +120,7 @@ export function AgoraCallSession({ grant, kind, scope, otherName, onJoined, onEr
     const portrait = height >= width;
     if (total <= 1) return { width: '100%' as const, minHeight: '100%' as const };
     if (total === 2) {
-      return portrait
-        ? { width: '100%' as const, minHeight: '50%' as const }
-        : { width: '50%' as const, minHeight: '100%' as const };
+      return { width: '50%' as const, minHeight: '100%' as const };
     }
     if (total <= 4) return { width: '50%' as const, minHeight: '50%' as const };
     if (total <= 6) return { width: '33.333%' as const, minHeight: '50%' as const };
