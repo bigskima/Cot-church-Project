@@ -20,6 +20,7 @@ import {
 } from '@/components';
 import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 import type { ChurchStory, LeadershipProfile } from '@church/types';
+import { LocationFinder, type VerifiedLocationResult } from '@/components/location/LocationFinder';
 
 type PublicLocation = {
   line1?: string | null;
@@ -81,7 +82,7 @@ export default function ChurchStoryScreen() {
   const { api, context } = useSession();
   const { colors } = useTheme();
   const access = useGeneralMinistryAccess();
-  const [activeTab, setActiveTab] = useState<'story' | 'leadership'>('story');
+  const [activeTab, setActiveTab] = useState<'story' | 'facts' | 'leadership'>('story');
   const [editing, setEditing] = useState(false);
   const [savingStory, setSavingStory] = useState(false);
   const [savingLocation, setSavingLocation] = useState(false);
@@ -112,6 +113,7 @@ export default function ChurchStoryScreen() {
   const [vision, setVision] = useState('');
   const [foundingStory, setFoundingStory] = useState('');
   const [foundingYear, setFoundingYear] = useState('');
+  const [quickFacts, setQuickFacts] = useState<string[]>(Array.from({ length: 7 }, () => ''));
   const [line1, setLine1] = useState('');
   const [line2, setLine2] = useState('');
   const [city, setCity] = useState('');
@@ -119,6 +121,9 @@ export default function ChurchStoryScreen() {
   const [country, setCountry] = useState('Nigeria');
   const [landmark, setLandmark] = useState('');
   const [mapUrl, setMapUrl] = useState('');
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [manualLocation, setManualLocation] = useState(false);
 
   useEffect(() => {
     setTitle(story?.title || 'Our Story');
@@ -127,6 +132,8 @@ export default function ChurchStoryScreen() {
     setVision(story?.vision || '');
     setFoundingStory(story?.founding_story || '');
     setFoundingYear(story?.founding_year ? String(story.founding_year) : '');
+    const savedFacts = Array.isArray(story?.quick_facts) ? story.quick_facts.slice(0, 7) : [];
+    setQuickFacts(Array.from({ length: 7 }, (_, index) => savedFacts[index] ?? ''));
   }, [story?.id, story?.updated_at]);
 
   useEffect(() => {
@@ -137,7 +144,10 @@ export default function ChurchStoryScreen() {
     setCountry(location?.country || 'Nigeria');
     setLandmark(location?.landmark || '');
     setMapUrl(location?.mapUrl || '');
-  }, [location?.line1, location?.line2, location?.city, location?.state, location?.country, location?.landmark, location?.mapUrl]);
+    setLatitude(typeof location?.latitude === 'number' ? location.latitude : null);
+    setLongitude(typeof location?.longitude === 'number' ? location.longitude : null);
+    setManualLocation(Boolean(location && (typeof location.latitude !== 'number' || typeof location.longitude !== 'number')));
+  }, [location?.line1, location?.line2, location?.city, location?.state, location?.country, location?.landmark, location?.mapUrl, location?.latitude, location?.longitude]);
 
   const hasStoryContent = Boolean(
     story && (story.mission || story.vision || story.founding_story || story.values?.length || story.history_milestones?.length)
@@ -160,6 +170,7 @@ export default function ChurchStoryScreen() {
           foundingStory: foundingStory.trim(),
           foundingYear: foundingYear.trim() || null,
           milestones: story?.history_milestones ?? [],
+          quickFacts: quickFacts.map((item) => item.trim()).filter(Boolean).slice(0, 7),
           values: story?.values ?? [],
           bannerImageUrl: story?.banner_image_url || undefined,
         }),
@@ -172,6 +183,29 @@ export default function ChurchStoryScreen() {
     } finally { setSavingStory(false); }
   };
 
+  const applyVerifiedLocation = (result: VerifiedLocationResult) => {
+    setLine1(result.line1 || result.label);
+    setLine2(result.line2 || '');
+    setCity(result.city || '');
+    setState(result.state || '');
+    setCountry(result.country || 'Nigeria');
+    setLatitude(result.latitude);
+    setLongitude(result.longitude);
+    setMapUrl(result.mapUrl);
+    setManualLocation(false);
+  };
+
+  const useManualLocation = () => {
+    setManualLocation(true);
+    setLatitude(null);
+    setLongitude(null);
+    setMapUrl('');
+  };
+
+  const updateQuickFact = (index: number, value: string) => {
+    setQuickFacts((current) => current.map((item, itemIndex) => itemIndex === index ? value : item));
+  };
+
   const saveLocation = async () => {
     setSavingLocation(true); setError(''); setFeedback('');
     try {
@@ -182,6 +216,7 @@ export default function ChurchStoryScreen() {
           location: {
             line1: line1.trim(), line2: line2.trim(), city: city.trim(), state: state.trim(),
             country: country.trim(), landmark: landmark.trim(), mapUrl: mapUrl.trim() || null,
+            latitude, longitude,
           },
         }),
       });
@@ -226,17 +261,43 @@ export default function ChurchStoryScreen() {
               <InputField label="Vision" value={vision} onChangeText={setVision} multiline numberOfLines={4} placeholder="Where COT is going…" />
               <InputField label="Founding story" value={foundingStory} onChangeText={setFoundingStory} multiline numberOfLines={8} placeholder="Tell the COT founding story…" />
               <InputField label="Founding year (optional)" value={foundingYear} onChangeText={setFoundingYear} keyboardType="number-pad" placeholder="2010" />
-              <Button label="Publish Our Story" onPress={() => void saveStory()} loading={savingStory} size="md" />
+              <View style={[styles.quickFactsEditor, { borderTopColor: colors.borderSubtle }]}>
+                <Text style={[styles.editorTitle, { color: colors.text }]}>Quick Facts</Text>
+                <Text style={[styles.editorHint, { color: colors.textSecondary }]}>Add up to seven concise public facts about General COT. COT AI can answer from these published facts.</Text>
+                {quickFacts.map((fact, index) => (
+                  <InputField key={index} label={`Quick fact ${index + 1}`} value={fact} onChangeText={(value) => updateQuickFact(index, value)} placeholder={`Fact ${index + 1}`} />
+                ))}
+              </View>
+              <Button label="Publish Our Story & Quick Facts" onPress={() => void saveStory()} loading={savingStory} size="md" />
             </View>
 
             <View style={[styles.editorCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
               <View style={styles.editorHeading}><View style={[styles.editorIcon, { backgroundColor: colors.primarySoft }]}><Icon name="location-outline" size={18} color={colors.interactive} /></View><View style={styles.flex}><Text style={[styles.editorTitle, { color: colors.text }]}>General COT location</Text><Text style={[styles.editorHint, { color: colors.textSecondary }]}>This is church-wide. Expression addresses are edited inside each Expression’s Settings.</Text></View></View>
-              <InputField label="Street / building" value={line1} onChangeText={setLine1} placeholder="Street name and building" />
-              <InputField label="Address line 2 (optional)" value={line2} onChangeText={setLine2} placeholder="Area, floor or suite" />
-              <View style={styles.twoCol}><View style={styles.flex}><InputField label="City" value={city} onChangeText={setCity} placeholder="Awka" /></View><View style={styles.flex}><InputField label="State" value={state} onChangeText={setState} placeholder="Anambra" /></View></View>
-              <InputField label="Country" value={country} onChangeText={setCountry} placeholder="Nigeria" />
+              <LocationFinder
+                initialLabel={addressLines.join(', ')}
+                onSelect={applyVerifiedLocation}
+                onManualFallback={useManualLocation}
+              />
+              {!manualLocation && latitude !== null && longitude !== null ? (
+                <View style={[styles.verifiedLocation, { backgroundColor: colors.successSoft, borderColor: colors.success }]}>
+                  <Icon name="checkmark-circle-outline" size={18} color={colors.success} />
+                  <View style={styles.flex}>
+                    <Text style={[styles.verifiedTitle, { color: colors.text }]}>Verified map location</Text>
+                    <Text style={[styles.editorHint, { color: colors.textSecondary }]}>{[line1, line2, city, state, country].filter(Boolean).join(', ')}</Text>
+                  </View>
+                </View>
+              ) : null}
+              {manualLocation ? (
+                <View style={[styles.manualLocation, { borderColor: colors.borderSubtle }]}>
+                  <Text style={[styles.editorTitle, { color: colors.text }]}>Manual location fallback</Text>
+                  <Text style={[styles.editorHint, { color: colors.textSecondary }]}>Use this only when the address cannot be found by the location finder. Manual entries are saved without verified coordinates.</Text>
+                  <InputField label="Street / building" value={line1} onChangeText={setLine1} placeholder="Street name and building" />
+                  <InputField label="Address line 2 (optional)" value={line2} onChangeText={setLine2} placeholder="Area, floor or suite" />
+                  <View style={styles.twoCol}><View style={styles.flex}><InputField label="City" value={city} onChangeText={setCity} placeholder="Awka" /></View><View style={styles.flex}><InputField label="State" value={state} onChangeText={setState} placeholder="Anambra" /></View></View>
+                  <InputField label="Country" value={country} onChangeText={setCountry} placeholder="Nigeria" />
+                </View>
+              ) : null}
               <InputField label="Landmark (optional)" value={landmark} onChangeText={setLandmark} placeholder="Near…" />
-              <InputField label="Map link (optional)" value={mapUrl} onChangeText={setMapUrl} autoCapitalize="none" autoCorrect={false} placeholder="https://…" />
               <Button label="Publish General Location" onPress={() => void saveLocation()} loading={savingLocation} size="md" />
             </View>
           </View>
@@ -244,6 +305,7 @@ export default function ChurchStoryScreen() {
 
         <View style={[styles.tabContainer, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
           <Chip label="History & Vision" selected={activeTab === 'story'} onPress={() => setActiveTab('story')} />
+          <Chip label="Quick Facts" selected={activeTab === 'facts'} onPress={() => setActiveTab('facts')} count={(story?.quick_facts ?? []).length} />
           <Chip label="Our Leaders" selected={activeTab === 'leadership'} onPress={() => setActiveTab('leadership')} count={leaders.length} />
         </View>
 
@@ -285,6 +347,19 @@ export default function ChurchStoryScreen() {
                 <EmptyState title="Story Not Published Yet" message="Authorized General COT leadership can create and publish mission, vision, heritage and location here." iconName="library-outline" />
               ) : null}
             </View>
+          ) : activeTab === 'facts' ? (
+            (story?.quick_facts ?? []).length ? (
+              <View style={styles.factsList}>
+                {(story?.quick_facts ?? []).map((fact, index) => (
+                  <View key={`${index}:${fact}`} style={[styles.factCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+                    <View style={[styles.factNumber, { backgroundColor: colors.primarySoft }]}><Text style={[styles.factNumberText, { color: colors.interactive }]}>{index + 1}</Text></View>
+                    <Text style={[styles.factText, { color: colors.text }]}>{fact}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <EmptyState title="Quick Facts not published yet" message="Authorized General COT leadership can publish up to seven concise public facts here." iconName="flash-outline" />
+            )
           ) : leaders.length > 0 ? (
             <View style={styles.leadersList}>{leaders.map((leader) => <LeaderCard key={leader.id} leader={leader} variant="standard" />)}</View>
           ) : (
@@ -315,4 +390,13 @@ const styles = StyleSheet.create({
   locationIcon: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, locationKicker: { ...typography.kicker }, locationText: { fontSize: 13.5, lineHeight: 19, fontWeight: '800', marginTop: 3 }, locationHint: { fontSize: 11, lineHeight: 16, marginTop: 3 }, locationCopy: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   valuesList: { gap: spacing.sm, marginTop: spacing.xs }, valueBlock: { padding: spacing.md, borderRadius: radius.lg, gap: 2 }, valueTitle: { fontSize: 14, fontWeight: '700' }, valueDesc: { fontSize: 12, lineHeight: 16 },
   leadersList: { gap: spacing.xs },
+  quickFactsEditor: { gap: spacing.sm, paddingTop: spacing.md, borderTopWidth: StyleSheet.hairlineWidth },
+  verifiedLocation: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  verifiedTitle: { fontSize: 12, lineHeight: 16, fontWeight: '900' },
+  manualLocation: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm },
+  factsList: { gap: spacing.sm },
+  factCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  factNumber: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  factNumberText: { fontSize: 12, fontWeight: '900' },
+  factText: { flex: 1, fontSize: 14, lineHeight: 21, fontWeight: '650' as any },
 });

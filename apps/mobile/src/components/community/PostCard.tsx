@@ -356,8 +356,9 @@ export function PostCard({
         {media.length ? (
           <View style={styles.mediaList}>
             <ScrollView
-              horizontal={media.length > 1}
+              horizontal
               scrollEnabled={media.length > 1}
+              style={styles.mediaScroller}
               showsHorizontalScrollIndicator={false}
               snapToInterval={media.length > 1 ? mediaCardWidth + 8 : undefined}
               decelerationRate={media.length > 1 ? 'fast' : 'normal'}
@@ -460,7 +461,10 @@ export function PostCard({
                         accessibilityLabel="Open attached file"
                       >
                         <View style={[styles.fileIcon, { backgroundColor: colors.primarySoft }]}><Icon name="document-text-outline" size={22} color={colors.interactive} /></View>
-                        <View style={styles.fileCopy}><Text numberOfLines={1} style={[styles.fileTitle, { color: colors.text }]}>File</Text></View>
+                        <View style={styles.fileCopy}>
+                          <Text numberOfLines={1} style={[styles.fileTitle, { color: colors.text }]}>{(item as any).fileName?.trim() || 'Attachment'}</Text>
+                          <Text numberOfLines={1} style={[styles.fileMeta, { color: colors.textMuted }]}>{mediaMime(item) || 'File'}</Text>
+                        </View>
                         <Icon name="expand-outline" size={18} color={colors.interactive} />
                       </Pressable>
                     </View>
@@ -551,6 +555,7 @@ const styles = StyleSheet.create({
   showMoreButton: { alignSelf: 'flex-start', minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 4, paddingRight: 6 },
   showMoreText: { fontSize: 11.5, lineHeight: 16, fontWeight: '900' },
   mediaList: { marginTop: spacing.md, marginHorizontal: -4, gap: 5 },
+  mediaScroller: { flexGrow: 0, flexShrink: 0 },
   mediaRail: { gap: 8, paddingRight: spacing.md },
   singleMediaRail: { width: '100%' },
   singleMediaItem: { width: '100%' },
@@ -566,6 +571,7 @@ const styles = StyleSheet.create({
   fileIcon: { width: 42, height: 42, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
   fileCopy: { flex: 1, minWidth: 0 },
   fileTitle: { fontSize: 13, fontWeight: '800' },
+  fileMeta: { fontSize: 9.5, lineHeight: 13, marginTop: 2 },
   reelReference: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md },
   reelReferenceIcon: { width: 44, height: 44, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
   reelReferenceCopy: { flex: 1, minWidth: 0 },

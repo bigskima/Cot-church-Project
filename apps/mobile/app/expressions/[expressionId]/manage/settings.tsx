@@ -9,6 +9,7 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { toUserFacingErrorMessage } from '@/api';
 import { ExpressionManagementGate } from '@/features/expression-management/ExpressionManagementGate';
+import { LocationFinder, type VerifiedLocationResult } from '@/components/location/LocationFinder';
 import { useExpressionManagementAccess } from '@/features/expression-management/useExpressionManagementAccess';
 
 type ExpressionLocation = {
@@ -19,6 +20,8 @@ type ExpressionLocation = {
   country?: string | null;
   landmark?: string | null;
   mapUrl?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 type ExpressionRecord = {
@@ -45,6 +48,8 @@ function normalizeAddress(address?: ExpressionLocation | null) {
     country: String(address?.country || '').trim(),
     landmark: String(address?.landmark || '').trim(),
     mapUrl: String(address?.mapUrl || '').trim(),
+    latitude: typeof address?.latitude === 'number' ? address.latitude : null,
+    longitude: typeof address?.longitude === 'number' ? address.longitude : null,
   };
 }
 
@@ -72,6 +77,9 @@ export default function ExpressionSettingsScreen() {
   const [country, setCountry] = useState('Nigeria');
   const [landmark, setLandmark] = useState('');
   const [mapUrl, setMapUrl] = useState('');
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [manualLocation, setManualLocation] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<'avatar' | 'banner' | null>(null);
   const [feedback, setFeedback] = useState('');
@@ -90,15 +98,37 @@ export default function ExpressionSettingsScreen() {
     setCountry(address.country || 'Nigeria');
     setLandmark(address.landmark);
     setMapUrl(address.mapUrl);
+    setLatitude(address.latitude);
+    setLongitude(address.longitude);
+    setManualLocation(Boolean(current.address && (address.latitude === null || address.longitude === null)));
   }, [current?.id, current?.name, current?.code, current?.timezone, current?.address]);
 
-  const addressDraft = useMemo(() => normalizeAddress({ line1, line2, city, state, country, landmark, mapUrl }), [line1, line2, city, state, country, landmark, mapUrl]);
+  const addressDraft = useMemo(() => normalizeAddress({ line1, line2, city, state, country, landmark, mapUrl, latitude, longitude }), [line1, line2, city, state, country, landmark, mapUrl, latitude, longitude]);
   const dirty = Boolean(current && (
     name.trim() !== current.name ||
     code.trim().toUpperCase() !== current.code ||
     timezone.trim() !== (current.timezone ?? '') ||
     JSON.stringify(addressDraft) !== JSON.stringify(normalizeAddress(current.address))
   ));
+
+  const applyVerifiedLocation = (result: VerifiedLocationResult) => {
+    setLine1(result.line1 || result.label);
+    setLine2(result.line2 || '');
+    setCity(result.city || '');
+    setState(result.state || '');
+    setCountry(result.country || 'Nigeria');
+    setLatitude(result.latitude);
+    setLongitude(result.longitude);
+    setMapUrl(result.mapUrl);
+    setManualLocation(false);
+  };
+
+  const useManualLocation = () => {
+    setManualLocation(true);
+    setLatitude(null);
+    setLongitude(null);
+    setMapUrl('');
+  };
 
   const uploadMedia = async (kind: 'avatar' | 'banner') => {
     if (!id || uploading) return;
@@ -248,12 +278,32 @@ export default function ExpressionSettingsScreen() {
                   <View style={[styles.sectionIcon, { backgroundColor: colors.primarySoft }]}><Icon name="location-outline" size={19} color={colors.interactive} /></View>
                   <View style={styles.sectionCopy}><Text style={[styles.sectionTitle, { color: colors.text }]}>Public location</Text><Text style={[styles.sectionText, { color: colors.textSecondary }]}>Published only for this Expression and available to members, discovery surfaces and COT AI.</Text></View>
                 </View>
-                <InputField label="Street / building" value={line1} onChangeText={setLine1} placeholder="Street name and building" />
-                <InputField label="Address line 2 (optional)" value={line2} onChangeText={setLine2} placeholder="Area, floor or suite" />
-                <View style={styles.twoCol}><View style={styles.flex}><InputField label="City" value={city} onChangeText={setCity} placeholder="Awka" /></View><View style={styles.flex}><InputField label="State" value={state} onChangeText={setState} placeholder="Anambra" /></View></View>
-                <InputField label="Country" value={country} onChangeText={setCountry} placeholder="Nigeria" />
+                <LocationFinder
+                  expressionId={id}
+                  initialLabel={[line1, line2, city, state, country].filter(Boolean).join(', ')}
+                  onSelect={applyVerifiedLocation}
+                  onManualFallback={useManualLocation}
+                />
+                {!manualLocation && latitude !== null && longitude !== null ? (
+                  <View style={[styles.verifiedLocation, { backgroundColor: colors.successSoft, borderColor: colors.success }]}>
+                    <Icon name="checkmark-circle-outline" size={18} color={colors.success} />
+                    <View style={styles.flex}>
+                      <Text style={[styles.verifiedTitle, { color: colors.text }]}>Verified map location</Text>
+                      <Text style={[styles.sectionText, { color: colors.textSecondary }]}>{[line1, line2, city, state, country].filter(Boolean).join(', ')}</Text>
+                    </View>
+                  </View>
+                ) : null}
+                {manualLocation ? (
+                  <View style={[styles.manualLocation, { borderColor: colors.borderSubtle }]}>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Manual location fallback</Text>
+                    <Text style={[styles.sectionText, { color: colors.textSecondary }]}>Use this only when the Expression address cannot be found by the map-backed finder. Manual entries are saved without verified coordinates.</Text>
+                    <InputField label="Street / building" value={line1} onChangeText={setLine1} placeholder="Street name and building" />
+                    <InputField label="Address line 2 (optional)" value={line2} onChangeText={setLine2} placeholder="Area, floor or suite" />
+                    <View style={styles.twoCol}><View style={styles.flex}><InputField label="City" value={city} onChangeText={setCity} placeholder="Awka" /></View><View style={styles.flex}><InputField label="State" value={state} onChangeText={setState} placeholder="Anambra" /></View></View>
+                    <InputField label="Country" value={country} onChangeText={setCountry} placeholder="Nigeria" />
+                  </View>
+                ) : null}
                 <InputField label="Landmark (optional)" value={landmark} onChangeText={setLandmark} placeholder="Near…" />
-                <InputField label="Map link (optional)" value={mapUrl} onChangeText={setMapUrl} autoCapitalize="none" autoCorrect={false} placeholder="https://…" helperText="Do not guess a map link. Save only the verified location for this Expression." />
               </View>
 
               <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
@@ -304,6 +354,9 @@ const styles = StyleSheet.create({
   avatarImage: { width: '100%', height: '100%', borderRadius: 18 },
   avatarEdit: { position: 'absolute', right: -5, bottom: -5, width: 26, height: 26, borderRadius: 13, backgroundColor: '#111827', alignItems: 'center', justifyContent: 'center' },
   previewCopy: { flex: 1, marginLeft: spacing.md, minWidth: 0 }, previewName: { fontSize: 17, fontWeight: '900' }, previewCode: { fontSize: 11, marginTop: 2 }, mediaFootnote: { fontSize: 10, lineHeight: 15 },
+  verifiedLocation: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  verifiedTitle: { fontSize: 12, lineHeight: 16, fontWeight: '900' },
+  manualLocation: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm },
   saveCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.md }, saveCopy: { flex: 1, minWidth: 0 }, saveTitle: { fontSize: 13, lineHeight: 17, fontWeight: '900' }, saveText: { fontSize: 10, lineHeight: 15, marginTop: 2 },
   boundary: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, boundaryText: { flex: 1, fontSize: 11, lineHeight: 17 },
 });

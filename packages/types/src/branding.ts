@@ -27,6 +27,7 @@ export interface ChurchStory {
     title: string;
     description: string;
   }>;
+  quick_facts: string[];
   values: Array<{
     title: string;
     description: string;

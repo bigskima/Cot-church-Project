@@ -244,6 +244,20 @@ async function activeCall(admin: any, input: ScopeInput) {
   return data ?? null;
 }
 
+async function callHistory(admin: any, input: ScopeInput) {
+  let query = admin.from("chat_call_sessions")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(50);
+  query = applyScopeQuery(query, input);
+  const { data, error } = await query;
+  if (error) throw new ApiError("CALL_HISTORY_FAILED", "Unable to load call history.", 500, undefined, false);
+  return Promise.all((data ?? []).map(async (call: any) => ({
+    call,
+    participants: await participants(admin, call.id),
+  })));
+}
+
 async function requireCall(admin: any, viewerId: string, callId: string) {
   const { data: call, error } = await admin.from("chat_call_sessions").select("*").eq("id", callId).maybeSingle();
   if (error || !call) throw new ApiError("CALL_NOT_FOUND", "This call is unavailable.", 404);
@@ -324,6 +338,9 @@ export const chatCallsHandler = createHandler(
         sectionId: url.searchParams.get("sectionId"),
       });
       await authorizeScope(admin, viewerId, input);
+      if (url.searchParams.get("history") === "true") {
+        return { data: { history: await callHistory(admin, input) } };
+      }
       const call = await activeCall(admin, input);
       return { data: call ? { call, participants: await participants(admin, call.id) } : null };
     }
@@ -477,11 +494,24 @@ export const chatCallsHandler = createHandler(
     if (action === "end") {
       if (call.created_by_profile_id !== viewerId) throw new ApiError("CALL_END_DENIED", "Only the person who started this call can end it for everyone.", 403);
       const now = new Date().toISOString();
-      await Promise.all([
-        admin.from("chat_call_sessions").update({ status: "ended", ended_at: now }).eq("id", call.id),
-        admin.from("chat_call_participants").update({ state: "left", left_at: now }).eq("call_id", call.id).eq("state", "joined"),
+      const [sessionResult, joinedResult, invitedResult] = await Promise.all([
+        admin.from("chat_call_sessions")
+          .update({ status: "ended", ended_at: now })
+          .eq("id", call.id)
+          .in("status", ["ringing", "active"]),
+        admin.from("chat_call_participants")
+          .update({ state: "left", left_at: now })
+          .eq("call_id", call.id)
+          .eq("state", "joined"),
+        admin.from("chat_call_participants")
+          .update({ state: "missed", left_at: now })
+          .eq("call_id", call.id)
+          .eq("state", "invited"),
       ]);
-      return { data: { ok: true } };
+      if (sessionResult.error || joinedResult.error || invitedResult.error) {
+        throw new ApiError("CALL_END_FAILED", "The call could not be ended for everyone. Please try again.", 500, undefined, false);
+      }
+      return { data: { ok: true, endedAt: now } };
     }
 
     throw new ApiError("VALIDATION_FAILED", "Unknown call action.", 422);
