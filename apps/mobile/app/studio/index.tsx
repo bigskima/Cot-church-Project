@@ -193,12 +193,7 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
           { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 120 },
         ]}
       >
-        <ScreenHeader
-          title="Create"
-          kicker="GENERAL COT"
-          subtitle="Publish to the church-wide public community."
-          showBack
-        />
+        <ScreenHeader title="Create" showBack compact />
 
         <View style={styles.body}>
           {signedIn ? (
