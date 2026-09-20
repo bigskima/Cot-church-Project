@@ -31,7 +31,7 @@ export function CompactRouteGrid({ items, minColumns = 4, maxColumns = 8, compac
   const itemWidth = `${100 / columns}%` as const;
 
   return (
-    <View style={styles.grid}>
+    <View style={[styles.grid, compact && styles.compactGrid]}>
       {items.map((item) => (
         <Pressable
           key={item.key}
@@ -87,6 +87,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     rowGap: spacing.md,
   },
+  compactGrid: { rowGap: spacing.sm },
   item: {
     minHeight: 74,
     alignItems: 'center',
@@ -95,8 +96,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   compactItem: {
-    minHeight: 66,
-    gap: 5,
+    minHeight: 60,
+    gap: 4,
   },
   icon: {
     width: 46,
