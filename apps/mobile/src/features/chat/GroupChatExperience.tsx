@@ -12,6 +12,7 @@ import { PLATFORM_KEYBOARD_BEHAVIOR, PLATFORM_KEYBOARD_DISMISS_MODE, PLATFORM_KE
 import { RichChatComposer } from './RichChatComposer';
 import { RichMessageBubble } from './RichMessageBubble';
 import type { ChatReaction, ChatReply, ChatSendPayload, RichChatMessage } from './rich-chat-types';
+import { ChatCallActions } from '@/features/calls/ChatCallActions';
 
 type GroupChatPayload = {
   group: { id: string; name: string; branch_id?: string | null };
@@ -155,6 +156,7 @@ export function GroupChatExperience({ groupId, sectionId, scope = 'expression' }
           ) : undefined}
         />
       </View>
+      <View style={styles.callRow}><ChatCallActions scope='group' groupId={groupId} sectionId={sectionId} /></View>
       {pinned.length ? <Pressable onPress={() => jumpToMessage(pinned[0].id)} style={[styles.pinned, { backgroundColor: colors.primarySoft }]}><Icon name='pin' size={14} color={colors.interactive} /><Text style={[styles.pinnedText, { color: colors.textSecondary }]} numberOfLines={1}>{pinned[0].body || 'Pinned media message'}</Text></Pressable> : null}
       <FlatList
         ref={listRef}
@@ -177,6 +179,7 @@ export function GroupChatExperience({ groupId, sectionId, scope = 'expression' }
 const styles = StyleSheet.create({
   screen: { flex: 1 }, center: { flex: 1, alignItems: 'center', justifyContent: 'center' }, state: { flex: 1, padding: spacing.lg },
   groupHome: { width: 36, height: 36, borderWidth: 1, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  callRow: { paddingHorizontal: spacing.md, paddingVertical: 4, alignItems: 'flex-end' },
   pinned: { marginHorizontal: spacing.md, borderRadius: radius.md, padding: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }, pinnedText: { flex: 1, fontSize: 11, fontWeight: '700' },
   messages: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, gap: spacing.xs, flexGrow: 1, justifyContent: 'flex-end' }, empty: { paddingVertical: 60, alignItems: 'center', gap: 6 }, emptyTitle: { fontSize: 17, fontWeight: '800' }, error: { paddingHorizontal: spacing.md, paddingVertical: 5, fontSize: 11 },
 });
