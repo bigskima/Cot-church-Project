@@ -206,7 +206,6 @@ export default function PublicMemberProfileScreen() {
                     authorAvatar={profile.avatar_url ?? null}
                     canEngage={mode === 'authenticated'}
                     onPress={() => router.push(`/general/post/${post.id}` as any)}
-                    onPressAuthor={() => undefined}
                     allowExternalShare
                     variant="feed"
                     showContext={false}
