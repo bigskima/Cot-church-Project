@@ -303,6 +303,7 @@ Deno.serve(createHandler(
         visibleRows,
         auth.user.id,
         safety.hiddenFromFeed,
+        { organizationId: auth.organizationId, branchId: group.branch_id },
       );
 
       const membershipIds = [...new Set((memberRows ?? []).map((item: any) => item.membership_id))];
@@ -571,6 +572,8 @@ Deno.serve(createHandler(
           "group_message_reactions",
           [created],
           auth.user.id,
+          new Set<string>(),
+          { organizationId: auth.organizationId, branchId: group.branch_id },
         ))[0],
         status: 201,
       };
