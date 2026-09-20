@@ -99,7 +99,7 @@ export function VideoPlayer({
 
   return (
     <View style={[styles.container, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md, style]}>
-      {/* 16:9 Video Canvas Frame */}
+      {/* Source-aware video canvas frame */}
       <View style={[styles.videoFrame, { backgroundColor: '#000000', aspectRatio: Number.isFinite(aspectRatio) && aspectRatio > 0 ? aspectRatio : 16 / 9 }]}>
         {sourceUrl && player ? (
           <VideoView
