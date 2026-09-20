@@ -5,16 +5,12 @@ import { CommunityExperience } from '@/features/community/CommunityExperience';
 import { TourAnchor } from '@/features/tour/AppTourProvider';
 import { Icon } from '@/components';
 import { radius, spacing } from '@/design-system/tokens';
-import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 
 export default function ExpressionFeedScreen() {
   const { expressionId } = useLocalSearchParams<{ expressionId: string }>();
   const id = typeof expressionId === 'string' ? expressionId : '';
-  const { context } = useSession();
   const { colors } = useTheme();
-  const expression = context?.expressions?.find((item) => item.id === id)
-    ?? (context?.expression?.id === id ? context.expression : undefined);
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
