@@ -151,7 +151,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $notice_signal$
 declare
   target_org uuid;
 begin
@@ -171,7 +171,7 @@ begin
   end if;
   return new;
 end;
-$;
+$notice_signal$;
 
 drop trigger if exists general_home_notices_realtime_signal on public.general_home_notices;
 create trigger general_home_notices_realtime_signal
