@@ -13,7 +13,10 @@ type Props = {
 };
 
 function validRatio(value?: number | null) {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return null;
+  // Keep feed/chat previews usable for unusually tall screenshots or malformed
+  // legacy metadata. The full preview still opens the original media.
+  return Math.min(2.5, Math.max(9 / 16, value));
 }
 
 /**
