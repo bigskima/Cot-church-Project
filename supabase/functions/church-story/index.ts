@@ -119,6 +119,61 @@ function normalizeLocation(value: unknown) {
   };
 }
 
+function quickFacts(value: unknown) {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) throw new ApiError("VALIDATION_FAILED", "Quick Facts must be a list", 422);
+  if (value.length > 7) throw new ApiError("VALIDATION_FAILED", "Quick Facts can contain up to seven items", 422);
+  return value.map((item, index) => requiredString(item, `quickFacts[${index}]`, 300).trim()).filter(Boolean);
+}
+
+function locationResult(row: any) {
+  const address = row?.address && typeof row.address === "object" ? row.address : {};
+  const latitude = Number(row?.lat);
+  const longitude = Number(row?.lon);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  const road = String(address.road || address.pedestrian || address.footway || address.residential || "").trim();
+  const houseNumber = String(address.house_number || "").trim();
+  const line1 = [houseNumber, road].filter(Boolean).join(" ").trim();
+  const line2 = String(address.neighbourhood || address.suburb || address.quarter || address.city_district || "").trim();
+  const city = String(address.city || address.town || address.village || address.municipality || address.county || "").trim();
+  const state = String(address.state || address.region || "").trim();
+  const country = String(address.country || "").trim();
+  return {
+    id: String(row.place_id || `${latitude},${longitude}`),
+    label: String(row.display_name || [line1, line2, city, state, country].filter(Boolean).join(", ")).trim(),
+    line1: line1 || String(row.name || "").trim(),
+    line2,
+    city,
+    state,
+    country,
+    latitude,
+    longitude,
+    mapUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${latitude},${longitude}`)}`,
+    provider: "OpenStreetMap",
+    verified: true,
+  };
+}
+
+async function searchLocations(query: string) {
+  const params = new URLSearchParams({
+    q: query,
+    format: "jsonv2",
+    addressdetails: "1",
+    limit: "6",
+  });
+  const response = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
+    headers: {
+      "Accept": "application/json",
+      "Accept-Language": "en",
+      "User-Agent": "COT-Digital-App/1.0 location-finder",
+    },
+  });
+  if (!response.ok) throw new ApiError("LOCATION_SEARCH_FAILED", "Location search is temporarily unavailable. You can try again or use manual entry.", 503, undefined, false);
+  const rows = await response.json();
+  if (!Array.isArray(rows)) return [];
+  return rows.map(locationResult).filter(Boolean);
+}
+
 function safePublicLocation(settings: unknown) {
   if (!settings || typeof settings !== "object" || Array.isArray(settings)) return null;
   const value = (settings as Record<string, unknown>).public_location;
@@ -136,6 +191,16 @@ Deno.serve(
       if (request.method === "GET") {
         const view = url.searchParams.get("view") ?? "all";
         const expressionId = uuid(url.searchParams.get("expressionId"), "expressionId");
+
+        if (view === "location-search") {
+          if (!auth?.user || !auth.organizationId) throw new ApiError("AUTHENTICATION_REQUIRED", "Sign in with church context to search locations", 401);
+          if (expressionId) await authorizeLeadershipScope(auth, expressionId);
+          else await authorizeOrganization(auth, "organization.leadership.manage");
+          const query = (url.searchParams.get("q") ?? "").trim();
+          if (query.length < 3) return { data: [] };
+          if (query.length > 240) throw new ApiError("VALIDATION_FAILED", "Location search is too long", 422);
+          return { data: await searchLocations(query) };
+        }
 
         if (view === "leader-candidates") {
           if (!auth?.user || !auth.organizationId) throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication and organization context required", 401);
@@ -235,7 +300,7 @@ Deno.serve(
         if (view === "all" || view === "story") {
           let query = publicClient()
             .from("church_story")
-            .select("id,organization_id,title,subtitle,mission,vision,founding_story,founding_year,history_milestones,values,banner_image_url,is_published,created_at,updated_at")
+            .select("id,organization_id,title,subtitle,mission,vision,founding_story,founding_year,history_milestones,quick_facts,values,banner_image_url,is_published,created_at,updated_at")
             .eq("is_published", true);
           if (organizationId) query = query.eq("organization_id", organizationId);
           const { data, error } = await query.limit(1).maybeSingle();
@@ -408,7 +473,7 @@ Deno.serve(
       if (request.method === "POST") {
         if (body.type === "story") {
           await authorizeOrganization(auth, "organization.leadership.manage");
-          assertNoUnknownFields(body, ["type", "title", "subtitle", "mission", "vision", "foundingStory", "foundingYear", "milestones", "values", "bannerImageUrl"]);
+          assertNoUnknownFields(body, ["type", "title", "subtitle", "mission", "vision", "foundingStory", "foundingYear", "milestones", "quickFacts", "values", "bannerImageUrl"]);
           const record = {
             organization_id: auth.organizationId,
             title: requiredString(body.title, "title", 200),
@@ -418,6 +483,7 @@ Deno.serve(
             founding_story: optionalString(body.foundingStory, "foundingStory", 20000) ?? "",
             founding_year: body.foundingYear != null && body.foundingYear !== "" ? Number(body.foundingYear) : null,
             history_milestones: Array.isArray(body.milestones) ? body.milestones : [],
+            quick_facts: quickFacts(body.quickFacts),
             values: Array.isArray(body.values) ? body.values : [],
             banner_image_url: optionalString(body.bannerImageUrl, "bannerImageUrl", 2000),
             updated_by: auth.user.id,
