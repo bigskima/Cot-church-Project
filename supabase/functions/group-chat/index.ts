@@ -14,6 +14,7 @@ import { jsonBody } from "../_shared/request.ts";
 import { createNotifications, mentionUsernames, notificationPreview, profileIdsForUsernames, senderIdentity } from "../_shared/notifications.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { filterByAuthor, loadSafetyProfileSets } from "../_shared/safety.ts";
+import { assertFeatureEnabled } from "../_shared/feature-controls.ts";
 import { assertNoUnknownFields, assertObject, requiredString, uuid } from "../_shared/validation.ts";
 
 const MESSAGE_SELECT = "id,group_id,section_id,sender_profile_id,body,reply_to_id,attachment_ids,pinned_at,pinned_by_profile_id,sent_at,edited_at,redacted_at";
@@ -428,6 +429,20 @@ Deno.serve(createHandler(
     }
 
     const action = requiredString(body.action, "action", 40);
+    const featureScope = {
+      organizationId: auth.organizationId,
+      expressionId: group.branch_id ?? null,
+      groupId,
+    };
+    if (["create_upload", "complete_upload", "delete_upload", "send", "react", "pin"].includes(action)) {
+      await assertFeatureEnabled(admin, "group_chat", featureScope, "Group chat is currently unavailable in this Group.");
+    }
+    if (action === "create_upload") {
+      await assertFeatureEnabled(admin, "chat_media", featureScope, "Chat photos and files are currently unavailable in this Group.");
+      if (String(body.mimeType ?? "").toLowerCase().startsWith("audio/")) {
+        await assertFeatureEnabled(admin, "voice_notes", featureScope, "Voice notes are currently unavailable in this Group.");
+      }
+    }
 
     if (action === "create_upload") {
       assertNoUnknownFields(body, ["action", "groupId", "sectionId", "mimeType", "fileName", "sizeBytes", "durationSeconds", "width", "height"]);
