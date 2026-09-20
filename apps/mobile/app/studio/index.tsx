@@ -128,7 +128,7 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
     },
     {
       title: 'Feed Ranking',
-      description: 'Tune explainable Home ranking weights without redeploying the app.',
+      description: 'Adjust how General COT Home prioritizes and presents content.',
       iconName: 'analytics-outline',
       badge: 'HOME',
       route: routeFor('/general/leadership/feed-ranking', '/general/leadership/feed-ranking'),
@@ -175,11 +175,11 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
       enabled: canCreateExpression,
     },
     {
-      title: 'Church Leadership',
-      description: 'Manage church-wide leaders and public leadership presentation.',
+      title: 'Church Profile',
+      description: 'Manage Our Story, Quick Facts, church location and Our Leaders.',
       iconName: 'business-outline',
       badge: 'CHURCH',
-      route: routeFor('/general/leadership/church-leadership', '/(tabs)/profile/leadership/church-leadership'),
+      route: '/general/church-story?manage=1',
       enabled: hasOrganizationCapability('organization.leadership.manage'),
     },
   ].filter((module) => module.enabled);
