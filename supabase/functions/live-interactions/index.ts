@@ -4,6 +4,7 @@ import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { assertNoUnknownFields, assertObject, requiredString, uuid } from "../_shared/validation.ts";
+import { assertFeatureEnabled } from "../_shared/feature-controls.ts";
 
 const reactionTypes = new Set(["heart", "prayer", "fire", "amen"]);
 const followUpTypes = new Set(["prayer_request", "altar_response", "counselling", "membership_interest"]);
@@ -109,6 +110,20 @@ Deno.serve(createHandler(
 
     const streamId = uuid(requiredString(body.streamId, "streamId", 36), "streamId", true)!;
     const action = requiredString(body.action, "action", 20);
+    const admin = adminClient();
+    const { data: stream, error: streamError } = await admin
+      .from("live_streams")
+      .select("id,organization_id,branch_id,group_id")
+      .eq("id", streamId)
+      .maybeSingle();
+    if (streamError || !stream) throw new ApiError("STREAM_NOT_FOUND", "This broadcast is unavailable.", 404);
+    const featureScope = { organizationId: stream.organization_id, expressionId: stream.branch_id, groupId: stream.group_id };
+    if (action === "react" || action === "chat") {
+      await assertFeatureEnabled(admin, "livestream_realtime_chat", featureScope, "Live chat and reactions are currently unavailable.");
+    }
+    if (action === "follow_up") {
+      await assertFeatureEnabled(admin, "pastoral_care", featureScope, "Pastoral follow-up is currently unavailable in this area.");
+    }
 
     let value: string;
     if (action === "react") {
