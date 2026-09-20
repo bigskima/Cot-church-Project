@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { BottomSheet, Icon } from '@/components';
-import { radius, shadows, spacing } from '@/design-system/tokens';
+import { BottomSheet } from '@/components/BottomSheet';
+import { CompactRouteGrid } from '@/components/navigation/CompactRouteGrid';
+import { Icon } from '@/components/primitives/Icon';
+import { radius, spacing } from '@/design-system/tokens';
 import { useTheme } from '@/state/theme';
 import { useExpressionManagementAccess } from '@/features/expression-management/useExpressionManagementAccess';
 
@@ -43,12 +45,12 @@ const tabs: Array<{ key: ExpressionManagementSection; label: string; description
   { key: 'events', label: 'Events', description: 'Plan Expression events', icon: 'calendar-outline' },
   { key: 'announcements', label: 'Updates', description: 'Publish announcements and notices', icon: 'megaphone-outline' },
   { key: 'testimonies', label: 'Testimony', description: 'Review testimony submissions', icon: 'document-text-outline' },
-  { key: 'prayer', label: 'Prayer inbox', description: 'Review prayer requests', icon: 'heart-outline' },
+  { key: 'prayer', label: 'Prayer', description: 'Review prayer requests', icon: 'heart-outline' },
   { key: 'leadership', label: 'Leaders', description: 'Manage Expression leadership', icon: 'people-circle-outline' },
   { key: 'invites', label: 'Invites', description: 'Manage Expression invite codes', icon: 'key-outline' },
   { key: 'access', label: 'Access', description: 'Ownership, roles and team access', icon: 'shield-checkmark-outline' },
   { key: 'giving', label: 'Giving', description: 'Configure Expression giving', icon: 'gift-outline' },
-  { key: 'finance', label: 'Giving reports', description: 'Review giving activity and reports', icon: 'analytics-outline' },
+  { key: 'finance', label: 'Reports', description: 'Review giving activity and reports', icon: 'analytics-outline' },
   { key: 'books', label: 'Finance', description: 'Expression finance workspace', icon: 'wallet-outline' },
   { key: 'settings', label: 'Settings', description: 'Expression profile and preferences', icon: 'settings-outline' },
 ];
@@ -85,6 +87,7 @@ export function ExpressionManagementHeader({
   const { colors } = useTheme();
   const access = useExpressionManagementAccess();
   const [menuOpen, setMenuOpen] = useState(false);
+
   const visibleTabs = tabs.filter((item) => {
     if (item.key === 'tools') return access.canManageAny;
     if (item.key === 'studio') return access.canUseContentStudio;
@@ -102,7 +105,6 @@ export function ExpressionManagementHeader({
     if (item.key === 'books') return access.canReadExpressionFinance;
     return access.canManageSettings;
   });
-  const activeDestination = visibleTabs.find((item) => item.key === active);
 
   const openDestination = (key: ExpressionManagementSection) => {
     setMenuOpen(false);
@@ -112,110 +114,73 @@ export function ExpressionManagementHeader({
 
   return (
     <>
-      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
-        <View style={styles.topRow}>
-          <View style={[styles.iconWrap, { backgroundColor: colors.primarySoft }]}>
-            <Icon name={icon as any} size={19} color={colors.interactive} />
-          </View>
-          <View style={styles.copy}>
-            <View style={styles.eyebrowRow}>
-              <Icon name="shield-checkmark-outline" size={10} color={colors.interactive} />
-              <Text style={[styles.eyebrow, { color: colors.interactive }]}>EXPRESSION OPERATIONS</Text>
-            </View>
-            <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-            <Text style={[styles.subtitle, { color: colors.textSecondary }]} numberOfLines={1}>{subtitle}</Text>
-            <Text style={[styles.expression, { color: colors.textMuted }]} numberOfLines={1}>{expressionName}</Text>
-          </View>
-          <View style={styles.actions}>
-            <Pressable
-              onPress={() => router.push(`/expressions/${expressionId}` as any)}
-              accessibilityRole="button"
-              accessibilityLabel="Expression home"
-              style={({ pressed }) => [styles.roundButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed ? styles.pressed : null]}
-            >
-              <Icon name="home-outline" size={16} color={colors.text} />
-            </Pressable>
-            <Pressable
-              onPress={() => setMenuOpen(true)}
-              accessibilityRole="button"
-              accessibilityLabel="Open Expression management menu"
-              style={({ pressed }) => [styles.roundButton, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }, pressed ? styles.pressed : null]}
-            >
-              <Icon name="ellipsis-horizontal" size={19} color={colors.interactive} />
-            </Pressable>
-          </View>
+      <View
+        accessibilityRole="header"
+        accessibilityLabel={`${title}. ${subtitle}. ${expressionName}`}
+        style={[styles.bar, { backgroundColor: colors.bg, borderBottomColor: colors.borderSubtle }]}
+      >
+        <View style={[styles.iconWrap, { backgroundColor: colors.primarySoft }]}>
+          <Icon name={icon as any} size={17} color={colors.interactive} />
         </View>
+        <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>{title}</Text>
 
-        <View style={styles.footerRow}>
-          {onAction && actionLabel ? (
-            <Pressable onPress={onAction} accessibilityRole="button" accessibilityLabel={actionLabel} style={({ pressed }) => [styles.actionLink, pressed ? styles.pressed : null]}>
-              <Icon name={actionIcon as any} size={12} color={colors.interactive} />
-              <Text style={[styles.actionText, { color: colors.interactive }]}>{actionLabel}</Text>
-            </Pressable>
-          ) : <View />}
-          {activeDestination ? (
-            <Pressable onPress={() => setMenuOpen(true)} style={styles.currentRow} accessibilityRole="button" accessibilityLabel={`Current section ${activeDestination.label}. Open menu`}>
-              <Text style={[styles.currentText, { color: colors.textMuted }]}>Management menu</Text>
-              <Text style={[styles.currentDot, { color: colors.textMuted }]}>·</Text>
-              <Text style={[styles.currentActive, { color: colors.interactive }]}>{activeDestination.label}</Text>
-              <Icon name="chevron-down" size={13} color={colors.textMuted} />
-            </Pressable>
-          ) : null}
-        </View>
+        {onAction && actionLabel ? (
+          <Pressable
+            onPress={onAction}
+            accessibilityRole="button"
+            accessibilityLabel={actionLabel}
+            style={({ pressed }) => [styles.roundButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.pressed]}
+          >
+            <Icon name={actionIcon as any} size={17} color={colors.interactive} />
+          </Pressable>
+        ) : null}
+
+        <Pressable
+          onPress={() => router.push(`/expressions/${expressionId}` as any)}
+          accessibilityRole="button"
+          accessibilityLabel="Expression home"
+          style={({ pressed }) => [styles.roundButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.pressed]}
+        >
+          <Icon name="home-outline" size={16} color={colors.text} />
+        </Pressable>
+        <Pressable
+          onPress={() => setMenuOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Open Expression management routes"
+          style={({ pressed }) => [styles.roundButton, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }, pressed && styles.pressed]}
+        >
+          <Icon name="ellipsis-horizontal" size={19} color={colors.interactive} />
+        </Pressable>
       </View>
 
-      <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)} title="Expression management" subtitle={`${expressionName} · choose a management area`} maxHeightPercent={84}>
-        <View style={styles.menuList}>
-          {visibleTabs.map((destination) => {
-            const selected = destination.key === active;
-            return (
-              <Pressable
-                key={destination.key}
-                onPress={() => openDestination(destination.key)}
-                style={({ pressed }) => [styles.menuItem, { backgroundColor: selected ? colors.primarySoft : colors.card, borderColor: selected ? colors.interactive : colors.borderSubtle }, pressed ? styles.pressed : null]}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-              >
-                <View style={[styles.menuIcon, { backgroundColor: selected ? colors.card : colors.bgSecondary }]}>
-                  <Icon name={destination.icon as any} size={19} color={selected ? colors.interactive : colors.textSecondary} />
-                </View>
-                <View style={styles.copy}>
-                  <Text style={[styles.menuLabel, { color: colors.text }]}>{destination.label}</Text>
-                  <Text style={[styles.menuDescription, { color: colors.textMuted }]} numberOfLines={1}>{destination.description}</Text>
-                </View>
-                {selected ? <Icon name="checkmark-circle" size={18} color={colors.interactive} /> : <Icon name="chevron-forward" size={16} color={colors.textMuted} />}
-              </Pressable>
-            );
-          })}
-        </View>
+      <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)} title="Manage" maxHeightPercent={76}>
+        <CompactRouteGrid
+          compact
+          items={visibleTabs.map((destination) => ({
+            key: destination.key,
+            label: destination.label,
+            icon: destination.icon,
+            selected: destination.key === active,
+            accessibilityLabel: `${destination.label}. ${destination.description}`,
+            onPress: () => openDestination(destination.key),
+          }))}
+        />
       </BottomSheet>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { marginHorizontal: spacing.md, marginTop: spacing.md, marginBottom: spacing.xs, padding: spacing.sm, borderWidth: 1, borderRadius: radius.xl },
-  topRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  iconWrap: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  copy: { flex: 1, minWidth: 0 },
-  eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  eyebrow: { fontSize: 8, lineHeight: 11, fontWeight: '900', letterSpacing: 0.75 },
-  title: { fontSize: 17, lineHeight: 21, fontWeight: '900', letterSpacing: -0.3, marginTop: 1 },
-  subtitle: { fontSize: 10, lineHeight: 14, marginTop: 1 },
-  expression: { fontSize: 9, lineHeight: 12, marginTop: 2, fontWeight: '700' },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  roundButton: { width: 35, height: 35, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  footerRow: { minHeight: 27, paddingTop: 5, paddingHorizontal: 3, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  currentRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4 },
-  currentText: { fontSize: 8.5, fontWeight: '700' },
-  currentDot: { fontSize: 9 },
-  currentActive: { fontSize: 8.5, fontWeight: '900' },
-  actionLink: { minHeight: 24, flexDirection: 'row', alignItems: 'center', gap: 4 },
-  actionText: { fontSize: 8.5, lineHeight: 12, fontWeight: '900' },
-  menuList: { gap: spacing.xs },
-  menuItem: { minHeight: 62, borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  menuIcon: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  menuLabel: { fontSize: 13, fontWeight: '900' },
-  menuDescription: { fontSize: 9.5, lineHeight: 13, marginTop: 2 },
-  pressed: { opacity: 0.72, transform: [{ scale: 0.98 }] },
+  bar: {
+    minHeight: 50,
+    paddingHorizontal: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  iconWrap: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  title: { flex: 1, minWidth: 0, fontSize: 15, lineHeight: 19, fontWeight: '900', letterSpacing: -0.25 },
+  roundButton: { width: 36, height: 36, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  pressed: { opacity: 0.72, transform: [{ scale: 0.97 }] },
 });
