@@ -48,7 +48,7 @@ create table if not exists public.chat_call_participants (
 );
 create index if not exists chat_call_participants_profile_idx on public.chat_call_participants(profile_id,invited_at desc);
 
-create or replace function public.can_access_chat_call(target_call_id uuid,target_profile_id uuid default auth.uid())
+create or replace function private.can_access_chat_call(target_call_id uuid,target_profile_id uuid)
 returns boolean language sql stable security definer set search_path='' as $$
   select exists (
     select 1 from public.chat_call_sessions c
@@ -78,15 +78,14 @@ returns boolean language sql stable security definer set search_path='' as $$
     )
   );
 $$;
-revoke all on function public.can_access_chat_call(uuid,uuid) from public;
-grant execute on function public.can_access_chat_call(uuid,uuid) to authenticated;
+revoke all on function private.can_access_chat_call(uuid,uuid) from public, anon, authenticated;
 
 alter table public.chat_call_sessions enable row level security;
 alter table public.chat_call_participants enable row level security;
 drop policy if exists chat_call_sessions_read on public.chat_call_sessions;
-create policy chat_call_sessions_read on public.chat_call_sessions for select to authenticated using(public.can_access_chat_call(id,auth.uid()));
+create policy chat_call_sessions_read on public.chat_call_sessions for select to authenticated using(private.can_access_chat_call(id,auth.uid()));
 drop policy if exists chat_call_participants_read on public.chat_call_participants;
-create policy chat_call_participants_read on public.chat_call_participants for select to authenticated using(public.can_access_chat_call(call_id,auth.uid()));
+create policy chat_call_participants_read on public.chat_call_participants for select to authenticated using(private.can_access_chat_call(call_id,auth.uid()));
 
 create table if not exists public.library_books (
   id uuid primary key default gen_random_uuid(),
