@@ -170,7 +170,7 @@ export function IncomingCallBridge() {
 }
 
 const styles = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFillObject, zIndex: 1200, justifyContent: 'flex-start', alignItems: 'center', paddingTop: Platform.OS === 'web' ? 18 : 54, paddingHorizontal: spacing.md },
+  overlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 1200, justifyContent: 'flex-start', alignItems: 'center', paddingTop: Platform.OS === 'web' ? 18 : 54, paddingHorizontal: spacing.md },
   card: { width: '100%', maxWidth: 430, borderWidth: 1, borderRadius: radius.xxl, padding: spacing.lg, gap: spacing.md },
   ringingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   pulse: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
