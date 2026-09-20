@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { CompactRouteGrid, EmptyState, Icon, SectionHeader, Skeleton } from '@/components';
+import { CompactRouteGrid, EmptyState, SectionHeader, Skeleton } from '@/components';
 import { ExpressionManagementHeader } from '@/components/expression/ExpressionManagementHeader';
 import { spacing } from '@/design-system/tokens';
 import { useSession } from '@/state/session';
@@ -243,10 +243,7 @@ export function ExpressionManagementHub() {
                 />
               </View>
             ))}
-            <View style={styles.scopeLine}>
-              <Icon name="shield-checkmark-outline" size={14} color={colors.textMuted} />
-              <Text style={[styles.scopeText, { color: colors.textMuted }]}>Expression ministry</Text>
-            </View>
+
           </>
         ) : (
           <EmptyState title="No ministry tools available" message="Tools appear when they are available to you." iconName="lock-closed-outline" />
@@ -263,6 +260,4 @@ const styles = StyleSheet.create({
   section: { gap: spacing.sm },
   skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.lg },
   skeletonItem: { width: '25%', alignItems: 'center', gap: 6 },
-  scopeLine: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 5, paddingTop: spacing.sm },
-  scopeText: { fontSize: 9.5, fontWeight: '800' },
 });
