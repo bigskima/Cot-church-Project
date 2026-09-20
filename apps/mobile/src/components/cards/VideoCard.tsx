@@ -9,6 +9,21 @@ import { CompactIdentityBadge } from '../identity/PublicIdentityBadge';
 import { InlineCommentsSheet, type InlineCommentsContext } from '../engagement/InlineCommentsSheet';
 import type { Video } from '@/types/content';
 
+function assetAspectRatio(video: Video) {
+  const asset = video.media_assets;
+  if (asset?.width && asset?.height && asset.width > 0 && asset.height > 0) return asset.width / asset.height;
+  const raw = asset?.aspect_ratio;
+  if (typeof raw !== 'string') return 16 / 9;
+  const match = raw.trim().match(/^(\d+(?:\.\d+)?)\s*[:/]\s*(\d+(?:\.\d+)?)$/);
+  if (match) {
+    const width = Number(match[1]);
+    const height = Number(match[2]);
+    if (width > 0 && height > 0) return width / height;
+  }
+  const numeric = Number(raw);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : 16 / 9;
+}
+
 export interface VideoCardProps {
   video: Video;
   expressionName?: string;
@@ -31,6 +46,7 @@ export function VideoCard({ video, expressionName, onPress, onBookmark, style, c
   const sourceUrl = video.media_assets?.url || streamRendition?.playbackUrl || streamRendition?.storage_path || '';
   const posterUrl = video.media_assets?.thumbnailUrl || '';
   const player = useVideoPlayer(sourceUrl, (instance) => { instance.loop = false; instance.muted = true; });
+  const mediaRatio = assetAspectRatio(video);
 
   const formatDuration = (secs?: number | null) => {
     if (!secs || secs <= 0) return null;
@@ -53,7 +69,7 @@ export function VideoCard({ video, expressionName, onPress, onBookmark, style, c
 
   return (
     <View style={[styles.container, variant === 'feed' && styles.feedContainer, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, variant === 'card' ? shadows.sm : null, style]}>
-      <View style={[styles.thumbnailFrame, variant === 'feed' && styles.feedThumbnail, { backgroundColor: colors.cardElevated }]}>
+      <View style={[styles.thumbnailFrame, variant === 'feed' && styles.feedThumbnail, { backgroundColor: colors.cardElevated, aspectRatio: mediaRatio }]}>
         {sourceUrl && player ? <VideoView player={player} style={styles.media} contentFit="contain" nativeControls /> : posterUrl ? <Image source={{ uri: posterUrl }} style={styles.media} resizeMode="cover" /> : <View style={styles.placeholder}><View style={[styles.playButton, { backgroundColor: colors.primarySoftStrong }]}><Icon name="play" size={24} color={colors.interactive} /></View></View>}
         {duration ? <View pointerEvents="none" style={styles.durationBadge}><Text style={styles.durationText}>{duration}</Text></View> : null}
         {variant === 'feed' ? <View pointerEvents="none" style={styles.typeBadge}><Icon name="videocam" size={11} color="#FFFFFF" /><Text style={styles.typeBadgeText}>VIDEO</Text></View> : null}
@@ -86,7 +102,7 @@ export function VideoCard({ video, expressionName, onPress, onBookmark, style, c
 const styles = StyleSheet.create({
   container: { width: '100%', borderWidth: 1, borderRadius: radius.card, padding: spacing.sm, marginBottom: spacing.md },
   feedContainer: { borderRadius: radius.xxl, marginBottom: 0, padding: 7 },
-  thumbnailFrame: { width: '100%', aspectRatio: 16 / 9, position: 'relative', borderRadius: radius.lg, overflow: 'hidden', backgroundColor: '#000000' },
+  thumbnailFrame: { width: '100%', position: 'relative', borderRadius: radius.lg, overflow: 'hidden', backgroundColor: '#000000' },
   feedThumbnail: { borderRadius: radius.xl },
   media: { width: '100%', height: '100%' }, placeholder: { flex: 1, alignItems: 'center', justifyContent: 'center' }, playButton: { width: 54, height: 54, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   durationBadge: { position: 'absolute', bottom: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.78)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.sm }, durationText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800', fontVariant: ['tabular-nums'] },
