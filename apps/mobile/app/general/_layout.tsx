@@ -143,6 +143,9 @@ export default function GeneralLayout() {
       <Tabs.Screen name="notifications" options={hidden as any} />
       <Tabs.Screen name="notification-settings" options={hidden as any} />
       <Tabs.Screen name="saved" options={hidden as any} />
+      <Tabs.Screen name="library/index" options={hidden as any} />
+      <Tabs.Screen name="library/[bookId]" options={hidden as any} />
+      <Tabs.Screen name="devotional" options={hidden as any} />
       <Tabs.Screen name="groups/index" options={hidden as any} />
       <Tabs.Screen name="groups/[groupId]" options={hidden as any} />
       <Tabs.Screen name="groups/[groupId]/chat" options={hidden as any} />
@@ -161,6 +164,8 @@ export default function GeneralLayout() {
       <Tabs.Screen name="leadership/giving-manage" options={hidden as any} />
       <Tabs.Screen name="leadership/giving-finance" options={hidden as any} />
       <Tabs.Screen name="leadership/sermons-manage" options={hidden as any} />
+      <Tabs.Screen name="leadership/library-manage" options={hidden as any} />
+      <Tabs.Screen name="leadership/devotionals-manage" options={hidden as any} />
       <Tabs.Screen name="leadership/events-manage" options={hidden as any} />
       <Tabs.Screen name="leadership/expressions-manage" options={hidden as any} />
       <Tabs.Screen name="leadership/roles-access" options={hidden as any} />

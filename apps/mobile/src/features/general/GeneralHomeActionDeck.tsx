@@ -42,6 +42,20 @@ export function GeneralHomeActionDeck() {
               onPress: () => router.push('/general/live' as any),
             },
             {
+              key: 'library',
+              label: 'Library',
+              icon: 'library-outline',
+              accessibilityLabel: 'COT Library',
+              onPress: () => router.push('/general/library' as any),
+            },
+            {
+              key: 'devotional',
+              label: 'Devotional',
+              icon: 'sunny-outline',
+              accessibilityLabel: 'Daily Devotional',
+              onPress: () => router.push('/general/devotional' as any),
+            },
+            {
               key: 'more',
               label: 'More',
               icon: 'grid-outline',

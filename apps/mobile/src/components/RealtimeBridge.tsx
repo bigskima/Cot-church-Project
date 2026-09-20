@@ -83,6 +83,13 @@ const optionalTableInvalidations: Record<string, string[]> = {
   feed_ranking_settings: ['mobile:home-feed:', 'expression:layered-home:'],
   expression_chat_messages: ['expression-chat:'],
   expression_chat_reactions: ['expression-chat:'],
+  chat_call_sessions: ['chat-call:'],
+  chat_call_participants: ['chat-call:'],
+  library_books: ['library:'],
+  library_reviews: ['library:'],
+  library_reading_progress: ['library:'],
+  devotional_series: ['devotional:'],
+  devotional_entries: ['devotional:'],
 };
 
 const contextTables = new Set(['branches', 'expression_memberships']);

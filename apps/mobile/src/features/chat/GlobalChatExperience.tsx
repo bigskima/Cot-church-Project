@@ -23,6 +23,7 @@ import { PLATFORM_KEYBOARD_BEHAVIOR, PLATFORM_KEYBOARD_DISMISS_MODE, PLATFORM_KE
 import { RichChatComposer } from './RichChatComposer';
 import { RichMessageBubble } from './RichMessageBubble';
 import type { ChatReaction, ChatReply, ChatSendPayload, RichChatMessage } from './rich-chat-types';
+import { ChatCallActions } from '@/features/calls/ChatCallActions';
 
 type Person = {
   id: string;
@@ -331,6 +332,7 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
             </View>
             <Text style={[styles.username, { color: colors.textSecondary }]}>@{threadPerson.username}</Text>
           </Pressable>
+          <ChatCallActions scope="direct" conversationId={selected.id} compact />
         </View>
 
         {pinnedMessages.length ? (
