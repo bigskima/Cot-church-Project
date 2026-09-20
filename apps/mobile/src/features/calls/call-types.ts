@@ -53,6 +53,8 @@ export type JoinedCallPayload = ActiveCallPayload & {
 export type AgoraCallSessionProps = {
   grant: ChatCallGrant;
   kind: ChatCallKind;
+  scope: ChatCallScope;
+  otherName?: string | null;
   onJoined?: () => void;
   onError?: (message: string) => void;
 };
