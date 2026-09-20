@@ -27,6 +27,8 @@ type MediaAttachment = {
   fileName?: string | null;
   sizeBytes: number;
   durationSeconds?: number | null;
+  width?: number | null;
+  height?: number | null;
 };
 type UploadIntent = MediaAttachment & { signedUploadUrl: string };
 type UploadableMedia = {
@@ -35,6 +37,8 @@ type UploadableMedia = {
   mimeType: string;
   reportedSize?: number | null;
   durationSeconds?: number | null;
+  width?: number | null;
+  height?: number | null;
   webFile?: Blob | null;
 };
 
@@ -114,6 +118,8 @@ export default function GeneralComposerExperience({ mode: composerMode = 'post' 
         fileName: media.fileName ?? undefined,
         sizeBytes,
         durationSeconds: media.durationSeconds ?? undefined,
+        width: media.width ?? undefined,
+        height: media.height ?? undefined,
       }),
     });
     try {
@@ -167,6 +173,8 @@ export default function GeneralComposerExperience({ mode: composerMode = 'post' 
         mimeType: inferImagePickerMime(asset),
         reportedSize: asset.fileSize,
         durationSeconds: asset.type === 'video' && asset.duration ? Math.max(1, Math.round(asset.duration / 1000)) : null,
+        width: asset.width || null,
+        height: asset.height || null,
         webFile: ((asset as any).file as Blob | undefined) ?? null,
       })));
     } catch (value) {
