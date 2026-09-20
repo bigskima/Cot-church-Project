@@ -329,7 +329,7 @@ const checks = [
   [/SocialProfileHero[\s\S]*banner[\s\S]*avatarActionRow/, 'member profiles use a reusable full-width social hero'],
   [/AdaptiveMediaImage[\s\S]*Image\.getSize[\s\S]*aspectRatio/, 'feed media preserves source geometry instead of forcing one rectangle'],
   [/MediaPreviewModal[\s\S]*typePill[\s\S]*AdaptiveMediaImage[\s\S]*VideoPlayer[\s\S]*AudioPlayer/, 'shared media preview stays type-aware and geometry-aware'],
-  [/CompactIdentityBadge[\s\S]*badges\?\.\[0\]|badges\[0\]/, 'creator identity badges are reusable across content surfaces'],
+  [/CompactIdentityBadge[\s\S]*(?:badges\?\.\[0\]|badges\[0\])/, 'creator identity badges are reusable across content surfaces'],
   [/GENERAL REELS[\s\S]*Public COT discovery[\s\S]*\/general\/studio\/reel/, 'General Reels carries public identity and direct creation'],
   [/GENERAL COT · WATCH[\s\S]*Videos[\s\S]*Reels[\s\S]*Messages[\s\S]*Start watching/, 'General Watch uses a layered public media dashboard'],
   [/visibility: broadcastScope === 'public' \? 'public' : 'branch'/, 'live broadcast destination follows selected scope'],
