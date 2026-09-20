@@ -4,6 +4,8 @@ import { authorize } from "../_shared/context.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString, uuid } from "../_shared/validation.ts";
+import { assertFeatureEnabled } from "../_shared/feature-controls.ts";
+import { adminClient } from "../_shared/supabase.ts";
 
 const campaignStatuses = new Set(["draft", "active", "paused", "completed", "archived"]);
 const purposeStatuses = new Set(["active", "inactive", "archived"]);
@@ -167,6 +169,11 @@ Deno.serve(
       if (action === "donate") {
         assertNoUnknownFields(body, ["action", "campaignId", "purposeId", "groupId", "amountMinor", "currency", "provider", "idempotencyKey", "anonymous", "note"]);
         const expressionId = auth.branchId;
+        const targetGroupId = body.groupId ? uuid(String(body.groupId), "groupId", true)! : null;
+        const featureScope = { organizationId, expressionId, groupId: targetGroupId };
+        const admin = adminClient();
+        await assertFeatureEnabled(admin, "giving", featureScope, "Giving is currently unavailable in this area.");
+        await assertFeatureEnabled(admin, "online_payment_giving", featureScope, "Online giving is currently unavailable in this area.");
         let settingsQuery = auth.client.from("giving_settings").select("online_payment_enabled,is_enabled").eq("organization_id", organizationId);
         settingsQuery = expressionId ? settingsQuery.eq("branch_id", expressionId) : settingsQuery.is("branch_id", null);
         const { data: settings } = await settingsQuery.maybeSingle();
@@ -174,7 +181,6 @@ Deno.serve(
           throw new ApiError("ONLINE_GIVING_UNAVAILABLE", "Online giving is not available for this giving destination", 409);
         }
 
-        const targetGroupId = body.groupId ? uuid(String(body.groupId), "groupId", true)! : null;
         const targetPurposeId = body.purposeId ? uuid(String(body.purposeId), "purposeId", true)! : null;
         const common = {
           target_organization_id: organizationId,
