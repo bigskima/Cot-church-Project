@@ -69,6 +69,20 @@ export function WatchDetailExperience({ videoId: id, scope = 'general' }: { vide
   const creatorName = contentIdentity?.author?.display_name || sourceName || 'COT';
   const creatorAvatar = contentIdentity?.author?.avatar_url ?? undefined;
   const creatorBadge = contentIdentity?.author?.badges?.[0];
+  const videoAspectRatio = (() => {
+    const asset = video?.media_assets;
+    if (asset?.width && asset?.height && asset.width > 0 && asset.height > 0) return asset.width / asset.height;
+    const raw = asset?.aspect_ratio;
+    if (typeof raw !== 'string') return 16 / 9;
+    const match = raw.trim().match(/^(\d+(?:\.\d+)?)\s*[:/]\s*(\d+(?:\.\d+)?)$/);
+    if (match) {
+      const width = Number(match[1]);
+      const height = Number(match[2]);
+      if (width > 0 && height > 0) return width / height;
+    }
+    const numeric = Number(raw);
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : 16 / 9;
+  })();
 
   const handleLike = async () => {
     if (mode === 'visitor') { router.push({ pathname: '/(auth)/login', params: { returnTo: expressionMode && context?.expression?.id ? `/expressions/${context.expression.id}/videos/${id}` : `/general/watch/${id}` } } as any); return; }
@@ -125,7 +139,7 @@ export function WatchDetailExperience({ videoId: id, scope = 'general' }: { vide
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}>
           {playback.error ? <ResourceError message={playback.error} retry={playback.refresh} /> : playback.data && !playback.data.available ? (
             <View style={[styles.playbackState, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}><View style={[styles.playbackStateIcon, { backgroundColor: colors.primarySoft }]}><Icon name={playback.data.processingState && playback.data.processingState !== 'ready' ? 'hourglass-outline' : 'videocam-off-outline'} size={28} color={colors.interactive} /></View><Text style={[styles.playbackStateTitle, { color: colors.text }]}>{playback.data.processingState && playback.data.processingState !== 'ready' ? 'Video is being prepared' : 'Video is not available'}</Text><Text style={[styles.playbackStateCopy, { color: colors.textSecondary }]}>{playback.data.reason || 'Playback is temporarily unavailable for this video.'}</Text><Button label="Check again" variant="outline" size="sm" onPress={playback.refresh} /></View>
-          ) : <VideoPlayer title={video.title} sourceUrl={videoUrl} posterUrl={posterUrl} durationSeconds={video.media_assets?.duration_seconds} chapters={video.chapters} initialPositionSeconds={engagement.data?.progress?.completed ? 0 : engagement.data?.progress?.progress_seconds ?? 0} onProgress={syncProgress} />}
+          ) : <VideoPlayer title={video.title} sourceUrl={videoUrl} posterUrl={posterUrl} durationSeconds={video.media_assets?.duration_seconds} aspectRatio={videoAspectRatio} chapters={video.chapters} initialPositionSeconds={engagement.data?.progress?.completed ? 0 : engagement.data?.progress?.progress_seconds ?? 0} onProgress={syncProgress} />}
 
           <View style={styles.metadataSection}>
             <View style={[styles.contextPill, { backgroundColor: expressionMode ? colors.accentSoft : colors.primarySoft }]}><Icon name={expressionMode ? 'people-outline' : 'globe-outline'} size={13} color={expressionMode ? colors.accent : colors.interactive} /><Text style={[styles.contextPillText, { color: expressionMode ? colors.accent : colors.interactive }]}>{expressionMode ? 'Expression video' : 'Public video'}</Text></View>
