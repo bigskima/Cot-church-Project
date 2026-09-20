@@ -16,9 +16,9 @@ export function DevotionalManageExperience(){
  const {api,context,hasOrganizationCapability}=useSession();
  const {colors}=useTheme();
  const organizationId=context?.organization?.id??context?.organizations?.[0]?.id??'';
- const endpoint=`library${organizationId?`?organizationId=${organizationId}`:''}`;
+ const endpoint=`noop?service=library${organizationId?`&organizationId=${organizationId}`:''}`;
  const canPublish=hasOrganizationCapability('sermons.publish');
- const resource=useResource<ManagePayload>(`devotional:manage:${organizationId||'none'}`,(signal)=>api.request<ManagePayload>(`library?view=devotional_manage${organizationId?`&organizationId=${organizationId}`:''}`,{signal,context:'public'}));
+ const resource=useResource<ManagePayload>(`devotional:manage:${organizationId||'none'}`,(signal)=>api.request<ManagePayload>(`noop?service=library&view=devotional_manage${organizationId?`&organizationId=${organizationId}`:''}`,{signal,context:'public'}));
 
  const [title,setTitle]=useState('');
  const [author,setAuthor]=useState('');
