@@ -34,8 +34,8 @@ export function LibraryManageExperience() {
   const {colors}=useTheme();
   const organizationId=context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
   const canPublish=hasOrganizationCapability('sermons.publish');
-  const endpoint=`library${organizationId ? `?organizationId=${organizationId}` : ''}`;
-  const books=useResource<LibraryBook[]>(`library:manage:${organizationId || 'none'}`,(signal)=>api.request<LibraryBook[]>(`library?view=manage${organizationId ? `&organizationId=${organizationId}` : ''}`,{signal,context:'public'}));
+  const endpoint=`noop?service=library${organizationId ? `&organizationId=${organizationId}` : ''}`;
+  const books=useResource<LibraryBook[]>(`library:manage:${organizationId || 'none'}`,(signal)=>api.request<LibraryBook[]>(`noop?service=library&view=manage${organizationId ? `&organizationId=${organizationId}` : ''}`,{signal,context:'public'}));
 
   const [title,setTitle]=useState('');
   const [subtitle,setSubtitle]=useState('');
