@@ -23,7 +23,7 @@ export function LibraryExperience() {
   const books = useResource<LibraryBook[]>(
     `library:list:${organizationId || 'public'}:${query.toLowerCase()}`,
     (signal) => api.request<LibraryBook[]>(
-      `library?view=list${organizationId ? `&organizationId=${organizationId}` : ''}${query ? `&search=${encodeURIComponent(query)}` : ''}`,
+      `noop?service=library&view=list${organizationId ? `&organizationId=${organizationId}` : ''}${query ? `&search=${encodeURIComponent(query)}` : ''}`,
       { signal, context: 'public' },
     ),
   );
