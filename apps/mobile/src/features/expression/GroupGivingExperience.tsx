@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
 import { Badge, Button, Chip, EmptyState, Icon, ResourceError, ScreenHeader, SectionHeader, Skeleton } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
@@ -221,7 +220,7 @@ export function GroupGivingExperience({ groupId, scope = 'expression' }: { group
 
           {group.data.permissions.manageGiving ? (
             <View style={[styles.manager, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
-              <SectionHeader title='Manage Group Giving' subtitle='This authority is limited to this Group. It does not grant Expression finance access.' />
+              <SectionHeader title='Manage Group Giving' subtitle='This is a Group-scoped destination. Changes here affect only this Group and never redirect you into General or Expression-wide Giving Setup.' />
               {options.map((item) => (
                 <View key={item.id} style={styles.manageRow}>
                   <View style={styles.flex}><Text style={[styles.cardTitle, { color: colors.text }]}>{item.label}</Text><Text style={[styles.meta, { color: colors.textMuted }]}>Enabled in this Group</Text></View>
@@ -236,12 +235,12 @@ export function GroupGivingExperience({ groupId, scope = 'expression' }: { group
                       Your Group Giving role is active. A purpose must first be published in {generalGroup ? 'General COT' : 'this Expression'} before it can be linked here.
                     </Text>
                   </View>
-                  <Button
-                    label='Open Giving Setup'
-                    variant='outline'
-                    size='sm'
-                    onPress={() => router.push((generalGroup ? '/general/leadership/giving-manage' : `/expressions/${expressionId}/manage/giving`) as any)}
-                  />
+                  <View style={styles.scopeLock}>
+                    <Icon name='lock-closed-outline' size={15} color={colors.interactive} />
+                    <Text style={[styles.scopeLockText, { color: colors.textSecondary }]}>
+                      Stay in this Group. A church or Expression finance manager can publish an approved destination separately; once available, it will appear here for you to enable for this Group.
+                    </Text>
+                  </View>
                 </View>
               ) : null}
               {group.data.availableGivingPurposes.filter((purpose) => !options.some((item) => item.giving_purpose_id === purpose.id)).map((purpose) => (
@@ -281,5 +280,7 @@ const styles = StyleSheet.create({
   notice: { borderRadius: radius.lg, padding: spacing.sm },
   manager: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm },
   setupCard: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm },
+  scopeLock: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs },
+  scopeLockText: { flex: 1, fontSize: 11, lineHeight: 16 },
   manageRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
 });
