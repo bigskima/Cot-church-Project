@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - feat/calls-library-devotionals
+  pull_request:
+    branches:
+      - codex/cot-launch-ui-refactor-batch-1
 
 permissions:
   contents: read
