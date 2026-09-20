@@ -129,7 +129,7 @@ async function sourceSignedUrl(admin: any, path: string) {
   return data.signedUrl;
 }
 
-Deno.serve(createHandler(
+export const libraryHandler = createHandler(
   { methods: ["GET", "POST", "PATCH"], authentication: "optional", organization: "optional" },
   async ({ request, auth }) => {
     const admin = adminClient();
@@ -476,4 +476,6 @@ Deno.serve(createHandler(
 
     throw new ApiError("VALIDATION_FAILED", "Unknown Library action.", 422);
   },
-));
+);
+
+if (import.meta.main) Deno.serve(libraryHandler);
