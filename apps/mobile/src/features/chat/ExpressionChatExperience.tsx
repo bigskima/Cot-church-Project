@@ -12,6 +12,7 @@ import { PLATFORM_KEYBOARD_BEHAVIOR, PLATFORM_KEYBOARD_DISMISS_MODE } from '@/ut
 import { RichChatComposer } from './RichChatComposer';
 import { RichMessageBubble } from './RichMessageBubble';
 import type { ChatReaction, ChatReply, ChatSendPayload, RichChatMessage } from './rich-chat-types';
+import { ChatCallActions } from '@/features/calls/ChatCallActions';
 
 type ExpressionChatMember = {
   id: string;
@@ -191,6 +192,7 @@ export function ExpressionChatExperience({ expressionId }: { expressionId: strin
           <Icon name="pin-outline" size={14} color={pinnedOnly ? colors.interactive : colors.textSecondary} />
           <Text style={[styles.quickToolText, { color: pinnedOnly ? colors.interactive : colors.textSecondary }]}>Pinned {pinned.length ? `(${pinned.length})` : ''}</Text>
         </Pressable>
+        <ChatCallActions scope="expression" expressionId={expressionId} />
         {resource.data?.permissions.moderateMembers ? (
           <Pressable onPress={() => setModerationOpen(true)} style={[styles.quickTool, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]} accessibilityRole="button" accessibilityLabel="Moderate discussion">
             <Icon name="shield-checkmark-outline" size={14} color={colors.interactive} />
