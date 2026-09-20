@@ -138,7 +138,7 @@ export function AppControlsPanel({
       setDirectory(data);
       if (!organizationId && data.organizations.length) setOrganizationId(data.organizations[0].id);
     } catch (value) {
-      setError(value instanceof Error ? value.message : 'Unable to load app-control scopes.');
+      setError(value instanceof Error ? value.message : 'Unable to load available churches, Expressions and Groups.');
     } finally {
       setDirectoryLoading(false);
     }
@@ -299,7 +299,7 @@ export function AppControlsPanel({
 
       <Card
         title="App Controls"
-        subtitle="Operational availability only. These switches do not delete data, change ministry permissions or replace the working feature backend."
+        subtitle="These controls change feature availability without deleting saved content or changing ministry roles."
         headerAction={<Badge label={scopeType === 'global' ? 'GLOBAL' : 'SCOPED'} variant={scopeType === 'global' ? 'gold' : 'neutral'} />}
       >
         <div style={{ display: 'grid', gap: 14 }}>
@@ -371,8 +371,7 @@ export function AppControlsPanel({
           <div className="admin-card" style={{ padding: 14, background: 'var(--admin-surface-muted, transparent)' }}>
             <strong>{scopeTitle}</strong>
             <p className="admin-muted" style={{ marginTop: 5, lineHeight: 1.5 }}>
-              Higher-level OFF switches always win. A scoped ENABLED value cannot bypass a parent scope or master feature that is OFF.
-              INHERIT removes the local override and follows the next higher scope.
+              A feature turned off for a wider area stays off inside smaller areas. “Inherit” follows the setting from the next wider area.
             </p>
           </div>
         </div>
@@ -380,7 +379,7 @@ export function AppControlsPanel({
 
       <Card
         title="Feature availability"
-        subtitle={scopeReady ? `${visible.length} operational control${visible.length === 1 ? '' : 's'} for this scope.` : 'Choose a complete scope to manage its controls.'}
+        subtitle={scopeReady ? `${visible.length} operational control${visible.length === 1 ? '' : 's'} for this scope.` : 'Choose where you want these controls to apply.'}
         headerAction={
           <div className="admin-header-actions">
             <SelectField
@@ -442,7 +441,7 @@ export function AppControlsPanel({
           data={scopeReady ? visible : []}
           keyExtractor={(item) => item.key}
           loading={loading}
-          emptyMessage={scopeReady ? 'No controls match this filter.' : 'Choose a scope first.'}
+          emptyMessage={scopeReady ? 'No controls match this filter.' : 'Choose an area first.'}
         />
       </Card>
 
