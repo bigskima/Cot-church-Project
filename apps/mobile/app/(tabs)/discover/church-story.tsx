@@ -84,7 +84,6 @@ export default function ChurchStoryScreen() {
   const { colors } = useTheme();
   const access = useGeneralMinistryAccess();
   const requestedTab = routeParams.tab === 'facts' ? 'facts' : routeParams.tab === 'leadership' ? 'leadership' : 'story';
-  const managementRequested = routeParams.manage === '1' || Boolean(routeParams.edit);
   const [activeTab, setActiveTab] = useState<'story' | 'facts' | 'leadership'>(requestedTab);
   const [editing, setEditing] = useState(false);
   const [savingStory, setSavingStory] = useState(false);
