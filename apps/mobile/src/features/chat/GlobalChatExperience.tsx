@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
-import { Avatar, Icon, ScreenHeader } from '@/components';
+import { Avatar, CompactIdentityBadge, Icon, ScreenHeader } from '@/components';
 import { ExpressionPeopleHeader } from '@/components/expression/ExpressionPeopleHeader';
 import { radius, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
@@ -30,6 +30,15 @@ type Person = {
   display_name?: string | null;
   avatar_url?: string | null;
   banner_url?: string | null;
+  badges?: Array<{
+    id: string;
+    code: string;
+    label: string;
+    backgroundColor: string;
+    textColor: string;
+    priority: number;
+    badgeVariant?: string;
+  }>;
 };
 
 type Conversation = {
@@ -293,6 +302,8 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
 
   if (selected) {
     const pinnedMessages = displayedMessages.filter((message) => message.pinned_at);
+    const threadPerson = thread.data?.conversation?.other ?? selected.person;
+    const threadBadge = threadPerson?.badges?.[0];
     return (
       <KeyboardAvoidingView
         style={[styles.screen, { backgroundColor: colors.bg, paddingBottom: generalThreadBottomInset }]}
@@ -301,11 +312,25 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
       >
         <View style={[styles.threadHeader, { paddingTop: Math.max(insets.top, 10), backgroundColor: colors.card, borderBottomColor: colors.borderSubtle }]}>
           <Pressable onPress={() => setSelected(null)} style={styles.iconButton}><Icon name="arrow-back" size={22} color={colors.text} /></Pressable>
-          <Avatar url={selected.person.avatar_url ?? undefined} name={selected.person.display_name || selected.person.username} size="sm" />
-          <View style={styles.headerCopy}>
-            <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>{selected.person.display_name || `@${selected.person.username}`}</Text>
-            <Text style={[styles.username, { color: colors.textSecondary }]}>@{selected.person.username}</Text>
-          </View>
+          <Pressable
+            onPress={() => router.push({ pathname: '/general/member/[username]', params: { username: threadPerson.username } } as any)}
+            accessibilityRole="link"
+            accessibilityLabel={`Open ${threadPerson.display_name || threadPerson.username} profile`}
+          >
+            <Avatar url={threadPerson.avatar_url ?? undefined} name={threadPerson.display_name || threadPerson.username} size="sm" />
+          </Pressable>
+          <Pressable
+            onPress={() => router.push({ pathname: '/general/member/[username]', params: { username: threadPerson.username } } as any)}
+            style={styles.headerCopy}
+            accessibilityRole="link"
+            accessibilityLabel={`Open ${threadPerson.display_name || threadPerson.username} profile`}
+          >
+            <View style={styles.threadIdentityLine}>
+              <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>{threadPerson.display_name || `@${threadPerson.username}`}</Text>
+              {threadBadge ? <CompactIdentityBadge badge={threadBadge} size={15} /> : null}
+            </View>
+            <Text style={[styles.username, { color: colors.textSecondary }]}>@{threadPerson.username}</Text>
+          </Pressable>
         </View>
 
         {pinnedMessages.length ? (
@@ -479,7 +504,8 @@ const styles = StyleSheet.create({
   threadHeader: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, paddingBottom: 7, borderBottomWidth: StyleSheet.hairlineWidth },
   iconButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerCopy: { flex: 1, minWidth: 0 },
-  headerTitle: { fontSize: 16, fontWeight: '800' },
+  threadIdentityLine: { flexDirection: 'row', alignItems: 'center', gap: 5, minWidth: 0 },
+  headerTitle: { fontSize: 16, fontWeight: '800', flexShrink: 1 },
   username: { fontSize: 11, marginTop: 1 },
   pinnedBanner: { minHeight: 38, borderBottomWidth: StyleSheet.hairlineWidth, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', gap: 7 },
   pinnedText: { flex: 1, fontSize: 11, fontWeight: '700' },
