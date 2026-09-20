@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Avatar, CompactIdentityBadge, Icon, ScreenHeader } from '@/components';
 import { ExpressionPeopleHeader } from '@/components/expression/ExpressionPeopleHeader';
 import { radius, spacing } from '@/design-system/tokens';
