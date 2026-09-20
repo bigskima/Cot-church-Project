@@ -56,7 +56,7 @@ const styles = StyleSheet.create({
   loadingCard: { width: '100%', maxWidth: 420, borderWidth: 1, borderRadius: radius.xxl, padding: spacing.xl, alignItems: 'center', gap: spacing.sm },
   loadingIcon: { width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xs },
   loadingTitle: { fontSize: 18, lineHeight: 23, fontWeight: '900', textAlign: 'center' },
-  copy: { maxWidth: 300, fontSize: 11.5, lineHeight: 17, fontWeight: '650', textAlign: 'center' },
+  copy: { maxWidth: 300, fontSize: 11.5, lineHeight: 17, fontWeight: '600', textAlign: 'center' },
   loadingLines: { width: '100%', marginTop: spacing.sm, gap: 7 },
   loadingLine: { width: '100%', height: 10, borderRadius: 5 },
   loadingLineShort: { width: '68%', height: 10, borderRadius: 5, alignSelf: 'center' },
