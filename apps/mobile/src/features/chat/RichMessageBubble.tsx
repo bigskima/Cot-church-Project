@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
-import { AdaptiveMediaImage, AudioPlayer, Avatar, Icon, VideoPlayer } from '@/components';
+import { AdaptiveMediaImage, AudioPlayer, Avatar, Icon, MediaPreviewModal, VideoPlayer } from '@/components';
 import { CompactIdentityBadge } from '@/components/identity/PublicIdentityBadge';
 import { radius, spacing } from '@/design-system/tokens';
 import { useTheme } from '@/state/theme';
@@ -56,6 +56,7 @@ function MessageAttachment({ attachment }: { attachment: ChatAttachment }) {
   const { colors } = useTheme();
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState('');
+  const [previewOpen, setPreviewOpen] = useState(false);
   if (!attachment.url) {
     return (
       <View style={[styles.missingMedia, { backgroundColor: colors.bgSecondary }]}>
@@ -115,20 +116,47 @@ function MessageAttachment({ attachment }: { attachment: ChatAttachment }) {
   return (
     <View style={styles.attachmentWrap}>
       {preview}
-      <Pressable
-        onPress={() => void download()}
-        disabled={downloading}
-        style={({ pressed }) => [
-          styles.downloadChip,
-          { backgroundColor: 'rgba(5,7,11,0.72)', borderColor: 'rgba(255,255,255,0.18)' },
-          pressed && styles.pressed,
-        ]}
-        accessibilityRole="button"
-        accessibilityLabel={`Download ${attachment.fileName || attachmentLabel(attachment.type)}`}
-      >
-        <Icon name={downloading ? 'hourglass-outline' : 'download-outline'} size={14} color="#FFFFFF" />
-      </Pressable>
+      <View style={styles.attachmentActions}>
+        <Pressable
+          onPress={() => setPreviewOpen(true)}
+          style={({ pressed }) => [
+            styles.attachmentAction,
+            { backgroundColor: 'rgba(5,7,11,0.72)', borderColor: 'rgba(255,255,255,0.18)' },
+            pressed && styles.pressed,
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${attachmentLabel(attachment.type)} preview`}
+        >
+          <Icon name="expand-outline" size={14} color="#FFFFFF" />
+        </Pressable>
+        <Pressable
+          onPress={() => void download()}
+          disabled={downloading}
+          style={({ pressed }) => [
+            styles.attachmentAction,
+            { backgroundColor: 'rgba(5,7,11,0.72)', borderColor: 'rgba(255,255,255,0.18)' },
+            pressed && styles.pressed,
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={`Download ${attachment.fileName || attachmentLabel(attachment.type)}`}
+        >
+          <Icon name={downloading ? 'hourglass-outline' : 'download-outline'} size={14} color="#FFFFFF" />
+        </Pressable>
+      </View>
       {downloadError ? <Text style={[styles.downloadError, { color: colors.live }]}>{downloadError}</Text> : null}
+      <MediaPreviewModal
+        visible={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        media={{
+          url: attachment.url,
+          type: attachment.type === 'gif' ? 'image' : attachment.type,
+          title: null,
+          mimeType: attachment.mimeType,
+          durationSeconds: attachment.durationSeconds,
+          width: attachment.width,
+          height: attachment.height,
+        }}
+      />
     </View>
   );
 }
@@ -353,7 +381,8 @@ const styles = StyleSheet.create({
   attachmentWrap: { position: 'relative', gap: 4 },
   image: { width: 238, maxWidth: '100%', borderRadius: radius.md, backgroundColor: '#0B1220' },
   player: { width: 270, maxWidth: '100%', marginVertical: 0 },
-  downloadChip: { position: 'absolute', right: 6, top: 6, width: 30, height: 30, borderRadius: 15, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  attachmentActions: { position: 'absolute', right: 6, top: 6, flexDirection: 'row', gap: 5, zIndex: 3 },
+  attachmentAction: { width: 30, height: 30, borderRadius: 15, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   downloadError: { fontSize: 9.5, lineHeight: 13 },
   missingMedia: { minWidth: 180, minHeight: 54, borderRadius: radius.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   missingMediaText: { fontSize: 11, fontWeight: '700' },
