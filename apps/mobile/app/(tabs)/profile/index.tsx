@@ -100,7 +100,7 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 110 },
+          { paddingTop: 0, paddingBottom: insets.bottom + 110 },
         ]}
       >
         {mode === 'visitor' ? (
@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     padding: spacing.lg,
   },
-  fullBleedProfile: { marginHorizontal: -spacing.md, marginTop: -spacing.sm },
+  fullBleedProfile: { marginHorizontal: -spacing.md },
   quickAction: {
     flex: 1,
     minHeight: 42,
