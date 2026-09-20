@@ -5,6 +5,7 @@ import { adminClient } from "../_shared/supabase.ts";
 import { resolveActiveOrganizationId } from "../_shared/public-organization.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString, uuid } from "../_shared/validation.ts";
+import { assertFeatureEnabled } from "../_shared/feature-controls.ts";
 
 const visibilities = new Set(["public", "organization", "branch", "group", "private"]);
 const videoCategories = new Set(["documentary", "conference", "worship", "interview", "testimony", "teaching", "programme", "highlights", "podcast", "general"]);
@@ -91,6 +92,18 @@ Deno.serve(createHandler(
         if (!visibilities.has(visibility)) throw new ApiError("VALIDATION_FAILED", "Invalid visibility", 422);
         ensureExpressionContext(targetExp);
         if (!targetExp && visibility === "public") await ensurePublicPublishing();
+        const featureScope = { organizationId: targetOrganizationId, expressionId: targetExp, groupId: targetGroup };
+        await assertFeatureEnabled(admin, "social_community_feed", featureScope, "Community publishing is currently unavailable.");
+        await assertFeatureEnabled(
+          admin,
+          targetExp ? "expression_posting" : "general_posting",
+          featureScope,
+          targetExp ? "Expression posting is currently unavailable." : "General COT posting is currently unavailable.",
+        );
+        if (targetGroup) await assertFeatureEnabled(admin, "groups", featureScope, "This Group is currently unavailable.");
+        if (Array.isArray(body.media) && body.media.length) {
+          await assertFeatureEnabled(admin, "photo_posts", featureScope, "Media posts are currently unavailable in this area.");
+        }
 
         const { data, error } = await auth.client.rpc("publish_typed_post", {
           p_org_id: targetOrganizationId,
@@ -121,6 +134,15 @@ Deno.serve(createHandler(
         if (!visibilities.has(visibility)) throw new ApiError("VALIDATION_FAILED", "Invalid visibility", 422);
         ensureExpressionContext(targetExp);
         if (!targetExp && visibility === "public") await ensurePublicPublishing();
+        const featureScope = { organizationId: targetOrganizationId, expressionId: targetExp };
+        await assertFeatureEnabled(admin, "social_community_feed", featureScope, "Community publishing is currently unavailable.");
+        await assertFeatureEnabled(
+          admin,
+          targetExp ? "expression_posting" : "general_posting",
+          featureScope,
+          targetExp ? "Expression posting is currently unavailable." : "General COT posting is currently unavailable.",
+        );
+        await assertFeatureEnabled(admin, "reels", featureScope, "Reels are currently unavailable in this area.");
 
         const { data, error } = await auth.client.rpc("publish_typed_reel", {
           p_org_id: targetOrganizationId,
@@ -154,6 +176,15 @@ Deno.serve(createHandler(
         if (!videoCategories.has(category)) throw new ApiError("VALIDATION_FAILED", "Invalid category", 422);
         ensureExpressionContext(targetExp);
         if (!targetExp && visibility === "public") await ensurePublicPublishing();
+        const featureScope = { organizationId: targetOrganizationId, expressionId: targetExp };
+        await assertFeatureEnabled(admin, "social_community_feed", featureScope, "Community publishing is currently unavailable.");
+        await assertFeatureEnabled(
+          admin,
+          targetExp ? "expression_posting" : "general_posting",
+          featureScope,
+          targetExp ? "Expression posting is currently unavailable." : "General COT posting is currently unavailable.",
+        );
+        await assertFeatureEnabled(admin, "long_form_video", featureScope, "Long-form video publishing is currently unavailable in this area.");
 
         const { data, error } = await auth.client.rpc("publish_typed_video", {
           p_org_id: targetOrganizationId,
