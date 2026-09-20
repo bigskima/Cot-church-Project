@@ -5,6 +5,7 @@ import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString, uuid } from "../_shared/validation.ts";
 import { adminClient, publicClient } from "../_shared/supabase.ts";
+import { featureEnabled } from "../_shared/feature-controls.ts";
 
 const PORTRAIT_BUCKET = "leadership-portraits";
 const LOCATION_FIELDS = ["line1", "line2", "city", "state", "country", "landmark", "mapUrl", "latitude", "longitude"];
@@ -336,6 +337,21 @@ Deno.serve(
             if (error) throw new ApiError("LOCATION_FETCH_FAILED", "Unable to retrieve the church location", 500, undefined, false);
             locationData = organization ? safePublicLocation(organization.settings) : null;
           }
+        }
+
+        const policyOrganizationId = organizationId ?? storyData?.organization_id ?? auth?.organizationId ?? null;
+        if (policyOrganizationId) {
+          const policyScope = { organizationId: policyOrganizationId, expressionId };
+          const [storyAvailable, factsAvailable, leadershipAvailable, locationAvailable] = await Promise.all([
+            featureEnabled(adminClient(), "church_story", { organizationId: policyOrganizationId }),
+            featureEnabled(adminClient(), "quick_facts", { organizationId: policyOrganizationId }),
+            featureEnabled(adminClient(), "leadership_directory", policyScope),
+            featureEnabled(adminClient(), "locations", policyScope),
+          ]);
+          if (!storyAvailable) storyData = null;
+          else if (storyData && !factsAvailable) storyData = { ...storyData, quick_facts: [] };
+          if (!leadershipAvailable) leadershipData = [];
+          if (!locationAvailable) locationData = null;
         }
 
         if (view === "story") return { data: storyData };

@@ -12,6 +12,7 @@ import {
   subscribeFloatingActionsPreference,
   type FloatingActionsPreference,
 } from './floatingActionsPreference';
+import { useFeatureControls } from '@/features/availability/useFeatureControls';
 
 const HIDDEN_PREFIXES = ['/onboarding', '/(auth)', '/login', '/signup'];
 const HIDDEN_EXACT = new Set(['/assistant']);
@@ -31,6 +32,7 @@ export function CotGlobalActions() {
   const { width, height } = useWindowDimensions();
   const { colors } = useTheme();
   const { mode, accessReady, context } = useSession();
+  const features = useFeatureControls();
   const [hidden, setHidden] = React.useState(false);
   const [ready, setReady] = React.useState(false);
   const pan = React.useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
@@ -40,7 +42,11 @@ export function CotGlobalActions() {
 
   const expressionId = context?.expression?.id ?? undefined;
   const onGeneralHome = pathname === '/general' || pathname === '/general/';
-  const dockWidth = onGeneralHome ? 104 : 148;
+  const assistantAvailable = features.isEnabled('cot_assistant');
+  const notificationsAvailable = features.isEnabled('notifications') && features.isEnabled('in_app_notifications');
+  const showNotifications = !onGeneralHome && notificationsAvailable;
+  const actionCount = Number(assistantAvailable) + Number(showNotifications);
+  const dockWidth = actionCount <= 1 ? 92 : 136;
   const dockHeight = 54;
   const tabOffset = pathname.startsWith('/general') ? 84 : 18;
   const safeBottom = Math.max(insets.bottom, Platform.OS === 'web' ? 14 : 10) + tabOffset;
@@ -120,7 +126,7 @@ export function CotGlobalActions() {
     persist(next, false);
   }, [bounds.maxX, bounds.maxY, bounds.minX, bounds.minY, hidden, pan, persist, ready]);
 
-  if (mode !== 'authenticated' || !accessReady || !ready || hidden) return null;
+  if (mode !== 'authenticated' || !accessReady || !ready || hidden || actionCount === 0) return null;
   if (HIDDEN_EXACT.has(pathname) || HIDDEN_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return null;
 
   const openAssistant = () => {
@@ -155,16 +161,18 @@ export function CotGlobalActions() {
         ]}
       >
         <View style={[styles.dock, { backgroundColor: colors.cardElevated, borderColor: colors.borderSubtle }, shadows.floating]}>
-          <Pressable
-            onPress={openAssistant}
-            accessibilityRole="button"
-            accessibilityLabel={expressionId ? `Ask COT AI about ${context?.expression?.name ?? 'this Expression'}` : 'Ask COT AI'}
-            style={({ pressed }) => [styles.primary, { backgroundColor: colors.interactive }, pressed && styles.pressed]}
-          >
-            <Icon name="chatbubble-ellipses" size={21} color="#FFFFFF" />
-          </Pressable>
+          {assistantAvailable ? (
+            <Pressable
+              onPress={openAssistant}
+              accessibilityRole="button"
+              accessibilityLabel={expressionId ? `Ask COT AI about ${context?.expression?.name ?? 'this Expression'}` : 'Ask COT AI'}
+              style={({ pressed }) => [styles.primary, { backgroundColor: colors.interactive }, pressed && styles.pressed]}
+            >
+              <Icon name="chatbubble-ellipses" size={21} color="#FFFFFF" />
+            </Pressable>
+          ) : null}
 
-          {!onGeneralHome ? (
+          {showNotifications ? (
             <Pressable
               onPress={openNotifications}
               accessibilityRole="button"

@@ -15,6 +15,7 @@ import { commonOrganizationId, createNotifications, notificationPreview, senderI
 import { adminClient } from "../_shared/supabase.ts";
 import { loadPublicChatBadges } from "../_shared/identity-badges.ts";
 import { assertProfilesMayInteract, loadSafetyProfileSets } from "../_shared/safety.ts";
+import { assertFeatureEnabled } from "../_shared/feature-controls.ts";
 import { assertNoUnknownFields, assertObject, requiredString, uuid } from "../_shared/validation.ts";
 
 const MESSAGE_SELECT = "id,conversation_id,sender_profile_id,body,reply_to_id,attachment_ids,pinned_at,pinned_by_profile_id,sent_at,edited_at,redacted_at";
@@ -278,6 +279,13 @@ Deno.serve(createHandler(
       if (targetError) throw new ApiError("CHAT_DIRECTORY_FAILED", "We couldn’t find that user right now.", 500, undefined, false);
       if (!target || target.id === viewerId) throw new ApiError("CHAT_USER_NOT_FOUND", "We couldn’t find that user.", 404);
       await assertProfilesMayInteract(admin, viewerId, target.id);
+      const policyOrganizationId = await commonOrganizationId(admin, viewerId, target.id);
+      await assertFeatureEnabled(
+        admin,
+        "direct_messages",
+        { organizationId: policyOrganizationId },
+        "Direct messages are currently unavailable.",
+      );
 
       const pair = pairFor(viewerId, target.id);
       let { data: conversation, error: lookupError } = await admin
@@ -331,6 +339,12 @@ Deno.serve(createHandler(
         ? conversation.participant_high
         : conversation.participant_low;
       await assertProfilesMayInteract(admin, viewerId, otherProfileId);
+      const policyOrganizationId = await commonOrganizationId(admin, viewerId, otherProfileId);
+      await assertFeatureEnabled(admin, "direct_messages", { organizationId: policyOrganizationId }, "Direct messages are currently unavailable.");
+      await assertFeatureEnabled(admin, "chat_media", { organizationId: policyOrganizationId }, "Chat photos and files are currently unavailable.");
+      if (String(body.mimeType ?? "").toLowerCase().startsWith("audio/")) {
+        await assertFeatureEnabled(admin, "voice_notes", { organizationId: policyOrganizationId }, "Voice notes are currently unavailable.");
+      }
       return {
         data: await createChatUpload(admin, viewerId, { conversationId }, {
           mimeType: body.mimeType,
@@ -375,6 +389,11 @@ Deno.serve(createHandler(
         ? conversation.participant_high
         : conversation.participant_low;
       await assertConversationInteraction(admin, conversation, viewerId);
+      const policyOrganizationId = await commonOrganizationId(admin, viewerId, otherProfileId);
+      await assertFeatureEnabled(admin, "direct_messages", { organizationId: policyOrganizationId }, "Direct messages are currently unavailable.");
+      if (attachmentIds.length) {
+        await assertFeatureEnabled(admin, "chat_media", { organizationId: policyOrganizationId }, "Chat photos and files are currently unavailable.");
+      }
       await validateChatUploads(admin, viewerId, attachmentIds, { conversationId });
 
       if (replyToId) {

@@ -5,6 +5,7 @@ import { jsonBody } from "../_shared/request.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { resolvePaymentRoute } from "../_shared/payments/configuration.ts";
 import { assertNoUnknownFields,assertObject,optionalString,requiredString,uuid } from "../_shared/validation.ts";
+import { assertFeatureEnabled } from "../_shared/feature-controls.ts";
 
 function money(value:unknown){const amount=Number(value);if(!Number.isSafeInteger(amount)||amount<1||amount>100000000000)throw new ApiError('VALIDATION_FAILED','amountMinor must be a positive safe integer',422);return amount;}
 function currency(value:unknown){const code=requiredString(value,'currency',3).toUpperCase();if(!/^[A-Z]{3}$/.test(code))throw new ApiError('VALIDATION_FAILED','currency must be a 3-letter ISO code',422);return code;}
@@ -22,6 +23,11 @@ Deno.serve(createHandler(
     const targetBranchId=scope==='church'?null:auth.branchId;
     if(scope==='expression'&&!targetBranchId)throw new ApiError('EXPRESSION_REQUIRED','Join or select an Expression before giving to an Expression',403);
 
+    const admin=adminClient();
+    const featureScope={organizationId:auth.organizationId,expressionId:targetBranchId};
+    await assertFeatureEnabled(admin,'giving',featureScope,'Giving is currently unavailable in this area.');
+    await assertFeatureEnabled(admin,'online_payment_giving',featureScope,'Online giving is currently unavailable in this area.');
+
     const amountMinor=money(body.amountMinor),currencyCode=currency(body.currency),method=paymentMethod(body.paymentMethod);
     const purposeId=body.purposeId?uuid(String(body.purposeId),'purposeId',true)!:null;
     const campaignId=body.campaignId?uuid(String(body.campaignId),'campaignId',true)!:null;
@@ -35,7 +41,6 @@ Deno.serve(createHandler(
     if(!settings?.is_enabled||!settings.online_payment_enabled)throw new ApiError('ONLINE_GIVING_UNAVAILABLE','Online giving is not enabled for this giving destination',409);
 
     const{resolved,adapter}=await resolvePaymentRoute(auth.organizationId,currencyCode,method,'production');
-    const admin=adminClient();
     const{data:intent,error:intentError}=await admin.rpc('create_online_donation_intent',{
       target_profile_id:auth.user.id,
       target_organization_id:auth.organizationId,

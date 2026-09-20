@@ -5,6 +5,7 @@ import { jsonBody } from "../_shared/request.ts";
 import { enforceRateLimit } from "../_shared/rate-limit.ts";
 import { adminClient, userClient } from "../_shared/supabase.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString, uuid } from "../_shared/validation.ts";
+import { assertFeatureEnabled } from "../_shared/feature-controls.ts";
 
 const statuses = new Set(["submitted", "in_review", "praying", "answered", "closed"]);
 const inputPrivacy = new Set(["pastoral_only", "private", "prayer_team", "public_approved", "public_wall", "organization"]);
@@ -245,6 +246,12 @@ Deno.serve(createHandler(
       const organizationId = await resolveOrganizationId(request, body.organizationId);
       const branchId = body.branchId ? uuid(String(body.branchId), "branchId", true)! : null;
       const identity = await identityFor(request, organizationId, branchId);
+      await assertFeatureEnabled(
+        admin,
+        "prayer_request_ministry",
+        { organizationId, expressionId: branchId },
+        branchId ? "Prayer is currently unavailable in this Expression." : "Prayer is currently unavailable in General COT.",
+      );
 
       await enforceRateLimit(
         request,
@@ -311,6 +318,12 @@ Deno.serve(createHandler(
 
       const identity = await identityFor(request, existing.organization_id, existing.branch_id);
       if (!identity.user) throw new ApiError("AUTHENTICATION_REQUIRED", "Sign in to pray with this request", 401);
+      await assertFeatureEnabled(
+        admin,
+        "prayer_request_ministry",
+        { organizationId: existing.organization_id, expressionId: existing.branch_id },
+        "Prayer participation is currently unavailable in this area.",
+      );
       if (existing.branch_id && !identity.expressionMembership) {
         throw new ApiError("EXPRESSION_MEMBERSHIP_REQUIRED", "Join this Expression before interacting with its prayer wall", 403);
       }

@@ -13,6 +13,7 @@ import {
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
+import { useFeatureControls } from '@/features/availability/useFeatureControls';
 
 export default function GeneralToolsScreen() {
   const insets = useSafeAreaInsets();
@@ -23,6 +24,7 @@ export default function GeneralToolsScreen() {
     hasPublicCapability,
   } = useSession();
   const { preference, setPreference, colors } = useTheme();
+  const features = useFeatureControls();
 
   const hasPublicBroadcastAccess = hasPublicCapability('public.live_stream.create');
   const hasLeadershipAccess = mode === 'authenticated' && accessReady && (
@@ -42,115 +44,115 @@ export default function GeneralToolsScreen() {
   );
 
   const createItems = mode === 'authenticated' ? [
-    {
+    features.isEnabled('social_community_feed') && features.isEnabled('general_posting') ? {
       key: 'post',
       label: 'Post',
       icon: 'create-outline',
       description: 'Create a General COT post.',
       onPress: () => router.push({ pathname: '/general/community', params: { compose: 'post', intentId: String(Date.now()) } } as any),
-    },
-    {
+    } : null,
+    features.isEnabled('social_community_feed') && features.isEnabled('general_posting') && features.isEnabled('voice_posts') ? {
       key: 'voice',
       label: 'Voice',
       icon: 'mic-outline',
       description: 'Record and publish audio.',
       onPress: () => router.push({ pathname: '/general/community', params: { compose: 'audio', intentId: String(Date.now()) } } as any),
-    },
-    {
+    } : null,
+    features.isEnabled('social_community_feed') && features.isEnabled('general_posting') && features.isEnabled('reels') ? {
       key: 'reel',
       label: 'Reel',
       icon: 'flash-outline',
       description: 'Create a public Reel.',
       onPress: () => router.push('/general/studio/reel'),
-    },
-    {
+    } : null,
+    features.isEnabled('social_community_feed') && features.isEnabled('general_posting') && features.isEnabled('long_form_video') ? {
       key: 'video',
       label: 'Video',
       icon: 'videocam-outline',
       description: 'Publish a long-form video.',
       onPress: () => router.push('/general/studio/video'),
-    },
-  ] : [];
+    } : null,
+  ].filter(Boolean) as Array<{ key: string; label: string; icon: string; description: string; onPress: () => void }> : [];
 
   const cotItems = [
-    mode === 'authenticated' ? {
+    mode === 'authenticated' && features.isEnabled('direct_messages') ? {
       key: 'messages',
       label: 'Messages',
       icon: 'chatbubbles-outline',
       description: 'Private direct messages across COT.',
       onPress: () => router.push('/general/chat'),
     } : null,
-    mode === 'authenticated' ? {
+    mode === 'authenticated' && features.isEnabled('groups') ? {
       key: 'groups',
       label: 'Groups',
       icon: 'people-circle-outline',
       description: 'Church-wide groups and discussions.',
       onPress: () => router.push('/general/groups' as any),
     } : null,
-    {
+    features.isEnabled('live_streaming') && features.isEnabled('general_live') ? {
       key: 'live',
       label: 'Live',
       icon: 'radio-outline',
       description: 'Current and upcoming broadcasts.',
       onPress: () => router.push('/general/live' as any),
-    },
-    {
+    } : null,
+    features.isEnabled('library_books') ? {
       key: 'library',
       label: 'Library',
       icon: 'library-outline',
       description: 'Browse books, authors and continue reading.',
       onPress: () => router.push('/general/library' as any),
-    },
-    {
+    } : null,
+    features.isEnabled('devotionals') ? {
       key: 'devotional',
       label: 'Devotional',
       icon: 'sunny-outline',
       description: 'Open the daily devotional by year, month and day.',
       onPress: () => router.push('/general/devotional' as any),
-    },
-    {
+    } : null,
+    features.isEnabled('locations') ? {
       key: 'location',
       label: 'Location',
       icon: 'location-outline',
       description: 'Official church location.',
       onPress: () => router.push('/general/location' as any),
-    },
-    mode === 'authenticated' ? {
+    } : null,
+    mode === 'authenticated' && features.isEnabled('polls_giveaways') ? {
       key: 'participate',
       label: 'Polls',
       icon: 'stats-chart-outline',
       description: 'Polls and giveaways.',
       onPress: () => router.push('/general/participate' as any),
     } : null,
-    mode === 'authenticated' ? {
+    mode === 'authenticated' && features.isEnabled('bookmarks') ? {
       key: 'saved',
       label: 'Saved',
       icon: 'bookmark-outline',
       description: 'Saved posts and media.',
       onPress: () => router.push('/general/saved'),
     } : null,
-    {
+    features.isEnabled('prayer_request_ministry') ? {
       key: 'prayer',
       label: 'Prayer',
       icon: 'heart-outline',
       description: 'Prayer wall and private petitions.',
       onPress: () => router.push('/general/prayer'),
-    },
-    {
+    } : null,
+    features.isEnabled('giving') ? {
       key: 'giving',
       label: 'Giving',
       icon: 'gift-outline',
       description: 'Giving destinations and receipts.',
       onPress: () => router.push('/general/giving'),
-    },
-    mode === 'authenticated' ? {
+    } : null,
+    mode === 'authenticated' && features.isEnabled('expressions') ? {
       key: 'expressions',
       label: 'Expressions',
       icon: 'business-outline',
       description: 'Open or join Expression spaces.',
       onPress: () => router.push('/expressions'),
     } : null,
-    mode === 'authenticated' ? {
+    mode === 'authenticated' && features.isEnabled('cot_assistant') ? {
       key: 'assistant',
       label: 'Assistant',
       icon: 'sparkles',
@@ -237,12 +239,16 @@ export default function GeneralToolsScreen() {
                   <Icon name="chevron-forward" size={18} color={colors.textMuted} />
                 </Pressable>
                 <View style={[styles.settingsDivider, { backgroundColor: colors.borderSubtle }]} />
-                <Pressable onPress={() => router.push('/general/notifications')} style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}>
-                  <View style={[styles.settingsIcon, { backgroundColor: colors.bgSecondary }]}><Icon name="notifications-outline" size={19} color={colors.text} /></View>
-                  <Text style={[styles.settingsTitle, { color: colors.text }]}>Notifications</Text>
-                  <Icon name="chevron-forward" size={18} color={colors.textMuted} />
-                </Pressable>
-                <View style={[styles.settingsDivider, { backgroundColor: colors.borderSubtle }]} />
+                {features.isEnabled('notifications') && features.isEnabled('in_app_notifications') ? (
+                  <>
+                    <Pressable onPress={() => router.push('/general/notifications')} style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}>
+                      <View style={[styles.settingsIcon, { backgroundColor: colors.bgSecondary }]}><Icon name="notifications-outline" size={19} color={colors.text} /></View>
+                      <Text style={[styles.settingsTitle, { color: colors.text }]}>Notifications</Text>
+                      <Icon name="chevron-forward" size={18} color={colors.textMuted} />
+                    </Pressable>
+                    <View style={[styles.settingsDivider, { backgroundColor: colors.borderSubtle }]} />
+                  </>
+                ) : null}
                 <Pressable onPress={() => router.push('/general/notification-settings')} style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}>
                   <View style={[styles.settingsIcon, { backgroundColor: colors.bgSecondary }]}><Icon name="options-outline" size={19} color={colors.text} /></View>
                   <Text style={[styles.settingsTitle, { color: colors.text }]}>Notification preferences</Text>

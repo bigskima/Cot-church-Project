@@ -7,6 +7,7 @@ import { resolveSecretValue } from "../_shared/secrets.ts";
 import { defaultStreamingConfig, loadStreamingConfig } from "../_shared/streaming/configuration.ts";
 import { streamingProvider } from "../_shared/streaming/registry.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString, uuid } from "../_shared/validation.ts";
+import { assertFeatureEnabled } from "../_shared/feature-controls.ts";
 
 const visibilities = new Set(["public", "branch", "group", "private"]);
 const latencies = new Set(["standard", "reduced", "low"]);
@@ -286,6 +287,15 @@ Deno.serve(createHandler(
         if (group.branch_id !== targetBranchId) throw new ApiError("EXPRESSION_SCOPE_DENIED", "The selected group is outside this broadcast scope", 403);
       }
 
+      const featureScope = { organizationId, expressionId: targetBranchId, groupId };
+      await assertFeatureEnabled(admin, "live_streaming", featureScope, "Live streaming is currently unavailable in this area.");
+      await assertFeatureEnabled(
+        admin,
+        targetBranchId ? "expression_live" : "general_live",
+        featureScope,
+        targetBranchId ? "Expression Live is currently unavailable." : "General COT Live is currently unavailable.",
+      );
+
       const eventId = body.eventId ? uuid(String(body.eventId), "eventId", true)! : null;
       if (eventId) {
         const { data: event, error: eventError } = await admin
@@ -400,7 +410,7 @@ Deno.serve(createHandler(
     const id = uuid(requiredString(body.id, "id", 36), "id", true)!;
     const { data: stream, error } = await admin
       .from("live_streams")
-      .select("id,organization_id,branch_id,provider_config_id,provider_broadcast_id,provider_asset_id,status")
+      .select("id,organization_id,branch_id,group_id,provider_config_id,provider_broadcast_id,provider_asset_id,status")
       .eq("id", id)
       .maybeSingle();
     if (error || !stream) throw new ApiError("STREAM_NOT_FOUND", "Broadcast not found", 404);
@@ -414,6 +424,14 @@ Deno.serve(createHandler(
     const action = requiredString(body.action, "action", 30);
 
     if (action === "mark_live") {
+      const featureScope = { organizationId: stream.organization_id, expressionId: stream.branch_id, groupId: stream.group_id };
+      await assertFeatureEnabled(admin, "live_streaming", featureScope, "Live streaming is currently unavailable in this area.");
+      await assertFeatureEnabled(
+        admin,
+        stream.branch_id ? "expression_live" : "general_live",
+        featureScope,
+        stream.branch_id ? "Expression Live is currently unavailable." : "General COT Live is currently unavailable.",
+      );
       if (loaded.provider.providerCode !== "agora") {
         throw new ApiError("STREAMING_ACTION_UNSUPPORTED", "Only RTC broadcasts use host-driven live status", 409);
       }

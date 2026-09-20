@@ -5,6 +5,7 @@ import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { assertNoUnknownFields, assertObject, requiredString } from "../_shared/validation.ts";
+import { featureEnabled } from "../_shared/feature-controls.ts";
 
 const EXPO_SEND_URL = "https://exp.host/--/api/v2/push/send";
 const EXPO_RECEIPTS_URL = "https://exp.host/--/api/v2/push/getReceipts";
@@ -257,6 +258,17 @@ async function sendExpo(client: any, job: OutboxJob, preference: PreferenceRow) 
   }
 
   const urgent = content.data?.urgent === true;
+  const branchId = typeof content.data?.branchId === "string" ? content.data.branchId : null;
+  const groupId = typeof content.data?.groupId === "string" ? content.data.groupId : null;
+  const pushAvailable = await featureEnabled(client, "push_notifications", {
+    organizationId: job.organization_id,
+    expressionId: branchId,
+    groupId,
+  });
+  if (!pushAvailable && !urgent) {
+    await deliverJob(client, job, { skipped: "platform_push_disabled" });
+    return { delivered: 0, skipped: 1, failed: 0 };
+  }
   if (urgent && preference.urgent_platform_alerts_enabled === false) {
     await deliverJob(client, job, { skipped: "urgent_platform_alerts_disabled" });
     return { delivered: 0, skipped: 1, failed: 0 };

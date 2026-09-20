@@ -3,6 +3,7 @@ import { ApiError } from "../_shared/errors.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { uuid } from "../_shared/validation.ts";
+import { assertFeatureEnabled, featureEnabled } from "../_shared/feature-controls.ts";
 
 Deno.serve(
   createHandler(
@@ -17,6 +18,12 @@ Deno.serve(
       const expressionParam = url.searchParams.get("expressionId");
       const expressionId = expressionParam ? uuid(expressionParam, "expressionId", true)! : null;
       const admin = adminClient();
+      await assertFeatureEnabled(
+        admin,
+        "giving",
+        { organizationId, expressionId },
+        expressionId ? "Giving is currently unavailable in this Expression." : "Giving is currently unavailable for this church.",
+      );
 
       const { data: organization, error: organizationError } = await admin
         .from("organizations")
@@ -96,8 +103,9 @@ Deno.serve(
 
       const settings = settingsResult.data;
       const accounts = accountsResult.data ?? [];
+      const manualPolicyEnabled = await featureEnabled(admin, "manual_transfer_giving", { organizationId, expressionId });
       const manualAvailable = Boolean(
-        settings?.is_enabled && settings.manual_transfer_enabled && accounts.length > 0,
+        manualPolicyEnabled && settings?.is_enabled && settings.manual_transfer_enabled && accounts.length > 0,
       );
 
       return {
@@ -118,7 +126,7 @@ Deno.serve(
             : null,
           purposes: purposesResult.data ?? [],
           campaigns: campaignsResult.data ?? [],
-          bankAccounts: accounts,
+          bankAccounts: manualPolicyEnabled ? accounts : [],
           currencies: [...new Set(accounts.map((account: any) => account.currency))],
           methods: {
             manualBankTransfer: manualAvailable,

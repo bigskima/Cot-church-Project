@@ -23,6 +23,7 @@ import { invalidate } from '@/services/query-cache';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import type { Event, LiveStream, Reel, Sermon, SocialPost, Video } from '@/types/content';
+import { useFeatureControls } from '@/features/availability/useFeatureControls';
 
 interface HomePayload {
   organization: { id: string; name: string; slug?: string };
@@ -92,6 +93,7 @@ export default function GeneralHomeExperience() {
   const { colors } = useTheme();
   const contextOrganization = context?.organization ?? context?.organizations?.[0];
   const organizationId = contextOrganization?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
+  const controls = useFeatureControls({ organizationId });
   const accessToken = auth?.session.accessToken ?? null;
   const authenticated = mode === 'authenticated';
   const wide = width >= 820;
@@ -220,13 +222,14 @@ export default function GeneralHomeExperience() {
 
   const payload = resource.data?.payload;
   const organization = payload?.organization ?? contextOrganization;
-  const streams = payload?.streams ?? [];
-  const posts = payload?.posts ?? [];
-  const reels = payload?.reels ?? [];
-  const videos = payload?.videos ?? [];
-  const sermons = payload?.sermons ?? [];
-  const events = payload?.events ?? [];
-  const announcements = resource.data?.announcements ?? [];
+  const communityAvailable = controls.isEnabled('social_community_feed');
+  const streams = controls.isEnabled('live_streaming') && controls.isEnabled('general_live') ? (payload?.streams ?? []) : [];
+  const posts = communityAvailable ? (payload?.posts ?? []) : [];
+  const reels = communityAvailable && controls.isEnabled('reels') ? (payload?.reels ?? []) : [];
+  const videos = communityAvailable && controls.isEnabled('long_form_video') ? (payload?.videos ?? []) : [];
+  const sermons = controls.isEnabled('sermons') ? (payload?.sermons ?? []) : [];
+  const events = controls.isEnabled('events_gatherings') ? (payload?.events ?? []) : [];
+  const announcements = controls.isEnabled('announcements') ? (resource.data?.announcements ?? []) : [];
   const degradedSections = payload?.degradedSections ?? [];
   const rankingMode = (resource.data?.plan?.length ?? 0) > 0 || payload?.rankingMode === 'personalized' ? 'personalized' : 'recent';
   const activeStream = useMemo(
@@ -348,7 +351,7 @@ export default function GeneralHomeExperience() {
           refreshControl={<RefreshControl refreshing={resource.refreshing} onRefresh={refreshHome} tintColor={colors.interactive} colors={[colors.interactive]} progressBackgroundColor={colors.card} />}
           renderItem={({ item }) => {
             if (item.kind === 'section') return <View style={[styles.fullWidthItem, { width: contentWidth }]}>{renderSection(item)}</View>;
-            if (item.kind === 'post') return <View style={[styles.timelineItem, { width: Math.min(contentWidth, 920) }]}><PostCard post={item.post} expressionName={item.post.expression?.name} canEngage={authenticated} allowExternalShare={item.post.visibility === 'public'} onPressAuthor={item.post.author?.username ? () => router.push({ pathname: '/general/member/[username]', params: { username: item.post.author!.username! } } as any) : undefined} onPress={() => openPost(item.post.id)} onReply={() => openPost(item.post.id, true)} onReact={authenticated ? (reaction) => reactToPost(item.post.id, reaction) : undefined} onBookmark={authenticated ? (currentlySaved) => bookmarkPost(item.post.id, currentlySaved) : undefined} variant="feed" showContext={false} style={styles.homePostCard} /></View>;
+            if (item.kind === 'post') return <View style={[styles.timelineItem, { width: Math.min(contentWidth, 920) }]}><PostCard post={item.post} expressionName={item.post.expression?.name} canEngage={authenticated} allowExternalShare={item.post.visibility === 'public'} onPressAuthor={item.post.author?.username ? () => router.push({ pathname: '/general/member/[username]', params: { username: item.post.author!.username! } } as any) : undefined} onPress={() => openPost(item.post.id)} onReply={controls.isEnabled('comments') ? () => openPost(item.post.id, true) : undefined} onReact={authenticated && controls.isEnabled('reactions') ? (reaction) => reactToPost(item.post.id, reaction) : undefined} onBookmark={authenticated && controls.isEnabled('bookmarks') ? (currentlySaved) => bookmarkPost(item.post.id, currentlySaved) : undefined} variant="feed" showContext={false} style={styles.homePostCard} /></View>;
             if (item.kind === 'reel') return <View style={[styles.timelineItem, { width: Math.min(contentWidth, 920) }]}><ReelCard reel={item.reel} width={reelWidth} variant="feed" commentContext="public" onPressCreator={item.reel.content_items?.author?.username ? () => router.push({ pathname: '/general/member/[username]', params: { username: item.reel.content_items!.author!.username! } } as any) : undefined} onPress={() => router.push({ pathname: '/general/reels', params: { reelId: item.reel.id } } as any)} onOpenComments={item.reel.content_items?.id ? () => router.push({ pathname: '/general/comments/[contentId]', params: { contentId: item.reel.content_items!.id } } as any) : undefined} /></View>;
             return <View style={[styles.timelineItem, { width: Math.min(contentWidth, 920) }]}><VideoCard video={item.video} variant="feed" commentContext="public" onPress={() => router.push(`/general/watch/${item.video.id}` as any)} onPressCreator={item.video.content_items?.author?.username ? () => router.push({ pathname: '/general/member/[username]', params: { username: item.video.content_items!.author!.username! } } as any) : undefined} onOpenComments={item.video.content_items?.id ? () => router.push({ pathname: '/general/comments/[contentId]', params: { contentId: item.video.content_items!.id } } as any) : undefined} /></View>;
           }}

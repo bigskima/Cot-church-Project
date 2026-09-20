@@ -1,12 +1,15 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { ApiError } from "../_shared/errors.ts";
 import { createHandler } from "../_shared/handler.ts";
+import { adminClient } from "../_shared/supabase.ts";
+import { assertFeatureEnabled } from "../_shared/feature-controls.ts";
 
 Deno.serve(createHandler(
   { methods: ["GET"], authentication: "required", organization: "required" },
   async ({ request, auth }) => {
     if (!auth?.organizationId) throw new ApiError("ORGANIZATION_REQUIRED", "Organization context is required", 400);
     if (!auth.branchId) throw new ApiError("EXPRESSION_REQUIRED", "Select or join an Expression to view birthdays", 400);
+    await assertFeatureEnabled(adminClient(), "birthdays", { organizationId: auth.organizationId, expressionId: auth.branchId }, "Birthdays are currently unavailable in this Expression.");
 
     const url = new URL(request.url);
     const daysParam = url.searchParams.get("daysAhead");
