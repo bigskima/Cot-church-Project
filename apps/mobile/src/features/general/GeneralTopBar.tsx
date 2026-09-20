@@ -52,7 +52,7 @@ export function GeneralTopBar({ organizationName, authenticated, avatarUrl, disp
             style={({ pressed }) => [styles.identity, pressed && authenticated ? styles.pressed : null]}
           >
             <View style={[styles.brand, { backgroundColor: colors.cardElevated, borderColor: colors.borderSubtle }]}>
-              <BrandMark variant="header" size={34} forceCot />
+              <BrandMark variant="header" size={29} forceCot />
             </View>
             <View style={styles.identityCopy}>
               <View style={styles.titleRow}>
@@ -65,7 +65,7 @@ export function GeneralTopBar({ organizationName, authenticated, avatarUrl, disp
                   <Icon name="globe" size={13} color={colors.interactive} />
                 </View>
               </View>
-              <Text style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>{organizationName || 'City of Transformation'}</Text>
+              {wide ? <Text style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>{organizationName || 'City of Transformation'}</Text> : null}
             </View>
           </Pressable>
 
@@ -103,12 +103,12 @@ export function GeneralTopBar({ organizationName, authenticated, avatarUrl, disp
 
 const styles = StyleSheet.create({
   wrap: { paddingHorizontal: spacing.sm, paddingBottom: spacing.xs, gap: 7 },
-  bar: { width: '100%', maxWidth: 1120, alignSelf: 'center', minHeight: 70, borderWidth: 1, borderRadius: radius.xl, paddingHorizontal: 10, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  identity: { minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 1 },
-  brand: { width: 48, height: 48, borderRadius: 17, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  bar: { width: '100%', maxWidth: 1120, alignSelf: 'center', minHeight: 58, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: 8, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  identity: { minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 7, flexShrink: 1 },
+  brand: { width: 40, height: 40, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   identityCopy: { minWidth: 0, maxWidth: 250, flexShrink: 1 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  title: { fontSize: 17.5, lineHeight: 21, fontWeight: '900', letterSpacing: -0.52, flexShrink: 1 },
+  title: { fontSize: 15.5, lineHeight: 19, fontWeight: '900', letterSpacing: -0.35, flexShrink: 1 },
   meta: { fontSize: 10.5, lineHeight: 14, fontWeight: '700', marginTop: 2 },
   scopePill: { width: 25, height: 25, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   search: { flex: 1, maxWidth: 430, minHeight: 42, borderRadius: radius.pill, borderWidth: 1, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginLeft: 'auto' },
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
   searchHint: { borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 4 },
   searchHintText: { fontSize: 9, fontWeight: '800' },
   actions: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 6 },
-  iconButton: { width: 41, height: 41, borderRadius: 15, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  iconButton: { width: 38, height: 38, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   avatarButton: { width: 42, height: 42, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   pressed: { opacity: 0.78, transform: [{ scale: 0.975 }] },
 });
