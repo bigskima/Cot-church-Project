@@ -187,7 +187,7 @@ function Control({ label, onPress, active = false }: { label: string; onPress: (
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#03060B' },
   directStage: { flex: 1, position: 'relative', overflow: 'hidden', backgroundColor: '#070D16' },
-  waitingStage: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: '#09111E' },
+  waitingStage: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: '#09111E' },
   directAvatar: { width: 108, height: 108, borderRadius: 54, backgroundColor: '#182538', alignItems: 'center', justifyContent: 'center' },
   directAvatarText: { color: '#FFFFFF', fontSize: 34, fontWeight: '900' },
   directName: { color: '#FFFFFF', fontSize: 21, fontWeight: '900', marginTop: 16 },
