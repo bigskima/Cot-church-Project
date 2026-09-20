@@ -8,6 +8,7 @@ import { invalidate } from '@/services/query-cache';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import type { ActiveCallPayload, ChatCallKind, ChatCallScope } from './call-types';
+import { useFeatureControls } from '@/features/availability/useFeatureControls';
 
 type Props = {
   scope: ChatCallScope;
@@ -32,6 +33,14 @@ export function ChatCallActions(props: Props) {
   const { colors } = useTheme();
   const [busy, setBusy] = useState<ChatCallKind | ''>('');
   const [error, setError] = useState('');
+  const controls = useFeatureControls({
+    expressionId: props.expressionId ?? null,
+    groupId: props.groupId ?? null,
+  });
+  const callScopeKey = props.scope === 'direct' ? 'dm_calls' : props.scope === 'expression' ? 'expression_calls' : 'group_calls';
+  const callsAllowed = controls.isEnabled('calls') && controls.isEnabled(callScopeKey);
+  const audioAllowed = callsAllowed && controls.isEnabled('audio_calls');
+  const videoAllowed = callsAllowed && controls.isEnabled('video_calls');
   const scopeKey = queryString(props);
   const active = useResource<ActiveCallPayload | null>(
     `chat-call:${scopeKey}`,
@@ -73,6 +82,7 @@ export function ChatCallActions(props: Props) {
   };
 
   if (mode !== 'authenticated') return null;
+  if (!active.data?.call && !audioAllowed && !videoAllowed) return null;
 
   if (props.compact) {
     return (
@@ -83,12 +93,16 @@ export function ChatCallActions(props: Props) {
           </Pressable>
         ) : (
           <>
-            <Pressable disabled={!!busy} onPress={() => void start('audio')} style={styles.iconButton} accessibilityRole='button' accessibilityLabel='Start audio call'>
-              <Icon name='call-outline' size={19} color={colors.text} />
-            </Pressable>
-            <Pressable disabled={!!busy} onPress={() => void start('video')} style={styles.iconButton} accessibilityRole='button' accessibilityLabel='Start video call'>
-              <Icon name='videocam-outline' size={21} color={colors.text} />
-            </Pressable>
+            {audioAllowed ? (
+              <Pressable disabled={!!busy} onPress={() => void start('audio')} style={styles.iconButton} accessibilityRole='button' accessibilityLabel='Start audio call'>
+                <Icon name='call-outline' size={19} color={colors.text} />
+              </Pressable>
+            ) : null}
+            {videoAllowed ? (
+              <Pressable disabled={!!busy} onPress={() => void start('video')} style={styles.iconButton} accessibilityRole='button' accessibilityLabel='Start video call'>
+                <Icon name='videocam-outline' size={21} color={colors.text} />
+              </Pressable>
+            ) : null}
           </>
         )}
       </View>
@@ -105,14 +119,18 @@ export function ChatCallActions(props: Props) {
           </Pressable>
         ) : (
           <>
-            <Pressable disabled={!!busy} onPress={() => void start('audio')} style={[styles.pill, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
-              <Icon name='call-outline' size={15} color={colors.textSecondary} />
-              <Text style={[styles.label, { color: colors.textSecondary }]}>{busy === 'audio' ? 'Starting…' : 'Audio'}</Text>
-            </Pressable>
-            <Pressable disabled={!!busy} onPress={() => void start('video')} style={[styles.pill, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
-              <Icon name='videocam-outline' size={16} color={colors.textSecondary} />
-              <Text style={[styles.label, { color: colors.textSecondary }]}>{busy === 'video' ? 'Starting…' : 'Video'}</Text>
-            </Pressable>
+            {audioAllowed ? (
+              <Pressable disabled={!!busy} onPress={() => void start('audio')} style={[styles.pill, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+                <Icon name='call-outline' size={15} color={colors.textSecondary} />
+                <Text style={[styles.label, { color: colors.textSecondary }]}>{busy === 'audio' ? 'Starting…' : 'Audio'}</Text>
+              </Pressable>
+            ) : null}
+            {videoAllowed ? (
+              <Pressable disabled={!!busy} onPress={() => void start('video')} style={[styles.pill, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+                <Icon name='videocam-outline' size={16} color={colors.textSecondary} />
+                <Text style={[styles.label, { color: colors.textSecondary }]}>{busy === 'video' ? 'Starting…' : 'Video'}</Text>
+              </Pressable>
+            ) : null}
           </>
         )}
       </View>
