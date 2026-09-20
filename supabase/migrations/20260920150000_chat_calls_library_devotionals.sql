@@ -6,6 +6,10 @@ insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_typ
 values ('library-books','library-books',false,78643200,array['application/epub+zip','application/pdf'])
 on conflict (id) do update set public=excluded.public,file_size_limit=excluded.file_size_limit,allowed_mime_types=excluded.allowed_mime_types;
 
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('library-covers','library-covers',true,10485760,array['image/jpeg','image/png','image/webp'])
+on conflict (id) do update set public=excluded.public,file_size_limit=excluded.file_size_limit,allowed_mime_types=excluded.allowed_mime_types;
+
 create table if not exists public.chat_call_sessions (
   id uuid primary key default gen_random_uuid(),
   scope text not null check (scope in ('direct','expression','group')),
