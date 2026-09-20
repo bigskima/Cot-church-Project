@@ -1,8 +1,8 @@
 import React from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Avatar, Badge, Button, Icon, ResourceError, Skeleton } from '@/components';
+import { Badge, Button, Icon, ResourceError, Skeleton, SocialProfileHero } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -87,7 +87,6 @@ export default function GeneralProfileExperience() {
   const profile = context?.profile;
   const organization = context?.organization ?? context?.organizations?.[0] ?? context?.creatorOrganizations?.[0];
   const displayName = profile?.display_name?.trim() || 'Church Member';
-  const firstName = displayName.split(/\s+/).filter(Boolean)[0] || 'there';
 
   const everydayLinks: HubLink[] = [
     { key: 'messages', title: 'Messages', subtitle: 'Direct conversations across COT', icon: 'chatbubbles-outline', route: '/general/chat' },
@@ -130,46 +129,29 @@ export default function GeneralProfileExperience() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 126 }]}>
-        <View style={styles.pageHeading}>
-          <View style={styles.flex}>
-            <Text style={[styles.pageEyebrow, { color: colors.interactive }]}>YOUR COT</Text>
-            <Text style={[styles.pageTitle, { color: colors.text }]}>You</Text>
-            <Text style={[styles.pageSubtitle, { color: colors.textMuted }]}>Profile, participation and ministry access without digging through settings.</Text>
-          </View>
-          <View style={styles.topActions}>
-            <RoundAction icon="notifications-outline" label="Notifications" onPress={() => router.push('/general/notifications')} />
-            <RoundAction icon="settings-outline" label="Settings" onPress={() => router.push('/general/settings')} />
-          </View>
-        </View>
-
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: 0, paddingBottom: insets.bottom + 126 }]}>
         {contextStatus === 'loading' && !context ? (
           <View style={styles.loadingStack}><Skeleton height={220} borderRadius={radius.xxl} /><Skeleton height={84} count={4} /></View>
         ) : contextStatus === 'error' && !context ? (
           <ResourceError message={contextError || 'We couldn’t load your account right now.'} retry={refreshContext} />
         ) : (
           <>
-            <View style={[styles.identityCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
-              <View style={[styles.identityBanner, { backgroundColor: colors.primarySoft }]}>
-                {profile?.banner_url ? <Image source={{ uri: profile.banner_url }} style={styles.identityBannerImage} resizeMode="cover" /> : <><View style={[styles.heroOrbLarge, { backgroundColor: colors.primarySoftStrong }]} /><View style={[styles.heroOrbSmall, { backgroundColor: colors.card }]} /></>}
-              </View>
-              <View style={styles.identityBody}>
-                <View style={styles.identityMainRow}>
-                  <View style={[styles.avatarFrame, { backgroundColor: colors.card, borderColor: colors.card }]}><Avatar url={profile?.avatar_url} name={displayName} size="lg" /></View>
-                  <View style={styles.identityCopy}>
-                    <Text style={[styles.welcome, { color: colors.textMuted }]}>Good to see you, {firstName}.</Text>
-                    <Text style={[styles.memberName, { color: colors.text }]} numberOfLines={1}>{displayName}</Text>
-                    {profile?.username ? <Text style={[styles.memberHandle, { color: colors.textSecondary }]} numberOfLines={1}>@{profile.username}</Text> : null}
-                  </View>
-                  <Pressable onPress={() => router.push('/general/settings')} style={({ pressed }) => [styles.editButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.pressed]} accessibilityRole="button">
-                    <Icon name="create-outline" size={16} color={colors.text} /><Text style={[styles.editText, { color: colors.text }]}>Edit</Text>
-                  </Pressable>
-                </View>
-                <View style={styles.identityMetaRow}>
-                  {organization?.name ? <View style={[styles.metaPill, { backgroundColor: colors.bgSecondary }]}><Icon name="globe-outline" size={12} color={colors.interactive} /><Text style={[styles.metaText, { color: colors.textSecondary }]} numberOfLines={1}>{organization.name}</Text></View> : null}
-                  {ministry.hasAnyMinistryAccess ? <View style={[styles.metaPill, { backgroundColor: colors.primarySoft }]}><Icon name="shield-checkmark-outline" size={12} color={colors.interactive} /><Text style={[styles.metaTextStrong, { color: colors.interactive }]}>Ministry access</Text></View> : null}
-                </View>
-              </View>
+            <View style={styles.profileHero}>
+              <SocialProfileHero
+                displayName={displayName}
+                username={profile?.username}
+                avatarUrl={profile?.avatar_url}
+                bannerUrl={profile?.banner_url}
+                bio={(profile as any)?.bio ?? null}
+                badges={((profile as any)?.badges ?? [])}
+                contextLabel={organization?.name ?? null}
+                actions={
+                  <>
+                    <RoundAction icon="notifications-outline" label="Notifications" onPress={() => router.push('/general/notifications')} />
+                    <Button label="Edit profile" variant="outline" size="sm" onPress={() => router.push('/general/settings')} />
+                  </>
+                }
+              />
             </View>
 
             <View style={styles.section}>
@@ -263,6 +245,7 @@ export default function GeneralProfileExperience() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: { flexGrow: 1, width: '100%', maxWidth: 940, alignSelf: 'center', paddingHorizontal: spacing.md, gap: spacing.xl },
+  profileHero: { marginHorizontal: -spacing.md },
   flex: { flex: 1, minWidth: 0 },
   pageHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   pageEyebrow: { fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 1.1 },
