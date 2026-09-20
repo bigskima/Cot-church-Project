@@ -51,7 +51,7 @@ export default function GeneralGivingFinanceExperience() {
 
   if (!organization) return <View style={[styles.screen, styles.center, { backgroundColor: colors.bg }]}><EmptyState title="Choose a church" message="Choose a church before viewing giving finance." iconName="business-outline" /></View>;
   if (!access.accessReady) return <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top + spacing.md }]}><View style={styles.body}><Skeleton height={120} count={4} /></View></View>;
-  if (!access.canReadGivingFinance) return <View style={[styles.screen, styles.center, { backgroundColor: colors.bg }]}><EmptyState title="Finance access unavailable" message="Giving reports appear only for roles with finance-read permission." iconName="lock-closed-outline" /></View>;
+  if (!access.canReadGivingFinance) return <View style={[styles.screen, styles.center, { backgroundColor: colors.bg }]}><EmptyState title="Finance access unavailable" message="Giving reports are available only to authorized finance roles." iconName="lock-closed-outline" /></View>;
 
   const rows = resource.data ?? [];
   const totalDonations = rows.reduce((sum, row) => sum + Number(row.donation_count || 0), 0);
