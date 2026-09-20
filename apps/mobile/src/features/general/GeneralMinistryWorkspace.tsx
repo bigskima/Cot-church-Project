@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, Button, CompactRouteGrid, EmptyState, Icon, Skeleton } from '@/components';
 import { radius, spacing } from '@/design-system/tokens';
+import { COT_MINISTRY_GUIDE_URL } from '@/constants/guides';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { type GeneralMinistryArea, useGeneralMinistryAccess } from './useGeneralMinistryAccess';
@@ -86,6 +87,16 @@ export default function GeneralMinistryWorkspace() {
           <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>Ministry Tools</Text>
           {workspaceReady && hasWorkspaceAccess ? (
             <Text style={[styles.count, { color: colors.interactive }]}>{available.length}</Text>
+          ) : null}
+          {workspaceReady && hasWorkspaceAccess ? (
+            <Pressable
+              onPress={() => void Linking.openURL(COT_MINISTRY_GUIDE_URL)}
+              accessibilityRole="link"
+              accessibilityLabel="Open the COT Ministry Roles and Operations Guide"
+              style={[styles.roundButton, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}
+            >
+              <Icon name="book-outline" size={18} color={colors.interactive} />
+            </Pressable>
           ) : null}
           <Pressable onPress={() => router.push('/general/profile')} accessibilityRole="button" accessibilityLabel="Open profile">
             <Avatar url={profile?.avatar_url} name={displayName} size="sm" />
