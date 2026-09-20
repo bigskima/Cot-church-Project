@@ -5,6 +5,7 @@ import { useTheme } from '@/state/theme';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { Icon } from '../primitives/Icon';
 import { Avatar } from '../primitives/Avatar';
+import { CompactIdentityBadge } from '../identity/PublicIdentityBadge';
 import { InlineCommentsSheet, type InlineCommentsContext } from '../engagement/InlineCommentsSheet';
 import type { Video } from '@/types/content';
 
@@ -41,6 +42,7 @@ export function VideoCard({ video, expressionName, onPress, onBookmark, style, c
   const sourceName = expressionName || video.content_items?.expression?.name || video.content_items?.organization?.name || null;
   const creatorName = video.content_items?.author?.display_name || sourceName || 'COT';
   const creatorAvatar = video.content_items?.author?.avatar_url ?? undefined;
+  const creatorBadge = video.content_items?.author?.badges?.[0];
   const timeAgo = () => {
     const d = new Date(video.created_at); const diff = (Date.now() - d.getTime()) / 1000;
     if (diff < 3600) return `${Math.max(1, Math.floor(diff / 60))}m ago`;
@@ -63,7 +65,11 @@ export function VideoCard({ video, expressionName, onPress, onBookmark, style, c
         </Pressable>
         <View style={styles.textColumn}>
           <Text style={[styles.title, variant === 'feed' && styles.feedTitle, { color: colors.text }]} numberOfLines={2}>{video.title}</Text>
-          <Text style={[styles.metaText, { color: colors.textSecondary }]} numberOfLines={1}>{[sourceName, formatViews(video.views_count), timeAgo()].filter(Boolean).join(' · ')}</Text>
+          <View style={styles.creatorMetaRow}>
+            <Text style={[styles.metaText, { color: colors.textSecondary }]} numberOfLines={1}>{creatorName}</Text>
+            {creatorBadge ? <CompactIdentityBadge badge={creatorBadge} size={14} /> : null}
+          </View>
+          <Text style={[styles.metaText, { color: colors.textMuted }]} numberOfLines={1}>{[sourceName, formatViews(video.views_count), timeAgo()].filter(Boolean).join(' · ')}</Text>
         </View>
         {contentId ? <Pressable onPress={(event) => { event.stopPropagation?.(); setCommentsOpen(true); }} hitSlop={8} style={({ pressed }) => [styles.moreBtn, pressed && { backgroundColor: colors.bgSecondary }]} accessibilityRole="button" accessibilityLabel="Open video comments"><Icon name="chatbubble-ellipses-outline" size={18} color={colors.textMuted} /></Pressable> : null}
         {onBookmark ? (
@@ -87,5 +93,5 @@ const styles = StyleSheet.create({
   typeBadge: { position: 'absolute', top: 9, left: 9, minHeight: 25, borderRadius: radius.pill, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(5,11,20,0.72)' }, typeBadgeText: { color: '#FFFFFF', fontSize: 8.5, fontWeight: '900', letterSpacing: 0.7 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.xs, paddingTop: spacing.md, paddingBottom: spacing.xs },
   feedMetaRow: { paddingHorizontal: spacing.sm, paddingTop: spacing.md, paddingBottom: spacing.sm },
-  textColumn: { flex: 1, gap: 3, minWidth: 0 }, title: { fontSize: 15, fontWeight: '700', lineHeight: 20, letterSpacing: -0.18 }, feedTitle: { fontSize: 16, lineHeight: 21, fontWeight: '900', letterSpacing: -0.3 }, metaText: { fontSize: 11.5, lineHeight: 16 }, moreBtn: { width: 34, height: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  textColumn: { flex: 1, gap: 3, minWidth: 0 }, creatorMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, minWidth: 0 }, title: { fontSize: 15, fontWeight: '700', lineHeight: 20, letterSpacing: -0.18 }, feedTitle: { fontSize: 16, lineHeight: 21, fontWeight: '900', letterSpacing: -0.3 }, metaText: { fontSize: 11.5, lineHeight: 16 }, moreBtn: { width: 34, height: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
 });
