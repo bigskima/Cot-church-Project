@@ -24,6 +24,8 @@ import { RichChatComposer } from './RichChatComposer';
 import { RichMessageBubble } from './RichMessageBubble';
 import type { ChatReaction, ChatReply, ChatSendPayload, RichChatMessage } from './rich-chat-types';
 import { ChatCallActions } from '@/features/calls/ChatCallActions';
+import { CallHistoryBubble } from '@/features/calls/CallHistoryBubble';
+import type { CallHistoryPayload } from '@/features/calls/call-types';
 
 type Person = {
   id: string;
@@ -57,6 +59,10 @@ type InboxItem =
   | { kind: 'person'; id: string; person: Person }
   | { kind: 'conversation'; id: string; conversation: Conversation };
 
+type DirectTimelineItem =
+  | { kind: 'message'; id: string; at: string; message: RichChatMessage }
+  | { kind: 'call'; id: string; at: string; entry: CallHistoryPayload['history'][number] };
+
 export function GlobalChatExperience({ embeddedExpression = false }: { embeddedExpression?: boolean }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -69,7 +75,7 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
   const [replyTo, setReplyTo] = useState<ChatReply | null>(null);
   const [localMessages, setLocalMessages] = useState<RichChatMessage[]>([]);
   const [messageOverrides, setMessageOverrides] = useState<Map<string, Partial<RichChatMessage>>>(new Map());
-  const messageListRef = useRef<FlatList<RichChatMessage>>(null);
+  const messageListRef = useRef<FlatList<DirectTimelineItem>>(null);
 
   const [normalizedFilter, setNormalizedFilter] = useState('');
   const [actionError, setActionError] = useState('');
@@ -106,6 +112,17 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
       { signal, context: 'public' },
     );
   });
+
+  const callHistory = useResource<CallHistoryPayload>(
+    selected ? `chat-call:history:direct:${selected.id}` : 'chat-call:history:direct:none',
+    (signal) => {
+      if (!selected || mode !== 'authenticated') return Promise.resolve({ history: [] });
+      return api.request<CallHistoryPayload>(
+        `noop?service=calls&history=true&scope=direct&conversationId=${encodeURIComponent(selected.id)}`,
+        { signal, context: 'public' },
+      );
+    },
+  );
 
   useEffect(() => {
     setReplyTo(null);
@@ -288,6 +305,22 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
     }))];
   }, [localMessages, messageOverrides, thread.data?.messages]);
 
+  const timeline = useMemo<DirectTimelineItem[]>(() => {
+    const messageItems = displayedMessages.map((message) => ({
+      kind: 'message' as const,
+      id: `message:${message.id}`,
+      at: message.sent_at,
+      message,
+    }));
+    const callItems = (callHistory.data?.history ?? []).map((entry) => ({
+      kind: 'call' as const,
+      id: `call:${entry.call.id}`,
+      at: entry.call.created_at,
+      entry,
+    }));
+    return [...messageItems, ...callItems].sort((left, right) => new Date(left.at).getTime() - new Date(right.at).getTime());
+  }, [callHistory.data?.history, displayedMessages]);
+
   const beginReply = (message: RichChatMessage) => setReplyTo({
     id: message.id,
     body: message.body,
@@ -297,7 +330,7 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
   });
 
   const jumpToMessage = (messageId: string) => {
-    const index = displayedMessages.findIndex((message) => message.id === messageId);
+    const index = timeline.findIndex((item) => item.kind === 'message' && item.message.id === messageId);
     if (index < 0) return;
     messageListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
   };
@@ -365,7 +398,7 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
         ) : (
           <FlatList
             ref={messageListRef}
-            data={displayedMessages}
+            data={timeline}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.messages}
             keyboardShouldPersistTaps="handled"
@@ -373,10 +406,13 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
             onContentSizeChange={() => { if (localMessages.length) messageListRef.current?.scrollToEnd({ animated: true }); }}
             onScrollToIndexFailed={({ index, averageItemLength }) => { messageListRef.current?.scrollToOffset({ offset: Math.max(0, averageItemLength * index), animated: true }); }}
             renderItem={({ item }) => {
-              const mine = item.sender_profile_id === context?.profile?.id;
+              if (item.kind === 'call') {
+                return <CallHistoryBubble entry={item.entry} viewerId={context?.profile?.id ?? ''} />;
+              }
+              const mine = item.message.sender_profile_id === context?.profile?.id;
               return (
                 <RichMessageBubble
-                  message={item}
+                  message={item.message}
                   mine={mine}
                   onReply={beginReply}
                   onReact={(target, emoji) => void react(target, emoji)}
