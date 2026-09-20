@@ -1,7 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import {
   Animated,
-  Image,
   PanResponder,
   Pressable,
   StyleSheet,
@@ -10,7 +9,8 @@ import {
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
-import { AudioPlayer, Avatar, Icon, VideoPlayer } from '@/components';
+import { AdaptiveMediaImage, AudioPlayer, Avatar, Icon, VideoPlayer } from '@/components';
+import { CompactIdentityBadge } from '@/components/identity/PublicIdentityBadge';
 import { radius, spacing } from '@/design-system/tokens';
 import { useTheme } from '@/state/theme';
 import { downloadFile } from '@/utils/download-file';
@@ -81,11 +81,14 @@ function MessageAttachment({ attachment }: { attachment: ChatAttachment }) {
   let preview: React.ReactNode;
   if (attachment.type === 'image' || attachment.type === 'gif') {
     preview = (
-      <Image
-        source={{ uri: attachment.url }}
+      <AdaptiveMediaImage
+        url={attachment.url}
+        alt={attachment.type === 'gif' ? 'GIF attachment' : 'Photo attachment'}
+        widthHint={attachment.width}
+        heightHint={attachment.height}
+        resizeMode="contain"
         style={styles.image}
-        resizeMode="cover"
-        accessibilityLabel={attachment.type === 'gif' ? 'GIF attachment' : 'Photo attachment'}
+        backgroundColor="#0B1220"
       />
     );
   } else if (attachment.type === 'video') {
@@ -116,14 +119,13 @@ function MessageAttachment({ attachment }: { attachment: ChatAttachment }) {
         disabled={downloading}
         style={({ pressed }) => [
           styles.downloadChip,
-          { backgroundColor: colors.card, borderColor: colors.borderSubtle },
+          { backgroundColor: 'rgba(5,7,11,0.72)', borderColor: 'rgba(255,255,255,0.18)' },
           pressed && styles.pressed,
         ]}
         accessibilityRole="button"
         accessibilityLabel={`Download ${attachment.fileName || attachmentLabel(attachment.type)}`}
       >
-        <Icon name={downloading ? 'hourglass-outline' : 'download-outline'} size={13} color={colors.interactive} />
-        <Text style={[styles.downloadText, { color: colors.textSecondary }]}>{downloading ? 'Saving…' : 'Download'}</Text>
+        <Icon name={downloading ? 'hourglass-outline' : 'download-outline'} size={14} color="#FFFFFF" />
       </Pressable>
       {downloadError ? <Text style={[styles.downloadError, { color: colors.live }]}>{downloadError}</Text> : null}
     </View>
@@ -154,6 +156,11 @@ export function RichMessageBubble({
   const [copied, setCopied] = useState(false);
   const translateX = useRef(new Animated.Value(0)).current;
   const senderName = message.sender?.display_name || message.sender?.username || 'Member';
+  const senderBadge = message.sender?.badges?.[0];
+  const openSender = () => {
+    if (!message.sender?.username) return;
+    router.push(`/general/member/${encodeURIComponent(message.sender.username)}` as any);
+  };
   const panResponder = useMemo(() => PanResponder.create({
     onMoveShouldSetPanResponder: (_, gesture) => (
       gesture.dx > 10 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.4
@@ -199,7 +206,9 @@ export function RichMessageBubble({
         style={[styles.row, mine && styles.rowMine, { transform: [{ translateX }] }]}
       >
         {!mine && showSender ? (
-          <Avatar url={message.sender?.avatar_url ?? undefined} name={senderName} size="xs" />
+          <Pressable onPress={openSender} disabled={!message.sender?.username} hitSlop={5} accessibilityRole={message.sender?.username ? 'link' : undefined}>
+            <Avatar url={message.sender?.avatar_url ?? undefined} name={senderName} size="xs" />
+          </Pressable>
         ) : null}
         <View style={styles.messageColumn}>
           <Pressable
@@ -217,9 +226,12 @@ export function RichMessageBubble({
           >
             <View style={styles.bubbleMeta}>
               {!mine && showSender ? (
-                <Text style={[styles.senderName, { color: colors.interactive }]} numberOfLines={1}>
-                  {message.sender?.username ? `@${message.sender.username}` : senderName}
-                </Text>
+                <Pressable onPress={openSender} disabled={!message.sender?.username} style={styles.senderIdentity} accessibilityRole={message.sender?.username ? 'link' : undefined}>
+                  <Text style={[styles.senderName, { color: colors.interactive }]} numberOfLines={1}>
+                    {message.sender?.username ? `@${message.sender.username}` : senderName}
+                  </Text>
+                  {senderBadge ? <CompactIdentityBadge badge={senderBadge} size={14} /> : null}
+                </Pressable>
               ) : <View style={styles.flex} />}
               {copied ? <Icon name="checkmark-outline" size={13} color={mine ? '#FFFFFF' : colors.interactive} /> : null}
               {message.pinned_at ? <Icon name="pin" size={13} color={mine ? '#FFFFFF' : colors.interactive} /> : null}
@@ -328,7 +340,8 @@ const styles = StyleSheet.create({
   theirs: { alignSelf: 'flex-start', borderBottomLeftRadius: 5 },
   flex: { flex: 1 },
   bubbleMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 13 },
-  senderName: { flex: 1, fontSize: 10, fontWeight: '800', marginBottom: 2 },
+  senderIdentity: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 },
+  senderName: { flexShrink: 1, fontSize: 10, fontWeight: '800' },
   messageText: { fontSize: 15, lineHeight: 20, marginTop: 3 },
   mentionText: { fontWeight: '900', textDecorationLine: 'underline' },
   time: { fontSize: 9, lineHeight: 12, alignSelf: 'flex-end', marginTop: 3 },
@@ -336,11 +349,10 @@ const styles = StyleSheet.create({
   replySender: { fontSize: 10, fontWeight: '800' },
   replyBody: { fontSize: 11, lineHeight: 15, marginTop: 1 },
   attachments: { gap: 7, marginBottom: 4 },
-  attachmentWrap: { gap: 4 },
-  image: { width: 238, maxWidth: '100%', height: 190, borderRadius: radius.md, backgroundColor: '#0B1220' },
+  attachmentWrap: { position: 'relative', gap: 4 },
+  image: { width: 238, maxWidth: '100%', borderRadius: radius.md, backgroundColor: '#0B1220' },
   player: { width: 270, maxWidth: '100%', marginVertical: 0 },
-  downloadChip: { alignSelf: 'flex-start', minHeight: 28, borderRadius: radius.pill, borderWidth: 1, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', gap: 5 },
-  downloadText: { fontSize: 9.5, fontWeight: '800' },
+  downloadChip: { position: 'absolute', right: 6, top: 6, width: 30, height: 30, borderRadius: 15, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   downloadError: { fontSize: 9.5, lineHeight: 13 },
   missingMedia: { minWidth: 180, minHeight: 54, borderRadius: radius.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   missingMediaText: { fontSize: 11, fontWeight: '700' },
