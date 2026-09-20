@@ -47,7 +47,7 @@ function publicProfile(profile: any, badges: any[] = []) {
 async function requireConversation(admin: any, conversationId: string, viewerId: string) {
   const { data: conversation, error } = await admin
     .from("direct_conversations")
-    .select("id,participant_low,participant_high,created_at,updated_at")
+    .select("id,participant_low,participant_high,participant_low_unread_count,participant_high_unread_count,participant_low_last_read_at,participant_high_last_read_at,created_at,updated_at")
     .eq("id", conversationId)
     .maybeSingle();
   if (error) throw new ApiError("CHAT_LOAD_FAILED", "We couldn’t load this conversation.", 500, undefined, false);
@@ -125,6 +125,20 @@ Deno.serve(createHandler(
           new Set<string>(),
           { organizationId: identityOrganizationId },
         );
+
+        const unreadColumn = conversation.participant_low === viewerId
+          ? "participant_low_unread_count"
+          : "participant_high_unread_count";
+        const readAtColumn = conversation.participant_low === viewerId
+          ? "participant_low_last_read_at"
+          : "participant_high_last_read_at";
+        if (Number(conversation[unreadColumn] ?? 0) > 0) {
+          await admin.from("direct_conversations")
+            .update({ [unreadColumn]: 0, [readAtColumn]: new Date().toISOString() })
+            .eq("id", conversationId)
+            .gt(unreadColumn, 0);
+        }
+
         return {
           data: {
             conversation: {
@@ -160,11 +174,11 @@ Deno.serve(createHandler(
         .limit(100);
       if (conversationError) throw new ApiError("CHAT_LOAD_FAILED", "We couldn’t load your conversations.", 500, undefined, false);
 
-      const relationshipConversations = (conversations ?? []).filter((conversation: any) => {
+      const visibleConversations = (conversations ?? []).filter((conversation: any) => {
         const otherId = conversation.participant_low === viewerId ? conversation.participant_high : conversation.participant_low;
-        return relationshipIds.has(otherId);
+        return !safety.blockedProfiles.has(otherId);
       });
-      const conversationOtherIds = [...new Set(relationshipConversations.map((conversation: any) =>
+      const conversationOtherIds = [...new Set(visibleConversations.map((conversation: any) =>
         conversation.participant_low === viewerId ? conversation.participant_high : conversation.participant_low
       ))];
 
@@ -172,12 +186,12 @@ Deno.serve(createHandler(
         conversationOtherIds.length
           ? admin.from("profiles").select("id,username,display_name,avatar_url,banner_url").in("id", conversationOtherIds)
           : Promise.resolve({ data: [] as any[] }),
-        relationshipConversations.length
+        visibleConversations.length
           ? admin.from("direct_messages")
               .select("conversation_id,body,attachment_ids,sent_at,sender_profile_id")
-              .in("conversation_id", relationshipConversations.map((row: any) => row.id))
+              .in("conversation_id", visibleConversations.map((row: any) => row.id))
               .order("sent_at", { ascending: false })
-              .limit(1000)
+              .limit(2000)
           : Promise.resolve({ data: [] as any[] }),
       ]);
 
@@ -218,8 +232,10 @@ Deno.serve(createHandler(
 
       return {
         data: {
-          people: people.map(publicProfile),
-          conversations: relationshipConversations
+          people: people
+            .filter((profile: any) => !conversationOtherIds.includes(profile.id))
+            .map(publicProfile),
+          conversations: visibleConversations
             .map((conversation: any) => {
               const otherId = conversation.participant_low === viewerId
                 ? conversation.participant_high
@@ -235,6 +251,11 @@ Deno.serve(createHandler(
                       body: recentMap.get(conversation.id).body || "Media attachment",
                     }
                   : null,
+                unreadCount: Number(
+                  conversation.participant_low === viewerId
+                    ? conversation.participant_low_unread_count ?? 0
+                    : conversation.participant_high_unread_count ?? 0,
+                ),
               };
             })
             .filter((conversation: any) => conversation.other),
