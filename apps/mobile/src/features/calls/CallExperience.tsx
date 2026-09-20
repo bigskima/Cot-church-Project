@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Avatar, Icon } from '@/components';
 import { useResource } from '@/hooks/use-resource';
@@ -12,6 +13,7 @@ import type { ActiveCallPayload, JoinedCallPayload } from './call-types';
 export function CallExperience({ callId, autoAnswer = false }: { callId: string; autoAnswer?: boolean }) {
   const { api, context, mode } = useSession();
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const viewerId = context?.profile?.id ?? '';
   const [payload, setPayload] = useState<JoinedCallPayload | null>(null);
   const [error, setError] = useState('');
@@ -72,6 +74,17 @@ export function CallExperience({ callId, autoAnswer = false }: { callId: string;
     if (!payload || !call || !['ended', 'cancelled'].includes(call.status)) return;
     leftRef.current = true;
   }, [call?.status, payload]);
+
+  // Realtime remains the primary transport, but a lightweight per-call refresh
+  // guarantees that an authoritative "end for everyone" state closes every
+  // participant's media session even if a browser misses a realtime frame.
+  useEffect(() => {
+    if (!payload || ended) return;
+    const timer = setInterval(() => {
+      void metadata.refresh();
+    }, 1500);
+    return () => clearInterval(timer);
+  }, [ended, metadata.refresh, payload]);
 
   useEffect(() => () => {
     if (!payload || leftRef.current || ended) return;
@@ -205,6 +218,7 @@ export function CallExperience({ callId, autoAnswer = false }: { callId: string;
         scope={call.scope}
         otherName={directOtherName}
         onError={setError}
+        overlayBottomInset={Math.max(insets.bottom, 10) + 62}
       />
       <View style={styles.topBar} pointerEvents='box-none'>
         <Pressable onPress={() => void leave(false)} style={styles.round}><Icon name='chevron-down' size={22} color='#FFFFFF' /></Pressable>
@@ -220,9 +234,23 @@ export function CallExperience({ callId, autoAnswer = false }: { callId: string;
         </View>
       </View>
       {error ? <View style={styles.errorBanner}><Text style={styles.errorText}>{error}</Text></View> : null}
-      <View style={styles.endRow} pointerEvents='box-none'>
-        <Pressable disabled={leaving} onPress={() => void leave(false)} style={styles.leave}><Icon name='call' size={21} color='#FFFFFF' /><Text style={styles.leaveText}>{directWaiting ? 'Cancel' : 'Leave'}</Text></Pressable>
-        {owner && call.scope !== 'direct' ? <Pressable disabled={leaving} onPress={() => void leave(true)} style={styles.endAll}><Text style={styles.endAllText}>End for everyone</Text></Pressable> : null}
+      <View style={[styles.endRow, { bottom: Math.max(insets.bottom, 10) + 10 }]} pointerEvents='box-none'>
+        {owner && call.scope === 'direct' ? (
+          <Pressable disabled={leaving} onPress={() => void leave(true)} style={styles.leave}>
+            <Icon name='call' size={21} color='#FFFFFF' />
+            <Text style={styles.leaveText}>{directWaiting ? 'Cancel call' : 'End call'}</Text>
+          </Pressable>
+        ) : (
+          <Pressable disabled={leaving} onPress={() => void leave(false)} style={styles.leave}>
+            <Icon name='call' size={21} color='#FFFFFF' />
+            <Text style={styles.leaveText}>{directWaiting ? 'Cancel' : 'Leave'}</Text>
+          </Pressable>
+        )}
+        {owner && call.scope !== 'direct' ? (
+          <Pressable disabled={leaving} onPress={() => void leave(true)} style={styles.endAll}>
+            <Text style={styles.endAllText}>End for everyone</Text>
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );
@@ -259,7 +287,7 @@ const styles = StyleSheet.create({
   callMeta: { color: '#CBD5E1', fontSize: 9, marginTop: 1 },
   errorBanner: { position: 'absolute', left: 16, right: 16, top: 70, backgroundColor: 'rgba(127,29,29,0.88)', padding: 9, borderRadius: 12 },
   errorText: { color: '#FFFFFF', fontSize: 11, textAlign: 'center' },
-  endRow: { position: 'absolute', bottom: 18, left: 12, right: 12, flexDirection: 'row', justifyContent: 'center', gap: 10 },
+  endRow: { position: 'absolute', left: 12, right: 12, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10, zIndex: 20 },
   leave: { minWidth: 98, height: 48, borderRadius: 24, paddingHorizontal: 17, backgroundColor: '#DC2626', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   leaveText: { color: '#FFFFFF', fontWeight: '900', fontSize: 12 },
   endAll: { minWidth: 138, height: 48, borderRadius: 24, paddingHorizontal: 17, backgroundColor: 'rgba(20,25,35,0.92)', alignItems: 'center', justifyContent: 'center' },
