@@ -153,3 +153,83 @@ export function devotionalDateFromTitle(title: string, year: number) {
   }
   return null;
 }
+
+
+export function devotionalDateFromChapter(title: string, body: string, year: number) {
+  return devotionalDateFromTitle(title, year)
+    ?? devotionalDateFromTitle(body.slice(0, 1200), year);
+}
+
+function isDateLabel(value: string, year: number) {
+  return devotionalDateFromTitle(value, year) !== null;
+}
+
+export function parseDevotionalChapter(title: string, body: string, year: number) {
+  const date = devotionalDateFromChapter(title, body, year);
+  const rawLines = body
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const lines = [...rawLines];
+  while (lines.length && (
+    isDateLabel(lines[0], year)
+    || lines[0].toLowerCase() === title.trim().toLowerCase()
+  )) {
+    lines.shift();
+  }
+
+  let devotionalTitle = "";
+  let scripture = "";
+  let memoryVerse = "";
+  let prayer = "";
+  const bodyLines: string[] = [];
+  let inPrayer = false;
+
+  for (const line of lines) {
+    const scriptureMatch = line.match(/^(?:scripture|bible reading|reading)\s*:\s*(.+)$/i);
+    if (scriptureMatch && !scripture) {
+      scripture = scriptureMatch[1].trim();
+      continue;
+    }
+    const memoryMatch = line.match(/^(?:memory verse|key verse|verse)\s*:\s*(.+)$/i);
+    if (memoryMatch && !memoryVerse) {
+      memoryVerse = memoryMatch[1].trim();
+      continue;
+    }
+    const prayerInline = line.match(/^(?:prayer|prayer\s*\/\s*reflection|reflection)\s*:\s*(.+)$/i);
+    if (prayerInline) {
+      inPrayer = true;
+      prayer = prayerInline[1].trim();
+      continue;
+    }
+    if (/^(?:prayer|prayer\s*\/\s*reflection|reflection)$/i.test(line)) {
+      inPrayer = true;
+      continue;
+    }
+
+    if (!devotionalTitle && !inPrayer && !/^(?:scripture|memory verse|key verse|bible reading|reading)\b/i.test(line)) {
+      devotionalTitle = line;
+      continue;
+    }
+
+    if (inPrayer) prayer += `${prayer ? "\n\n" : ""}${line}`;
+    else bodyLines.push(line);
+  }
+
+  const fallbackTitle = title.trim();
+  if (!devotionalTitle || devotionalDateFromTitle(devotionalTitle, year)) {
+    devotionalTitle = fallbackTitle && !devotionalDateFromTitle(fallbackTitle, year)
+      ? fallbackTitle
+      : "Daily Devotional";
+  }
+
+  return {
+    date,
+    title: devotionalTitle.slice(0, 180),
+    scripture: scripture.slice(0, 1000),
+    memoryVerse: memoryVerse.slice(0, 1000),
+    body: bodyLines.join("\n\n").trim() || rawLines.join("\n\n").trim(),
+    prayer: prayer.slice(0, 5000).trim(),
+  };
+}
