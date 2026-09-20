@@ -3,6 +3,7 @@ import { ApiError } from "../_shared/errors.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { resolveSecretJson } from "../_shared/secrets.ts";
+import { commonOrganizationId, createNotifications, senderIdentity } from "../_shared/notifications.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { assertProfilesMayInteract } from "../_shared/safety.ts";
 import { assertObject, requiredString, uuid } from "../_shared/validation.ts";
@@ -60,7 +61,7 @@ async function directAccess(admin: any, viewerId: string, conversationId: string
   }
   const otherProfileId = data.participant_low === viewerId ? data.participant_high : data.participant_low;
   await assertProfilesMayInteract(admin, viewerId, otherProfileId);
-  return { organizationId: null, otherProfileId };
+  return { organizationId: null, otherProfileId, branchId: null };
 }
 
 async function expressionAccess(admin: any, viewerId: string, expressionId: string | null | undefined) {
@@ -74,13 +75,13 @@ async function expressionAccess(admin: any, viewerId: string, expressionId: stri
   if (error || !membership || membership.chat_banned_at) {
     throw new ApiError("CALL_ACCESS_DENIED", "Join this Expression to use its call.", 403);
   }
-  return { organizationId: membership.organization_id as string, otherProfileId: null };
+  return { organizationId: membership.organization_id as string, otherProfileId: null, branchId: expressionId };
 }
 
 async function groupAccess(admin: any, viewerId: string, groupId: string | null | undefined, sectionId: string | null | undefined) {
   if (!groupId) throw new ApiError("VALIDATION_FAILED", "groupId is required.", 422);
   const { data: group, error: groupError } = await admin.from("groups")
-    .select("id,organization_id,is_active")
+    .select("id,organization_id,branch_id,is_active")
     .eq("id", groupId)
     .eq("is_active", true)
     .maybeSingle();
@@ -125,7 +126,7 @@ async function groupAccess(admin: any, viewerId: string, groupId: string | null 
     }
   }
 
-  return { organizationId: group.organization_id as string, otherProfileId: null };
+  return { organizationId: group.organization_id as string, otherProfileId: null, branchId: group.branch_id as string | null };
 }
 
 async function authorizeScope(admin: any, viewerId: string, input: ScopeInput) {
@@ -139,6 +140,42 @@ function applyScopeQuery(query: any, input: ScopeInput) {
   if (input.scope === "expression") return query.eq("scope", "expression").eq("expression_id", input.expressionId);
   query = query.eq("scope", "group").eq("group_id", input.groupId);
   return input.sectionId ? query.eq("section_id", input.sectionId) : query.is("section_id", null);
+}
+
+async function callRecipients(admin: any, input: ScopeInput, viewerId: string, otherProfileId?: string | null) {
+  if (input.scope === "direct") return otherProfileId ? [otherProfileId] : [];
+  if (input.scope === "expression") {
+    const { data } = await admin.from("expression_memberships")
+      .select("profile_id")
+      .eq("branch_id", input.expressionId)
+      .eq("status", "active")
+      .is("chat_banned_at", null)
+      .neq("profile_id", viewerId)
+      .limit(250);
+    return (data ?? []).map((row: any) => row.profile_id);
+  }
+  if (!input.groupId) return [];
+  const { data: gm } = await admin.from("group_memberships")
+    .select("id,membership_id")
+    .eq("group_id", input.groupId)
+    .eq("status", "active")
+    .is("banned_at", null)
+    .limit(500);
+  let memberships = gm ?? [];
+  if (input.sectionId && memberships.length) {
+    const { data: allowed } = await admin.from("group_chat_section_members")
+      .select("group_membership_id")
+      .eq("section_id", input.sectionId)
+      .in("group_membership_id", memberships.map((row: any) => row.id));
+    const allowedIds = new Set((allowed ?? []).map((row: any) => row.group_membership_id));
+    memberships = memberships.filter((row: any) => allowedIds.has(row.id));
+  }
+  if (!memberships.length) return [];
+  const { data: members } = await admin.from("memberships")
+    .select("id,profile_id")
+    .in("id", memberships.map((row: any) => row.membership_id))
+    .eq("status", "active");
+  return (members ?? []).map((row: any) => row.profile_id).filter((id: string) => id !== viewerId);
 }
 
 async function activeCall(admin: any, input: ScopeInput) {
@@ -264,6 +301,31 @@ Deno.serve(createHandler(
       const participantRows = [{ call_id: call.id, profile_id: viewerId, state: "joined", joined_at: new Date().toISOString() }];
       if (access.otherProfileId) participantRows.push({ call_id: call.id, profile_id: access.otherProfileId, state: "invited", joined_at: null } as any);
       await admin.from("chat_call_participants").upsert(participantRows, { onConflict: "call_id,profile_id" });
+
+      const recipientProfileIds = await callRecipients(admin, input, viewerId, access.otherProfileId);
+      const notificationOrganizationId = access.organizationId
+        ?? (access.otherProfileId ? await commonOrganizationId(admin, viewerId, access.otherProfileId) : null);
+      if (notificationOrganizationId && recipientProfileIds.length) {
+        const sender = await senderIdentity(admin, viewerId);
+        const senderName = sender.display_name || sender.username || "A COT member";
+        await createNotifications(admin, {
+          organizationId: notificationOrganizationId,
+          recipientProfileIds,
+          senderProfileId: viewerId,
+          type: "chat_call_started",
+          title: `${senderName} started a ${callKind} call`,
+          body: input.scope === "direct" ? "Tap to join the call." : input.scope === "expression" ? "Join the Expression discussion call." : "Join the Group discussion call.",
+          data: {
+            scope: access.branchId ? "expression" : "general",
+            branchId: access.branchId ?? null,
+            entityType: "chat_call",
+            entityId: call.id,
+            callId: call.id,
+            callKind,
+            route: `/calls/${call.id}`,
+          },
+        });
+      }
       return { data: { call, participants: await participants(admin, call.id), existing: false }, status: 201 };
     }
 
