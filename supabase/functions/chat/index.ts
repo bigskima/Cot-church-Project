@@ -112,12 +112,15 @@ Deno.serve(createHandler(
 
         if (messagesError) throw new ApiError("CHAT_LOAD_FAILED", "We couldn’t load these messages.", 500, undefined, false);
         const profileMap = new Map((people ?? []).map((profile: any) => [profile.id, profile]));
+        const identityOrganizationId = await commonOrganizationId(admin, viewerId, otherProfileId);
         const messages = await hydrateChatMessages(
           admin,
           "direct_messages",
           "direct_message_reactions",
           (messageRows ?? []).reverse(),
           viewerId,
+          new Set<string>(),
+          { organizationId: identityOrganizationId },
         );
         return {
           data: {
@@ -411,6 +414,8 @@ Deno.serve(createHandler(
           "direct_message_reactions",
           [created],
           viewerId,
+          new Set<string>(),
+          { organizationId },
         ))[0],
         status: 201,
       };
