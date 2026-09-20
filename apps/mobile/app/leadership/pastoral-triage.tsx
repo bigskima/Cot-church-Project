@@ -173,7 +173,7 @@ export default function PastoralTriageScreen() {
           <ScreenHeader
             title="Pastoral Care"
             kicker="LEADERSHIP"
-            subtitle="Prayer and live-service follow-up stay inside your assigned church or Expression scope."
+            subtitle="Prayer and live-service follow-up stay within the church or Expression you are responsible for."
             showBack
           />
         </View>
@@ -250,7 +250,7 @@ export default function PastoralTriageScreen() {
                   );
                 })
               ) : (
-                <EmptyState title="No Prayer Requests in This Queue" message="New petitions routed to your exact prayer or pastoral scope will appear here." iconName="shield-checkmark-outline" />
+                <EmptyState title="No Prayer Requests in This Queue" message="New petitions assigned to your prayer or pastoral care area will appear here." iconName="shield-checkmark-outline" />
               )}
             </View>
           ) : canReceiveFollowups ? (

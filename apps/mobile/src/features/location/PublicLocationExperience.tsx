@@ -125,7 +125,7 @@ export function PublicLocationExperience({ scope, expressionId }: { scope: 'gene
       ) : !location ? (
         <EmptyState
           title="Location has not been published yet"
-          message={scope === 'expression' ? 'An authorized Expression leader can add the official address in Expression Settings.' : 'An authorized General COT leader can publish the official church location from Our Story & Location.'}
+          message={scope === 'expression' ? 'An authorized Expression leader can add the official address in Expression Settings.' : 'An authorized General COT leader can publish the official church location from the Church Profile.'}
           iconName="location-outline"
           actionLabel={scope === 'general' && generalAccess.canManageLeadership ? 'Publish location' : undefined}
           onAction={scope === 'general' && generalAccess.canManageLeadership

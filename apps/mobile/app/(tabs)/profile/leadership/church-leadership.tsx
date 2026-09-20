@@ -1,6 +1,6 @@
 import React from 'react';
-import LeadershipManageExperience from '@/features/leadership/LeadershipManageExperience';
+import { Redirect } from 'expo-router';
 
-export default function ChurchLeadershipManageScreen() {
-  return <LeadershipManageExperience scope="organization" />;
+export default function ChurchLeadershipManageRoute() {
+  return <Redirect href={{ pathname: '/general/church-story', params: { manage: '1', tab: 'leadership' } } as any} />;
 }

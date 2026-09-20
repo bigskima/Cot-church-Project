@@ -156,7 +156,7 @@ export function ExpressionManagementHub() {
       {
         key: 'books',
         title: 'Financial Management',
-        description: 'Wallets, sessions, manual records and immutable ledger.',
+        description: 'Manage giving accounts, received gifts, expenses and finance reports.',
         iconName: 'wallet-outline',
         route: `${base}/books`,
         enabled: access.canReadExpressionFinance,

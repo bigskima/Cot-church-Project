@@ -70,7 +70,7 @@ export function ExpressionLeadershipExperience({ embedded = false, expressionId 
             </View>
             <View style={styles.flex}>
               <Text style={[styles.contextTitle, { color: colors.text }]}>Serving this community</Text>
-              <Text style={[styles.contextCopy, { color: colors.textSecondary }]}>Leadership shown here is scoped to {expressionName}, separate from the church-wide General COT leadership experience.</Text>
+              <Text style={[styles.contextCopy, { color: colors.textSecondary }]}>The leaders shown here serve {expressionName}. Church-wide leaders remain listed separately in General COT.</Text>
             </View>
           </View>
 

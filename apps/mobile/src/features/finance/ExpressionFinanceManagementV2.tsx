@@ -227,7 +227,7 @@ export default function ExpressionFinanceManagementV2() {
 
       <View style={[styles.introCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
         <View style={[styles.introIcon, { backgroundColor: colors.primarySoft }]}><Icon name="wallet-outline" size={24} color={colors.interactive} /></View>
-        <View style={styles.flex}><Text style={[styles.introTitle, { color: colors.text }]}>Finance</Text><Text style={[styles.introText, { color: colors.textSecondary }]}>Start with totals. Add individual names only when you actually need that level of detail. Provider-confirmed online giving is recorded automatically.</Text></View>
+        <View style={styles.flex}><Text style={[styles.introTitle, { color: colors.text }]}>Finance</Text><Text style={[styles.introText, { color: colors.textSecondary }]}>Start with totals. Add individual names only when you actually need that level of detail. Confirmed online giving is recorded automatically.</Text></View>
       </View>
 
       <View style={[styles.segmented, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>

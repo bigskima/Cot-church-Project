@@ -11,9 +11,9 @@ async function getRuntimeConfig(): Promise<RuntimeConfig> {
   if (!configPromise) {
     configPromise = fetch(`${apiUrl}/realtime-config`, { headers: { Accept: 'application/json' } })
       .then(async (response) => {
-        if (!response.ok) throw new Error('Unable to load the database runtime configuration.');
+        if (!response.ok) throw new Error('Live updates are unavailable right now. Please try again.');
         const payload = await response.json() as { data?: RuntimeConfig };
-        if (!payload.data?.url || !payload.data?.anonKey) throw new Error('Database runtime configuration is incomplete.');
+        if (!payload.data?.url || !payload.data?.anonKey) throw new Error('Live updates are unavailable right now. Please try again.');
         return payload.data;
       })
       .catch((error) => {
