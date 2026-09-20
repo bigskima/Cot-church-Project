@@ -6,6 +6,7 @@ import { enrichContentEngagement, enrichSocialPosts } from "../_shared/public-id
 import { resolveActiveOrganizationId } from "../_shared/public-organization.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { filterByAuthor, loadSafetyProfileSets } from "../_shared/safety.ts";
+import { assertFeatureEnabled } from "../_shared/feature-controls.ts";
 import { assertNoUnknownFields, assertObject, requiredString, uuid } from "../_shared/validation.ts";
 
 const visibilities = new Set(["public", "organization", "branch", "group", "private"]);
@@ -122,6 +123,18 @@ Deno.serve(createHandler(
     if (body.action === "comment") {
       assertNoUnknownFields(body, ["action", "organizationId", "postId", "body", "parentCommentId"]);
       const contentId = uuid(requiredString(body.postId, "postId", 36), "postId", true)!;
+      const { data: targetContent } = await adminClient()
+        .from("content_items")
+        .select("id,organization_id,expression_id,group_id")
+        .eq("id", contentId)
+        .maybeSingle();
+      if (!targetContent) throw new ApiError("POST_NOT_FOUND", "This post is no longer available", 404);
+      await assertFeatureEnabled(
+        adminClient(),
+        "comments",
+        { organizationId: targetContent.organization_id, expressionId: targetContent.expression_id, groupId: targetContent.group_id },
+        "Comments are currently unavailable for this post.",
+      );
       const parentCommentId = body.parentCommentId
         ? uuid(String(body.parentCommentId), "parentCommentId", true)
         : null;
@@ -152,6 +165,10 @@ Deno.serve(createHandler(
     if (body.action === "share_reel") {
       assertNoUnknownFields(body, ["action", "organizationId", "reelId", "body"]);
       const reelId = uuid(requiredString(body.reelId, "reelId", 36), "reelId", true)!;
+      await assertFeatureEnabled(adminClient(), "social_community_feed", { organizationId: targetOrganizationId }, "Community posting is currently unavailable.");
+      await assertFeatureEnabled(adminClient(), "general_posting", { organizationId: targetOrganizationId }, "General COT posting is currently unavailable.");
+      await assertFeatureEnabled(adminClient(), "content_sharing", { organizationId: targetOrganizationId }, "Sharing content is currently unavailable.");
+      await assertFeatureEnabled(adminClient(), "reels", { organizationId: targetOrganizationId }, "Reels are currently unavailable.");
       const shareBody = body.body === undefined || body.body === null ? "" : requiredString(body.body, "body", 10000).trim();
       const { data, error } = await auth.client.rpc("publish_social_reel_share", {
         target_organization_id: targetOrganizationId,
@@ -174,6 +191,18 @@ Deno.serve(createHandler(
       assertNoUnknownFields(body, ["action", "postId", "reaction"]);
       const contentId = uuid(requiredString(body.postId, "postId", 36), "postId", true)!;
       const reaction = requiredString(body.reaction, "reaction", 20);
+      const { data: targetContent } = await adminClient()
+        .from("content_items")
+        .select("id,organization_id,expression_id,group_id")
+        .eq("id", contentId)
+        .maybeSingle();
+      if (!targetContent) throw new ApiError("POST_NOT_FOUND", "This post is no longer available", 404);
+      await assertFeatureEnabled(
+        adminClient(),
+        "reactions",
+        { organizationId: targetContent.organization_id, expressionId: targetContent.expression_id, groupId: targetContent.group_id },
+        "Reactions are currently unavailable for this post.",
+      );
       if (!new Set(["like", "love", "pray", "celebrate", "amen", "support"]).has(reaction)) {
         throw new ApiError("VALIDATION_FAILED", "Invalid reaction type", 422);
       }
@@ -199,6 +228,21 @@ Deno.serve(createHandler(
     const normalizedBody = postBody(body.body, uploadIds.length > 0);
     const targetBranchId = body.branchId ? uuid(String(body.branchId), "branchId", true) : null;
     const targetGroupId = body.groupId ? uuid(String(body.groupId), "groupId", true) : null;
+    const featureScope = {
+      organizationId: targetOrganizationId,
+      expressionId: targetBranchId,
+      groupId: targetGroupId,
+    };
+    await assertFeatureEnabled(adminClient(), "social_community_feed", featureScope, "Community posting is currently unavailable.");
+    await assertFeatureEnabled(
+      adminClient(),
+      targetBranchId ? "expression_posting" : "general_posting",
+      featureScope,
+      targetBranchId ? "Expression posting is currently unavailable." : "General COT posting is currently unavailable.",
+    );
+    if (uploadIds.length) {
+      await assertFeatureEnabled(adminClient(), "photo_posts", featureScope, "Media posts are currently unavailable in this area.");
+    }
 
     const { data, error } = await auth.client.rpc("publish_social_post_with_uploads", {
       target_organization_id: targetOrganizationId,
