@@ -4,6 +4,7 @@ import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString, uuid } from "../_shared/validation.ts";
 import { adminClient } from "../_shared/supabase.ts";
+import { assertFeatureEnabled } from "../_shared/feature-controls.ts";
 
 const statuses = new Set(["draft", "review", "scheduled", "published", "archived"]);
 const visibilities = new Set(["public", "organization", "branch", "private"]);
@@ -93,6 +94,7 @@ Deno.serve(createHandler(
       }
 
       if (view !== "published") throw new ApiError("VALIDATION_FAILED", "Unsupported sermon view", 422);
+      await assertFeatureEnabled(adminClient(), "sermons", { organizationId, expressionId: auth?.branchId ?? null }, "Sermons are currently unavailable in this area.");
 
       if (url.searchParams.get("type") === "series") {
         let seriesQuery = client
