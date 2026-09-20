@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { ApiError } from "../_shared/errors.ts";
 import { createHandler } from "../_shared/handler.ts";
-import { parseEpub, devotionalDateFromTitle } from "../_shared/library-epub.ts";
+import { parseEpub, devotionalDateFromChapter, parseDevotionalChapter } from "../_shared/library-epub.ts";
 import { resolveActiveOrganizationId } from "../_shared/public-organization.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { adminClient } from "../_shared/supabase.ts";
@@ -489,14 +489,23 @@ export const libraryHandler = createHandler(
       if (error || !series || !series.book_id) throw new ApiError("DEVOTIONAL_BOOK_REQUIRED", "Attach a Library book before importing daily entries.", 422);
       const { data: chapters, error: chapterError } = await admin.from("library_book_chapters").select("id,chapter_order,title,body").eq("book_id", series.book_id).order("chapter_order");
       if (chapterError) throw new ApiError("DEVOTIONAL_IMPORT_FAILED", "Unable to read the attached book.", 500, undefined, false);
-      const mapped = (chapters ?? []).map((chapter: any) => ({ chapter, date: devotionalDateFromTitle(chapter.title, series.devotional_year) })).filter((item: any) => item.date);
-      if (!mapped.length) throw new ApiError("DEVOTIONAL_DATES_NOT_FOUND", "No dated chapters were found. Add entries manually or rename chapters with dates such as January 1.", 422);
-      const rows = mapped.map(({ chapter, date }: any) => ({
+      const mapped = (chapters ?? [])
+        .map((chapter: any) => ({
+          chapter,
+          date: devotionalDateFromChapter(chapter.title, chapter.body, series.devotional_year),
+          parsed: parseDevotionalChapter(chapter.title, chapter.body, series.devotional_year),
+        }))
+        .filter((item: any) => item.date);
+      if (!mapped.length) throw new ApiError("DEVOTIONAL_DATES_NOT_FOUND", "No dated chapters were found. Add entries manually or include dates such as January 1 in the chapter heading or opening text.", 422);
+      const rows = mapped.map(({ chapter, date, parsed }: any) => ({
         series_id: series.id,
         chapter_id: chapter.id,
         devotional_date: date,
-        title: chapter.title,
-        body: chapter.body,
+        title: parsed.title,
+        scripture: parsed.scripture,
+        memory_verse: parsed.memoryVerse,
+        body: parsed.body,
+        prayer: parsed.prayer,
       }));
       const { error: importError } = await admin.from("devotional_entries").upsert(rows, { onConflict: "series_id,devotional_date" });
       if (importError) throw new ApiError("DEVOTIONAL_IMPORT_FAILED", "Unable to map the dated chapters.", 500, undefined, false);
