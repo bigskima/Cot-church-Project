@@ -123,6 +123,7 @@ export default function GeneralMinistryWorkspace() {
             </ScrollView>
 
             <CompactRouteGrid
+              compact
               items={visible.map((tool) => ({
                 key: tool.key,
                 label: tool.title,
