@@ -24,6 +24,7 @@ export interface BottomSheetProps {
   subtitle?: string;
   children: React.ReactNode;
   maxHeightPercent?: number;
+  compact?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -35,6 +36,7 @@ export function BottomSheet({
   subtitle,
   children,
   maxHeightPercent = 88,
+  compact = false,
   style,
 }: BottomSheetProps) {
   const insets = useSafeAreaInsets();
@@ -54,6 +56,7 @@ export function BottomSheet({
           keyboardVerticalOffset={PLATFORM_KEYBOARD_VERTICAL_OFFSET}
           style={[
             styles.sheetContainer,
+            compact && styles.compactSheet,
             {
               backgroundColor: colors.cardElevated,
               borderColor: colors.borderSubtle,
@@ -67,9 +70,9 @@ export function BottomSheet({
           <View pointerEvents="none" style={[styles.handleBar, { backgroundColor: colors.borderStrong }]} />
 
           {(title || subtitle) ? (
-            <View style={[styles.header, { borderBottomColor: colors.borderSubtle }]}>
+            <View style={[styles.header, compact && styles.compactHeader, { borderBottomColor: colors.borderSubtle }]}>
               <View style={styles.headerCopy}>
-                {title ? <Text style={[styles.title, { color: colors.text }]}>{title}</Text> : null}
+                {title ? <Text style={[styles.title, compact && styles.compactTitle, { color: colors.text }]}>{title}</Text> : null}
                 {subtitle ? <Text style={[styles.subtitle, { color: colors.textMuted }]} numberOfLines={1}>{subtitle}</Text> : null}
               </View>
               <Pressable
@@ -93,7 +96,7 @@ export function BottomSheet({
             keyboardShouldPersistTaps="always"
             keyboardDismissMode={PLATFORM_KEYBOARD_DISMISS_MODE}
             nestedScrollEnabled
-            contentContainerStyle={styles.contentContainer}
+            contentContainerStyle={[styles.contentContainer, compact && styles.compactContent]}
           >
             {children}
           </ScrollView>
@@ -120,6 +123,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...shadows.floating,
   },
+  compactSheet: { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl },
   sheetGlow: {
     position: 'absolute',
     width: 160,
@@ -147,8 +151,10 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  compactHeader: { paddingHorizontal: spacing.md, paddingTop: spacing.xs, paddingBottom: spacing.xs },
   headerCopy: { flex: 1, minWidth: 0 },
   title: { fontSize: 19, lineHeight: 24, fontWeight: '900', letterSpacing: -0.35 },
+  compactTitle: { fontSize: 16, lineHeight: 20 },
   subtitle: {
     ...typography.bodySmall,
     marginTop: 3,
@@ -165,5 +171,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
     paddingBottom: spacing.xl,
+  },
+  compactContent: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.lg,
   },
 });
