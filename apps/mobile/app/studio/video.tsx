@@ -277,7 +277,7 @@ export default function WatchVideoCreatorScreen() {
                 ) : (
                   <View style={[styles.categoryEmpty, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Icon name="search-outline" size={17} color={colors.textMuted} /><Text style={[styles.helper, { color: colors.textMuted }]}>No enabled category matches that search. Clear the search or ask an administrator to update Watch categories.</Text></View>
                 )}
-                <Text style={[styles.helper, { color: colors.textMuted }]}>Category names and availability come from COT database settings, not this app build.</Text>
+                <Text style={[styles.helper, { color: colors.textMuted }]}>Category names and availability are managed by COT leadership.</Text>
               </View>
 
               {stage ? <View style={[styles.progressNotice, { backgroundColor: colors.primarySoft }]}><Icon name="cloud-upload-outline" size={18} color={colors.interactive} /><Text style={[styles.progressText, { color: colors.textSecondary }]}>{stage}</Text></View> : null}
