@@ -176,3 +176,6 @@ verify_jwt = true
 
 [functions.safety-controls]
 verify_jwt = true
+
+[functions.feature-access]
+verify_jwt = false
