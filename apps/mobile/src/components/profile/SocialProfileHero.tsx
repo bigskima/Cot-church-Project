@@ -1,6 +1,7 @@
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Avatar, Icon } from '@/components';
+import { Avatar } from '@/components/primitives/Avatar';
+import { Icon } from '@/components/primitives/Icon';
 import { FullIdentityBadge, type PublicIdentityBadge } from '@/components/identity/PublicIdentityBadge';
 import { radius, spacing } from '@/design-system/tokens';
 import { useTheme } from '@/state/theme';
