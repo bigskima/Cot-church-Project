@@ -134,4 +134,4 @@ export function AgoraCallSession({ grant, kind, onJoined, onError }: AgoraCallSe
     </div>
   );
 }
-const buttonStyle: React.CSSProperties = { border: 0, minWidth: 86, height: 46, borderRadius: 999, background: '#151B25', color: '#fff', fontWeight: 800, cursor: 'pointer' };
+const buttonStyle: any = { border: 0, minWidth: 86, height: 46, borderRadius: 999, background: '#151B25', color: '#fff', fontWeight: 800, cursor: 'pointer' };
