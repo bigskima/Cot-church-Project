@@ -79,17 +79,18 @@ interface SectionHeaderProps {
   actionLabel?: string;
   onAction?: () => void;
   dark?: boolean;
+  compact?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
-export function SectionHeader({ title, subtitle, badge, actionLabel, onAction, style }: SectionHeaderProps) {
+export function SectionHeader({ title, subtitle, badge, actionLabel, onAction, compact = false, style }: SectionHeaderProps) {
   const { colors } = useTheme();
 
   return (
-    <View style={[styles.sectionContainer, style]}>
+    <View style={[styles.sectionContainer, compact && styles.sectionCompact, style]}>
       <View style={styles.sectionCopy}>
         <View style={styles.sectionTitleRow}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
+          <Text style={[styles.sectionTitle, compact && styles.sectionTitleCompact, { color: colors.text }]}>{title}</Text>
           {badge !== undefined ? (
             <View style={[styles.sectionBadge, { backgroundColor: colors.primarySoft }]}>
               <Text style={[styles.sectionBadgeText, { color: colors.interactive }]}>{badge}</Text>
@@ -151,6 +152,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
   },
+  sectionCompact: { marginTop: spacing.xs, marginBottom: 0, paddingHorizontal: 0 },
   sectionCopy: { flex: 1, minWidth: 0 },
   sectionTitleRow: {
     flexDirection: 'row',
@@ -158,6 +160,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   sectionTitle: { fontSize: 17, lineHeight: 22, fontWeight: '900', letterSpacing: -0.3 },
+  sectionTitleCompact: { fontSize: 14.5, lineHeight: 19 },
   sectionBadge: {
     minWidth: 24,
     minHeight: 22,
