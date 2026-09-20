@@ -198,8 +198,9 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
         <View style={styles.body}>
           {signedIn ? (
             <View style={styles.createSection}>
-              <SectionHeader title="Create" />
+              <SectionHeader title="Create" compact />
               <CompactRouteGrid
+                compact
                 items={creationActions.map((item) => ({
                   key: item.title,
                   label: item.title,
@@ -222,8 +223,9 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
 
           {leadershipModules.length ? (
             <View style={styles.modulesSection}>
-              <SectionHeader title="Ministry" badge={leadershipModules.length} />
+              <SectionHeader title="Ministry" badge={leadershipModules.length} compact />
               <CompactRouteGrid
+                compact
                 items={leadershipModules.map((module) => ({
                   key: module.title,
                   label: module.title,
