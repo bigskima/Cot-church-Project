@@ -167,7 +167,7 @@ export function BookReaderExperience({ bookId }: { bookId: string }) {
             {book.source_url ? <PdfBookFrame url={book.source_url} /> : <EmptyState title='PDF unavailable' message='The secure book file could not be prepared.' iconName='document-outline' />}
             <View style={[styles.note, { backgroundColor: colors.bgSecondary }]}>
               <Icon name='volume-high-outline' size={16} color={colors.textMuted} />
-              <Text style={[styles.noteText, { color: colors.textSecondary }]}>Read aloud is available for EPUB text. A PDF keeps its original page design; scanned PDFs are not treated as readable text.</Text>
+              <Text style={[styles.noteText, { color: colors.textSecondary }]}>PDF pages now stay inside COT. Use the reader controls to move by page; embedded PDF bookmarks appear as document sections. Read aloud remains available for EPUB text.</Text>
             </View>
           </View>
         ) : !chapter ? (
