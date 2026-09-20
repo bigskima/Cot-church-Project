@@ -5,6 +5,7 @@ import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString, uuid } from "../_shared/validation.ts";
+import { assertFeatureEnabled } from "../_shared/feature-controls.ts";
 
 function branchCode(value: unknown) {
   const code = requiredString(value, "code", 40).toUpperCase();
@@ -68,6 +69,8 @@ Deno.serve(createHandler(
       const submittedOrganizationId = body.organizationId === undefined ? null : uuid(requiredString(body.organizationId, "organizationId", 64), "organizationId", true)!;
       const organizationId = auth.organizationId ?? submittedOrganizationId;
       if (!organizationId) throw new ApiError("ORGANIZATION_REQUIRED", "Choose the church this Expression belongs to", 400);
+      await assertFeatureEnabled(adminClient(), "expressions", { organizationId }, "Expressions are currently unavailable for this church.");
+      await assertFeatureEnabled(adminClient(), "expression_creation", { organizationId }, "Creating new Expressions is currently unavailable.");
       if (auth.organizationId && submittedOrganizationId && submittedOrganizationId !== auth.organizationId) {
         throw new ApiError("ORGANIZATION_ACCESS_DENIED", "Organization context does not match this request", 403);
       }
