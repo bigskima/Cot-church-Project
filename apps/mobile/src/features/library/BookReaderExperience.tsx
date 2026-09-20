@@ -47,11 +47,11 @@ export function BookReaderExperience({ bookId }: { bookId: string }) {
   const { api, context, mode } = useSession();
   const { colors } = useTheme();
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
-  const endpoint = `library${organizationId ? `?organizationId=${organizationId}` : ''}`;
+  const endpoint = `noop?service=library${organizationId ? `&organizationId=${organizationId}` : ''}`;
   const detail = useResource<BookDetailPayload>(
     `library:book:${bookId}:${organizationId || 'public'}`,
     (signal) => api.request<BookDetailPayload>(
-      `library?view=detail&bookId=${bookId}${organizationId ? `&organizationId=${organizationId}` : ''}`,
+      `noop?service=library&view=detail&bookId=${bookId}${organizationId ? `&organizationId=${organizationId}` : ''}`,
       { signal, context: 'public' },
     ),
   );
