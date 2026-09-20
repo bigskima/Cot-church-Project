@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ApiClient } from '../api';
 import { Badge, Button, Card, InputField, Modal, SearchBar, SelectField, Table, Tabs } from '../components/ui';
+import { AppControlsPanel } from './AppControlsPanel';
 
 type PostingMode = 'open' | 'closed' | 'allowlist';
-type ModerationTab = 'posting' | 'reports' | 'content' | 'deletions';
+type ModerationTab = 'app-controls' | 'posting' | 'reports' | 'content' | 'deletions';
 
 interface PostingPolicy {
   mode: PostingMode;
@@ -162,8 +163,18 @@ function cleanupVariant(status: DeletionItem['storage_cleanup_status']) {
   return 'suspended' as const;
 }
 
-export function ModerationCenter({ api, canManage = false }: { api: ApiClient; canManage?: boolean }) {
-  const [activeTab, setActiveTab] = useState<ModerationTab>('posting');
+export function ModerationCenter({
+  api,
+  canManage = false,
+  canReadFeatures = false,
+  canManageFeatures = false,
+}: {
+  api: ApiClient;
+  canManage?: boolean;
+  canReadFeatures?: boolean;
+  canManageFeatures?: boolean;
+}) {
+  const [activeTab, setActiveTab] = useState<ModerationTab>(canReadFeatures ? 'app-controls' : 'posting');
   const [state, setState] = useState<ModerationState | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingPolicy, setSavingPolicy] = useState(false);
@@ -511,6 +522,7 @@ export function ModerationCenter({ api, canManage = false }: { api: ApiClient; c
           activeKey={activeTab}
           onChange={(key) => setActiveTab(key as ModerationTab)}
           tabs={[
+            ...(canReadFeatures ? [{ key: 'app-controls', label: 'App Controls' }] : []),
             { key: 'posting', label: 'Public Posting' },
             { key: 'reports', label: 'Reports', count: activeTab === 'reports' ? unresolvedReports : undefined },
             { key: 'content', label: 'Content' },
@@ -518,6 +530,10 @@ export function ModerationCenter({ api, canManage = false }: { api: ApiClient; c
           ]}
         />
       </Card>
+
+      {activeTab === 'app-controls' && canReadFeatures ? (
+        <AppControlsPanel api={api} canRead={canReadFeatures} canManage={canManageFeatures} />
+      ) : null}
 
       {activeTab === 'posting' ? (
         <>
