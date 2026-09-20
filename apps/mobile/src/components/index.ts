@@ -37,3 +37,5 @@ export * from './engagement/ReactionDrawer';
 export * from './workflow/ProgressiveFlow';
 
 export * from './profile/SocialProfileHero';
+
+export * from './identity/PublicIdentityBadge';
