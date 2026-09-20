@@ -39,3 +39,5 @@ export * from './workflow/ProgressiveFlow';
 export * from './profile/SocialProfileHero';
 
 export * from './identity/PublicIdentityBadge';
+
+export * from './navigation/WorkspaceTopBar';
