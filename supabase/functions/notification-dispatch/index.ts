@@ -289,13 +289,14 @@ async function sendExpo(client: any, job: OutboxJob, preference: PreferenceRow) 
       : { title: content.title, body: content.body };
 
   const soundEnabled = preference.push_sound_enabled !== false;
+  const callNotification = content.type === "chat_call_started";
   const messages = devices.map((device: any) => ({
     to: device.expo_push_token,
     title: preview.title,
     body: preview.body,
     sound: soundEnabled ? "default" : null,
-    channelId: soundEnabled ? "cot-default" : "cot-silent",
-    priority: urgent ? "high" : "default",
+    channelId: soundEnabled ? (callNotification ? "cot-calls" : "cot-default") : "cot-silent",
+    priority: urgent || callNotification ? "high" : "default",
     data: {
       ...content.data,
       notificationId: content.notificationId,
