@@ -36,7 +36,7 @@ export function ChatCallActions(props: Props) {
   const active = useResource<ActiveCallPayload | null>(
     `chat-call:${scopeKey}`,
     (signal) => mode === 'authenticated'
-      ? api.request<ActiveCallPayload | null>(`chat-calls?${scopeKey}`, { signal, context: 'public' })
+      ? api.request<ActiveCallPayload | null>(`noop?service=calls&${scopeKey}`, { signal, context: 'public' })
       : Promise.resolve(null),
   );
 
@@ -50,7 +50,7 @@ export function ChatCallActions(props: Props) {
     setBusy(kind);
     setError('');
     try {
-      const result = await api.request<ActiveCallPayload & { existing?: boolean }>('chat-calls', {
+      const result = await api.request<ActiveCallPayload & { existing?: boolean }>('noop?service=calls', {
         method: 'POST',
         context: 'public',
         body: JSON.stringify({
