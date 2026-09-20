@@ -95,6 +95,20 @@ export default function GeneralToolsScreen() {
       onPress: () => router.push('/general/live' as any),
     },
     {
+      key: 'library',
+      label: 'Library',
+      icon: 'library-outline',
+      description: 'Browse books, authors and continue reading.',
+      onPress: () => router.push('/general/library' as any),
+    },
+    {
+      key: 'devotional',
+      label: 'Devotional',
+      icon: 'sunny-outline',
+      description: 'Open the daily devotional by year, month and day.',
+      onPress: () => router.push('/general/devotional' as any),
+    },
+    {
       key: 'location',
       label: 'Location',
       icon: 'location-outline',
