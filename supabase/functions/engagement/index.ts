@@ -6,6 +6,7 @@ import { adminClient, publicClient } from "../_shared/supabase.ts";
 import { assertProfilesMayInteract, filterByAuthor, loadSafetyProfileSets } from "../_shared/safety.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString, uuid } from "../_shared/validation.ts";
 import { loadPublicChatBadges } from "../_shared/identity-badges.ts";
+import { assertFeatureEnabled } from "../_shared/feature-controls.ts";
 
 const allowedReactions = new Set(["like", "love", "pray", "celebrate", "amen", "support"]);
 
@@ -272,7 +273,13 @@ Deno.serve(createHandler(
       assertNoUnknownFields(body, ["action", "contentId", "reaction"]);
       const contentId = uuid(requiredString(body.contentId, "contentId", 36), "contentId", true)!;
       const reaction = requiredString(body.reaction, "reaction", 20);
-      await assertContentAccess(auth, contentId);
+      const targetContent = await assertContentAccess(auth, contentId);
+      await assertFeatureEnabled(
+        adminClient(),
+        "reactions",
+        { organizationId: targetContent.organization_id, expressionId: targetContent.expression_id, groupId: targetContent.group_id },
+        "Reactions are currently unavailable for this content.",
+      );
 
       if (!allowedReactions.has(reaction)) {
         throw new ApiError("VALIDATION_FAILED", "Invalid reaction type", 422);
@@ -296,7 +303,13 @@ Deno.serve(createHandler(
     if (body.action === "unreact") {
       assertNoUnknownFields(body, ["action", "contentId"]);
       const contentId = uuid(requiredString(body.contentId, "contentId", 36), "contentId", true)!;
-      await assertContentAccess(auth, contentId);
+      const targetContent = await assertContentAccess(auth, contentId);
+      await assertFeatureEnabled(
+        adminClient(),
+        "reactions",
+        { organizationId: targetContent.organization_id, expressionId: targetContent.expression_id, groupId: targetContent.group_id },
+        "Reactions are currently unavailable for this content.",
+      );
       const { error } = await auth.client.from("content_reactions").delete().eq("content_item_id", contentId).eq("profile_id", auth.user.id);
       if (error) throw new ApiError("REACTION_FAILED", "Unable to remove reaction", 500, undefined, false);
       return { data: { reacted: false } };
@@ -309,6 +322,12 @@ Deno.serve(createHandler(
       const commentBody = requiredString(body.body, "body", 3000);
       const parentId = body.parentCommentId ? uuid(String(body.parentCommentId), "parentCommentId", true) : null;
       const targetContent = await assertContentAccess(auth, contentId);
+      await assertFeatureEnabled(
+        adminClient(),
+        "comments",
+        { organizationId: targetContent.organization_id, expressionId: targetContent.expression_id, groupId: targetContent.group_id },
+        "Comments are currently unavailable for this content.",
+      );
 
       if (parentId) {
         const { data: parentComment, error: parentError } = await auth.client
@@ -350,7 +369,13 @@ Deno.serve(createHandler(
     if (body.action === "bookmark") {
       assertNoUnknownFields(body, ["action", "contentId"]);
       const contentId = uuid(requiredString(body.contentId, "contentId", 36), "contentId", true)!;
-      await assertContentAccess(auth, contentId);
+      const targetContent = await assertContentAccess(auth, contentId);
+      await assertFeatureEnabled(
+        adminClient(),
+        "bookmarks",
+        { organizationId: targetContent.organization_id, expressionId: targetContent.expression_id, groupId: targetContent.group_id },
+        "Saved content is currently unavailable.",
+      );
 
       const { data: existing } = await auth.client
         .from("content_bookmarks")
