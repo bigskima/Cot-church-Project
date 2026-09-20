@@ -205,7 +205,48 @@ Deno.serve(createHandler(
         if (entryError) throw new ApiError("DEVOTIONAL_LOAD_FAILED", "Unable to load the devotional.", 500, undefined, false);
         const entry = entries?.[0] ?? null;
         const series = entry ? (seriesRows ?? []).find((row: any) => row.id === entry.series_id) ?? null : null;
-        return { data: entry ? { series, entry } : null };
+        if (entry && series) return { data: { series, entry } };
+
+        // Keep the original one-day devotional domain readable while churches
+        // migrate into yearly/monthly devotional books.
+        const { data: legacy, error: legacyError } = await admin.from("devotionals")
+          .select("id,title,scripture,content,publish_date,created_by,created_at")
+          .eq("organization_id", organizationId)
+          .eq("status", "published")
+          .eq("publish_date", date)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (legacyError) throw new ApiError("DEVOTIONAL_LOAD_FAILED", "Unable to load the devotional.", 500, undefined, false);
+        if (!legacy) return { data: null };
+        return {
+          data: {
+            series: {
+              id: `legacy-${legacy.id}`,
+              organization_id: organizationId,
+              book_id: null,
+              title: "Daily Devotional",
+              author_name: "",
+              devotional_year: year,
+              description: "",
+              status: "published",
+              published_at: legacy.created_at,
+            },
+            entry: {
+              id: legacy.id,
+              series_id: `legacy-${legacy.id}`,
+              chapter_id: null,
+              devotional_date: legacy.publish_date,
+              title: legacy.title,
+              scripture: legacy.scripture,
+              memory_verse: "",
+              body: legacy.content,
+              prayer: "",
+              created_at: legacy.created_at,
+              updated_at: legacy.created_at,
+            },
+          },
+        };
       }
 
       if (view === "devotional_manage") {
