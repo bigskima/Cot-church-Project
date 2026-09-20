@@ -5,6 +5,7 @@ import { adminClient, publicClient } from "../_shared/supabase.ts";
 import { enrichContentCreators, enrichSocialPosts } from "../_shared/public-identity.ts";
 import { assertProfilesMayInteract, filterByAuthor, loadSafetyProfileSets } from "../_shared/safety.ts";
 import { uuid } from "../_shared/validation.ts";
+import { assertFeatureEnabled, featureEnabled } from "../_shared/feature-controls.ts";
 
 function nestedItem(value: any) {
   return Array.isArray(value) ? value[0] ?? null : value ?? null;
@@ -49,6 +50,7 @@ Deno.serve(createHandler(
       const { data, error } = await query.maybeSingle();
       if (error) throw new ApiError("PUBLIC_EVENT_FAILED", "Unable to retrieve this event", 500, undefined, false);
       if (!data) throw new ApiError("EVENT_NOT_FOUND", "This event is not available", 404);
+      await assertFeatureEnabled(admin, "events_gatherings", { organizationId: data.organization_id, expressionId: data.branch_id }, "Events are currently unavailable in this area.");
       return { data };
     }
 
@@ -78,6 +80,7 @@ Deno.serve(createHandler(
       const { data, error } = await query.maybeSingle();
       if (error) throw new ApiError("PUBLIC_SERMON_FAILED", "Unable to retrieve this sermon", 500, undefined, false);
       if (!data) throw new ApiError("SERMON_NOT_FOUND", "This sermon is not available", 404);
+      await assertFeatureEnabled(admin, "sermons", { organizationId: data.organization_id, expressionId: data.expression_id }, "Sermons are currently unavailable in this area.");
       if (auth?.user && data.content_item_id) {
         const { data: item, error: itemError } = await admin
           .from("content_items")
@@ -98,6 +101,7 @@ Deno.serve(createHandler(
       const { data: series, error: seriesError } = await seriesQuery.maybeSingle();
       if (seriesError) throw new ApiError("PUBLIC_SERIES_FAILED", "Unable to retrieve this series", 500, undefined, false);
       if (!series) throw new ApiError("SERIES_NOT_FOUND", "This series is not available", 404);
+      await assertFeatureEnabled(admin, "sermons", { organizationId: series.organization_id, expressionId: series.expression_id }, "Sermons are currently unavailable in this area.");
       const { data: sermons, error: sermonsError } = await client.from("sermons").select("id,organization_id,expression_id,content_item_id,series_id,title,slug,preacher,sermon_date,scripture_references,description,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,duration_seconds,status,visibility,published_at").eq("series_id", series.id).eq("organization_id", series.organization_id).eq("visibility", "public").eq("status", "published").order("sermon_date", { ascending: false });
       if (sermonsError) throw new ApiError("PUBLIC_SERIES_SERMONS_FAILED", "Unable to retrieve sermons in this series", 500, undefined, false);
       return { data: { series, sermons: sermons ?? [] } };
@@ -115,6 +119,15 @@ Deno.serve(createHandler(
       if (expressionError || !expression || (organizationId && expression.organization_id !== organizationId)) {
         throw new ApiError("EXPRESSION_NOT_FOUND", "This Expression is not available", 404);
       }
+      await assertFeatureEnabled(admin, "expressions", { organizationId: expression.organization_id }, "Expressions are currently unavailable.");
+      const expressionFeatureScope = { organizationId: expression.organization_id, expressionId };
+      const [sermonsAvailable, videosAvailable, reelsAvailable, eventsAvailable, leadersAvailable] = await Promise.all([
+        featureEnabled(admin, "sermons", expressionFeatureScope),
+        featureEnabled(admin, "long_form_video", expressionFeatureScope),
+        featureEnabled(admin, "reels", expressionFeatureScope),
+        featureEnabled(admin, "events_gatherings", expressionFeatureScope),
+        featureEnabled(admin, "leadership_directory", expressionFeatureScope),
+      ]);
 
       const [sermons, videos, reels, events, leaders] = await Promise.all([
         client.from("sermons").select("id,organization_id,expression_id,content_item_id,series_id,title,slug,preacher,sermon_date,scripture_references,topics,description,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,duration_seconds,status,visibility,is_featured,play_count,published_at").eq("expression_id", expressionId).eq("visibility", "public").eq("status", "published").order("published_at", { ascending: false }).limit(30),
@@ -133,11 +146,11 @@ Deno.serve(createHandler(
       return {
         data: {
           expression,
-          sermons: visibleExpressionSermons,
-          videos: await enrichContentCreators(visibleExpressionVideos, client),
-          reels: await enrichContentCreators(visibleExpressionReels, client),
-          events: events.data ?? [],
-          leaders: visibleExpressionLeaders.map((leader) => ({
+          sermons: sermonsAvailable ? visibleExpressionSermons : [],
+          videos: videosAvailable ? await enrichContentCreators(visibleExpressionVideos, client) : [],
+          reels: reelsAvailable ? await enrichContentCreators(visibleExpressionReels, client) : [],
+          events: eventsAvailable ? (events.data ?? []) : [],
+          leaders: leadersAvailable ? visibleExpressionLeaders.map((leader) => ({
             id: leader.id,
             organization_id: leader.organization_id,
             expression_id: leader.expression_id,
@@ -155,6 +168,7 @@ Deno.serve(createHandler(
     }
 
     if (type === "reels") {
+      if (organizationId) await assertFeatureEnabled(admin, "reels", { organizationId, expressionId }, "Reels are currently unavailable in this area.");
       let query = client
         .from("reels")
         .select(`
@@ -178,6 +192,10 @@ Deno.serve(createHandler(
     }
 
     if (type === "videos") {
+      if (organizationId) {
+        await assertFeatureEnabled(admin, "long_form_video", { organizationId, expressionId }, "Long-form video is currently unavailable in this area.");
+        if (!expressionId) await assertFeatureEnabled(admin, "watch_library", { organizationId }, "Watch is currently unavailable.");
+      }
       let query = client
         .from("videos")
         .select(`
@@ -201,6 +219,7 @@ Deno.serve(createHandler(
     }
 
     if (type === "sermons") {
+      if (organizationId) await assertFeatureEnabled(admin, "sermons", { organizationId, expressionId }, "Sermons are currently unavailable in this area.");
       let query = client
         .from("sermons")
         .select("id,organization_id,expression_id,content_item_id,series_id,title,slug,preacher,sermon_date,scripture_references,topics,description,transcript,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,chapters,duration_seconds,status,visibility,is_featured,play_count,published_at")
@@ -216,6 +235,7 @@ Deno.serve(createHandler(
     }
 
     if (type === "series") {
+      if (organizationId) await assertFeatureEnabled(admin, "sermons", { organizationId, expressionId }, "Sermons are currently unavailable in this area.");
       let query = client
         .from("sermon_series")
         .select("id,organization_id,expression_id,title,slug,description,artwork_url,starts_at,ends_at,is_featured,created_at,updated_at")
@@ -230,6 +250,7 @@ Deno.serve(createHandler(
     }
 
     if (type === "leaders") {
+      if (organizationId) await assertFeatureEnabled(admin, "leadership_directory", { organizationId }, "Leadership directory is currently unavailable.");
       // General Community leadership is curated centrally. Expression leadership is
       // a separate, membership-scoped experience and is never leaked through this endpoint.
       let query = client
@@ -314,16 +335,26 @@ Deno.serve(createHandler(
       const [sermonsRes, videosRes, reelsRes, expressionsRes, leadersRes] = await Promise.all([
         sermonsQuery, videosQuery, reelsQuery, expressionsQuery, leadersQuery,
       ]);
-      const visibleSermons = await filterSermonsBySafety(admin, sermonsRes.data ?? [], safety.hiddenFromFeed);
-      const visibleVideos = filterByAuthor(videosRes.data ?? [], safety.hiddenFromFeed, (row: any) => nestedItem(row.content_items)?.author_profile_id);
-      const visibleReels = filterByAuthor(reelsRes.data ?? [], safety.hiddenFromFeed, (row: any) => nestedItem(row.content_items)?.author_profile_id);
-      const visibleLeaders = filterByAuthor(leadersRes.data ?? [], safety.hiddenFromFeed, (row: any) => row.profile_id);
+      const searchScope = organizationId ? { organizationId } : null;
+      const [searchSermons, searchVideos, searchReels, searchExpressions, searchLeaders] = searchScope
+        ? await Promise.all([
+            featureEnabled(admin, "sermons", searchScope),
+            featureEnabled(admin, "long_form_video", searchScope),
+            featureEnabled(admin, "reels", searchScope),
+            featureEnabled(admin, "expressions", searchScope),
+            featureEnabled(admin, "leadership_directory", searchScope),
+          ])
+        : [true, true, true, true, true];
+      const visibleSermons = searchSermons ? await filterSermonsBySafety(admin, sermonsRes.data ?? [], safety.hiddenFromFeed) : [];
+      const visibleVideos = searchVideos ? filterByAuthor(videosRes.data ?? [], safety.hiddenFromFeed, (row: any) => nestedItem(row.content_items)?.author_profile_id);
+      const visibleReels = searchReels ? filterByAuthor(reelsRes.data ?? [], safety.hiddenFromFeed, (row: any) => nestedItem(row.content_items)?.author_profile_id) : [];
+      const visibleLeaders = searchLeaders ? filterByAuthor(leadersRes.data ?? [], safety.hiddenFromFeed, (row: any) => row.profile_id) : [];
       return {
         data: {
           sermons: visibleSermons,
           videos: visibleVideos,
           reels: visibleReels,
-          expressions: expressionsRes.data ?? [],
+          expressions: searchExpressions ? (expressionsRes.data ?? []) : [],
           leaders: visibleLeaders.map((leader) => ({
             id: leader.id,
             organization_id: leader.organization_id,
@@ -382,6 +413,7 @@ Deno.serve(createHandler(
     }
 
     if (type === "events") {
+      if (organizationId) await assertFeatureEnabled(admin, "events_gatherings", { organizationId }, "Events are currently unavailable.");
       let query = client
         .from("events")
         .select("id,organization_id,title,description,starts_at,ends_at,location,capacity,visibility")
@@ -395,6 +427,7 @@ Deno.serve(createHandler(
     }
 
     if (type === "giving") {
+      if (organizationId) await assertFeatureEnabled(admin, "giving", { organizationId }, "Giving is currently unavailable.");
       // Legacy compatibility only. The canonical giving endpoint is public-giving.
       // General Community giving must never mix Expression destinations into this response.
       let campaignQuery = client
@@ -436,6 +469,7 @@ Deno.serve(createHandler(
       return { data: data ?? [] };
     }
 
+    if (organizationId) await assertFeatureEnabled(admin, "social_community_feed", { organizationId }, "Community feed is currently unavailable.");
     let feedQuery = client
       .from("social_posts")
       .select("id,organization_id,author_membership_id,branch_id,group_id,body,media,published_at,visibility,status,created_at")
