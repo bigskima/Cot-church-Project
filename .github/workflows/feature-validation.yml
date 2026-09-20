@@ -1,0 +1,30 @@
+name: COT feature validation
+
+on:
+  push:
+    branches:
+      - feat/calls-library-devotionals
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Use Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Mobile typecheck
+        run: npm run mobile:typecheck
+      - name: API contract checks
+        run: npm run api:check
+      - name: App contract checks
+        run: npm run apps:check
