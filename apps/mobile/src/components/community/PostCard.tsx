@@ -140,6 +140,9 @@ export function PostCard({
   const avatarUrl = authorAvatar || author.avatarUrl || author.avatar_url || postAsAny.author_avatar;
   const isVerified = author.isVerified || author.is_verified || postAsAny.is_verified || false;
   const badges: PublicIdentityBadge[] = Array.isArray(author.badges) ? author.badges : [];
+  const openAuthor = onPressAuthor ?? (handle
+    ? () => router.push({ pathname: '/general/member/[username]', params: { username: handle } } as any)
+    : undefined);
 
   const media = Array.isArray(post.media)
     ? post.media.filter((item) => Boolean(item?.url) || mediaKind(item) === 'reel_reference')
@@ -243,12 +246,12 @@ export function PostCard({
 
   const identityHeader = (
     <View style={styles.headerRow}>
-      <Pressable onPress={onPressAuthor || onPress} hitSlop={4}>
+      <Pressable onPress={openAuthor || onPress} hitSlop={4}>
         <Avatar name={displayName} url={avatarUrl} size="md" />
       </Pressable>
       <View style={styles.identityColumn}>
         <View style={styles.authorLine}>
-          <Pressable onPress={onPressAuthor || onPress} style={styles.nameGroup}>
+          <Pressable onPress={openAuthor || onPress} style={styles.nameGroup}>
             <Text style={[styles.displayName, { color: colors.text }]} numberOfLines={1}>{displayName}</Text>
             {badges[0] ? <CompactIdentityBadge badge={badges[0]} size={17} /> : null}
             {isVerified ? <Icon name="checkmark-circle" size={15} color={colors.interactive} /> : null}
