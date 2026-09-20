@@ -118,6 +118,7 @@ export default function LeadershipHubScreen() {
             </View>
           ) : availableTools.length ? (
             <CompactRouteGrid
+              compact
               items={availableTools.map((tool) => ({
                 key: tool.title,
                 label: tool.title,
