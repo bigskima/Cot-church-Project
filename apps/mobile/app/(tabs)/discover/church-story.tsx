@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -21,6 +21,7 @@ import {
 import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 import type { ChurchStory, LeadershipProfile } from '@church/types';
 import { LocationFinder, type VerifiedLocationResult } from '@/components/location/LocationFinder';
+import GeneralChurchLeadershipPanel from '@/features/general/GeneralChurchLeadershipPanel';
 
 type PublicLocation = {
   line1?: string | null;
@@ -78,11 +79,13 @@ function TextCard({ kicker, text, secondary = false }: { kicker: string; text: s
 
 export default function ChurchStoryScreen() {
   const insets = useSafeAreaInsets();
-  const routeParams = useLocalSearchParams<{ edit?: string }>();
+  const routeParams = useLocalSearchParams<{ edit?: string; manage?: string; tab?: string }>();
   const { api, context } = useSession();
   const { colors } = useTheme();
   const access = useGeneralMinistryAccess();
-  const [activeTab, setActiveTab] = useState<'story' | 'facts' | 'leadership'>('story');
+  const requestedTab = routeParams.tab === 'facts' ? 'facts' : routeParams.tab === 'leadership' ? 'leadership' : 'story';
+  const managementRequested = routeParams.manage === '1' || Boolean(routeParams.edit);
+  const [activeTab, setActiveTab] = useState<'story' | 'facts' | 'leadership'>(requestedTab);
   const [editing, setEditing] = useState(false);
   const [savingStory, setSavingStory] = useState(false);
   const [savingLocation, setSavingLocation] = useState(false);
@@ -90,11 +93,27 @@ export default function ChurchStoryScreen() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (routeParams.edit === 'location' && access.canManageLeadership) {
+    if (!access.canManageLeadership) return;
+    if (routeParams.edit === 'leaders' || routeParams.edit === 'leadership') {
+      setActiveTab('leadership');
       setEditing(true);
-      setActiveTab('story');
+      return;
     }
-  }, [routeParams.edit, access.canManageLeadership]);
+    if (routeParams.edit === 'facts') {
+      setActiveTab('facts');
+      setEditing(true);
+      return;
+    }
+    if (routeParams.edit === 'location' || routeParams.edit === 'story') {
+      setActiveTab('story');
+      setEditing(true);
+      return;
+    }
+    if (routeParams.tab === 'facts' || routeParams.tab === 'leadership' || routeParams.tab === 'story') {
+      setActiveTab(routeParams.tab);
+    }
+    if (routeParams.manage === '1') setEditing(true);
+  }, [routeParams.edit, routeParams.manage, routeParams.tab, access.canManageLeadership]);
 
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
   const orgParam = organizationId ? `?organizationId=${encodeURIComponent(organizationId)}` : '';
@@ -175,8 +194,7 @@ export default function ChurchStoryScreen() {
           bannerImageUrl: story?.banner_image_url || undefined,
         }),
       });
-      setFeedback('Our Story was published to COT.');
-      setEditing(false);
+      setFeedback(activeTab === 'facts' ? 'Quick Facts were published.' : 'Our Story was published.');
       resource.refresh();
     } catch (value) {
       setError(value instanceof Error ? value.message : 'We couldn’t publish Our Story.');
@@ -238,12 +256,25 @@ export default function ChurchStoryScreen() {
           <ScreenHeader
             title={story?.title ?? 'Our Story'}
             kicker="COT"
-            subtitle={story?.subtitle ?? 'Mission, vision, heritage, location and pastoral leadership.'}
+            subtitle={story?.subtitle ?? 'Our Story, Quick Facts, church location and Our Leaders.'}
             showBack
           />
           {access.canManageLeadership ? (
             <View style={styles.adminActions}>
-              <Button label={editing ? 'Close editor' : 'Edit Our Story & Location'} onPress={() => setEditing((current) => !current)} variant={editing ? 'outline' : 'primary'} size="sm" />
+              <Button
+                label={editing ? 'Done managing' : 'Manage church profile'}
+                onPress={() => {
+                  if (editing) {
+                    setEditing(false);
+                    router.replace({ pathname: '/general/church-story', params: { tab: activeTab } } as any);
+                  } else {
+                    setEditing(true);
+                    router.replace({ pathname: '/general/church-story', params: { manage: '1', tab: activeTab } } as any);
+                  }
+                }}
+                variant={editing ? 'outline' : 'primary'}
+                size="sm"
+              />
             </View>
           ) : null}
         </View>
@@ -251,65 +282,101 @@ export default function ChurchStoryScreen() {
         {feedback ? <View style={[styles.notice, { backgroundColor: colors.successSoft, borderColor: colors.success }]}><Icon name="checkmark-circle-outline" size={17} color={colors.success} /><Text style={[styles.noticeText, { color: colors.success }]}>{feedback}</Text></View> : null}
         {error ? <View style={[styles.notice, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}><Icon name="alert-circle-outline" size={17} color={colors.live} /><Text style={[styles.noticeText, { color: colors.live }]}>{error}</Text></View> : null}
 
+        <View style={[styles.tabContainer, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+          <Chip label="Our Story" selected={activeTab === 'story'} onPress={() => {
+            setActiveTab('story');
+            if (editing) router.replace({ pathname: '/general/church-story', params: { manage: '1', tab: 'story' } } as any);
+          }} />
+          <Chip label="Quick Facts" selected={activeTab === 'facts'} onPress={() => {
+            setActiveTab('facts');
+            if (editing) router.replace({ pathname: '/general/church-story', params: { manage: '1', tab: 'facts' } } as any);
+          }} count={(story?.quick_facts ?? []).length} />
+          <Chip label="Our Leaders" selected={activeTab === 'leadership'} onPress={() => {
+            setActiveTab('leadership');
+            if (editing) router.replace({ pathname: '/general/church-story', params: { manage: '1', tab: 'leadership' } } as any);
+          }} count={leaders.length} />
+        </View>
+
         {editing && access.canManageLeadership ? (
           <View style={styles.editorWrap}>
-            <View style={[styles.editorCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
-              <View style={styles.editorHeading}><View style={[styles.editorIcon, { backgroundColor: colors.primarySoft }]}><Icon name="library-outline" size={18} color={colors.interactive} /></View><View style={styles.flex}><Text style={[styles.editorTitle, { color: colors.text }]}>Publish Our Story</Text><Text style={[styles.editorHint, { color: colors.textSecondary }]}>These fields update the public Our Story page immediately after saving.</Text></View></View>
-              <InputField label="Title" value={title} onChangeText={setTitle} placeholder="Our Story" />
-              <InputField label="Subtitle" value={subtitle} onChangeText={setSubtitle} placeholder="City of Transformation" />
-              <InputField label="Mission" value={mission} onChangeText={setMission} multiline numberOfLines={4} placeholder="What COT exists to do…" />
-              <InputField label="Vision" value={vision} onChangeText={setVision} multiline numberOfLines={4} placeholder="Where COT is going…" />
-              <InputField label="Founding story" value={foundingStory} onChangeText={setFoundingStory} multiline numberOfLines={8} placeholder="Tell the COT founding story…" />
-              <InputField label="Founding year (optional)" value={foundingYear} onChangeText={setFoundingYear} keyboardType="number-pad" placeholder="2010" />
-              <View style={[styles.quickFactsEditor, { borderTopColor: colors.borderSubtle }]}>
-                <Text style={[styles.editorTitle, { color: colors.text }]}>Quick Facts</Text>
-                <Text style={[styles.editorHint, { color: colors.textSecondary }]}>Add up to seven concise public facts about General COT. COT AI can answer from these published facts.</Text>
+            {activeTab === 'story' ? (
+              <>
+                <View style={[styles.editorCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+                  <View style={styles.editorHeading}>
+                    <View style={[styles.editorIcon, { backgroundColor: colors.primarySoft }]}><Icon name="library-outline" size={18} color={colors.interactive} /></View>
+                    <View style={styles.flex}>
+                      <Text style={[styles.editorTitle, { color: colors.text }]}>Manage Our Story</Text>
+                      <Text style={[styles.editorHint, { color: colors.textSecondary }]}>Update the church story members and visitors read here.</Text>
+                    </View>
+                  </View>
+                  <InputField label="Title" value={title} onChangeText={setTitle} placeholder="Our Story" />
+                  <InputField label="Subtitle" value={subtitle} onChangeText={setSubtitle} placeholder="City of Transformation" />
+                  <InputField label="Mission" value={mission} onChangeText={setMission} multiline numberOfLines={4} placeholder="What COT exists to do…" />
+                  <InputField label="Vision" value={vision} onChangeText={setVision} multiline numberOfLines={4} placeholder="Where COT is going…" />
+                  <InputField label="Founding story" value={foundingStory} onChangeText={setFoundingStory} multiline numberOfLines={8} placeholder="Tell the COT founding story…" />
+                  <InputField label="Founding year (optional)" value={foundingYear} onChangeText={setFoundingYear} keyboardType="number-pad" placeholder="2010" />
+                  <Button label="Save Our Story" onPress={() => void saveStory()} loading={savingStory} size="md" />
+                </View>
+
+                <View style={[styles.editorCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+                  <View style={styles.editorHeading}>
+                    <View style={[styles.editorIcon, { backgroundColor: colors.primarySoft }]}><Icon name="location-outline" size={18} color={colors.interactive} /></View>
+                    <View style={styles.flex}>
+                      <Text style={[styles.editorTitle, { color: colors.text }]}>Church location</Text>
+                      <Text style={[styles.editorHint, { color: colors.textSecondary }]}>Publish the official General COT address. Expression addresses remain in each Expression’s settings.</Text>
+                    </View>
+                  </View>
+                  <LocationFinder
+                    initialLabel={addressLines.join(', ')}
+                    onSelect={applyVerifiedLocation}
+                    onManualFallback={useManualLocation}
+                  />
+                  {!manualLocation && latitude !== null && longitude !== null ? (
+                    <View style={[styles.verifiedLocation, { backgroundColor: colors.successSoft, borderColor: colors.success }]}>
+                      <Icon name="checkmark-circle-outline" size={18} color={colors.success} />
+                      <View style={styles.flex}>
+                        <Text style={[styles.verifiedTitle, { color: colors.text }]}>Location confirmed</Text>
+                        <Text style={[styles.editorHint, { color: colors.textSecondary }]}>{[line1, line2, city, state, country].filter(Boolean).join(', ')}</Text>
+                      </View>
+                    </View>
+                  ) : null}
+                  {manualLocation ? (
+                    <View style={[styles.manualLocation, { borderColor: colors.borderSubtle }]}>
+                      <Text style={[styles.editorTitle, { color: colors.text }]}>Enter address manually</Text>
+                      <Text style={[styles.editorHint, { color: colors.textSecondary }]}>Use this when the location search cannot find the address.</Text>
+                      <InputField label="Street / building" value={line1} onChangeText={setLine1} placeholder="Street name and building" />
+                      <InputField label="Address line 2 (optional)" value={line2} onChangeText={setLine2} placeholder="Area, floor or suite" />
+                      <View style={styles.twoCol}>
+                        <View style={styles.flex}><InputField label="City" value={city} onChangeText={setCity} placeholder="Awka" /></View>
+                        <View style={styles.flex}><InputField label="State" value={state} onChangeText={setState} placeholder="Anambra" /></View>
+                      </View>
+                      <InputField label="Country" value={country} onChangeText={setCountry} placeholder="Nigeria" />
+                    </View>
+                  ) : null}
+                  <InputField label="Landmark (optional)" value={landmark} onChangeText={setLandmark} placeholder="Near…" />
+                  <Button label="Save Church Location" onPress={() => void saveLocation()} loading={savingLocation} size="md" />
+                </View>
+              </>
+            ) : activeTab === 'facts' ? (
+              <View style={[styles.editorCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+                <View style={styles.editorHeading}>
+                  <View style={[styles.editorIcon, { backgroundColor: colors.primarySoft }]}><Icon name="flash-outline" size={18} color={colors.interactive} /></View>
+                  <View style={styles.flex}>
+                    <Text style={[styles.editorTitle, { color: colors.text }]}>Manage Quick Facts</Text>
+                    <Text style={[styles.editorHint, { color: colors.textSecondary }]}>Add up to seven concise facts people should know about General COT.</Text>
+                  </View>
+                </View>
                 {quickFacts.map((fact, index) => (
                   <InputField key={index} label={`Quick fact ${index + 1}`} value={fact} onChangeText={(value) => updateQuickFact(index, value)} placeholder={`Fact ${index + 1}`} />
                 ))}
+                <Button label="Save Quick Facts" onPress={() => void saveStory()} loading={savingStory} size="md" />
               </View>
-              <Button label="Publish Our Story & Quick Facts" onPress={() => void saveStory()} loading={savingStory} size="md" />
-            </View>
-
-            <View style={[styles.editorCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
-              <View style={styles.editorHeading}><View style={[styles.editorIcon, { backgroundColor: colors.primarySoft }]}><Icon name="location-outline" size={18} color={colors.interactive} /></View><View style={styles.flex}><Text style={[styles.editorTitle, { color: colors.text }]}>General COT location</Text><Text style={[styles.editorHint, { color: colors.textSecondary }]}>This is church-wide. Expression addresses are edited inside each Expression’s Settings.</Text></View></View>
-              <LocationFinder
-                initialLabel={addressLines.join(', ')}
-                onSelect={applyVerifiedLocation}
-                onManualFallback={useManualLocation}
-              />
-              {!manualLocation && latitude !== null && longitude !== null ? (
-                <View style={[styles.verifiedLocation, { backgroundColor: colors.successSoft, borderColor: colors.success }]}>
-                  <Icon name="checkmark-circle-outline" size={18} color={colors.success} />
-                  <View style={styles.flex}>
-                    <Text style={[styles.verifiedTitle, { color: colors.text }]}>Verified map location</Text>
-                    <Text style={[styles.editorHint, { color: colors.textSecondary }]}>{[line1, line2, city, state, country].filter(Boolean).join(', ')}</Text>
-                  </View>
-                </View>
-              ) : null}
-              {manualLocation ? (
-                <View style={[styles.manualLocation, { borderColor: colors.borderSubtle }]}>
-                  <Text style={[styles.editorTitle, { color: colors.text }]}>Manual location fallback</Text>
-                  <Text style={[styles.editorHint, { color: colors.textSecondary }]}>Use this only when the address cannot be found by the location finder. Manual entries are saved without verified coordinates.</Text>
-                  <InputField label="Street / building" value={line1} onChangeText={setLine1} placeholder="Street name and building" />
-                  <InputField label="Address line 2 (optional)" value={line2} onChangeText={setLine2} placeholder="Area, floor or suite" />
-                  <View style={styles.twoCol}><View style={styles.flex}><InputField label="City" value={city} onChangeText={setCity} placeholder="Awka" /></View><View style={styles.flex}><InputField label="State" value={state} onChangeText={setState} placeholder="Anambra" /></View></View>
-                  <InputField label="Country" value={country} onChangeText={setCountry} placeholder="Nigeria" />
-                </View>
-              ) : null}
-              <InputField label="Landmark (optional)" value={landmark} onChangeText={setLandmark} placeholder="Near…" />
-              <Button label="Publish General Location" onPress={() => void saveLocation()} loading={savingLocation} size="md" />
-            </View>
+            ) : (
+              <GeneralChurchLeadershipPanel />
+            )}
           </View>
-        ) : null}
-
-        <View style={[styles.tabContainer, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
-          <Chip label="History & Vision" selected={activeTab === 'story'} onPress={() => setActiveTab('story')} />
-          <Chip label="Quick Facts" selected={activeTab === 'facts'} onPress={() => setActiveTab('facts')} count={(story?.quick_facts ?? []).length} />
-          <Chip label="Our Leaders" selected={activeTab === 'leadership'} onPress={() => setActiveTab('leadership')} count={leaders.length} />
-        </View>
-
-        <View style={styles.body}>
+        ) : (
+          <View style={styles.body}>
           {resource.loading ? (
             <View style={{ gap: spacing.md }}><Skeleton height={120} borderRadius={radius.lg} /><Skeleton height={160} borderRadius={radius.lg} /></View>
           ) : resource.error && !resource.data ? (
@@ -366,6 +433,7 @@ export default function ChurchStoryScreen() {
             <EmptyState title="No Leaders Listed" message="Leadership profiles will appear here once configured by pastoral administration." iconName="people-outline" />
           )}
         </View>
+        )}
       </ScrollView>
     </View>
   );
