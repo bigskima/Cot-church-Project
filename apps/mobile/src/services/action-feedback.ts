@@ -5,6 +5,7 @@ export type ActionFeedback = {
   message: string;
   details?: string[];
   retry?: (() => Promise<unknown>) | null;
+  operationKey?: string;
 };
 
 type Listener = (feedback: ActionFeedback) => void;
@@ -29,6 +30,23 @@ export function emitActionFeedback(feedback: Omit<ActionFeedback, 'id'>) {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
   };
   listeners.forEach((listener) => listener(item));
+}
+
+export function mutationFeedbackKey(path: string, method: string, body?: unknown) {
+  const parsed = parseMutationBody(body);
+  const cleanPath = path.split('?')[0].replace(/^\/+/, '');
+  const action = readable(parsed.action) || method.toUpperCase();
+  const identity = [
+    parsed.id,
+    parsed.groupId,
+    parsed.expressionId,
+    parsed.conversationId,
+    parsed.profileId,
+    parsed.definitionId,
+    parsed.campaignId,
+    parsed.key,
+  ].map(readable).find(Boolean) || '';
+  return [cleanPath, action.toLowerCase(), identity].filter(Boolean).join(':');
 }
 
 function parseMutationBody(body: unknown): Record<string, unknown> {
@@ -143,14 +161,15 @@ export function buildMutationSuccessFeedback(path: string, method: string, body?
   const description = describeMutation(path, method, body);
   const target = description.target ? ` “${description.target}”` : '';
   const resultDetail = responseDetail(data);
+  const resourceLabel = `${description.resource[0]?.toUpperCase() ?? ''}${description.resource.slice(1)}`;
   return {
-    title: `${description.resource[0]?.toUpperCase() ?? ''}${description.resource.slice(1)} ${description.action.toLowerCase()}`,
-    message: `${description.action} ${description.resource}${target}. The server confirmed the request completed successfully.`,
+    title: `${resourceLabel} ${description.action.toLowerCase()}`,
+    message: description.target
+      ? `${resourceLabel}${target} was updated successfully.`
+      : `${resourceLabel} was updated successfully.`,
     details: [
-      `Action: ${description.action} ${description.resource}`,
-      ...(description.target ? [`Target: ${description.target}`] : []),
+      ...(description.target ? [`Updated: ${description.target}`] : []),
       ...(resultDetail ? [resultDetail] : []),
-      'Result: The confirmed server response was successful.',
     ],
   };
 }
@@ -158,9 +177,8 @@ export function buildMutationSuccessFeedback(path: string, method: string, body?
 export function buildMutationFailureDetails(path: string, method: string, body?: unknown) {
   const description = describeMutation(path, method, body);
   return [
-    `Attempted: ${description.action} ${description.resource}`,
     ...(description.target ? [`Target: ${description.target}`] : []),
-    'Result: The requested change was not confirmed as successful.',
+    `The ${description.resource} update was not completed.`,
   ];
 }
 
