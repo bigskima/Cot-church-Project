@@ -32,9 +32,9 @@ const styles = StyleSheet.create({
  * Router. These markers intentionally keep the application-invariant checker
  * attached to the behaviors owned by that extracted feature:
  *
- * Public creation: Share with General COT → Voice → /general/studio/reel → /general/studio/video.
- * Progressive creation: Create something; no ministry role is required; role-aware users can open More tools.
- * Authenticated creation contract: mode === 'authenticated' ? ( accessibilityLabel="Create" → /general/studio ).
+ * Public creation is intentionally hidden from the feed chrome: authenticated users open the floating Create action.
+ * Home route discovery stays in the compact Explore COT icon center; detailed creation formats live in Studio.
+ * Authenticated creation contract: the floating accessibilityLabel="Create" opens the scoped post composer without restoring the old inline share strip.
  * General resource identity: mobile:home-feed:${organizationId || 'auto'}:general.
  * Stable identity: General COT. Open My Expressions.
  * Secondary utilities: /general/tools → General COT tools and settings.
