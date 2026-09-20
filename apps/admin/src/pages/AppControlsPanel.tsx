@@ -300,12 +300,12 @@ export function AppControlsPanel({
       <Card
         title="App Controls"
         subtitle="These controls change feature availability without deleting saved content or changing ministry roles."
-        headerAction={<Badge label={scopeType === 'global' ? 'GLOBAL' : 'SCOPED'} variant={scopeType === 'global' ? 'gold' : 'neutral'} />}
+        headerAction={<Badge label={scopeType === 'global' ? 'ALL COT' : 'SELECTED AREA'} variant={scopeType === 'global' ? 'gold' : 'neutral'} />}
       >
         <div style={{ display: 'grid', gap: 14 }}>
           <div className="admin-form-grid-two">
             <SelectField
-              label="Control scope"
+              label="Apply to"
               value={scopeType}
               onChange={(event) => {
                 const next = event.target.value as ScopeType;
@@ -412,20 +412,20 @@ export function AppControlsPanel({
               accessor: (item) => <Badge label={categoryLabel(item.category).toUpperCase()} variant="neutral" />,
             },
             {
-              header: scopeType === 'global' ? 'GLOBAL STATE' : 'THIS SCOPE',
+              header: scopeType === 'global' ? 'ALL COT' : 'THIS AREA',
               accessor: (item) => {
                 const state = controlState(item, scopeType);
                 return <Badge label={stateLabel(state)} variant={state === 'enabled' ? 'active' : state === 'disabled' ? 'suspended' : 'neutral'} />;
               },
             },
             {
-              header: 'EFFECTIVE',
+              header: 'FINAL STATUS',
               accessor: (item) => (
                 <div>
                   <Badge label={item.effective_enabled ? 'AVAILABLE' : 'UNAVAILABLE'} variant={item.effective_enabled ? 'active' : 'suspended'} />
                   {item.blocked_by ? (
                     <div className="admin-row-meta" style={{ marginTop: 4 }}>
-                      Blocked by {payload?.items.find((candidate) => candidate.key === item.blocked_by)?.name ?? item.blocked_by}
+                      Turned off by {payload?.items.find((candidate) => candidate.key === item.blocked_by)?.name ?? item.blocked_by}
                     </div>
                   ) : null}
                 </div>
@@ -448,7 +448,7 @@ export function AppControlsPanel({
       <Modal
         isOpen={Boolean(editing)}
         onClose={() => { if (!saving) setEditing(null); }}
-        title={editing ? `App control · ${editing.name}` : 'App control'}
+        title={editing ? `Feature availability · ${editing.name}` : 'Feature availability'}
         subtitle={scopeTitle}
         footer={
           <div className="admin-header-actions">
