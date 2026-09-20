@@ -1,7 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { ApiError } from "../_shared/errors.ts";
 import { createHandler } from "../_shared/handler.ts";
-import { publicClient } from "../_shared/supabase.ts";
+import { adminClient, publicClient } from "../_shared/supabase.ts";
+import { assertFeatureEnabled } from "../_shared/feature-controls.ts";
 import { uuid } from "../_shared/validation.ts";
 
 Deno.serve(createHandler(
@@ -9,6 +10,7 @@ Deno.serve(createHandler(
   async ({ request }) => {
     const url = new URL(request.url);
     const organizationId = uuid(url.searchParams.get("organizationId"), "organizationId", true)!;
+    await assertFeatureEnabled(adminClient(), "birthdays", { organizationId }, "Birthdays are currently unavailable.");
     const rawDays = url.searchParams.get("daysAhead") ?? "60";
     const daysAhead = Number(rawDays);
     if (!Number.isInteger(daysAhead) || daysAhead < 0 || daysAhead > 366) {
