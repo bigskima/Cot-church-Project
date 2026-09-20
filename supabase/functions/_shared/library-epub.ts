@@ -69,9 +69,12 @@ function htmlToText(html: string) {
 }
 
 function chapterTitle(html: string, fallback: string) {
-  const title = html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1]
-    ?? html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1]
+  // Visible chapter/day headings are more useful than the document <title>,
+  // which many EPUB generators repeat as the book title on every file.
+  const title = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1]
     ?? html.match(/<h2\b[^>]*>([\s\S]*?)<\/h2>/i)?.[1]
+    ?? html.match(/<h3\b[^>]*>([\s\S]*?)<\/h3>/i)?.[1]
+    ?? html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1]
     ?? "";
   const text = htmlToText(title).slice(0, 180).trim();
   return text || fallback;
