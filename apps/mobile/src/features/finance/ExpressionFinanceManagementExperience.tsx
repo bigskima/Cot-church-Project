@@ -335,7 +335,7 @@ export default function ExpressionFinanceManagementExperience() {
       </View>
       <View style={[styles.onlineCard, { backgroundColor: resource.data?.settings?.online_payment_enabled ? colors.successSoft : colors.bgSecondary, borderColor: colors.borderSubtle }]}>
         <Icon name={resource.data?.settings?.online_payment_enabled ? 'checkmark-circle-outline' : 'time-outline'} size={17} color={resource.data?.settings?.online_payment_enabled ? colors.success : colors.textMuted} />
-        <Text style={[styles.onlineText, { color: colors.textSecondary }]}>{resource.data?.settings?.online_payment_enabled ? 'Online giving is enabled. Successful provider-confirmed donations automatically enter the correct documentation wallet.' : 'Online giving is still disabled. Manual transfer/cash documentation works now; the database bridge is ready for online payments later.'}</Text>
+        <Text style={[styles.onlineText, { color: colors.textSecondary }]}>{resource.data?.settings?.online_payment_enabled ? 'Online giving is enabled. Confirmed online gifts are recorded automatically in the correct giving records.' : 'Online giving is currently unavailable. Manual transfer and cash giving can still be recorded here.'}</Text>
       </View>
 
       {resource.loading && !resource.data ? <Skeleton height={96} count={4} /> : resource.error && !resource.data ? <ResourceError message={resource.error} retry={resource.refresh} /> : (
