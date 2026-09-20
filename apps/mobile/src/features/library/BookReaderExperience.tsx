@@ -152,6 +152,25 @@ export function BookReaderExperience({ bookId }: { bookId: string }) {
   if (!detail.data) return <View style={[styles.screen, styles.center, { backgroundColor: colors.bg }]}><EmptyState title='Book unavailable' message={detail.error || 'This book could not be opened.'} iconName='book-outline' /><Pressable onPress={() => router.back()}><Text style={{ color: colors.interactive, fontWeight: '900' }}>Back to Library</Text></Pressable></View>;
 
   const { book, reviews } = detail.data;
+
+  if (book.source_format === 'pdf') {
+    return (
+      <View style={[styles.pdfReaderScreen, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
+        <View style={[styles.pdfReaderHeader, { borderBottomColor: colors.borderSubtle }]}>
+          <ScreenHeader title={book.title} showBack compact />
+        </View>
+        <View style={styles.pdfReaderFrame}>
+          {book.source_url ? (
+            <PdfBookFrame url={book.source_url} />
+          ) : (
+            <View style={styles.pdfUnavailable}>
+              <EmptyState title='PDF unavailable' message='The secure book file could not be prepared.' iconName='document-outline' />
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  }
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 100 }]}>
@@ -162,15 +181,7 @@ export function BookReaderExperience({ bookId }: { bookId: string }) {
           <Text style={[styles.author, { color: colors.textSecondary }]}>by {book.author_name}</Text>
         </View>
 
-        {book.source_format === 'pdf' ? (
-          <View style={styles.pdfBlock}>
-            {book.source_url ? <PdfBookFrame url={book.source_url} /> : <EmptyState title='PDF unavailable' message='The secure book file could not be prepared.' iconName='document-outline' />}
-            <View style={[styles.note, { backgroundColor: colors.bgSecondary }]}>
-              <Icon name='volume-high-outline' size={16} color={colors.textMuted} />
-              <Text style={[styles.noteText, { color: colors.textSecondary }]}>PDF pages now stay inside COT. Use the reader controls to move by page; embedded PDF bookmarks appear as document sections. Read aloud remains available for EPUB text.</Text>
-            </View>
-          </View>
-        ) : !chapter ? (
+        {!chapter ? (
           <EmptyState title='Book is being prepared' message='Readable chapters are not available yet.' iconName='hourglass-outline' />
         ) : (
           <>
@@ -233,6 +244,10 @@ const styles = StyleSheet.create({
   screen: { flex: 1 }, center: { alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
   content: { flexGrow: 1, paddingHorizontal: spacing.md, gap: spacing.lg, maxWidth: 920, width: '100%', alignSelf: 'center' },
   loading: { paddingHorizontal: spacing.md, gap: spacing.md },
+  pdfReaderScreen: { flex: 1, minHeight: 0 },
+  pdfReaderHeader: { borderBottomWidth: StyleSheet.hairlineWidth },
+  pdfReaderFrame: { flex: 1, minHeight: 0, overflow: 'hidden' },
+  pdfUnavailable: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
   bookHeading: { gap: 3 }, bookTitle: { fontSize: 24, lineHeight: 30, fontWeight: '900', letterSpacing: -0.5 }, subtitle: { fontSize: 13 }, author: { fontSize: 12, fontWeight: '700' },
   pdfBlock: { gap: spacing.sm }, note: { borderRadius: radius.lg, padding: spacing.sm, flexDirection: 'row', gap: 8, alignItems: 'flex-start' }, noteText: { flex: 1, fontSize: 10.5, lineHeight: 15 },
   readerToolbar: { gap: spacing.sm }, chapterStrip: { gap: 6 }, chapterChip: { maxWidth: 180, height: 32, borderWidth: 1, borderRadius: radius.pill, justifyContent: 'center', paddingHorizontal: 11 }, chapterChipText: { fontSize: 9.5, fontWeight: '800' },

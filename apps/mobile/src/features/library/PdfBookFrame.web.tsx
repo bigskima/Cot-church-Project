@@ -9,11 +9,10 @@ export function PdfBookFrame({ url }: { url: string }) {
       sandbox="allow-scripts allow-same-origin allow-popups"
       style={{
         width: '100%',
-        height: '82vh',
-        minHeight: 620,
+        height: '100%',
+        minHeight: 0,
         border: 0,
-        borderRadius: 16,
-        background: '#090e16',
+        background: '#080d15',
       }}
     />
   );
