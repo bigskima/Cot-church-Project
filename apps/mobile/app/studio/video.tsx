@@ -20,6 +20,8 @@ type SelectedVideo = {
   mimeType: string;
   sizeBytes: number;
   durationSeconds?: number;
+  width?: number;
+  height?: number;
   body: Blob;
 };
 type UploadIntent = {
@@ -141,6 +143,8 @@ export default function WatchVideoCreatorScreen() {
         mimeType,
         sizeBytes,
         durationSeconds: asset.duration ? Math.round(asset.duration / 1000) : undefined,
+        width: asset.width || undefined,
+        height: asset.height || undefined,
         body,
       });
     } catch (error) {
@@ -173,7 +177,7 @@ export default function WatchVideoCreatorScreen() {
           mimeType: video.mimeType,
           expressionId: selectedExpressionId,
           durationSeconds: video.durationSeconds,
-          aspectRatio: '16:9',
+          aspectRatio: video.width && video.height ? `${video.width}:${video.height}` : undefined,
           fileSizeBytes: video.sizeBytes,
           fileName: video.fileName,
         }),
