@@ -2,10 +2,10 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Avatar, BrandMark, Icon } from '@/components';
+import { Avatar, BrandMark, Icon, WorkspaceTopBar } from '@/components';
 import { TourAnchor } from '@/features/tour/AppTourProvider';
 import { GeneralHomeNoticeStrip } from './GeneralHomeNoticeStrip';
-import { radius, shadows, spacing } from '@/design-system/tokens';
+import { radius, spacing } from '@/design-system/tokens';
 import { useTheme } from '@/state/theme';
 
 type Props = {
@@ -43,7 +43,7 @@ export function GeneralTopBar({ organizationName, authenticated, avatarUrl, disp
   return (
     <View style={[styles.wrap, { paddingTop: insets.top + spacing.xs }]}>
       <TourAnchor targetKey="general.topbar">
-        <View style={[styles.bar, { backgroundColor: colors.glass, borderColor: colors.borderSubtle }, shadows.sm]}>
+        <WorkspaceTopBar>
           <Pressable
             onPress={() => authenticated ? router.push('/expressions') : undefined}
             disabled={!authenticated}
@@ -94,7 +94,7 @@ export function GeneralTopBar({ organizationName, authenticated, avatarUrl, disp
               <HeaderButton icon="person-outline" label="Sign in" onPress={() => router.push('/(auth)/login' as any)} accent />
             ) : null}
           </View>
-        </View>
+        </WorkspaceTopBar>
       </TourAnchor>
       <GeneralHomeNoticeStrip />
     </View>
@@ -103,7 +103,6 @@ export function GeneralTopBar({ organizationName, authenticated, avatarUrl, disp
 
 const styles = StyleSheet.create({
   wrap: { paddingHorizontal: spacing.sm, paddingBottom: spacing.xs, gap: 7 },
-  bar: { width: '100%', maxWidth: 1120, alignSelf: 'center', minHeight: 58, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: 8, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   identity: { minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 7, flexShrink: 1 },
   brand: { width: 40, height: 40, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   identityCopy: { minWidth: 0, maxWidth: 250, flexShrink: 1 },
