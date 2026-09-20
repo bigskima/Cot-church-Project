@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
   },
   dateHero: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   weekday: { fontSize: 9.5, lineHeight: 13, fontWeight: '900', letterSpacing: 1.5 },
-  dayNumber: { fontSize: 42, lineHeight: 48, fontWeight: '950', letterSpacing: -1.4, marginTop: 2 },
+  dayNumber: { fontSize: 42, lineHeight: 48, fontWeight: '900', letterSpacing: -1.4, marginTop: 2 },
   monthYear: { fontSize: 13, lineHeight: 18, fontWeight: '800', marginTop: 1 },
   jumpPanel: {
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
   },
   jumpCopy: { gap: 2 },
   jumpKicker: { fontSize: 8.5, fontWeight: '900', letterSpacing: 1.1 },
-  jumpHint: { fontSize: 10.5, fontWeight: '650' },
+  jumpHint: { fontSize: 10.5, fontWeight: '700' },
   jumpControls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   dateInputWrap: {
     flex: 1,
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   todayText: { fontSize: 10, fontWeight: '900' },
-  dateError: { fontSize: 10.5, fontWeight: '750' },
+  dateError: { fontSize: 10.5, fontWeight: '700' },
   loading: { gap: spacing.md },
   emptyCard: {
     minHeight: 280,
