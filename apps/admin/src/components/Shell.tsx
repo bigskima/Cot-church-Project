@@ -19,6 +19,8 @@ import { FeatureFlags } from '../pages/FeatureFlags';
 import { IntegrationsJobs } from '../pages/IntegrationsJobs';
 import { AuditSecurity } from '../pages/AuditSecurity';
 
+const PLATFORM_ADMIN_GUIDE_URL = 'https://docs.google.com/document/d/17SeNvbifGeuAL7pV-2TkbnZ_ZGr1S-GI0U5ZdPH4XLw/edit?usp=drivesdk';
+
 type NavItem = { key: string; label: string; permission: string; superAdminOnly?: boolean };
 type NavSection = { group: string; items: NavItem[] };
 
@@ -288,6 +290,16 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
             <Badge label={isSuperAdmin ? "SUPER ADMIN" : "ADMIN"} variant="gold" />
           </div>
           <div className="admin-topbar-right">
+            <a
+              className="admin-guide-trigger admin-guide-external-link"
+              href={PLATFORM_ADMIN_GUIDE_URL}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Open the COT Platform Administration Guide"
+            >
+              <span className="admin-guide-trigger-icon" aria-hidden="true">↗</span>
+              <span className="admin-guide-trigger-label">Full guide</span>
+            </a>
             <AdminGuide api={api} page={page} pageTitle={getPageTitle()} canOpenAi={allowedPageKeys.has('ai')} onNavigate={navigate} />
             <button
               type="button"
