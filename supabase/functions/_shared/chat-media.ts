@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.57.4";
 import { ApiError } from "./errors.ts";
+import { loadPublicChatBadges } from "./identity-badges.ts";
 
 export const CHAT_MEDIA_BUCKET = "chat-media";
 export const MAX_CHAT_MEDIA_BYTES = 100 * 1024 * 1024;
@@ -285,12 +286,13 @@ export async function messageReactionMap(
   return result;
 }
 
-function publicSender(profile: any) {
+function publicSender(profile: any, badges: any[] = []) {
   return profile ? {
     id: profile.id,
     username: profile.username,
     display_name: profile.display_name,
     avatar_url: profile.avatar_url,
+    badges,
   } : null;
 }
 
@@ -301,6 +303,7 @@ export async function hydrateChatMessages(
   rows: any[],
   viewerId: string,
   hiddenProfileIds: Set<string> = new Set<string>(),
+  identityScope: { organizationId?: string | null; branchId?: string | null } = {},
 ) {
   if (!rows.length) return [];
   const messageIds = rows.map((message) => message.id);
@@ -321,12 +324,13 @@ export async function hydrateChatMessages(
   const allRows = [...rows, ...(missingReplies ?? []).filter((reply: any) => !hiddenProfileIds.has(reply.sender_profile_id))];
   const profileIds = [...new Set(allRows.map((message) => message.sender_profile_id).filter(Boolean))];
   const attachmentIds = [...new Set(allRows.flatMap((message) => message.attachment_ids ?? []))];
-  const [{ data: profiles, error: profilesError }, attachmentMap, reactions] = await Promise.all([
+  const [{ data: profiles, error: profilesError }, attachmentMap, reactions, badgeMap] = await Promise.all([
     profileIds.length
       ? admin.from("profiles").select("id,username,display_name,avatar_url").in("id", profileIds)
       : Promise.resolve({ data: [] as any[], error: null }),
     signedChatAttachments(admin, attachmentIds),
     messageReactionMap(admin, reactionTable, messageIds, viewerId),
+    loadPublicChatBadges(admin, profileIds, identityScope.organizationId, identityScope.branchId),
   ]);
   if (profilesError) throw new ApiError("CHAT_LOAD_FAILED", "We couldn’t load message senders.", 500, undefined, false);
   const profileMap = new Map((profiles ?? []).map((profile: any) => [profile.id, profile]));
@@ -335,14 +339,14 @@ export async function hydrateChatMessages(
     id: reply.id,
     body: reply.redacted_at ? "Message removed" : reply.body,
     sender_profile_id: reply.sender_profile_id,
-    sender: publicSender(profileMap.get(reply.sender_profile_id)),
+    sender: publicSender(profileMap.get(reply.sender_profile_id), badgeMap.get(reply.sender_profile_id) ?? []),
     attachmentType: (reply.attachment_ids ?? []).map((id: string) => attachmentMap.get(id)?.type).find(Boolean) ?? null,
   } : null;
 
   return rows.map((message) => ({
     ...message,
     body: message.redacted_at ? "Message removed" : message.body,
-    sender: publicSender(profileMap.get(message.sender_profile_id)),
+    sender: publicSender(profileMap.get(message.sender_profile_id), badgeMap.get(message.sender_profile_id) ?? []),
     attachments: message.redacted_at
       ? []
       : (message.attachment_ids ?? []).map((id: string) => attachmentMap.get(id)).filter(Boolean),
