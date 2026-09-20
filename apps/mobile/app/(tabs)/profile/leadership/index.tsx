@@ -4,8 +4,8 @@ import { Redirect, router, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
-import { EmptyState, LeadershipModuleCard, ScreenHeader, SectionHeader, Skeleton } from '@/components';
-import { radius, shadows, spacing } from '@/design-system/tokens';
+import { CompactRouteGrid, EmptyState, ScreenHeader, SectionHeader, Skeleton } from '@/components';
+import { spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 
 export default function LeadershipHubScreen() {
@@ -95,17 +95,42 @@ export default function LeadershipHubScreen() {
   const availableTools = tools.filter((tool) => tool.enabled);
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: generalWorkspace ? spacing.md : insets.top + spacing.sm, paddingBottom: generalWorkspace ? insets.bottom + spacing.xl : insets.bottom + 120 }]}>
-        <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
-          <ScreenHeader title="Leadership tools" kicker="MINISTRY" subtitle="Only the ministry tools available to you appear here." showBack />
-        </View>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: generalWorkspace ? spacing.sm : insets.top + spacing.sm,
+            paddingBottom: generalWorkspace ? insets.bottom + spacing.xl : insets.bottom + 120,
+          },
+        ]}
+      >
+        <ScreenHeader title="Ministry tools" showBack compact />
         <View style={styles.body}>
-          <SectionHeader title="Available tools" badge={authorityReady ? availableTools.length : undefined} subtitle={authorityReady ? (generalWorkspace ? 'Church ministry tools' : activeExpression?.name ? `Current space: ${activeExpression!.name}` : 'Church ministry tools') : 'Checking your ministry tools'} />
+          <SectionHeader title="Available" badge={authorityReady ? availableTools.length : undefined} />
           {!authorityReady ? (
-            <Skeleton height={104} count={3} />
-          ) : availableTools.length ? availableTools.map((tool) => (
-            <LeadershipModuleCard key={tool.title} title={tool.title} description={tool.description} iconName={tool.iconName} badge={tool.badge} onPress={() => router.push(tool.route as any)} />
-          )) : <EmptyState title="No ministry tools available" message="Your COT experience is ready. If you’re added to a ministry team, its tools will appear here." iconName="lock-closed-outline" />}
+            <View style={styles.skeletonGrid}>
+              {Array.from({ length: 8 }).map((_, index) => (
+                <View key={index} style={styles.skeletonItem}>
+                  <Skeleton height={44} width={44} borderRadius={15} />
+                  <Skeleton height={10} width={58} borderRadius={5} />
+                </View>
+              ))}
+            </View>
+          ) : availableTools.length ? (
+            <CompactRouteGrid
+              items={availableTools.map((tool) => ({
+                key: tool.title,
+                label: tool.title,
+                icon: tool.iconName,
+                badge: tool.badge,
+                accessibilityLabel: `${tool.title}. ${tool.description}`,
+                onPress: () => router.push(tool.route as any),
+              }))}
+            />
+          ) : (
+            <EmptyState title="No ministry tools available" message="Tools appear when your ministry role grants access." iconName="lock-closed-outline" />
+          )}
         </View>
       </ScrollView>
     </View>
@@ -114,7 +139,8 @@ export default function LeadershipHubScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  content: { flexGrow: 1 },
-  headerCard: { marginHorizontal: spacing.md, borderWidth: 1, borderRadius: radius.xxl, overflow: 'hidden' },
-  body: { paddingHorizontal: spacing.md, gap: spacing.sm, paddingTop: spacing.md },
+  content: { flexGrow: 1, width: '100%', maxWidth: 940, alignSelf: 'center', paddingHorizontal: spacing.md, gap: spacing.sm },
+  body: { gap: spacing.sm },
+  skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.lg },
+  skeletonItem: { width: '25%', alignItems: 'center', gap: 6 },
 });
