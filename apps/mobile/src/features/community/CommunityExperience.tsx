@@ -58,6 +58,8 @@ type MediaAttachment = {
   fileName?: string | null;
   sizeBytes: number;
   durationSeconds?: number | null;
+  width?: number | null;
+  height?: number | null;
 };
 type UploadIntent = {
   uploadId: string;
@@ -73,6 +75,8 @@ type UploadableMedia = {
   mimeType: string;
   reportedSize?: number | null;
   durationSeconds?: number | null;
+  width?: number | null;
+  height?: number | null;
   webFile?: Blob | null;
 };
 
@@ -308,6 +312,8 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
         sizeBytes,
         branchId,
         durationSeconds: media.durationSeconds ?? undefined,
+        width: media.width ?? undefined,
+        height: media.height ?? undefined,
       }),
     });
 
@@ -371,6 +377,8 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
         mimeType: inferImagePickerMime(asset),
         reportedSize: asset.fileSize,
         durationSeconds: asset.type === 'video' && asset.duration ? Math.max(1, Math.round(asset.duration / 1000)) : null,
+        width: asset.width || null,
+        height: asset.height || null,
         webFile: ((asset as any).file as Blob | undefined) ?? null,
       })));
     } catch (error) {
@@ -787,7 +795,7 @@ const styles = StyleSheet.create({
   createFab: { position: 'absolute', right: 18, zIndex: 40, width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', ...shadows.floating },
   createFabPressed: { opacity: 0.82, transform: [{ scale: 0.95 }] },
   loadingContainer: { padding: spacing.lg, gap: spacing.md },
-  feedPostCard: { marginHorizontal: spacing.sm, borderRadius: radius.xl },
+  feedPostCard: { marginHorizontal: 0, borderRadius: 0 },
   composerBody: { gap: spacing.md },
   destinationBlock: { gap: spacing.xs },
   destinationLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
