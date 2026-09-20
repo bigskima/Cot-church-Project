@@ -6,6 +6,7 @@ import { resolveSecretJson } from "../_shared/secrets.ts";
 import { commonOrganizationId, createNotifications, senderIdentity } from "../_shared/notifications.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { assertProfilesMayInteract } from "../_shared/safety.ts";
+import { assertFeatureEnabled } from "../_shared/feature-controls.ts";
 import { assertObject, requiredString, uuid } from "../_shared/validation.ts";
 import { RtcRole, RtcTokenBuilder } from "npm:agora-token@2.0.6";
 
@@ -352,6 +353,30 @@ export const chatCallsHandler = createHandler(
       const input = scopeFrom(body);
       const callKind = kindValue(body.callKind);
       const access = await authorizeScope(admin, viewerId, input);
+      const policyOrganizationId = access.organizationId
+        ?? (access.otherProfileId ? await commonOrganizationId(admin, viewerId, access.otherProfileId) : null);
+      const featureScope = {
+        organizationId: policyOrganizationId,
+        expressionId: access.branchId ?? input.expressionId ?? null,
+        groupId: input.groupId ?? null,
+      };
+      await assertFeatureEnabled(admin, "calls", featureScope, "Calls are currently unavailable in this area.");
+      await assertFeatureEnabled(
+        admin,
+        callKind === "video" ? "video_calls" : "audio_calls",
+        featureScope,
+        callKind === "video" ? "Video calls are currently unavailable in this area." : "Audio calls are currently unavailable in this area.",
+      );
+      await assertFeatureEnabled(
+        admin,
+        input.scope === "direct" ? "dm_calls" : input.scope === "expression" ? "expression_calls" : "group_calls",
+        featureScope,
+        input.scope === "direct"
+          ? "Direct-message calls are currently unavailable."
+          : input.scope === "expression"
+            ? "Expression calls are currently unavailable."
+            : "Group calls are currently unavailable in this Group.",
+      );
       const existing = await activeCall(admin, input);
       if (existing) return { data: { call: existing, participants: await participants(admin, existing.id), existing: true } };
 
