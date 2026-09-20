@@ -1,8 +1,19 @@
+export type ChatIdentityBadge = {
+  id: string;
+  code: string;
+  label: string;
+  backgroundColor: string;
+  textColor: string;
+  priority: number;
+  badgeVariant?: string;
+};
+
 export type ChatPerson = {
   id: string;
   username?: string | null;
   display_name?: string | null;
   avatar_url?: string | null;
+  badges?: ChatIdentityBadge[];
 };
 
 export type ChatAttachment = {
@@ -12,6 +23,8 @@ export type ChatAttachment = {
   fileName?: string | null;
   sizeBytes: number;
   durationSeconds?: number | null;
+  width?: number | null;
+  height?: number | null;
   url?: string | null;
 };
 
