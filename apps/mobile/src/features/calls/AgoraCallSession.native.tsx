@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { PermissionsAndroid, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { PermissionsAndroid, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import {
   ChannelProfileType,
   createAgoraRtcEngine,
@@ -19,7 +19,8 @@ async function requestCallPermissions(video: boolean) {
   return audio && camera;
 }
 
-export function AgoraCallSession({ grant, kind, scope, otherName, onJoined, onError }: AgoraCallSessionProps) {
+export function AgoraCallSession({ grant, kind, scope, otherName, onJoined, onError, overlayBottomInset = 72 }: AgoraCallSessionProps) {
+  const { width, height } = useWindowDimensions();
   const engineRef = useRef<IRtcEngine | null>(null);
   const callbacks = useRef({ onJoined, onError });
   const [remoteUids, setRemoteUids] = useState<number[]>([]);
@@ -116,11 +117,17 @@ export function AgoraCallSession({ grant, kind, scope, otherName, onJoined, onEr
   const groupVideoUids = kind === 'video' ? [0, ...remoteUids] : [];
   const total = remoteUids.length + 1;
   const groupTile = useMemo(() => {
+    const portrait = height >= width;
     if (total <= 1) return { width: '100%' as const, minHeight: '100%' as const };
-    if (total <= 4) return { width: '50%' as const, minHeight: total <= 2 ? '100%' as const : '50%' as const };
+    if (total === 2) {
+      return portrait
+        ? { width: '100%' as const, minHeight: '50%' as const }
+        : { width: '50%' as const, minHeight: '100%' as const };
+    }
+    if (total <= 4) return { width: '50%' as const, minHeight: '50%' as const };
     if (total <= 6) return { width: '33.333%' as const, minHeight: '50%' as const };
     return { width: '33.333%' as const, minHeight: '33.333%' as const };
-  }, [total]);
+  }, [height, total, width]);
 
   const remotePrimary = remoteUids[0];
 
@@ -190,7 +197,7 @@ export function AgoraCallSession({ grant, kind, scope, otherName, onJoined, onEr
         </View>
       )}
       <View style={styles.status}><Text style={styles.statusText}>{status} · {total} connected</Text></View>
-      <View style={styles.controls}>
+      <View style={[styles.controls, { paddingBottom: overlayBottomInset + 14 }]}>
         <Control label={micMuted ? 'Unmute' : 'Mute'} onPress={toggleMic} active={micMuted} />
         {kind === 'video' ? <Control label={cameraMuted ? 'Camera on' : 'Camera off'} onPress={toggleCamera} active={cameraMuted} /> : null}
         {kind === 'video' ? <Control label='Flip' onPress={flip} /> : null}
@@ -231,8 +238,8 @@ const styles = StyleSheet.create({
   audioMeta: { color: '#9CA3AF', fontSize: 13 },
   status: { position: 'absolute', top: 12, left: 12, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: 'rgba(0,0,0,0.55)' },
   statusText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800' },
-  controls: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 82, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10, backgroundColor: '#03060B' },
-  control: { minWidth: 82, height: 46, borderRadius: 23, backgroundColor: '#151B25', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 },
+  controls: { paddingHorizontal: 16, paddingTop: 14, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10, backgroundColor: '#03060B' },
+  control: { minWidth: 82, height: 46, borderRadius: 23, backgroundColor: '#151B25', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 },
   controlActive: { backgroundColor: '#7F1D1D', borderColor: '#B91C1C' },
   controlText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
 });
