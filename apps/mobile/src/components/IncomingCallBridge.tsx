@@ -62,6 +62,33 @@ export function IncomingCallBridge() {
   }, [call?.id, player, visible]);
 
   useEffect(() => {
+    if (!visible || !call) return;
+    const remaining = Math.max(0, 60_000 - (Date.now() - new Date(call.created_at).getTime()));
+    const timer = setTimeout(() => {
+      invalidate('chat-call:incoming:');
+      invalidate('chat-call:session:');
+    }, remaining + 250);
+    return () => clearTimeout(timer);
+  }, [call?.created_at, call?.id, visible]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !visible || !call || typeof window === 'undefined' || typeof Notification === 'undefined') return;
+    if (Notification.permission !== 'granted') return;
+    const displayName = caller?.display_name || caller?.username || 'COT member';
+    const notice = new Notification(`${displayName} is calling`, {
+      body: `Incoming ${call.call_kind} call on COT`,
+      tag: `cot-call-${call.id}`,
+      requireInteraction: true,
+    });
+    notice.onclick = () => {
+      window.focus();
+      router.push({ pathname: '/calls/[callId]', params: { callId: call.id } } as any);
+      notice.close();
+    };
+    return () => notice.close();
+  }, [call?.id, call?.call_kind, caller?.display_name, caller?.username, visible]);
+
+  useEffect(() => {
     if (!call || call.id !== dismissedCallId) return;
     if (!incoming.data || !['ringing', 'active'].includes(incoming.data.call.status)) {
       setDismissedCallId('');
