@@ -376,6 +376,48 @@ export const libraryHandler = createHandler(
       return { data };
     }
 
+    if (action === "archive_book") {
+      await requireManage(auth, organizationId);
+      const bookId = uuid(requiredString(body.bookId, "bookId", 36), "bookId", true)!;
+      const book = await requireBook(admin, bookId, organizationId);
+      if (book.status === "published") await requirePublish(auth, organizationId);
+      if (book.status === "processing") throw new ApiError("BOOK_NOT_READY", "Wait for this book to finish processing before disabling it.", 409);
+      const { data, error } = await admin.from("library_books")
+        .update({ status: "archived", published_at: null })
+        .eq("id", bookId)
+        .select("*")
+        .single();
+      if (error) throw new ApiError("BOOK_ARCHIVE_FAILED", "Unable to disable this book.", 500, undefined, false);
+      return { data };
+    }
+
+    if (action === "restore_book") {
+      await requireManage(auth, organizationId);
+      const bookId = uuid(requiredString(body.bookId, "bookId", 36), "bookId", true)!;
+      const book = await requireBook(admin, bookId, organizationId);
+      if (book.status !== "archived") throw new ApiError("BOOK_NOT_ARCHIVED", "Only disabled books can be restored.", 409);
+      const { data, error } = await admin.from("library_books")
+        .update({ status: "draft", published_at: null })
+        .eq("id", bookId)
+        .select("*")
+        .single();
+      if (error) throw new ApiError("BOOK_RESTORE_FAILED", "Unable to restore this book.", 500, undefined, false);
+      return { data };
+    }
+
+    if (action === "delete_book") {
+      await requireManage(auth, organizationId);
+      const bookId = uuid(requiredString(body.bookId, "bookId", 36), "bookId", true)!;
+      const book = await requireBook(admin, bookId, organizationId);
+      if (book.status === "published") throw new ApiError("BOOK_ARCHIVE_FIRST", "Disable this published book before deleting it.", 409);
+      if (book.status === "processing") throw new ApiError("BOOK_NOT_READY", "Wait for this book to finish processing before deleting it.", 409);
+      const { error } = await admin.from("library_books").delete().eq("id", bookId).eq("organization_id", organizationId);
+      if (error) throw new ApiError("BOOK_DELETE_FAILED", "Unable to delete this book.", 500, undefined, false);
+      if (book.source_path) await admin.storage.from(BOOK_BUCKET).remove([book.source_path]).catch(() => {});
+      if (book.cover_path) await admin.storage.from(COVER_BUCKET).remove([book.cover_path]).catch(() => {});
+      return { data: { deleted: true, bookId } };
+    }
+
     if (action === "review") {
       const bookId = uuid(requiredString(body.bookId, "bookId", 36), "bookId", true)!;
       const book = await requireBook(admin, bookId, organizationId);
@@ -423,6 +465,23 @@ export const libraryHandler = createHandler(
       return { data, status: 201 };
     }
 
+    if (action === "attach_devotional_book") {
+      await requireManage(auth, organizationId);
+      const seriesId = uuid(requiredString(body.seriesId, "seriesId", 36), "seriesId", true)!;
+      const bookId = uuid(requiredString(body.bookId, "bookId", 36), "bookId", true)!;
+      const book = await requireBook(admin, bookId, organizationId);
+      if (book.source_format !== "epub") throw new ApiError("DEVOTIONAL_EPUB_REQUIRED", "Daily devotional mapping requires an EPUB book.", 422);
+      if (["archived", "failed", "processing"].includes(book.status)) throw new ApiError("DEVOTIONAL_BOOK_NOT_READY", "Choose an active EPUB that finished processing.", 409);
+      const { data, error } = await admin.from("devotional_series")
+        .update({ book_id: bookId, updated_at: new Date().toISOString() })
+        .eq("id", seriesId)
+        .eq("organization_id", organizationId)
+        .select("*")
+        .single();
+      if (error) throw new ApiError("DEVOTIONAL_ATTACH_FAILED", "Unable to attach this EPUB to the devotional.", 500, undefined, false);
+      return { data };
+    }
+
     if (action === "import_devotional_from_book") {
       await requireManage(auth, organizationId);
       const seriesId = uuid(requiredString(body.seriesId, "seriesId", 36), "seriesId", true)!;
@@ -467,6 +526,17 @@ export const libraryHandler = createHandler(
     if (action === "publish_devotional_series") {
       await requirePublish(auth, organizationId);
       const seriesId = uuid(requiredString(body.seriesId, "seriesId", 36), "seriesId", true)!;
+      const { data: series, error: seriesError } = await admin.from("devotional_series")
+        .select("id,book_id")
+        .eq("id", seriesId)
+        .eq("organization_id", organizationId)
+        .maybeSingle();
+      if (seriesError || !series) throw new ApiError("DEVOTIONAL_NOT_FOUND", "This devotional is unavailable.", 404);
+      if (series.book_id) {
+        const sourceBook = await requireBook(admin, series.book_id, organizationId);
+        if (!sourceBook.redistribution_confirmed) throw new ApiError("BOOK_RIGHTS_REQUIRED", "Confirm distribution rights for the attached devotional book before publishing.", 422);
+        if (["archived", "failed", "processing"].includes(sourceBook.status)) throw new ApiError("DEVOTIONAL_BOOK_NOT_READY", "The attached EPUB is not available for publishing.", 409);
+      }
       const { count } = await admin.from("devotional_entries").select("*", { count: "exact", head: true }).eq("series_id", seriesId);
       if (!count) throw new ApiError("DEVOTIONAL_EMPTY", "Add at least one daily entry before publishing.", 422);
       const { data, error } = await admin.from("devotional_series").update({ status: "published", published_at: new Date().toISOString() }).eq("id", seriesId).eq("organization_id", organizationId).select("*").single();
