@@ -91,7 +91,7 @@ const realtimeDomains: RealtimeDomain[] = [
       library_reading_progress: ['library:'],
       devotional_series: ['devotional:'],
       devotional_entries: ['devotional:'],
-      general_home_notices: ['general-home-notice:'],
+      general_home_notice_signals: ['general-home-notice:'],
     },
   },
   {
