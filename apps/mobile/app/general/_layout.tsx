@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Tabs, usePathname } from 'expo-router';
+import { router, Tabs, usePathname } from 'expo-router';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/primitives/Icon';
@@ -40,10 +40,7 @@ function PrimaryGeneralTabBar({ state, descriptors, navigation }: any) {
               const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
               if (event.defaultPrevented) return;
               if (route.name === 'profile' && mode === 'visitor') {
-                navigation.navigate('(auth)', {
-                  screen: 'login',
-                  params: { returnTo: '/general/profile' },
-                });
+                router.push({ pathname: '/(auth)/login', params: { returnTo: '/general/profile' } } as any);
                 return;
               }
               if (!focused) navigation.navigate(route.name, route.params);
