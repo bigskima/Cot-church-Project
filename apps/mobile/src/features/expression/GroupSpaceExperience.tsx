@@ -24,7 +24,8 @@ type GivingOption = { id: string; giving_purpose_id: string; label: string; note
 type Purpose = { id: string; name: string; description?: string };
 type Payload = {
   group: { id: string; name: string; description?: string; visibility: string; join_policy: string; meeting_schedule?: Record<string, unknown> };
-  membership: { id: string; is_leader: boolean };
+  membership: { id: string; is_leader: boolean; chat_unread_count?: number };
+  sectionMembers?: Array<{ id: string; section_id: string; group_membership_id: string; unread_count?: number }>;
   permissions: { manageMembers: boolean; manageChat: boolean; manageContent: boolean; pinMessages: boolean; createSections: boolean; assignRoles: boolean; manageGiving: boolean };
   sections: Section[]; members: Member[]; roles: Role[]; announcements: Announcement[]; events: Event[];
   givingOptions: GivingOption[]; availableGivingPurposes: Purpose[];
@@ -141,7 +142,7 @@ export function GroupSpaceExperience({ groupId, initialTab = 'home', scope = 'ex
           <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
             <View style={[styles.heroIcon, { backgroundColor: colors.primarySoft }]}><Icon name='people-circle' size={28} color={colors.interactive} /></View>
             <View style={styles.flex}><Text style={[styles.heroTitle, { color: colors.text }]}>{data.group.name}</Text><Text style={[styles.meta, { color: colors.textMuted }]}>{activeMembers.length} members · {data.group.visibility === 'private' ? 'Private' : generalGroup ? 'Church members' : 'Expression members'}</Text></View>
-            <Button label='Open chat' onPress={() => router.push(`${routeBase}/${groupId}/chat` as any)} variant='primary' size='sm' />
+            <Button label={Number(data.membership.chat_unread_count ?? 0) > 0 ? `Open chat · ${data.membership.chat_unread_count}` : 'Open chat'} onPress={() => router.push(`${routeBase}/${groupId}/chat` as any)} variant='primary' size='sm' />
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>{tabs.map((item) => <Chip key={item.key} label={item.label} icon={item.icon} selected={tab === item.key} onPress={() => setTab(item.key)} />)}</ScrollView>
           {feedback ? <View style={[styles.notice, { backgroundColor: colors.successSoft }]}><Icon name='checkmark-circle' size={17} color={colors.success} /><Text style={[styles.noticeText, { color: colors.success }]}>{feedback}</Text></View> : null}
@@ -157,7 +158,11 @@ export function GroupSpaceExperience({ groupId, initialTab = 'home', scope = 'ex
             </View>
             <SectionHeader title='Temporary chats' badge={activeSections.length} subtitle='Focused conversations for selected members' />
             {data.permissions.createSections ? <Button label='Create temporary chat' onPress={() => setSheet('section')} variant='outline' size='sm' /> : null}
-            {activeSections.map((section) => <Pressable key={section.id} onPress={() => router.push(`${routeBase}/${groupId}/chat?sectionId=${section.id}` as any)} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}><Icon name='timer-outline' size={20} color={colors.interactive} /><View style={styles.flex}><Text style={[styles.cardTitle, { color: colors.text }]}>{section.name}</Text><Text style={[styles.meta, { color: colors.textMuted }]}>Expires {section.expires_at ? new Date(section.expires_at).toLocaleString() : 'when closed'}</Text></View><Icon name='chevron-forward' size={18} color={colors.textMuted} /></Pressable>)}
+            {activeSections.map((section) => {
+              const mine = (data.sectionMembers ?? []).find((item) => item.section_id === section.id && item.group_membership_id === data.membership.id);
+              const unread = Number(mine?.unread_count ?? 0);
+              return <Pressable key={section.id} onPress={() => router.push(`${routeBase}/${groupId}/chat?sectionId=${section.id}` as any)} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}><Icon name='timer-outline' size={20} color={colors.interactive} /><View style={styles.flex}><Text style={[styles.cardTitle, { color: colors.text }]}>{section.name}</Text><Text style={[styles.meta, { color: colors.textMuted }]}>Expires {section.expires_at ? new Date(section.expires_at).toLocaleString() : 'when closed'}</Text></View>{unread > 0 ? <View style={[styles.unreadBadge,{backgroundColor:colors.interactive}]}><Text style={styles.unreadText}>{unread > 99 ? '99+' : unread}</Text></View> : null}<Icon name='chevron-forward' size={18} color={colors.textMuted} /></Pressable>;
+            })}
           </> : null}
 
           {tab === 'announcements' ? <><View style={styles.heading}><SectionHeader title='Announcements' badge={data.announcements.length} />{data.permissions.manageContent ? <Button label='New' onPress={() => setSheet('announcement')} size='sm' /> : null}</View>{data.announcements.length ? data.announcements.map((item) => <View key={item.id} style={[styles.contentCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}><View style={styles.heading}><Text style={[styles.cardTitle, { color: colors.text }]}>{item.title}</Text>{item.is_pinned ? <Badge label='PINNED' variant='primary' /> : null}</View><Text style={[styles.copy, { color: colors.textSecondary }]}>{item.body}</Text></View>) : <EmptyState title='No Group announcements' message='Important updates for this Group will appear here.' iconName='megaphone-outline' />}</> : null}
@@ -191,6 +196,6 @@ const styles = StyleSheet.create({
   hero: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, heroIcon: { width: 50, height: 50, borderRadius: 18, alignItems: 'center', justifyContent: 'center' }, heroTitle: { fontSize: 18, fontWeight: '900' },
   tabs: { gap: 6 }, grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, feature: { width: '47%', minHeight: 105, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: 5 }, featureValue: { fontSize: 22, fontWeight: '900' },
   heading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm }, card: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, contentCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm }, cardTitle: { fontSize: 14, fontWeight: '800' }, copy: { fontSize: 13, lineHeight: 19 }, meta: { fontSize: 10, lineHeight: 14 }, accent: { fontSize: 12, fontWeight: '800' },
-  notice: { borderRadius: radius.md, padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: 7 }, noticeText: { flex: 1, fontSize: 11, fontWeight: '700' }, label: { fontSize: 10, fontWeight: '800', letterSpacing: 0.6 },
+  notice: { borderRadius: radius.md, padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: 7 }, noticeText: { flex: 1, fontSize: 11, fontWeight: '700' }, label: { fontSize: 10, fontWeight: '800', letterSpacing: 0.6 }, unreadBadge: { minWidth: 24, height: 24, borderRadius: 12, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' }, unreadText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
   memberCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.sm, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, roleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 5 }, roleBadge: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2 }, roleText: { fontSize: 9, fontWeight: '800' }, adminActions: { alignItems: 'flex-end', gap: 3 }, form: { gap: spacing.md },
 });
