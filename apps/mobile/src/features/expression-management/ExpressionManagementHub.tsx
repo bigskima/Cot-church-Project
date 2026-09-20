@@ -231,8 +231,9 @@ export function ExpressionManagementHub() {
           <>
             {sections.map((section) => (
               <View key={section.key} style={styles.section}>
-                <SectionHeader title={section.title} badge={section.tools.length} />
+                <SectionHeader title={section.title} badge={section.tools.length} compact />
                 <CompactRouteGrid
+                  compact
                   items={section.tools.map((tool) => ({
                     key: tool.key,
                     label: tool.title,
