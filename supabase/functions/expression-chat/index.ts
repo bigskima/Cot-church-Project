@@ -111,7 +111,7 @@ async function hydrate(admin: any, rows: any[], viewerId: string, organizationId
     profileIds.length ? admin.from("profiles").select("id,username,display_name,avatar_url").in("id", profileIds) : Promise.resolve({ data: [], error: null }),
     ids.length ? admin.from("expression_chat_reactions").select("message_id,profile_id,emoji").in("message_id", ids) : Promise.resolve({ data: [], error: null }),
     replyIds.length ? admin.from("expression_chat_messages").select("id,sender_profile_id,body,attachment_ids,sent_at,redacted_at").in("id", replyIds) : Promise.resolve({ data: [], error: null }),
-    uploadIds.length ? admin.from("expression_chat_uploads").select("id,media_kind,mime_type,storage_path,size_bytes,duration_seconds,status").in("id", uploadIds).eq("status", "attached") : Promise.resolve({ data: [], error: null }),
+    uploadIds.length ? admin.from("expression_chat_uploads").select("id,media_kind,mime_type,storage_path,size_bytes,duration_seconds,width,height,status").in("id", uploadIds).eq("status", "attached") : Promise.resolve({ data: [], error: null }),
   ]);
   if (profilesResult.error || reactionsResult.error || repliesResult.error || uploadsResult.error) {
     throw new ApiError("EXPRESSION_CHAT_LOAD_FAILED", "Unable to prepare this discussion.", 500, undefined, false);
@@ -147,6 +147,8 @@ async function hydrate(admin: any, rows: any[], viewerId: string, organizationId
         mimeType: row.mime_type,
         sizeBytes: Number(row.size_bytes),
         durationSeconds: row.duration_seconds == null ? null : Number(row.duration_seconds),
+        width: row.width == null ? null : Number(row.width),
+        height: row.height == null ? null : Number(row.height),
         url,
       });
     });
@@ -228,22 +230,32 @@ Deno.serve(createHandler(
       const sizeBytes = Number(body.sizeBytes);
       if (!Number.isSafeInteger(sizeBytes) || sizeBytes < 1 || sizeBytes > MAX_BYTES) throw new ApiError("PAYLOAD_TOO_LARGE", "Discussion media must be 100 MB or smaller.", 413);
       const durationSeconds = body.durationSeconds == null ? null : Math.max(0, Math.min(86400, Math.round(Number(body.durationSeconds))));
+      const readDimension = (value: unknown) => {
+        if (value === undefined || value === null || value === "") return null;
+        const dimension = Number(value);
+        if (!Number.isSafeInteger(dimension) || dimension < 1 || dimension > 32768) {
+          throw new ApiError("VALIDATION_FAILED", "Media dimensions are invalid.", 422);
+        }
+        return dimension;
+      };
+      const width = media.kind === "image" || media.kind === "gif" || media.kind === "video" ? readDimension(body.width) : null;
+      const height = media.kind === "image" || media.kind === "gif" || media.kind === "video" ? readDimension(body.height) : null;
       const uploadId = crypto.randomUUID();
       const storagePath = `orgs/${auth.organizationId}/expressions/${branchId}/${auth.user.id}/${uploadId}.${media.ext}`;
-      const { error } = await admin.from("expression_chat_uploads").insert({ id: uploadId, organization_id: auth.organizationId, branch_id: branchId, uploader_profile_id: auth.user.id, media_kind: media.kind, mime_type: mimeType, storage_path: storagePath, original_filename: safeFilename(body.fileName), size_bytes: sizeBytes, duration_seconds: durationSeconds });
+      const { error } = await admin.from("expression_chat_uploads").insert({ id: uploadId, organization_id: auth.organizationId, branch_id: branchId, uploader_profile_id: auth.user.id, media_kind: media.kind, mime_type: mimeType, storage_path: storagePath, original_filename: safeFilename(body.fileName), size_bytes: sizeBytes, duration_seconds: durationSeconds, width, height });
       if (error) throw new ApiError("EXPRESSION_CHAT_UPLOAD_FAILED", "Unable to prepare this attachment.", 500, undefined, false);
       const signed = await admin.storage.from(BUCKET).createSignedUploadUrl(storagePath, { upsert: false });
       if (signed.error || !signed.data?.signedUrl) {
         await admin.from("expression_chat_uploads").delete().eq("id", uploadId);
         throw new ApiError("EXPRESSION_CHAT_UPLOAD_FAILED", "Unable to prepare this attachment.", 500, undefined, false);
       }
-      return { data: { uploadId, type: media.kind, mimeType, sizeBytes, durationSeconds, signedUploadUrl: signed.data.signedUrl } };
+      return { data: { uploadId, type: media.kind, mimeType, sizeBytes, durationSeconds, width, height, signedUploadUrl: signed.data.signedUrl } };
     }
 
     if (action === "complete_upload" || action === "delete_upload") {
       assertMayPost(membership);
       const uploadId = uuid(String(body.uploadId ?? ""), "uploadId", true)!;
-      const { data: upload, error } = await admin.from("expression_chat_uploads").select("id,storage_path,status,media_kind,mime_type,size_bytes,duration_seconds").eq("id", uploadId).eq("branch_id", branchId).eq("uploader_profile_id", auth.user.id).maybeSingle();
+      const { data: upload, error } = await admin.from("expression_chat_uploads").select("id,storage_path,status,media_kind,mime_type,size_bytes,duration_seconds,width,height").eq("id", uploadId).eq("branch_id", branchId).eq("uploader_profile_id", auth.user.id).maybeSingle();
       if (error || !upload) throw new ApiError("EXPRESSION_CHAT_UPLOAD_NOT_FOUND", "This attachment is unavailable.", 404);
       if (action === "delete_upload") {
         if (upload.status === "attached") throw new ApiError("EXPRESSION_CHAT_UPLOAD_ATTACHED", "Sent attachments cannot be removed here.", 409);
@@ -253,7 +265,7 @@ Deno.serve(createHandler(
         }
         return { data: { uploadId, deleted: true } };
       }
-      if (upload.status === "uploaded" || upload.status === "attached") return { data: { uploadId, type: upload.media_kind, mimeType: upload.mime_type, sizeBytes: Number(upload.size_bytes), durationSeconds: upload.duration_seconds } };
+      if (upload.status === "uploaded" || upload.status === "attached") return { data: { uploadId, type: upload.media_kind, mimeType: upload.mime_type, sizeBytes: Number(upload.size_bytes), durationSeconds: upload.duration_seconds, width: upload.width == null ? null : Number(upload.width), height: upload.height == null ? null : Number(upload.height) } };
       const path = upload.storage_path.split("/");
       const objectName = path.pop()!;
       const listed = await admin.storage.from(BUCKET).list(path.join("/"), { search: objectName, limit: 10 });
