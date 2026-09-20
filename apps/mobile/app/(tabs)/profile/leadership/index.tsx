@@ -4,7 +4,7 @@ import { Redirect, router, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
-import { CompactRouteGrid, EmptyState, ScreenHeader, SectionHeader, Skeleton } from '@/components';
+import { CompactRouteGrid, EmptyState, ScreenHeader, Skeleton } from '@/components';
 import { spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 
@@ -107,7 +107,6 @@ export default function LeadershipHubScreen() {
       >
         <ScreenHeader title="Ministry tools" showBack compact />
         <View style={styles.body}>
-          <SectionHeader title="Available" badge={authorityReady ? availableTools.length : undefined} />
           {!authorityReady ? (
             <View style={styles.skeletonGrid}>
               {Array.from({ length: 8 }).map((_, index) => (
