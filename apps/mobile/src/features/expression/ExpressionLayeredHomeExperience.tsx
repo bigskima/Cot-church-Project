@@ -306,7 +306,7 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
         </Pressable>
       ) : null}
     </View>
-  );;
+  );
 }
 
 const styles = StyleSheet.create({
