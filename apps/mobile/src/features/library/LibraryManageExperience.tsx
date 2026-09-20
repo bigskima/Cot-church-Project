@@ -51,6 +51,7 @@ export function LibraryManageExperience() {
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [success,setSuccess]=useState('');
+  const [confirmDeleteId,setConfirmDeleteId]=useState('');
 
   const published=useMemo(()=> (books.data??[]).filter((book)=>book.status==='published').length,[books.data]);
 
@@ -111,6 +112,17 @@ export function LibraryManageExperience() {
     catch(value){setError(value instanceof Error?value.message:'Unable to publish this book.');}
     finally{setBusy(false);}
   };
+  const changeBook=async(action:'archive_book'|'restore_book'|'delete_book',bookId:string)=>{
+    if(busy)return;
+    setBusy(true);setError('');setSuccess('');
+    try{
+      await api.request(endpoint,{method:'POST',context:'public',body:JSON.stringify({action,bookId})});
+      setConfirmDeleteId('');
+      setSuccess(action==='archive_book'?'Book disabled and removed from the reader Library.':action==='restore_book'?'Book restored as a draft.':'Book deleted.');
+      books.refresh();
+    }catch(value){setError(value instanceof Error?value.message:'Unable to update this book.');}
+    finally{setBusy(false);}
+  };
 
   return <View style={[styles.screen,{backgroundColor:colors.bg}]}>
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content,{paddingTop:insets.top+spacing.sm,paddingBottom:insets.bottom+110}]}>
@@ -136,7 +148,18 @@ export function LibraryManageExperience() {
       </View>
 
       <View style={styles.listSection}><Text style={[styles.listTitle,{color:colors.text}]}>Library catalogue</Text>
-        {books.loading&&!books.data?<Skeleton height={180} borderRadius={18}/>:!books.data?.length?<EmptyState title='No books yet' message='Add the first EPUB or PDF above.' iconName='library-outline'/>:(books.data??[]).map((book)=><View key={book.id} style={[styles.bookRow,{borderBottomColor:colors.borderSubtle}]}><View style={styles.flex}><Text style={[styles.bookTitle,{color:colors.text}]}>{book.title}</Text><Text style={[styles.bookMeta,{color:colors.textSecondary}]}>{book.author_name} · {book.source_format.toUpperCase()} · {book.status}</Text></View>{book.status==='draft'&&canPublish?<Pressable disabled={busy} onPress={()=>void publish(book.id)} style={[styles.publishButton,{backgroundColor:colors.primarySoft}]}><Text style={[styles.publishText,{color:colors.interactive}]}>Publish</Text></Pressable>:null}</View>)}
+        {books.loading&&!books.data?<Skeleton height={180} borderRadius={18}/>:!books.data?.length?<EmptyState title='No books yet' message='Add the first EPUB or PDF above.' iconName='library-outline'/>:(books.data??[]).map((book)=>{
+          const canDisable=book.status!=='archived'&&book.status!=='processing'&&(book.status!=='published'||canPublish);
+          const canDelete=book.status!=='published'&&book.status!=='processing';
+          return <View key={book.id} style={[styles.bookRow,{borderBottomColor:colors.borderSubtle}]}>
+            <View style={styles.flex}><Text style={[styles.bookTitle,{color:colors.text}]}>{book.title}</Text><Text style={[styles.bookMeta,{color:colors.textSecondary}]}>{book.author_name} · {book.source_format.toUpperCase()} · {book.status}</Text></View>
+            <View style={styles.bookActions}>
+              {book.status==='draft'&&canPublish?<Pressable disabled={busy} onPress={()=>void publish(book.id)} style={[styles.publishButton,{backgroundColor:colors.primarySoft}]}><Text style={[styles.publishText,{color:colors.interactive}]}>Publish</Text></Pressable>:null}
+              {book.status==='archived'?<Pressable disabled={busy} onPress={()=>void changeBook('restore_book',book.id)} style={[styles.secondaryButton,{borderColor:colors.borderSubtle}]}><Text style={[styles.secondaryText,{color:colors.textSecondary}]}>Restore</Text></Pressable>:canDisable?<Pressable disabled={busy} onPress={()=>void changeBook('archive_book',book.id)} style={[styles.secondaryButton,{borderColor:colors.borderSubtle}]}><Text style={[styles.secondaryText,{color:colors.textSecondary}]}>Disable</Text></Pressable>:null}
+              {canDelete?(confirmDeleteId===book.id?<View style={styles.confirmDelete}><Pressable disabled={busy} onPress={()=>void changeBook('delete_book',book.id)} style={[styles.deleteButton,{borderColor:colors.live}]}><Text style={[styles.deleteText,{color:colors.live}]}>Confirm delete</Text></Pressable><Pressable onPress={()=>setConfirmDeleteId('')} style={styles.cancelDelete}><Text style={[styles.secondaryText,{color:colors.textMuted}]}>Cancel</Text></Pressable></View>:<Pressable disabled={busy} onPress={()=>setConfirmDeleteId(book.id)} style={[styles.deleteButton,{borderColor:colors.borderSubtle}]}><Text style={[styles.deleteText,{color:colors.live}]}>Delete</Text></Pressable>):null}
+            </View>
+          </View>;
+        })}
       </View>
     </ScrollView>
   </View>;
