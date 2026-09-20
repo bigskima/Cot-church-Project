@@ -84,20 +84,6 @@ jobs:
           if-no-files-found: warn
           retention-days: 5
 
-      - name: Package source for deployment
-        if: always()
-        shell: bash
-        run: git archive --format=zip --output=cot-source.zip HEAD
-
-      - name: Upload deployment source
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: cot-source-${{ github.run_id }}
-          path: cot-source.zip
-          if-no-files-found: error
-          retention-days: 1
-
 
       - name: Enforce validation gate
         if: always()
