@@ -59,17 +59,14 @@ export default function GeneralToolsScreen() {
         pressed && styles.pressed,
       ]}
       accessibilityRole="button"
-      accessibilityLabel={title}
+      accessibilityLabel={`${title}. ${subtitle}`}
     >
-      <View style={[styles.toolIcon, { backgroundColor: colors.primarySoft }]}>
+      <View style={[styles.toolIcon, { backgroundColor: colors.primarySoft, borderColor: colors.primarySoftStrong }]}>
         <Icon name={icon} size={20} color={colors.interactive} />
       </View>
-      <View style={styles.toolCopy}>
-        <View style={styles.toolTitleRow}>
-          <Text style={[styles.toolTitle, { color: colors.text }]}>{title}</Text>
-          {badge ? <Badge label={badge} variant="primary" /> : null}
-        </View>
-        <Text style={[styles.toolSubtitle, { color: colors.textSecondary }]} numberOfLines={2}>{subtitle}</Text>
+      <View style={styles.toolTitleRow}>
+        <Text style={[styles.toolTitle, { color: colors.text }]} numberOfLines={2}>{title}</Text>
+        {badge ? <View style={styles.badgeDot} accessibilityLabel={badge}><Text style={[styles.badgeDotText, { color: colors.interactive }]}>•</Text></View> : null}
       </View>
     </Pressable>
   );
@@ -77,11 +74,11 @@ export default function GeneralToolsScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 120 }]}>
-        <ScreenHeader title="General COT" kicker="TOOLS & SETTINGS" subtitle="Create, connect and manage your COT experience from one simple place." showBack />
+        <ScreenHeader title="Tools" showBack compact />
 
         {mode === 'authenticated' ? (
           <View style={styles.section}>
-            <SectionHeader title="Create" subtitle="Share to the public General COT space" />
+            <SectionHeader title="Create" />
             <View style={[styles.createRail, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
               {[
                 ['create-outline', 'Post', () => router.push({ pathname: '/general/community', params: { compose: 'post', intentId: String(Date.now()) } } as any)],
@@ -105,7 +102,7 @@ export default function GeneralToolsScreen() {
         )}
 
         <View style={styles.section}>
-          <SectionHeader title="COT tools" subtitle="Everything useful without crowding Home" />
+          <SectionHeader title="COT tools" />
           <View style={styles.toolsGrid}>
             {mode === 'authenticated' ? toolTile({ icon: 'chatbubbles-outline', title: 'Messages', subtitle: 'Private direct messages across COT', onPress: () => router.push('/general/chat') }) : null}
             {mode === 'authenticated' ? toolTile({ icon: 'people-circle-outline', title: 'Groups', subtitle: 'Create or join church-wide prayer, fellowship and discussion Groups', badge: 'COMMUNITY', onPress: () => router.push('/general/groups' as any) }) : null}
@@ -122,7 +119,7 @@ export default function GeneralToolsScreen() {
         </View>
 
         <View style={styles.section}>
-          <SectionHeader title="Account & settings" subtitle="Keep account controls together" />
+          <SectionHeader title="Account & settings" />
           <View style={[styles.settingsCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
             {mode === 'authenticated' ? (
               <>
@@ -172,13 +169,13 @@ const styles = StyleSheet.create({
   createAction: { flex: 1, minHeight: 70, alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: radius.lg },
   createIcon: { width: 36, height: 36, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   createLabel: { fontSize: 11, fontWeight: '800' },
-  toolsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  toolTile: { width: '48%', minHeight: 116, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm },
-  toolIcon: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  toolCopy: { flex: 1, gap: 3 },
-  toolTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.xs },
-  toolTitle: { fontSize: 14, fontWeight: '800', flexShrink: 1 },
-  toolSubtitle: { fontSize: 11, lineHeight: 16 },
+  toolsGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.md },
+  toolTile: { width: '25%', minHeight: 78, alignItems: 'center', justifyContent: 'flex-start', paddingHorizontal: 4, gap: 6 },
+  toolIcon: { width: 44, height: 44, borderRadius: 15, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  toolTitleRow: { maxWidth: '100%', flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center', gap: 2 },
+  toolTitle: { fontSize: 9.5, lineHeight: 12, fontWeight: '800', textAlign: 'center', flexShrink: 1 },
+  badgeDot: { width: 6, height: 12, alignItems: 'center', justifyContent: 'center' },
+  badgeDotText: { fontSize: 12, lineHeight: 12, fontWeight: '900' },
   signInCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   signInIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   signInCopy: { flex: 1, minWidth: 0 },
