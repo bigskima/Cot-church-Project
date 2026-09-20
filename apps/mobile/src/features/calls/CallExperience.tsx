@@ -67,7 +67,7 @@ export function CallExperience({ callId }: { callId: string }) {
         <View style={styles.topCopy}><Text style={styles.callType}>{payload.call.call_kind === 'video' ? 'Video call' : 'Audio call'}</Text><Text style={styles.callMeta}>{payload.call.scope === 'direct' ? 'Direct message' : payload.call.scope === 'expression' ? 'Expression discussion' : 'Group discussion'}</Text></View>
       </View>
       {error ? <View style={styles.errorBanner}><Text style={styles.errorText}>{error}</Text></View> : null}
-      <View style={styles.endRow}>
+      <View style={styles.endRow} pointerEvents='box-none'>
         <Pressable disabled={leaving} onPress={() => void leave(false)} style={styles.leave}><Icon name='call' size={21} color='#FFFFFF' /><Text style={styles.leaveText}>Leave</Text></Pressable>
         {owner ? <Pressable disabled={leaving} onPress={() => void leave(true)} style={styles.endAll}><Text style={styles.endAllText}>End for everyone</Text></Pressable> : null}
       </View>
@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
   callMeta: { color: '#CBD5E1', fontSize: 9, marginTop: 1 },
   errorBanner: { position: 'absolute', left: 16, right: 16, top: 70, backgroundColor: 'rgba(127,29,29,0.88)', padding: 9, borderRadius: 12 },
   errorText: { color: '#FFFFFF', fontSize: 11, textAlign: 'center' },
-  endRow: { position: 'absolute', bottom: 18, left: 12, right: 12, flexDirection: 'row', justifyContent: 'center', gap: 10, pointerEvents: 'box-none' },
+  endRow: { position: 'absolute', bottom: 18, left: 12, right: 12, flexDirection: 'row', justifyContent: 'center', gap: 10 },
   leave: { minWidth: 98, height: 48, borderRadius: 24, paddingHorizontal: 17, backgroundColor: '#DC2626', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   leaveText: { color: '#FFFFFF', fontWeight: '900', fontSize: 12 },
   endAll: { minWidth: 138, height: 48, borderRadius: 24, paddingHorizontal: 17, backgroundColor: 'rgba(20,25,35,0.92)', alignItems: 'center', justifyContent: 'center' },
