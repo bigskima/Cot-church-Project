@@ -4,6 +4,7 @@ import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString, uuid } from "../_shared/validation.ts";
+import { assertFeatureEnabled } from "../_shared/feature-controls.ts";
 
 const scopes = new Set(["expression", "church", "all"]);
 const visibilities = new Set(["members", "private"]);
@@ -122,6 +123,7 @@ Deno.serve(createHandler(
     if (action === "request_membership") {
       assertNoUnknownFields(body, ["action", "groupId"]);
       const groupId = uuid(requiredString(body.groupId, "groupId", 36), "groupId", true)!;
+      await assertFeatureEnabled(admin, "groups", { organizationId: auth.organizationId, groupId }, "Groups are currently unavailable in this area.");
       const { data, error } = await auth.client.rpc("request_group_membership", { target_group_id: groupId }).single();
       if (error?.code === "23514") throw new ApiError("GROUP_FULL", "This group has reached its capacity", 409);
       if (error?.code === "42501") {
@@ -182,6 +184,12 @@ Deno.serve(createHandler(
     }
 
     const churchMemberMayCreate = request.method === "POST" && targetBranchId === null;
+    if (request.method === "POST") {
+      const featureScope = { organizationId: auth.organizationId, expressionId: targetBranchId };
+      await assertFeatureEnabled(admin, "groups", featureScope, "Groups are currently unavailable in this area.");
+      await assertFeatureEnabled(admin, "group_creation", featureScope, "Creating new Groups is currently unavailable in this area.");
+    }
+
     const creatorMayUpdate = request.method === "PATCH" && existingCreatedBy === auth.user.id;
     if (!churchMemberMayCreate && !creatorMayUpdate && !(await hasScopedPermission(auth, "groups.manage", targetBranchId))) {
       throw new ApiError("PERMISSION_DENIED", "You do not have permission to manage groups in this scope", 403);
