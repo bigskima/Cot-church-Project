@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import * as Speech from 'expo-speech';
-import { WebView } from 'react-native-webview';
+import WebView, { type WebViewMessageEvent } from 'react-native-webview';
 import { pdfViewerHtml } from './pdf-viewer-html';
 
 type PdfReaderMessage =
@@ -9,7 +9,7 @@ type PdfReaderMessage =
   | { type: 'pdf-stop-reading' };
 
 export function PdfBookFrame({ url }: { url: string }) {
-  const webViewRef = useRef<WebView>(null);
+  const webViewRef = useRef<React.ElementRef<typeof WebView>>(null);
 
   useEffect(() => () => { void Speech.stop(); }, []);
 
@@ -19,7 +19,7 @@ export function PdfBookFrame({ url }: { url: string }) {
     );
   };
 
-  const onMessage = (event: any) => {
+  const onMessage = (event: WebViewMessageEvent) => {
     try {
       const message = JSON.parse(event.nativeEvent.data) as PdfReaderMessage;
       if (message.type === 'pdf-stop-reading') {
