@@ -151,18 +151,27 @@ returns trigger
 language plpgsql
 security definer
 set search_path = ''
-as $$
+as $
 declare
   target_org uuid;
 begin
-  target_org := coalesce(new.organization_id, old.organization_id);
+  if tg_op = 'DELETE' then
+    target_org := old.organization_id;
+  else
+    target_org := new.organization_id;
+  end if;
+
   insert into public.general_home_notice_signals(organization_id, changed_at)
   values(target_org, now())
   on conflict (organization_id)
   do update set changed_at = excluded.changed_at;
-  return coalesce(new, old);
+
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
 end;
-$$;
+$;
 
 drop trigger if exists general_home_notices_realtime_signal on public.general_home_notices;
 create trigger general_home_notices_realtime_signal
