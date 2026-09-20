@@ -178,6 +178,60 @@ async function callRecipients(admin: any, input: ScopeInput, viewerId: string, o
   return (members ?? []).map((row: any) => row.profile_id).filter((id: string) => id !== viewerId);
 }
 
+async function expireStaleRingingCalls(admin: any) {
+  const cutoff = new Date(Date.now() - 60_000).toISOString();
+  const { data: stale } = await admin.from("chat_call_sessions")
+    .select("id")
+    .eq("status", "ringing")
+    .lt("created_at", cutoff)
+    .limit(100);
+  const ids = (stale ?? []).map((row: any) => row.id);
+  if (!ids.length) return;
+  const now = new Date().toISOString();
+  await Promise.all([
+    admin.from("chat_call_sessions")
+      .update({ status: "cancelled", ended_at: now })
+      .in("id", ids)
+      .eq("status", "ringing"),
+    admin.from("chat_call_participants")
+      .update({ state: "missed", left_at: now })
+      .in("call_id", ids)
+      .eq("state", "invited"),
+  ]);
+}
+
+async function incomingCall(admin: any, viewerId: string) {
+  const { data: invited, error } = await admin.from("chat_call_participants")
+    .select("call_id,state,invited_at")
+    .eq("profile_id", viewerId)
+    .eq("state", "invited")
+    .order("invited_at", { ascending: false })
+    .limit(12);
+  if (error) throw new ApiError("CALL_LOAD_FAILED", "Unable to load incoming calls.", 500, undefined, false);
+
+  for (const row of invited ?? []) {
+    const { data: call } = await admin.from("chat_call_sessions")
+      .select("*")
+      .eq("id", row.call_id)
+      .in("status", ["ringing", "active"])
+      .maybeSingle();
+    if (!call) continue;
+    try {
+      await authorizeScope(admin, viewerId, {
+        scope: call.scope,
+        conversationId: call.conversation_id,
+        expressionId: call.expression_id,
+        groupId: call.group_id,
+        sectionId: call.section_id,
+      });
+      return call;
+    } catch {
+      // Ignore stale invitations that no longer match the viewer's access.
+    }
+  }
+  return null;
+}
+
 async function activeCall(admin: any, input: ScopeInput) {
   let query = admin.from("chat_call_sessions")
     .select("*")
@@ -250,8 +304,13 @@ export const chatCallsHandler = createHandler(
     const admin = adminClient();
     const viewerId = auth.user.id;
     const url = new URL(request.url);
+    await expireStaleRingingCalls(admin);
 
     if (request.method === "GET") {
+      if (url.searchParams.get("incoming") === "true") {
+        const call = await incomingCall(admin, viewerId);
+        return { data: call ? { call, participants: await participants(admin, call.id) } : null };
+      }
       const callId = optionalUuid(url.searchParams.get("callId"), "callId");
       if (callId) {
         const call = await requireCall(admin, viewerId, callId);
@@ -298,11 +357,18 @@ export const chatCallsHandler = createHandler(
         throw new ApiError("CALL_CREATE_FAILED", "Unable to start this call.", 500, undefined, false);
       }
 
-      const participantRows = [{ call_id: call.id, profile_id: viewerId, state: "joined", joined_at: new Date().toISOString() }];
-      if (access.otherProfileId) participantRows.push({ call_id: call.id, profile_id: access.otherProfileId, state: "invited", joined_at: null } as any);
+      const recipientProfileIds = await callRecipients(admin, input, viewerId, access.otherProfileId);
+      const participantRows = [
+        { call_id: call.id, profile_id: viewerId, state: "joined", joined_at: new Date().toISOString() },
+        ...recipientProfileIds.map((profileId) => ({
+          call_id: call.id,
+          profile_id: profileId,
+          state: "invited",
+          joined_at: null,
+        })),
+      ];
       await admin.from("chat_call_participants").upsert(participantRows, { onConflict: "call_id,profile_id" });
 
-      const recipientProfileIds = await callRecipients(admin, input, viewerId, access.otherProfileId);
       const notificationOrganizationId = access.organizationId
         ?? (access.otherProfileId ? await commonOrganizationId(admin, viewerId, access.otherProfileId) : null);
       if (notificationOrganizationId && recipientProfileIds.length) {
@@ -322,6 +388,9 @@ export const chatCallsHandler = createHandler(
             entityId: call.id,
             callId: call.id,
             callKind,
+            callerProfileId: viewerId,
+            callerName: senderName,
+            urgent: true,
             route: `/calls/${call.id}`,
           },
         });
@@ -338,28 +407,70 @@ export const chatCallsHandler = createHandler(
       await admin.from("chat_call_participants").upsert({
         call_id: call.id, profile_id: viewerId, state: "joined", joined_at: now, left_at: null,
       }, { onConflict: "call_id,profile_id" });
-      if (call.status === "ringing") {
-        await admin.from("chat_call_sessions").update({ status: "active", started_at: call.started_at ?? now }).eq("id", call.id);
+
+      // A direct call stays in the ringing state while only the caller is in the
+      // Agora channel. It becomes active only when the invited person answers.
+      const directCallerWaiting = call.scope === "direct"
+        && call.created_by_profile_id === viewerId
+        && call.status === "ringing";
+      const nextStatus = directCallerWaiting ? "ringing" : "active";
+      const startedAt = nextStatus === "active" ? (call.started_at ?? now) : call.started_at;
+      if (call.status !== nextStatus || (nextStatus === "active" && !call.started_at)) {
+        await admin.from("chat_call_sessions")
+          .update({ status: nextStatus, started_at: startedAt ?? null })
+          .eq("id", call.id);
       }
-      return { data: { call: { ...call, status: "active", started_at: call.started_at ?? now }, grant: await rtcGrant(call.agora_channel_name), participants: await participants(admin, call.id) } };
+      return {
+        data: {
+          call: { ...call, status: nextStatus, started_at: startedAt ?? null },
+          grant: await rtcGrant(call.agora_channel_name),
+          participants: await participants(admin, call.id),
+        },
+      };
     }
 
     if (action === "decline") {
+      const now = new Date().toISOString();
       await admin.from("chat_call_participants").upsert({
-        call_id: call.id, profile_id: viewerId, state: "declined", left_at: new Date().toISOString(),
+        call_id: call.id, profile_id: viewerId, state: "declined", left_at: now,
       }, { onConflict: "call_id,profile_id" });
+      if (call.scope === "direct" && call.created_by_profile_id !== viewerId) {
+        await Promise.all([
+          admin.from("chat_call_sessions").update({ status: "cancelled", ended_at: now }).eq("id", call.id),
+          admin.from("chat_call_participants").update({ state: "left", left_at: now }).eq("call_id", call.id).eq("state", "joined"),
+        ]);
+      }
       return { data: { ok: true } };
     }
 
     if (action === "leave") {
+      const now = new Date().toISOString();
       await admin.from("chat_call_participants").upsert({
-        call_id: call.id, profile_id: viewerId, state: "left", left_at: new Date().toISOString(),
+        call_id: call.id, profile_id: viewerId, state: "left", left_at: now,
       }, { onConflict: "call_id,profile_id" });
+
+      if (call.scope === "direct") {
+        await Promise.all([
+          admin.from("chat_call_sessions")
+            .update({ status: call.status === "ringing" ? "cancelled" : "ended", ended_at: now })
+            .eq("id", call.id),
+          admin.from("chat_call_participants")
+            .update({ state: "left", left_at: now })
+            .eq("call_id", call.id)
+            .eq("state", "joined"),
+          admin.from("chat_call_participants")
+            .update({ state: "missed", left_at: now })
+            .eq("call_id", call.id)
+            .eq("state", "invited"),
+        ]);
+        return { data: { ok: true } };
+      }
+
       const { count } = await admin.from("chat_call_participants")
         .select("*", { count: "exact", head: true })
         .eq("call_id", call.id)
         .eq("state", "joined");
-      if (!count) await admin.from("chat_call_sessions").update({ status: "ended", ended_at: new Date().toISOString() }).eq("id", call.id);
+      if (!count) await admin.from("chat_call_sessions").update({ status: "ended", ended_at: now }).eq("id", call.id);
       return { data: { ok: true } };
     }
 
