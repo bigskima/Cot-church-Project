@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, usePathname } from 'expo-router';
 import { useAudioPlayer } from 'expo-audio';
 import { Avatar, Icon } from '@/components';
+import { apiUrl } from '@/api';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 import { invalidate } from '@/services/query-cache';
@@ -13,11 +14,12 @@ import type { ActiveCallPayload } from '@/features/calls/call-types';
 const RINGTONE_URI = 'data:audio/wav;base64,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';
 
 export function IncomingCallBridge() {
-  const { api, mode, context } = useSession();
+  const { api, auth, mode, context } = useSession();
   const { colors } = useTheme();
   const pathname = usePathname();
   const player = useAudioPlayer(RINGTONE_URI, { updateInterval: 500, downloadFirst: false });
   const profileId = context?.profile?.id ?? '';
+  const accessToken = auth?.session.accessToken ?? '';
   const [dismissedCallId, setDismissedCallId] = useState('');
   const [busy, setBusy] = useState<'answer' | 'decline' | ''>('');
   const lastRingingId = useRef('');
@@ -40,6 +42,97 @@ export function IncomingCallBridge() {
     && !pathname.startsWith(`/calls/${call.id}`)
     && ['ringing', 'active'].includes(call.status),
   );
+
+  useEffect(() => {
+    if (mode !== 'authenticated' || !profileId || !accessToken || !apiUrl) return;
+
+    let disposed = false;
+    let client: any = null;
+    let channel: any = null;
+    const refreshIncoming = () => {
+      if (disposed) return;
+      incoming.refresh();
+    };
+
+    const connect = async () => {
+      try {
+        const [{ createClient }, response] = await Promise.all([
+          import('@supabase/supabase-js'),
+          fetch(`${apiUrl}/realtime-config`, { headers: { Accept: 'application/json' } }),
+        ]);
+        if (disposed || !response.ok) return;
+        const payload = await response.json() as { data?: { url?: string; anonKey?: string } };
+        if (!payload.data?.url || !payload.data?.anonKey) return;
+
+        client = createClient(payload.data.url, payload.data.anonKey, {
+          auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+          global: { headers: { Authorization: `Bearer ${accessToken}` } },
+          realtime: { params: { eventsPerSecond: 20 } },
+        });
+        await client.realtime.setAuth(accessToken);
+        if (disposed) return;
+
+        channel = client
+          .channel(`cot-foreground-calls-${profileId}-${auth?.session.expiresAt ?? 'active'}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'notifications',
+              filter: `recipient_profile_id=eq.${profileId}`,
+            },
+            (payload: any) => {
+              const row = payload?.new;
+              if (row?.type !== 'chat_call_started') return;
+              invalidate('notifications:');
+              refreshIncoming();
+            },
+          )
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'chat_call_participants',
+              filter: `profile_id=eq.${profileId}`,
+            },
+            refreshIncoming,
+          )
+          .subscribe((status: string) => {
+            if (status === 'SUBSCRIBED') refreshIncoming();
+          });
+      } catch {
+        // The shared Realtime bridge and push notification path remain available.
+      }
+    };
+
+    void connect();
+
+    const appStateSubscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refreshIncoming();
+    });
+
+    const onVisible = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') refreshIncoming();
+    };
+    const onFocus = () => refreshIncoming();
+    if (Platform.OS === 'web' && typeof document !== 'undefined' && typeof window !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisible);
+      window.addEventListener('focus', onFocus);
+    }
+
+    return () => {
+      disposed = true;
+      appStateSubscription.remove();
+      if (Platform.OS === 'web' && typeof document !== 'undefined' && typeof window !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisible);
+        window.removeEventListener('focus', onFocus);
+      }
+      if (channel && client) void client.removeChannel(channel);
+      if (client) void client.removeAllChannels();
+    };
+  }, [accessToken, auth?.session.expiresAt, incoming.refresh, mode, profileId]);
 
   useEffect(() => {
     if (!visible || !call) {
@@ -139,8 +232,16 @@ export function IncomingCallBridge() {
         : 'Group call';
 
   return (
-    <View pointerEvents='box-none' style={styles.overlay}>
-      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.lg]}>
+    <Modal
+      visible
+      transparent
+      statusBarTranslucent
+      animationType='fade'
+      onRequestClose={() => void decline()}
+    >
+      <View style={styles.overlay}>
+        <View style={[styles.backdrop, { backgroundColor: 'rgba(2,6,12,0.48)' }]} />
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.lg]}>
         <View style={styles.ringingRow}>
           <View style={[styles.pulse, { backgroundColor: colors.primarySoft }]}>
             <Icon name={call.call_kind === 'video' ? 'videocam' : 'call'} size={22} color={colors.interactive} />
@@ -164,13 +265,15 @@ export function IncomingCallBridge() {
             <Text style={styles.answerText}>{busy === 'answer' ? 'Opening…' : 'Answer'}</Text>
           </Pressable>
         </View>
+        </View>
       </View>
-    </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 1200, justifyContent: 'flex-start', alignItems: 'center', paddingTop: Platform.OS === 'web' ? 18 : 54, paddingHorizontal: spacing.md },
+  overlay: { flex: 1, zIndex: 9999, justifyContent: 'flex-start', alignItems: 'center', paddingTop: Platform.OS === 'web' ? 24 : 58, paddingHorizontal: spacing.md },
+  backdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   card: { width: '100%', maxWidth: 430, borderWidth: 1, borderRadius: radius.xxl, padding: spacing.lg, gap: spacing.md },
   ringingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   pulse: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },

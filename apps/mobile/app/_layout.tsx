@@ -48,7 +48,6 @@ function AppContent() {
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <RealtimeBridge />
       <PushNotificationsBridge />
-      <IncomingCallBridge />
       <OnboardingGate />
       <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -87,6 +86,7 @@ function AppContent() {
         <Stack.Screen name="leadership/invite-codes" options={{ headerShown: false }} />
       </Stack>
       <CotGlobalActions />
+      <IncomingCallBridge />
     </AppTourProvider>
   );
 }

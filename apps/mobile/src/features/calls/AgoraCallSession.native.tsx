@@ -28,6 +28,7 @@ export function AgoraCallSession({ grant, kind, scope, otherName, onJoined, onEr
   const [speakerOn, setSpeakerOn] = useState(true);
   const [facing, setFacing] = useState<'front' | 'rear'>('front');
   const [status, setStatus] = useState('Connecting…');
+  const [directLocalPrimary, setDirectLocalPrimary] = useState(false);
 
   useEffect(() => { callbacks.current = { onJoined, onError }; }, [onError, onJoined]);
 
@@ -129,22 +130,41 @@ export function AgoraCallSession({ grant, kind, scope, otherName, onJoined, onEr
         scope === 'direct' ? (
           <View style={styles.directStage}>
             {remotePrimary ? (
-              <RtcSurfaceView canvas={{ uid: remotePrimary, renderMode: RenderModeType.RenderModeHidden }} style={StyleSheet.absoluteFill} />
+              <Pressable
+                accessibilityRole='button'
+                accessibilityLabel={directLocalPrimary ? 'Make the other person large' : 'Other person is large. Tap to swap'}
+                onPress={() => setDirectLocalPrimary((current) => !current)}
+                style={directLocalPrimary ? styles.directPip : styles.directPrimary}
+              >
+                <RtcSurfaceView canvas={{ uid: remotePrimary, renderMode: RenderModeType.RenderModeHidden }} style={styles.videoFill} />
+                <Text style={styles.tileLabel}>{directLocalPrimary ? (otherName || 'Other person') : `${otherName || 'Other person'} · tap to swap`}</Text>
+              </Pressable>
             ) : (
-              <View style={styles.waitingStage}>
-                <View style={styles.directAvatar}><Text style={styles.directAvatarText}>{(otherName || 'C').slice(0, 1).toUpperCase()}</Text></View>
-                <Text style={styles.directName}>{otherName || 'COT member'}</Text>
-                <Text style={styles.directWaiting}>Waiting for the other person…</Text>
-              </View>
+              <Pressable
+                disabled={!directLocalPrimary}
+                onPress={() => setDirectLocalPrimary(false)}
+                style={directLocalPrimary ? styles.directPip : styles.directPrimary}
+              >
+                <View style={styles.waitingStage}>
+                  <View style={[styles.directAvatar, directLocalPrimary && styles.directAvatarSmall]}><Text style={[styles.directAvatarText, directLocalPrimary && styles.directAvatarTextSmall]}>{(otherName || 'C').slice(0, 1).toUpperCase()}</Text></View>
+                  {!directLocalPrimary ? <Text style={styles.directName}>{otherName || 'COT member'}</Text> : null}
+                  <Text style={styles.directWaiting}>Waiting for the other person…</Text>
+                </View>
+              </Pressable>
             )}
-            <View style={styles.localPip}>
+            <Pressable
+              accessibilityRole='button'
+              accessibilityLabel={directLocalPrimary ? 'Your video is large. Tap to swap' : 'Make your video large'}
+              onPress={() => setDirectLocalPrimary((current) => !current)}
+              style={directLocalPrimary ? styles.directPrimary : styles.directPip}
+            >
               {cameraMuted ? (
                 <View style={styles.placeholder}><Text style={styles.placeholderText}>Camera off</Text></View>
               ) : (
-                <RtcSurfaceView key={`local-${facing}`} canvas={{ uid: 0, renderMode: RenderModeType.RenderModeHidden }} style={styles.video} />
+                <RtcSurfaceView key={`local-${facing}`} canvas={{ uid: 0, renderMode: RenderModeType.RenderModeHidden }} style={styles.videoFill} />
               )}
-              <Text style={styles.tileLabel}>You</Text>
-            </View>
+              <Text style={styles.tileLabel}>{directLocalPrimary ? 'You · tap to swap' : 'You · tap to enlarge'}</Text>
+            </Pressable>
           </View>
         ) : (
           <View style={styles.grid}>
@@ -187,12 +207,16 @@ function Control({ label, onPress, active = false }: { label: string; onPress: (
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#03060B' },
   directStage: { flex: 1, position: 'relative', overflow: 'hidden', backgroundColor: '#070D16' },
-  waitingStage: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: '#09111E' },
+  directPrimary: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, overflow: 'hidden', backgroundColor: '#0B111B' },
+  directPip: { position: 'absolute', right: 14, bottom: 92, width: 124, height: 170, borderRadius: 20, overflow: 'hidden', backgroundColor: '#111827', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)', zIndex: 5 },
+  waitingStage: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#09111E', paddingHorizontal: 10 },
   directAvatar: { width: 108, height: 108, borderRadius: 54, backgroundColor: '#182538', alignItems: 'center', justifyContent: 'center' },
   directAvatarText: { color: '#FFFFFF', fontSize: 34, fontWeight: '900' },
+  directAvatarSmall: { width: 56, height: 56, borderRadius: 28 },
+  directAvatarTextSmall: { fontSize: 18 },
   directName: { color: '#FFFFFF', fontSize: 21, fontWeight: '900', marginTop: 16 },
   directWaiting: { color: '#94A3B8', fontSize: 12, marginTop: 6 },
-  localPip: { position: 'absolute', right: 14, bottom: 92, width: 124, height: 170, borderRadius: 20, overflow: 'hidden', backgroundColor: '#111827', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)' },
+  videoFill: { width: '100%', height: '100%', backgroundColor: '#0B111B' },
   grid: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', padding: 5, alignContent: 'stretch' },
   groupTile: { padding: 3, overflow: 'hidden' },
   video: { flex: 1, minHeight: 120, backgroundColor: '#0B111B', borderRadius: 16 },
