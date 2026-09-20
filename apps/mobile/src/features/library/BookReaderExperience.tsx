@@ -47,6 +47,7 @@ export function BookReaderExperience({ bookId }: { bookId: string }) {
   const { api, context, mode } = useSession();
   const { colors } = useTheme();
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
+  const endpoint = `library${organizationId ? `?organizationId=${organizationId}` : ''}`;
   const detail = useResource<BookDetailPayload>(
     `library:book:${bookId}:${organizationId || 'public'}`,
     (signal) => api.request<BookDetailPayload>(
@@ -84,7 +85,7 @@ export function BookReaderExperience({ bookId }: { bookId: string }) {
   useEffect(() => {
     if (!detail.data || mode !== 'authenticated' || detail.data.book.source_format !== 'epub' || !chapter) return;
     const timer = setTimeout(() => {
-      void api.request('library', {
+      void api.request(endpoint, {
         method: 'POST',
         context: 'public',
         body: JSON.stringify({
@@ -97,7 +98,7 @@ export function BookReaderExperience({ bookId }: { bookId: string }) {
       }).catch(() => {});
     }, 450);
     return () => clearTimeout(timer);
-  }, [api, bookId, chapter?.chapter_order, detail.data?.book.source_format, mode, progressPercent, safePageIndex]);
+  }, [api, bookId, chapter?.chapter_order, detail.data?.book.source_format, endpoint, mode, progressPercent, safePageIndex]);
 
   const speak = async () => {
     if (!page.trim()) return;
@@ -132,7 +133,7 @@ export function BookReaderExperience({ bookId }: { bookId: string }) {
     setReviewBusy(true);
     setReviewError('');
     try {
-      await api.request('library', {
+      await api.request(endpoint, {
         method: 'POST',
         context: 'public',
         body: JSON.stringify({ action: 'review', bookId, rating, body: reviewBody.trim() }),
