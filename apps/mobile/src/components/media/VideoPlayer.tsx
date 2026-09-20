@@ -105,9 +105,10 @@ export function VideoPlayer({
           <VideoView
             player={player}
             style={styles.videoView}
+            contentFit="contain"
           />
         ) : posterUrl ? (
-          <Image source={{ uri: posterUrl }} style={styles.posterImage} resizeMode="cover" />
+          <Image source={{ uri: posterUrl }} style={styles.posterImage} resizeMode="contain" />
         ) : (
           <View style={styles.placeholder}>
             <Icon name="play-circle-outline" size={48} color={colors.interactive} />
