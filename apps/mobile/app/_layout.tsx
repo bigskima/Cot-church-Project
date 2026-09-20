@@ -10,6 +10,7 @@ import { BrandingProvider } from '@/state/branding';
 import { OnboardingGate } from '@/components/OnboardingGate';
 import { RealtimeBridge } from '@/components/RealtimeBridge';
 import { PushNotificationsBridge } from '@/components/PushNotificationsBridge';
+import { IncomingCallBridge } from '@/components/IncomingCallBridge';
 import { ActionFeedbackProvider } from '@/components/ActionFeedbackProvider';
 import { AppTourProvider } from '@/features/tour/AppTourProvider';
 import { CotGlobalActions } from '@/features/ai/CotGlobalActions';
@@ -47,6 +48,7 @@ function AppContent() {
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <RealtimeBridge />
       <PushNotificationsBridge />
+      <IncomingCallBridge />
       <OnboardingGate />
       <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

@@ -3,6 +3,6 @@ import { useLocalSearchParams } from 'expo-router';
 import { CallExperience } from '@/features/calls/CallExperience';
 
 export default function ChatCallRoute() {
-  const { callId } = useLocalSearchParams<{ callId: string }>();
-  return <CallExperience callId={String(callId ?? '')} />;
+  const { callId, answer } = useLocalSearchParams<{ callId: string; answer?: string }>();
+  return <CallExperience callId={String(callId ?? '')} autoAnswer={answer === '1'} />;
 }

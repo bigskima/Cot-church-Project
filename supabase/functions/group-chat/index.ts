@@ -202,7 +202,7 @@ Deno.serve(createHandler(
 
     const { data: membership, error: membershipError } = await admin
       .from("group_memberships")
-      .select("id,status,is_leader,chat_restricted_until,banned_at,moderation_reason")
+      .select("id,status,is_leader,chat_restricted_until,banned_at,moderation_reason,chat_unread_count,chat_last_read_at")
       .eq("group_id", groupId)
       .eq("organization_id", auth.organizationId)
       .eq("membership_id", auth.membershipId)
@@ -261,7 +261,7 @@ Deno.serve(createHandler(
           .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
           .order("created_at", { ascending: false }),
         auth.client.from("group_chat_section_members")
-          .select("id,section_id,group_membership_id,created_at")
+          .select("id,section_id,group_membership_id,unread_count,last_read_at,created_at")
           .eq("group_id", groupId),
         admin.from("group_roles")
           .select("id,name,color,permissions,is_system,created_at")
@@ -288,6 +288,23 @@ Deno.serve(createHandler(
 
       if (messagesError || membersError || sectionsError || sectionMembersError || rolesError || assignmentsError || announcementsError || eventsError || givingError) {
         throw new ApiError("GROUP_CHAT_LOAD_FAILED", "Unable to load this Group space.", 500, undefined, false);
+      }
+
+      const readAt = new Date().toISOString();
+      if (sectionId) {
+        await admin.from("group_chat_section_members")
+          .update({ unread_count: 0, last_read_at: readAt })
+          .eq("group_id", groupId)
+          .eq("section_id", sectionId)
+          .eq("group_membership_id", membership.id)
+          .gt("unread_count", 0);
+      } else if (Number(membership.chat_unread_count ?? 0) > 0) {
+        await admin.from("group_memberships")
+          .update({ chat_unread_count: 0, chat_last_read_at: readAt })
+          .eq("id", membership.id)
+          .gt("chat_unread_count", 0);
+        membership.chat_unread_count = 0;
+        membership.chat_last_read_at = readAt;
       }
 
       const safety = await loadSafetyProfileSets(admin, auth.user.id);

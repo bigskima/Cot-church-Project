@@ -15,84 +15,104 @@ type RealtimeClient = {
   removeAllChannels: () => Promise<unknown> | unknown;
 };
 
-// Tables that exist in the current production schema. Keep these on the primary
-// channel so unreleased draft migrations can never disable established realtime.
-const tableInvalidations: Record<string, string[]> = {
-  conversations: ['chat:'],
-  conversation_participants: ['chat:'],
-  messages: ['chat:'],
-  direct_conversations: ['chat:'],
-  direct_messages: ['chat:'],
-  direct_message_reactions: ['chat:'],
-  group_messages: ['group-chat:'],
-  group_message_reactions: ['group-chat:'],
-  group_chat_sections: ['group-chat:', 'expression:groups:', 'church:groups:'],
-  group_chat_section_members: ['group-chat:'],
-  group_roles: ['group-chat:', 'expression:groups:', 'church:groups:'],
-  group_role_assignments: ['group-chat:', 'expression:groups:', 'church:groups:'],
-  group_announcements: ['group-chat:', 'expression:groups:', 'church:groups:'],
-  group_events: ['group-chat:', 'expression:groups:', 'church:groups:'],
-  group_giving_options: ['group-chat:', 'expression:groups:', 'church:groups:'],
-  social_posts: ['mobile:home-feed:', 'mobile:community:', 'expression:'],
-  social_comments: ['comments:', 'mobile:home-feed:', 'mobile:community:', 'expression:'],
-  social_reactions: ['mobile:home-feed:', 'mobile:community:', 'expression:'],
-  content_items: ['mobile:home-feed:', 'mobile:community:', 'expression:', 'reels:immersive:', 'watch:catalogue:'],
-  content_comments: engagementResources,
-  content_reactions: engagementResources,
-  content_bookmarks: engagementResources,
-  content_playback_progress: ['mobile:home-feed:', 'expression:', 'reels:immersive:', 'watch:catalogue:', 'playback:'],
-  reels: ['mobile:home-feed:', 'reels:immersive:', 'expression:'],
-  videos: ['mobile:home-feed:', 'watch:catalogue:', 'expression:'],
-  media_assets: ['playback:', 'mobile:home-feed:', 'reels:immersive:', 'watch:catalogue:', 'expression:'],
-  media_renditions: ['playback:', 'mobile:home-feed:', 'reels:immersive:', 'watch:catalogue:', 'expression:'],
-  media_thumbnails: ['mobile:home-feed:', 'reels:immersive:', 'watch:catalogue:', 'expression:'],
-  media_tracks: ['reels:immersive:', 'watch:catalogue:', 'expression:'],
-  live_streams: ['live:', 'leadership:streams:', 'mobile:home-feed:', 'expression:'],
-  stream_messages: ['live:'],
-  stream_reactions: ['live:'],
-  groups: ['expression:groups:', 'church:groups:', 'expression:'],
-  group_memberships: ['expression:groups:', 'church:groups:', 'expression:'],
-  branches: ['expression:', 'mobile:home-feed:'],
-  expression_memberships: ['expression:', 'chat:', 'expression-chat:'],
-  events: ['events:', 'mobile:home-feed:', 'expression:'],
-  announcements: ['announcements:', 'mobile:home-feed:', 'expression:'],
-  sermons: ['sermon:', 'mobile:home-feed:', 'expression:'],
-  profiles: ['chat:', 'comments:', 'mobile:community:', 'mobile:home-feed:', 'public-profile:', 'birthdays:', 'expression:birthdays:', 'expression-chat:'],
-  notifications: ['notifications:'],
-  follows: ['mobile:home-feed:', 'public-profile:', 'expression:'],
-  giving_purposes: ['expression:finance-books:', 'giving:'],
-  giving_campaigns: ['expression:finance-books:', 'giving:'],
-  giving_settings: ['expression:finance-books:', 'giving:'],
+type RealtimeDomain = {
+  name: string;
+  tables: Record<string, string[]>;
+  refreshContext?: boolean;
 };
 
-// These tables are introduced by draft migrations. They intentionally live on a
-// second channel: if a migration has not been promoted yet, that channel may fail
-// without affecting established chat/feed/media realtime.
-const optionalTableInvalidations: Record<string, string[]> = {
-  polls: ['participation:'],
-  poll_options: ['participation:'],
-  poll_votes: ['participation:'],
-  giveaways: ['participation:'],
-  giveaway_entries: ['participation:'],
-  giveaway_winners: ['participation:'],
-  testimonies: ['expression:testimonies:'],
-  testimony_responses: ['expression:testimonies:'],
-  financial_accounts: ['expression:finance-books:'],
-  financial_sessions: ['expression:finance-books:'],
-  financial_ledger_entries: ['expression:finance-books:'],
-  feed_ranking_settings: ['mobile:home-feed:', 'expression:layered-home:'],
-  expression_chat_messages: ['expression-chat:'],
-  expression_chat_reactions: ['expression-chat:'],
-  chat_call_sessions: ['chat-call:'],
-  chat_call_participants: ['chat-call:'],
-  library_books: ['library:'],
-  library_reviews: ['library:'],
-  library_reading_progress: ['library:'],
-  devotional_series: ['devotional:'],
-  devotional_entries: ['devotional:'],
-};
-
-const contextTables = new Set(['branches', 'expression_memberships']);
+// Keep domains deliberately small and only subscribe to tables that are enabled
+// in the production Realtime publication. A missing/unpublished table must never
+// be able to take down chat, calls, or feeds as collateral damage.
+const realtimeDomains: RealtimeDomain[] = [
+  {
+    name: 'direct-chat',
+    tables: {
+      direct_conversations: ['chat:'],
+      direct_messages: ['chat:'],
+      direct_message_reactions: ['chat:'],
+      conversations: ['chat:'],
+      conversation_participants: ['chat:'],
+      messages: ['chat:'],
+      profiles: ['chat:', 'public-profile:'],
+      follows: ['chat:', 'public-profile:', 'mobile:home-feed:'],
+    },
+  },
+  {
+    name: 'community-chat',
+    tables: {
+      expression_chat_messages: ['expression-chat:'],
+      expression_chat_reactions: ['expression-chat:'],
+      group_messages: ['group-chat:'],
+      group_message_reactions: ['group-chat:'],
+      group_chat_sections: ['group-chat:', 'expression:groups:', 'church:groups:'],
+      group_chat_section_members: ['group-chat:'],
+      group_roles: ['group-chat:', 'expression:groups:', 'church:groups:'],
+      group_role_assignments: ['group-chat:', 'expression:groups:', 'church:groups:'],
+      group_announcements: ['group-chat:', 'expression:groups:', 'church:groups:'],
+      group_events: ['group-chat:', 'expression:groups:', 'church:groups:'],
+      group_giving_options: ['group-chat:', 'expression:groups:', 'church:groups:'],
+    },
+  },
+  {
+    name: 'calls-notifications',
+    tables: {
+      chat_call_sessions: ['chat-call:'],
+      chat_call_participants: ['chat-call:'],
+      notifications: ['notifications:', 'chat-call:incoming:'],
+    },
+  },
+  {
+    name: 'social-content',
+    tables: {
+      social_posts: ['mobile:home-feed:', 'mobile:community:', 'expression:'],
+      social_comments: ['comments:', 'mobile:home-feed:', 'mobile:community:', 'expression:'],
+      social_reactions: ['mobile:home-feed:', 'mobile:community:', 'expression:'],
+      content_items: ['mobile:home-feed:', 'mobile:community:', 'expression:', 'reels:immersive:', 'watch:catalogue:'],
+      content_comments: engagementResources,
+      content_reactions: engagementResources,
+      content_bookmarks: engagementResources,
+      reels: ['mobile:home-feed:', 'reels:immersive:', 'expression:'],
+      videos: ['mobile:home-feed:', 'watch:catalogue:', 'expression:'],
+      media_assets: ['playback:', 'mobile:home-feed:', 'reels:immersive:', 'watch:catalogue:', 'expression:'],
+      media_renditions: ['playback:', 'mobile:home-feed:', 'reels:immersive:', 'watch:catalogue:', 'expression:'],
+      media_thumbnails: ['mobile:home-feed:', 'reels:immersive:', 'watch:catalogue:', 'expression:'],
+      media_tracks: ['reels:immersive:', 'watch:catalogue:', 'expression:'],
+    },
+  },
+  {
+    name: 'ministry-content',
+    tables: {
+      events: ['events:', 'event:', 'discover:events:', 'leadership:events:', 'general:ministry:events:', 'mobile:home-feed:', 'expression:'],
+      announcements: ['general:announcements:', 'expression:announcements:', 'leadership:announcements:', 'general:ministry:announcements:', 'mobile:home-feed:', 'expression:'],
+      sermons: ['sermon:', 'general:sermons:', 'discover:sermons:', 'discover:series:', 'leadership:sermons:', 'general:ministry:sermons:', 'mobile:home-feed:', 'expression:', 'saved:'],
+      library_books: ['library:'],
+      library_reviews: ['library:'],
+      library_reading_progress: ['library:'],
+      devotional_series: ['devotional:'],
+      devotional_entries: ['devotional:'],
+      general_home_notice_signals: ['general-home-notice:'],
+    },
+  },
+  {
+    name: 'live-groups',
+    tables: {
+      live_streams: ['live:', 'leadership:streams:', 'mobile:home-feed:', 'expression:'],
+      stream_messages: ['live:'],
+      stream_reactions: ['live:'],
+      groups: ['expression:groups:', 'church:groups:', 'expression:'],
+      group_memberships: ['expression:groups:', 'church:groups:', 'expression:'],
+    },
+  },
+  {
+    name: 'membership-context',
+    refreshContext: true,
+    tables: {
+      branches: ['expression:', 'mobile:home-feed:'],
+      expression_memberships: ['expression:', 'chat:', 'expression-chat:'],
+    },
+  },
+];
 
 export function RealtimeBridge() {
   const { auth, mode, refreshContext } = useSession();
@@ -106,6 +126,7 @@ export function RealtimeBridge() {
     const channels: any[] = [];
     let flushTimer: ReturnType<typeof setTimeout> | undefined;
     const pendingPrefixes = new Set<string>();
+
     const queueInvalidation = (prefix: string) => {
       pendingPrefixes.add(prefix);
       if (flushTimer) return;
@@ -114,19 +135,14 @@ export function RealtimeBridge() {
         if (disposed) return;
         pendingPrefixes.forEach(invalidate);
         pendingPrefixes.clear();
-      }, 150);
+      }, 90);
     };
 
     const connect = async () => {
       try {
-        // Realtime is an optional enhancement, not an application bootstrap dependency.
-        // Load the Supabase realtime client only after React has rendered so a module,
-        // browser, websocket or runtime-configuration failure can never blank the app.
         const [{ createClient }, response] = await Promise.all([
           import('@supabase/supabase-js'),
-          fetch(`${apiUrl}/realtime-config`, {
-            headers: { Accept: 'application/json' },
-          }),
+          fetch(`${apiUrl}/realtime-config`, { headers: { Accept: 'application/json' } }),
         ]);
 
         if (disposed || !response.ok) return;
@@ -136,10 +152,8 @@ export function RealtimeBridge() {
 
         const nextClient = createClient(config.url, config.anonKey, {
           auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-          global: {
-            headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
-          },
-          realtime: { params: { eventsPerSecond: 20 } },
+          global: { headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {} },
+          realtime: { params: { eventsPerSecond: 40 } },
         }) as unknown as RealtimeClient;
 
         if (disposed) {
@@ -151,36 +165,42 @@ export function RealtimeBridge() {
         if (accessToken) await client.realtime.setAuth(accessToken);
         if (disposed) return;
 
-        const attach = (name: string, invalidations: Record<string, string[]>, refreshMembershipContext: boolean) => {
-          let nextChannel = client!.channel(name);
-          for (const table of Object.keys(invalidations)) {
-            nextChannel = nextChannel.on(
+        const identity = accessToken ? auth?.session.expiresAt ?? 'member' : 'visitor';
+
+        for (const domain of realtimeDomains) {
+          let channel = client.channel(`cot-live-${domain.name}-${identity}`);
+          for (const [table, prefixes] of Object.entries(domain.tables)) {
+            channel = channel.on(
               'postgres_changes',
               { event: '*', schema: 'public', table },
               () => {
-                invalidations[table].forEach(queueInvalidation);
-                if (refreshMembershipContext && accessToken && contextTables.has(table)) refreshContext();
+                prefixes.forEach(queueInvalidation);
+                if (domain.refreshContext && accessToken) refreshContext();
               },
             );
           }
 
-          let subscribed = false;
-          nextChannel.subscribe((status: string) => {
-            if (disposed || status !== 'SUBSCRIBED') return;
-            // Postgres changes are not replayed after a disconnected socket.
-            if (subscribed) Object.values(invalidations).flat().forEach(queueInvalidation);
-            subscribed = true;
+          let subscribedOnce = false;
+          channel.subscribe((status: string) => {
+            if (disposed) return;
+            if (status === 'SUBSCRIBED') {
+              // Supabase does not replay Postgres Changes after a disconnected
+              // socket. Refresh only this domain after reconnecting.
+              if (subscribedOnce) {
+                Object.values(domain.tables).flat().forEach(queueInvalidation);
+              }
+              subscribedOnce = true;
+            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+              // Never poison other realtime domains. Their channels remain
+              // subscribed even if one feature/domain experiences a problem.
+              if (typeof __DEV__ !== 'undefined' && __DEV__) {
+                console.warn(`Realtime domain ${domain.name} is unavailable (${status}).`);
+              }
+            }
           });
-          channels.push(nextChannel);
-        };
-
-        const identity = accessToken ? auth?.session.expiresAt ?? 'member' : 'visitor';
-        attach(`cot-live-core-${identity}`, tableInvalidations, true);
-        attach(`cot-live-draft-${identity}`, optionalTableInvalidations, false);
+          channels.push(channel);
+        }
       } catch (error) {
-        // Canonical reads continue to work when realtime is unavailable. Keep a
-        // websocket/config failure isolated from the route tree instead of ever
-        // blanking the application shell.
         if (typeof __DEV__ !== 'undefined' && __DEV__) {
           console.warn('Realtime enhancement unavailable:', error);
         }

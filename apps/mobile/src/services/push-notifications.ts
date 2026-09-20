@@ -42,6 +42,14 @@ export async function configurePushChannels() {
       vibrationPattern: [0, 250, 200, 250],
       showBadge: true,
     }),
+    Notifications.setNotificationChannelAsync('cot-calls', {
+      name: 'Incoming COT calls',
+      description: 'Audio and video call alerts from COT chats.',
+      importance: Notifications.AndroidImportance.MAX,
+      sound: 'default',
+      vibrationPattern: [0, 450, 220, 450, 220, 450],
+      showBadge: true,
+    }),
     Notifications.setNotificationChannelAsync('cot-silent', {
       name: 'COT quiet notifications',
       description: 'COT notifications without sound.',

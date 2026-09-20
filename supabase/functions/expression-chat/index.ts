@@ -77,7 +77,7 @@ async function expressionContext(auth: any, admin: any, branchId: string) {
   const [{ data: branch, error: branchError }, { data: membership, error: membershipError }] = await Promise.all([
     admin.from("branches").select("id,organization_id,name,is_active").eq("id", branchId).eq("organization_id", auth.organizationId).maybeSingle(),
     admin.from("expression_memberships")
-      .select("id,organization_id,branch_id,profile_id,status,chat_restricted_until,chat_banned_at,chat_moderation_reason")
+      .select("id,organization_id,branch_id,profile_id,status,chat_restricted_until,chat_banned_at,chat_moderation_reason,chat_unread_count,chat_last_read_at")
       .eq("organization_id", auth.organizationId).eq("branch_id", branchId).eq("profile_id", auth.user.id).eq("status", "active").maybeSingle(),
   ]);
   if (branchError || !branch || !branch.is_active || membershipError || !membership) {
@@ -212,6 +212,15 @@ Deno.serve(createHandler(
         const profileMap = new Map((profiles ?? []).map((profile: any) => [profile.id, profile]));
         members = (memberRows ?? []).map((row: any) => ({ ...row, profile: profileMap.get(row.profile_id) ?? null }));
       }
+      if (Number(membership.chat_unread_count ?? 0) > 0) {
+        await admin.from("expression_memberships")
+          .update({ chat_unread_count: 0, chat_last_read_at: new Date().toISOString() })
+          .eq("id", membership.id)
+          .gt("chat_unread_count", 0);
+        membership.chat_unread_count = 0;
+        membership.chat_last_read_at = new Date().toISOString();
+      }
+
       return { data: {
         expression: { id: branch.id, name: branch.name },
         membership,
