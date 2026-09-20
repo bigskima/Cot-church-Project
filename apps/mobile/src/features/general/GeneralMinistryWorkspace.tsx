@@ -55,6 +55,7 @@ export default function GeneralMinistryWorkspace() {
   const visible = filter === 'All' ? available : available.filter((tool) => tool.area === filter);
   const areas = (['Create', 'Content', 'Care', 'People', 'Finance', 'Media', 'Settings'] as GeneralMinistryArea[])
     .filter((area) => available.some((tool) => tool.area === area));
+  const showFilters = available.length > 4 && areas.length > 1;
 
   if (mode !== 'authenticated') {
     return (
@@ -101,26 +102,30 @@ export default function GeneralMinistryWorkspace() {
           </View>
         ) : (
           <>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
-              {(['All', ...areas] as Filter[]).map((item) => {
-                const selected = item === filter;
-                return (
-                  <Pressable
-                    key={item}
-                    onPress={() => setFilter(item)}
-                    style={[
-                      styles.filterPill,
-                      {
-                        backgroundColor: selected ? colors.text : colors.card,
-                        borderColor: selected ? colors.text : colors.borderSubtle,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.filterText, { color: selected ? colors.bg : colors.textSecondary }]}>{item}</Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+            {showFilters ? (
+              <View style={styles.filters}>
+                {(['All', ...areas] as Filter[]).map((item) => {
+                  const selected = item === filter;
+                  return (
+                    <Pressable
+                      key={item}
+                      onPress={() => setFilter(item)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      style={[
+                        styles.filterPill,
+                        {
+                          backgroundColor: selected ? colors.text : colors.card,
+                          borderColor: selected ? colors.text : colors.borderSubtle,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.filterText, { color: selected ? colors.bg : colors.textSecondary }]}>{item}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
 
             <CompactRouteGrid
               compact
@@ -165,8 +170,8 @@ const styles = StyleSheet.create({
   count: { fontSize: 11, lineHeight: 16, fontWeight: '900' },
   loading: { gap: spacing.lg },
   noAccess: { gap: spacing.md },
-  filters: { gap: 7, paddingRight: spacing.md },
-  filterPill: { minHeight: 34, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
+  filters: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 7 },
+  filterPill: { height: 34, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start' },
   filterText: { fontSize: 10.5, fontWeight: '800' },
   skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.lg },
   skeletonItem: { width: '25%', alignItems: 'center', gap: 6 },
