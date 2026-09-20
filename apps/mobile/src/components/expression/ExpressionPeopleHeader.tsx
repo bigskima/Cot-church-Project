@@ -70,7 +70,7 @@ export function ExpressionPeopleHeader({ expressionId, expressionName, active, t
         </Pressable>
       </View>
 
-      <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)} title="Quick routes" maxHeightPercent={60}>
+      <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)} title="Quick routes" maxHeightPercent={60} compact>
         <CompactRouteGrid
           compact
           items={destinations.map((destination) => ({
