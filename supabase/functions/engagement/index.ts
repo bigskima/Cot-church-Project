@@ -5,6 +5,7 @@ import { jsonBody } from "../_shared/request.ts";
 import { adminClient, publicClient } from "../_shared/supabase.ts";
 import { assertProfilesMayInteract, filterByAuthor, loadSafetyProfileSets } from "../_shared/safety.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString, uuid } from "../_shared/validation.ts";
+import { loadPublicChatBadges } from "../_shared/identity-badges.ts";
 
 const allowedReactions = new Set(["like", "love", "pray", "celebrate", "amen", "support"]);
 
@@ -13,6 +14,31 @@ function requestedContentIds(value: string | null) {
   if (!ids.length) throw new ApiError("VALIDATION_FAILED", "At least one contentId is required", 400);
   if (ids.length > 30) throw new ApiError("VALIDATION_FAILED", "A maximum of 30 content activity states can be loaded at once", 422);
   return ids.map((id) => uuid(id, "contentId", true)!);
+}
+
+async function enrichCommentAuthors(admin: any, rows: any[], content: any) {
+  if (!rows.length) return rows;
+  const profileIds = [...new Set(rows.map((row) => row.author_profile_id).filter(Boolean))] as string[];
+  const badgeMap = await loadPublicChatBadges(
+    admin,
+    profileIds,
+    content?.organization_id ?? null,
+    content?.expression_id ?? null,
+  );
+
+  return rows.map((row) => {
+    const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+    return {
+      ...row,
+      author: profile ? {
+        id: profile.id,
+        display_name: profile.display_name,
+        username: profile.username,
+        avatar_url: profile.avatar_url,
+        badges: badgeMap.get(row.author_profile_id) ?? [],
+      } : null,
+    };
+  });
 }
 
 async function assertContentAccess(auth: any, contentId: string) {
@@ -207,7 +233,7 @@ Deno.serve(createHandler(
         if (reaction.error || bookmark.error || progress.error) throw new ApiError("ENGAGEMENT_STATE_FAILED", "Unable to retrieve your content activity", 500, undefined, false);
         return { data: { reaction: reaction.data?.reaction ?? null, bookmarked: Boolean(bookmark.data), progress: progress.data ?? null } };
       }
-      await assertContentAccess(auth, contentId);
+      const targetContent = await assertContentAccess(auth, contentId);
       const { data, error } = await client
         .from("content_comments")
         .select(`
@@ -217,7 +243,7 @@ Deno.serve(createHandler(
           parent_comment_id,
           body,
           created_at,
-          profiles(id, display_name, avatar_url)
+          profiles(id, display_name, username, avatar_url)
         `)
         .eq("content_item_id", contentId)
         .eq("is_hidden", false)
@@ -225,10 +251,12 @@ Deno.serve(createHandler(
         .limit(100);
 
       if (error) throw new ApiError("COMMENTS_FETCH_FAILED", "Unable to retrieve comments", 500, undefined, false);
-      if (!auth?.user) return { data: data ?? [] };
-      const safety = await loadSafetyProfileSets(adminClient(), auth.user.id);
+      const admin = adminClient();
+      const enriched = await enrichCommentAuthors(admin, data ?? [], targetContent);
+      if (!auth?.user) return { data: enriched };
+      const safety = await loadSafetyProfileSets(admin, auth.user.id);
       return {
-        data: filterByAuthor(data ?? [], safety.hiddenFromFeed, (comment: any) => comment.author_profile_id),
+        data: filterByAuthor(enriched, safety.hiddenFromFeed, (comment: any) => comment.author_profile_id),
       };
     }
 
@@ -280,7 +308,7 @@ Deno.serve(createHandler(
       const contentId = uuid(requiredString(body.contentId, "contentId", 36), "contentId", true)!;
       const commentBody = requiredString(body.body, "body", 3000);
       const parentId = body.parentCommentId ? uuid(String(body.parentCommentId), "parentCommentId", true) : null;
-      await assertContentAccess(auth, contentId);
+      const targetContent = await assertContentAccess(auth, contentId);
 
       if (parentId) {
         const { data: parentComment, error: parentError } = await auth.client
@@ -309,12 +337,13 @@ Deno.serve(createHandler(
           parent_comment_id,
           body,
           created_at,
-          profiles(id, display_name, avatar_url)
+          profiles(id, display_name, username, avatar_url)
         `)
         .single();
 
       if (error) throw new ApiError("COMMENT_FAILED", "Unable to post comment", 500, undefined, false);
-      return { data, status: 201 };
+      const [enriched] = await enrichCommentAuthors(adminClient(), data ? [data] : [], targetContent);
+      return { data: enriched ?? data, status: 201 };
     }
 
     // 3. Bookmark
