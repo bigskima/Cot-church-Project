@@ -180,7 +180,7 @@ export function AgoraCallSession({ grant, kind, scope, otherName, onJoined, onEr
                 {uid === 0 && cameraMuted ? (
                   <View style={styles.placeholder}><Text style={styles.placeholderText}>Camera off</Text></View>
                 ) : (
-                  <RtcSurfaceView canvas={{ uid, renderMode: RenderModeType.RenderModeFit }} style={styles.video} />
+                  <RtcSurfaceView canvas={{ uid, renderMode: RenderModeType.RenderModeHidden }} style={styles.video} />
                 )}
                 <Text style={styles.tileLabel}>{uid === 0 ? 'You' : `Participant ${index + 1}`}</Text>
               </View>
