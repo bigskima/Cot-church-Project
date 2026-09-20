@@ -249,7 +249,7 @@ export function ExpressionManagementHub() {
             </View>
           </>
         ) : (
-          <EmptyState title="No ministry tools available" message="Tools appear when your Expression role grants access." iconName="lock-closed-outline" />
+          <EmptyState title="No ministry tools available" message="Tools appear when they are available to you." iconName="lock-closed-outline" />
         )}
       </ScrollView>
     </View>
