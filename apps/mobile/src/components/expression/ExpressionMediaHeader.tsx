@@ -98,7 +98,7 @@ export function ExpressionMediaHeader({
         </Pressable>
       </View>
 
-      <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)} title="Media" maxHeightPercent={58}>
+      <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)} title="Media" maxHeightPercent={58} compact>
         <CompactRouteGrid
           compact
           items={destinations.map((destination) => ({
