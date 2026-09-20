@@ -159,15 +159,15 @@ export function VideoCategorySettingsExperience() {
         <ScreenHeader
           title="Watch categories"
           kicker="MEDIA SETTINGS"
-          subtitle="Rename, search, reorder, or hide Watch categories without changing the canonical media category stored on existing videos."
+          subtitle="Rename, search, reorder or hide the categories people see in Watch."
           showBack
         />
 
         <View style={[styles.infoCard, { backgroundColor: colors.primarySoft, borderColor: colors.primarySoftStrong }]}>
           <Icon name="options-outline" size={21} color={colors.interactive} />
           <View style={styles.flex}>
-            <Text style={[styles.infoTitle, { color: colors.text }]}>Database-controlled catalogue</Text>
-            <Text style={[styles.infoText, { color: colors.textSecondary }]}>Labels, aliases, ordering and visibility update immediately for Watch discovery after the category configuration migration is promoted.</Text>
+            <Text style={[styles.infoTitle, { color: colors.text }]}>Watch category settings</Text>
+            <Text style={[styles.infoText, { color: colors.textSecondary }]}>Changes to names, search terms, order and visibility appear in Watch after you save them.</Text>
           </View>
         </View>
 
@@ -192,7 +192,7 @@ export function VideoCategorySettingsExperience() {
                       <Icon name="pricetag-outline" size={19} color={draft.isActive ? colors.interactive : colors.textMuted} />
                     </View>
                     <View style={styles.flex}>
-                      <Text style={[styles.keyLabel, { color: colors.textMuted }]}>CANONICAL KEY</Text>
+                      <Text style={[styles.keyLabel, { color: colors.textMuted }]}>CATEGORY</Text>
                       <Text style={[styles.keyValue, { color: colors.text }]}>{humanizeKey(row.category)}</Text>
                     </View>
                     <Badge label={draft.isActive ? 'VISIBLE' : 'HIDDEN'} variant={draft.isActive ? 'active' : 'neutral'} />
@@ -212,7 +212,7 @@ export function VideoCategorySettingsExperience() {
                     <Icon name={draft.isActive ? 'eye-outline' : 'eye-off-outline'} size={18} color={draft.isActive ? colors.interactive : colors.textMuted} />
                     <View style={styles.flex}>
                       <Text style={[styles.visibilityTitle, { color: colors.text }]}>{draft.isActive ? 'Shown in Watch discovery' : 'Hidden from Watch discovery'}</Text>
-                      <Text style={[styles.visibilityHint, { color: colors.textMuted }]}>Existing videos keep their category key; hiding only removes this option from discovery and publishing choices.</Text>
+                      <Text style={[styles.visibilityHint, { color: colors.textMuted }]}>Existing videos stay unchanged. Hiding a category only removes it from Watch discovery and future publishing choices.</Text>
                     </View>
                   </Pressable>
 
@@ -222,7 +222,7 @@ export function VideoCategorySettingsExperience() {
             })}
           </View>
         ) : (
-          <EmptyState title="No categories found" message={query ? 'Try a different search.' : 'Category options will appear after the database configuration migration is promoted.'} iconName="pricetags-outline" />
+          <EmptyState title="No categories found" message={query ? 'Try a different search.' : 'Category options will appear here when they are available.'} iconName="pricetags-outline" />
         )}
       </ScrollView>
     </View>
