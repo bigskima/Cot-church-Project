@@ -30,7 +30,7 @@ export function DevotionalExperience() {
   const devotional = useResource<DailyDevotionalPayload | null>(
     `devotional:${organizationId || 'public'}:${date}`,
     (signal) => api.request<DailyDevotionalPayload | null>(
-      `library?view=devotional&date=${date}${organizationId ? `&organizationId=${organizationId}` : ''}`,
+      `noop?service=library&view=devotional&date=${date}${organizationId ? `&organizationId=${organizationId}` : ''}`,
       { signal, context: 'public' },
     ),
   );
