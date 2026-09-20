@@ -243,7 +243,7 @@ async function participants(admin: any, callId: string) {
   return (data ?? []).map((row: any) => ({ ...row, profile: map.get(row.profile_id) ?? null }));
 }
 
-Deno.serve(createHandler(
+export const chatCallsHandler = createHandler(
   { methods: ["GET", "POST"], authentication: "required", organization: "optional" },
   async ({ request, auth }) => {
     if (!auth?.user) throw new ApiError("AUTHENTICATION_REQUIRED", "Sign in to use calls.", 401);
@@ -375,4 +375,6 @@ Deno.serve(createHandler(
 
     throw new ApiError("VALIDATION_FAILED", "Unknown call action.", 422);
   },
-));
+);
+
+if (import.meta.main) Deno.serve(chatCallsHandler);
