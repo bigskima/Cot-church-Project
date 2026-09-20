@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
   wrap: { gap: spacing.xs },
   label: { fontSize: 11, lineHeight: 15, fontWeight: '800' },
   search: { minHeight: 50, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  input: { flex: 1, minWidth: 0, fontSize: 14, paddingVertical: 12, outlineStyle: 'none' as any },
+  input: { flex: 1, minWidth: 0, fontSize: 14, paddingVertical: 12 },
   results: { borderWidth: 1, borderRadius: radius.lg, overflow: 'hidden' },
   result: { minHeight: 60, padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth },
   pressed: { opacity: 0.8 },
