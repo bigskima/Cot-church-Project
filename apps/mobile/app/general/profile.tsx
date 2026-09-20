@@ -25,9 +25,11 @@ export default function GeneralProfileRoute() {
       <Suspense fallback={<View style={[styles.loading, { backgroundColor: colors.bg }]}><ActivityIndicator color={colors.interactive} /><Text style={[styles.copy, { color: colors.textMuted }]}>Preparing your COT space…</Text></View>}>
         <GeneralProfileExperience />
       </Suspense>
-      <TourAnchor targetKey="general.profile.header" style={[styles.headerTarget, { top: insets.top + 6 }]}>
-        <View style={styles.fill} />
-      </TourAnchor>
+      <View pointerEvents="none" style={[styles.headerTarget, { top: insets.top + 6 }]}>
+        <TourAnchor targetKey="general.profile.header" style={styles.fill}>
+          <View style={styles.fill} />
+        </TourAnchor>
+      </View>
     </View>
   );
 }
