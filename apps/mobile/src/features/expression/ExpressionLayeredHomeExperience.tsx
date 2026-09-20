@@ -28,6 +28,7 @@ import { getRuntimeSupabase } from '@/services/runtime-supabase';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import type { Event, LiveStream, Reel, Sermon, SocialPost, Video } from '@/types/content';
+import { useFeatureControls } from '@/features/availability/useFeatureControls';
 
 type Announcement = { id: string; title: string; body: string; published_at?: string | null; created_at?: string | null };
 type FeedPlanRow = {
@@ -97,6 +98,7 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
   const { colors } = useTheme();
   const membership = context?.expressions?.find((item) => item.id === expressionId && item.status === 'active');
   const organizationId = membership?.organizationId ?? context?.organization?.id ?? '';
+  const controls = useFeatureControls({ organizationId, expressionId });
   const accessToken = auth?.session.accessToken ?? null;
   const reelWidth = Math.max(300, Math.min(width - spacing.sm * 2, 680));
 
@@ -166,13 +168,14 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
 
   const payload = resource.data?.payload;
   const expression = payload?.expression ?? (context?.expression?.id === expressionId ? context.expression : undefined) ?? membership;
-  const streams = payload?.streams ?? [];
-  const posts = payload?.posts ?? [];
-  const reels = payload?.reels ?? [];
-  const videos = payload?.videos ?? [];
-  const sermons = payload?.sermons ?? [];
-  const events = payload?.events ?? [];
-  const announcements = resource.data?.announcements ?? [];
+  const communityAvailable = controls.isEnabled('social_community_feed');
+  const streams = controls.isEnabled('live_streaming') && controls.isEnabled('expression_live') ? (payload?.streams ?? []) : [];
+  const posts = communityAvailable ? (payload?.posts ?? []) : [];
+  const reels = communityAvailable && controls.isEnabled('reels') ? (payload?.reels ?? []) : [];
+  const videos = communityAvailable && controls.isEnabled('long_form_video') ? (payload?.videos ?? []) : [];
+  const sermons = controls.isEnabled('sermons') ? (payload?.sermons ?? []) : [];
+  const events = controls.isEnabled('events_gatherings') ? (payload?.events ?? []) : [];
+  const announcements = controls.isEnabled('announcements') ? (resource.data?.announcements ?? []) : [];
   const activeStream = streams.find((item) => item.status === 'live') ?? streams.find((item) => item.status === 'scheduled');
 
   const feed = useMemo<HomeUnit[]>(() => {
@@ -251,6 +254,15 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
     );
   };
 
+  const quickLinks = [
+    controls.isEnabled('announcements') ? { key: 'updates', label: 'Updates', hint: 'Important updates', icon: 'megaphone-outline', route: `/expressions/${expressionId}/announcements` } : null,
+    controls.isEnabled('prayer_request_ministry') ? { key: 'prayer', label: 'Prayer', hint: 'Pray together', icon: 'heart-outline', route: `/expressions/${expressionId}/prayer` } : null,
+    controls.isEnabled('events_gatherings') ? { key: 'events', label: 'Events', hint: 'Gatherings', icon: 'calendar-outline', route: `/expressions/${expressionId}/events` } : null,
+    controls.isEnabled('polls_giveaways') ? { key: 'participate', label: 'Join in', hint: 'Polls & giveaways', icon: 'chatbubbles-outline', route: `/expressions/${expressionId}/participate` } : null,
+    controls.isEnabled('groups') ? { key: 'groups', label: 'Groups', hint: 'Smaller circles', icon: 'people-circle-outline', route: `/expressions/${expressionId}/groups` } : null,
+    controls.isEnabled('expression_discussion') ? { key: 'chat', label: 'Chat', hint: 'Expression discussion', icon: 'chatbubble-ellipses-outline', route: `/expressions/${expressionId}/chat` } : null,
+  ].filter(Boolean) as Array<{ key: string; label: string; hint: string; icon: string; route: string }>;
+
   const header = (
     <View style={styles.headerWrap}>
       <View style={styles.quickSection}>
@@ -258,12 +270,9 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
           <Text style={[styles.quickHeadingTitle, { color: colors.text }]}>Explore</Text>
         </View>
         <View style={styles.quickGrid}>
-          <QuickLink label="Updates" hint="Important updates" icon="megaphone-outline" onPress={() => router.push(`/expressions/${expressionId}/announcements` as any)} />
-          <QuickLink label="Prayer" hint="Pray together" icon="heart-outline" onPress={() => router.push(`/expressions/${expressionId}/prayer` as any)} />
-          <QuickLink label="Events" hint="Gatherings" icon="calendar-outline" onPress={() => router.push(`/expressions/${expressionId}/events` as any)} />
-          <QuickLink label="Join in" hint="Polls & giveaways" icon="chatbubbles-outline" onPress={() => router.push(`/expressions/${expressionId}/participate` as any)} />
-          <QuickLink label="Groups" hint="Smaller circles" icon="people-circle-outline" onPress={() => router.push(`/expressions/${expressionId}/groups` as any)} />
-          <QuickLink label="Chat" hint="Direct messages" icon="chatbubble-ellipses-outline" onPress={() => router.push(`/expressions/${expressionId}/chat` as any)} />
+          {quickLinks.map((item) => (
+            <QuickLink key={item.key} label={item.label} hint={item.hint} icon={item.icon} onPress={() => router.push(item.route as any)} />
+          ))}
         </View>
       </View>
 
@@ -295,7 +304,7 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
           return <View style={styles.feedCard}><VideoCard video={item.video} variant="feed" commentContext="current" onPressCreator={item.video.content_items?.author?.username ? () => router.push({ pathname: '/general/member/[username]', params: { username: item.video.content_items!.author!.username! } } as any) : undefined} onPress={() => router.push(`/expressions/${expressionId}/videos/${item.video.id}` as any)} onOpenComments={item.video.content_items?.id ? () => router.push({ pathname: `/expressions/${expressionId}/comments/[contentId]`, params: { contentId: item.video.content_items!.id } } as any) : undefined} /></View>;
         }}
         />
-      {mode === 'authenticated' ? (
+      {mode === 'authenticated' && communityAvailable && controls.isEnabled('expression_posting') ? (
         <Pressable
           onPress={() => router.push({ pathname: `/expressions/${expressionId}/feed`, params: { compose: 'post', intentId: String(Date.now()) } } as any)}
           accessibilityRole="button"
