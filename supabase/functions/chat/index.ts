@@ -298,7 +298,7 @@ Deno.serve(createHandler(
     }
 
     if (action === "create_upload") {
-      assertNoUnknownFields(body, ["action", "conversationId", "mimeType", "fileName", "sizeBytes", "durationSeconds"]);
+      assertNoUnknownFields(body, ["action", "conversationId", "mimeType", "fileName", "sizeBytes", "durationSeconds", "width", "height"]);
       const conversationId = uuid(requiredString(body.conversationId, "conversationId", 36), "conversationId", true)!;
       const conversation = await requireConversation(admin, conversationId, viewerId);
       const otherProfileId = conversation.participant_low === viewerId
@@ -311,6 +311,8 @@ Deno.serve(createHandler(
           fileName: body.fileName,
           sizeBytes: body.sizeBytes,
           durationSeconds: body.durationSeconds,
+          width: body.width,
+          height: body.height,
         }),
         status: 201,
       };
