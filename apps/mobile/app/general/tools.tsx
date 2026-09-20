@@ -171,7 +171,7 @@ export default function GeneralToolsScreen() {
 
         {mode === 'authenticated' ? (
           <View style={styles.section}>
-            <SectionHeader title="Create" />
+            <SectionHeader title="Create" compact />
             <CompactRouteGrid
               compact
               items={createItems.map((item) => ({
@@ -199,8 +199,9 @@ export default function GeneralToolsScreen() {
         )}
 
         <View style={styles.section}>
-          <SectionHeader title="COT" />
+          <SectionHeader title="COT" compact />
           <CompactRouteGrid
+            compact
             items={cotItems.map((item) => ({
               key: item.key,
               label: item.label,
@@ -212,7 +213,7 @@ export default function GeneralToolsScreen() {
         </View>
 
         <View style={styles.section}>
-          <SectionHeader title="Account" />
+          <SectionHeader title="Account" compact />
           <View style={[styles.settingsCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
             {mode === 'authenticated' ? (
               <>
