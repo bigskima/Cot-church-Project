@@ -68,10 +68,11 @@ export function ExpressionContentStudio() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.section}>
-          <SectionHeader title="Create" badge={access.ready ? tools.length : undefined} />
+          <SectionHeader title="Create" badge={access.ready ? tools.length : undefined} compact />
 
           {access.ready && tools.length ? (
             <CompactRouteGrid
+              compact
               items={tools.map((tool) => ({
                 key: tool.key,
                 label: tool.title,
