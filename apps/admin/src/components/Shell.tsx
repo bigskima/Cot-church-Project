@@ -164,7 +164,14 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
       case 'organizations': return <OrganizationsGovernance api={api} canManage={can('platform.organizations.manage')} />;
       case 'expressions': return <ExpressionsGovernance api={api} canManage={can('platform.expressions.manage')} />;
       case 'users': return <UserGovernance api={api} canManage={can('platform.users.manage')} />;
-      case 'moderation': return <ModerationCenter api={api} canManage={can('platform.moderation.manage')} />;
+      case 'moderation': return (
+        <ModerationCenter
+          api={api}
+          canManage={can('platform.moderation.manage')}
+          canReadFeatures={can('platform.features.read')}
+          canManageFeatures={can('platform.features.manage')}
+        />
+      );
       case 'roles-access': return <RolesAccess api={api} canManage={can('platform.roles.manage')} />;
       case 'admin-invitations': return isSuperAdmin ? <AdminInvitations api={api} /> : <PlatformOverview api={api} onNavigate={navigate} allowedPages={allowedPageKeys} />;
       case 'expression-creators': return isSuperAdmin ? <ExpressionCreators api={api} /> : <PlatformOverview api={api} onNavigate={navigate} allowedPages={allowedPageKeys} />;
