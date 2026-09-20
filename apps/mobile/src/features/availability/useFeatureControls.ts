@@ -43,7 +43,7 @@ export function useFeatureControls(input: {
     if (expressionId) params.set('expressionId', expressionId);
     if (groupId) params.set('groupId', groupId);
     const value = params.toString();
-    return value ? `feature-access?${value}` : 'feature-access';
+    return value ? `noop?service=feature-access&${value}` : 'noop?service=feature-access';
   }, [expressionId, groupId, organizationId]);
 
   const resource = useResource<FeatureAccessPayload>(
