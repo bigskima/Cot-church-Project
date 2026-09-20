@@ -68,7 +68,7 @@ const rolePresets: Array<{ key: string; name: string; description: string; permi
   {
     key: 'general_admin',
     name: 'General COT Admin',
-    description: 'Runs people, content, giving, ministry and General COT configuration without becoming a Level-1 Platform Admin.',
+    description: 'Helps manage people, content, giving and ministry across General COT without becoming a Platform Administrator.',
     permissions: ['members.read','members.update','members.invite','roles.read','roles.assign','organization.leadership.manage','posts.create','posts.publish','media.upload','sermons.create','sermons.manage','sermons.publish','events.create','events.update','announcements.manage','polls.manage','giving.campaigns.manage','giving.finance.read','giving.read','prayer.moderate','prayer.pastoral.receive','prayer.team.receive','pastoral.followups.receive','testimonies.review','testimonies.manage'],
   },
 ];
@@ -203,7 +203,7 @@ export default function GeneralRolesAccessExperience() {
     return <View style={[styles.center, { backgroundColor: colors.bg }]}><EmptyState title="Choose a church" message="General COT roles are managed inside a church organization." iconName="business-outline" /></View>;
   }
   if (!canRead) {
-    return <View style={[styles.center, { backgroundColor: colors.bg }]}><EmptyState title="Role management unavailable" message="Your General COT role does not include roles.read." iconName="lock-closed-outline" /></View>;
+    return <View style={[styles.center, { backgroundColor: colors.bg }]}><EmptyState title="Role management unavailable" message="Your role does not include access to manage church roles." iconName="lock-closed-outline" /></View>;
   }
 
   return (
