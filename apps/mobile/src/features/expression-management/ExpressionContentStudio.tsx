@@ -84,7 +84,7 @@ export function ExpressionContentStudio() {
           ) : access.ready ? (
             <EmptyState
               title="No publishing tools available"
-              message="Publishing tools appear when your Expression role allows them."
+              message="Publishing tools appear when they are available to your account."
               iconName="lock-closed-outline"
             />
           ) : null}
