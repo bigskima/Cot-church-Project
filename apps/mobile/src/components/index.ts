@@ -41,3 +41,5 @@ export * from './profile/SocialProfileHero';
 export * from './identity/PublicIdentityBadge';
 
 export * from './navigation/WorkspaceTopBar';
+
+export * from './navigation/CompactRouteGrid';
