@@ -171,12 +171,6 @@ export function ExpressionChatExperience({ expressionId }: { expressionId: strin
     const index = messages.findIndex((message) => message.id === id);
     if (index >= 0) requestAnimationFrame(() => listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 }));
   };
-  const jumpToLatest = () => {
-    setPinnedOnly(false);
-    setSearchQuery('');
-    requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
-  };
-
   if (resource.loading && !resource.data) return <View style={[styles.center, { backgroundColor: colors.bg }]}><ActivityIndicator color={colors.interactive} /></View>;
   if (resource.error && !resource.data) return <View style={[styles.screen, { backgroundColor: colors.bg }]}><View style={styles.state}><ResourceError message={resource.error} retry={resource.refresh} /></View></View>;
 
@@ -188,17 +182,6 @@ export function ExpressionChatExperience({ expressionId }: { expressionId: strin
       keyboardVerticalOffset={Platform.select({ ios: insets.top, android: 0, web: 0, default: 0 })}
     >
       <ExpressionPeopleHeader expressionId={expressionId} expressionName={expressionName} active="chat" title="General discussion" subtitle="One conversation for everyone in this Expression." icon="chatbubbles-outline" />
-      <View style={[styles.scope, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}>
-        <Icon name="people-circle-outline" size={17} color={colors.interactive} />
-        <Text style={[styles.scopeText, { color: colors.textSecondary }]}>Everyone in {expressionName} can post, reply, react and share media here.</Text>
-        {resource.data?.permissions.moderateMembers ? (
-          <Pressable onPress={() => setModerationOpen(true)} style={[styles.manageButton, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
-            <Icon name="shield-checkmark-outline" size={14} color={colors.interactive} />
-            <Text style={[styles.manageText, { color: colors.interactive }]}>Moderate</Text>
-          </Pressable>
-        ) : null}
-      </View>
-
       <View style={styles.quickTools}>
         <Pressable onPress={() => setSearchOpen((current) => !current)} style={[styles.quickTool, { backgroundColor: searchOpen || !!normalizedSearch ? colors.primarySoft : colors.card, borderColor: searchOpen || !!normalizedSearch ? colors.interactive : colors.borderSubtle }]} accessibilityRole="button" accessibilityState={{ selected: searchOpen || !!normalizedSearch }}>
           <Icon name="search-outline" size={14} color={searchOpen || !!normalizedSearch ? colors.interactive : colors.textSecondary} />
@@ -208,10 +191,12 @@ export function ExpressionChatExperience({ expressionId }: { expressionId: strin
           <Icon name="pin-outline" size={14} color={pinnedOnly ? colors.interactive : colors.textSecondary} />
           <Text style={[styles.quickToolText, { color: pinnedOnly ? colors.interactive : colors.textSecondary }]}>Pinned {pinned.length ? `(${pinned.length})` : ''}</Text>
         </Pressable>
-        <Pressable onPress={jumpToLatest} style={[styles.quickTool, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]} accessibilityRole="button" accessibilityLabel="Jump to latest message">
-          <Icon name="arrow-down-circle-outline" size={14} color={colors.textSecondary} />
-          <Text style={[styles.quickToolText, { color: colors.textSecondary }]}>Latest</Text>
-        </Pressable>
+        {resource.data?.permissions.moderateMembers ? (
+          <Pressable onPress={() => setModerationOpen(true)} style={[styles.quickTool, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]} accessibilityRole="button" accessibilityLabel="Moderate discussion">
+            <Icon name="shield-checkmark-outline" size={14} color={colors.interactive} />
+            <Text style={[styles.quickToolText, { color: colors.interactive }]}>Moderate</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {searchOpen ? (
@@ -230,7 +215,7 @@ export function ExpressionChatExperience({ expressionId }: { expressionId: strin
         keyboardDismissMode={PLATFORM_KEYBOARD_DISMISS_MODE}
         onContentSizeChange={() => { if (!normalizedSearch && !pinnedOnly) listRef.current?.scrollToEnd({ animated: true }); }}
         onScrollToIndexFailed={({ index, averageItemLength }) => listRef.current?.scrollToOffset({ offset: averageItemLength * index, animated: true })}
-        ListEmptyComponent={<View style={styles.empty}><Icon name={normalizedSearch || pinnedOnly ? 'search-outline' : 'chatbubbles-outline'} size={34} color={colors.textMuted} /><Text style={[styles.emptyTitle, { color: colors.text }]}>{normalizedSearch || pinnedOnly ? 'No matching messages' : 'Start the Expression discussion'}</Text><Text style={[styles.emptyCopy, { color: colors.textMuted }]}>{normalizedSearch || pinnedOnly ? 'Try another search or turn off the pinned filter.' : 'Messages, photos, videos, reactions and voice notes stay inside this Expression.'}</Text></View>}
+        ListEmptyComponent={<View style={styles.empty}><Icon name={normalizedSearch || pinnedOnly ? 'search-outline' : 'chatbubbles-outline'} size={30} color={colors.textMuted} /><Text style={[styles.emptyTitle, { color: colors.text }]}>{normalizedSearch || pinnedOnly ? 'No matching messages' : 'No messages yet'}</Text></View>}
         renderItem={({ item }) => <RichMessageBubble message={item} mine={item.sender_profile_id === context?.profile?.id} showSender canPin={resource.data?.permissions.pinMessages === true} onReply={beginReply} onReact={(target, emoji) => void react(target, emoji)} onPin={(target, value) => void pin(target, value)} onJumpToMessage={jumpToMessage} />}
       />
       {actionError ? <Text style={[styles.error, { color: colors.live }]} accessibilityRole="alert">{actionError}</Text> : null}
@@ -272,12 +257,10 @@ export function ExpressionChatExperience({ expressionId }: { expressionId: strin
 
 const styles = StyleSheet.create({
   screen: { flex: 1 }, center: { flex: 1, alignItems: 'center', justifyContent: 'center' }, state: { flex: 1, padding: spacing.lg, justifyContent: 'center' }, flex: { flex: 1, minWidth: 0 },
-  scope: { marginHorizontal: spacing.md, marginBottom: spacing.xs, padding: spacing.sm, borderWidth: 1, borderRadius: radius.lg, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  scopeText: { flex: 1, fontSize: 10.5, lineHeight: 15, fontWeight: '600' }, manageButton: { minHeight: 34, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', gap: 4 }, manageText: { fontSize: 9.5, fontWeight: '900' },
-  quickTools: { marginHorizontal: spacing.md, marginBottom: spacing.xs, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  quickTools: { marginHorizontal: spacing.sm, marginVertical: 4, flexDirection: 'row', alignItems: 'center', gap: 6 },
   quickTool: { minHeight: 32, flex: 1, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
   quickToolText: { fontSize: 9, lineHeight: 12, fontWeight: '900' }, searchWrap: { marginHorizontal: spacing.md, marginBottom: spacing.xs },
   pinned: { marginHorizontal: spacing.md, borderRadius: radius.md, padding: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }, pinnedText: { flex: 1, fontSize: 11, fontWeight: '700' },
-  messages: { padding: spacing.md, gap: spacing.sm, flexGrow: 1, justifyContent: 'flex-end' }, empty: { paddingVertical: 54, paddingHorizontal: spacing.lg, alignItems: 'center', gap: 7 }, emptyTitle: { fontSize: 17, fontWeight: '900', textAlign: 'center' }, emptyCopy: { fontSize: 11, lineHeight: 16, textAlign: 'center', maxWidth: 320 }, error: { paddingHorizontal: spacing.md, paddingVertical: 5, fontSize: 11 },
+  messages: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, gap: spacing.xs, flexGrow: 1, justifyContent: 'flex-end' }, empty: { paddingVertical: 54, paddingHorizontal: spacing.lg, alignItems: 'center', gap: 7 }, emptyTitle: { fontSize: 17, fontWeight: '900', textAlign: 'center' }, emptyCopy: { fontSize: 11, lineHeight: 16, textAlign: 'center', maxWidth: 320 }, error: { paddingHorizontal: spacing.md, paddingVertical: 5, fontSize: 11 },
   memberList: { gap: spacing.sm }, sheetHint: { fontSize: 11, lineHeight: 16, marginBottom: spacing.xs }, memberRow: { minHeight: 64, borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, memberName: { fontSize: 12.5, fontWeight: '900' }, memberMeta: { fontSize: 10, lineHeight: 14, marginTop: 2 }, moderationForm: { gap: spacing.md }, backRow: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' }, backText: { fontSize: 11, fontWeight: '900' }, selectedCard: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, selectedName: { fontSize: 14, fontWeight: '900' }, actionTitle: { fontSize: 9, fontWeight: '900', letterSpacing: 0.8 }, chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 }, moderationButtons: { gap: spacing.sm },
 });
