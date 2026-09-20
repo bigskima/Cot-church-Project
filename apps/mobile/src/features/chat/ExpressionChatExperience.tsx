@@ -13,6 +13,8 @@ import { RichChatComposer } from './RichChatComposer';
 import { RichMessageBubble } from './RichMessageBubble';
 import type { ChatReaction, ChatReply, ChatSendPayload, RichChatMessage } from './rich-chat-types';
 import { ChatCallActions } from '@/features/calls/ChatCallActions';
+import { CallHistoryBubble } from '@/features/calls/CallHistoryBubble';
+import type { CallHistoryPayload } from '@/features/calls/call-types';
 
 type ExpressionChatMember = {
   id: string;
@@ -31,6 +33,10 @@ type ExpressionChatPayload = {
   members: ExpressionChatMember[];
   messages: RichChatMessage[];
 };
+
+type ExpressionTimelineItem =
+  | { kind: 'message'; id: string; at: string; message: RichChatMessage }
+  | { kind: 'call'; id: string; at: string; entry: CallHistoryPayload['history'][number] };
 
 function futureIso(hours: number) {
   return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
@@ -51,13 +57,24 @@ export function ExpressionChatExperience({ expressionId }: { expressionId: strin
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [pinnedOnly, setPinnedOnly] = useState(false);
-  const listRef = useRef<FlatList<RichChatMessage>>(null);
+  const listRef = useRef<FlatList<ExpressionTimelineItem>>(null);
   const key = `expression-chat:${expressionId}`;
 
   const resource = useResource<ExpressionChatPayload>(key, (signal) => {
     if (mode !== 'authenticated' || !expressionId) return Promise.reject(new Error('Join this Expression to use its discussion.'));
     return api.request<ExpressionChatPayload>(`expression-chat?branchId=${encodeURIComponent(expressionId)}`, { signal, context: 'current' });
   });
+
+  const callHistory = useResource<CallHistoryPayload>(
+    `chat-call:history:expression:${expressionId}`,
+    (signal) => {
+      if (mode !== 'authenticated' || !expressionId) return Promise.resolve({ history: [] });
+      return api.request<CallHistoryPayload>(
+        `noop?service=calls&history=true&scope=expression&expressionId=${encodeURIComponent(expressionId)}`,
+        { signal, context: 'current' },
+      );
+    },
+  );
 
   useEffect(() => {
     if (resource.data?.messages) setMessages(resource.data.messages);
@@ -164,12 +181,21 @@ export function ExpressionChatExperience({ expressionId }: { expressionId: strin
     return (message.body ?? '').toLowerCase().includes(normalizedSearch) || author.includes(normalizedSearch);
   }), [messages, normalizedSearch, pinnedOnly]);
   const memberList = useMemo(() => (resource.data?.members ?? []).filter((member) => member.status === 'active'), [resource.data?.members]);
+  const fullTimeline = useMemo<ExpressionTimelineItem[]>(() => {
+    const messageItems = messages.map((message) => ({ kind: 'message' as const, id: `message:${message.id}`, at: message.sent_at, message }));
+    const callItems = (callHistory.data?.history ?? []).map((entry) => ({ kind: 'call' as const, id: `call:${entry.call.id}`, at: entry.call.created_at, entry }));
+    return [...messageItems, ...callItems].sort((left, right) => new Date(left.at).getTime() - new Date(right.at).getTime());
+  }, [callHistory.data?.history, messages]);
+  const visibleTimeline = useMemo<ExpressionTimelineItem[]>(() => {
+    if (!normalizedSearch && !pinnedOnly) return fullTimeline;
+    return visibleMessages.map((message) => ({ kind: 'message' as const, id: `message:${message.id}`, at: message.sent_at, message }));
+  }, [fullTimeline, normalizedSearch, pinnedOnly, visibleMessages]);
 
   const beginReply = (message: RichChatMessage) => setReplyTo({ id: message.id, body: message.body, sender_profile_id: message.sender_profile_id, sender: message.sender, attachmentType: message.attachments?.[0]?.type ?? null });
   const jumpToMessage = (id: string) => {
     setPinnedOnly(false);
     setSearchQuery('');
-    const index = messages.findIndex((message) => message.id === id);
+    const index = fullTimeline.findIndex((item) => item.kind === 'message' && item.message.id === id);
     if (index >= 0) requestAnimationFrame(() => listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 }));
   };
   if (resource.loading && !resource.data) return <View style={[styles.center, { backgroundColor: colors.bg }]}><ActivityIndicator color={colors.interactive} /></View>;
@@ -210,7 +236,7 @@ export function ExpressionChatExperience({ expressionId }: { expressionId: strin
       {pinned.length && !pinnedOnly && !normalizedSearch ? <Pressable onPress={() => jumpToMessage(pinned[0].id)} style={[styles.pinned, { backgroundColor: colors.primarySoft }]}><Icon name="pin" size={14} color={colors.interactive} /><Text style={[styles.pinnedText, { color: colors.textSecondary }]} numberOfLines={1}>{pinned[0].body || 'Pinned media message'}</Text></Pressable> : null}
       <FlatList
         ref={listRef}
-        data={visibleMessages}
+        data={visibleTimeline}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.messages}
         keyboardShouldPersistTaps="always"
@@ -218,7 +244,9 @@ export function ExpressionChatExperience({ expressionId }: { expressionId: strin
         onContentSizeChange={() => { if (!normalizedSearch && !pinnedOnly) listRef.current?.scrollToEnd({ animated: true }); }}
         onScrollToIndexFailed={({ index, averageItemLength }) => listRef.current?.scrollToOffset({ offset: averageItemLength * index, animated: true })}
         ListEmptyComponent={<View style={styles.empty}><Icon name={normalizedSearch || pinnedOnly ? 'search-outline' : 'chatbubbles-outline'} size={30} color={colors.textMuted} /><Text style={[styles.emptyTitle, { color: colors.text }]}>{normalizedSearch || pinnedOnly ? 'No matching messages' : 'No messages yet'}</Text></View>}
-        renderItem={({ item }) => <RichMessageBubble message={item} mine={item.sender_profile_id === context?.profile?.id} showSender canPin={resource.data?.permissions.pinMessages === true} onReply={beginReply} onReact={(target, emoji) => void react(target, emoji)} onPin={(target, value) => void pin(target, value)} onJumpToMessage={jumpToMessage} />}
+        renderItem={({ item }) => item.kind === 'call'
+          ? <CallHistoryBubble entry={item.entry} viewerId={context?.profile?.id ?? ''} />
+          : <RichMessageBubble message={item.message} mine={item.message.sender_profile_id === context?.profile?.id} showSender canPin={resource.data?.permissions.pinMessages === true} onReply={beginReply} onReact={(target, emoji) => void react(target, emoji)} onPin={(target, value) => void pin(target, value)} onJumpToMessage={jumpToMessage} />}
       />
       {actionError ? <Text style={[styles.error, { color: colors.live }]} accessibilityRole="alert">{actionError}</Text> : null}
       <RichChatComposer endpoint="expression-chat" requestContext="current" scope={{ branchId: expressionId }} replyTo={replyTo} disabledReason={disabledReason} bottomInset={Math.max(insets.bottom, 10)} onCancelReply={() => setReplyTo(null)} onSend={send} />
