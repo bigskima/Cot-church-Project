@@ -4,8 +4,7 @@ import { adminClient } from "../_shared/supabase.ts";
 import { loadEffectiveFeatures } from "../_shared/feature-controls.ts";
 import { uuid } from "../_shared/validation.ts";
 
-Deno.serve(
-  createHandler(
+export const featureAccessHandler = createHandler(
     { methods: ["GET"], authentication: "optional", organization: "none" },
     async ({ request }) => {
       const url = new URL(request.url);
@@ -39,5 +38,4 @@ Deno.serve(
 
       return { data: { scope: state.scope, items } };
     },
-  ),
 );
