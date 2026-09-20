@@ -7,6 +7,7 @@ import { runAi } from "../_shared/ai/router.ts";
 import { aiProvider } from "../_shared/ai/registry.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { resolveSecretValue } from "../_shared/secrets.ts";
+import { assertFeatureEnabled } from "../_shared/feature-controls.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString, uuid } from "../_shared/validation.ts";
 
 const allowed = new Set(["assistant.answer", "sermon.summarize", "translate.text", "content.moderate", "pastoral.triage", "admin.insight"]);
@@ -231,6 +232,7 @@ Deno.serve(createHandler(
       const capability = url.searchParams.get("capability") ?? "assistant.answer";
       if (!allowed.has(capability)) throw new ApiError("AI_CAPABILITY_DENIED", "Capability is not available through this endpoint", 422);
       if (capability !== "assistant.answer") await authorize(auth, "ai.use");
+      else await assertFeatureEnabled(adminClient(), "cot_assistant", { organizationId: auth.organizationId, expressionId: auth.branchId ?? null }, "COT Assistant is currently unavailable in this area.");
       return { data: { capability, ...(await readiness(auth.organizationId, capability)) } };
     }
 
@@ -241,6 +243,7 @@ Deno.serve(createHandler(
 
     if (capability !== "assistant.answer") await authorize(auth, "ai.use");
     else {
+      await assertFeatureEnabled(adminClient(), "cot_assistant", { organizationId: auth.organizationId, expressionId: auth.branchId ?? null }, "COT Assistant is currently unavailable in this area.");
       const state = await readiness(auth.organizationId, capability);
       if (!state.ready) throw new ApiError("AI_ASSISTANT_NOT_READY", "The church assistant is not configured yet", 503, { reason: state.reason }, false);
     }
