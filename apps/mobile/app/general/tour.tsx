@@ -4,10 +4,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, ScreenHeader } from '@/components';
 import { TourAnchor, useAppTour } from '@/features/tour/AppTourProvider';
 import { radius, shadows, spacing } from '@/design-system/tokens';
+import { COT_MEMBER_GUIDE_URL } from '@/constants/guides';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
-
-const COT_USER_GUIDE_URL = 'https://docs.google.com/document/d/1UucR5xhl40vSqQSeeUA9HqpSkJWpmSazUn_AlWV024s/edit?usp=drivesdk';
 
 export default function AppTourSettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -48,15 +47,15 @@ export default function AppTourSettingsScreen() {
         {error ? <View style={[styles.errorCard, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}><Icon name="alert-circle-outline" size={16} color={colors.live} /><Text style={[styles.errorText, { color: colors.live }]}>{error}</Text></View> : null}
 
         <Pressable
-          onPress={() => void Linking.openURL(COT_USER_GUIDE_URL)}
+          onPress={() => void Linking.openURL(COT_MEMBER_GUIDE_URL)}
           accessibilityRole="link"
-          accessibilityLabel="Open the complete COT app user guide"
+          accessibilityLabel="Open the COT Member User Guide"
           style={({ pressed }) => [styles.guideCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}
         >
           <View style={[styles.cardIcon, { backgroundColor: colors.primarySoft }]}><Icon name="book-outline" size={21} color={colors.interactive} /></View>
           <View style={styles.flex}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>Read the complete COT guide</Text>
-            <Text style={[styles.cardCopy, { color: colors.textMuted }]}>If the guided tour is not enough, open the full user and ministry operations documentation.</Text>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>Read the COT Member Guide</Text>
+            <Text style={[styles.cardCopy, { color: colors.textMuted }]}>Open the complete member guide for General COT, Expressions, Groups, messages, media, prayer, giving, events and everyday participation.</Text>
           </View>
           <Icon name="open-outline" size={18} color={colors.interactive} />
         </Pressable>
