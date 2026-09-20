@@ -146,7 +146,7 @@ export function VideoCategorySettingsExperience() {
       <View style={styles.pad}>
         <EmptyState
           title="Category controls are restricted"
-          message="Church leadership permission is required to change Watch category labels, order, or visibility."
+          message="Only authorized church leaders can change Watch category names, order or visibility."
           iconName="lock-closed-outline"
         />
       </View>
