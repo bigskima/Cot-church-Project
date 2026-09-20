@@ -1,15 +1,24 @@
 import React, { Suspense } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { Redirect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TourAnchor } from '@/features/tour/AppTourProvider';
 import { spacing } from '@/design-system/tokens';
 import { useTheme } from '@/state/theme';
+import { useSession } from '@/state/session';
 
 const GeneralProfileExperience = React.lazy(() => import('@/features/general/GeneralProfileExperience'));
 
 export default function GeneralProfileRoute() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { mode } = useSession();
+
+  // The profile tab is an account destination. Visitors should never have to
+  // load the authenticated profile bundle just to reach sign-in.
+  if (mode === 'visitor') {
+    return <Redirect href={{ pathname: '/(auth)/login', params: { returnTo: '/general/profile' } } as any} />;
+  }
 
   return (
     <View style={styles.screen}>

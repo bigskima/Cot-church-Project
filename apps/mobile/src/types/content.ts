@@ -78,6 +78,15 @@ export type ContentItem = {
     username?: string | null;
     avatar_url?: string | null;
     banner_url?: string | null;
+    badges?: Array<{
+      id: string;
+      code: string;
+      label: string;
+      backgroundColor: string;
+      textColor: string;
+      priority: number;
+      badgeVariant?: string;
+    }>;
   } | null;
   expression?: {
     id?: string;

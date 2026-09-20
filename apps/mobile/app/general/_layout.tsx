@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Tabs, usePathname } from 'expo-router';
+import { router, Tabs, usePathname } from 'expo-router';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/primitives/Icon';
@@ -16,6 +16,7 @@ const PRIMARY_TAB_NAMES = ['index', 'explore', 'reels', 'chat', 'profile'] as co
 
 function PrimaryGeneralTabBar({ state, descriptors, navigation }: any) {
   const { colors } = useTheme();
+  const { mode } = useSession();
   const insets = useSafeAreaInsets();
   const bottomInset = Math.max(insets.bottom, Platform.OS === 'web' ? 9 : 7);
   const routes = state.routes.filter((route: any) => PRIMARY_TAB_NAMES.includes(route.name));
@@ -37,7 +38,12 @@ function PrimaryGeneralTabBar({ state, descriptors, navigation }: any) {
             accessibilityLabel={options.tabBarAccessibilityLabel ?? label}
             onPress={() => {
               const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-              if (!focused && !event.defaultPrevented) navigation.navigate(route.name, route.params);
+              if (event.defaultPrevented) return;
+              if (route.name === 'profile' && mode === 'visitor') {
+                router.push({ pathname: '/(auth)/login', params: { returnTo: '/general/profile' } } as any);
+                return;
+              }
+              if (!focused) navigation.navigate(route.name, route.params);
             }}
             onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })}
             style={({ pressed }) => [styles.customTabItem, pressed && styles.pressedTab]}

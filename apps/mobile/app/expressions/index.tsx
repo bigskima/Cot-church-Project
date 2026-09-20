@@ -38,7 +38,7 @@ export default function ExpressionsScreen() {
   if (mode === 'visitor') {
     return (
       <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
-        <ScreenHeader title="My Expressions" showBack />
+        <ScreenHeader title="My Expressions" showBack compact />
         <EmptyState title="Sign in to join an Expression" message="You can explore General COT without signing in. Sign in when you want to join or enter an Expression." iconName="lock-closed-outline" actionLabel="Sign In" onAction={() => router.push({ pathname: '/(auth)/login', params: { returnTo: '/expressions' } } as any)} />
       </View>
     );
@@ -106,15 +106,12 @@ export default function ExpressionsScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + spacing.xxl }]} keyboardShouldPersistTaps="handled">
-        <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
-          <ScreenHeader
-            title="Expressions"
-            kicker="YOUR SPACES"
-            subtitle="Enter a community you belong to, or join one with an invite code."
-            showBack
-            rightAction={canCreateExpression ? <Button label="Create" onPress={openExpressionCreation} size="sm" /> : undefined}
-          />
-        </View>
+        <ScreenHeader
+          title="Expressions"
+          showBack
+          compact
+          rightAction={canCreateExpression ? <Button label="Create" onPress={openExpressionCreation} size="sm" /> : undefined}
+        />
 
         {activeExpressionId ? (
           <View style={[styles.activeCard, { backgroundColor: colors.primarySoft, borderColor: colors.interactive }]}>
@@ -122,7 +119,6 @@ export default function ExpressionsScreen() {
               <Icon name="people" size={22} color={colors.interactive} />
               <View style={styles.flex}>
                 <Text style={[styles.cardTitle, { color: colors.text }]}>{context?.expression?.name}</Text>
-                <Text style={[styles.copy, { color: colors.textSecondary }]}>You’re currently inside this private community space.</Text>
               </View>
               <Badge label="ACTIVE" variant="active" />
             </View>
@@ -197,12 +193,11 @@ export default function ExpressionsScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  content: { paddingHorizontal: spacing.md, gap: spacing.xl },
+  content: { paddingHorizontal: spacing.md, gap: spacing.lg },
   section: { gap: spacing.sm },
   heading: { ...typography.h3 },
-  heroCard: { borderWidth: 1, borderRadius: radius.xxl, overflow: 'hidden' },
-  activeCard: { borderWidth: 1, borderRadius: radius.xxl, padding: spacing.lg, gap: spacing.md },
-  joinCard: { borderWidth: 1, borderRadius: radius.xxl, padding: spacing.lg, gap: spacing.md },
+  activeCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm },
+  joinCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm },
   membershipCard: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.md },
   expressionIcon: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },

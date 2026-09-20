@@ -29,7 +29,7 @@ import type { ChatAttachment, ChatReply, ChatSendPayload } from './rich-chat-typ
 type ChatEndpoint = 'chat' | 'group-chat' | 'expression-chat';
 type ChatScope = { conversationId?: string; groupId?: string; sectionId?: string | null; branchId?: string };
 type UploadIntent = ChatAttachment & { signedUploadUrl: string };
-type UploadableMedia = UploadFile & { durationSeconds?: number | null };
+type UploadableMedia = UploadFile & { durationSeconds?: number | null; width?: number | null; height?: number | null };
 
 const MAX_CHAT_MEDIA_BYTES = 100 * 1024 * 1024;
 const MAX_ATTACHMENTS = 4;
@@ -152,6 +152,8 @@ export function RichChatComposer({
         fileName: media.name,
         sizeBytes,
         durationSeconds: media.durationSeconds ?? undefined,
+        width: media.width ?? undefined,
+        height: media.height ?? undefined,
       })),
     });
     try {
@@ -199,6 +201,8 @@ export function RichChatComposer({
         size: asset.fileSize,
         file: (asset as any).file as Blob | undefined,
         durationSeconds: asset.type === 'video' && asset.duration ? Math.max(1, Math.round(asset.duration / 1000)) : null,
+        width: asset.width || null,
+        height: asset.height || null,
       })));
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to open your media library.');
@@ -220,6 +224,8 @@ export function RichChatComposer({
         size: asset.fileSize,
         file: (asset as any).file as Blob | undefined,
         durationSeconds: asset.type === 'video' && asset.duration ? Math.max(1, Math.round(asset.duration / 1000)) : null,
+        width: asset.width || null,
+        height: asset.height || null,
       }]);
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to open the camera.');

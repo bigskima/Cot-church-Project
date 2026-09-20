@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
-import { Image, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { Pressable, ScrollView, StyleProp, StyleSheet, Text, useWindowDimensions, View, ViewStyle } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useTheme } from '@/state/theme';
 import { radius, shadows, spacing } from '@/design-system/tokens';
@@ -9,6 +9,7 @@ import { Avatar } from '../primitives/Avatar';
 import { Icon } from '../primitives/Icon';
 import { AudioPlayer } from '../media/AudioPlayer';
 import { VideoPlayer } from '../media/VideoPlayer';
+import { AdaptiveMediaImage } from '../media/AdaptiveMediaImage';
 import { MediaPreviewModal, type PreviewableMedia } from '../media/MediaPreviewModal';
 import { ContentReportSheet } from '../engagement/ContentReportSheet';
 import { InlineCommentsSheet } from '../engagement/InlineCommentsSheet';
@@ -86,6 +87,23 @@ function mediaMime(media: MediaAsset) {
   return item.mimeType || item.mime_type || null;
 }
 
+function mediaAspectRatio(media: MediaAsset) {
+  if (typeof media.width === 'number' && typeof media.height === 'number' && media.width > 0 && media.height > 0) {
+    return media.width / media.height;
+  }
+  if (typeof media.aspect_ratio === 'string') {
+    const match = media.aspect_ratio.trim().match(/^(\d+(?:\.\d+)?)\s*[:/]\s*(\d+(?:\.\d+)?)$/);
+    if (match) {
+      const width = Number(match[1]);
+      const height = Number(match[2]);
+      if (width > 0 && height > 0) return width / height;
+    }
+    const numeric = Number(media.aspect_ratio);
+    if (Number.isFinite(numeric) && numeric > 0) return numeric;
+  }
+  return undefined;
+}
+
 export function PostCard({
   post,
   authorName,
@@ -108,6 +126,7 @@ export function PostCard({
   showContext,
 }: PostCardProps) {
   const { colors } = useTheme();
+  const { width: windowWidth } = useWindowDimensions();
   const postAsAny = post as any;
   const author = postAsAny.author ?? {};
   const expressionLabel = expressionName || postAsAny.expression?.name || undefined;
@@ -121,10 +140,14 @@ export function PostCard({
   const avatarUrl = authorAvatar || author.avatarUrl || author.avatar_url || postAsAny.author_avatar;
   const isVerified = author.isVerified || author.is_verified || postAsAny.is_verified || false;
   const badges: PublicIdentityBadge[] = Array.isArray(author.badges) ? author.badges : [];
+  const openAuthor = onPressAuthor ?? (handle
+    ? () => router.push({ pathname: '/general/member/[username]', params: { username: handle } } as any)
+    : undefined);
 
   const media = Array.isArray(post.media)
     ? post.media.filter((item) => Boolean(item?.url) || mediaKind(item) === 'reel_reference')
     : [];
+  const mediaCardWidth = Math.min(Math.max(windowWidth - 44, 280), 760);
 
   const [hasLiked, setHasLiked] = useState(Boolean(postAsAny.viewer_reaction));
   const [likeCount, setLikeCount] = useState(postAsAny.likes_count ?? (post.social_reactions?.length || 0));
@@ -223,12 +246,12 @@ export function PostCard({
 
   const identityHeader = (
     <View style={styles.headerRow}>
-      <Pressable onPress={onPressAuthor || onPress} hitSlop={4}>
+      <Pressable onPress={openAuthor || onPress} hitSlop={4}>
         <Avatar name={displayName} url={avatarUrl} size="md" />
       </Pressable>
       <View style={styles.identityColumn}>
         <View style={styles.authorLine}>
-          <Pressable onPress={onPressAuthor || onPress} style={styles.nameGroup}>
+          <Pressable onPress={openAuthor || onPress} style={styles.nameGroup}>
             <Text style={[styles.displayName, { color: colors.text }]} numberOfLines={1}>{displayName}</Text>
             {badges[0] ? <CompactIdentityBadge badge={badges[0]} size={17} /> : null}
             {isVerified ? <Icon name="checkmark-circle" size={15} color={colors.interactive} /> : null}
@@ -332,24 +355,152 @@ export function PostCard({
 
         {media.length ? (
           <View style={styles.mediaList}>
-            {media.map((item, index) => {
-              const kind = mediaKind(item);
-              const key = item.id || (item as any).uploadId || `${kind || 'media'}-${index}-${item.url}`;
-              if (kind === 'reel_reference') {
-                const reference = item as MediaAsset & { reelId?: string; caption?: string | null };
-                return <Pressable key={key} onPress={() => { if (!reference.reelId) return; router.push((isExpressionPost && postExpressionId ? { pathname: `/expressions/${postExpressionId}/reels`, params: { reelId: reference.reelId } } : { pathname: '/general/reels', params: { reelId: reference.reelId } }) as any); }} style={({ pressed }) => [styles.reelReference, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed ? { opacity: 0.88 } : null]} accessibilityRole="button" accessibilityLabel="Open shared Reel"><View style={[styles.reelReferenceIcon, { backgroundColor: colors.primarySoft }]}><Icon name="flash-outline" size={22} color={colors.interactive} /></View><View style={styles.reelReferenceCopy}><Text style={[styles.reelReferenceKicker, { color: colors.interactive }]}>SHARED REEL</Text><Text style={[styles.reelReferenceTitle, { color: colors.text }]} numberOfLines={2}>{reference.caption?.trim() || 'Open this Reel'}</Text><Text style={[styles.reelReferenceMeta, { color: colors.textMuted }]}>Tap to watch the original Reel</Text></View><Icon name="chevron-forward" size={18} color={colors.textMuted} /></Pressable>;
-              }
-              if (kind === 'video') {
-                return <View key={key} style={[styles.richMediaFrame, { borderColor: colors.borderSubtle }]}><VideoPlayer title={mediaTitle(item, 'Video')} sourceUrl={item.url} posterUrl={item.thumbnailUrl} durationSeconds={item.duration_seconds} /><Pressable onPress={(event) => { event.stopPropagation(); setPreview({ url: item.url!, type: 'video', title: mediaTitle(item, 'Video'), posterUrl: item.thumbnailUrl, durationSeconds: item.duration_seconds }); }} style={styles.expandButton} accessibilityLabel="Open video full screen"><Icon name="expand-outline" size={19} color="#FFFFFF" /></Pressable></View>;
-              }
-              if (kind === 'audio') {
-                return <View key={key} style={styles.audioWrap}><AudioPlayer title={mediaTitle(item, 'Audio')} speaker={displayName} sourceUrl={item.url} durationSeconds={item.duration_seconds} style={styles.audioPlayer} /><Pressable onPress={(event) => { event.stopPropagation(); setPreview({ url: item.url!, type: 'audio', title: mediaTitle(item, 'Audio'), durationSeconds: item.duration_seconds }); }} style={[styles.audioExpand, { backgroundColor: colors.primarySoft }]} accessibilityLabel="Open audio preview"><Icon name="expand-outline" size={17} color={colors.interactive} /></Pressable></View>;
-              }
-              if (kind === 'document' || kind === 'file') {
-                return <Pressable key={key} onPress={(event) => { event.stopPropagation(); setPreview({ url: item.url!, type: 'document', title: mediaTitle(item, 'Attachment'), mimeType: mediaMime(item) || undefined }); }} style={[styles.fileCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]} accessibilityRole="button" accessibilityLabel="Open attached file"><View style={[styles.fileIcon, { backgroundColor: colors.primarySoft }]}><Icon name="document-text-outline" size={22} color={colors.interactive} /></View><View style={styles.fileCopy}><Text numberOfLines={1} style={[styles.fileTitle, { color: colors.text }]}>Attachment</Text><Text style={[styles.fileHint, { color: colors.textMuted }]}>Preview or download attachment</Text></View><Icon name="expand-outline" size={18} color={colors.interactive} /></Pressable>;
-              }
-              return <Pressable key={key} onPress={(event) => { event.stopPropagation(); setPreview({ url: item.url!, type: 'image', title: mediaTitle(item, 'Photo') }); }} style={[styles.mediaFrame, { backgroundColor: colors.bgSecondary }]} accessibilityRole="button" accessibilityLabel="View full image"><Image source={{ uri: item.url! }} style={styles.mediaImage} resizeMode="cover" accessibilityLabel={item.alt || 'Community post image'} /><View style={styles.expandButton}><Icon name="expand-outline" size={19} color="#FFFFFF" /></View></Pressable>;
-            })}
+            <ScrollView
+              horizontal={media.length > 1}
+              scrollEnabled={media.length > 1}
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={media.length > 1 ? mediaCardWidth + 8 : undefined}
+              decelerationRate={media.length > 1 ? 'fast' : 'normal'}
+              contentContainerStyle={media.length > 1 ? styles.mediaRail : styles.singleMediaRail}
+            >
+              {media.map((item, index) => {
+                const kind = mediaKind(item);
+                const key = item.id || (item as any).uploadId || `${kind || 'media'}-${index}-${item.url}`;
+                const itemStyle = media.length > 1 ? { width: mediaCardWidth } : styles.singleMediaItem;
+                const ratio = mediaAspectRatio(item);
+
+                if (kind === 'reel_reference') {
+                  const reference = item as MediaAsset & { reelId?: string; caption?: string | null };
+                  return (
+                    <View key={key} style={itemStyle}>
+                      <Pressable
+                        onPress={(event) => {
+                          event.stopPropagation?.();
+                          if (!reference.reelId) return;
+                          router.push((isExpressionPost && postExpressionId
+                            ? { pathname: `/expressions/${postExpressionId}/reels`, params: { reelId: reference.reelId } }
+                            : { pathname: '/general/reels', params: { reelId: reference.reelId } }) as any);
+                        }}
+                        style={({ pressed }) => [styles.reelReference, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed ? { opacity: 0.88 } : null]}
+                        accessibilityRole="button"
+                        accessibilityLabel="Open shared Reel"
+                      >
+                        <View style={[styles.reelReferenceIcon, { backgroundColor: colors.primarySoft }]}><Icon name="flash-outline" size={22} color={colors.interactive} /></View>
+                        <View style={styles.reelReferenceCopy}>
+                          <Text style={[styles.reelReferenceKicker, { color: colors.interactive }]}>REEL</Text>
+                          <Text style={[styles.reelReferenceTitle, { color: colors.text }]} numberOfLines={2}>{reference.caption?.trim() || 'Open Reel'}</Text>
+                        </View>
+                        <Icon name="chevron-forward" size={18} color={colors.textMuted} />
+                      </Pressable>
+                    </View>
+                  );
+                }
+
+                if (kind === 'video') {
+                  return (
+                    <View key={key} style={[itemStyle, styles.richMediaFrame, { borderColor: colors.borderSubtle }]}>
+                      <VideoPlayer
+                        title={mediaTitle(item, 'Video')}
+                        sourceUrl={item.url}
+                        posterUrl={item.thumbnailUrl}
+                        durationSeconds={item.duration_seconds}
+                        aspectRatio={ratio}
+                      />
+                      <Pressable
+                        onPress={(event) => {
+                          event.stopPropagation?.();
+                          setPreview({
+                            url: item.url!,
+                            type: 'video',
+                            title: mediaTitle(item, 'Video'),
+                            posterUrl: item.thumbnailUrl,
+                            durationSeconds: item.duration_seconds,
+                            width: item.width,
+                            height: item.height,
+                            aspectRatio: ratio,
+                          });
+                        }}
+                        style={styles.expandButton}
+                        accessibilityLabel="Open video full screen"
+                      >
+                        <Icon name="expand-outline" size={19} color="#FFFFFF" />
+                      </Pressable>
+                    </View>
+                  );
+                }
+
+                if (kind === 'audio') {
+                  return (
+                    <View key={key} style={[itemStyle, styles.audioWrap]}>
+                      <AudioPlayer title={mediaTitle(item, 'Audio')} speaker={displayName} sourceUrl={item.url} durationSeconds={item.duration_seconds} style={styles.audioPlayer} />
+                      <Pressable
+                        onPress={(event) => {
+                          event.stopPropagation?.();
+                          setPreview({ url: item.url!, type: 'audio', title: mediaTitle(item, 'Audio'), durationSeconds: item.duration_seconds });
+                        }}
+                        style={[styles.audioExpand, { backgroundColor: colors.primarySoft }]}
+                        accessibilityLabel="Open audio preview"
+                      >
+                        <Icon name="expand-outline" size={17} color={colors.interactive} />
+                      </Pressable>
+                    </View>
+                  );
+                }
+
+                if (kind === 'document' || kind === 'file') {
+                  return (
+                    <View key={key} style={itemStyle}>
+                      <Pressable
+                        onPress={(event) => {
+                          event.stopPropagation?.();
+                          setPreview({ url: item.url!, type: 'document', title: mediaTitle(item, 'Attachment'), mimeType: mediaMime(item) || undefined });
+                        }}
+                        style={[styles.fileCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}
+                        accessibilityRole="button"
+                        accessibilityLabel="Open attached file"
+                      >
+                        <View style={[styles.fileIcon, { backgroundColor: colors.primarySoft }]}><Icon name="document-text-outline" size={22} color={colors.interactive} /></View>
+                        <View style={styles.fileCopy}><Text numberOfLines={1} style={[styles.fileTitle, { color: colors.text }]}>File</Text></View>
+                        <Icon name="expand-outline" size={18} color={colors.interactive} />
+                      </Pressable>
+                    </View>
+                  );
+                }
+
+                return (
+                  <Pressable
+                    key={key}
+                    onPress={(event) => {
+                      event.stopPropagation?.();
+                      setPreview({
+                        url: item.url!,
+                        type: 'image',
+                        title: mediaTitle(item, 'Photo'),
+                        width: item.width,
+                        height: item.height,
+                        aspectRatio: ratio,
+                      });
+                    }}
+                    style={[itemStyle, styles.mediaFrame, { backgroundColor: colors.bgSecondary }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="View full image"
+                  >
+                    <AdaptiveMediaImage
+                      url={item.url!}
+                      alt={item.alt || 'Community post image'}
+                      widthHint={item.width}
+                      heightHint={item.height}
+                      aspectRatioHint={ratio}
+                      resizeMode="contain"
+                      style={styles.mediaImage}
+                      backgroundColor={colors.bgSecondary}
+                    />
+                    <View style={styles.expandButton}><Icon name="expand-outline" size={19} color="#FFFFFF" /></View>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            {media.length > 1 ? <Text style={[styles.mediaCount, { color: colors.textMuted }]}>{media.length} media</Text> : null}
           </View>
         ) : null}
 
@@ -373,9 +524,9 @@ export function PostCard({
 }
 
 const styles = StyleSheet.create({
-  container: { marginHorizontal: spacing.md, marginVertical: spacing.sm, padding: spacing.lg, borderWidth: 1, borderRadius: radius.card },
-  feedContainer: { marginHorizontal: 0, marginTop: 7, paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.sm, borderRadius: radius.xxl },
-  detachedIdentity: { paddingHorizontal: 2, gap: 6 },
+  container: { marginHorizontal: spacing.sm, marginVertical: spacing.xs, padding: spacing.md, borderWidth: 1, borderRadius: radius.card },
+  feedContainer: { marginHorizontal: 0, marginTop: 0, paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: spacing.sm, borderRadius: 0, borderLeftWidth: 0, borderRightWidth: 0 },
+  detachedIdentity: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, gap: 5 },
   publicCard: { ...shadows.sm },
   expressionCard: { ...shadows.md },
   contextRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginTop: 2, marginBottom: 2 },
@@ -399,9 +550,13 @@ const styles = StyleSheet.create({
   feedBodyText: { fontSize: 16, lineHeight: 25, marginTop: 0, letterSpacing: -0.12 },
   showMoreButton: { alignSelf: 'flex-start', minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 4, paddingRight: 6 },
   showMoreText: { fontSize: 11.5, lineHeight: 16, fontWeight: '900' },
-  mediaList: { gap: spacing.sm, marginTop: spacing.md, marginHorizontal: -4 },
-  mediaFrame: { width: '100%', aspectRatio: 16 / 10, borderRadius: radius.xl, overflow: 'hidden' },
-  mediaImage: { width: '100%', height: '100%' },
+  mediaList: { marginTop: spacing.md, marginHorizontal: -4, gap: 5 },
+  mediaRail: { gap: 8, paddingRight: spacing.md },
+  singleMediaRail: { width: '100%' },
+  singleMediaItem: { width: '100%' },
+  mediaFrame: { borderRadius: radius.xl, overflow: 'hidden' },
+  mediaImage: { width: '100%', borderRadius: radius.xl },
+  mediaCount: { alignSelf: 'flex-end', fontSize: 9.5, fontWeight: '700', paddingRight: 2 },
   richMediaFrame: { width: '100%', overflow: 'hidden', borderRadius: radius.xl, borderWidth: 1, position: 'relative' },
   expandButton: { position: 'absolute', right: 8, top: 8, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.62)' },
   audioWrap: { position: 'relative' },
@@ -411,13 +566,11 @@ const styles = StyleSheet.create({
   fileIcon: { width: 42, height: 42, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
   fileCopy: { flex: 1, minWidth: 0 },
   fileTitle: { fontSize: 13, fontWeight: '800' },
-  fileHint: { fontSize: 10, marginTop: 3 },
   reelReference: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md },
   reelReferenceIcon: { width: 44, height: 44, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
   reelReferenceCopy: { flex: 1, minWidth: 0 },
   reelReferenceKicker: { fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
   reelReferenceTitle: { fontSize: 14, lineHeight: 19, fontWeight: '800', marginTop: 2 },
-  reelReferenceMeta: { fontSize: 10, marginTop: 3 },
   actionRail: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, minHeight: 46 },
   actionGroup: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   guestGroup: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 },

@@ -27,10 +27,7 @@ export function ExpressionManagementGate({
     return (
       <View style={[styles.state, { backgroundColor: colors.bg }]}>
         <ActivityIndicator size="large" color={colors.interactive} />
-        <Text style={[styles.title, { color: colors.text }]}>Checking your ministry tools</Text>
-        <Text style={[styles.copy, { color: colors.textSecondary }]}>
-          Making sure this tool is available for you in this Expression.
-        </Text>
+        <Text style={[styles.title, { color: colors.text }]}>Loading tools</Text>
       </View>
     );
   }
@@ -57,7 +54,7 @@ export function ExpressionManagementGate({
 const styles = StyleSheet.create({
   state: {
     flex: 1,
-    minHeight: 360,
+    minHeight: 240,
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.xl,

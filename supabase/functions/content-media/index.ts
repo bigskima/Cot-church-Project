@@ -176,7 +176,7 @@ Deno.serve(createHandler(
       const durationSeconds = typeof body.durationSeconds === "number" && Number.isFinite(body.durationSeconds) && body.durationSeconds >= 0
         ? Math.round(body.durationSeconds)
         : null;
-      const aspectRatio = optionalString(body.aspectRatio, "aspectRatio", 20) ?? (mediaType === "video" ? "9:16" : null);
+      const aspectRatio = optionalString(body.aspectRatio, "aspectRatio", 20) ?? null;
       const assetId = crypto.randomUUID();
       const storagePath = `orgs/${organizationId}/content/${auth.user.id}/${assetId}.${mime.ext}`;
 

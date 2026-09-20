@@ -28,11 +28,11 @@ import { useResource } from '@/hooks/use-resource';
 import {
   Avatar,
   BottomSheet,
-  BrandMark,
   EmptyState,
   Icon,
   PostCard,
   ResourceError,
+  ScreenHeader,
   Skeleton,
 } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
@@ -58,6 +58,8 @@ type MediaAttachment = {
   fileName?: string | null;
   sizeBytes: number;
   durationSeconds?: number | null;
+  width?: number | null;
+  height?: number | null;
 };
 type UploadIntent = {
   uploadId: string;
@@ -73,6 +75,8 @@ type UploadableMedia = {
   mimeType: string;
   reportedSize?: number | null;
   durationSeconds?: number | null;
+  width?: number | null;
+  height?: number | null;
   webFile?: Blob | null;
 };
 
@@ -111,7 +115,6 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
 
   const [activeTab, setActiveTab] = useState<FeedScope>(scope);
   const [composerOpen, setComposerOpen] = useState(false);
-  const [shareMenuOpen, setShareMenuOpen] = useState(false);
   const [postText, setPostText] = useState('');
   const [postDestination, setPostDestination] = useState<FeedScope>(scope);
   const [attachments, setAttachments] = useState<MediaAttachment[]>([]);
@@ -132,14 +135,15 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
 
 
   useEffect(() => {
-    if (scope !== 'general' || mode !== 'authenticated' || !compose) return;
-    const key = `${compose}:${intentId ?? 'direct'}`;
+    if (mode !== 'authenticated' || !compose) return;
+    if (scope === 'expression' && !expression?.id) return;
+    const key = `${scope}:${compose}:${intentId ?? 'direct'}`;
     if (handledComposeIntent.current === key) return;
     handledComposeIntent.current = key;
-    setPostDestination('general');
+    setPostDestination(scope);
     setPostError('');
     setComposerOpen(true);
-  }, [compose, intentId, mode, scope]);
+  }, [compose, expression?.id, intentId, mode, scope]);
 
   const feedKey = `mobile:community:${activeTab}:${organizationId || 'auto'}:${activeTab === 'expression' ? expression?.id ?? 'none' : 'general'}:${mode}`;
   const resource = useResource<CommunityPost[]>(feedKey, (signal) => {
@@ -308,6 +312,8 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
         sizeBytes,
         branchId,
         durationSeconds: media.durationSeconds ?? undefined,
+        width: media.width ?? undefined,
+        height: media.height ?? undefined,
       }),
     });
 
@@ -371,6 +377,8 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
         mimeType: inferImagePickerMime(asset),
         reportedSize: asset.fileSize,
         durationSeconds: asset.type === 'video' && asset.duration ? Math.max(1, Math.round(asset.duration / 1000)) : null,
+        width: asset.width || null,
+        height: asset.height || null,
         webFile: ((asset as any).file as Blob | undefined) ?? null,
       })));
     } catch (error) {
@@ -499,52 +507,14 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       {!embedded ? (
-        <View
-          style={[
-            styles.headerBar,
-            {
-              paddingTop: insets.top + spacing.sm,
-              backgroundColor: colors.glass,
-              borderColor: colors.borderSubtle,
-            },
-            shadows.sm,
-          ]}
-        >
-          <View pointerEvents="none" style={[styles.headerGlow, { backgroundColor: colors.primarySoft }]} />
-          <View style={styles.headerIdentity}>
-            <View style={[styles.headerBrandShell, { backgroundColor: colors.cardElevated, borderColor: colors.borderSubtle }]}>
-              <BrandMark variant="header" size={31} />
-            </View>
-            <View style={styles.headerCopy}>
-              <Text style={[styles.headerEyebrow, { color: colors.textMuted }]}>CITY OF TRANSFORMATION</Text>
-              <Text style={[styles.headerTitle, { color: colors.text }]}>{scope === 'general' ? 'Public Community' : 'Community'}</Text>
-              <View style={[styles.headerScopePill, { backgroundColor: colors.primarySoft }]}>
-                <Icon name={expression?.id ? 'people-outline' : 'globe-outline'} size={11} color={colors.interactive} />
-                <Text style={[styles.headerScopeText, { color: colors.interactive }]} numberOfLines={1}>
-                  {expression?.name || 'General COT · Public'}
-                </Text>
-              </View>
-            </View>
-          </View>
-          {expression?.id ? (
-            <Pressable
-              onPress={() => expression?.id ? router.push(`/expressions/${expression.id}/leadership` as any) : undefined}
-              hitSlop={8}
-              style={({ pressed }) => [
-                styles.headerIconBtn,
-                { backgroundColor: colors.cardElevated, borderColor: colors.borderSubtle },
-                pressed && styles.composerPressed,
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel={`${expression.name} leadership`}
-            >
-              <Icon name="people-outline" size={18} color={colors.text} />
-            </Pressable>
-          ) : null}
+        <View style={{ paddingTop: insets.top }}>
+          <ScreenHeader
+            title={scope === 'general' ? 'Community' : expression?.name || 'Community'}
+            compact
+          />
         </View>
-  
-  
       ) : null}
+
 
       {interactionError ? (
         <Pressable
@@ -559,57 +529,6 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
         </Pressable>
       ) : null}
 
-      {canPostCurrent ? (
-        <View style={[styles.composerSurface, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
-          <View style={styles.composerStrip}>
-            <Avatar url={context?.profile?.avatar_url} name={context?.profile?.display_name || 'Me'} size="sm" />
-            <Pressable onPress={openComposer} style={({ pressed }) => [styles.composerCopy, pressed && styles.composerPressed]}>
-              <Text style={[styles.composerPrompt, { color: colors.text }]}>
-                {activeTab === 'general' ? 'Share to General COT' : `Share inside ${expression?.name ?? 'this Expression'}`}
-              </Text>
-              <Text style={[styles.composerPlaceholder, { color: colors.textMuted }]}>Start a post</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setShareMenuOpen((value) => !value)}
-              accessibilityRole="button"
-              accessibilityState={{ expanded: shareMenuOpen }}
-              accessibilityLabel={shareMenuOpen ? 'Close sharing options' : 'Open sharing options'}
-              style={({ pressed }) => [
-                styles.composeActionIcon,
-                { backgroundColor: shareMenuOpen ? colors.interactive : colors.primarySoft },
-                pressed && styles.composerPressed,
-              ]}
-            >
-              <Icon name={shareMenuOpen ? 'close' : 'add'} size={20} color={shareMenuOpen ? '#FFFFFF' : colors.interactive} />
-            </Pressable>
-          </View>
-
-          {shareMenuOpen ? (
-            <View style={[styles.quickCreateRow, { borderTopColor: colors.borderSubtle }]}>
-              <Pressable onPress={() => { setShareMenuOpen(false); openComposer(); }} style={({ pressed }) => [styles.quickCreateButton, pressed && styles.composerPressed]}>
-                <Icon name="chatbubble-ellipses-outline" size={15} color={colors.interactive} />
-                <Text style={[styles.quickCreateText, { color: colors.textSecondary }]}>Post</Text>
-              </Pressable>
-              <Pressable onPress={() => { setShareMenuOpen(false); openComposer(); }} style={({ pressed }) => [styles.quickCreateButton, pressed && styles.composerPressed]}>
-                <Icon name="images-outline" size={15} color={colors.interactive} />
-                <Text style={[styles.quickCreateText, { color: colors.textSecondary }]}>Media</Text>
-              </Pressable>
-              {activeTab === 'general' ? (
-                <Pressable onPress={() => { setShareMenuOpen(false); openComposer(); }} style={({ pressed }) => [styles.quickCreateButton, pressed && styles.composerPressed]}>
-                  <Icon name="mic-outline" size={15} color={colors.interactive} />
-                  <Text style={[styles.quickCreateText, { color: colors.textSecondary }]}>Voice</Text>
-                </Pressable>
-              ) : null}
-              {canCreateReel ? (
-                <Pressable onPress={() => { setShareMenuOpen(false); router.push((scope === 'expression' && expression?.id ? `/expressions/${expression.id}/manage/reel` : '/general/studio/reel') as any); }} style={({ pressed }) => [styles.quickCreateButton, pressed && styles.composerPressed]}>
-                  <Icon name="flash-outline" size={15} color={colors.interactive} />
-                  <Text style={[styles.quickCreateText, { color: colors.textSecondary }]}>Reel</Text>
-                </Pressable>
-              ) : null}
-            </View>
-          ) : null}
-        </View>
-      ) : null}
 
       {resource.loading && !resource.data ? (
         <View style={styles.loadingContainer}><Skeleton height={100} count={4} /></View>
@@ -649,6 +568,24 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
           iconName="chatbubbles-outline"
         />
       )}
+
+      {canPostCurrent ? (
+        <Pressable
+          onPress={openComposer}
+          accessibilityRole="button"
+          accessibilityLabel="Create"
+          style={({ pressed }) => [
+            styles.createFab,
+            {
+              bottom: embedded ? Math.max(insets.bottom + 16, 22) : insets.bottom + 92,
+              backgroundColor: colors.interactive,
+            },
+            pressed && styles.createFabPressed,
+          ]}
+        >
+          <Icon name="add" size={28} color="#FFFFFF" />
+        </Pressable>
+      ) : null}
 
       <BottomSheet
         visible={composerOpen}
@@ -847,35 +784,18 @@ export default function GeneralCommunityExperience() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  headerBar: { position: 'relative', overflow: 'hidden', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: spacing.md, marginTop: spacing.xs, paddingHorizontal: spacing.md, paddingBottom: spacing.md, borderWidth: 1, borderRadius: radius.xxl },
-  headerGlow: { position: 'absolute', width: 132, height: 132, borderRadius: 66, right: -48, top: -72, opacity: 0.72 },
-  headerIdentity: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1, minWidth: 0 },
-  headerBrandShell: { width: 46, height: 46, borderRadius: radius.lg, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  headerCopy: { flex: 1, minWidth: 0, alignItems: 'flex-start' },
-  headerEyebrow: { fontSize: 8, lineHeight: 11, fontWeight: '800', letterSpacing: 0.8 },
-  headerTitle: { fontSize: 19, lineHeight: 23, fontWeight: '800', letterSpacing: -0.5, marginTop: 1 },
-  headerScopePill: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3, maxWidth: 190 },
-  headerScopeText: { fontSize: 10, fontWeight: '700', flexShrink: 1 },
   headerSubtitle: { fontSize: 11, lineHeight: 15, marginTop: 1 },
-  headerIconBtn: { width: 38, height: 38, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   tabBar: { flexDirection: 'row', marginHorizontal: spacing.md, marginTop: spacing.sm, padding: 4, borderWidth: 1, borderRadius: radius.pill },
   tabItem: { flex: 1, alignItems: 'center', paddingVertical: 9, paddingHorizontal: spacing.sm, borderRadius: radius.pill },
   tabText: { fontSize: 14, fontWeight: '600' },
   tabTextActive: { fontWeight: '800' },
   feedError: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginHorizontal: spacing.md, marginTop: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderRadius: radius.lg },
   feedErrorText: { flex: 1, fontSize: 12, lineHeight: 17, fontWeight: '700' },
-  composerSurface: { marginHorizontal: spacing.sm, marginVertical: spacing.sm, borderWidth: 1, borderRadius: radius.xl, overflow: 'hidden' },
-  composerStrip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.sm, paddingVertical: 9, gap: spacing.sm },
-  composeActionIcon: { width: 38, height: 38, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  quickCreateRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.sm, paddingVertical: 7, borderTopWidth: StyleSheet.hairlineWidth, gap: 2 },
-  quickCreateButton: { flex: 1, minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: radius.pill, paddingHorizontal: spacing.xs },
-  quickCreateText: { fontSize: 10.5, fontWeight: '700' },
   composerPressed: { opacity: 0.88, transform: [{ scale: 0.992 }] },
-  composerCopy: { flex: 1, minWidth: 0 },
-  composerPrompt: { fontSize: 13, fontWeight: '800', letterSpacing: -0.15 },
-  composerPlaceholder: { fontSize: 10, marginTop: 1 },
+  createFab: { position: 'absolute', right: 18, zIndex: 40, width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', ...shadows.floating },
+  createFabPressed: { opacity: 0.82, transform: [{ scale: 0.95 }] },
   loadingContainer: { padding: spacing.lg, gap: spacing.md },
-  feedPostCard: { marginHorizontal: spacing.sm, borderRadius: radius.xl },
+  feedPostCard: { marginHorizontal: 0, borderRadius: 0 },
   composerBody: { gap: spacing.md },
   destinationBlock: { gap: spacing.xs },
   destinationLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },

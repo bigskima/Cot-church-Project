@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { router } from 'expo-router';
 import { useTheme } from '@/state/theme';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import type { ContentComment } from '@/types/content';
@@ -134,14 +135,28 @@ export function CommentsThread({
           },
         ]}
       >
-        <Avatar url={identity.avatarUrl} name={identity.displayName} size="sm" />
+        <Pressable
+          onPress={identity.username ? () => router.push({ pathname: '/general/member/[username]', params: { username: identity.username } } as any) : undefined}
+          disabled={!identity.username}
+          hitSlop={5}
+          accessibilityRole={identity.username ? 'link' : undefined}
+          accessibilityLabel={identity.username ? `Open ${identity.displayName} profile` : undefined}
+        >
+          <Avatar url={identity.avatarUrl} name={identity.displayName} size="sm" />
+        </Pressable>
         <View style={styles.commentBody}>
           <View style={styles.commentMeta}>
-            <View style={styles.identityLine}>
+            <Pressable
+              onPress={identity.username ? () => router.push({ pathname: '/general/member/[username]', params: { username: identity.username } } as any) : undefined}
+              disabled={!identity.username}
+              style={styles.identityLine}
+              accessibilityRole={identity.username ? 'link' : undefined}
+              accessibilityLabel={identity.username ? `Open ${identity.displayName} profile` : undefined}
+            >
               <Text style={[styles.authorName, { color: colors.text }]} numberOfLines={1}>{identity.displayName}</Text>
               {identity.badges[0] ? <CompactIdentityBadge badge={identity.badges[0]} size={15} /> : null}
               {identity.username ? <Text style={[styles.username, { color: colors.textMuted }]} numberOfLines={1}>@{identity.username}</Text> : null}
-            </View>
+            </Pressable>
             <Text style={[styles.time, { color: colors.textMuted }]}>{commentTime(item.created_at)}</Text>
           </View>
 

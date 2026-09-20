@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { router, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Icon } from '@/components';
+import { Icon, WorkspaceTopBar } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 import { useSession } from '@/state/session';
@@ -93,7 +93,7 @@ function ExpressionNavigation({ expressionId, onNavigate }: { expressionId: stri
   const communityItems = useMemo<NavItem[]>(
     () => [
       { key: 'discussion', label: 'General discussion', icon: 'chatbubble-ellipses-outline', active: pathname === `${basePath}/chat`, onPress: () => router.push(`${basePath}/chat` as any) },
-      { key: 'feed', label: 'Expression feed', icon: 'chatbubbles-outline', active: pathname === `${basePath}/feed`, onPress: () => router.push(`${basePath}/feed` as any) },
+      { key: 'feed', label: 'Feed', icon: 'chatbubbles-outline', active: pathname === `${basePath}/feed`, onPress: () => router.push(`${basePath}/feed` as any) },
       { key: 'prayer', label: 'Prayer', icon: 'heart-outline', active: pathname === `${basePath}/prayer`, onPress: () => router.push(`${basePath}/prayer` as any) },
       { key: 'testimonies', label: 'Testimonies', icon: 'sparkles-outline', active: pathname === `${basePath}/testimonies`, onPress: () => router.push(`${basePath}/testimonies` as any) },
       { key: 'events', label: 'Events', icon: 'calendar-outline', active: pathname === `${basePath}/events`, onPress: () => router.push(`${basePath}/events` as any) },
@@ -239,7 +239,7 @@ export function ExpressionShell({ expressionId, children }: Props) {
 
   return (
     <View style={[styles.mobileRoot, { backgroundColor: colors.bg }]}>
-      <View style={[styles.mobileHeader, { paddingTop: insets.top + spacing.xs, backgroundColor: colors.glass, borderColor: colors.borderSubtle }, shadows.sm]}>
+      <WorkspaceTopBar style={[styles.mobileHeader, { paddingTop: insets.top + spacing.xs }]}>
         <Pressable onPress={() => setDrawerOpen(true)} accessibilityRole="button" accessibilityLabel="Open Expression navigation" style={({ pressed }) => [styles.headerButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed ? styles.pressed : null]}>
           <Icon name="menu" size={21} color={colors.text} />
         </Pressable>
@@ -248,12 +248,11 @@ export function ExpressionShell({ expressionId, children }: Props) {
         </View>
         <View style={styles.headerCopy}>
           <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>{expressionName}</Text>
-          <View style={styles.headerMetaRow}><Icon name="people-outline" size={12} color={colors.interactive} /><Text style={[styles.headerMeta, { color: colors.textSecondary }]}>Expression</Text></View>
         </View>
         <Pressable onPress={() => router.push('/expressions')} accessibilityRole="button" accessibilityLabel="Switch Expression" style={({ pressed }) => [styles.headerButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed ? styles.pressed : null]}>
           <Icon name="swap-horizontal-outline" size={20} color={colors.text} />
         </Pressable>
-      </View>
+      </WorkspaceTopBar>
 
       <View style={styles.mobileContent}>{children}</View>
 
@@ -280,15 +279,13 @@ const styles = StyleSheet.create({
   desktopSidebar: { width: 280, borderRightWidth: 1, paddingHorizontal: spacing.md, paddingBottom: spacing.lg },
   desktopContent: { flex: 1, minWidth: 0 },
   mobileRoot: { flex: 1 },
-  mobileHeader: { minHeight: 68, marginHorizontal: spacing.sm, marginTop: Platform.OS === 'web' ? spacing.xs : 0, paddingHorizontal: spacing.sm, paddingBottom: spacing.sm, borderWidth: 1, borderRadius: radius.xxl, flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, zIndex: 10 },
+  mobileHeader: { marginHorizontal: spacing.sm, marginTop: Platform.OS === 'web' ? spacing.xs : 0, paddingHorizontal: 7, paddingBottom: 6, alignItems: 'flex-end', gap: 7, zIndex: 10 },
   mobileContent: { flex: 1 },
-  headerButton: { width: 40, height: 40, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  headerAvatar: { width: 34, height: 34, borderRadius: 12, borderWidth: 1, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  headerButton: { width: 38, height: 38, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  headerAvatar: { width: 32, height: 32, borderRadius: 11, borderWidth: 1, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   headerAvatarImage: { width: '100%', height: '100%' },
   headerCopy: { flex: 1, minWidth: 0, justifyContent: 'center', paddingBottom: 2 },
-  headerTitle: { fontSize: 16, lineHeight: 20, fontWeight: '800', letterSpacing: -0.3 },
-  headerMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  headerMeta: { fontSize: 11, lineHeight: 14, fontWeight: '700' },
+  headerTitle: { fontSize: 15, lineHeight: 19, fontWeight: '900', letterSpacing: -0.25 },
   navRoot: { flex: 1 },
   identityCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.md },
   identityImage: { width: '100%', height: '100%' },

@@ -13,6 +13,7 @@ import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { commonOrganizationId, createNotifications, notificationPreview, senderIdentity } from "../_shared/notifications.ts";
 import { adminClient } from "../_shared/supabase.ts";
+import { loadPublicChatBadges } from "../_shared/identity-badges.ts";
 import { assertProfilesMayInteract, loadSafetyProfileSets } from "../_shared/safety.ts";
 import { assertNoUnknownFields, assertObject, requiredString, uuid } from "../_shared/validation.ts";
 
@@ -32,13 +33,14 @@ function pairFor(first: string, second: string) {
     : { participant_low: second, participant_high: first };
 }
 
-function publicProfile(profile: any) {
+function publicProfile(profile: any, badges: any[] = []) {
   return profile ? {
     id: profile.id,
     username: profile.username,
     display_name: profile.display_name,
     avatar_url: profile.avatar_url,
     banner_url: profile.banner_url,
+    badges,
   } : null;
 }
 
@@ -112,18 +114,22 @@ Deno.serve(createHandler(
 
         if (messagesError) throw new ApiError("CHAT_LOAD_FAILED", "We couldn’t load these messages.", 500, undefined, false);
         const profileMap = new Map((people ?? []).map((profile: any) => [profile.id, profile]));
+        const identityOrganizationId = await commonOrganizationId(admin, viewerId, otherProfileId);
+        const directBadgeMap = await loadPublicChatBadges(admin, [otherProfileId], identityOrganizationId);
         const messages = await hydrateChatMessages(
           admin,
           "direct_messages",
           "direct_message_reactions",
           (messageRows ?? []).reverse(),
           viewerId,
+          new Set<string>(),
+          { organizationId: identityOrganizationId },
         );
         return {
           data: {
             conversation: {
               ...conversation,
-              other: publicProfile(profileMap.get(otherProfileId)),
+              other: publicProfile(profileMap.get(otherProfileId), directBadgeMap.get(otherProfileId) ?? []),
             },
             messages,
             pinnedMessages: messages.filter((message: any) => message.pinned_at),
@@ -288,14 +294,16 @@ Deno.serve(createHandler(
         }
       }
 
+      const identityOrganizationId = await commonOrganizationId(admin, viewerId, target.id);
+      const directBadgeMap = await loadPublicChatBadges(admin, [target.id], identityOrganizationId);
       return {
-        data: { conversationId: conversation.id, other: publicProfile(target) },
+        data: { conversationId: conversation.id, other: publicProfile(target, directBadgeMap.get(target.id) ?? []) },
         status: 201,
       };
     }
 
     if (action === "create_upload") {
-      assertNoUnknownFields(body, ["action", "conversationId", "mimeType", "fileName", "sizeBytes", "durationSeconds"]);
+      assertNoUnknownFields(body, ["action", "conversationId", "mimeType", "fileName", "sizeBytes", "durationSeconds", "width", "height"]);
       const conversationId = uuid(requiredString(body.conversationId, "conversationId", 36), "conversationId", true)!;
       const conversation = await requireConversation(admin, conversationId, viewerId);
       const otherProfileId = conversation.participant_low === viewerId
@@ -308,6 +316,8 @@ Deno.serve(createHandler(
           fileName: body.fileName,
           sizeBytes: body.sizeBytes,
           durationSeconds: body.durationSeconds,
+          width: body.width,
+          height: body.height,
         }),
         status: 201,
       };
@@ -411,6 +421,8 @@ Deno.serve(createHandler(
           "direct_message_reactions",
           [created],
           viewerId,
+          new Set<string>(),
+          { organizationId },
         ))[0],
         status: 201,
       };

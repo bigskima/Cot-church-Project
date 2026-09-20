@@ -37,8 +37,9 @@ function loginErrorMessage(error: unknown) {
     case 'RATE_LIMITED':
       return 'Too many sign-in attempts. Please wait a little and try again.';
     case 'REQUEST_TIMEOUT':
+      return 'Sign in is taking longer than expected. Please try again.';
     case 'NETWORK_ERROR':
-      return 'We couldn’t reach the server. Check your connection and try again.';
+      return 'We couldn’t reach COT services right now. Please try again.';
     case 'API_NOT_CONFIGURED':
       return 'Sign in is temporarily unavailable on this app build.';
     case 'ORIGIN_NOT_ALLOWED':

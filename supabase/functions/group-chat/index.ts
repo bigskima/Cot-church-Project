@@ -303,6 +303,7 @@ Deno.serve(createHandler(
         visibleRows,
         auth.user.id,
         safety.hiddenFromFeed,
+        { organizationId: auth.organizationId, branchId: group.branch_id },
       );
 
       const membershipIds = [...new Set((memberRows ?? []).map((item: any) => item.membership_id))];
@@ -412,7 +413,7 @@ Deno.serve(createHandler(
     const action = requiredString(body.action, "action", 40);
 
     if (action === "create_upload") {
-      assertNoUnknownFields(body, ["action", "groupId", "sectionId", "mimeType", "fileName", "sizeBytes", "durationSeconds"]);
+      assertNoUnknownFields(body, ["action", "groupId", "sectionId", "mimeType", "fileName", "sizeBytes", "durationSeconds", "width", "height"]);
       assertMayChat(membership);
       return {
         data: await createChatUpload(admin, auth.user.id, {
@@ -424,6 +425,8 @@ Deno.serve(createHandler(
           fileName: body.fileName,
           sizeBytes: body.sizeBytes,
           durationSeconds: body.durationSeconds,
+          width: body.width,
+          height: body.height,
         }),
         status: 201,
       };
@@ -571,6 +574,8 @@ Deno.serve(createHandler(
           "group_message_reactions",
           [created],
           auth.user.id,
+          new Set<string>(),
+          { organizationId: auth.organizationId, branchId: group.branch_id },
         ))[0],
         status: 201,
       };

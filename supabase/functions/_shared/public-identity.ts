@@ -213,7 +213,14 @@ export async function enrichContentCreators<T extends { content_items?: any }>(r
   const organizationIds = [...new Set(items.map((item) => item.organization_id).filter(Boolean))] as string[];
   const contentIds = [...new Set(items.map((item) => item.id).filter(Boolean))] as string[];
 
-  const [profilesResult, expressionsResult, organizationsResult, engagementResult] = await Promise.all([
+  const [
+    profilesResult,
+    expressionsResult,
+    organizationsResult,
+    engagementResult,
+    defaultsResult,
+    assignmentsResult,
+  ] = await Promise.all([
     profileIds.length
       ? admin.from("profiles").select("id,display_name,username,avatar_url,banner_url").in("id", profileIds)
       : Promise.resolve({ data: [] as any[], error: null }),
@@ -229,6 +236,20 @@ export async function enrichContentCreators<T extends { content_items?: any }>(r
       ? client.from("content_items").select("id,content_reactions(count),content_comments(count)")
           .in("id", contentIds).eq("content_comments.is_hidden", false)
       : Promise.resolve({ data: [] as any[], error: null }),
+    organizationIds.length
+      ? admin.from("identity_badge_definitions")
+          .select("id,organization_id,branch_id,code,label,background_color,text_color,priority,badge_variant")
+          .in("organization_id", organizationIds)
+          .eq("is_membership_default", true)
+          .eq("is_active", true)
+      : Promise.resolve({ data: [] as any[], error: null }),
+    profileIds.length
+      ? admin.from("identity_badge_assignments")
+          .select("organization_id,profile_id,branch_id,identity_badge_definitions!inner(id,organization_id,branch_id,code,label,background_color,text_color,priority,badge_variant,is_active)")
+          .in("profile_id", profileIds)
+          .eq("is_active", true)
+          .eq("identity_badge_definitions.is_active", true)
+      : Promise.resolve({ data: [] as any[], error: null }),
   ]);
   if (engagementResult.error) throw new ApiError("MEDIA_ENGAGEMENT_FAILED", "Unable to retrieve media engagement", 500, undefined, false);
 
@@ -236,6 +257,23 @@ export async function enrichContentCreators<T extends { content_items?: any }>(r
   const expressionMap = new Map((expressionsResult.data ?? []).map((expression: any) => [expression.id, expression]));
   const organizationMap = new Map((organizationsResult.data ?? []).map((organization: any) => [organization.id, organization]));
   const engagementMap = new Map((engagementResult.data ?? []).map((item: any) => [item.id, item]));
+  const defaultByOrg = new Map((defaultsResult.data ?? []).map((badge: any) => [badge.organization_id, badge]));
+  const assignedByProfile = new Map<string, any[]>();
+  for (const assignment of assignmentsResult.data ?? []) {
+    const current = assignedByProfile.get((assignment as any).profile_id) ?? [];
+    current.push(assignment);
+    assignedByProfile.set((assignment as any).profile_id, current);
+  }
+
+  const contentBadge = (definition: any): PublicBadge => ({
+    id: definition.id,
+    code: definition.code,
+    label: definition.label,
+    backgroundColor: definition.background_color,
+    textColor: definition.text_color,
+    priority: Number(definition.priority ?? 0),
+    badgeVariant: definition.badge_variant ?? 'default',
+  });
 
   return rows.map((row) => {
     const item = nestedContentItem(row.content_items);
@@ -244,6 +282,33 @@ export async function enrichContentCreators<T extends { content_items?: any }>(r
     const expression = item.expression_id ? expressionMap.get(item.expression_id) ?? null : null;
     const organization = item.organization_id ? organizationMap.get(item.organization_id) ?? null : null;
     const engagement = engagementMap.get(item.id);
+    const badges: PublicBadge[] = [];
+    if (author?.id && item.organization_id) {
+      const membershipDefault = defaultByOrg.get(item.organization_id);
+      if (item.expression_id && membershipDefault) badges.push(contentBadge(membershipDefault));
+
+      for (const assignment of assignedByProfile.get(author.id) ?? []) {
+        if (assignment.organization_id !== item.organization_id) continue;
+        if (item.expression_id) {
+          if (assignment.branch_id !== null && assignment.branch_id !== item.expression_id) continue;
+        } else if (assignment.branch_id !== null) {
+          continue;
+        }
+        const definition = Array.isArray(assignment.identity_badge_definitions)
+          ? assignment.identity_badge_definitions[0]
+          : assignment.identity_badge_definitions;
+        if (definition) badges.push(contentBadge(definition));
+      }
+
+      const seen = new Set<string>();
+      badges.sort((a, b) => b.priority - a.priority);
+      for (let index = badges.length - 1; index >= 0; index -= 1) {
+        const badge = badges[index];
+        const key = badge.id || badge.code || badge.label;
+        if (seen.has(key)) badges.splice(index, 1);
+        else seen.add(key);
+      }
+    }
     return {
       ...row,
       likes_count: engagement?.content_reactions?.[0]?.count ?? 0,
@@ -256,6 +321,7 @@ export async function enrichContentCreators<T extends { content_items?: any }>(r
           username: author.username,
           avatar_url: author.avatar_url,
           banner_url: author.banner_url,
+          badges,
         } : null,
         expression: expression ? {
           id: expression.id,

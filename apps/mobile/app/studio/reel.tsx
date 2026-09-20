@@ -11,7 +11,7 @@ import { putSignedUpload, readUploadFile, type UploadFile } from '@/services/upl
 import { PLATFORM_KEYBOARD_BEHAVIOR, PLATFORM_KEYBOARD_DISMISS_MODE, PLATFORM_KEYBOARD_VERTICAL_OFFSET } from '@/utils/keyboard';
 
 type ReelScope = 'public' | 'branch';
-type SelectedVideo = UploadFile & { sizeBytes: number; durationSeconds?: number };
+type SelectedVideo = UploadFile & { sizeBytes: number; durationSeconds?: number; width?: number; height?: number };
 type UploadIntent = { asset: { id: string }; uploadSession: { assetId: string; signedUploadUrl: string; storagePath: string } };
 const MAX_BYTES = 200 * 1024 * 1024;
 
@@ -104,6 +104,8 @@ export default function ReelCreatorScreen() {
         size: sizeBytes,
         sizeBytes,
         durationSeconds: asset.duration ? Math.round(asset.duration / 1000) : undefined,
+        width: asset.width || undefined,
+        height: asset.height || undefined,
         file: body,
       });
     } catch (error) {
@@ -136,7 +138,7 @@ export default function ReelCreatorScreen() {
           mimeType: video.mimeType,
           expressionId: selectedExpressionId,
           durationSeconds: video.durationSeconds,
-          aspectRatio: '9:16',
+          aspectRatio: video.width && video.height ? `${video.width}:${video.height}` : undefined,
           fileSizeBytes: video.sizeBytes,
           fileName: video.name,
         }),

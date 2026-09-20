@@ -46,6 +46,15 @@ function durationSeconds(value: unknown) {
   return Math.round(duration);
 }
 
+function sourceDimension(value: unknown, field: "width" | "height") {
+  if (value === undefined || value === null || value === "") return null;
+  const dimension = Number(value);
+  if (!Number.isSafeInteger(dimension) || dimension < 1 || dimension > 32768) {
+    throw new ApiError("VALIDATION_FAILED", `Media ${field} is invalid`, 422);
+  }
+  return dimension;
+}
+
 Deno.serve(createHandler(
   { methods: ["POST", "DELETE"], authentication: "required", organization: "none" },
   async ({ request, auth }) => {
@@ -85,7 +94,7 @@ Deno.serve(createHandler(
 
     const action = requiredString(body.action, "action", 32);
     if (action === "create_upload") {
-      assertNoUnknownFields(body, ["action", "organizationId", "mimeType", "fileName", "sizeBytes", "branchId", "durationSeconds"]);
+      assertNoUnknownFields(body, ["action", "organizationId", "mimeType", "fileName", "sizeBytes", "branchId", "durationSeconds", "width", "height"]);
       const requestedOrganizationId = body.organizationId
         ? uuid(String(body.organizationId), "organizationId", true)!
         : null;
@@ -107,6 +116,8 @@ Deno.serve(createHandler(
       const declaredDurationSeconds = type.kind === "video" || type.kind === "audio"
         ? durationSeconds(body.durationSeconds)
         : null;
+      const width = type.kind === "image" || type.kind === "video" ? sourceDimension(body.width, "width") : null;
+      const height = type.kind === "image" || type.kind === "video" ? sourceDimension(body.height, "height") : null;
 
       if (branchId) {
         const { data: expressionMembership, error: expressionMembershipError } = await admin
@@ -138,6 +149,8 @@ Deno.serve(createHandler(
         original_filename: fileLabel(body.fileName),
         size_bytes: sizeBytes,
         duration_seconds: declaredDurationSeconds,
+        width,
+        height,
         status: "pending",
       });
       if (recordError) throw new ApiError("MEDIA_UPLOAD_INTENT_FAILED", "Unable to prepare media upload", 500, undefined, false);
@@ -155,6 +168,8 @@ Deno.serve(createHandler(
           mimeType,
           sizeBytes,
           durationSeconds: declaredDurationSeconds,
+          width,
+          height,
           signedUploadUrl: signed.signedUrl,
           uploadToken: signed.token,
           storagePath: signed.path,
@@ -168,7 +183,7 @@ Deno.serve(createHandler(
       const uploadId = uuid(requiredString(body.uploadId, "uploadId", 36), "uploadId", true)!;
       const { data: upload, error: lookupError } = await admin
         .from("social_media_uploads")
-        .select("id,branch_id,media_kind,mime_type,storage_path,public_url,original_filename,size_bytes,duration_seconds,status")
+        .select("id,branch_id,media_kind,mime_type,storage_path,public_url,original_filename,size_bytes,duration_seconds,width,height,status")
         .eq("id", uploadId)
         .eq("uploader_profile_id", auth.user.id)
         .maybeSingle();
@@ -191,6 +206,8 @@ Deno.serve(createHandler(
             fileName: upload.original_filename,
             sizeBytes: Number(upload.size_bytes),
             durationSeconds: upload.duration_seconds == null ? null : Number(upload.duration_seconds),
+            width: upload.width == null ? null : Number(upload.width),
+            height: upload.height == null ? null : Number(upload.height),
           },
         };
       }
@@ -214,7 +231,7 @@ Deno.serve(createHandler(
         status: "uploaded",
         size_bytes: Math.round(actualSize),
       }).eq("id", upload.id).eq("status", "pending")
-        .select("id,media_kind,mime_type,public_url,original_filename,size_bytes,duration_seconds")
+        .select("id,media_kind,mime_type,public_url,original_filename,size_bytes,duration_seconds,width,height")
         .single();
       if (completeError || !completed) throw new ApiError("MEDIA_VERIFY_FAILED", "Unable to finalize uploaded media", 500, undefined, false);
 
@@ -227,6 +244,8 @@ Deno.serve(createHandler(
           fileName: completed.original_filename,
           sizeBytes: Number(completed.size_bytes),
           durationSeconds: completed.duration_seconds == null ? null : Number(completed.duration_seconds),
+          width: completed.width == null ? null : Number(completed.width),
+          height: completed.height == null ? null : Number(completed.height),
         },
       };
     }

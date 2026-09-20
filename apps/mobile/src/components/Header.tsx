@@ -2,9 +2,8 @@ import React from 'react';
 import { Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '@/state/theme';
-import { radius, shadows, spacing, typography } from '@/design-system/tokens';
+import { radius, spacing, typography } from '@/design-system/tokens';
 import { Icon } from './primitives/Icon';
-import { BrandMark } from './primitives/BrandMark';
 
 interface ScreenHeaderProps {
   title: string;
@@ -35,64 +34,40 @@ export function ScreenHeader({
     else router.back();
   };
 
+  const accessibleContext = [title, kicker, subtitle].filter(Boolean).join('. ');
+
   return (
     <View
+      accessibilityRole="header"
+      accessibilityLabel={accessibleContext || undefined}
       style={[
         styles.headerContainer,
         compact && styles.headerCompact,
-        {
-          backgroundColor: colors.glass,
-          borderColor: colors.borderSubtle,
-        },
-        shadows.sm,
+        { backgroundColor: colors.bg, borderColor: colors.borderSubtle },
         style,
       ]}
     >
-      <View pointerEvents="none" style={[styles.headerGlow, { backgroundColor: colors.primarySoft }]} />
+      {showBack ? (
+        <Pressable
+          onPress={handleBack}
+          hitSlop={8}
+          style={({ pressed }) => [
+            styles.backButton,
+            { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle },
+            pressed && { backgroundColor: colors.pressed, transform: [{ scale: 0.96 }] },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <Icon name="chevron-back" size={22} color={colors.text} />
+        </Pressable>
+      ) : null}
 
-      <View style={styles.topRow}>
-        <View style={styles.headerIdentity}>
-          {showBack ? (
-            <Pressable
-              onPress={handleBack}
-              hitSlop={8}
-              style={({ pressed }) => [
-                styles.backButton,
-                { backgroundColor: colors.cardElevated, borderColor: colors.borderSubtle },
-                pressed && { backgroundColor: colors.pressed, transform: [{ scale: 0.96 }] },
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel="Go back"
-            >
-              <Icon name="chevron-back" size={21} color={colors.text} />
-            </Pressable>
-          ) : null}
-
-          <View style={[styles.brandShell, { backgroundColor: colors.cardElevated, borderColor: colors.borderSubtle }]}>
-            <BrandMark variant="header" size={30} />
-          </View>
-
-          <View style={styles.identityCopy}>
-            <Text style={[styles.identityLabel, { color: colors.textMuted }]}>CITY OF TRANSFORMATION</Text>
-            {kicker ? (
-              <View style={[styles.kickerPill, { backgroundColor: colors.primarySoft }]}>
-                <Text style={[styles.kickerText, { color: colors.interactive }]}>{kicker}</Text>
-              </View>
-            ) : null}
-          </View>
-        </View>
-
-        {rightAction ? <View style={styles.rightActionContainer}>{rightAction}</View> : null}
+      <View style={styles.compactCopy}>
+        {title ? <Text style={[styles.compactBarTitle, { color: colors.text }]} numberOfLines={1}>{title}</Text> : null}
       </View>
 
-      <View style={styles.titleBlock}>
-        <Text style={[compact ? styles.compactTitle : styles.title, { color: colors.text }]} numberOfLines={2}>
-          {title}
-        </Text>
-        {subtitle ? (
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{subtitle}</Text>
-        ) : null}
-      </View>
+      {rightAction ? <View style={styles.rightActionContainer}>{rightAction}</View> : null}
     </View>
   );
 }
@@ -104,24 +79,25 @@ interface SectionHeaderProps {
   actionLabel?: string;
   onAction?: () => void;
   dark?: boolean;
+  compact?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
-export function SectionHeader({ title, subtitle, badge, actionLabel, onAction, style }: SectionHeaderProps) {
+export function SectionHeader({ title, subtitle, badge, actionLabel, onAction, compact = false, style }: SectionHeaderProps) {
   const { colors } = useTheme();
 
   return (
-    <View style={[styles.sectionContainer, style]}>
+    <View style={[styles.sectionContainer, compact && styles.sectionCompact, style]}>
       <View style={styles.sectionCopy}>
         <View style={styles.sectionTitleRow}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
+          <Text style={[styles.sectionTitle, compact && styles.sectionTitleCompact, { color: colors.text }]}>{title}</Text>
           {badge !== undefined ? (
             <View style={[styles.sectionBadge, { backgroundColor: colors.primarySoft }]}>
               <Text style={[styles.sectionBadgeText, { color: colors.interactive }]}>{badge}</Text>
             </View>
           ) : null}
         </View>
-        {subtitle ? <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>{subtitle}</Text> : null}
+        {subtitle ? <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]} numberOfLines={1}>{subtitle}</Text> : null}
       </View>
 
       {actionLabel && onAction ? (
@@ -146,65 +122,16 @@ export function SectionHeader({ title, subtitle, badge, actionLabel, onAction, s
 
 const styles = StyleSheet.create({
   headerContainer: {
-    position: 'relative',
-    overflow: 'hidden',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.lg,
-    borderWidth: 1,
-    borderRadius: radius.xxl,
-  },
-  headerCompact: {
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-  },
-  headerGlow: {
-    position: 'absolute',
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    right: -58,
-    top: -82,
-    opacity: 0.7,
-  },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    marginBottom: spacing.md,
-    minHeight: 42,
-  },
-  headerIdentity: {
-    flex: 1,
-    minWidth: 0,
+    width: '100%',
+    minHeight: 52,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
   },
-  brandShell: {
-    width: 42,
-    height: 42,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  identityCopy: {
-    flex: 1,
-    minWidth: 0,
-    alignItems: 'flex-start',
-    gap: 4,
-  },
-  identityLabel: {
-    fontSize: 9,
-    lineHeight: 12,
-    fontWeight: '800',
-    letterSpacing: 0.85,
-  },
-  titleBlock: {
-    gap: 2,
-  },
+  headerCompact: { minHeight: 46, paddingVertical: 4 },
   backButton: {
     width: 40,
     height: 40,
@@ -212,46 +139,28 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    ...shadows.sm,
   },
-  kickerPill: {
-    minHeight: 24,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  kickerText: { ...typography.kicker },
-  spacer: { flex: 1 },
-  rightActionContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    zIndex: 2,
-  },
-  title: { ...typography.display },
-  compactTitle: { ...typography.h1 },
-  subtitle: {
-    ...typography.bodySmall,
-    marginTop: spacing.xs,
-    maxWidth: 680,
-  },
+  compactCopy: { flex: 1, minWidth: 0 },
+  compactBarTitle: { fontSize: 16, lineHeight: 20, fontWeight: '900', letterSpacing: -0.3 },
+  rightActionContainer: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   sectionContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    marginTop: spacing.xxl,
-    marginBottom: spacing.md,
+    paddingHorizontal: spacing.sm,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
   },
+  sectionCompact: { marginTop: spacing.xs, marginBottom: 0, paddingHorizontal: 0 },
   sectionCopy: { flex: 1, minWidth: 0 },
   sectionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
   },
-  sectionTitle: { ...typography.h2 },
+  sectionTitle: { fontSize: 17, lineHeight: 22, fontWeight: '900', letterSpacing: -0.3 },
+  sectionTitleCompact: { fontSize: 14.5, lineHeight: 19 },
   sectionBadge: {
     minWidth: 24,
     minHeight: 22,
@@ -266,7 +175,7 @@ const styles = StyleSheet.create({
   },
   sectionSubtitle: {
     ...typography.caption,
-    marginTop: 3,
+    marginTop: 1,
   },
   actionButton: {
     flexDirection: 'row',

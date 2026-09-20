@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import {
   FlatList,
-  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -254,57 +253,24 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
 
   const header = (
     <View style={styles.headerWrap}>
-      <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
-        <View style={[styles.identityBanner, { backgroundColor: colors.primarySoft }]}>
-          {expression?.banner_url ? <Image source={{ uri: expression.banner_url }} style={styles.identityBannerImage} resizeMode="cover" /> : null}
-        </View>
-        <View style={styles.heroIdentityRow}>
-          <View style={[styles.heroAvatar, { backgroundColor: colors.cardElevated, borderColor: colors.card }]}>
-            {expression?.avatar_url ? <Image source={{ uri: expression.avatar_url }} style={styles.avatarImage} /> : <Icon name="people" size={22} color={colors.interactive} />}
-          </View>
-          <View style={styles.flex}>
-            <Text style={[styles.heroEyebrow, { color: colors.interactive }]}>YOUR EXPRESSION</Text>
-            <Text style={[styles.heroTitle, { color: colors.text }]} numberOfLines={1}>{expression?.name ?? 'Your Expression'}</Text>
-            <View style={styles.privateInline}>
-              <Icon name="lock-closed" size={11} color={colors.textMuted} />
-              <Text style={[styles.privateText, { color: colors.textMuted }]}>Members-only home</Text>
-            </View>
-          </View>
-          <Pressable onPress={() => router.replace('/general')} style={[styles.heroIconAction, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]} accessibilityRole="button" accessibilityLabel="Open General COT">
-            <Icon name="globe-outline" size={18} color={colors.text} />
-          </Pressable>
-        </View>
-
-        <Pressable
-          onPress={() => router.push(`/expressions/${expressionId}/feed` as any)}
-          style={({ pressed }) => [styles.expressionFeedTrigger, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.pressed]}
-          accessibilityRole="button"
-        >
-          <Icon name="chatbubbles-outline" size={17} color={colors.interactive} />
-          <Text style={[styles.expressionFeedTriggerText, { color: colors.textSecondary }]}>Open community feed or share something</Text>
-          <Icon name="arrow-forward" size={15} color={colors.interactive} />
-        </Pressable>
-      </View>
-
       <View style={styles.quickSection}>
         <View style={styles.quickHeading}>
-          <Text style={[styles.quickHeadingTitle, { color: colors.text }]}>Inside this Expression</Text>
-          <Text style={[styles.quickHeadingMeta, { color: colors.textMuted }]}>Quick access</Text>
+          <Text style={[styles.quickHeadingTitle, { color: colors.text }]}>Explore</Text>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickGrid}>
+        <View style={styles.quickGrid}>
           <QuickLink label="Updates" hint="Important updates" icon="megaphone-outline" onPress={() => router.push(`/expressions/${expressionId}/announcements` as any)} />
           <QuickLink label="Prayer" hint="Pray together" icon="heart-outline" onPress={() => router.push(`/expressions/${expressionId}/prayer` as any)} />
           <QuickLink label="Events" hint="Gatherings" icon="calendar-outline" onPress={() => router.push(`/expressions/${expressionId}/events` as any)} />
           <QuickLink label="Join in" hint="Polls & giveaways" icon="chatbubbles-outline" onPress={() => router.push(`/expressions/${expressionId}/participate` as any)} />
           <QuickLink label="Groups" hint="Smaller circles" icon="people-circle-outline" onPress={() => router.push(`/expressions/${expressionId}/groups` as any)} />
           <QuickLink label="Chat" hint="Direct messages" icon="chatbubble-ellipses-outline" onPress={() => router.push(`/expressions/${expressionId}/chat` as any)} />
-        </ScrollView>
+        </View>
       </View>
 
       {payload?.degradedSections?.length ? <Pressable onPress={resource.refresh} style={[styles.notice, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Icon name="alert-circle-outline" size={17} color={colors.textSecondary} /><Text style={[styles.noticeText, { color: colors.textSecondary }]}>Some Expression sections are still loading. Tap to retry.</Text><Icon name="refresh-outline" size={15} color={colors.textMuted} /></Pressable> : null}
       {activeStream ? <View style={styles.liveWrap}><HeroLiveCard stream={activeStream} onPress={() => router.push(`/expressions/${expressionId}/live/${activeStream.id}` as any)} /></View> : null}
 
-      {feed.length ? <View style={styles.feedHeading}><View><Text style={[styles.feedEyebrow, { color: colors.interactive }]}>EXPRESSION HOME</Text><Text style={[styles.feedTitle, { color: colors.text }]}>For this community</Text></View><Pressable onPress={() => router.push(`/expressions/${expressionId}/feed` as any)}><Text style={[styles.seeAll, { color: colors.interactive }]}>Full feed</Text></Pressable></View> : null}
+      {feed.length ? <View style={styles.feedHeading}><Text style={[styles.feedTitle, { color: colors.text }]}>Latest</Text><Pressable onPress={() => router.push(`/expressions/${expressionId}/feed` as any)}><Text style={[styles.seeAll, { color: colors.interactive }]}>Full feed</Text></Pressable></View> : null}
     </View>
   );
 
@@ -312,61 +278,59 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
   if (resource.error && !resource.data) return <View style={[styles.stateWrap, { backgroundColor: colors.bg }]}><ResourceError message={resource.error} retry={resource.refresh} /></View>;
 
   return (
-    <FlatList
-      style={{ backgroundColor: colors.bg }}
-      data={feed}
-      keyExtractor={(item) => item.key}
-      ListHeaderComponent={header}
-      ListEmptyComponent={<EmptyState title="This Expression Home is ready" message="Posts, Reels, videos, sermons, events, announcements, polls and giveaways will form focused layers as they are published." iconName="home-outline" />}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={resource.refreshing} onRefresh={resource.refresh} tintColor={colors.interactive} />}
-      renderItem={({ item }) => {
-        if (item.kind === 'section') return renderSection(item);
-        if (item.kind === 'post') return <View style={styles.feedCard}><PostCard post={item.post} expressionName={expression?.name} canEngage={mode === 'authenticated'} allowExternalShare={false} onPress={() => router.push({ pathname: `/expressions/${expressionId}/post/[id]`, params: { id: item.post.id } } as any)} onReply={() => router.push({ pathname: `/expressions/${expressionId}/post/[id]`, params: { id: item.post.id, focus: 'comments' } } as any)} variant="feed" showContext={false} style={styles.homePostCard} /></View>;
-        if (item.kind === 'reel') return <View style={styles.feedCard}><ReelCard reel={item.reel} width={reelWidth} commentContext="current" onPress={() => router.push({ pathname: `/expressions/${expressionId}/reels`, params: { reelId: item.reel.id } } as any)} onOpenComments={item.reel.content_items?.id ? () => router.push({ pathname: `/expressions/${expressionId}/comments/[contentId]`, params: { contentId: item.reel.content_items!.id } } as any) : undefined} /></View>;
-        return <View style={styles.feedCard}><VideoCard video={item.video} commentContext="current" onPress={() => router.push(`/expressions/${expressionId}/videos/${item.video.id}` as any)} onOpenComments={item.video.content_items?.id ? () => router.push({ pathname: `/expressions/${expressionId}/comments/[contentId]`, params: { contentId: item.video.content_items!.id } } as any) : undefined} /></View>;
-      }}
-    />
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+      <FlatList
+        style={{ backgroundColor: colors.bg }}
+        data={feed}
+        keyExtractor={(item) => item.key}
+        ListHeaderComponent={header}
+        ListEmptyComponent={<EmptyState title="This Expression Home is ready" message="Posts, Reels, videos, sermons, events, announcements, polls and giveaways will form focused layers as they are published." iconName="home-outline" />}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={resource.refreshing} onRefresh={resource.refresh} tintColor={colors.interactive} />}
+        renderItem={({ item }) => {
+          if (item.kind === 'section') return renderSection(item);
+          if (item.kind === 'post') return <View style={styles.feedCard}><PostCard post={item.post} expressionName={expression?.name} canEngage={mode === 'authenticated'} allowExternalShare={false} onPress={() => router.push({ pathname: `/expressions/${expressionId}/post/[id]`, params: { id: item.post.id } } as any)} onReply={() => router.push({ pathname: `/expressions/${expressionId}/post/[id]`, params: { id: item.post.id, focus: 'comments' } } as any)} variant="feed" showContext={false} style={styles.homePostCard} /></View>;
+          if (item.kind === 'reel') return <View style={styles.feedCard}><ReelCard reel={item.reel} width={reelWidth} variant="feed" commentContext="current" onPressCreator={item.reel.content_items?.author?.username ? () => router.push({ pathname: '/general/member/[username]', params: { username: item.reel.content_items!.author!.username! } } as any) : undefined} onPress={() => router.push({ pathname: `/expressions/${expressionId}/reels`, params: { reelId: item.reel.id } } as any)} onOpenComments={item.reel.content_items?.id ? () => router.push({ pathname: `/expressions/${expressionId}/comments/[contentId]`, params: { contentId: item.reel.content_items!.id } } as any) : undefined} /></View>;
+          return <View style={styles.feedCard}><VideoCard video={item.video} variant="feed" commentContext="current" onPressCreator={item.video.content_items?.author?.username ? () => router.push({ pathname: '/general/member/[username]', params: { username: item.video.content_items!.author!.username! } } as any) : undefined} onPress={() => router.push(`/expressions/${expressionId}/videos/${item.video.id}` as any)} onOpenComments={item.video.content_items?.id ? () => router.push({ pathname: `/expressions/${expressionId}/comments/[contentId]`, params: { contentId: item.video.content_items!.id } } as any) : undefined} /></View>;
+        }}
+        />
+      {mode === 'authenticated' ? (
+        <Pressable
+          onPress={() => router.push({ pathname: `/expressions/${expressionId}/feed`, params: { compose: 'post', intentId: String(Date.now()) } } as any)}
+          accessibilityRole="button"
+          accessibilityLabel="Create"
+          style={({ pressed }) => [styles.createFab, { backgroundColor: colors.interactive }, pressed && styles.createFabPressed]}
+        >
+          <Icon name="add" size={28} color="#FFFFFF" />
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1 },
   content: { width: '100%', maxWidth: 1060, alignSelf: 'center', paddingHorizontal: spacing.sm, paddingTop: spacing.sm, paddingBottom: 120, gap: spacing.sm },
   stateWrap: { flex: 1, padding: spacing.lg, gap: spacing.md },
   headerWrap: { gap: spacing.sm },
   flex: { flex: 1, minWidth: 0 },
-  hero: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.sm, overflow: 'hidden' },
-  identityBanner: { height: 42, marginHorizontal: -12, marginTop: -12, marginBottom: 9, overflow: 'hidden', opacity: 0.7 },
-  identityBannerImage: { width: '100%', height: '100%' },
-  identityFallback: { flex: 1, alignItems: 'flex-end', padding: spacing.sm },
-  heroIdentityRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  heroAvatar: { width: 50, height: 50, borderRadius: 16, borderWidth: 3, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  avatarImage: { width: '100%', height: '100%' },
-  privateInline: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  privateText: { fontSize: 9.5, fontWeight: '700' },
-  heroEyebrow: { fontSize: 8, fontWeight: '900', letterSpacing: 0.9 },
-  heroTitle: { fontSize: 19, lineHeight: 23, fontWeight: '900', letterSpacing: -0.4, marginTop: 1 },
-  heroIconAction: { width: 40, height: 40, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  expressionFeedTrigger: { minHeight: 44, marginTop: spacing.sm, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  expressionFeedTriggerText: { flex: 1, fontSize: 11, fontWeight: '800' },
   quickSection: { gap: 6 },
   quickHeading: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingHorizontal: 2 },
   quickHeadingTitle: { fontSize: 12.5, fontWeight: '900' },
-  quickHeadingMeta: { fontSize: 9, fontWeight: '700' },
-  quickGrid: { gap: spacing.sm, paddingRight: spacing.md, paddingHorizontal: 2, paddingBottom: 2 },
-  quickLink: { minWidth: 54, alignItems: 'center', gap: 5 },
+  quickGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.sm, paddingHorizontal: 2, paddingBottom: 2 },
+  quickLink: { width: '25%', minHeight: 64, alignItems: 'center', gap: 5, paddingHorizontal: 3 },
   quickIcon: { width: 42, height: 42, borderRadius: 15, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   quickLabel: { fontSize: 9.5, fontWeight: '800' },
-  quickHint: { fontSize: 9, marginTop: 1 },
   notice: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   noticeText: { flex: 1, fontSize: 11.5, lineHeight: 17 },
   liveWrap: { marginTop: spacing.xs },
   feedHeading: { marginTop: spacing.md, marginBottom: spacing.xs, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.sm },
-  feedEyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1 },
   feedTitle: { fontSize: 20, lineHeight: 24, fontWeight: '900', marginTop: 2 },
-  feedCard: { width: '100%', maxWidth: 780, alignSelf: 'center', paddingVertical: spacing.sm },
-  homePostCard: { marginHorizontal: 0, marginVertical: 0, borderRadius: radius.xl },
+  feedCard: { width: '100%', maxWidth: 920, alignSelf: 'center', paddingVertical: spacing.xs },
+  homePostCard: { marginHorizontal: 0, marginVertical: 0, borderRadius: 0 },
+  createFab: { position: 'absolute', right: 18, bottom: 24, zIndex: 30, width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', ...shadows.floating },
+  createFabPressed: { opacity: 0.82, transform: [{ scale: 0.95 }] },
   shelf: { borderWidth: 1, borderRadius: radius.xl, paddingVertical: spacing.md, marginVertical: 7 },
   shelfHeader: { paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   shelfTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },

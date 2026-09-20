@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Chip, EmptyState, InputField, ResourceError, Skeleton, VideoCard } from '@/components';
 import { ExpressionMediaHeader } from '@/components/expression/ExpressionMediaHeader';
-import { radius, shadows, spacing } from '@/design-system/tokens';
+import { spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 import { getRuntimeSupabase } from '@/services/runtime-supabase';
 import { useSession } from '@/state/session';
@@ -92,53 +92,43 @@ export default function ExpressionVideosScreen() {
         refreshControl={<RefreshControl refreshing={resource.refreshing} onRefresh={resource.refresh} tintColor={colors.interactive} />}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.librarySummary}>
-          <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
-            <Text style={[styles.metricNumber, { color: colors.text }]}>{videos.length}</Text>
-            <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Videos in library</Text>
-          </View>
-          <View style={[styles.metricCard, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}>
-            <Text style={[styles.metricNumber, { color: colors.interactive }]} numberOfLines={1}>{activeCategory}</Text>
-            <Text style={[styles.metricLabel, { color: colors.textMuted }]}>{filtered.length} showing</Text>
-          </View>
-        </View>
-
-        <View style={[styles.filterCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
-          <Text style={[styles.filterEyebrow, { color: colors.textMuted }]}>BROWSE BY TYPE</Text>
-          <InputField label="Find a category" value={categorySearch} onChangeText={setCategorySearch} placeholder="Search video categories…" autoCapitalize="none" />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-            {visibleCategories.map((category) => (
-              <Chip
-                key={category.category}
-                label={category.label}
-                selected={selectedCategory === category.category}
-                onPress={() => setSelectedCategory(category.category)}
+        {categoryOptions.length ? (
+          <View style={styles.filters}>
+            {categoryOptions.length > 6 ? (
+              <InputField
+                value={categorySearch}
+                onChangeText={setCategorySearch}
+                placeholder="Search categories"
+                autoCapitalize="none"
               />
-            ))}
-          </ScrollView>
-          {!visibleCategories.length ? <Text style={[styles.filterHint, { color: colors.textMuted }]}>No enabled category matches that search.</Text> : null}
-        </View>
+            ) : null}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+              {visibleCategories.map((category) => (
+                <Chip
+                  key={category.category}
+                  label={category.label}
+                  selected={selectedCategory === category.category}
+                  onPress={() => setSelectedCategory(category.category)}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
 
         {resource.loading && !resource.data ? (
           <View style={styles.stack}><Skeleton height={220} count={3} /></View>
         ) : resource.error && !resource.data ? (
           <ResourceError message={resource.error} retry={resource.refresh} />
         ) : filtered.length ? (
-          <View style={styles.section}>
-            <View>
-              <Text style={[styles.sectionEyebrow, { color: colors.interactive }]}>{selectedCategory === 'all' ? 'VIDEO LIBRARY' : activeCategory.toUpperCase()}</Text>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>{selectedCategory === 'all' ? 'Watch inside your Expression' : `${activeCategory} videos`}</Text>
-            </View>
-            <View style={styles.stack}>
-              {filtered.map((video) => (
-                <VideoCard
-                  key={video.id}
-                  video={video}
-                  expressionName={expressionName}
-                  onPress={() => router.push(`/expressions/${id}/videos/${video.id}` as any)}
-                />
-              ))}
-            </View>
+          <View style={styles.stack}>
+            {filtered.map((video) => (
+              <VideoCard
+                key={video.id}
+                video={video}
+                expressionName={expressionName}
+                onPress={() => router.push(`/expressions/${id}/videos/${video.id}` as any)}
+              />
+            ))}
           </View>
         ) : (
           <EmptyState
@@ -156,16 +146,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   scroll: { flex: 1 },
   content: { width: '100%', maxWidth: 920, alignSelf: 'center', padding: spacing.md, paddingTop: spacing.sm, paddingBottom: 80, gap: spacing.md },
-  librarySummary: { flexDirection: 'row', gap: spacing.sm },
-  metricCard: { flex: 1, minHeight: 66, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, justifyContent: 'center' },
-  metricNumber: { fontSize: 16, lineHeight: 20, fontWeight: '900', letterSpacing: -0.25 },
-  metricLabel: { fontSize: 9, lineHeight: 13, fontWeight: '800', marginTop: 2 },
-  filterCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm },
-  filterEyebrow: { fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 0.8 },
-  filterHint: { fontSize: 10.5, lineHeight: 15 },
+  filters: { gap: spacing.xs },
   chips: { gap: spacing.xs, paddingRight: spacing.md },
-  section: { gap: spacing.sm },
-  sectionEyebrow: { fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 0.9 },
-  sectionTitle: { fontSize: 17, lineHeight: 22, fontWeight: '900', letterSpacing: -0.25, marginTop: 2 },
   stack: { gap: spacing.sm },
 });

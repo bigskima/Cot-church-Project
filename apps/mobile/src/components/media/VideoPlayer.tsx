@@ -15,6 +15,7 @@ export interface VideoPlayerProps {
   initialPositionSeconds?: number;
   chapters?: { title: string; timestamp_seconds: number }[];
   style?: StyleProp<ViewStyle>;
+  aspectRatio?: number;
 }
 
 export function VideoPlayer({
@@ -27,6 +28,7 @@ export function VideoPlayer({
   initialPositionSeconds = 0,
   chapters = [],
   style,
+  aspectRatio = 16 / 9,
 }: VideoPlayerProps) {
   const { colors } = useTheme();
   const [isPlaying, setIsPlaying] = useState(false);
@@ -97,15 +99,16 @@ export function VideoPlayer({
 
   return (
     <View style={[styles.container, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md, style]}>
-      {/* 16:9 Video Canvas Frame */}
-      <View style={[styles.videoFrame, { backgroundColor: '#000000' }]}>
+      {/* Source-aware video canvas frame */}
+      <View style={[styles.videoFrame, { backgroundColor: '#000000', aspectRatio: Number.isFinite(aspectRatio) && aspectRatio > 0 ? aspectRatio : 16 / 9 }]}>
         {sourceUrl && player ? (
           <VideoView
             player={player}
             style={styles.videoView}
+            contentFit="contain"
           />
         ) : posterUrl ? (
-          <Image source={{ uri: posterUrl }} style={styles.posterImage} resizeMode="cover" />
+          <Image source={{ uri: posterUrl }} style={styles.posterImage} resizeMode="contain" />
         ) : (
           <View style={styles.placeholder}>
             <Icon name="play-circle-outline" size={48} color={colors.interactive} />
@@ -197,7 +200,6 @@ const styles = StyleSheet.create({
   },
   videoFrame: {
     width: '100%',
-    aspectRatio: 16 / 9,
     position: 'relative',
     overflow: 'hidden',
   },

@@ -1,15 +1,14 @@
 import React from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  Avatar,
   Badge,
   Button,
   Icon,
   ResourceError,
-  ScreenHeader,
   SectionHeader,
+  SocialProfileHero,
   Skeleton,
 } from '@/components';
 import { radius, shadows, spacing, typography } from '@/design-system/tokens';
@@ -72,20 +71,6 @@ export default function ProfileScreen() {
     hasPublicBroadcastAccess || hasOrganizationLeadershipAccess
   );
 
-  const quickAction = (route: string, icon: string, label: string) => (
-    <Pressable
-      onPress={() => router.push(route as any)}
-      style={({ pressed }) => [
-        styles.quickAction,
-        { backgroundColor: colors.bgSecondary },
-        pressed && styles.pressed,
-      ]}
-    >
-      <Icon name={icon} size={17} color={colors.text} />
-      <Text style={[styles.quickActionText, { color: colors.text }]}>{label}</Text>
-    </Pressable>
-  );
-
   const compactLink = (route: string, icon: string, title: string, subtitle: string) => (
     <Pressable
       onPress={() => router.push(route as any)}
@@ -115,15 +100,9 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 110 },
+          { paddingTop: 0, paddingBottom: insets.bottom + 110 },
         ]}
       >
-        <ScreenHeader
-          title="You"
-          subtitle="Your profile, spaces and account controls."
-          kicker="PROFILE"
-        />
-
         {mode === 'visitor' ? (
           <View style={[styles.visitorCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
             <View style={[styles.visitorIconWrap, { backgroundColor: colors.primarySoft }]}>
@@ -160,49 +139,23 @@ export default function ProfileScreen() {
             retry={refreshContext}
           />
         ) : (
-          <View style={[styles.memberCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
-            <View style={[styles.memberBanner, { backgroundColor: colors.primarySoft }]}>
-              {profile?.banner_url ? (
-                <Image source={{ uri: profile.banner_url }} style={styles.memberBannerImage} resizeMode="cover" />
-              ) : (
-                <View style={styles.memberBannerFallback}>
-                  <Icon name="image-outline" size={24} color={colors.interactive} />
-                </View>
-              )}
-            </View>
-
-            <View style={styles.memberHeader}>
-              <View style={[styles.avatarHalo, { backgroundColor: colors.card, borderColor: colors.card }]}>
-                <Avatar url={profile?.avatar_url} name={profile?.display_name} size="lg" />
-              </View>
-              <View style={styles.memberInfo}>
-                <Text style={[styles.memberName, { color: colors.text }]}>
-                  {profile?.display_name ?? 'Church Member'}
-                </Text>
-                {profile?.username ? (
-                  <Text style={[styles.memberHandle, { color: colors.textSecondary }]} numberOfLines={1}>
-                    @{profile.username}
-                  </Text>
-                ) : profile?.email ? (
-                  <Text style={[styles.memberHandle, { color: colors.textSecondary }]} numberOfLines={1}>
-                    {profile.email}
-                  </Text>
-                ) : null}
-                {organization?.name ? (
-                  <View style={styles.memberContextRow}>
-                    <Icon name="globe-outline" size={12} color={colors.interactive} />
-                    <Text style={[styles.memberOrg, { color: colors.interactive }]} numberOfLines={1}>
-                      {organization.name}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-            </View>
-
-            <View style={styles.profileQuickActions}>
-              {quickAction('/general/settings', 'create-outline', 'Edit profile')}
-              {quickAction('/general/tools', 'grid-outline', 'Tools & settings')}
-            </View>
+          <View style={styles.fullBleedProfile}>
+            <SocialProfileHero
+              displayName={profile?.display_name ?? 'Church Member'}
+              username={profile?.username}
+              avatarUrl={profile?.avatar_url}
+              bannerUrl={profile?.banner_url}
+              badges={((profile as any)?.badges ?? [])}
+              contextLabel={organization?.name ?? null}
+              actions={
+                <Button
+                  label="Edit profile"
+                  variant="outline"
+                  size="sm"
+                  onPress={() => router.push('/general/settings')}
+                />
+              }
+            />
           </View>
         )}
 
@@ -308,25 +261,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: spacing.md,
     overflow: 'hidden',
-    paddingBottom: spacing.lg,
+    padding: spacing.lg,
   },
-  memberBanner: { width: '100%', aspectRatio: 3 / 1, overflow: 'hidden' },
-  memberBannerImage: { width: '100%', height: '100%' },
-  memberBannerFallback: { flex: 1, alignItems: 'flex-end', justifyContent: 'flex-start', padding: spacing.md },
-  memberHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    marginTop: -28,
-  },
-  avatarHalo: { padding: 4, borderWidth: 3, borderRadius: radius.pill },
-  memberInfo: { flex: 1, minWidth: 0, gap: 2, paddingTop: 22 },
-  memberName: { fontSize: 20, fontWeight: '900', letterSpacing: -0.4 },
-  memberHandle: { fontSize: 12.5 },
-  memberContextRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
-  memberOrg: { fontSize: 11.5, fontWeight: '700', flexShrink: 1 },
-  profileQuickActions: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg },
+  fullBleedProfile: { marginHorizontal: -spacing.md },
   quickAction: {
     flex: 1,
     minHeight: 42,

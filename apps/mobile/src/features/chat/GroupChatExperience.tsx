@@ -138,11 +138,22 @@ export function GroupChatExperience({ groupId, sectionId, scope = 'expression' }
       behavior={PLATFORM_KEYBOARD_BEHAVIOR}
       keyboardVerticalOffset={PLATFORM_KEYBOARD_VERTICAL_OFFSET}
     >
-      <View style={{ paddingTop: insets.top }}><ScreenHeader title={resource.data?.activeSection?.name ?? resource.data?.group.name ?? 'Group chat'} kicker={sectionId ? 'PRIVATE GROUP ROOM' : 'GROUP CHAT'} subtitle={resource.data?.activeSection?.description || 'Replies, media, voice notes, reactions and pins.'} showBack /></View>
-      <View style={[styles.scope, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}>
-        <Icon name='people-circle-outline' size={17} color={colors.interactive} />
-        <Text style={[styles.scopeText, { color: colors.textSecondary }]}>This conversation stays inside the Group.</Text>
-        {context?.expression?.id ? <Pressable onPress={() => router.push(`/expressions/${context.expression!.id}/groups/${groupId}` as any)}><Text style={[styles.link, { color: colors.interactive }]}>Group home</Text></Pressable> : null}
+      <View style={{ paddingTop: insets.top }}>
+        <ScreenHeader
+          title={resource.data?.activeSection?.name ?? resource.data?.group.name ?? 'Group chat'}
+          showBack
+          compact
+          rightAction={context?.expression?.id ? (
+            <Pressable
+              onPress={() => router.push(`/expressions/${context.expression!.id}/groups/${groupId}` as any)}
+              accessibilityRole="button"
+              accessibilityLabel="Group home"
+              style={[styles.groupHome, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}
+            >
+              <Icon name="home-outline" size={16} color={colors.text} />
+            </Pressable>
+          ) : undefined}
+        />
       </View>
       {pinned.length ? <Pressable onPress={() => jumpToMessage(pinned[0].id)} style={[styles.pinned, { backgroundColor: colors.primarySoft }]}><Icon name='pin' size={14} color={colors.interactive} /><Text style={[styles.pinnedText, { color: colors.textSecondary }]} numberOfLines={1}>{pinned[0].body || 'Pinned media message'}</Text></Pressable> : null}
       <FlatList
@@ -165,8 +176,7 @@ export function GroupChatExperience({ groupId, sectionId, scope = 'expression' }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 }, center: { flex: 1, alignItems: 'center', justifyContent: 'center' }, state: { flex: 1, padding: spacing.lg },
-  scope: { marginHorizontal: spacing.md, marginBottom: spacing.xs, padding: spacing.sm, borderWidth: 1, borderRadius: radius.lg, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  scopeText: { flex: 1, fontSize: 11, fontWeight: '600' }, link: { fontSize: 11, fontWeight: '800' },
+  groupHome: { width: 36, height: 36, borderWidth: 1, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   pinned: { marginHorizontal: spacing.md, borderRadius: radius.md, padding: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }, pinnedText: { flex: 1, fontSize: 11, fontWeight: '700' },
-  messages: { padding: spacing.md, gap: spacing.sm, flexGrow: 1, justifyContent: 'flex-end' }, empty: { paddingVertical: 60, alignItems: 'center', gap: 6 }, emptyTitle: { fontSize: 17, fontWeight: '800' }, error: { paddingHorizontal: spacing.md, paddingVertical: 5, fontSize: 11 },
+  messages: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, gap: spacing.xs, flexGrow: 1, justifyContent: 'flex-end' }, empty: { paddingVertical: 60, alignItems: 'center', gap: 6 }, emptyTitle: { fontSize: 17, fontWeight: '800' }, error: { paddingHorizontal: spacing.md, paddingVertical: 5, fontSize: 11 },
 });

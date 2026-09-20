@@ -44,19 +44,23 @@ export function CompactIdentityBadge({ badge, size = 18 }: { badge: PublicIdenti
   );
 }
 
-export function FullIdentityBadge({ badge }: { badge: PublicIdentityBadge }) {
+export function FullIdentityBadge({ badge, compact = false }: { badge: PublicIdentityBadge; compact?: boolean }) {
   return (
     <View
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={badge.label + ' ministry badge'}
       style={[
         styles.full,
+        compact && styles.fullCompact,
         {
           backgroundColor: badge.backgroundColor,
           borderColor: borderForVariant(badge.badgeVariant),
         },
       ]}
     >
-      <Icon name="ribbon" size={12} color={badge.textColor} />
-      <Text style={[styles.fullText, { color: badge.textColor }]} numberOfLines={1}>{badge.label}</Text>
+      <Icon name="ribbon" size={compact ? 10 : 12} color={badge.textColor} />
+      <Text style={[styles.fullText, compact && styles.fullTextCompact, { color: badge.textColor }]} numberOfLines={1}>{badge.label}</Text>
     </View>
   );
 }
@@ -78,9 +82,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
   },
+  fullCompact: {
+    minHeight: 21,
+    maxWidth: 170,
+    paddingHorizontal: 7,
+    gap: 4,
+  },
   fullText: {
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '900',
+  },
+  fullTextCompact: {
+    fontSize: 9.5,
+    lineHeight: 12,
   },
 });

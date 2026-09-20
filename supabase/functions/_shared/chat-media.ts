@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.57.4";
 import { ApiError } from "./errors.ts";
+import { loadPublicChatBadges } from "./identity-badges.ts";
 
 export const CHAT_MEDIA_BUCKET = "chat-media";
 export const MAX_CHAT_MEDIA_BYTES = 100 * 1024 * 1024;
@@ -49,6 +50,15 @@ function validDuration(value: unknown) {
   return Math.round(duration);
 }
 
+function validDimension(value: unknown, field: "width" | "height") {
+  if (value === undefined || value === null || value === "") return null;
+  const dimension = Number(value);
+  if (!Number.isSafeInteger(dimension) || dimension < 1 || dimension > 32768) {
+    throw new ApiError("VALIDATION_FAILED", `Media ${field} is invalid.`, 422);
+  }
+  return dimension;
+}
+
 export function chatAttachmentIds(value: unknown) {
   if (value === undefined || value === null) return [];
   if (!Array.isArray(value)) throw new ApiError("VALIDATION_FAILED", "attachmentIds must be a list.", 422);
@@ -66,7 +76,7 @@ export async function createChatUpload(
   admin: SupabaseClient,
   profileId: string,
   scope: ChatScope,
-  values: { mimeType: unknown; fileName?: unknown; sizeBytes: unknown; durationSeconds?: unknown },
+  values: { mimeType: unknown; fileName?: unknown; sizeBytes: unknown; durationSeconds?: unknown; width?: unknown; height?: unknown },
 ) {
   const mimeType = String(values.mimeType ?? "").trim().toLowerCase();
   const media = MIME_TYPES[mimeType];
@@ -74,6 +84,12 @@ export async function createChatUpload(
   const sizeBytes = validSize(values.sizeBytes);
   const durationSeconds = media.kind === "video" || media.kind === "audio"
     ? validDuration(values.durationSeconds)
+    : null;
+  const width = media.kind === "image" || media.kind === "gif" || media.kind === "video"
+    ? validDimension(values.width, "width")
+    : null;
+  const height = media.kind === "image" || media.kind === "gif" || media.kind === "video"
+    ? validDimension(values.height, "height")
     : null;
   const uploadId = crypto.randomUUID();
   const scopePath = scope.conversationId
@@ -94,6 +110,8 @@ export async function createChatUpload(
     original_filename: safeFileName(values.fileName),
     size_bytes: sizeBytes,
     duration_seconds: durationSeconds,
+    width,
+    height,
     status: "pending",
   });
   if (recordError) throw new ApiError("CHAT_UPLOAD_FAILED", "We couldn’t prepare this attachment.", 500, undefined, false);
@@ -112,6 +130,8 @@ export async function createChatUpload(
     mimeType,
     sizeBytes,
     durationSeconds,
+    width,
+    height,
     fileName: safeFileName(values.fileName),
     signedUploadUrl: signed.signedUrl,
   };
@@ -134,7 +154,7 @@ export async function completeChatUpload(
 ) {
   const { data: upload, error: lookupError } = await scopedUploadQuery(
     admin.from("chat_media_uploads")
-      .select("id,media_kind,mime_type,storage_path,original_filename,size_bytes,duration_seconds,status"),
+      .select("id,media_kind,mime_type,storage_path,original_filename,size_bytes,duration_seconds,width,height,status"),
     profileId,
     uploadId,
     scope,
@@ -163,7 +183,7 @@ export async function completeChatUpload(
     .update({ status: "uploaded", size_bytes: actualSize })
     .eq("id", upload.id)
     .eq("status", "pending")
-    .select("id,media_kind,mime_type,original_filename,size_bytes,duration_seconds,status")
+    .select("id,media_kind,mime_type,original_filename,size_bytes,duration_seconds,width,height,status")
     .single();
   if (completeError || !completed) throw new ApiError("CHAT_UPLOAD_FAILED", "We couldn’t finish this attachment.", 500, undefined, false);
   return attachmentPayload(completed);
@@ -231,6 +251,8 @@ function attachmentPayload(upload: any, url?: string | null) {
     fileName: upload.original_filename,
     sizeBytes: Number(upload.size_bytes),
     durationSeconds: upload.duration_seconds == null ? null : Number(upload.duration_seconds),
+    width: upload.width == null ? null : Number(upload.width),
+    height: upload.height == null ? null : Number(upload.height),
     url: url ?? null,
   };
 }
@@ -240,7 +262,7 @@ export async function signedChatAttachments(admin: SupabaseClient, ids: string[]
   const result = new Map<string, ReturnType<typeof attachmentPayload>>();
   if (!uniqueIds.length) return result;
   const { data: uploads, error } = await admin.from("chat_media_uploads")
-    .select("id,media_kind,mime_type,storage_path,original_filename,size_bytes,duration_seconds,status")
+    .select("id,media_kind,mime_type,storage_path,original_filename,size_bytes,duration_seconds,width,height,status")
     .in("id", uniqueIds)
     .eq("status", "attached");
   if (error) throw new ApiError("CHAT_LOAD_FAILED", "We couldn’t prepare chat attachments.", 500, undefined, false);
@@ -285,12 +307,13 @@ export async function messageReactionMap(
   return result;
 }
 
-function publicSender(profile: any) {
+function publicSender(profile: any, badges: any[] = []) {
   return profile ? {
     id: profile.id,
     username: profile.username,
     display_name: profile.display_name,
     avatar_url: profile.avatar_url,
+    badges,
   } : null;
 }
 
@@ -301,6 +324,7 @@ export async function hydrateChatMessages(
   rows: any[],
   viewerId: string,
   hiddenProfileIds: Set<string> = new Set<string>(),
+  identityScope: { organizationId?: string | null; branchId?: string | null } = {},
 ) {
   if (!rows.length) return [];
   const messageIds = rows.map((message) => message.id);
@@ -321,12 +345,13 @@ export async function hydrateChatMessages(
   const allRows = [...rows, ...(missingReplies ?? []).filter((reply: any) => !hiddenProfileIds.has(reply.sender_profile_id))];
   const profileIds = [...new Set(allRows.map((message) => message.sender_profile_id).filter(Boolean))];
   const attachmentIds = [...new Set(allRows.flatMap((message) => message.attachment_ids ?? []))];
-  const [{ data: profiles, error: profilesError }, attachmentMap, reactions] = await Promise.all([
+  const [{ data: profiles, error: profilesError }, attachmentMap, reactions, badgeMap] = await Promise.all([
     profileIds.length
       ? admin.from("profiles").select("id,username,display_name,avatar_url").in("id", profileIds)
       : Promise.resolve({ data: [] as any[], error: null }),
     signedChatAttachments(admin, attachmentIds),
     messageReactionMap(admin, reactionTable, messageIds, viewerId),
+    loadPublicChatBadges(admin, profileIds, identityScope.organizationId, identityScope.branchId),
   ]);
   if (profilesError) throw new ApiError("CHAT_LOAD_FAILED", "We couldn’t load message senders.", 500, undefined, false);
   const profileMap = new Map((profiles ?? []).map((profile: any) => [profile.id, profile]));
@@ -335,14 +360,14 @@ export async function hydrateChatMessages(
     id: reply.id,
     body: reply.redacted_at ? "Message removed" : reply.body,
     sender_profile_id: reply.sender_profile_id,
-    sender: publicSender(profileMap.get(reply.sender_profile_id)),
+    sender: publicSender(profileMap.get(reply.sender_profile_id), badgeMap.get(reply.sender_profile_id) ?? []),
     attachmentType: (reply.attachment_ids ?? []).map((id: string) => attachmentMap.get(id)?.type).find(Boolean) ?? null,
   } : null;
 
   return rows.map((message) => ({
     ...message,
     body: message.redacted_at ? "Message removed" : message.body,
-    sender: publicSender(profileMap.get(message.sender_profile_id)),
+    sender: publicSender(profileMap.get(message.sender_profile_id), badgeMap.get(message.sender_profile_id) ?? []),
     attachments: message.redacted_at
       ? []
       : (message.attachment_ids ?? []).map((id: string) => attachmentMap.get(id)).filter(Boolean),

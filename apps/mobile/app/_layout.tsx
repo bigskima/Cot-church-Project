@@ -33,9 +33,10 @@ function AppContent() {
     return (
       <View style={[styles.accessBootstrap, { backgroundColor: colors.bg }]}>
         <View style={[styles.accessBootstrapCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
-          <ActivityIndicator size="large" color={colors.interactive} />
-          <Text style={[styles.accessBootstrapTitle, { color: colors.text }]}>Opening COT</Text>
-          <Text style={[styles.accessBootstrapCopy, { color: colors.textSecondary }]}>Getting your church home, Expressions and messages ready.</Text>
+          <View style={[styles.accessBootstrapSpinner, { backgroundColor: colors.primarySoft }]}>
+            <ActivityIndicator size="small" color={colors.interactive} />
+          </View>
+          <Text style={[styles.accessBootstrapTitle, { color: colors.text }]}>Loading COT</Text>
         </View>
       </View>
     );
@@ -126,9 +127,9 @@ export default function RootLayout() {
 
 const styles = StyleSheet.create({
   accessBootstrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
-  accessBootstrapCard: { width: '100%', maxWidth: 420, minHeight: 180, borderWidth: 1, borderRadius: radius.xxl, padding: spacing.xxl, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-  accessBootstrapTitle: { marginTop: spacing.sm, fontSize: 20, fontWeight: '800', textAlign: 'center', letterSpacing: -0.35 },
-  accessBootstrapCopy: { fontSize: 13, lineHeight: 19, textAlign: 'center', maxWidth: 330 },
+  accessBootstrapCard: { width: '100%', maxWidth: 280, minHeight: 118, borderWidth: 1, borderRadius: radius.xxl, padding: spacing.lg, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+  accessBootstrapSpinner: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  accessBootstrapTitle: { fontSize: 16, lineHeight: 20, fontWeight: '900', textAlign: 'center', letterSpacing: -0.25 },
   errorScreen: { flex: 1, backgroundColor: palette.darkBg, alignItems: 'center', justifyContent: 'center', padding: spacing.xxl },
   errorCard: { width: '100%', maxWidth: 460, borderRadius: radius.xxl, borderWidth: 1, borderColor: palette.darkBorder, backgroundColor: palette.darkCard, padding: spacing.xxl },
   errorTitle: { color: palette.textDarkPrimary, fontSize: 22, fontWeight: '800', letterSpacing: -0.4, marginBottom: spacing.sm },

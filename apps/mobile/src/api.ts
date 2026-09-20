@@ -115,7 +115,7 @@ const INTERNAL_COPY_PATTERN = /\b(api|webhook|runtime|secret|provider|adapter|co
 function userFacingApiMessage(code: string, status: number, serverMessage?: string) {
   const known: Record<string, string> = {
     API_NOT_CONFIGURED: 'This feature is temporarily unavailable. Please try again later.',
-    NETWORK_ERROR: 'We couldn’t connect. Check your internet connection and try again.',
+    NETWORK_ERROR: 'We couldn’t reach COT services right now. Please try again.',
     REQUEST_TIMEOUT: 'This is taking longer than expected. Please try again.',
     INVALID_RESPONSE: 'We couldn’t load this right now. Please try again.',
     AUTHENTICATION_REQUIRED: 'Please sign in to continue.',

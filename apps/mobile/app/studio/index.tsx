@@ -11,12 +11,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import {
+  CompactRouteGrid,
   Icon,
-  LeadershipModuleCard,
   ScreenHeader,
   SectionHeader,
 } from '@/components';
-import { radius, shadows, spacing } from '@/design-system/tokens';
+import { radius, spacing } from '@/design-system/tokens';
 
 export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'general' } = {}) {
   const insets = useSafeAreaInsets();
@@ -193,63 +193,48 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
           { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 120 },
         ]}
       >
-        <ScreenHeader
-          title="Create"
-          kicker="GENERAL COT"
-          subtitle="Publish to the church-wide public community."
-          showBack
-        />
+        <ScreenHeader title="Create" showBack compact />
 
         <View style={styles.body}>
-          <View style={[styles.publicNotice, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}>
-            <View style={[styles.publicNoticeIcon, { backgroundColor: colors.card }]}>
-              <Icon name="globe-outline" size={20} color={colors.interactive} />
-            </View>
-            <View style={styles.publicNoticeCopy}>
-              <Text style={[styles.publicNoticeTitle, { color: colors.text }]}>General COT is public</Text>
-              <Text style={[styles.publicNoticeText, { color: colors.textSecondary }]}>Posts, Reels, videos, voice recordings and public giveaways created here can be seen across the public COT experience.</Text>
-            </View>
-          </View>
-
           {signedIn ? (
             <View style={styles.createSection}>
-              <SectionHeader title="Create something" subtitle="Choose a format; no ministry role is required for public Posts, Reels, videos, voice or giveaways. Official polls remain permission-controlled." />
-              <View style={styles.createGrid}>
-                {creationActions.map((item) => (
-                  <Pressable
-                    key={item.title}
-                    onPress={item.action}
-                    style={({ pressed }) => [styles.createCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Create ${item.title}`}
-                  >
-                    <View style={[styles.createIcon, { backgroundColor: item.title === 'Reel' ? colors.liveSoft : colors.primarySoft }]}>
-                      <Icon name={item.iconName} size={24} color={item.title === 'Reel' ? colors.live : colors.interactive} />
-                    </View>
-                    <Text style={[styles.createTitle, { color: colors.text }]}>{item.title}</Text>
-                    <Text style={[styles.createDescription, { color: colors.textMuted }]}>{item.description}</Text>
-                    <View style={styles.createArrow}><Icon name="arrow-forward" size={15} color={colors.textMuted} /></View>
-                  </Pressable>
-                ))}
-              </View>
+              <SectionHeader title="Create" compact />
+              <CompactRouteGrid
+                compact
+                items={creationActions.map((item) => ({
+                  key: item.title,
+                  label: item.title,
+                  icon: item.iconName,
+                  accessibilityLabel: `${item.title}. ${item.description}`,
+                  onPress: item.action,
+                }))}
+              />
             </View>
           ) : (
             <Pressable
               onPress={() => router.push({ pathname: '/(auth)/login', params: { returnTo: '/general/studio' } } as any)}
               style={({ pressed }) => [styles.signInCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, pressed && styles.pressed]}
             >
-              <Icon name="person-circle-outline" size={28} color={colors.interactive} />
-              <View style={styles.signInCopy}><Text style={[styles.signInTitle, { color: colors.text }]}>Sign in to create</Text><Text style={[styles.signInText, { color: colors.textMuted }]}>Public content creation is available to every signed-in account.</Text></View>
+              <Icon name="person-circle-outline" size={24} color={colors.interactive} />
+              <Text style={[styles.signInTitle, { color: colors.text }]}>Sign in to create</Text>
               <Icon name="chevron-forward" size={18} color={colors.textMuted} />
             </Pressable>
           )}
 
           {leadershipModules.length ? (
             <View style={styles.modulesSection}>
-              <SectionHeader title="More tools" badge={leadershipModules.length} subtitle="Ministry tools appear only when they are available to your account." />
-              {leadershipModules.map((module) => (
-                <LeadershipModuleCard key={module.title} title={module.title} description={module.description} iconName={module.iconName} badge={module.badge} onPress={() => router.push(module.route as any)} />
-              ))}
+              <SectionHeader title="Ministry" badge={leadershipModules.length} compact />
+              <CompactRouteGrid
+                compact
+                items={leadershipModules.map((module) => ({
+                  key: module.title,
+                  label: module.title,
+                  icon: module.iconName,
+                  badge: module.badge,
+                  accessibilityLabel: `${module.title}. ${module.description}`,
+                  onPress: () => router.push(module.route as any),
+                }))}
+              />
             </View>
           ) : null}
         </View>
@@ -261,23 +246,10 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: { flexGrow: 1 },
-  body: { paddingHorizontal: spacing.md, gap: spacing.xl },
-  publicNotice: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md },
-  publicNoticeIcon: { width: 44, height: 44, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
-  publicNoticeCopy: { flex: 1, gap: 2 },
-  publicNoticeTitle: { fontSize: 14, fontWeight: '800' },
-  publicNoticeText: { fontSize: 11.5, lineHeight: 17 },
+  body: { paddingHorizontal: spacing.md, gap: spacing.lg },
   createSection: { gap: spacing.sm },
-  createGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  createCard: { width: '48.5%', minHeight: 174, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.xs, position: 'relative' },
-  createIcon: { width: 46, height: 46, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xs },
-  createTitle: { fontSize: 17, lineHeight: 22, fontWeight: '800', letterSpacing: -0.35 },
-  createDescription: { fontSize: 11.5, lineHeight: 17, paddingRight: spacing.sm },
-  createArrow: { position: 'absolute', right: spacing.md, bottom: spacing.md },
-  modulesSection: { gap: spacing.xs },
-  signInCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderWidth: 1, borderRadius: radius.xl, padding: spacing.lg },
-  signInCopy: { flex: 1, gap: 2 },
-  signInTitle: { fontSize: 15, fontWeight: '800' },
-  signInText: { fontSize: 12, lineHeight: 17 },
+  modulesSection: { gap: spacing.sm },
+  signInCard: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.xl, paddingHorizontal: spacing.md },
+  signInTitle: { flex: 1, fontSize: 14, fontWeight: '800' },
   pressed: { opacity: 0.88, transform: [{ scale: 0.992 }] },
 });
