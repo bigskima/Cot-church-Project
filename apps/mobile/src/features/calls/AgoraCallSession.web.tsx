@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import AgoraRTC, { type IAgoraRTCClient, type ICameraVideoTrack, type IMicrophoneAudioTrack, type IAgoraRTCRemoteUser } from 'agora-rtc-sdk-ng';
 import type { AgoraCallSessionProps } from './call-types';
 
-export function AgoraCallSession({ grant, kind, scope, otherName, onJoined, onError }: AgoraCallSessionProps) {
+export function AgoraCallSession({ grant, kind, scope, otherName, onJoined, onError, overlayBottomInset = 72 }: AgoraCallSessionProps) {
   const clientRef = useRef<IAgoraRTCClient | null>(null);
   const audioRef = useRef<IMicrophoneAudioTrack | null>(null);
   const videoRef = useRef<ICameraVideoTrack | null>(null);
@@ -114,7 +114,13 @@ export function AgoraCallSession({ grant, kind, scope, otherName, onJoined, onEr
   };
 
   const total = remoteUids.length + 1;
-  const columns = useMemo(() => total <= 1 ? '1fr' : total <= 4 ? 'repeat(2,minmax(0,1fr))' : total <= 6 ? 'repeat(3,minmax(0,1fr))' : 'repeat(auto-fit,minmax(180px,1fr))', [total]);
+  const columns = useMemo(() => {
+    if (total <= 1) return '1fr';
+    if (total === 2) return 'repeat(auto-fit,minmax(min(100%,280px),1fr))';
+    if (total <= 4) return 'repeat(2,minmax(0,1fr))';
+    if (total <= 6) return 'repeat(3,minmax(0,1fr))';
+    return 'repeat(auto-fit,minmax(180px,1fr))';
+  }, [total]);
   const remotePrimary = remoteUids[0];
 
   return (
@@ -163,7 +169,7 @@ export function AgoraCallSession({ grant, kind, scope, otherName, onJoined, onEr
             </div>
           </div>
         ) : (
-          <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: columns, gridAutoRows: total <= 2 ? 'minmax(0,1fr)' : 'minmax(170px,1fr)', gap: 8, padding: 8, overflow: 'auto' }}>
+          <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: columns, gridAutoRows: total === 2 ? 'minmax(240px,1fr)' : total <= 4 ? 'minmax(190px,1fr)' : 'minmax(170px,1fr)', gap: 8, padding: 8, overflow: 'auto' }}>
             <div id='cot-call-local' style={tileStyle}>
               {cameraMuted ? <div style={placeholderStyle}>Camera off</div> : null}
               <div style={tileLabelStyle}>You</div>
@@ -184,7 +190,7 @@ export function AgoraCallSession({ grant, kind, scope, otherName, onJoined, onEr
           </div>
         </div>
       )}
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', padding: '14px 16px 82px', background: 'linear-gradient(180deg,rgba(3,6,11,.15),#03060B)' }}>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', padding: `14px 16px ${overlayBottomInset + 14}px`, background: 'linear-gradient(180deg,rgba(3,6,11,.15),#03060B)' }}>
         <button onClick={() => void toggleMic()} style={{ ...buttonStyle, ...(micMuted ? activeButtonStyle : {}) }}>{micMuted ? 'Unmute' : 'Mute'}</button>
         {kind === 'video' ? <button onClick={() => void toggleCamera()} style={{ ...buttonStyle, ...(cameraMuted ? activeButtonStyle : {}) }}>{cameraMuted ? 'Camera on' : 'Camera off'}</button> : null}
         {kind === 'video' ? <button onClick={() => void flip()} style={buttonStyle}>Flip camera</button> : null}
