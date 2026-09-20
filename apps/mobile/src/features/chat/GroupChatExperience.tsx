@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +13,8 @@ import { RichChatComposer } from './RichChatComposer';
 import { RichMessageBubble } from './RichMessageBubble';
 import type { ChatReaction, ChatReply, ChatSendPayload, RichChatMessage } from './rich-chat-types';
 import { ChatCallActions } from '@/features/calls/ChatCallActions';
+import { CallHistoryBubble } from '@/features/calls/CallHistoryBubble';
+import type { CallHistoryPayload } from '@/features/calls/call-types';
 
 type GroupChatPayload = {
   group: { id: string; name: string; branch_id?: string | null };
@@ -21,6 +23,10 @@ type GroupChatPayload = {
   permissions: { pinMessages: boolean };
   messages: RichChatMessage[];
 };
+
+type GroupTimelineItem =
+  | { kind: 'message'; id: string; at: string; message: RichChatMessage }
+  | { kind: 'call'; id: string; at: string; entry: CallHistoryPayload['history'][number] };
 
 export function GroupChatExperience({ groupId, sectionId, scope = 'expression' }: { groupId: string; sectionId?: string | null; scope?: 'expression' | 'general' }) {
   const { colors } = useTheme();
@@ -33,7 +39,7 @@ export function GroupChatExperience({ groupId, sectionId, scope = 'expression' }
   const [messages, setMessages] = useState<RichChatMessage[]>([]);
   const [replyTo, setReplyTo] = useState<ChatReply | null>(null);
   const [actionError, setActionError] = useState('');
-  const listRef = useRef<FlatList<RichChatMessage>>(null);
+  const listRef = useRef<FlatList<GroupTimelineItem>>(null);
   const key = `group-chat:${groupId}:${sectionId ?? 'main'}`;
 
   const resource = useResource<GroupChatPayload>(key, (signal) => {
@@ -42,6 +48,16 @@ export function GroupChatExperience({ groupId, sectionId, scope = 'expression' }
     if (sectionId) query.set('sectionId', sectionId);
     return api.request<GroupChatPayload>(`group-chat?${query.toString()}`, { signal, ...requestScope });
   });
+
+  const callHistory = useResource<CallHistoryPayload>(
+    `chat-call:history:group:${groupId}:${sectionId ?? 'main'}`,
+    (signal) => {
+      if (mode !== 'authenticated' || !groupId) return Promise.resolve({ history: [] });
+      const query = new URLSearchParams({ service: 'calls', history: 'true', scope: 'group', groupId });
+      if (sectionId) query.set('sectionId', sectionId);
+      return api.request<CallHistoryPayload>(`noop?${query.toString()}`, { signal, context: 'public' });
+    },
+  );
 
   useEffect(() => {
     if (resource.data?.messages) setMessages(resource.data.messages);
@@ -106,9 +122,15 @@ export function GroupChatExperience({ groupId, sectionId, scope = 'expression' }
     }
   };
 
+  const timeline = useMemo<GroupTimelineItem[]>(() => {
+    const messageItems = messages.map((message) => ({ kind: 'message' as const, id: `message:${message.id}`, at: message.sent_at, message }));
+    const callItems = (callHistory.data?.history ?? []).map((entry) => ({ kind: 'call' as const, id: `call:${entry.call.id}`, at: entry.call.created_at, entry }));
+    return [...messageItems, ...callItems].sort((left, right) => new Date(left.at).getTime() - new Date(right.at).getTime());
+  }, [callHistory.data?.history, messages]);
+
   const beginReply = (message: RichChatMessage) => setReplyTo({ id: message.id, body: message.body, sender_profile_id: message.sender_profile_id, sender: message.sender, attachmentType: message.attachments?.[0]?.type ?? null });
   const jumpToMessage = (id: string) => {
-    const index = messages.findIndex((message) => message.id === id);
+    const index = timeline.findIndex((item) => item.kind === 'message' && item.message.id === id);
     if (index >= 0) listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
   };
 
@@ -160,7 +182,7 @@ export function GroupChatExperience({ groupId, sectionId, scope = 'expression' }
       {pinned.length ? <Pressable onPress={() => jumpToMessage(pinned[0].id)} style={[styles.pinned, { backgroundColor: colors.primarySoft }]}><Icon name='pin' size={14} color={colors.interactive} /><Text style={[styles.pinnedText, { color: colors.textSecondary }]} numberOfLines={1}>{pinned[0].body || 'Pinned media message'}</Text></Pressable> : null}
       <FlatList
         ref={listRef}
-        data={messages}
+        data={timeline}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.messages}
         keyboardShouldPersistTaps='handled'
@@ -168,7 +190,9 @@ export function GroupChatExperience({ groupId, sectionId, scope = 'expression' }
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
         onScrollToIndexFailed={({ index, averageItemLength }) => listRef.current?.scrollToOffset({ offset: averageItemLength * index, animated: true })}
         ListEmptyComponent={<View style={styles.empty}><Icon name='chatbubbles-outline' size={30} color={colors.textMuted} /><Text style={[styles.emptyTitle, { color: colors.text }]}>No messages yet</Text></View>}
-        renderItem={({ item }) => <RichMessageBubble message={item} mine={item.sender_profile_id === context?.profile?.id} showSender canPin={resource.data?.permissions.pinMessages === true} onReply={beginReply} onReact={(target, emoji) => void react(target, emoji)} onPin={(target, value) => void pin(target, value)} onJumpToMessage={jumpToMessage} />}
+        renderItem={({ item }) => item.kind === 'call'
+          ? <CallHistoryBubble entry={item.entry} viewerId={context?.profile?.id ?? ''} />
+          : <RichMessageBubble message={item.message} mine={item.message.sender_profile_id === context?.profile?.id} showSender canPin={resource.data?.permissions.pinMessages === true} onReply={beginReply} onReact={(target, emoji) => void react(target, emoji)} onPin={(target, value) => void pin(target, value)} onJumpToMessage={jumpToMessage} />}
       />
       {actionError ? <Text style={[styles.error, { color: colors.live }]}>{actionError}</Text> : null}
       <RichChatComposer endpoint='group-chat' requestContext='current' scope={{ groupId, sectionId }} replyTo={replyTo} disabledReason={restriction} bottomInset={Math.max(insets.bottom, 10)} onCancelReply={() => setReplyTo(null)} onSend={send} />
