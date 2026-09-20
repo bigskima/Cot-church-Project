@@ -37,6 +37,7 @@ const files = [
   'apps/mobile/app/general/leadership/platform-admin/index.tsx',
   'apps/mobile/app/general/leadership/platform-admin/[module].tsx',
   'apps/mobile/src/features/general/GeneralMinistryWorkspace.tsx',
+  'apps/mobile/src/constants/guides.ts',
   'apps/mobile/src/features/general/GeneralRolesAccessExperience.tsx',
   'apps/mobile/src/features/notifications/NotificationsExperience.tsx',
   'apps/mobile/src/features/expression-management/ExpressionIdentityBadgesExperience.tsx',
@@ -198,6 +199,13 @@ const adminPlatformBoundaryUi = [
   sources.get('apps/admin/src/pages/AdminInvitations.tsx') ?? '',
 ].join('\n');
 const identityBadgeUi = sources.get('apps/mobile/src/features/expression-management/ExpressionIdentityBadgesExperience.tsx') ?? '';
+const guideLinksUi = [
+  sources.get('apps/mobile/src/constants/guides.ts') ?? '',
+  sources.get('apps/mobile/app/general/tour.tsx') ?? '',
+  sources.get('apps/mobile/src/features/general/GeneralMinistryWorkspace.tsx') ?? '',
+  sources.get('apps/mobile/src/components/expression/ExpressionManagementHeader.tsx') ?? '',
+  sources.get('apps/admin/src/components/Shell.tsx') ?? '',
+].join('\n');
 const paymentInfrastructureUi = sources.get('apps/admin/src/pages/PaymentInfrastructure.tsx') ?? '';
 const profileSettingsUi = sources.get('apps/mobile/app/(tabs)/profile/settings.tsx') ?? '';
 const sessionUi = sources.get('apps/mobile/src/state/session.tsx') ?? '';
@@ -496,6 +504,9 @@ const boundaryChecks = [
   [identityBadgeUi, /hasOrganizationCapability\('organization\.leadership\.manage'\)/, 'General COT identity badges require ministry leadership authority'],
   [adminPlatformBoundaryUi, /platform-admin-invitations\?view=pending[\s\S]*Accept and continue/, 'web admin accepts pending Platform Administrator invitations'],
   [adminPlatformBoundaryUi, /The app delivers the notice; acceptance happens only on this administration website/, 'web admin invitation UI explains the app-delivery-only boundary'],
+  [guideLinksUi, /1tzW_4eU9yDzKHGjey4dxcUbMRPnRyThP-TtY0B2dD2M[\s\S]*Read the COT Member Guide/, 'member help opens only the COT Member Guide'],
+  [guideLinksUi, /13AM5RK4CuJffYe9zIF2iew1VWBneg7YrskL4dNh23hU[\s\S]*Open the COT Ministry Roles and Operations Guide/, 'ministry workspaces open the role-specific Ministry Guide'],
+  [guideLinksUi, /17SeNvbifGeuAL7pV-2TkbnZ_ZGr1S-GI0U5ZdPH4XLw[\s\S]*Open the COT Platform Administration Guide/, 'platform shell opens the role-specific Platform Administration Guide'],
 ];
 
 const forbiddenGivingPatterns = [
