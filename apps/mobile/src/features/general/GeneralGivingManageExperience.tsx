@@ -213,12 +213,12 @@ export default function GeneralGivingManageExperience() {
 
   if (!organization) return <View style={[styles.screen, styles.center, { backgroundColor: colors.bg }]}><EmptyState title="Choose a church" message="Choose a church before managing giving." iconName="business-outline" /></View>;
   if (!access.accessReady || scopeAccess.loading) return <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top + spacing.md }]}><View style={styles.body}><Skeleton height={110} count={4} /></View></View>;
-  if (!access.canManageGiving || scopeAccess.data?.organization === false) return <View style={[styles.screen, styles.center, { backgroundColor: colors.bg }]}><EmptyState title="Giving setup unavailable" message="Church-wide giving setup appears only for roles with giving configuration authority." iconName="lock-closed-outline" /></View>;
+  if (!access.canManageGiving || scopeAccess.data?.organization === false) return <View style={[styles.screen, styles.center, { backgroundColor: colors.bg }]}><EmptyState title="Giving setup unavailable" message="Church-wide giving setup is available only to roles allowed to manage giving." iconName="lock-closed-outline" /></View>;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + spacing.xxl }]}>
-        <ScreenHeader title="Giving setup" kicker="MINISTRY · FINANCE" subtitle={`Configure the church-wide giving experience for ${organization.name}.`} showBack rightAction={access.canReadGivingFinance ? <Button label="Reports" variant="outline" size="sm" onPress={() => router.push('/general/leadership/giving-finance')} /> : undefined} />
+        <ScreenHeader title="Giving setup" kicker="MINISTRY · FINANCE" subtitle={`Set up church-wide giving for ${organization.name}.`} showBack rightAction={access.canReadGivingFinance ? <Button label="Reports" variant="outline" size="sm" onPress={() => router.push('/general/leadership/giving-finance')} /> : undefined} />
         <View style={styles.body}>
           {notice ? <Pressable onPress={() => setNotice('')} style={[styles.notice, { backgroundColor: colors.successSoft, borderColor: colors.success }]}><Icon name="checkmark-circle" size={18} color={colors.success} /><Text style={[styles.noticeText, { color: colors.success }]}>{notice}</Text></Pressable> : null}
           {error && !flow ? <Pressable onPress={() => setError('')} style={[styles.notice, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}><Icon name="alert-circle-outline" size={18} color={colors.live} /><Text style={[styles.noticeText, { color: colors.live }]}>{error}</Text></Pressable> : null}
