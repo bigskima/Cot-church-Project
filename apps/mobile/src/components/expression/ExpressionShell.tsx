@@ -93,7 +93,7 @@ function ExpressionNavigation({ expressionId, onNavigate }: { expressionId: stri
   const communityItems = useMemo<NavItem[]>(
     () => [
       { key: 'discussion', label: 'General discussion', icon: 'chatbubble-ellipses-outline', active: pathname === `${basePath}/chat`, onPress: () => router.push(`${basePath}/chat` as any) },
-      { key: 'feed', label: 'Expression feed', icon: 'chatbubbles-outline', active: pathname === `${basePath}/feed`, onPress: () => router.push(`${basePath}/feed` as any) },
+      { key: 'feed', label: 'Feed', icon: 'chatbubbles-outline', active: pathname === `${basePath}/feed`, onPress: () => router.push(`${basePath}/feed` as any) },
       { key: 'prayer', label: 'Prayer', icon: 'heart-outline', active: pathname === `${basePath}/prayer`, onPress: () => router.push(`${basePath}/prayer` as any) },
       { key: 'testimonies', label: 'Testimonies', icon: 'sparkles-outline', active: pathname === `${basePath}/testimonies`, onPress: () => router.push(`${basePath}/testimonies` as any) },
       { key: 'events', label: 'Events', icon: 'calendar-outline', active: pathname === `${basePath}/events`, onPress: () => router.push(`${basePath}/events` as any) },
