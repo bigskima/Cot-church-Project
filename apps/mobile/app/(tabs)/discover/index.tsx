@@ -158,9 +158,9 @@ export default function DiscoverScreen() {
             compact
             items={[
               { key: 'watch', label: 'Watch', icon: 'play-circle-outline', accessibilityLabel: 'Watch. Long-form media', onPress: () => router.push('/general/watch') },
-              { key: 'reels', label: 'Reels', icon: 'flash-outline', accessibilityLabel: 'Reels. Short videos', onPress: () => router.push('/general/reels') },
+              { key: 'reels', label: 'Reels', icon: 'flash-outline', accessibilityLabel: 'Reels. Quick discovery', onPress: () => router.push('/general/reels') },
               { key: 'community', label: 'Community', icon: 'people-outline', accessibilityLabel: 'Community. Public conversations', onPress: () => router.push('/general') },
-              { key: 'story', label: 'Our Story', icon: 'library-outline', accessibilityLabel: 'Our Story. Church and leaders', onPress: () => router.push('/general/church-story' as any) },
+              { key: 'story', label: 'Our Story', icon: 'library-outline', accessibilityLabel: 'Our Story. Church & leaders', onPress: () => router.push('/general/church-story' as any) },
             ]}
           />
         </View>
