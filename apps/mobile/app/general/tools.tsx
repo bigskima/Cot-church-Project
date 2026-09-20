@@ -125,19 +125,19 @@ export default function GeneralToolsScreen() {
               <>
                 <Pressable onPress={() => router.push('/general/settings')} style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}>
                   <View style={[styles.settingsIcon, { backgroundColor: colors.bgSecondary }]}><Icon name="person-circle-outline" size={19} color={colors.text} /></View>
-                  <View style={styles.settingsCopy}><Text style={[styles.settingsTitle, { color: colors.text }]}>Profile & privacy</Text><Text style={[styles.settingsSubtitle, { color: colors.textSecondary }]}>Identity, banner, birthday privacy and contact</Text></View>
+                  <View style={styles.settingsCopy}><Text style={[styles.settingsTitle, { color: colors.text }]}>Profile & privacy</Text></View>
                   <Icon name="chevron-forward" size={18} color={colors.textMuted} />
                 </Pressable>
                 <View style={[styles.settingsDivider, { backgroundColor: colors.borderSubtle }]} />
                 <Pressable onPress={() => router.push('/general/notifications')} style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}>
                   <View style={[styles.settingsIcon, { backgroundColor: colors.bgSecondary }]}><Icon name="notifications-outline" size={19} color={colors.text} /></View>
-                  <View style={styles.settingsCopy}><Text style={[styles.settingsTitle, { color: colors.text }]}>Notifications</Text><Text style={[styles.settingsSubtitle, { color: colors.textSecondary }]}>Inbox, invitations and activity</Text></View>
+                  <View style={styles.settingsCopy}><Text style={[styles.settingsTitle, { color: colors.text }]}>Notifications</Text></View>
                   <Icon name="chevron-forward" size={18} color={colors.textMuted} />
                 </Pressable>
                 <View style={[styles.settingsDivider, { backgroundColor: colors.borderSubtle }]} />
                 <Pressable onPress={() => router.push('/general/notification-settings')} style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}>
                   <View style={[styles.settingsIcon, { backgroundColor: colors.bgSecondary }]}><Icon name="options-outline" size={19} color={colors.text} /></View>
-                  <View style={styles.settingsCopy}><Text style={[styles.settingsTitle, { color: colors.text }]}>Notification preferences</Text><Text style={[styles.settingsSubtitle, { color: colors.textSecondary }]}>Choose what COT should notify you about</Text></View>
+                  <View style={styles.settingsCopy}><Text style={[styles.settingsTitle, { color: colors.text }]}>Notification preferences</Text></View>
                   <Icon name="chevron-forward" size={18} color={colors.textMuted} />
                 </Pressable>
               </>
@@ -146,7 +146,7 @@ export default function GeneralToolsScreen() {
             <View style={[styles.appearanceBlock, mode === 'authenticated' && { borderTopColor: colors.borderSubtle, borderTopWidth: StyleSheet.hairlineWidth }]}>
               <View style={styles.appearanceHeading}>
                 <View style={[styles.settingsIcon, { backgroundColor: colors.bgSecondary }]}><Icon name="color-palette-outline" size={19} color={colors.text} /></View>
-                <View style={styles.settingsCopy}><Text style={[styles.settingsTitle, { color: colors.text }]}>Appearance</Text><Text style={[styles.settingsSubtitle, { color: colors.textSecondary }]}>Choose how COT looks on this device</Text></View>
+                <View style={styles.settingsCopy}><Text style={[styles.settingsTitle, { color: colors.text }]}>Appearance</Text></View>
               </View>
               <View style={styles.themeRow}>
                 <Chip label="System" selected={preference === 'system'} onPress={() => setPreference('system')} />
@@ -182,13 +182,13 @@ const styles = StyleSheet.create({
   signInTitle: { fontSize: 14, fontWeight: '800' },
   signInText: { fontSize: 11, lineHeight: 16, marginTop: 2 },
   settingsCard: { borderWidth: 1, borderRadius: radius.xl, overflow: 'hidden' },
-  settingsRow: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md },
+  settingsRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md },
   settingsIcon: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   settingsCopy: { flex: 1, minWidth: 0 },
   settingsTitle: { fontSize: 13.5, fontWeight: '800' },
   settingsSubtitle: { fontSize: 10.5, lineHeight: 15, marginTop: 2 },
   settingsDivider: { height: StyleSheet.hairlineWidth, marginLeft: 62 },
-  appearanceBlock: { padding: spacing.md, gap: spacing.sm },
+  appearanceBlock: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.xs },
   appearanceHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   themeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, paddingLeft: 48 },
   pressed: { opacity: 0.86, transform: [{ scale: 0.99 }] },
