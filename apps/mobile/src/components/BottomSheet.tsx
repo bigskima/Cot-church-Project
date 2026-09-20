@@ -70,7 +70,7 @@ export function BottomSheet({
             <View style={[styles.header, { borderBottomColor: colors.borderSubtle }]}>
               <View style={styles.headerCopy}>
                 {title ? <Text style={[styles.title, { color: colors.text }]}>{title}</Text> : null}
-                {subtitle ? <Text style={[styles.subtitle, { color: colors.textMuted }]}>{subtitle}</Text> : null}
+                {subtitle ? <Text style={[styles.subtitle, { color: colors.textMuted }]} numberOfLines={1}>{subtitle}</Text> : null}
               </View>
               <Pressable
                 onPress={onClose}
@@ -142,13 +142,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerCopy: { flex: 1, minWidth: 0 },
-  title: { ...typography.h2 },
+  title: { fontSize: 19, lineHeight: 24, fontWeight: '900', letterSpacing: -0.35 },
   subtitle: {
     ...typography.bodySmall,
     marginTop: 3,
@@ -162,8 +162,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   contentContainer: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xxl,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xl,
   },
 });
