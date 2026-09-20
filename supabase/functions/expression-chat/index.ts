@@ -231,6 +231,19 @@ Deno.serve(createHandler(
     }
 
     const action = requiredString(body.action, "action", 40);
+    const featureScope = {
+      organizationId: auth.organizationId,
+      expressionId: branchId,
+    };
+    if (["create_upload", "complete_upload", "delete_upload", "send", "react", "pin"].includes(action)) {
+      await assertFeatureEnabled(admin, "expression_discussion", featureScope, "Expression discussion is currently unavailable.");
+    }
+    if (action === "create_upload") {
+      await assertFeatureEnabled(admin, "chat_media", featureScope, "Chat photos and files are currently unavailable in this Expression.");
+      if (String(body.mimeType ?? "").toLowerCase().startsWith("audio/")) {
+        await assertFeatureEnabled(admin, "voice_notes", featureScope, "Voice notes are currently unavailable in this Expression.");
+      }
+    }
     if (action === "create_upload") {
       assertMayPost(membership);
       const mimeType = String(body.mimeType ?? "").trim().toLowerCase();
