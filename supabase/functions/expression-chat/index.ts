@@ -5,6 +5,7 @@ import { jsonBody } from "../_shared/request.ts";
 import { createNotifications, mentionUsernames, notificationPreview, profileIdsForUsernames, senderIdentity } from "../_shared/notifications.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { loadSafetyProfileSets } from "../_shared/safety.ts";
+import { loadPublicChatBadges } from "../_shared/identity-badges.ts";
 import { assertObject, requiredString, uuid } from "../_shared/validation.ts";
 
 const BUCKET = "chat-media";
@@ -98,7 +99,7 @@ function assertMayPost(membership: any) {
   }
 }
 
-async function hydrate(admin: any, rows: any[], viewerId: string) {
+async function hydrate(admin: any, rows: any[], viewerId: string, organizationId: string, branchId: string) {
   if (!rows.length) return [];
   const safety = await loadSafetyProfileSets(admin, viewerId);
   const visible = rows.filter((row) => !safety.hiddenFromFeed.has(row.sender_profile_id));
@@ -122,6 +123,7 @@ async function hydrate(admin: any, rows: any[], viewerId: string) {
     if (!extra.error) profilesResult.data = [...(profilesResult.data ?? []), ...(extra.data ?? [])];
   }
   const profileMap = new Map((profilesResult.data ?? []).map((profile: any) => [profile.id, profile]));
+  const badgeMap = await loadPublicChatBadges(admin, [...new Set([...profileIds, ...extraReplyProfileIds])], organizationId, branchId);
   const replyMap = new Map(visibleReplies.map((reply: any) => [reply.id, reply]));
   const reactions = new Map<string, Map<string, { count: number; reactedByMe: boolean }>>();
   for (const row of reactionsResult.data ?? []) {
@@ -153,12 +155,16 @@ async function hydrate(admin: any, rows: any[], viewerId: string) {
     const reply = row.reply_to_id ? replyMap.get(row.reply_to_id) : null;
     return {
       ...row,
-      sender: profileMap.get(row.sender_profile_id) ?? null,
+      sender: profileMap.has(row.sender_profile_id)
+        ? { ...profileMap.get(row.sender_profile_id), badges: badgeMap.get(row.sender_profile_id) ?? [] }
+        : null,
       replyTo: reply ? {
         id: reply.id,
         body: reply.redacted_at ? "Message removed" : reply.body,
         sender_profile_id: reply.sender_profile_id,
-        sender: profileMap.get(reply.sender_profile_id) ?? null,
+        sender: profileMap.has(reply.sender_profile_id)
+          ? { ...profileMap.get(reply.sender_profile_id), badges: badgeMap.get(reply.sender_profile_id) ?? [] }
+          : null,
         attachmentType: reply.attachment_ids?.length ? uploadMap.get(reply.attachment_ids[0])?.type ?? null : null,
       } : null,
       attachments: (row.attachment_ids ?? []).map((id: string) => uploadMap.get(id)).filter(Boolean),
@@ -209,7 +215,7 @@ Deno.serve(createHandler(
         membership,
         permissions: { moderateMembers: canModerate, pinMessages: canModerate },
         members,
-        messages: await hydrate(admin, (rows ?? []).reverse(), auth.user.id),
+        messages: await hydrate(admin, (rows ?? []).reverse(), auth.user.id, auth.organizationId!, branchId),
       } };
     }
 
@@ -321,7 +327,7 @@ Deno.serve(createHandler(
           },
         });
       }
-      return { data: (await hydrate(admin, [created], auth.user.id))[0] };
+      return { data: (await hydrate(admin, [created], auth.user.id, auth.organizationId!, branchId))[0] };
     }
 
     if (action === "react") {
