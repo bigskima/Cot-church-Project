@@ -6,6 +6,7 @@ import { resolveActiveOrganizationId } from "../_shared/public-organization.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { assertObject, requiredString, uuid } from "../_shared/validation.ts";
+import { assertFeatureEnabled } from "../_shared/feature-controls.ts";
 
 const BOOK_BUCKET = "library-books";
 const COVER_BUCKET = "library-covers";
@@ -142,6 +143,7 @@ export const libraryHandler = createHandler(
       const view = url.searchParams.get("view") ?? "list";
 
       if (view === "list") {
+        await assertFeatureEnabled(admin, "library_books", { organizationId }, "COT Library is currently unavailable.");
         const search = (url.searchParams.get("search") ?? "").trim().slice(0, 80);
         let query = admin.from("library_books")
           .select("id,organization_id,title,subtitle,author_name,publisher,isbn,description,source_format,cover_path,status,published_at,created_at")
@@ -155,6 +157,7 @@ export const libraryHandler = createHandler(
       }
 
       if (view === "detail") {
+        await assertFeatureEnabled(admin, "library_books", { organizationId }, "COT Library is currently unavailable.");
         const bookId = uuid(url.searchParams.get("bookId"), "bookId", true)!;
         const book = await requireBook(admin, bookId, organizationId);
         if (book.status !== "published" && !(await canManage(auth, organizationId))) {
@@ -189,6 +192,7 @@ export const libraryHandler = createHandler(
       }
 
       if (view === "devotional") {
+        await assertFeatureEnabled(admin, "devotionals", { organizationId }, "Devotionals are currently unavailable.");
         const date = isoDate(url.searchParams.get("date") ?? new Date().toISOString().slice(0, 10));
         const year = Number(date.slice(0, 4));
         const { data: seriesRows, error: seriesError } = await admin.from("devotional_series")
@@ -264,6 +268,7 @@ export const libraryHandler = createHandler(
         const { data: series, error } = await admin.from("devotional_series").select("*").eq("id", seriesId).eq("organization_id", organizationId).maybeSingle();
         if (error || !series) throw new ApiError("DEVOTIONAL_NOT_FOUND", "This devotional is unavailable.", 404);
         if (series.status !== "published") await requireManage(auth, organizationId);
+        else await assertFeatureEnabled(admin, "devotionals", { organizationId }, "Devotionals are currently unavailable.");
         const { data: entries, error: entriesError } = await admin.from("devotional_entries").select("*").eq("series_id", seriesId).order("devotional_date");
         if (entriesError) throw new ApiError("DEVOTIONAL_LOAD_FAILED", "Unable to load devotional entries.", 500, undefined, false);
         return { data: { series, entries: entries ?? [] } };
@@ -419,6 +424,7 @@ export const libraryHandler = createHandler(
     }
 
     if (action === "review") {
+      await assertFeatureEnabled(admin, "library_books", { organizationId }, "COT Library is currently unavailable.");
       const bookId = uuid(requiredString(body.bookId, "bookId", 36), "bookId", true)!;
       const book = await requireBook(admin, bookId, organizationId);
       if (book.status !== "published") throw new ApiError("BOOK_NOT_FOUND", "This book is unavailable.", 404);
@@ -432,6 +438,7 @@ export const libraryHandler = createHandler(
     }
 
     if (action === "progress") {
+      await assertFeatureEnabled(admin, "library_books", { organizationId }, "COT Library is currently unavailable.");
       const bookId = uuid(requiredString(body.bookId, "bookId", 36), "bookId", true)!;
       await requireBook(admin, bookId, organizationId);
       const chapterOrder = integer(body.chapterOrder ?? 0, "chapterOrder", 0, 100000);
