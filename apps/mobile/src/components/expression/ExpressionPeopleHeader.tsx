@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { BottomSheet, Icon } from '@/components';
+import { BottomSheet } from '@/components/BottomSheet';
+import { CompactRouteGrid } from '@/components/navigation/CompactRouteGrid';
+import { Icon } from '@/components/primitives/Icon';
 import { radius, spacing } from '@/design-system/tokens';
 import { useTheme } from '@/state/theme';
 
@@ -28,10 +30,6 @@ function routeFor(expressionId: string, key: PeopleSection) {
   return `/expressions/${expressionId}/${key === 'groups' ? 'groups' : key}`;
 }
 
-/**
- * Compact Expression section toolbar. The ExpressionShell already establishes
- * the space identity, so child screens only need the current action + routes.
- */
 export function ExpressionPeopleHeader({ expressionId, expressionName, active, title, subtitle, icon }: Props) {
   const { colors } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -72,26 +70,18 @@ export function ExpressionPeopleHeader({ expressionId, expressionName, active, t
         </Pressable>
       </View>
 
-      <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)} title="Quick routes" subtitle={expressionName} maxHeightPercent={66}>
-        <View style={styles.menuGrid}>
-          {destinations.map((destination) => {
-            const selected = destination.key === active;
-            return (
-              <Pressable
-                key={destination.key}
-                onPress={() => openDestination(destination.key)}
-                style={({ pressed }) => [styles.menuItem, pressed && styles.pressed]}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-              >
-                <View style={[styles.menuIcon, { backgroundColor: selected ? colors.primarySoft : colors.bgSecondary, borderColor: selected ? colors.interactive : colors.borderSubtle }]}>
-                  <Icon name={destination.icon as any} size={19} color={selected ? colors.interactive : colors.textSecondary} />
-                </View>
-                <Text style={[styles.menuLabel, { color: selected ? colors.interactive : colors.text }]} numberOfLines={2}>{destination.label}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
+      <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)} title="Quick routes" maxHeightPercent={60}>
+        <CompactRouteGrid
+          compact
+          items={destinations.map((destination) => ({
+            key: destination.key,
+            label: destination.label,
+            icon: destination.icon,
+            selected: destination.key === active,
+            accessibilityLabel: `${destination.label} in ${expressionName}`,
+            onPress: () => openDestination(destination.key),
+          }))}
+        />
       </BottomSheet>
     </>
   );
@@ -109,9 +99,5 @@ const styles = StyleSheet.create({
   iconWrap: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   title: { flex: 1, minWidth: 0, fontSize: 15, lineHeight: 19, fontWeight: '900', letterSpacing: -0.25 },
   roundButton: { width: 36, height: 36, borderRadius: radius.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  menuGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.md },
-  menuItem: { width: '25%', alignItems: 'center', gap: 6, paddingHorizontal: 3 },
-  menuIcon: { width: 44, height: 44, borderRadius: 15, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  menuLabel: { fontSize: 10, lineHeight: 13, fontWeight: '800', textAlign: 'center' },
   pressed: { opacity: 0.72, transform: [{ scale: 0.97 }] },
 });
