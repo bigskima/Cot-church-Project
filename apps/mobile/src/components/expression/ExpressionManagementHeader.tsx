@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { BottomSheet } from '@/components/BottomSheet';
 import { CompactRouteGrid } from '@/components/navigation/CompactRouteGrid';
 import { Icon } from '@/components/primitives/Icon';
 import { radius, spacing } from '@/design-system/tokens';
+import { COT_MINISTRY_GUIDE_URL } from '@/constants/guides';
 import { useTheme } from '@/state/theme';
 import { useExpressionManagementAccess } from '@/features/expression-management/useExpressionManagementAccess';
 
@@ -134,6 +135,15 @@ export function ExpressionManagementHeader({
             <Icon name={actionIcon as any} size={17} color={colors.interactive} />
           </Pressable>
         ) : null}
+
+        <Pressable
+          onPress={() => void Linking.openURL(COT_MINISTRY_GUIDE_URL)}
+          accessibilityRole="link"
+          accessibilityLabel="Open the COT Ministry Roles and Operations Guide"
+          style={({ pressed }) => [styles.roundButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.pressed]}
+        >
+          <Icon name="book-outline" size={17} color={colors.interactive} />
+        </Pressable>
 
         <Pressable
           onPress={() => router.push(`/expressions/${expressionId}` as any)}
