@@ -1,11 +1,13 @@
 import React, { useMemo, useState } from 'react';
-import { Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomSheet, Button, Chip, EmptyState, Icon, InputField, ResourceError, ScreenHeader, SectionHeader, Skeleton } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 import { invalidate } from '@/services/query-cache';
+import { putSignedUpload, type UploadFile } from '@/services/uploads';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 
@@ -13,8 +15,9 @@ type FieldType = 'text' | 'textarea' | 'email' | 'phone' | 'number' | 'select' |
 type FormField = { id: string; label: string; type: FieldType; required: boolean; placeholder?: string; help?: string; options?: string[] };
 type CotForm = {
   id: string; slug: string; title: string; description: string; status: 'draft' | 'published' | 'closed' | 'hidden';
-  fields: FormField[]; submit_label: string; success_message: string; requires_auth: boolean; updated_at?: string;
+  fields: FormField[]; submit_label: string; success_message: string; requires_auth: boolean; banner_image_url?: string | null; updated_at?: string;
 };
+type UploadIntent = { signedUploadUrl: string; publicUrl: string };
 type ResponseRow = {
   id: string; values: Record<string, unknown>; status: 'active' | 'hidden'; created_at: string;
   profile?: { display_name?: string; username?: string } | null;
@@ -53,6 +56,7 @@ export default function GeneralFormsManageExperience() {
   const [submitLabel, setSubmitLabel] = useState('Submit');
   const [successMessage, setSuccessMessage] = useState('Thank you. Your response has been received.');
   const [requiresAuth, setRequiresAuth] = useState(true);
+  const [bannerFile, setBannerFile] = useState<UploadFile | null>(null);
   const [fields, setFields] = useState<FormField[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -71,12 +75,12 @@ export default function GeneralFormsManageExperience() {
 
   const reset = () => {
     setEditing(null); setTitle(''); setSlug(''); setDescription(''); setStatus('draft');
-    setSubmitLabel('Submit'); setSuccessMessage('Thank you. Your response has been received.'); setRequiresAuth(true); setFields([]); setError('');
+    setSubmitLabel('Submit'); setSuccessMessage('Thank you. Your response has been received.'); setRequiresAuth(true); setBannerFile(null); setFields([]); setError('');
   };
   const openCreate = () => { reset(); setFields([{ id: 'name', label: 'Name', type: 'text', required: true }]); setEditorOpen(true); };
   const openEdit = (item: CotForm) => {
     setEditing(item); setTitle(item.title); setSlug(item.slug); setDescription(item.description); setStatus(item.status);
-    setSubmitLabel(item.submit_label); setSuccessMessage(item.success_message); setRequiresAuth(item.requires_auth);
+    setSubmitLabel(item.submit_label); setSuccessMessage(item.success_message); setRequiresAuth(item.requires_auth); setBannerFile(null);
     setFields((item.fields ?? []).map((field) => ({ ...field, options: field.options ?? [] }))); setError(''); setEditorOpen(true);
   };
 
@@ -84,6 +88,18 @@ export default function GeneralFormsManageExperience() {
     setFields((current) => current.map((field, fieldIndex) => fieldIndex === index ? { ...field, ...next } : field));
   };
   const addField = () => setFields((current) => [...current, { id: 'field_' + (current.length + 1), label: 'New field', type: 'text', required: false }]);
+
+  const chooseBannerImage = async () => {
+    setError('');
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) { setError('Allow photo-library access to choose the form banner.'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [16, 7], quality: .92 });
+    const asset = result.canceled ? null : result.assets?.[0];
+    if (!asset) return;
+    const mimeType = asset.mimeType?.toLowerCase() || 'image/jpeg';
+    if (!['image/jpeg','image/png','image/webp'].includes(mimeType)) { setError('Choose a JPG, PNG or WebP image.'); return; }
+    setBannerFile({ uri: asset.uri, name: asset.fileName || 'cot-form-banner.jpg', mimeType, size: asset.fileSize, file: (asset as any).file });
+  };
 
   const save = async () => {
     if (!title.trim() || !fields.length || saving) { setError('Add a form title and at least one field.'); return; }
@@ -94,6 +110,16 @@ export default function GeneralFormsManageExperience() {
         id: fieldKey(field.label, 'field_' + (index + 1)),
         options: field.type === 'select' ? (field.options ?? []).filter(Boolean) : [],
       }));
+      let bannerImageUrl = editing?.banner_image_url ?? null;
+      if (bannerFile) {
+        const intent = await api.request<UploadIntent>('noop?service=engagement-hub', {
+          method: 'POST',
+          context: 'public',
+          body: JSON.stringify({ action: 'create_banner_upload', organizationId, mimeType: bannerFile.mimeType }),
+        });
+        await putSignedUpload(intent.signedUploadUrl, bannerFile);
+        bannerImageUrl = intent.publicUrl;
+      }
       await api.request('noop?service=engagement-hub', {
         method: 'POST', context: 'public',
         body: JSON.stringify({
@@ -102,10 +128,10 @@ export default function GeneralFormsManageExperience() {
           description: description.trim(), status, fields: normalizedFields,
           submitLabel: submitLabel.trim() || 'Submit',
           successMessage: successMessage.trim() || 'Thank you. Your response has been received.',
-          requiresAuth,
+          requiresAuth, bannerImageUrl,
         }),
       });
-      invalidate('engagement:manage:');
+      invalidate('engagement:manage:'); invalidate('home:spotlight:banners:');
       setEditorOpen(false); reset(); resource.refresh();
     } catch (value) { setError(value instanceof Error ? value.message : 'Unable to save form.'); }
     finally { setSaving(false); }
@@ -173,6 +199,7 @@ export default function GeneralFormsManageExperience() {
           <SectionHeader title="Form library" badge={list.length} subtitle="Reusable forms can be linked from banners, announcements and events." />
           {resource.loading && !resource.data ? <Skeleton height={104} count={3} /> : resource.error && !resource.data ? <ResourceError message={resource.error} retry={resource.refresh} /> : list.length ? list.map((item) => (
             <View key={item.id} style={[styles.card,{backgroundColor:colors.card,borderColor:colors.borderSubtle},shadows.sm]}>
+              {item.banner_image_url ? <Image source={{ uri: item.banner_image_url }} style={styles.formBannerThumb} resizeMode="cover" /> : null}
               <View style={styles.cardTop}><View style={styles.flex}><Text style={[styles.cardTitle,{color:colors.text}]}>{item.title}</Text><Text style={[styles.cardMeta,{color:colors.textMuted}]}>/{item.slug} · {item.fields?.length ?? 0} fields · {item.status}</Text></View><Icon name="document-text-outline" size={20} color={colors.interactive}/></View>
               {item.description ? <Text style={[styles.cardBody,{color:colors.textSecondary}]} numberOfLines={2}>{item.description}</Text> : null}
               <View style={styles.actions}><Button label="Edit" variant="outline" size="sm" onPress={()=>openEdit(item)}/><Button label="Responses" variant="outline" size="sm" onPress={()=>openResponses(item)}/><Button label="Open" variant="outline" size="sm" onPress={()=>router.push('/general/forms/'+item.slug as any)}/><Button label="Delete" variant="outline" size="sm" onPress={()=>void removeForm(item)}/></View>
@@ -186,6 +213,17 @@ export default function GeneralFormsManageExperience() {
           <InputField label="Form title" value={title} onChangeText={setTitle} placeholder="Conference registration"/>
           <InputField label="URL slug" value={slug} onChangeText={setSlug} placeholder="conference-registration"/>
           <InputField label="Description" value={description} onChangeText={setDescription} multiline numberOfLines={4} placeholder="Explain what this form is for."/>
+          <Text style={[styles.label,{color:colors.textSecondary}]}>HOME BANNER IMAGE</Text>
+          <Pressable onPress={()=>void chooseBannerImage()} style={[styles.upload,{backgroundColor:colors.bgSecondary,borderColor:colors.borderSubtle}]}>
+            {bannerFile?.uri || editing?.banner_image_url
+              ? <Image source={{ uri: bannerFile?.uri || editing?.banner_image_url! }} style={styles.uploadPreview} resizeMode="cover" />
+              : <View style={[styles.uploadIcon,{backgroundColor:colors.primarySoft}]}><Icon name="image-outline" size={23} color={colors.interactive}/></View>}
+            <View style={styles.flex}>
+              <Text style={[styles.uploadTitle,{color:colors.text}]}>{bannerFile || editing?.banner_image_url ? 'Change banner image' : 'Choose banner image'}</Text>
+              <Text style={[styles.uploadHelp,{color:colors.textMuted}]}>Published forms automatically appear in the Home spotlight. Wide 16:7 artwork is used there.</Text>
+            </View>
+            <Icon name="chevron-forward" size={17} color={colors.textMuted}/>
+          </Pressable>
           <Text style={[styles.label,{color:colors.textSecondary}]}>STATUS</Text>
           <View style={styles.chips}>{(['draft','published','closed','hidden'] as const).map((item)=><Chip key={item} label={item} selected={status===item} onPress={()=>setStatus(item)}/>)}</View>
           <View style={styles.toggleRow}><Text style={[styles.toggleText,{color:colors.text}]}>Require signed-in member</Text><Chip label={requiresAuth?'Yes':'No'} selected={requiresAuth} onPress={()=>setRequiresAuth(v=>!v)}/></View>
@@ -232,8 +270,8 @@ export default function GeneralFormsManageExperience() {
 const styles=StyleSheet.create({
   screen:{flex:1},content:{flexGrow:1,width:'100%',maxWidth:940,alignSelf:'center'},body:{paddingHorizontal:spacing.md,gap:spacing.md},flex:{flex:1,minWidth:0},
   summaryRow:{flexDirection:'row',gap:spacing.sm},summary:{flex:1,borderWidth:1,borderRadius:radius.xl,padding:spacing.md},summaryNumber:{fontSize:24,fontWeight:'900'},summaryLabel:{fontSize:10.5,marginTop:2},
-  card:{borderWidth:1,borderRadius:radius.xl,padding:spacing.md,gap:spacing.sm},cardTop:{flexDirection:'row',alignItems:'flex-start',gap:spacing.sm},cardTitle:{fontSize:14,fontWeight:'900'},cardMeta:{fontSize:9.5,lineHeight:14,marginTop:2},cardBody:{fontSize:11,lineHeight:16},
-  actions:{flexDirection:'row',flexWrap:'wrap',gap:6},sheet:{gap:spacing.md,paddingBottom:spacing.xl},label:{fontSize:9.5,fontWeight:'900',letterSpacing:.7},chips:{flexDirection:'row',flexWrap:'wrap',gap:6,paddingRight:spacing.md},
+  card:{borderWidth:1,borderRadius:radius.xl,padding:spacing.md,gap:spacing.sm},formBannerThumb:{width:'100%',aspectRatio:16/7,borderRadius:radius.lg,marginBottom:2},cardTop:{flexDirection:'row',alignItems:'flex-start',gap:spacing.sm},cardTitle:{fontSize:14,fontWeight:'900'},cardMeta:{fontSize:9.5,lineHeight:14,marginTop:2},cardBody:{fontSize:11,lineHeight:16},
+  actions:{flexDirection:'row',flexWrap:'wrap',gap:6},sheet:{gap:spacing.md,paddingBottom:spacing.xl},label:{fontSize:9.5,fontWeight:'900',letterSpacing:.7},chips:{flexDirection:'row',flexWrap:'wrap',gap:6,paddingRight:spacing.md},upload:{minHeight:84,borderWidth:1,borderRadius:radius.xl,padding:spacing.sm,flexDirection:'row',alignItems:'center',gap:spacing.sm},uploadPreview:{width:120,aspectRatio:16/7,borderRadius:radius.md},uploadIcon:{width:58,height:58,borderRadius:radius.lg,alignItems:'center',justifyContent:'center'},uploadTitle:{fontSize:12.5,fontWeight:'900'},uploadHelp:{fontSize:10,lineHeight:14,marginTop:2},
   toggleRow:{minHeight:48,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:spacing.sm},toggleText:{fontSize:12,fontWeight:'800'},rowBetween:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:spacing.sm},
   sectionTitle:{fontSize:14,fontWeight:'900'},fieldCard:{borderWidth:1,borderRadius:radius.xl,padding:spacing.md,gap:spacing.sm},fieldNumber:{fontSize:8.5,fontWeight:'900',letterSpacing:.8},
   error:{fontSize:11,lineHeight:16,fontWeight:'700'},responseList:{gap:spacing.sm,paddingBottom:spacing.md},responseCard:{borderWidth:1,borderRadius:radius.lg,padding:spacing.md,gap:spacing.sm},responseName:{fontSize:12.5,fontWeight:'900'},
