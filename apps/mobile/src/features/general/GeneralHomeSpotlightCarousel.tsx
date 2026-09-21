@@ -31,6 +31,7 @@ type HomeBanner = {
   image_url?: string | null;
   destination_type: 'none' | 'route' | 'external' | 'event' | 'announcement' | 'form';
   destination_value?: string | null;
+  source?: 'published_event' | 'published_announcement' | 'published_form' | string;
 };
 
 type SpotlightItem = {
@@ -73,7 +74,7 @@ export function GeneralHomeSpotlightCarousel() {
     if (banner.destination_type === 'external') { void Linking.openURL(value); return; }
     if (banner.destination_type === 'route') { router.push(value as any); return; }
     if (banner.destination_type === 'event') { router.push('/general/event/' + value as any); return; }
-    if (banner.destination_type === 'announcement') { router.push({ pathname: '/general/announcements', params: { announcementId: value } } as any); return; }
+    if (banner.destination_type === 'announcement') { router.push('/general/announcement/' + value as any); return; }
     if (banner.destination_type === 'form') { router.push('/general/forms/' + value as any); }
   };
 
@@ -122,7 +123,13 @@ export function GeneralHomeSpotlightCarousel() {
       result.push({
         key: 'banner:' + banner.id,
         kind: 'banner',
-        eyebrow: 'COT OFFICIAL',
+        eyebrow: banner.destination_type === 'announcement'
+          ? 'ANNOUNCEMENT'
+          : banner.destination_type === 'event'
+            ? 'UPCOMING EVENT'
+            : banner.destination_type === 'form'
+              ? 'COT FORM'
+              : 'COT OFFICIAL',
         title: banner.title,
         body: banner.subtitle || '',
         imageUrl: banner.image_url,
