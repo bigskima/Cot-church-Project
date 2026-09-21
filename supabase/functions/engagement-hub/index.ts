@@ -185,10 +185,18 @@ export const engagementHubHandler=createHandler(
       if(action==="event_responses"){
         await requireManager(auth,organizationId);
         const eventId=uuid(requiredString(url.searchParams.get("eventId"),"eventId",36),"eventId",true)!;
-        const [{data:interests},{data:registrations}]=await Promise.all([
+        const {data:event,error:eventError}=await admin.from("events").select("id,response_form_id").eq("organization_id",organizationId).eq("id",eventId).maybeSingle();
+        if(eventError||!event) throw new ApiError("EVENT_NOT_FOUND","This event is unavailable.",404);
+        const [{data:interests},{data:registrations},{data:form}]=await Promise.all([
           admin.from("cot_event_interests").select("profile_id,created_at").eq("organization_id",organizationId).eq("event_id",eventId).order("created_at",{ascending:false}),
           admin.from("event_registrations").select("id,membership_id,status,registered_at").eq("organization_id",organizationId).eq("event_id",eventId).order("registered_at",{ascending:false}),
+          event.response_form_id
+            ? admin.from("cot_forms").select("id,slug,title,fields,status").eq("organization_id",organizationId).eq("id",event.response_form_id).maybeSingle()
+            : Promise.resolve({data:null,error:null}),
         ]);
+        const {data:formSubmissions}=event.response_form_id
+          ? await admin.from("cot_form_submissions").select("id,profile_id,values,status,created_at").eq("organization_id",organizationId).eq("form_id",event.response_form_id).order("created_at",{ascending:false}).limit(1000)
+          : {data:[] as any[]};
         const membershipIds=(registrations??[]).map((row:any)=>row.membership_id).filter(Boolean);
         const {data:memberships}=membershipIds.length
           ? await admin.from("memberships").select("id,profile_id").in("id",membershipIds)
@@ -197,11 +205,14 @@ export const engagementHubHandler=createHandler(
         const ids=[
           ...(interests??[]).map((row:any)=>row.profile_id),
           ...(registrations??[]).map((row:any)=>memberMap.get(row.membership_id)).filter(Boolean),
+          ...(formSubmissions??[]).map((row:any)=>row.profile_id).filter(Boolean),
         ];
         const profiles=await profileMap(admin,ids as string[]);
         return {data:{
           interested:(interests??[]).map((row:any)=>({...row,profile:profiles.get(row.profile_id)??null})),
           registered:(registrations??[]).map((row:any)=>({...row,profile:profiles.get(memberMap.get(row.membership_id))??null})),
+          form:form??null,
+          formResponses:(formSubmissions??[]).map((row:any)=>({...row,profile:row.profile_id?profiles.get(row.profile_id)??null:null})),
         }};
       }
 
