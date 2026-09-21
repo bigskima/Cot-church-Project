@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
   wrap: { gap: 7 },
   track: { alignItems: 'stretch' },
   card: { marginHorizontal: 0, minHeight: 190, aspectRatio: 2.15, borderWidth: 1, borderRadius: radius.xl, overflow: 'hidden' },
-  image: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  image: { ...StyleSheet.absoluteFill as any, width: '100%', height: '100%' },
   overlay: { flex: 1, padding: spacing.md, justifyContent: 'space-between' },
   overlayOnImage: { backgroundColor: 'rgba(2,10,20,.42)' },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
