@@ -17,11 +17,15 @@ import { bibleVerseCardDataUri } from './bible-share-card';
 type BibleVersion = {
   id: string;
   abbreviation?: string;
+  localized_abbreviation?: string;
   title?: string;
   localized_title?: string;
   copyright?: string;
   provider?: string;
   language?: { name?: string; iso_639_1?: string };
+  language_tag?: string;
+  available?: boolean;
+  accessStatus?: 'public_domain' | 'licensed' | 'requires_license';
 };
 
 type BibleBook = { name: string; usfm: string; number: number; chapters: number };
@@ -116,6 +120,7 @@ export function BibleExperience() {
   const [versionId, setVersionId] = useState('web');
   const [language, setLanguage] = useState('en');
   const [versionSheet, setVersionSheet] = useState(false);
+  const [versionSearch, setVersionSearch] = useState('');
   const [bookSheet, setBookSheet] = useState(false);
   const [noteSheet, setNoteSheet] = useState(false);
   const [noteText, setNoteText] = useState('');
@@ -218,6 +223,21 @@ export function BibleExperience() {
   const highlight = study.data?.highlights?.find((item) => item.reference === visibleReference && item.version_id === versionId);
   const savedNote = study.data?.notes?.find((item) => item.reference === visibleReference && item.version_id === versionId);
   const currentVersion = versions.data?.find((item) => String(item.id) === String(versionId));
+  const visibleVersions = useMemo(() => {
+    const needle = versionSearch.trim().toLowerCase();
+    const source = versions.data ?? [];
+    if (!needle) return source;
+    return source.filter((item) => {
+      const haystack = [
+        item.abbreviation,
+        item.localized_abbreviation,
+        item.title,
+        item.localized_title,
+        item.language_tag,
+      ].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(needle);
+    });
+  }, [versions.data, versionSearch]);
 
   useEffect(() => {
     if (!passage.data) return;
@@ -723,45 +743,75 @@ export function BibleExperience() {
         </ScrollView>
       </BottomSheet>
 
-      <BottomSheet visible={versionSheet} onClose={() => setVersionSheet(false)} title="Bible version" subtitle="Licensed translations appear when YouVersion is connected." maxHeightPercent={80}>
-        <TextInput
-          value={language}
-          onChangeText={setLanguage}
-          placeholder="Language code e.g. en, ig, fr"
-          placeholderTextColor={colors.textMuted}
-          style={[styles.languageInput, { color: colors.text, borderColor: colors.borderSubtle, backgroundColor: colors.bgSecondary }]}
-        />
+      <BottomSheet visible={versionSheet} onClose={() => setVersionSheet(false)} title="Bible version" subtitle="KJV, NKJV and other YouVersion translations appear according to your app's publisher licenses." maxHeightPercent={82}>
+        <View style={styles.versionFilters}>
+          <TextInput
+            value={language}
+            onChangeText={setLanguage}
+            placeholder="Language code e.g. en, ig, fr"
+            placeholderTextColor={colors.textMuted}
+            style={[styles.languageInput, { color: colors.text, borderColor: colors.borderSubtle, backgroundColor: colors.bgSecondary }]}
+          />
+          <View style={[styles.versionSearch, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+            <Icon name="search-outline" size={16} color={colors.textMuted} />
+            <TextInput
+              value={versionSearch}
+              onChangeText={setVersionSearch}
+              placeholder="Search KJV, NKJV, NIV…"
+              placeholderTextColor={colors.textMuted}
+              style={[styles.versionSearchInput, { color: colors.text }]}
+            />
+            {versionSearch ? <Pressable onPress={() => setVersionSearch('')}><Icon name="close-circle" size={16} color={colors.textMuted} /></Pressable> : null}
+          </View>
+        </View>
         <ScrollView style={styles.versionScroll}>
-          {versions.data?.map((item) => (
-            <Pressable
-              key={String(item.id)}
-              onPress={() => {
-                setVersionId(String(item.id));
-                setVersionSheet(false);
-                if (mode === 'authenticated') void postAction({
-                  action: 'preferences',
-                  defaultVersionId: String(item.id),
-                  languageTag: language,
-                  dailyScriptureNotification: Boolean(study.data?.preferences?.daily_scripture_notification),
-                  notificationTime: study.data?.preferences?.notification_time || '07:00',
-                  timezone: study.data?.preferences?.timezone || localTimezone(),
-                  audioRate: speechRate,
-                });
-              }}
-              style={[styles.versionRow, { borderBottomColor: colors.borderSubtle }]}
-            >
-              <View style={[styles.versionBadge, { backgroundColor: colors.primarySoft }]}>
-                <Text style={[styles.versionBadgeText, { color: colors.interactive }]}>{item.abbreviation || String(item.id)}</Text>
-              </View>
-              <View style={styles.flex}>
-                <Text style={[styles.versionTitle, { color: colors.text }]}>{item.localized_title || item.title || item.abbreviation}</Text>
-                <Text style={[styles.versionMeta, { color: colors.textMuted }]}>
-                  {item.language?.name || ''}{item.provider ? ' · ' + item.provider : ''}
-                </Text>
-              </View>
-              {String(item.id) === String(versionId) ? <Icon name="checkmark-circle" size={18} color={colors.interactive} /> : null}
-            </Pressable>
-          ))}
+          {visibleVersions.map((item) => {
+            const available = item.available !== false;
+            const abbreviation = item.localized_abbreviation || item.abbreviation || String(item.id);
+            return (
+              <Pressable
+                key={String(item.id)}
+                disabled={!available}
+                onPress={() => {
+                  setVersionId(String(item.id));
+                  setVersePage(0);
+                  setVersionSheet(false);
+                  if (mode === 'authenticated') void postAction({
+                    action: 'preferences',
+                    defaultVersionId: String(item.id),
+                    languageTag: language,
+                    dailyScriptureNotification: Boolean(study.data?.preferences?.daily_scripture_notification),
+                    notificationTime: study.data?.preferences?.notification_time || '07:00',
+                    timezone: study.data?.preferences?.timezone || localTimezone(),
+                    audioRate: speechRate,
+                  });
+                }}
+                style={[styles.versionRow, { borderBottomColor: colors.borderSubtle, opacity: available ? 1 : 0.58 }]}
+              >
+                <View style={[styles.versionBadge, { backgroundColor: available ? colors.primarySoft : colors.bgSecondary }]}>
+                  <Text style={[styles.versionBadgeText, { color: available ? colors.interactive : colors.textMuted }]}>{abbreviation}</Text>
+                </View>
+                <View style={styles.flex}>
+                  <Text style={[styles.versionTitle, { color: colors.text }]}>{item.localized_title || item.title || abbreviation}</Text>
+                  <Text style={[styles.versionMeta, { color: available ? colors.textMuted : colors.live }]}>
+                    {available
+                      ? ((item.language?.name || item.language_tag || '') + (item.provider ? ' · ' + item.provider : ''))
+                      : 'Listed by YouVersion · publisher license not enabled for this COT App Key'}
+                  </Text>
+                </View>
+                {String(item.id) === String(versionId)
+                  ? <Icon name="checkmark-circle" size={18} color={colors.interactive} />
+                  : !available
+                    ? <Icon name="lock-closed-outline" size={16} color={colors.textMuted} />
+                    : null}
+              </Pressable>
+            );
+          })}
+          {!visibleVersions.length ? (
+            <Text style={[styles.emptyHelp, { color: colors.textMuted }]}>
+              No translation matches this search. If a YouVersion translation is missing, its publisher license may not be enabled for this App Key yet.
+            </Text>
+          ) : null}
         </ScrollView>
       </BottomSheet>
 
@@ -957,7 +1007,10 @@ const styles = StyleSheet.create({
   chapterGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chapterChip: { width: 42, height: 38, borderWidth: 1, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   chapterChipText: { fontSize: 10.5, fontWeight: '800' },
-  languageInput: { minHeight: 44, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: 12, marginBottom: spacing.sm },
+  versionFilters: { gap: 8, marginBottom: spacing.sm },
+  languageInput: { minHeight: 44, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: 12 },
+  versionSearch: { minHeight: 44, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  versionSearchInput: { flex: 1, fontSize: 12.5 },
   versionScroll: { maxHeight: 460 },
   versionRow: { minHeight: 62, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 8 },
   versionBadge: { width: 48, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
