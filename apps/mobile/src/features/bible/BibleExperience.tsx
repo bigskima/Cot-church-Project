@@ -62,6 +62,7 @@ type PlanDetail = Plan & {
   progress?: { current_day: number; completed_days: number[] } | null;
 };
 type Tab = 'read' | 'search' | 'plans' | 'study';
+type StudyTab = 'overview' | 'bookmarks' | 'highlights' | 'notes' | 'history' | 'settings';
 
 function buildReference(book: BibleBook | undefined, chapter: number) {
   return book ? book.name + ' ' + chapter : 'John 3';
@@ -132,6 +133,8 @@ export function BibleExperience() {
   const [compareSheet, setCompareSheet] = useState(false);
   const [moreToolsOpen, setMoreToolsOpen] = useState(false);
   const [versePage, setVersePage] = useState(0);
+  const [studyTab, setStudyTab] = useState<StudyTab>('overview');
+  const [studyLimit, setStudyLimit] = useState(8);
   const [speechRate, setSpeechRate] = useReadAloudRate();
   const [speaking, setSpeaking] = useState(false);
   const [actionError, setActionError] = useState('');
@@ -191,6 +194,10 @@ export function BibleExperience() {
     if (preference?.default_version_id && versionId === 'web') setVersionId(preference.default_version_id);
     if (preference?.language_tag) setLanguage(preference.language_tag);
   }, [study.data?.preferences]);
+
+  useEffect(() => {
+    setStudyLimit(8);
+  }, [studyTab]);
 
   useEffect(() => {
     if (mode !== 'authenticated' || !passage.data?.reference) return;
@@ -626,6 +633,50 @@ export function BibleExperience() {
     </View>
   );
 
+  const bookmarkItems = (study.data?.bookmarks ?? []).map((item) => ({
+    title: item.reference,
+    meta: item.version_id,
+    onPress: () => { setReference(item.reference); setVersionId(item.version_id); setTab('read'); },
+  }));
+
+  const highlightItems = (study.data?.highlights ?? []).map((item) => ({
+    title: item.reference,
+    meta: 'Highlight · ' + item.color_key,
+    onPress: () => { setReference(item.reference); setVersionId(item.version_id); setTab('read'); },
+  }));
+
+  const noteItems = (study.data?.notes ?? []).map((item) => ({
+    title: item.reference,
+    meta: item.body,
+    onPress: () => { setReference(item.reference); setVersionId(item.version_id); setTab('read'); },
+  }));
+
+  const historyItems = (study.data?.history ?? []).map((item) => ({
+    title: item.reference,
+    meta: 'Read ' + item.read_count + ' time' + (item.read_count === 1 ? '' : 's'),
+    onPress: () => { setReference(item.reference); setVersionId(item.version_id); setTab('read'); },
+  }));
+
+  const activeStudyItems =
+    studyTab === 'bookmarks' ? bookmarkItems :
+    studyTab === 'highlights' ? highlightItems :
+    studyTab === 'notes' ? noteItems :
+    studyTab === 'history' ? historyItems :
+    [];
+
+  const activeStudyTitle =
+    studyTab === 'bookmarks' ? 'Bookmarks' :
+    studyTab === 'highlights' ? 'Highlights' :
+    studyTab === 'notes' ? 'Notes' :
+    studyTab === 'history' ? 'Reading history' :
+    '';
+
+  const activeStudyIcon =
+    studyTab === 'bookmarks' ? 'bookmark-outline' :
+    studyTab === 'highlights' ? 'color-palette-outline' :
+    studyTab === 'notes' ? 'create-outline' :
+    'time-outline';
+
   const studyView = (
     <View style={styles.section}>
       {mode !== 'authenticated' ? (
@@ -639,59 +690,143 @@ export function BibleExperience() {
         </View>
       ) : (
         <>
-          <View style={[styles.settingsCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
-            <Text style={[styles.resultTitle, { color: colors.text }]}>Daily Scripture reminder</Text>
-            <Text style={[styles.emptyHelp, { color: colors.textMuted }]}>
-              The Home card appears every day. Notifications remain optional.
-            </Text>
-            <View style={styles.rowBetween}>
-              <Text style={[styles.settingLabel, { color: colors.textSecondary }]}>Reminder</Text>
-              <Chip
-                label={study.data?.preferences?.daily_scripture_notification ? 'On' : 'Off'}
-                selected={Boolean(study.data?.preferences?.daily_scripture_notification)}
-                onPress={() => void savePreferences(!study.data?.preferences?.daily_scripture_notification)}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.studyTabs}>
+            <Chip label="Overview" selected={studyTab === 'overview'} onPress={() => setStudyTab('overview')} />
+            <Chip label="Saved" selected={studyTab === 'bookmarks'} onPress={() => setStudyTab('bookmarks')} />
+            <Chip label="Highlights" selected={studyTab === 'highlights'} onPress={() => setStudyTab('highlights')} />
+            <Chip label="Notes" selected={studyTab === 'notes'} onPress={() => setStudyTab('notes')} />
+            <Chip label="History" selected={studyTab === 'history'} onPress={() => setStudyTab('history')} />
+            <Chip label="Settings" selected={studyTab === 'settings'} onPress={() => setStudyTab('settings')} />
+          </ScrollView>
+
+          {studyTab === 'overview' ? (
+            <>
+              <View style={[styles.myBibleHero, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+                <View style={[styles.myBibleHeroIcon, { backgroundColor: colors.primarySoft }]}>
+                  <Icon name="book-outline" size={22} color={colors.interactive} />
+                </View>
+                <View style={styles.flex}>
+                  <Text style={[styles.myBibleHeroTitle, { color: colors.text }]}>My Bible</Text>
+                  <Text style={[styles.myBibleHeroText, { color: colors.textMuted }]}>
+                    Your saved Scripture, study notes and reading activity are organized here.
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.studyDashboard}>
+                <MyBibleSummaryCard
+                  icon="bookmark-outline"
+                  label="Saved"
+                  count={bookmarkItems.length}
+                  onPress={() => setStudyTab('bookmarks')}
+                />
+                <MyBibleSummaryCard
+                  icon="color-palette-outline"
+                  label="Highlights"
+                  count={highlightItems.length}
+                  onPress={() => setStudyTab('highlights')}
+                />
+                <MyBibleSummaryCard
+                  icon="create-outline"
+                  label="Notes"
+                  count={noteItems.length}
+                  onPress={() => setStudyTab('notes')}
+                />
+                <MyBibleSummaryCard
+                  icon="time-outline"
+                  label="History"
+                  count={historyItems.length}
+                  onPress={() => setStudyTab('history')}
+                />
+              </View>
+
+              <Pressable
+                onPress={() => setStudyTab('settings')}
+                style={[styles.studySettingsShortcut, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}
+              >
+                <View style={[styles.studySettingsIcon, { backgroundColor: colors.primarySoft }]}>
+                  <Icon name="notifications-outline" size={18} color={colors.interactive} />
+                </View>
+                <View style={styles.flex}>
+                  <Text style={[styles.studySettingsTitle, { color: colors.text }]}>Daily Scripture settings</Text>
+                  <Text style={[styles.studySettingsText, { color: colors.textMuted }]}>
+                    Reminder {study.data?.preferences?.daily_scripture_notification ? 'on' : 'off'} · {study.data?.preferences?.notification_time?.slice(0,5) || '07:00'}
+                  </Text>
+                </View>
+                <Icon name="chevron-forward" size={17} color={colors.textMuted} />
+              </Pressable>
+
+              {historyItems.length ? (
+                <View style={[styles.recentStudyCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+                  <View style={styles.rowBetween}>
+                    <Text style={[styles.resultTitle, { color: colors.text }]}>Recent reading</Text>
+                    <Pressable onPress={() => setStudyTab('history')}>
+                      <Text style={[styles.studySeeAll, { color: colors.interactive }]}>See all</Text>
+                    </Pressable>
+                  </View>
+                  {historyItems.slice(0, 3).map((item, index) => (
+                    <Pressable key={item.title + '-' + index} onPress={item.onPress} style={[styles.studyRow, { borderBottomColor: colors.borderSubtle }]}>
+                      <View style={styles.flex}>
+                        <Text style={[styles.studyTitle, { color: colors.text }]}>{item.title}</Text>
+                        <Text style={[styles.studyMeta, { color: colors.textMuted }]}>{item.meta}</Text>
+                      </View>
+                      <Icon name="chevron-forward" size={16} color={colors.textMuted} />
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+            </>
+          ) : null}
+
+          {studyTab === 'settings' ? (
+            <View style={[styles.settingsCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+              <View style={styles.sectionHeading}>
+                <Icon name="notifications-outline" size={18} color={colors.interactive} />
+                <Text style={[styles.resultTitle, { color: colors.text }]}>Daily Scripture reminder</Text>
+              </View>
+              <Text style={[styles.emptyHelp, { color: colors.textMuted }]}>
+                The Home card appears every day. Notifications remain optional.
+              </Text>
+              <View style={styles.rowBetween}>
+                <Text style={[styles.settingLabel, { color: colors.textSecondary }]}>Reminder</Text>
+                <Chip
+                  label={study.data?.preferences?.daily_scripture_notification ? 'On' : 'Off'}
+                  selected={Boolean(study.data?.preferences?.daily_scripture_notification)}
+                  onPress={() => void savePreferences(!study.data?.preferences?.daily_scripture_notification)}
+                />
+              </View>
+              <TimeField
+                label="Reminder time"
+                value={timeValue(study.data?.preferences?.notification_time)}
+                onChange={(next) => void savePreferences(
+                  Boolean(study.data?.preferences?.daily_scripture_notification),
+                  hhmm(next),
+                )}
+                helperText={'Uses ' + (study.data?.preferences?.timezone || localTimezone()) + ' on this account.'}
               />
+              <Text style={[styles.copyright, { color: colors.textMuted }]}>
+                Daily Scripture reminders use the COT notification system and your saved local time.
+              </Text>
             </View>
-            <TimeField
-              label="Reminder time"
-              value={timeValue(study.data?.preferences?.notification_time)}
-              onChange={(next) => void savePreferences(
-                Boolean(study.data?.preferences?.daily_scripture_notification),
-                hhmm(next),
-              )}
-              helperText={'Uses ' + (study.data?.preferences?.timezone || localTimezone()) + ' on this account.'}
-            />
-            <Text style={[styles.copyright, { color: colors.textMuted }]}>
-              Daily Scripture reminders use the COT notification system and your saved local time.
-            </Text>
-          </View>
-          <StudySection
-            title="Bookmarks"
-            icon="bookmark-outline"
-            items={(study.data?.bookmarks ?? []).map((item) => ({
-              title: item.reference,
-              meta: item.version_id,
-              onPress: () => { setReference(item.reference); setVersionId(item.version_id); setTab('read'); },
-            }))}
-          />
-          <StudySection
-            title="Notes"
-            icon="create-outline"
-            items={(study.data?.notes ?? []).map((item) => ({
-              title: item.reference,
-              meta: item.body,
-              onPress: () => { setReference(item.reference); setVersionId(item.version_id); setTab('read'); },
-            }))}
-          />
-          <StudySection
-            title="Reading history"
-            icon="time-outline"
-            items={(study.data?.history ?? []).map((item) => ({
-              title: item.reference,
-              meta: 'Read ' + item.read_count + ' time' + (item.read_count === 1 ? '' : 's'),
-              onPress: () => { setReference(item.reference); setVersionId(item.version_id); setTab('read'); },
-            }))}
-          />
+          ) : null}
+
+          {activeStudyTitle ? (
+            <View style={[styles.studyListCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+              <StudySection
+                title={activeStudyTitle}
+                icon={activeStudyIcon}
+                items={activeStudyItems.slice(0, studyLimit)}
+              />
+              {activeStudyItems.length > studyLimit ? (
+                <Button
+                  label={'Show more (' + (activeStudyItems.length - studyLimit) + ')'}
+                  variant="outline"
+                  size="sm"
+                  onPress={() => setStudyLimit((value) => value + 8)}
+                />
+              ) : null}
+            </View>
+          ) : null}
         </>
       )}
     </View>
@@ -896,6 +1031,26 @@ function ReaderAction({ icon, label, onPress, active = false }: { icon: string; 
   );
 }
 
+function MyBibleSummaryCard({ icon, label, count, onPress }: { icon: string; label: string; count: number; onPress: () => void }) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.studySummaryCard,
+        { backgroundColor: colors.card, borderColor: colors.borderSubtle },
+        pressed && { opacity: 0.9 },
+      ]}
+    >
+      <View style={[styles.studySummaryIcon, { backgroundColor: colors.primarySoft }]}>
+        <Icon name={icon} size={18} color={colors.interactive} />
+      </View>
+      <Text style={[styles.studySummaryCount, { color: colors.text }]}>{count}</Text>
+      <Text style={[styles.studySummaryLabel, { color: colors.textMuted }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
 function StudySection({ title, icon, items }: { title: string; icon: string; items: Array<{ title: string; meta: string; onPress: () => void }> }) {
   const { colors } = useTheme();
   return (
@@ -994,6 +1149,23 @@ const styles = StyleSheet.create({
   signInCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.lg, gap: spacing.sm, alignItems: 'flex-start' },
   settingsCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm },
   settingLabel: { fontSize: 11.5, fontWeight: '800' },
+  studyTabs: { gap: 7, paddingRight: spacing.md },
+  myBibleHero: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  myBibleHeroIcon: { width: 46, height: 46, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  myBibleHeroTitle: { fontSize: 16, fontWeight: '900' },
+  myBibleHeroText: { fontSize: 10.5, lineHeight: 15, marginTop: 2 },
+  studyDashboard: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  studySummaryCard: { width: '48.5%', minHeight: 112, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, justifyContent: 'space-between' },
+  studySummaryIcon: { width: 36, height: 36, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  studySummaryCount: { fontSize: 22, lineHeight: 27, fontWeight: '900', marginTop: 8 },
+  studySummaryLabel: { fontSize: 10.5, fontWeight: '800' },
+  studySettingsShortcut: { minHeight: 68, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  studySettingsIcon: { width: 38, height: 38, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  studySettingsTitle: { fontSize: 12, fontWeight: '900' },
+  studySettingsText: { fontSize: 9.5, lineHeight: 14, marginTop: 2 },
+  recentStudyCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: 2 },
+  studySeeAll: { fontSize: 10, fontWeight: '900' },
+  studyListCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm },
   studySection: { gap: 4 },
   sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   studyRow: { minHeight: 54, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', alignItems: 'center', gap: 8 },
