@@ -13,7 +13,7 @@ import { useFeatureControls } from '@/features/availability/useFeatureControls';
 export function GeneralHomeActionDeck() {
   const { colors } = useTheme();
   const features = useFeatureControls();
-  const items = [
+  const priorityItems = [
     features.isEnabled('sermons') ? {
       key: 'sermons',
       label: 'Sermons',
@@ -49,14 +49,18 @@ export function GeneralHomeActionDeck() {
       accessibilityLabel: 'Daily Devotional',
       onPress: () => router.push('/general/devotional' as any),
     } : null,
+  ].filter(Boolean) as Array<{ key: string; label: string; icon: string; accessibilityLabel: string; onPress: () => void }>;
+
+  const items = [
+    ...priorityItems.slice(0, 3),
     {
       key: 'more',
-      label: 'More',
+      label: 'View more',
       icon: 'grid-outline',
-      accessibilityLabel: 'More COT tools and routes',
+      accessibilityLabel: 'View more COT routes',
       onPress: () => router.push('/general/tools' as any),
     },
-  ].filter(Boolean) as Array<{ key: string; label: string; icon: string; accessibilityLabel: string; onPress: () => void }>;
+  ];
 
   return (
     <TourAnchor targetKey="general.home.actions">
