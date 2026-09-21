@@ -15,6 +15,11 @@ export type GeneratedImage = {
   model: string;
 };
 
+export type ImageGenerationOptions = {
+  width?: number;
+  height?: number;
+};
+
 type ProviderRow = {
   code: string;
   name: string;
@@ -93,15 +98,15 @@ export async function imageProviderReadiness(admin: any): Promise<ImageProviderR
   };
 }
 
-async function generateCloudflare(admin: any, row: ProviderRow, prompt: string, signal: AbortSignal): Promise<GeneratedImage> {
+async function generateCloudflare(admin: any, row: ProviderRow, prompt: string, signal: AbortSignal, options: ImageGenerationOptions = {}): Promise<GeneratedImage> {
   const config = await configuredCloudflare(admin, row);
   if (!config.accountId || !config.token) {
     throw new ApiError("IMAGE_PROVIDER_NOT_CONFIGURED", "Cloudflare image generation is not configured yet. Upload an image instead, or add the Cloudflare secrets.", 503);
   }
 
   const configuration = row.configuration ?? {};
-  const width = Number(configuration.width ?? 1200);
-  const height = Number(configuration.height ?? 525);
+  const width = Number(options.width ?? configuration.width ?? 1200);
+  const height = Number(options.height ?? configuration.height ?? 525);
   const steps = Math.max(1, Math.min(20, Number(configuration.steps ?? 4) || 4));
   const endpoint = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(config.accountId)}/ai/run/${config.model}`;
   const response = await fetch(endpoint, {
@@ -154,9 +159,9 @@ async function generateCloudflare(admin: any, row: ProviderRow, prompt: string, 
   };
 }
 
-export async function generateImage(admin: any, prompt: string, signal: AbortSignal): Promise<GeneratedImage> {
+export async function generateImage(admin: any, prompt: string, signal: AbortSignal, options: ImageGenerationOptions = {}): Promise<GeneratedImage> {
   const row = await activeProvider(admin);
   if (!row) throw new ApiError("IMAGE_PROVIDER_UNAVAILABLE", "No image-generation provider is active.", 503);
-  if (row.code === "cloudflare") return generateCloudflare(admin, row, prompt, signal);
+  if (row.code === "cloudflare") return generateCloudflare(admin, row, prompt, signal, options);
   throw new ApiError("IMAGE_PROVIDER_UNSUPPORTED", `The ${row.code} image provider is not supported by this runtime yet.`, 503);
 }
