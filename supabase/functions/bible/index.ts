@@ -117,6 +117,46 @@ async function getWebPassage(parsed: ParsedReference) {
   return payload;
 }
 
+function stripVerseLabel(value: string) {
+  return value
+    .replace(/<span[^>]*class=["'][^"']*\\byv-vlbl\\b[^"']*["'][^>]*>[\\s\\S]*?<\\/span>/gi, " ")
+    .replace(/&nbsp;/gi, " ");
+}
+
+function parseYouVersionVerses(html: string, parsed: ParsedReference) {
+  const source = String(html || "");
+  const marker = /<span[^>]*class=["'][^"']*\\byv-v\\b[^"']*["'][^>]*\\bv=["']?(\\d+)["']?[^>]*>/gi;
+  const starts: Array<{ verse: number; start: number; bodyStart: number }> = [];
+  let match: RegExpExecArray | null;
+  while ((match = marker.exec(source))) {
+    starts.push({ verse: Number(match[1]), start: match.index, bodyStart: marker.lastIndex });
+  }
+  if (!starts.length) return [];
+  return starts.map((item, index) => {
+    const end = starts[index + 1]?.start ?? source.length;
+    const segment = source.slice(item.bodyStart, end);
+    return {
+      bookId: parsed.usfm,
+      bookName: parsed.bookName,
+      chapter: parsed.chapter,
+      verse: item.verse,
+      text: cleanText(stripVerseLabel(segment)),
+    };
+  }).filter((item) => item.text);
+}
+
+async function getYouVersionMetadata(versionId: string, key: string) {
+  try {
+    const result = await fetchJson(
+      `${YOUVERSION_BASE}/bibles/${encodeURIComponent(versionId)}`,
+      { headers: { "X-YVP-App-Key": key, "Accept":"application/json" } },
+    );
+    return result?.data ?? result ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function getYouVersionPassage(parsed: ParsedReference, versionId: string) {
   const key = Deno.env.get("BIBLE_YOUVERSION_APP_KEY");
   if (!key) throw new ApiError("BIBLE_VERSION_UNAVAILABLE","This licensed Bible provider has not been connected yet.",503);
@@ -126,18 +166,70 @@ async function getYouVersionPassage(parsed: ParsedReference, versionId: string) 
   );
   const row = result?.data ?? result;
   const html = row?.content ?? row?.html ?? row?.text ?? "";
+  const metadata = await getYouVersionMetadata(versionId, key);
+  let verses = Array.isArray(row?.verses) ? row.verses : [];
+
+  if (!verses.length && typeof html === "string" && html.includes("yv-v")) {
+    verses = parseYouVersionVerses(html, parsed);
+  }
+
+  if (!verses.length && !parsed.verseStart) {
+    try {
+      const verseIndex = await fetchJson(
+        `${YOUVERSION_BASE}/bibles/${encodeURIComponent(versionId)}/books/${parsed.usfm}/chapters/${parsed.chapter}/verses?page_size=99`,
+        { headers: { "X-YVP-App-Key": key, "Accept":"application/json" } },
+      );
+      const indexed = Array.isArray(verseIndex?.data) ? verseIndex.data : [];
+      const resolved = await Promise.all(indexed.map(async (verse: any) => {
+        const verseNumber = Number(verse?.id ?? verse?.title ?? String(verse?.passage_id ?? "").split(".").pop());
+        if (!Number.isFinite(verseNumber)) return null;
+        try {
+          const passageId = verse?.passage_id || `${parsed.usfm}.${parsed.chapter}.${verseNumber}`;
+          const verseResult = await fetchJson(
+            `${YOUVERSION_BASE}/bibles/${encodeURIComponent(versionId)}/passages/${encodeURIComponent(passageId)}`,
+            { headers: { "X-YVP-App-Key": key, "Accept":"application/json" } },
+          );
+          const verseRow = verseResult?.data ?? verseResult;
+          return {
+            bookId: parsed.usfm,
+            bookName: parsed.bookName,
+            chapter: parsed.chapter,
+            verse: verseNumber,
+            text: cleanText(stripVerseLabel(verseRow?.content ?? verseRow?.text ?? "")),
+          };
+        } catch {
+          return null;
+        }
+      }));
+      verses = resolved.filter(Boolean);
+    } catch {
+      // Keep the full passage as a last-resort fallback.
+    }
+  }
+
+  if (parsed.verseStart && verses.length) {
+    verses = verses.filter((verse: any) =>
+      Number(verse.verse) >= parsed.verseStart! &&
+      Number(verse.verse) <= (parsed.verseEnd ?? parsed.verseStart!)
+    );
+  }
+
+  const normalizedText = verses.length
+    ? verses.map((verse: any) => verse.text).join(" ")
+    : cleanText(html);
+
   return {
     reference: parsed.display,
     versionId,
-    abbreviation: row?.bible?.abbreviation ?? row?.version?.abbreviation ?? String(versionId),
-    versionName: row?.bible?.title ?? row?.version?.title ?? "Bible",
-    language: row?.bible?.language?.name ?? null,
-    copyright: row?.copyright ?? row?.bible?.copyright ?? null,
+    abbreviation: metadata?.localized_abbreviation ?? metadata?.abbreviation ?? row?.bible?.abbreviation ?? row?.version?.abbreviation ?? String(versionId),
+    versionName: metadata?.localized_title ?? metadata?.title ?? row?.bible?.title ?? row?.version?.title ?? "Bible",
+    language: metadata?.language_tag ?? row?.bible?.language?.name ?? null,
+    copyright: metadata?.copyright ?? row?.copyright ?? row?.bible?.copyright ?? null,
     provider: "youversion",
-    verses: row?.verses ?? [],
+    verses,
     html,
-    text: cleanText(html),
-    youversionDeepLink: row?.youversion_deep_link ?? null,
+    text: normalizedText,
+    youversionDeepLink: metadata?.youversion_deep_link ?? row?.youversion_deep_link ?? null,
     audio: null,
   };
 }
