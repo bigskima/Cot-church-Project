@@ -63,6 +63,24 @@ function buildReference(book: BibleBook | undefined, chapter: number) {
   return book ? book.name + ' ' + chapter : 'John 3';
 }
 
+function chapterReferenceOf(value: string) {
+  const match = value.trim().match(/^(.+?\s+\d{1,3})(?::\d{1,3}(?:[-–—]\d{1,3})?)?$/);
+  return match?.[1] || value.trim();
+}
+
+function requestedVerseOf(value: string) {
+  const match = value.trim().match(/:(\d{1,3})(?:[-–—](\d{1,3}))?$/);
+  return match ? Number(match[1]) : null;
+}
+
+function progressiveReference(chapterReference: string, verses: Verse[]) {
+  const numbered = verses.map((verse) => Number(verse.verse)).filter((verse) => Number.isFinite(verse));
+  if (!numbered.length) return chapterReference;
+  const first = numbered[0];
+  const last = numbered[numbered.length - 1];
+  return first === last ? chapterReference + ':' + first : chapterReference + ':' + first + '-' + last;
+}
+
 function timeValue(value?: string | null) {
   const date = new Date();
   const match = String(value || '07:00').match(/^(\d{1,2}):(\d{2})/);
@@ -106,6 +124,8 @@ export function BibleExperience() {
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [compareVersion, setCompareVersion] = useState<string | null>(null);
   const [compareSheet, setCompareSheet] = useState(false);
+  const [moreToolsOpen, setMoreToolsOpen] = useState(false);
+  const [versePage, setVersePage] = useState(0);
   const [speechRate, setSpeechRate] = useReadAloudRate();
   const [speaking, setSpeaking] = useState(false);
   const [actionError, setActionError] = useState('');
@@ -116,6 +136,8 @@ export function BibleExperience() {
     return params.toString();
   };
 
+  const chapterReference = useMemo(() => chapterReferenceOf(reference), [reference]);
+
   const books = useResource<BibleBook[]>('bible:books', (signal) =>
     api.request('noop?service=bible&' + queryString({ action: 'books' }), { signal, context: 'public' }),
   );
@@ -123,8 +145,8 @@ export function BibleExperience() {
     api.request('noop?service=bible&' + queryString({ action: 'versions', language }), { signal, context: 'public' }),
   );
   const passage = useResource<Passage>(
-    'bible:passage:' + versionId + ':' + reference + ':' + organizationId,
-    (signal) => api.request('noop?service=bible&' + queryString({ action: 'passage', reference, versionId }), { signal, context: 'public' }),
+    'bible:passage:' + versionId + ':' + chapterReference + ':' + organizationId,
+    (signal) => api.request('noop?service=bible&' + queryString({ action: 'passage', reference: chapterReference, versionId }), { signal, context: 'public' }),
   );
   const today = useResource<Today>('bible:today:' + organizationId, (signal) =>
     api.request('noop?service=bible&' + queryString({ action: 'today' }), { signal, context: 'public' }),
@@ -174,15 +196,39 @@ export function BibleExperience() {
   }, [passage.data?.reference, versionId, mode]);
 
   const parsed = useMemo(() => {
-    const match = reference.match(/^(.+?)\s+(\d{1,3})/);
+    const match = chapterReference.match(/^(.+?)\s+(\d{1,3})/);
     const book = books.data?.find((item) => item.name.toLowerCase() === (match?.[1] || '').toLowerCase());
     return { book, chapter: Number(match?.[2] || 1) };
-  }, [reference, books.data]);
+  }, [chapterReference, books.data]);
 
-  const bookmarked = Boolean(study.data?.bookmarks?.some((item) => item.reference === passage.data?.reference && item.version_id === versionId));
-  const highlight = study.data?.highlights?.find((item) => item.reference === passage.data?.reference && item.version_id === versionId);
-  const savedNote = study.data?.notes?.find((item) => item.reference === passage.data?.reference && item.version_id === versionId);
+  const allVerses = passage.data?.verses?.filter((verse) => Boolean(verse.text)) ?? [];
+  const versesPerPage = 2;
+  const totalVersePages = Math.max(1, Math.ceil(Math.max(allVerses.length, 1) / versesPerPage));
+  const safeVersePage = Math.min(Math.max(versePage, 0), totalVersePages - 1);
+  const visibleVerses = allVerses.length
+    ? allVerses.slice(safeVersePage * versesPerPage, safeVersePage * versesPerPage + versesPerPage)
+    : passage.data
+      ? [{ text: passage.data.text }]
+      : [];
+  const visibleReference = passage.data
+    ? progressiveReference(chapterReference, visibleVerses)
+    : reference;
+  const visibleText = visibleVerses.map((verse) => verse.text || '').filter(Boolean).join(' ');
+  const bookmarked = Boolean(study.data?.bookmarks?.some((item) => item.reference === visibleReference && item.version_id === versionId));
+  const highlight = study.data?.highlights?.find((item) => item.reference === visibleReference && item.version_id === versionId);
+  const savedNote = study.data?.notes?.find((item) => item.reference === visibleReference && item.version_id === versionId);
   const currentVersion = versions.data?.find((item) => String(item.id) === String(versionId));
+
+  useEffect(() => {
+    if (!passage.data) return;
+    const requestedVerse = requestedVerseOf(reference);
+    if (!requestedVerse || !allVerses.length) {
+      setVersePage(0);
+      return;
+    }
+    const requestedIndex = allVerses.findIndex((verse) => Number(verse.verse) === requestedVerse);
+    setVersePage(requestedIndex >= 0 ? Math.floor(requestedIndex / versesPerPage) : 0);
+  }, [chapterReference, passage.data?.reference, reference]);
 
   const postAction = async (body: Record<string, unknown>) => {
     setActionError('');
@@ -216,18 +262,33 @@ export function BibleExperience() {
     } else if (chapter < 1 || chapter > book.chapters) {
       return;
     }
+    void Speech.stop();
+    setSpeaking(false);
+    setVersePage(0);
     setReference(buildReference(book, chapter));
   };
 
+  const changeBook = (delta: number) => {
+    if (!parsed.book) return;
+    const list = books.data ?? [];
+    const index = list.findIndex((item) => item.number === parsed.book!.number);
+    const nextBook = list[index + delta];
+    if (!nextBook) return;
+    void Speech.stop();
+    setSpeaking(false);
+    setVersePage(0);
+    setReference(buildReference(nextBook, 1));
+  };
+
   const speak = async () => {
-    if (!passage.data?.text) return;
+    if (!visibleText) return;
     if (speaking) {
       await Speech.stop();
       setSpeaking(false);
       return;
     }
     setSpeaking(true);
-    Speech.speak(passage.data.text, {
+    Speech.speak(visibleText, {
       rate: speechRate,
       onDone: () => setSpeaking(false),
       onStopped: () => setSpeaking(false),
@@ -236,18 +297,18 @@ export function BibleExperience() {
   };
 
   const shareVerse = async (graphic = false) => {
-    if (!passage.data) return;
+    if (!passage.data || !visibleText) return;
     const message =
-      '“' + passage.data.text + '”\n— ' +
-      passage.data.reference + ' ' + (passage.data.abbreviation || '') +
+      '“' + visibleText + '”\n— ' +
+      visibleReference + ' ' + (passage.data.abbreviation || '') +
       '\nShared from COT Bible';
     await shareContent({
-      title: passage.data.reference,
+      title: visibleReference,
       message,
       attachment: graphic ? {
         url: bibleVerseCardDataUri({
-          reference: passage.data.reference,
-          text: passage.data.text,
+          reference: visibleReference,
+          text: visibleText,
           version: passage.data.abbreviation,
         }),
         mimeType: 'image/svg+xml',
@@ -257,14 +318,14 @@ export function BibleExperience() {
   };
 
   const shareToCot = () => {
-    if (!passage.data) return;
+    if (!passage.data || !visibleText) return;
     router.push({
       pathname: '/general/community',
       params: {
         compose: 'post',
         intentId: String(Date.now()),
-        scriptureReference: passage.data.reference,
-        scriptureText: passage.data.text,
+        scriptureReference: visibleReference,
+        scriptureText: visibleText,
         scriptureVersion: passage.data.abbreviation || versionId,
       },
     } as any);
@@ -285,14 +346,17 @@ export function BibleExperience() {
       {today.data ? (
         <Pressable
           onPress={() => setReference(today.data!.reference)}
-          style={[styles.todayCard, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }, shadows.sm]}
+          style={[styles.todayCard, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}
         >
-          <View style={styles.rowBetween}>
-            <Text style={[styles.kicker, { color: colors.interactive }]}>TODAY'S SCRIPTURE · {today.data.theme.toUpperCase()}</Text>
-            <Icon name="sunny-outline" size={18} color={colors.interactive} />
+          <View style={styles.todayCompactTop}>
+            <View style={[styles.todayCompactIcon, { backgroundColor: colors.card }]}>
+              <Icon name="sunny-outline" size={15} color={colors.interactive} />
+            </View>
+            <Text style={[styles.kicker, { color: colors.interactive }]}>TODAY · {today.data.theme.toUpperCase()}</Text>
+            <Text style={[styles.todayRef, { color: colors.textSecondary }]}>{today.data.reference}</Text>
+            <Icon name="chevron-forward" size={15} color={colors.textMuted} />
           </View>
-          <Text style={[styles.todayText, { color: colors.text }]} numberOfLines={4}>{today.data.passage.text}</Text>
-          <Text style={[styles.todayRef, { color: colors.textSecondary }]}>{today.data.reference}</Text>
+          <Text style={[styles.todayText, { color: colors.text }]} numberOfLines={2}>{today.data.passage.text}</Text>
         </Pressable>
       ) : null}
 
@@ -302,7 +366,7 @@ export function BibleExperience() {
           style={[styles.selector, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}
         >
           <Icon name="book-outline" size={16} color={colors.interactive} />
-          <Text style={[styles.selectorText, { color: colors.text }]} numberOfLines={1}>{reference}</Text>
+          <Text style={[styles.selectorText, { color: colors.text }]} numberOfLines={1}>{chapterReference}</Text>
           <Icon name="chevron-down" size={14} color={colors.textMuted} />
         </Pressable>
         <Pressable
@@ -315,73 +379,95 @@ export function BibleExperience() {
         </Pressable>
       </View>
 
-      <View style={styles.chapterNav}>
-        <Pressable onPress={() => changeChapter(-1)} style={[styles.navCircle, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
-          <Icon name="chevron-back" size={19} color={colors.text} />
-        </Pressable>
-        <Text style={[styles.chapterTitle, { color: colors.text }]}>{passage.data?.reference || reference}</Text>
-        <Pressable onPress={() => changeChapter(1)} style={[styles.navCircle, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
-          <Icon name="chevron-forward" size={19} color={colors.text} />
-        </Pressable>
+      <View style={[styles.navigationStack, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+        <View style={styles.navLine}>
+          <Pressable onPress={() => changeBook(-1)} disabled={!parsed.book || parsed.book.number <= 1} style={styles.navTap}>
+            <Icon name="play-back-outline" size={16} color={!parsed.book || parsed.book.number <= 1 ? colors.textMuted : colors.interactive} />
+          </Pressable>
+          <View style={styles.navLabelWrap}>
+            <Text style={[styles.navKicker, { color: colors.textMuted }]}>BOOK</Text>
+            <Text style={[styles.navLabel, { color: colors.text }]}>{parsed.book?.name || 'Bible'}</Text>
+          </View>
+          <Pressable onPress={() => changeBook(1)} disabled={!parsed.book || parsed.book.number >= 66} style={styles.navTap}>
+            <Icon name="play-forward-outline" size={16} color={!parsed.book || parsed.book.number >= 66 ? colors.textMuted : colors.interactive} />
+          </Pressable>
+        </View>
+        <View style={[styles.navDivider, { backgroundColor: colors.borderSubtle }]} />
+        <View style={styles.navLine}>
+          <Pressable onPress={() => changeChapter(-1)} style={styles.navTap}>
+            <Icon name="chevron-back" size={19} color={colors.interactive} />
+          </Pressable>
+          <View style={styles.navLabelWrap}>
+            <Text style={[styles.navKicker, { color: colors.textMuted }]}>CHAPTER</Text>
+            <Text style={[styles.chapterTitle, { color: colors.text }]}>{parsed.chapter}</Text>
+          </View>
+          <Pressable onPress={() => changeChapter(1)} style={styles.navTap}>
+            <Icon name="chevron-forward" size={19} color={colors.interactive} />
+          </Pressable>
+        </View>
       </View>
 
       {passage.loading && !passage.data ? (
-        <><Skeleton height={48} /><Skeleton height={280} /></>
+        <><Skeleton height={48} /><Skeleton height={260} /></>
       ) : passage.error ? (
         <ResourceError message={passage.error} retry={passage.refresh} />
       ) : passage.data ? (
         <>
-          <View style={[styles.scripturePaper, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
-            {(passage.data.verses?.length ? passage.data.verses : [{ text: passage.data.text }]).map((verse, index) => (
-              <View key={verse.verse || index} style={styles.verseRow}>
-                {verse.verse ? <Text style={[styles.verseNo, { color: colors.interactive }]}>{verse.verse}</Text> : null}
-                <Text
-                  selectable
-                  style={[
-                    styles.verseText,
-                    {
-                      color: colors.text,
-                      backgroundColor: highlight ? colors.primarySoft : 'transparent',
-                    },
-                  ]}
-                >
-                  {verse.text}
-                </Text>
-              </View>
-            ))}
-            <View style={[styles.rule, { backgroundColor: colors.borderSubtle }]} />
-            <Text style={[styles.copyright, { color: colors.textMuted }]}>
-              {passage.data.versionName || currentVersion?.title || 'World English Bible'}
-              {passage.data.copyright ? ' · ' + passage.data.copyright : ''}
+          <View style={[styles.progressMeta, { backgroundColor: colors.bgSecondary }]}>
+            <Text style={[styles.progressReference, { color: colors.interactive }]}>{visibleReference}</Text>
+            <Text style={[styles.progressCount, { color: colors.textMuted }]}>
+              {safeVersePage + 1} / {totalVersePages}
             </Text>
           </View>
 
-          <View style={styles.actionGrid}>
-            <ReaderAction icon={bookmarked ? 'bookmark' : 'bookmark-outline'} label={bookmarked ? 'Saved' : 'Save'} active={bookmarked} onPress={() => void postAction({ action: 'toggle_bookmark', reference: passage.data!.reference, versionId })} />
-            <ReaderAction icon="color-palette-outline" label={highlight ? 'Highlighted' : 'Highlight'} active={Boolean(highlight)} onPress={() => void postAction({ action: 'highlight', reference: passage.data!.reference, versionId, colorKey: 'gold', remove: Boolean(highlight) })} />
-            <ReaderAction icon="create-outline" label="Note" active={Boolean(savedNote)} onPress={() => { setNoteText(savedNote?.body || ''); setNoteSheet(true); }} />
-            <ReaderAction icon={speaking ? 'stop-circle-outline' : 'volume-high-outline'} label={speaking ? 'Stop' : 'Listen'} active={speaking} onPress={() => void speak()} />
-            <ReaderAction icon="git-compare-outline" label="Compare" active={Boolean(compareVersion)} onPress={() => setCompareSheet(true)} />
-            <ReaderAction icon="share-social-outline" label="Share" onPress={() => void shareVerse(false)} />
-            <ReaderAction icon="image-outline" label="Verse card" onPress={() => void shareVerse(true)} />
-            <ReaderAction icon="people-outline" label="Share to COT" onPress={shareToCot} />
-          </View>
+          <View style={[styles.progressiveReaderRow]}>
+            <Pressable
+              onPress={() => setVersePage((page) => Math.max(0, page - 1))}
+              disabled={safeVersePage <= 0}
+              style={[styles.verseArrow, { backgroundColor: colors.card, borderColor: colors.borderSubtle, opacity: safeVersePage <= 0 ? 0.35 : 1 }]}
+              accessibilityLabel="Previous verses"
+            >
+              <Icon name="chevron-back" size={21} color={colors.text} />
+            </Pressable>
 
-          <ReadAloudRateControl value={speechRate} onChange={setSpeechRate} compact />
-
-          {passage.data.audio?.available && passage.data.audio.url ? (
-            <View style={styles.audioWrap}>
-              <AudioPlayer
-                title={passage.data.reference + ' · recorded Bible'}
-                sourceUrl={passage.data.audio.url}
-                durationSeconds={passage.data.audio.duration || undefined}
-              />
+            <View style={[styles.scripturePaper, styles.progressivePaper, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+              {visibleVerses.map((verse, index) => (
+                <View key={verse.verse || index} style={styles.verseRow}>
+                  {verse.verse ? <Text style={[styles.verseNo, { color: colors.interactive }]}>{verse.verse}</Text> : null}
+                  <Text
+                    selectable
+                    style={[
+                      styles.verseText,
+                      {
+                        color: colors.text,
+                        backgroundColor: highlight ? colors.primarySoft : 'transparent',
+                      },
+                    ]}
+                  >
+                    {verse.text}
+                  </Text>
+                </View>
+              ))}
+              <View style={[styles.rule, { backgroundColor: colors.borderSubtle }]} />
+              <Text style={[styles.copyright, { color: colors.textMuted }]}>
+                {passage.data.versionName || currentVersion?.title || 'World English Bible'}
+                {passage.data.copyright ? ' · ' + passage.data.copyright : ''}
+              </Text>
             </View>
-          ) : (
-            <Text style={[styles.audioHint, { color: colors.textMuted }]}>
-              Recorded Bible audio appears when Bible Brain is connected for this language. COT read aloud works now.
-            </Text>
-          )}
+
+            <Pressable
+              onPress={() => setVersePage((page) => Math.min(totalVersePages - 1, page + 1))}
+              disabled={safeVersePage >= totalVersePages - 1}
+              style={[styles.verseArrow, { backgroundColor: colors.card, borderColor: colors.borderSubtle, opacity: safeVersePage >= totalVersePages - 1 ? 0.35 : 1 }]}
+              accessibilityLabel="Next verses"
+            >
+              <Icon name="chevron-forward" size={21} color={colors.text} />
+            </Pressable>
+          </View>
+
+          <Text style={[styles.progressiveHint, { color: colors.textMuted }]}>
+            Read one or two verses at a time. Use the side arrows for verses, and the controls above for chapters or books.
+          </Text>
 
           {compareVersion && compare.data ? (
             <View style={[styles.compareCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
@@ -389,7 +475,7 @@ export function BibleExperience() {
                 <Text style={[styles.compareTitle, { color: colors.text }]}>Compare · {compare.data.abbreviation || compareVersion}</Text>
                 <Pressable onPress={() => setCompareVersion(null)}><Icon name="close" size={18} color={colors.textMuted} /></Pressable>
               </View>
-              <Text style={[styles.compareText, { color: colors.textSecondary }]}>{compare.data.text}</Text>
+              <Text style={[styles.compareText, { color: colors.textSecondary }]} numberOfLines={8}>{compare.data.text}</Text>
             </View>
           ) : null}
           {actionError ? <Text style={[styles.error, { color: colors.live }]}>{actionError}</Text> : null}
@@ -594,7 +680,7 @@ export function BibleExperience() {
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 120 }]}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + (tab === 'read' ? 190 : 120) }]}
       >
         <ScreenHeader title="Bible" subtitle="Read, listen, search, save and study Scripture inside COT." showBack compact />
         <View style={styles.tabs}>
@@ -605,6 +691,16 @@ export function BibleExperience() {
         </View>
         {tab === 'read' ? reader : tab === 'search' ? searchView : tab === 'plans' ? plansView : studyView}
       </ScrollView>
+
+      {tab === 'read' && passage.data ? (
+        <View style={[styles.readerDock, { backgroundColor: colors.card, borderColor: colors.borderSubtle, paddingBottom: Math.max(insets.bottom, 8) }, shadows.md]}>
+          <ReaderDockAction icon={bookmarked ? 'bookmark' : 'bookmark-outline'} label={bookmarked ? 'Saved' : 'Save'} active={bookmarked} onPress={() => void postAction({ action: 'toggle_bookmark', reference: visibleReference, versionId })} />
+          <ReaderDockAction icon="color-palette-outline" label="Highlight" active={Boolean(highlight)} onPress={() => void postAction({ action: 'highlight', reference: visibleReference, versionId, colorKey: 'gold', remove: Boolean(highlight) })} />
+          <ReaderDockAction icon="create-outline" label="Note" active={Boolean(savedNote)} onPress={() => { setNoteText(savedNote?.body || ''); setNoteSheet(true); }} />
+          <ReaderDockAction icon={speaking ? 'stop-circle-outline' : 'volume-high-outline'} label={speaking ? 'Stop' : 'Listen'} active={speaking} onPress={() => void speak()} />
+          <ReaderDockAction icon="ellipsis-horizontal-circle-outline" label="More" onPress={() => setMoreToolsOpen(true)} />
+        </View>
+      ) : null}
 
       <BottomSheet visible={bookSheet} onClose={() => setBookSheet(false)} title="Choose book & chapter" subtitle="Genesis to Revelation" maxHeightPercent={84}>
         <ScrollView style={styles.sheetScroll}>
@@ -669,7 +765,7 @@ export function BibleExperience() {
         </ScrollView>
       </BottomSheet>
 
-      <BottomSheet visible={noteSheet} onClose={() => setNoteSheet(false)} title={passage.data?.reference || 'Bible note'} subtitle="Private to your COT account">
+      <BottomSheet visible={noteSheet} onClose={() => setNoteSheet(false)} title={visibleReference || 'Bible note'} subtitle="Private to your COT account">
         <TextInput
           multiline
           value={noteText}
@@ -678,8 +774,31 @@ export function BibleExperience() {
           placeholderTextColor={colors.textMuted}
           style={[styles.noteInput, { color: colors.text, backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}
         />
-        <Button label="Save note" onPress={() => void postAction({ action: 'note', reference: passage.data?.reference || reference, versionId, body: noteText }).then(() => setNoteSheet(false))} />
-        {savedNote ? <Button label="Delete note" variant="outline" onPress={() => void postAction({ action: 'note', reference: passage.data?.reference || reference, versionId, body: '' }).then(() => setNoteSheet(false))} /> : null}
+        <Button label="Save note" onPress={() => void postAction({ action: 'note', reference: visibleReference, versionId, body: noteText }).then(() => setNoteSheet(false))} />
+        {savedNote ? <Button label="Delete note" variant="outline" onPress={() => void postAction({ action: 'note', reference: visibleReference, versionId, body: '' }).then(() => setNoteSheet(false))} /> : null}
+      </BottomSheet>
+
+      <BottomSheet visible={moreToolsOpen} onClose={() => setMoreToolsOpen(false)} title={visibleReference} subtitle="Bible tools" maxHeightPercent={78}>
+        <View style={styles.moreTools}>
+          <View style={styles.moreToolsGrid}>
+            <ReaderAction icon="git-compare-outline" label="Compare" active={Boolean(compareVersion)} onPress={() => { setMoreToolsOpen(false); setCompareSheet(true); }} />
+            <ReaderAction icon="share-social-outline" label="Share" onPress={() => void shareVerse(false)} />
+            <ReaderAction icon="image-outline" label="Verse card" onPress={() => void shareVerse(true)} />
+            <ReaderAction icon="people-outline" label="Share to COT" onPress={shareToCot} />
+          </View>
+          <ReadAloudRateControl value={speechRate} onChange={setSpeechRate} compact />
+          {passage.data?.audio?.available && passage.data.audio.url ? (
+            <AudioPlayer
+              title={visibleReference + ' · recorded Bible'}
+              sourceUrl={passage.data.audio.url}
+              durationSeconds={passage.data.audio.duration || undefined}
+            />
+          ) : (
+            <Text style={[styles.audioHint, { color: colors.textMuted }]}>
+              Recorded Bible audio appears when Bible Brain is connected. COT read aloud remains available.
+            </Text>
+          )}
+        </View>
       </BottomSheet>
 
       <BottomSheet visible={compareSheet} onClose={() => setCompareSheet(false)} title="Compare translation" subtitle="Choose another Bible version">
@@ -695,6 +814,18 @@ export function BibleExperience() {
         ))}
       </BottomSheet>
     </View>
+  );
+}
+
+function ReaderDockAction({ icon, label, onPress, active = false }: { icon: string; label: string; onPress: () => void; active?: boolean }) {
+  const { colors } = useTheme();
+  return (
+    <Pressable onPress={onPress} style={styles.dockAction}>
+      <View style={[styles.dockIcon, { backgroundColor: active ? colors.primarySoft : colors.bgSecondary }]}>
+        <Icon name={icon} size={19} color={active ? colors.interactive : colors.textSecondary} />
+      </View>
+      <Text style={[styles.dockLabel, { color: active ? colors.interactive : colors.textSecondary }]} numberOfLines={1}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -745,19 +876,33 @@ const styles = StyleSheet.create({
   section: { gap: spacing.md },
   flex: { flex: 1, minWidth: 0 },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  todayCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.lg, gap: 8 },
-  kicker: { fontSize: 9.5, fontWeight: '900', letterSpacing: 1 },
-  todayText: { fontSize: 17, lineHeight: 27, fontWeight: '600' },
-  todayRef: { fontSize: 12, fontWeight: '900' },
+  todayCard: { borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: spacing.md, paddingVertical: 11, gap: 6 },
+  todayCompactTop: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  todayCompactIcon: { width: 28, height: 28, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  kicker: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.9 },
+  todayText: { fontSize: 13.5, lineHeight: 20, fontWeight: '600' },
+  todayRef: { flex: 1, textAlign: 'right', fontSize: 10, fontWeight: '900' },
   readerControls: { flexDirection: 'row', gap: 8 },
   selector: { flex: 1, minHeight: 46, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
   selectorText: { flex: 1, fontSize: 13, fontWeight: '800' },
   versionButton: { minWidth: 72, minHeight: 46, borderWidth: 1, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
   versionButtonText: { fontSize: 11, fontWeight: '900' },
-  chapterNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  navCircle: { width: 40, height: 40, borderWidth: 1, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  chapterTitle: { fontSize: 20, fontWeight: '900' },
+  navigationStack: { borderWidth: 1, borderRadius: radius.xl, overflow: 'hidden' },
+  navLine: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 8 },
+  navTap: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
+  navLabelWrap: { flex: 1, alignItems: 'center' },
+  navKicker: { fontSize: 8, fontWeight: '900', letterSpacing: 0.8 },
+  navLabel: { fontSize: 13, lineHeight: 18, fontWeight: '900', marginTop: 1 },
+  navDivider: { height: StyleSheet.hairlineWidth, marginHorizontal: 12 },
+  chapterTitle: { fontSize: 18, fontWeight: '900' },
+  progressMeta: { minHeight: 36, borderRadius: radius.pill, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  progressReference: { fontSize: 11, fontWeight: '900' },
+  progressCount: { fontSize: 9.5, fontWeight: '800' },
+  progressiveReaderRow: { flexDirection: 'row', alignItems: 'stretch', gap: 7 },
+  verseArrow: { width: 42, borderWidth: 1, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
   scripturePaper: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.lg, gap: 14 },
+  progressivePaper: { flex: 1, minHeight: 230, justifyContent: 'center' },
+  progressiveHint: { fontSize: 9.5, lineHeight: 14, textAlign: 'center', paddingHorizontal: 18 },
   verseRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 9 },
   verseNo: { width: 24, fontSize: 10, fontWeight: '900', paddingTop: 4, textAlign: 'right' },
   verseText: { flex: 1, fontSize: 17, lineHeight: 29, borderRadius: 5 },
@@ -766,6 +911,12 @@ const styles = StyleSheet.create({
   actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   action: { minWidth: 84, minHeight: 48, borderWidth: 1, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 9 },
   actionLabel: { fontSize: 9.5, fontWeight: '800' },
+  readerDock: { position: 'absolute', left: 10, right: 10, bottom: 6, minHeight: 78, borderWidth: 1, borderRadius: radius.xl, paddingTop: 8, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-around' },
+  dockAction: { flex: 1, minWidth: 0, alignItems: 'center', gap: 4 },
+  dockIcon: { width: 38, height: 38, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  dockLabel: { fontSize: 8.5, fontWeight: '800' },
+  moreTools: { gap: spacing.md },
+  moreToolsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   audioWrap: { marginTop: 2 },
   audioHint: { fontSize: 10.5, lineHeight: 16 },
   compareCard: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, gap: 8 },
