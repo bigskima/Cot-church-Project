@@ -83,13 +83,21 @@ function webFullBible() {
   return webFullBiblePromise;
 }
 
-async function getWebPassage(parsed: ParsedReference) {
+const PUBLIC_GETBIBLE_TRANSLATIONS: Record<string,{ abbreviation:string; title:string; copyright:string }> = {
+  web: { abbreviation:"WEB", title:"World English Bible", copyright:"Public Domain" },
+  kjv: { abbreviation:"KJV", title:"King James Version", copyright:"Public Domain" },
+};
+
+async function getPublicPassage(parsed: ParsedReference, versionId: string) {
+  const translation = PUBLIC_GETBIBLE_TRANSLATIONS[versionId];
+  if (!translation) throw new ApiError("BIBLE_VERSION_UNAVAILABLE","This public Bible translation is unavailable.",404);
+
   const admin = adminClient();
-  const key = `web:${parsed.display.toLowerCase()}`;
+  const key = `${versionId}:${parsed.display.toLowerCase()}`;
   const { data: cached } = await admin.from("bible_public_passage_cache").select("payload").eq("cache_key",key).maybeSingle();
   if (cached?.payload) return cached.payload;
 
-  const chapter = await fetchJson(`${GETBIBLE_BASE}/web/${parsed.bookNumber}/${parsed.chapter}.json`);
+  const chapter = await fetchJson(`${GETBIBLE_BASE}/${versionId}/${parsed.bookNumber}/${parsed.chapter}.json`);
   const verses = (chapter?.verses ?? []).filter((verse: any) => {
     const nr = Number(verse.nr ?? verse.verse ?? verse.number);
     if (!parsed.verseStart) return true;
@@ -101,19 +109,27 @@ async function getWebPassage(parsed: ParsedReference) {
     verse: Number(verse.nr ?? verse.verse ?? verse.number),
     text: cleanText(verse.text),
   }));
+
   const payload = {
     reference: parsed.display,
-    versionId: "web",
-    abbreviation: "WEB",
-    versionName: chapter?.translation || "World English Bible",
+    versionId,
+    abbreviation: String(chapter?.abbreviation ?? translation.abbreviation).toUpperCase(),
+    versionName: chapter?.translation || translation.title,
     language: chapter?.language || "English",
-    copyright: "Public Domain",
+    copyright: translation.copyright,
     provider: "getbible",
     verses,
     text: verses.map((v:any) => v.text).join(" "),
     audio: null,
   };
-  await admin.from("bible_public_passage_cache").upsert({ cache_key:key,version_id:"web",reference:parsed.display,payload }).then(()=>{});
+
+  await admin.from("bible_public_passage_cache").upsert({
+    cache_key:key,
+    version_id:versionId,
+    reference:parsed.display,
+    payload,
+  }).then(()=>{});
+
   return payload;
 }
 
@@ -236,7 +252,9 @@ async function getYouVersionPassage(parsed: ParsedReference, versionId: string) 
 
 async function passage(reference: string, versionId = "web") {
   const parsed = parseReference(reference);
-  return versionId === "web" ? getWebPassage(parsed) : getYouVersionPassage(parsed,versionId);
+  return PUBLIC_GETBIBLE_TRANSLATIONS[versionId]
+    ? getPublicPassage(parsed,versionId)
+    : getYouVersionPassage(parsed,versionId);
 }
 
 async function fetchYouVersionBiblePages(key: string, language: string, allAvailable = false) {
@@ -270,11 +288,18 @@ function versionPriority(item: any) {
 }
 
 async function versions(language = "en") {
-  const free = [{
-    id:"web", abbreviation:"WEB", localized_abbreviation:"WEB", title:"World English Bible", localized_title:"World English Bible",
-    language:{ name:"English", iso_639_1:"en" }, language_tag:"en",
-    copyright:"Public Domain", provider:"getbible", available:true, accessStatus:"public_domain",
-  }];
+  const free = [
+    {
+      id:"kjv", abbreviation:"KJV", localized_abbreviation:"KJV", title:"King James Version", localized_title:"King James Version",
+      language:{ name:"English", iso_639_1:"en" }, language_tag:"en",
+      copyright:"Public Domain", provider:"getbible", available:true, accessStatus:"public_domain",
+    },
+    {
+      id:"web", abbreviation:"WEB", localized_abbreviation:"WEB", title:"World English Bible", localized_title:"World English Bible",
+      language:{ name:"English", iso_639_1:"en" }, language_tag:"en",
+      copyright:"Public Domain", provider:"getbible", available:true, accessStatus:"public_domain",
+    },
+  ];
   const key = Deno.env.get("BIBLE_YOUVERSION_APP_KEY");
   if (!key) return free;
   try {
