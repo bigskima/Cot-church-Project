@@ -138,6 +138,9 @@ export function BibleExperience() {
   const [studyLimit, setStudyLimit] = useState(8);
   const [speechRate, setSpeechRate] = useReadAloudRate();
   const [speaking, setSpeaking] = useState(false);
+  const [autoReading, setAutoReading] = useState(false);
+  const autoReadingRef = useRef(false);
+  const speechPageRef = useRef('');
   const [actionError, setActionError] = useState('');
 
   const queryString = (extra: Record<string, string> = {}) => {
@@ -195,6 +198,10 @@ export function BibleExperience() {
     if (preference?.default_version_id && versionId === 'web') setVersionId(preference.default_version_id);
     if (preference?.language_tag) setLanguage(preference.language_tag);
   }, [study.data?.preferences]);
+
+  useEffect(() => {
+    autoReadingRef.current = autoReading;
+  }, [autoReading]);
 
   useEffect(() => {
     setStudyLimit(8);
@@ -311,6 +318,7 @@ export function BibleExperience() {
     }
     void Speech.stop();
     setSpeaking(false);
+    speechPageRef.current = '';
     setVersePage(0);
     setReference(buildReference(book, chapter));
   };
@@ -323,25 +331,117 @@ export function BibleExperience() {
     if (!nextBook) return;
     void Speech.stop();
     setSpeaking(false);
+    speechPageRef.current = '';
     setVersePage(0);
     setReference(buildReference(nextBook, 1));
   };
 
-  const speak = async () => {
-    if (!visibleText) return;
-    if (speaking) {
-      await Speech.stop();
-      setSpeaking(false);
+  const stopAutoReading = async () => {
+    autoReadingRef.current = false;
+    setAutoReading(false);
+    speechPageRef.current = '';
+    await Speech.stop();
+    setSpeaking(false);
+  };
+
+  const advanceAfterSpeech = () => {
+    if (!autoReadingRef.current) return;
+
+    if (safeVersePage < totalVersePages - 1) {
+      setVersePage((page) => Math.min(totalVersePages - 1, page + 1));
       return;
     }
+
+    if (!parsed.book) {
+      void stopAutoReading();
+      return;
+    }
+
+    const list = books.data ?? [];
+    const bookIndex = list.findIndex((item) => item.number === parsed.book!.number);
+
+    if (parsed.chapter < parsed.book.chapters) {
+      setVersePage(0);
+      setReference(buildReference(parsed.book, parsed.chapter + 1));
+      return;
+    }
+
+    const nextBook = list[bookIndex + 1];
+    if (nextBook) {
+      setVersePage(0);
+      setReference(buildReference(nextBook, 1));
+      return;
+    }
+
+    // Revelation is the natural end of the continuous Bible reading sequence.
+    void stopAutoReading();
+  };
+
+  const speakCurrentPage = () => {
+    if (!visibleText || speaking) return;
+
+    const pageKey = versionId + ':' + visibleReference + ':' + visibleText;
+    if (speechPageRef.current === pageKey) return;
+
+    speechPageRef.current = pageKey;
     setSpeaking(true);
+
     Speech.speak(visibleText, {
       rate: speechRate,
-      onDone: () => setSpeaking(false),
-      onStopped: () => setSpeaking(false),
-      onError: () => setSpeaking(false),
+      onDone: () => {
+        setSpeaking(false);
+        speechPageRef.current = '';
+        advanceAfterSpeech();
+      },
+      onStopped: () => {
+        setSpeaking(false);
+        speechPageRef.current = '';
+      },
+      onError: () => {
+        autoReadingRef.current = false;
+        setAutoReading(false);
+        setSpeaking(false);
+        speechPageRef.current = '';
+      },
     });
   };
+
+  const speak = async () => {
+    if (!visibleText) return;
+
+    if (autoReading || speaking) {
+      await stopAutoReading();
+      return;
+    }
+
+    autoReadingRef.current = true;
+    setAutoReading(true);
+    speechPageRef.current = '';
+    speakCurrentPage();
+  };
+
+  useEffect(() => {
+    if (!autoReading || speaking || passage.loading || !passage.data || !visibleText) return;
+
+    const loadedChapter = chapterReferenceOf(passage.data.reference);
+    if (loadedChapter !== chapterReference) return;
+
+    const timer = setTimeout(() => {
+      if (autoReadingRef.current) speakCurrentPage();
+    }, 120);
+
+    return () => clearTimeout(timer);
+  }, [
+    autoReading,
+    speaking,
+    passage.loading,
+    passage.data?.reference,
+    visibleReference,
+    visibleText,
+    chapterReference,
+    versionId,
+    speechRate,
+  ]);
 
   const shareVerse = async (graphic = false) => {
     if (!passage.data || !visibleText) return;
@@ -469,7 +569,14 @@ export function BibleExperience() {
 
           <View style={[styles.progressiveReaderRow]}>
             <Pressable
-              onPress={() => setVersePage((page) => Math.max(0, page - 1))}
+              onPress={() => {
+                if (autoReadingRef.current) {
+                  void Speech.stop();
+                  setSpeaking(false);
+                  speechPageRef.current = '';
+                }
+                setVersePage((page) => Math.max(0, page - 1));
+              }}
               disabled={safeVersePage <= 0}
               style={[styles.verseArrow, { backgroundColor: colors.card, borderColor: colors.borderSubtle, opacity: safeVersePage <= 0 ? 0.35 : 1 }]}
               accessibilityLabel="Previous verses"
@@ -503,7 +610,14 @@ export function BibleExperience() {
             </View>
 
             <Pressable
-              onPress={() => setVersePage((page) => Math.min(totalVersePages - 1, page + 1))}
+              onPress={() => {
+                if (autoReadingRef.current) {
+                  void Speech.stop();
+                  setSpeaking(false);
+                  speechPageRef.current = '';
+                }
+                setVersePage((page) => Math.min(totalVersePages - 1, page + 1));
+              }}
               disabled={safeVersePage >= totalVersePages - 1}
               style={[styles.verseArrow, { backgroundColor: colors.card, borderColor: colors.borderSubtle, opacity: safeVersePage >= totalVersePages - 1 ? 0.35 : 1 }]}
               accessibilityLabel="Next verses"
@@ -897,7 +1011,7 @@ export function BibleExperience() {
           <ReaderDockAction icon={bookmarked ? 'bookmark' : 'bookmark-outline'} label={bookmarked ? 'Saved' : 'Save'} active={bookmarked} onPress={() => void postAction({ action: 'toggle_bookmark', reference: visibleReference, versionId })} />
           <ReaderDockAction icon="color-palette-outline" label="Highlight" active={Boolean(highlight)} onPress={() => void postAction({ action: 'highlight', reference: visibleReference, versionId, colorKey: 'gold', remove: Boolean(highlight) })} />
           <ReaderDockAction icon="create-outline" label="Note" active={Boolean(savedNote)} onPress={() => { setNoteText(savedNote?.body || ''); setNoteSheet(true); }} />
-          <ReaderDockAction icon={speaking ? 'stop-circle-outline' : 'volume-high-outline'} label={speaking ? 'Stop' : 'Listen'} active={speaking} onPress={() => void speak()} />
+          <ReaderDockAction icon={autoReading ? 'stop-circle-outline' : 'volume-high-outline'} label={autoReading ? 'Stop' : 'Listen'} active={autoReading} onPress={() => void speak()} />
           <ReaderDockAction icon="ellipsis-horizontal-circle-outline" label="More" onPress={() => setMoreToolsOpen(true)} />
         </View>
       ) : null}
@@ -1014,6 +1128,15 @@ export function BibleExperience() {
             <ReaderAction icon="share-social-outline" label="Share" onPress={() => void shareVerse(false)} />
             <ReaderAction icon="image-outline" label="Verse card" onPress={() => void shareVerse(true)} />
             <ReaderAction icon="people-outline" label="Share to COT" onPress={shareToCot} />
+          </View>
+          <View style={[styles.autoReadInfo, { backgroundColor: colors.primarySoft }]}>
+            <Icon name="play-forward-circle-outline" size={18} color={colors.interactive} />
+            <View style={styles.flex}>
+              <Text style={[styles.autoReadTitle, { color: colors.text }]}>Continuous Bible reading</Text>
+              <Text style={[styles.autoReadText, { color: colors.textMuted }]}>
+                Listen continues automatically through the next verses, chapter and book until you stop it.
+              </Text>
+            </View>
           </View>
           <ReadAloudRateControl value={speechRate} onChange={setSpeechRate} compact />
           {passage.data?.audio?.available && passage.data.audio.url ? (
@@ -1166,6 +1289,9 @@ const styles = StyleSheet.create({
   dockLabel: { fontSize: 8.5, fontWeight: '800' },
   moreTools: { gap: spacing.md },
   moreToolsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  autoReadInfo: { borderRadius: radius.lg, padding: spacing.sm, flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  autoReadTitle: { fontSize: 10.5, fontWeight: '900' },
+  autoReadText: { fontSize: 9, lineHeight: 13, marginTop: 2 },
   audioWrap: { marginTop: 2 },
   audioHint: { fontSize: 10.5, lineHeight: 16 },
   compareCard: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, gap: 8 },
