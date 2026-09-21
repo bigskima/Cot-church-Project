@@ -10,6 +10,7 @@ import { invalidate } from '@/services/query-cache';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useGeneralMinistryAccess } from '@/features/general/useGeneralMinistryAccess';
+import { DailyVisualManagerCard, type DailyVisual, type ImageProviderReadiness } from '@/features/daily-visuals/DailyVisualManagerCard';
 
 type DailyQuote = {
   id?: string;
@@ -34,11 +35,17 @@ type DayRow = {
   bible: BibleDaily;
   automaticQuote: DailyQuote;
   quote: DailyQuote;
+  visuals: {
+    bible?: DailyVisual | null;
+    quote?: DailyVisual | null;
+    devotional?: DailyVisual | null;
+  };
 };
 
 type HighlightsPayload = {
   fromDate: string;
   days: DayRow[];
+  provider?: ImageProviderReadiness | null;
 };
 
 type Version = {
@@ -107,7 +114,7 @@ export default function DailyHighlightsManageScreen() {
     'daily-highlights:' + organizationId + ':' + fromDate + ':' + rangeDays,
     (signal) => access.canManageBible && organizationId
       ? api.request<HighlightsPayload>(query, { signal, context: 'public' })
-      : Promise.resolve({ fromDate, days: [] }),
+      : Promise.resolve({ fromDate, days: [], provider: null }),
   );
 
   const versions = useResource<Version[]>(
@@ -391,6 +398,15 @@ export default function DailyHighlightsManageScreen() {
                 <Chip label="Published" selected={quoteStatus === 'published'} onPress={() => setQuoteStatus('published')} />
                 <Chip label="Hidden" selected={quoteStatus === 'hidden'} onPress={() => setQuoteStatus('hidden')} />
               </View>
+              <DailyVisualManagerCard
+                date={selected?.date || fromDate}
+                kind="quote"
+                organizationId={organizationId}
+                visual={selected?.visuals?.quote ?? null}
+                provider={highlights.data?.provider ?? null}
+                allowBibleInheritance
+                onChanged={refresh}
+              />
               <Button label="Save quote override" loading={busy === 'quote'} onPress={() => void saveQuote()} fullWidth />
               {selected?.quote.isOverride ? <Button label="Return to automatic quote" loading={busy === 'quote-reset'} onPress={() => void resetQuote()} variant="outline" fullWidth /> : null}
               <View style={[styles.preview, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
@@ -415,6 +431,14 @@ export default function DailyHighlightsManageScreen() {
               </ScrollView>
               <InputField label="Theme" value={bibleTheme} onChangeText={setBibleTheme} placeholder="peace" />
               <InputField label="Ministry note (optional)" value={bibleMessage} onChangeText={setBibleMessage} multiline numberOfLines={3} placeholder="Short context for today’s Scripture" />
+              <DailyVisualManagerCard
+                date={selected?.date || fromDate}
+                kind="bible"
+                organizationId={organizationId}
+                visual={selected?.visuals?.bible ?? null}
+                provider={highlights.data?.provider ?? null}
+                onChanged={refresh}
+              />
               <Button label="Save Bible override" loading={busy === 'bible'} onPress={() => void saveBible()} fullWidth />
               {selected?.bible.source === 'ministry' ? <Button label="Return to automatic Scripture" loading={busy === 'bible-reset'} onPress={() => void resetBible()} variant="outline" fullWidth /> : null}
               <Text style={[styles.help, { color: colors.textMuted }]}>COT loads the actual verse text from the selected Bible provider. Ministry only chooses the reference, translation and theme.</Text>
