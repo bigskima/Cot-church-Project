@@ -4,9 +4,12 @@ import { createHandler } from "../_shared/handler.ts";
 import { resolveActiveOrganizationId } from "../_shared/public-organization.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { adminClient } from "../_shared/supabase.ts";
+import { generateImage, imageProviderReadiness } from "../_shared/image-generation.ts";
 import { assertObject, requiredString, uuid } from "../_shared/validation.ts";
 
 const BANNER_BUCKET="home-banners";
+const DAILY_VISUAL_BUCKET="daily-visuals";
+const DAILY_VISUAL_KINDS=new Set(["bible","quote","devotional"]);
 const FIELD_TYPES=new Set(["text","textarea","email","phone","number","select","checkbox","date"]);
 const BANNER_DESTINATIONS=new Set(["none","route","external","event","announcement","form"]);
 const BANNER_STATUSES=new Set(["draft","published","hidden","archived"]);
@@ -164,6 +167,101 @@ async function canManageDailyHighlights(auth:any,organizationId:string){
 }
 async function requireDailyHighlightsManager(auth:any,organizationId:string){
   if(!(await canManageDailyHighlights(auth,organizationId))) throw new ApiError("PERMISSION_DENIED","Your ministry role cannot manage Daily Quote or Daily Scripture.",403);
+}
+async function canManageDevotionals(auth:any,organizationId:string){
+  if(!auth?.user) return false;
+  for(const permission of ["devotionals.manage","sermons.manage","sermons.create","sermons.publish"]){
+    const {data}=await auth.client.rpc("has_permission",{target_organization_id:organizationId,requested_permission:permission,target_branch_id:null});
+    if(data===true) return true;
+  }
+  return false;
+}
+async function requireVisualManager(auth:any,organizationId:string,kind:string){
+  if(kind==="devotional"){
+    if(!(await canManageDevotionals(auth,organizationId))) throw new ApiError("PERMISSION_DENIED","Your ministry role cannot manage devotional visuals.",403);
+    return;
+  }
+  await requireDailyHighlightsManager(auth,organizationId);
+}
+function visualKind(value:unknown){
+  const kind=String(value??"").trim().toLowerCase();
+  if(!DAILY_VISUAL_KINDS.has(kind)) throw new ApiError("VALIDATION_FAILED","Choose Daily Bible, Daily Quote or Daily Devotional.",422);
+  return kind;
+}
+async function devotionalVisualContent(admin:any,organizationId:string,date:string){
+  const year=Number(date.slice(0,4));
+  const {data:series}=await admin.from("devotional_series")
+    .select("id,title,author_name")
+    .eq("organization_id",organizationId)
+    .eq("devotional_year",year)
+    .eq("status","published")
+    .order("published_at",{ascending:false})
+    .limit(12);
+  const ids=(series??[]).map((row:any)=>row.id);
+  if(ids.length){
+    const {data:entry}=await admin.from("devotional_entries")
+      .select("series_id,title,scripture,memory_verse,body,prayer")
+      .in("series_id",ids)
+      .eq("devotional_date",date)
+      .limit(1)
+      .maybeSingle();
+    if(entry){
+      const matched=(series??[]).find((row:any)=>row.id===entry.series_id);
+      return {title:entry.title||matched?.title||"Daily Devotional",scripture:entry.scripture||entry.memory_verse||"",body:entry.body||"",seriesTitle:matched?.title||""};
+    }
+  }
+  const {data:legacy}=await admin.from("devotionals")
+    .select("title,scripture,content")
+    .eq("organization_id",organizationId)
+    .eq("status","published")
+    .eq("publish_date",date)
+    .order("created_at",{ascending:false})
+    .limit(1)
+    .maybeSingle();
+  if(legacy) return {title:legacy.title||"Daily Devotional",scripture:legacy.scripture||"",body:legacy.content||"",seriesTitle:"Daily Devotional"};
+  throw new ApiError("DEVOTIONAL_NOT_FOUND","There is no published devotional for this date.",404);
+}
+async function visualContent(admin:any,organizationId:string,date:string,kind:string){
+  const bible=await resolvedScripture(admin,organizationId,date);
+  if(kind==="bible") return {reference:String(bible.reference??""),theme:String(bible.theme??"general"),title:"Daily Bible",body:String(bible.message??"")};
+  if(kind==="quote"){
+    const {data:saved}=await admin.from("cot_daily_quotes").select("body,source_reference,theme,status").eq("organization_id",organizationId).eq("quote_date",date).maybeSingle();
+    const quote=saved&&saved.status!=="hidden"
+      ? {body:saved.body,sourceReference:saved.source_reference,theme:saved.theme}
+      : automaticQuote(bible,date);
+    return {reference:String(quote.sourceReference??bible.reference??""),theme:String(quote.theme??bible.theme??"general"),title:"Daily Quote",body:String(quote.body??"")};
+  }
+  const devotional=await devotionalVisualContent(admin,organizationId,date);
+  return {reference:String(devotional.scripture??bible.reference??""),theme:String(bible.theme??"general"),title:String(devotional.title??"Daily Devotional"),body:String(devotional.body??"")};
+}
+function visualPrompt(kind:string,date:string,content:any){
+  const title=String(content.title??"").slice(0,180);
+  const reference=String(content.reference??"").slice(0,160);
+  const theme=String(content.theme??"general").slice(0,120);
+  const body=String(content.body??"").replace(/\s+/g," ").slice(0,700);
+  const subject=kind==="bible"?"a Daily Bible reading":kind==="quote"?"an original Bible-inspired daily reflection":"a Christian daily devotional";
+  return [
+    "Create a premium wide editorial illustration for "+subject+".",
+    title?"Title context: "+title+".":"",
+    reference?"Scripture context: "+reference+".":"",
+    theme?"Theme: "+theme+".":"",
+    body?"Meaning to express visually: "+body+".":"",
+    "Use reverent symbolic Christian visual storytelling, cinematic natural light, elegant depth, realistic or painterly photography-inspired composition, calm premium church-app aesthetic.",
+    "Do not render any text, letters, Bible verses, captions, logos, watermarks, UI, borders, or readable signage in the image.",
+    "Avoid sensational imagery. Keep the composition suitable for a 16:7 mobile Home carousel with safe space for COT text overlays.",
+    "Date context: "+date+".",
+  ].filter(Boolean).join(" ");
+}
+function visualExtension(contentType:string){
+  if(contentType==="image/jpeg") return "jpg";
+  if(contentType==="image/webp") return "webp";
+  return "png";
+}
+async function readyVisual(admin:any,organizationId:string,date:string,kind:string){
+  const {data}=await admin.from("cot_daily_visuals")
+    .select("id,visual_date,content_kind,image_url,image_source,provider_code,prompt,status,generated_at,updated_at")
+    .eq("organization_id",organizationId).eq("visual_date",date).eq("content_kind",kind).eq("status","ready").maybeSingle();
+  return data??null;
 }
 
 async function canManage(auth:any,organizationId:string){
