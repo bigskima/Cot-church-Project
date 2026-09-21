@@ -22,6 +22,19 @@ function assertFutureSchedule(value: string | null | undefined) {
   if (!Number.isFinite(time) || time <= Date.now()) throw new ApiError("VALIDATION_FAILED", "Choose a future time for the scheduled announcement", 422);
 }
 
+async function responseFormIdForOrganization(value: unknown, organizationId: string) {
+  if (value === null || value === undefined || value === "") return null;
+  const id = uuid(String(value), "responseFormId", true)!;
+  const { data, error } = await adminClient()
+    .from("cot_forms")
+    .select("id")
+    .eq("id", id)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  if (error || !data) throw new ApiError("FORM_NOT_FOUND", "Choose a response form from this church.", 422);
+  return id;
+}
+
 Deno.serve(createHandler(
   { methods: ["GET", "POST", "PATCH"], authentication: "required", organization: "required" },
   async ({ request, auth }) => {
@@ -108,7 +121,7 @@ Deno.serve(createHandler(
       if (status !== "scheduled" && body.scheduledFor === undefined) record.scheduled_for = null;
     }
     if (body.bannerUrl !== undefined) record.banner_url = optionalString(body.bannerUrl, "bannerUrl", 2000);
-    if (body.responseFormId !== undefined) record.response_form_id = body.responseFormId ? uuid(String(body.responseFormId), "responseFormId", true) : null;
+    if (body.responseFormId !== undefined) record.response_form_id = await responseFormIdForOrganization(body.responseFormId, auth.organizationId);
 
     if (request.method === "POST") {
       if (record.status === "scheduled") assertFutureSchedule(record.scheduled_for as string | null | undefined);
