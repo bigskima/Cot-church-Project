@@ -639,6 +639,149 @@ export const engagementHubHandler=createHandler(
 
     const organizationId=await resolveOrganization(auth,url,body);
 
+    if(["visual_upload_intent","visual_save_upload","visual_generate","visual_inherit","visual_clear"].includes(actionName)){
+      if(!auth?.user) throw new ApiError("AUTHENTICATION_REQUIRED","Sign in to manage Daily visuals.",401);
+      const kind=visualKind(body.kind);
+      const date=quoteDate(body.date);
+      await requireVisualManager(auth,organizationId,kind);
+
+      if(actionName==="visual_upload_intent"){
+        const mimeType=text(body.mimeType,80,true).toLowerCase();
+        const ext=mimeType==="image/png"?"png":mimeType==="image/webp"?"webp":mimeType==="image/jpeg"?"jpg":null;
+        if(!ext) throw new ApiError("UNSUPPORTED_MEDIA_TYPE","Choose a JPG, PNG, or WebP image.",415);
+        const storagePath="orgs/"+organizationId+"/"+kind+"/"+date+"/"+auth.user.id+"/"+crypto.randomUUID()+"."+ext;
+        const {data,error}=await admin.storage.from(DAILY_VISUAL_BUCKET).createSignedUploadUrl(storagePath,{upsert:false});
+        if(error||!data?.signedUrl) throw new ApiError("UPLOAD_SESSION_FAILED","Unable to prepare the Daily visual upload.",500,undefined,false);
+        return {data:{
+          signedUploadUrl:data.signedUrl,
+          storagePath,
+          publicUrl:admin.storage.from(DAILY_VISUAL_BUCKET).getPublicUrl(storagePath).data.publicUrl,
+        }};
+      }
+
+      if(actionName==="visual_save_upload"){
+        const storagePath=text(body.storagePath,800,true);
+        const prefix="orgs/"+organizationId+"/"+kind+"/"+date+"/"+auth.user.id+"/";
+        if(!storagePath.startsWith(prefix)) throw new ApiError("DAILY_VISUAL_UPLOAD_INVALID","This visual upload does not belong to this ministry account.",403);
+        const {data:existing}=await admin.from("cot_daily_visuals").select("storage_path,image_source").eq("organization_id",organizationId).eq("visual_date",date).eq("content_kind",kind).maybeSingle();
+        const imageUrl=admin.storage.from(DAILY_VISUAL_BUCKET).getPublicUrl(storagePath).data.publicUrl;
+        const {data,error}=await admin.from("cot_daily_visuals").upsert({
+          organization_id:organizationId,
+          visual_date:date,
+          content_kind:kind,
+          image_url:imageUrl,
+          storage_path:storagePath,
+          image_source:"upload",
+          provider_code:null,
+          prompt:"",
+          status:"ready",
+          last_error:"",
+          generated_at:null,
+          created_by:auth.user.id,
+          updated_at:new Date().toISOString(),
+        },{onConflict:"organization_id,visual_date,content_kind"}).select("*").single();
+        if(error) throw new ApiError("DAILY_VISUAL_SAVE_FAILED","Unable to attach this image.",500,undefined,false);
+        if(existing?.storage_path&&existing.storage_path!==storagePath&&existing.image_source!=="inherited") await admin.storage.from(DAILY_VISUAL_BUCKET).remove([existing.storage_path]).catch(()=>{});
+        return {data};
+      }
+
+      if(actionName==="visual_inherit"){
+        if(kind!=="quote") throw new ApiError("VALIDATION_FAILED","Only Daily Quote can inherit the Daily Bible image.",422);
+        const bibleVisual=await readyVisual(admin,organizationId,date,"bible");
+        if(!bibleVisual?.image_url) throw new ApiError("DAILY_VISUAL_SOURCE_MISSING","Generate or upload the Daily Bible image first.",422);
+        const {data:existing}=await admin.from("cot_daily_visuals").select("storage_path,image_source").eq("organization_id",organizationId).eq("visual_date",date).eq("content_kind","quote").maybeSingle();
+        const {data,error}=await admin.from("cot_daily_visuals").upsert({
+          organization_id:organizationId,
+          visual_date:date,
+          content_kind:"quote",
+          image_url:bibleVisual.image_url,
+          storage_path:null,
+          image_source:"inherited",
+          provider_code:bibleVisual.provider_code??null,
+          prompt:"",
+          status:"ready",
+          last_error:"",
+          generated_at:bibleVisual.generated_at??null,
+          created_by:auth.user.id,
+          updated_at:new Date().toISOString(),
+        },{onConflict:"organization_id,visual_date,content_kind"}).select("*").single();
+        if(error) throw new ApiError("DAILY_VISUAL_SAVE_FAILED","Unable to inherit the Daily Bible image.",500,undefined,false);
+        if(existing?.storage_path&&existing.image_source!=="inherited") await admin.storage.from(DAILY_VISUAL_BUCKET).remove([existing.storage_path]).catch(()=>{});
+        return {data};
+      }
+
+      if(actionName==="visual_clear"){
+        const {data:existing}=await admin.from("cot_daily_visuals").select("storage_path,image_source").eq("organization_id",organizationId).eq("visual_date",date).eq("content_kind",kind).maybeSingle();
+        const {error}=await admin.from("cot_daily_visuals").delete().eq("organization_id",organizationId).eq("visual_date",date).eq("content_kind",kind);
+        if(error) throw new ApiError("DAILY_VISUAL_DELETE_FAILED","Unable to remove this Daily visual.",500,undefined,false);
+        if(existing?.storage_path&&existing.image_source!=="inherited") await admin.storage.from(DAILY_VISUAL_BUCKET).remove([existing.storage_path]).catch(()=>{});
+        return {data:{date,kind,deleted:true}};
+      }
+
+      const content=await visualContent(admin,organizationId,date,kind);
+      const prompt=visualPrompt(kind,date,content);
+      const {data:existing}=await admin.from("cot_daily_visuals").select("storage_path,image_source").eq("organization_id",organizationId).eq("visual_date",date).eq("content_kind",kind).maybeSingle();
+      await admin.from("cot_daily_visuals").upsert({
+        organization_id:organizationId,
+        visual_date:date,
+        content_kind:kind,
+        image_url:null,
+        storage_path:null,
+        image_source:"ai",
+        provider_code:null,
+        prompt,
+        status:"generating",
+        last_error:"",
+        generated_at:null,
+        created_by:auth.user.id,
+        updated_at:new Date().toISOString(),
+      },{onConflict:"organization_id,visual_date,content_kind"});
+      try{
+        const generated=await generateImage(admin,prompt,request.signal);
+        const ext=visualExtension(generated.contentType);
+        const storagePath="orgs/"+organizationId+"/"+kind+"/"+date+"/ai-"+crypto.randomUUID()+"."+ext;
+        const {error:uploadError}=await admin.storage.from(DAILY_VISUAL_BUCKET).upload(storagePath,generated.bytes,{contentType:generated.contentType,upsert:false});
+        if(uploadError) throw new ApiError("DAILY_VISUAL_STORAGE_FAILED","The image was generated but could not be stored.",500,undefined,false);
+        const imageUrl=admin.storage.from(DAILY_VISUAL_BUCKET).getPublicUrl(storagePath).data.publicUrl;
+        const {data,error}=await admin.from("cot_daily_visuals").upsert({
+          organization_id:organizationId,
+          visual_date:date,
+          content_kind:kind,
+          image_url:imageUrl,
+          storage_path:storagePath,
+          image_source:"ai",
+          provider_code:generated.providerCode,
+          prompt,
+          status:"ready",
+          last_error:"",
+          generated_at:new Date().toISOString(),
+          created_by:auth.user.id,
+          updated_at:new Date().toISOString(),
+        },{onConflict:"organization_id,visual_date,content_kind"}).select("*").single();
+        if(error) throw new ApiError("DAILY_VISUAL_SAVE_FAILED","The generated image could not be attached.",500,undefined,false);
+        if(existing?.storage_path&&existing.storage_path!==storagePath&&existing.image_source!=="inherited") await admin.storage.from(DAILY_VISUAL_BUCKET).remove([existing.storage_path]).catch(()=>{});
+        return {data:{...data,model:generated.model}};
+      }catch(value){
+        const message=value instanceof Error?value.message:"Image generation failed.";
+        await admin.from("cot_daily_visuals").upsert({
+          organization_id:organizationId,
+          visual_date:date,
+          content_kind:kind,
+          image_url:null,
+          storage_path:null,
+          image_source:"ai",
+          provider_code:null,
+          prompt,
+          status:"failed",
+          last_error:message.slice(0,1000),
+          generated_at:null,
+          created_by:auth.user.id,
+          updated_at:new Date().toISOString(),
+        },{onConflict:"organization_id,visual_date,content_kind"});
+        throw value;
+      }
+    }
+
     if(["quote_save","quote_delete","quote_provision"].includes(actionName)){
       await requireDailyHighlightsManager(auth,organizationId);
 
