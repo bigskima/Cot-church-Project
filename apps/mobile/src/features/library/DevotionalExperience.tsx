@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Speech from 'expo-speech';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EmptyState, Icon, ScreenHeader, Skeleton } from '@/components';
+import { DateTimeField } from '@/components/DateTimeField';
+import { ReadAloudRateControl, useReadAloudRate } from '@/components/ReadAloudRateControl';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 import { useSession } from '@/state/session';
@@ -48,9 +50,8 @@ export function DevotionalExperience() {
   const { colors } = useTheme();
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
   const [date, setDate] = useState(today());
-  const [dateInput, setDateInput] = useState(date);
-  const [dateError, setDateError] = useState('');
   const [speaking, setSpeaking] = useState(false);
+  const [speechRate, setSpeechRate] = useReadAloudRate();
   const devotional = useResource<DailyDevotionalPayload | null>(
     `devotional:${organizationId || 'public'}:${date}`,
     (signal) => api.request<DailyDevotionalPayload | null>(
@@ -62,8 +63,6 @@ export function DevotionalExperience() {
   const selected = useMemo(() => dateParts(date), [date]);
 
   useEffect(() => {
-    setDateInput(date);
-    setDateError('');
     void Speech.stop();
     setSpeaking(false);
   }, [date]);
@@ -86,28 +85,11 @@ export function DevotionalExperience() {
     ].filter(Boolean).join('. ');
     setSpeaking(true);
     Speech.speak(text, {
-      rate: 0.92,
+      rate: speechRate,
       onDone: () => setSpeaking(false),
       onStopped: () => setSpeaking(false),
       onError: () => setSpeaking(false),
     });
-  };
-
-  const applyDate = () => {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
-      setDateError('Use YYYY-MM-DD, for example 2026-01-05.');
-      return;
-    }
-    const parsed = fromIso(dateInput);
-    if (
-      Number.isNaN(parsed.getTime())
-      || localIsoDate(parsed) !== dateInput
-    ) {
-      setDateError('Choose a valid calendar date.');
-      return;
-    }
-    setDateError('');
-    setDate(dateInput);
   };
 
   return (
@@ -162,28 +144,17 @@ export function DevotionalExperience() {
               <Text style={[styles.jumpHint, { color: colors.textSecondary }]}>Enter any devotional date</Text>
             </View>
             <View style={styles.jumpControls}>
-              <View style={[styles.dateInputWrap, { backgroundColor: colors.bgSecondary, borderColor: dateError ? colors.live : colors.borderSubtle }]}>
-                <Icon name='calendar-outline' size={16} color={colors.interactive} />
-                <TextInput
-                  value={dateInput}
-                  onChangeText={(value) => { setDateInput(value); if (dateError) setDateError(''); }}
-                  onSubmitEditing={applyDate}
-                  placeholder='YYYY-MM-DD'
-                  placeholderTextColor={colors.textMuted}
-                  keyboardType='numbers-and-punctuation'
-                  returnKeyType='go'
-                  style={[styles.dateInput, { color: colors.text }]}
+              <View style={styles.datePickerWrap}>
+                <DateTimeField
+                  label='Devotional date'
+                  value={fromIso(date)}
+                  onChange={(next) => setDate(localIsoDate(next))}
+                  includeTime={false}
+                  minYear={2000}
+                  maxYear={2200}
+                  placeholder='Choose devotional date'
                 />
-                <Pressable
-                  onPress={applyDate}
-                  accessibilityRole='button'
-                  accessibilityLabel='Open selected devotional date'
-                  style={[styles.goButton, { backgroundColor: colors.interactive }]}
-                >
-                  <Icon name='arrow-forward' size={17} color='#fff' />
-                </Pressable>
               </View>
-
               <Pressable
                 onPress={() => setDate(today())}
                 style={[
@@ -195,7 +166,6 @@ export function DevotionalExperience() {
                 <Text style={[styles.todayText, { color: colors.interactive }]}>Today</Text>
               </Pressable>
             </View>
-            {dateError ? <Text style={[styles.dateError, { color: colors.live }]}>{dateError}</Text> : null}
           </View>
         </View>
 
@@ -239,6 +209,8 @@ export function DevotionalExperience() {
                 <Text style={[styles.listenText, { color: colors.interactive }]}>{speaking ? 'Stop' : 'Listen'}</Text>
               </Pressable>
             </View>
+
+            <ReadAloudRateControl value={speechRate} onChange={setSpeechRate} compact />
 
             <View style={[styles.paper, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
               <Text style={[styles.entryDate, { color: colors.interactive }]}>
@@ -321,25 +293,7 @@ const styles = StyleSheet.create({
   jumpKicker: { fontSize: 8.5, fontWeight: '900', letterSpacing: 1.1 },
   jumpHint: { fontSize: 10.5, fontWeight: '700' },
   jumpControls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  dateInputWrap: {
-    flex: 1,
-    minHeight: 48,
-    borderWidth: 1,
-    borderRadius: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    paddingLeft: 12,
-    paddingRight: 5,
-  },
-  dateInput: { flex: 1, minWidth: 0, fontSize: 13, fontWeight: '800', paddingVertical: 9 },
-  goButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  datePickerWrap: { flex: 1, minWidth: 0 },
   todayButton: {
     height: 48,
     borderWidth: 1,
@@ -350,7 +304,6 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   todayText: { fontSize: 10, fontWeight: '900' },
-  dateError: { fontSize: 10.5, fontWeight: '700' },
   loading: { gap: spacing.md },
   emptyCard: {
     minHeight: 280,
