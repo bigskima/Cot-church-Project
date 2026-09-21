@@ -4,6 +4,7 @@ import * as Speech from 'expo-speech';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AudioPlayer, BottomSheet, Button, Chip, Icon, ResourceError, ScreenHeader, Skeleton } from '@/components';
+import { TimeField } from '@/components/DateTimeField';
 import { ReadAloudRateControl, useReadAloudRate } from '@/components/ReadAloudRateControl';
 import { useResource } from '@/hooks/use-resource';
 import { invalidate } from '@/services/query-cache';
@@ -60,6 +61,25 @@ type Tab = 'read' | 'search' | 'plans' | 'study';
 
 function buildReference(book: BibleBook | undefined, chapter: number) {
   return book ? book.name + ' ' + chapter : 'John 3';
+}
+
+function timeValue(value?: string | null) {
+  const date = new Date();
+  const match = String(value || '07:00').match(/^(\d{1,2}):(\d{2})/);
+  date.setHours(Number(match?.[1] ?? 7), Number(match?.[2] ?? 0), 0, 0);
+  return date;
+}
+
+function hhmm(value: Date) {
+  return String(value.getHours()).padStart(2, '0') + ':' + String(value.getMinutes()).padStart(2, '0');
+}
+
+function localTimezone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch {
+    return 'UTC';
+  }
 }
 
 export function BibleExperience() {
@@ -250,13 +270,13 @@ export function BibleExperience() {
     } as any);
   };
 
-  const savePreferences = (dailyEnabled: boolean) => postAction({
+  const savePreferences = (dailyEnabled: boolean, notificationTime?: string) => postAction({
     action: 'preferences',
     defaultVersionId: study.data?.preferences?.default_version_id || versionId,
     languageTag: study.data?.preferences?.language_tag || language,
     dailyScriptureNotification: dailyEnabled,
-    notificationTime: study.data?.preferences?.notification_time || '07:00',
-    timezone: study.data?.preferences?.timezone || 'Africa/Lagos',
+    notificationTime: notificationTime || study.data?.preferences?.notification_time || '07:00',
+    timezone: study.data?.preferences?.timezone || localTimezone(),
     audioRate: speechRate,
   });
 
@@ -525,8 +545,17 @@ export function BibleExperience() {
                 onPress={() => void savePreferences(!study.data?.preferences?.daily_scripture_notification)}
               />
             </View>
+            <TimeField
+              label="Reminder time"
+              value={timeValue(study.data?.preferences?.notification_time)}
+              onChange={(next) => void savePreferences(
+                Boolean(study.data?.preferences?.daily_scripture_notification),
+                hhmm(next),
+              )}
+              helperText={'Uses ' + (study.data?.preferences?.timezone || localTimezone()) + ' on this account.'}
+            />
             <Text style={[styles.copyright, { color: colors.textMuted }]}>
-              Default reminder: 7:00 AM local time. The reminder uses your COT notification system.
+              Daily Scripture reminders use the COT notification system and your saved local time.
             </Text>
           </View>
           <StudySection
@@ -619,7 +648,7 @@ export function BibleExperience() {
                   languageTag: language,
                   dailyScriptureNotification: Boolean(study.data?.preferences?.daily_scripture_notification),
                   notificationTime: study.data?.preferences?.notification_time || '07:00',
-                  timezone: study.data?.preferences?.timezone || 'Africa/Lagos',
+                  timezone: study.data?.preferences?.timezone || localTimezone(),
                   audioRate: speechRate,
                 });
               }}
