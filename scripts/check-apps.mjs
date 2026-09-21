@@ -38,6 +38,7 @@ const files = [
   'apps/mobile/app/general/leadership/platform-admin/[module].tsx',
   'apps/mobile/src/features/general/GeneralMinistryWorkspace.tsx',
   'apps/mobile/src/constants/guides.ts',
+  'apps/mobile/app/general/tour.tsx',
   'apps/mobile/src/features/general/GeneralRolesAccessExperience.tsx',
   'apps/mobile/src/features/notifications/NotificationsExperience.tsx',
   'apps/mobile/src/features/expression-management/ExpressionIdentityBadgesExperience.tsx',
