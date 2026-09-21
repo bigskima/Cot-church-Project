@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleProp, StyleSheet, Text, useWindowDimensions, View, ViewStyle } from 'react-native';
+import { Pressable, ScrollView, StyleProp, StyleSheet, Text, TextInput, useWindowDimensions, View, ViewStyle } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useTheme } from '@/state/theme';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { shareContent } from '@/services/share';
+import { invalidate } from '@/services/query-cache';
+import { useSession } from '@/state/session';
 import { Avatar } from '../primitives/Avatar';
 import { Icon } from '../primitives/Icon';
 import { AudioPlayer } from '../media/AudioPlayer';
@@ -13,6 +15,8 @@ import { AdaptiveMediaImage } from '../media/AdaptiveMediaImage';
 import { MediaPreviewModal, type PreviewableMedia } from '../media/MediaPreviewModal';
 import { ContentReportSheet } from '../engagement/ContentReportSheet';
 import { InlineCommentsSheet } from '../engagement/InlineCommentsSheet';
+import { BottomSheet } from '../BottomSheet';
+import { QuotedContentCard } from './QuotedContentCard';
 import type { MediaAsset, Post, SocialPost } from '@/types/content';
 import { CompactIdentityBadge, type PublicIdentityBadge } from '@/components/identity/PublicIdentityBadge';
 
@@ -66,6 +70,7 @@ export interface PostCardProps {
   onBookmark?: (currentlySaved: boolean) => void | boolean | Promise<boolean>;
   onShare?: () => void;
   allowExternalShare?: boolean;
+  allowInternalShare?: boolean;
   onMore?: () => void;
   style?: StyleProp<ViewStyle>;
   dark?: boolean;
@@ -120,12 +125,14 @@ export function PostCard({
   onBookmark,
   onShare,
   allowExternalShare = true,
+  allowInternalShare = true,
   onMore,
   style,
   variant,
   showContext,
 }: PostCardProps) {
   const { colors } = useTheme();
+  const { api, mode, context } = useSession();
   const { width: windowWidth } = useWindowDimensions();
   const postAsAny = post as any;
   const author = postAsAny.author ?? {};
@@ -144,10 +151,33 @@ export function PostCard({
     ? () => router.push({ pathname: '/general/member/[username]', params: { username: handle } } as any)
     : undefined);
 
-  const media = Array.isArray(post.media)
-    ? post.media.filter((item) => Boolean(item?.url) || mediaKind(item) === 'reel_reference')
+  const rawMedia = Array.isArray(post.media)
+    ? post.media.filter((item) => Boolean(item?.url) || mediaKind(item) === 'reel_reference' || mediaKind(item) === 'post_reference')
     : [];
+  const quoteReferences = rawMedia.filter((item) => mediaKind(item) === 'reel_reference' || mediaKind(item) === 'post_reference');
+  const legacyQuotePreviewIds = new Set(
+    quoteReferences.flatMap((item: any) => [item.reelId, item.postId].filter(Boolean)),
+  );
+  // Keep the existing horizontal media rail exactly for ordinary images/video/audio.
+  // Quote previews are nested inside their reference card instead of becoming a
+  // second carousel item (the bug that produced the giant blank/sideways Reel).
+  const media = rawMedia.filter((item: any) => (
+    mediaKind(item) !== 'reel_reference'
+    && mediaKind(item) !== 'post_reference'
+    && !(item.quotedReelId && legacyQuotePreviewIds.has(item.quotedReelId))
+    && !(item.quotedPostId && legacyQuotePreviewIds.has(item.quotedPostId))
+  ));
   const mediaCardWidth = Math.min(Math.max(windowWidth - 44, 280), 760);
+  const internalShareAvailable = Boolean(
+    allowInternalShare
+    && canEngage
+    && mode === 'authenticated'
+    && !postAsAny.group_id
+    && (
+      post.visibility === 'public'
+      || (post.visibility === 'branch' && postExpressionId)
+    )
+  );
 
   const [hasLiked, setHasLiked] = useState(Boolean(postAsAny.viewer_reaction));
   const [likeCount, setLikeCount] = useState(postAsAny.likes_count ?? (post.social_reactions?.length || 0));
@@ -156,6 +186,10 @@ export function PostCard({
   const [preview, setPreview] = useState<PreviewableMedia | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [quoteBody, setQuoteBody] = useState('');
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareError, setShareError] = useState('');
   const [bodyRevealStep, setBodyRevealStep] = useState(() => postRevealSteps.get(post.id) ?? 1);
 
   const likePending = useRef(false);
@@ -227,6 +261,40 @@ export function PostCard({
       onShare?.();
     } catch {
       // Closing the operating-system share sheet leaves the post unchanged.
+    }
+  };
+
+  const handleInternalShare = async () => {
+    if (!internalShareAvailable || shareBusy) return;
+    const organizationId = post.organization_id || context?.organization?.id || context?.organizations?.[0]?.id;
+    if (!organizationId) {
+      setShareError('Choose a church community before sharing this post.');
+      return;
+    }
+    setShareBusy(true);
+    setShareError('');
+    try {
+      await api.request('social-feed', {
+        method: 'POST',
+        context: isExpressionPost ? 'current' : 'public',
+        body: JSON.stringify({
+          action: 'share_post',
+          organizationId,
+          postId: post.id,
+          body: quoteBody.trim(),
+          ...(isExpressionPost && postExpressionId ? { branchId: postExpressionId } : {}),
+        }),
+      });
+      invalidate('mobile:home-feed:');
+      invalidate('mobile:community:');
+      invalidate('expression:');
+      setQuoteBody('');
+      setShareOpen(false);
+      onShare?.();
+    } catch (value) {
+      setShareError(value instanceof Error ? value.message : 'Unable to share this post inside COT.');
+    } finally {
+      setShareBusy(false);
     }
   };
 
@@ -348,6 +416,26 @@ export function PostCard({
                 <Icon name={revealedBody.hasMore ? 'chevron-down' : 'chevron-up'} size={14} color={colors.interactive} />
               </Pressable>
             ) : null}
+          </View>
+        ) : null}
+
+        {quoteReferences.length ? (
+          <View style={styles.quotedList}>
+            {quoteReferences.map((reference: any, index) => {
+              const fallbackPreview = rawMedia.find((candidate: any) => (
+                reference.reelId && candidate.quotedReelId === reference.reelId
+              ) || (
+                reference.postId && candidate.quotedPostId === reference.postId
+              )) ?? null;
+              return (
+                <QuotedContentCard
+                  key={reference.reelId || reference.postId || `quote-${index}`}
+                  reference={reference}
+                  fallbackPreview={fallbackPreview}
+                  currentExpressionId={postExpressionId}
+                />
+              );
+            })}
           </View>
         ) : null}
 
@@ -515,9 +603,75 @@ export function PostCard({
               {post.body?.trim() ? <Pressable onPress={(event) => { event.stopPropagation?.(); void handleCopy(); }} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed ? { backgroundColor: colors.primarySoft } : null]} accessibilityRole="button" accessibilityLabel="Copy post text"><Icon name={copied ? 'checkmark-outline' : 'copy-outline'} size={18} color={copied ? colors.interactive : colors.textSecondary} /></Pressable> : null}
             </View>
           ) : <View style={styles.guestGroup}><Text style={[styles.guestMeta, { color: colors.textMuted }]}>Sign in to join the conversation</Text>{post.body?.trim() ? <Pressable onPress={(event) => { event.stopPropagation?.(); void handleCopy(); }} style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Copy post text"><Icon name={copied ? 'checkmark-outline' : 'copy-outline'} size={18} color={copied ? colors.interactive : colors.textSecondary} /></Pressable> : null}</View>}
-          {allowExternalShare ? <Pressable onPress={handleNativeShare} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed ? { backgroundColor: colors.bgSecondary } : null]} accessibilityRole="button" accessibilityLabel="Share post"><Icon name="share-social-outline" size={18} color={colors.textSecondary} /></Pressable> : <View style={styles.noShareMeta}><Icon name="lock-closed-outline" size={12} color={colors.textMuted} /><Text style={[styles.noShareText, { color: colors.textMuted }]}>Stays here</Text></View>}
+          {internalShareAvailable || allowExternalShare ? <Pressable onPress={(event) => { event.stopPropagation?.(); setShareError(''); setShareOpen(true); }} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed ? { backgroundColor: colors.bgSecondary } : null]} accessibilityRole="button" accessibilityLabel="Share post"><Icon name="share-social-outline" size={18} color={colors.textSecondary} /></Pressable> : <View style={styles.noShareMeta}><Icon name="lock-closed-outline" size={12} color={colors.textMuted} /><Text style={[styles.noShareText, { color: colors.textMuted }]}>Stays here</Text></View>}
         </View>
       </Pressable>
+      <BottomSheet
+        visible={shareOpen}
+        onClose={() => { if (!shareBusy) { setShareOpen(false); setShareError(''); } }}
+        title="Share"
+        subtitle="Keep the original connected when you share inside COT."
+        maxHeightPercent={82}
+        compact
+      >
+        <View style={styles.shareSheet}>
+          {internalShareAvailable ? (
+            <View style={[styles.internalShareCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+              <View style={styles.shareSheetHead}>
+                <View style={[styles.shareSheetIcon, { backgroundColor: colors.primarySoft }]}>
+                  <Icon name="repeat-outline" size={18} color={colors.interactive} />
+                </View>
+                <View style={styles.shareSheetCopy}>
+                  <Text style={[styles.shareSheetTitle, { color: colors.text }]}>
+                    {isExpressionPost ? `Share in ${expressionLabel || 'this Expression'}` : 'Quote in General COT'}
+                  </Text>
+                  <Text style={[styles.shareSheetMeta, { color: colors.textMuted }]}>
+                    The original post stays linked. Media is not duplicated.
+                  </Text>
+                </View>
+              </View>
+              <TextInput
+                value={quoteBody}
+                onChangeText={setQuoteBody}
+                multiline
+                maxLength={2200}
+                placeholder="Add a thought (optional)"
+                placeholderTextColor={colors.textMuted}
+                style={[styles.quoteInput, { color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.borderSubtle }]}
+              />
+              {shareError ? <Text style={[styles.shareError, { color: colors.live }]}>{shareError}</Text> : null}
+              <Pressable
+                disabled={shareBusy}
+                onPress={() => void handleInternalShare()}
+                style={({ pressed }) => [
+                  styles.internalShareButton,
+                  { backgroundColor: colors.interactive },
+                  (pressed || shareBusy) && { opacity: 0.78 },
+                ]}
+              >
+                <Icon name={shareBusy ? 'hourglass-outline' : 'repeat-outline'} size={17} color="#FFFFFF" />
+                <Text style={styles.internalShareButtonText}>{shareBusy ? 'Sharing…' : 'Share inside COT'}</Text>
+              </Pressable>
+            </View>
+          ) : null}
+
+          {allowExternalShare ? (
+            <Pressable
+              onPress={() => { setShareOpen(false); void handleNativeShare(); }}
+              style={({ pressed }) => [styles.externalShareButton, { borderColor: colors.borderSubtle }, pressed && { backgroundColor: colors.bgSecondary }]}
+            >
+              <View style={[styles.shareSheetIcon, { backgroundColor: colors.bgSecondary }]}>
+                <Icon name="share-social-outline" size={18} color={colors.textSecondary} />
+              </View>
+              <View style={styles.shareSheetCopy}>
+                <Text style={[styles.shareSheetTitle, { color: colors.text }]}>Share outside COT</Text>
+                <Text style={[styles.shareSheetMeta, { color: colors.textMuted }]}>Use your device share menu.</Text>
+              </View>
+              <Icon name="chevron-forward" size={17} color={colors.textMuted} />
+            </Pressable>
+          ) : null}
+        </View>
+      </BottomSheet>
       <MediaPreviewModal media={preview} visible={Boolean(preview)} onClose={() => setPreview(null)} />
       <InlineCommentsSheet visible={commentsOpen} onClose={() => setCommentsOpen(false)} contentId={post.id} context={isExpressionPost ? 'current' : 'public'} title="Comments" subtitle="Keep this post and its media in view while you read and reply." returnTo={isExpressionPost && postExpressionId ? `/expressions/${postExpressionId}/feed` : '/general'} onViewAll={onComment || onReply} />
       <ContentReportSheet target={reportOpen ? { contentId: post.id, context: isExpressionPost ? 'current' : 'public', label: isExpressionPost ? `Report post in ${expressionLabel || 'this Expression'}` : 'Report this General COT post' } : null} onClose={() => setReportOpen(false)} />
@@ -553,6 +707,7 @@ const styles = StyleSheet.create({
   feedBodyText: { fontSize: 16, lineHeight: 25, marginTop: 0, letterSpacing: -0.12 },
   showMoreButton: { alignSelf: 'flex-start', minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 4, paddingRight: 6 },
   showMoreText: { fontSize: 11.5, lineHeight: 16, fontWeight: '900' },
+  quotedList: { marginTop: spacing.md, gap: spacing.sm },
   mediaList: { marginTop: spacing.md, marginHorizontal: -4, gap: 5 },
   mediaScroller: { flexGrow: 0, flexShrink: 0 },
   mediaRail: { gap: 8, paddingRight: spacing.md },
@@ -584,4 +739,16 @@ const styles = StyleSheet.create({
   guestMeta: { fontSize: 11, fontWeight: '600', flexShrink: 1 },
   noShareMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6 },
   noShareText: { fontSize: 9, fontWeight: '700' },
+  shareSheet: { gap: spacing.md },
+  internalShareCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm },
+  shareSheetHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  shareSheetIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  shareSheetCopy: { flex: 1, minWidth: 0 },
+  shareSheetTitle: { fontSize: 13, fontWeight: '900' },
+  shareSheetMeta: { fontSize: 10.5, lineHeight: 15, marginTop: 2 },
+  quoteInput: { minHeight: 92, maxHeight: 180, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, textAlignVertical: 'top', fontSize: 13, lineHeight: 19 },
+  shareError: { fontSize: 10.5, lineHeight: 15, fontWeight: '700' },
+  internalShareButton: { minHeight: 44, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: spacing.md },
+  internalShareButtonText: { color: '#FFFFFF', fontSize: 11.5, fontWeight: '900' },
+  externalShareButton: { minHeight: 62, borderWidth: 1, borderRadius: radius.xl, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
 });

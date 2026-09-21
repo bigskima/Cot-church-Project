@@ -187,6 +187,44 @@ Deno.serve(createHandler(
       return { data, status: 201 };
     }
 
+    if (body.action === "share_post") {
+      assertNoUnknownFields(body, ["action", "organizationId", "postId", "body", "branchId"]);
+      const postId = uuid(requiredString(body.postId, "postId", 36), "postId", true)!;
+      const targetBranchId = body.branchId ? uuid(String(body.branchId), "branchId", true) : null;
+      const featureScope = { organizationId: targetOrganizationId, expressionId: targetBranchId };
+      await assertFeatureEnabled(adminClient(), "social_community_feed", featureScope, "Community posting is currently unavailable.");
+      await assertFeatureEnabled(
+        adminClient(),
+        targetBranchId ? "expression_posting" : "general_posting",
+        featureScope,
+        targetBranchId ? "Expression posting is currently unavailable." : "General COT posting is currently unavailable.",
+      );
+      await assertFeatureEnabled(adminClient(), "content_sharing", featureScope, "Sharing content is currently unavailable.");
+      const shareBody = body.body === undefined || body.body === null ? "" : requiredString(body.body, "body", 10000).trim();
+
+      const { data, error } = await auth.client.rpc("publish_social_post_share", {
+        target_organization_id: targetOrganizationId,
+        target_post_id: postId,
+        post_body: shareBody,
+        target_branch_id: targetBranchId,
+      }).single();
+
+      if (error?.code === "P0002") throw new ApiError("POST_NOT_FOUND", "The original post is no longer available", 404);
+      if (error?.code === "42501") {
+        const message = String(error.message ?? "");
+        if (message.includes("Posting is currently restricted")) throw new ApiError("POSTING_RESTRICTED", "Your posting access is currently restricted", 403);
+        if (message.includes("Public posting is currently unavailable")) throw new ApiError("PUBLIC_POSTING_UNAVAILABLE", "Public posting is currently unavailable for this account", 403);
+        if (message.includes("Expression membership required")) throw new ApiError("EXPRESSION_MEMBERSHIP_REQUIRED", "Join this Expression before sharing inside it", 403);
+        if (message.includes("same Expression")) throw new ApiError("POST_SHARE_SCOPE_DENIED", "Expression posts can only be shared inside the same Expression", 403);
+        if (message.includes("Only public posts")) throw new ApiError("POST_SHARE_SCOPE_DENIED", "Only public posts can be shared into General COT", 403);
+        if (message.includes("cannot be shared")) throw new ApiError("POST_SHARE_UNAVAILABLE", "This post cannot be shared inside COT", 403);
+        throw new ApiError("PERMISSION_DENIED", "You do not have permission to share this post here", 403);
+      }
+      if (error?.code === "22023" || error?.code === "23514") throw new ApiError("VALIDATION_FAILED", error.message, 422);
+      if (error) throw new ApiError("POST_SHARE_FAILED", "Unable to share this post inside COT", 500, undefined, false);
+      return { data, status: 201 };
+    }
+
     if (body.action === "react") {
       assertNoUnknownFields(body, ["action", "postId", "reaction"]);
       const contentId = uuid(requiredString(body.postId, "postId", 36), "postId", true)!;

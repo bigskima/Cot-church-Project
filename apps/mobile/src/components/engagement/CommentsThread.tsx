@@ -63,17 +63,21 @@ export function CommentsThread({
   const [composerFocused, setComposerFocused] = useState(false);
   const [reportTarget, setReportTarget] = useState<ContentComment | null>(null);
 
-  const roots = useMemo(() => comments.filter((item) => !item.parent_comment_id), [comments]);
+  const commentById = useMemo(() => new Map(comments.map((item) => [item.id, item])), [comments]);
+  const roots = useMemo(
+    () => comments.filter((item) => !item.parent_comment_id || !commentById.has(item.parent_comment_id)),
+    [comments, commentById],
+  );
   const repliesByParent = useMemo(() => {
     const map = new Map<string, ContentComment[]>();
     for (const item of comments) {
-      if (!item.parent_comment_id) continue;
+      if (!item.parent_comment_id || !commentById.has(item.parent_comment_id)) continue;
       const current = map.get(item.parent_comment_id) ?? [];
       current.push(item);
       map.set(item.parent_comment_id, current);
     }
     return map;
-  }, [comments]);
+  }, [comments, commentById]);
 
   useEffect(() => {
     if (!focusRequest || !canComment) return;
@@ -121,8 +125,9 @@ export function CommentsThread({
     }
   };
 
-  const renderComment = (item: ContentComment, isReply = false) => {
+  const renderComment = (item: ContentComment, isReply = false, parent?: ContentComment | null) => {
     const identity = commentIdentity(item);
+    const parentIdentity = parent ? commentIdentity(parent) : null;
     return (
       <View
         key={item.id}
@@ -160,6 +165,16 @@ export function CommentsThread({
             <Text style={[styles.time, { color: colors.textMuted }]}>{commentTime(item.created_at)}</Text>
           </View>
 
+          {parentIdentity ? (
+            <View style={[styles.replyContext, { backgroundColor: colors.primarySoft }]}>
+              <Icon name="return-down-forward-outline" size={12} color={colors.interactive} />
+              <Text style={[styles.replyContextText, { color: colors.textSecondary }]} numberOfLines={1}>
+                Replying to {parentIdentity.username ? `@${parentIdentity.username}` : parentIdentity.displayName}
+                {parent?.body ? ` · “${parent.body.trim().slice(0, 72)}${parent.body.trim().length > 72 ? '…' : ''}”` : ''}
+              </Text>
+            </View>
+          ) : null}
+
           <Text style={[styles.bodyText, { color: colors.text }]}>{item.body}</Text>
 
           <View style={styles.commentActions}>
@@ -185,6 +200,37 @@ export function CommentsThread({
             </Pressable>
           </View>
         </View>
+      </View>
+    );
+  };
+
+  const renderThreadNode = (item: ContentComment, depth = 0): React.ReactNode => {
+    const parent = item.parent_comment_id ? commentById.get(item.parent_comment_id) ?? null : null;
+    const children = repliesByParent.get(item.id) ?? [];
+    const visualDepth = Math.min(depth, 3);
+    return (
+      <View
+        key={item.id}
+        style={[
+          styles.threadNode,
+          depth > 0 && { marginLeft: visualDepth * 24 },
+        ]}
+      >
+        {depth > 0 ? (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.threadConnector,
+              { borderColor: colors.borderStrong },
+            ]}
+          />
+        ) : null}
+        {renderComment(item, depth > 0, parent)}
+        {children.length ? (
+          <View style={styles.childThread}>
+            {children.map((child) => renderThreadNode(child, depth + 1))}
+          </View>
+        ) : null}
       </View>
     );
   };
@@ -216,13 +262,7 @@ export function CommentsThread({
         </View>
       ) : (
         <View style={styles.thread}>
-          {roots.map((root) => (
-            <View key={root.id} style={styles.threadGroup}>
-              {renderComment(root)}
-              {(repliesByParent.get(root.id) ?? []).map((reply) => renderComment(reply, true))}
-            </View>
-          ))}
-          {comments.filter((item) => item.parent_comment_id && !comments.some((parent) => parent.id === item.parent_comment_id)).map((item) => renderComment(item, true))}
+          {roots.map((root) => renderThreadNode(root))}
         </View>
       )}
 
@@ -232,6 +272,7 @@ export function CommentsThread({
             <View style={styles.replyingCopy}>
               <Text style={[styles.replyingKicker, { color: colors.interactive }]}>Replying to</Text>
               <Text style={[styles.replyingName, { color: colors.text }]} numberOfLines={1}>{replyIdentity.displayName}</Text>
+              {replyingTo?.body ? <Text style={[styles.replyingExcerpt, { color: colors.textMuted }]} numberOfLines={1}>“{replyingTo.body.trim()}”</Text> : null}
             </View>
             <Pressable onPress={() => setReplyingTo(null)} hitSlop={6} accessibilityRole="button" accessibilityLabel="Cancel reply">
               <Icon name="close-circle" size={19} color={colors.interactive} />
@@ -327,10 +368,13 @@ const styles = StyleSheet.create({
   stateTitle: { fontSize: 14, fontWeight: '800' },
   stateCopy: { fontSize: 11, lineHeight: 16, textAlign: 'center' },
   thread: { gap: spacing.md },
+  threadNode: { position: 'relative', gap: spacing.sm },
+  childThread: { gap: spacing.sm },
+  threadConnector: { position: 'absolute', left: -14, top: -9, width: 14, height: 30, borderLeftWidth: 1, borderBottomWidth: 1, borderBottomLeftRadius: 10 },
   commentActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   threadGroup: { gap: spacing.sm },
   comment: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md },
-  reply: { marginLeft: 34, borderRadius: radius.lg },
+  reply: { borderRadius: radius.lg },
   commentBody: { flex: 1, minWidth: 0 },
   commentMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   identityLine: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 5 },
@@ -340,6 +384,8 @@ const styles = StyleSheet.create({
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 5 },
   badge: { borderRadius: radius.pill, paddingHorizontal: 6, paddingVertical: 2 },
   badgeText: { fontSize: 9, fontWeight: '800' },
+  replyContext: { minHeight: 28, borderRadius: radius.md, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 5, marginTop: 7 },
+  replyContextText: { flex: 1, minWidth: 0, fontSize: 9.5, lineHeight: 14, fontWeight: '700' },
   bodyText: { fontSize: 13, lineHeight: 19, marginTop: 7 },
   replyAction: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8, minHeight: 28, paddingHorizontal: 2 },
   replyActionText: { fontSize: 11, fontWeight: '700' },
@@ -348,6 +394,7 @@ const styles = StyleSheet.create({
   replyingCopy: { flex: 1, minWidth: 0 },
   replyingKicker: { fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
   replyingName: { fontSize: 11, fontWeight: '700', marginTop: 1 },
+  replyingExcerpt: { fontSize: 9.5, lineHeight: 13, marginTop: 2 },
   composerRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm },
   inputShell: { flex: 1, minHeight: 46, maxHeight: 132, borderWidth: 1, borderRadius: 18, paddingHorizontal: spacing.md, paddingVertical: 8 },
   input: { minHeight: 26, maxHeight: 92, fontSize: 13, lineHeight: 18, padding: 0 },
