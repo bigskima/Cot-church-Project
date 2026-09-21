@@ -122,6 +122,20 @@ export function GroupChatExperience({ groupId, sectionId, scope = 'expression' }
     }
   };
 
+  const deleteMessage = async (message: RichChatMessage) => {
+    if (message.sender_profile_id !== context?.profile?.id) return;
+    setActionError('');
+    await api.request('group-chat', {
+      method: 'POST',
+      ...requestScope,
+      feedback: false,
+      body: JSON.stringify({ action: 'delete_message', groupId, sectionId, messageId: message.id }),
+    });
+    setMessages((current) => current.filter((item) => item.id !== message.id));
+    if (replyTo?.id === message.id) setReplyTo(null);
+    invalidate(key);
+  };
+
   const timeline = useMemo<GroupTimelineItem[]>(() => {
     const messageItems = messages.map((message) => ({ kind: 'message' as const, id: `message:${message.id}`, at: message.sent_at, message }));
     const callItems = (callHistory.data?.history ?? []).map((entry) => ({ kind: 'call' as const, id: `call:${entry.call.id}`, at: entry.call.created_at, entry }));
@@ -192,7 +206,7 @@ export function GroupChatExperience({ groupId, sectionId, scope = 'expression' }
         ListEmptyComponent={<View style={styles.empty}><Icon name='chatbubbles-outline' size={30} color={colors.textMuted} /><Text style={[styles.emptyTitle, { color: colors.text }]}>No messages yet</Text></View>}
         renderItem={({ item }) => item.kind === 'call'
           ? <CallHistoryBubble entry={item.entry} viewerId={context?.profile?.id ?? ''} />
-          : <RichMessageBubble message={item.message} mine={item.message.sender_profile_id === context?.profile?.id} showSender canPin={resource.data?.permissions.pinMessages === true} onReply={beginReply} onReact={(target, emoji) => void react(target, emoji)} onPin={(target, value) => void pin(target, value)} onJumpToMessage={jumpToMessage} />}
+          : <RichMessageBubble message={item.message} mine={item.message.sender_profile_id === context?.profile?.id} showSender canPin={resource.data?.permissions.pinMessages === true} onReply={beginReply} onReact={(target, emoji) => void react(target, emoji)} onPin={(target, value) => void pin(target, value)} onDelete={(target) => deleteMessage(target)} onJumpToMessage={jumpToMessage} />}
       />
       {actionError ? <Text style={[styles.error, { color: colors.live }]}>{actionError}</Text> : null}
       <RichChatComposer endpoint='group-chat' requestContext='current' scope={{ groupId, sectionId }} replyTo={replyTo} disabledReason={restriction} bottomInset={Math.max(insets.bottom, 10)} onCancelReply={() => setReplyTo(null)} onSend={send} />
