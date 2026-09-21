@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Chip, Icon, ResourceError, ScreenHeader, Skeleton } from '@/components';
@@ -10,7 +10,7 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 
 type FormField={id:string;label:string;type:'text'|'textarea'|'email'|'phone'|'number'|'select'|'checkbox'|'date';required:boolean;placeholder?:string;help?:string;options?:string[]};
-type CotForm={id:string;slug:string;title:string;description:string;fields:FormField[];submit_label:string;success_message:string;requires_auth:boolean;status:string};
+type CotForm={id:string;slug:string;title:string;description:string;fields:FormField[];submit_label:string;success_message:string;requires_auth:boolean;status:string;banner_image_url?:string|null};
 
 export default function CotFormScreen(){
   const {slug}=useLocalSearchParams<{slug:string}>();
@@ -41,6 +41,7 @@ export default function CotFormScreen(){
   return <View style={[styles.screen,{backgroundColor:colors.bg}]}>
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content,{paddingTop:insets.top+spacing.sm,paddingBottom:insets.bottom+spacing.xxl}]}>
       <ScreenHeader title={form?.title||'Form'} kicker="COT FORM" subtitle={form?.description||undefined} showBack/>
+      {form?.banner_image_url?<Image source={{uri:form.banner_image_url}} style={styles.banner} resizeMode="cover"/>:null}
       {resource.loading&&!form?<Skeleton height={90} count={4}/>:resource.error&&!form?<ResourceError message={resource.error} retry={resource.refresh}/>:form?(
         success?<View style={[styles.success,{backgroundColor:colors.successSoft,borderColor:colors.success},shadows.sm]}><View style={[styles.successIcon,{backgroundColor:colors.card}]}><Icon name="checkmark-circle" size={28} color={colors.success}/></View><Text style={[styles.successTitle,{color:colors.text}]}>Response received</Text><Text style={[styles.successText,{color:colors.textSecondary}]}>{success}</Text><Button label="Done" onPress={()=>router.back()} variant="outline"/></View>:
         <View style={[styles.form,{backgroundColor:colors.card,borderColor:colors.borderSubtle},shadows.md]}>
@@ -62,4 +63,4 @@ export default function CotFormScreen(){
   </View>;
 }
 
-const styles=StyleSheet.create({screen:{flex:1},content:{width:'100%',maxWidth:760,alignSelf:'center',paddingHorizontal:spacing.md,gap:spacing.md},form:{borderWidth:1,borderRadius:radius.xxl,padding:spacing.lg,gap:spacing.lg},field:{gap:6},fieldLabel:{fontSize:12.5,fontWeight:'900'},input:{minHeight:48,borderWidth:1,borderRadius:radius.lg,paddingHorizontal:12,fontSize:13},textarea:{minHeight:110,paddingTop:12,textAlignVertical:'top'},help:{fontSize:9.5,lineHeight:14},chips:{flexDirection:'row',flexWrap:'wrap',gap:6},checkboxRow:{minHeight:58,borderWidth:1,borderRadius:radius.lg,padding:spacing.sm,flexDirection:'row',alignItems:'center',gap:spacing.sm},checkbox:{width:26,height:26,borderRadius:8,borderWidth:1,alignItems:'center',justifyContent:'center'},flex:{flex:1,minWidth:0},error:{fontSize:11,fontWeight:'700'},success:{borderWidth:1,borderRadius:radius.xxl,padding:spacing.xl,gap:spacing.md,alignItems:'center'},successIcon:{width:58,height:58,borderRadius:20,alignItems:'center',justifyContent:'center'},successTitle:{fontSize:21,fontWeight:'900'},successText:{fontSize:12,lineHeight:18,textAlign:'center'}});
+const styles=StyleSheet.create({screen:{flex:1},content:{width:'100%',maxWidth:760,alignSelf:'center',paddingHorizontal:spacing.md,gap:spacing.md},banner:{width:'100%',aspectRatio:16/7,borderRadius:radius.xl},form:{borderWidth:1,borderRadius:radius.xxl,padding:spacing.lg,gap:spacing.lg},field:{gap:6},fieldLabel:{fontSize:12.5,fontWeight:'900'},input:{minHeight:48,borderWidth:1,borderRadius:radius.lg,paddingHorizontal:12,fontSize:13},textarea:{minHeight:110,paddingTop:12,textAlignVertical:'top'},help:{fontSize:9.5,lineHeight:14},chips:{flexDirection:'row',flexWrap:'wrap',gap:6},checkboxRow:{minHeight:58,borderWidth:1,borderRadius:radius.lg,padding:spacing.sm,flexDirection:'row',alignItems:'center',gap:spacing.sm},checkbox:{width:26,height:26,borderRadius:8,borderWidth:1,alignItems:'center',justifyContent:'center'},flex:{flex:1,minWidth:0},error:{fontSize:11,fontWeight:'700'},success:{borderWidth:1,borderRadius:radius.xxl,padding:spacing.xl,gap:spacing.md,alignItems:'center'},successIcon:{width:58,height:58,borderRadius:20,alignItems:'center',justifyContent:'center'},successTitle:{fontSize:21,fontWeight:'900'},successText:{fontSize:12,lineHeight:18,textAlign:'center'}});
