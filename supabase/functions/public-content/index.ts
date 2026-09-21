@@ -42,7 +42,7 @@ Deno.serve(createHandler(
       if (!eventId) throw new ApiError("VALIDATION_FAILED", "id is required", 422);
       let query = client
         .from("events")
-        .select("id,organization_id,branch_id,title,description,status,visibility,location,timezone,starts_at,ends_at,registration_opens_at,registration_closes_at,capacity")
+        .select("id,organization_id,branch_id,title,description,status,visibility,location,timezone,starts_at,ends_at,registration_opens_at,registration_closes_at,capacity,response_form_id")
         .eq("id", eventId)
         .eq("visibility", "public")
         .eq("status", "published");
