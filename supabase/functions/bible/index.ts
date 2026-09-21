@@ -409,6 +409,25 @@ async function requireBibleManager(auth:any,organizationId:string) {
   if (!data) throw new ApiError("PERMISSION_DENIED","Bible management is not available for your ministry role.",403);
 }
 
+function normalizePersonalPlanDays(value:any) {
+  const days=Array.isArray(value)?value:[];
+  if(!days.length) throw new ApiError("VALIDATION_FAILED","Add at least one reading-plan day.",422);
+  if(days.length>365) throw new ApiError("VALIDATION_FAILED","A personal reading plan can contain up to 365 days.",422);
+  return days.map((day:any,index:number)=>{
+    const refs=(Array.isArray(day?.references)?day.references:[])
+      .map((item:any)=>String(item??"").trim())
+      .filter(Boolean);
+    if(!refs.length) throw new ApiError("VALIDATION_FAILED",`Day ${index+1} needs at least one Bible reference.`,422);
+    const normalizedRefs=refs.map((reference:string)=>parseReference(reference).display);
+    return {
+      day_number:index+1,
+      title:String(day?.title??`Day ${index+1}`).trim().slice(0,160)||`Day ${index+1}`,
+      scripture_references:normalizedRefs,
+      reflection:day?.reflection?String(day.reflection).trim().slice(0,2000):null,
+    };
+  });
+}
+
 async function providerAudio(reference:string,organizationId:string) {
   const parsed=parseReference(reference);
   const key=Deno.env.get("BIBLE_BRAIN_API_KEY");
@@ -483,21 +502,51 @@ export const bibleHandler = createHandler(
         return { data:{preferences:preferences.data,bookmarks:bookmarks.data??[],highlights:highlights.data??[],notes:notes.data??[],history:history.data??[]} };
       }
       if (action==="plans") {
-        const { data,error }=await adminClient().from("bible_reading_plans").select("id,slug,title,description,duration_days,organization_id").eq("is_public",true).or(organizationId?`organization_id.is.null,organization_id.eq.${organizationId}`:"organization_id.is.null").order("created_at");
-        if(error) throw new ApiError("BIBLE_PLANS_FAILED","Unable to load reading plans.",500,undefined,false);
-        return { data:data??[] };
+        const admin=adminClient();
+        const publicPromise=admin
+          .from("bible_reading_plans")
+          .select("id,slug,title,description,duration_days,organization_id,created_by,is_public,created_at")
+          .eq("is_public",true)
+          .or(organizationId?`organization_id.is.null,organization_id.eq.${organizationId}`:"organization_id.is.null")
+          .order("created_at",{ascending:true});
+        const personalPromise=auth?.user && organizationId
+          ? admin
+              .from("bible_reading_plans")
+              .select("id,slug,title,description,duration_days,organization_id,created_by,is_public,created_at")
+              .eq("created_by",auth.user.id)
+              .eq("is_public",false)
+              .eq("organization_id",organizationId)
+              .order("created_at",{ascending:false})
+          : Promise.resolve({data:[],error:null});
+        const [publicPlans,personalPlans]=await Promise.all([publicPromise,personalPromise]);
+        if(publicPlans.error||personalPlans.error) throw new ApiError("BIBLE_PLANS_FAILED","Unable to load reading plans.",500,undefined,false);
+        return {
+          data:[
+            ...((personalPlans.data??[]).map((plan:any)=>({...plan,is_personal:true,plan_kind:"personal"}))),
+            ...((publicPlans.data??[]).map((plan:any)=>({...plan,is_personal:false,plan_kind:plan.organization_id?"ministry":"template"}))),
+          ],
+        };
       }
       if (action==="plan") {
         const planId=uuid(url.searchParams.get("planId"),"planId",true)!;
         const admin=adminClient();
-        const [{data:plan,error},{data:days}]=await Promise.all([
-          admin.from("bible_reading_plans").select("*").eq("id",planId).eq("is_public",true).single(),
-          admin.from("bible_reading_plan_days").select("*").eq("plan_id",planId).order("day_number"),
-        ]);
-        if(error) throw new ApiError("BIBLE_PLAN_NOT_FOUND","Reading plan not found.",404);
+        const {data:plan,error}=await admin.from("bible_reading_plans").select("*").eq("id",planId).single();
+        if(error||!plan) throw new ApiError("BIBLE_PLAN_NOT_FOUND","Reading plan not found.",404);
+        const personal=Boolean(auth?.user&&plan.created_by===auth.user.id&&!plan.is_public);
+        const publicInScope=Boolean(plan.is_public&&(!plan.organization_id||plan.organization_id===organizationId));
+        if(!personal&&!publicInScope) throw new ApiError("BIBLE_PLAN_NOT_FOUND","Reading plan not found.",404);
+        const {data:days}=await admin.from("bible_reading_plan_days").select("*").eq("plan_id",planId).order("day_number");
         let progress=null;
         if(auth?.user) progress=(await auth.client.from("bible_reading_plan_progress").select("*").eq("profile_id",auth.user.id).eq("plan_id",planId).maybeSingle()).data;
-        return { data:{...plan,days:(days??[]).map((day:any)=>({...day,references:day.scripture_references??[]})),progress} };
+        return {
+          data:{
+            ...plan,
+            is_personal:personal,
+            plan_kind:personal?"personal":plan.organization_id?"ministry":"template",
+            days:(days??[]).map((day:any)=>({...day,references:day.scripture_references??[]})),
+            progress,
+          },
+        };
       }
       if (action==="manage") {
         if(!organizationId) throw new ApiError("ORGANIZATION_REQUIRED","Choose a church.",422);
@@ -570,6 +619,68 @@ export const bibleHandler = createHandler(
       const finished=Boolean(plan && completed.length>=plan.duration_days);
       const {data,error}=await auth.client.from("bible_reading_plan_progress").upsert({profile_id:auth.user.id,plan_id:planId,current_day:finished?plan!.duration_days:Math.min((plan?.duration_days??day+1),Math.max(day+1,existing.data?.current_day??1)),completed_days:completed,completed_at:finished?new Date().toISOString():null,updated_at:new Date().toISOString()}).select().single();
       if(error) throw new ApiError("BIBLE_PLAN_PROGRESS_FAILED","Unable to update reading plan.",500,undefined,false); return {data};
+    }
+
+    if(actionName==="personal_plan_save"){
+      const admin=adminClient();
+      const planId=body.planId?uuid(String(body.planId),"planId",true):null;
+      const title=requiredString(body.title,"title",160);
+      const description=String(body.description??"").trim().slice(0,1200);
+      const rows=normalizePersonalPlanDays(body.days);
+      let plan:any=null;
+
+      if(planId){
+        const existing=await admin.from("bible_reading_plans").select("*").eq("id",planId).maybeSingle();
+        if(!existing.data||existing.data.created_by!==auth.user.id||existing.data.is_public) throw new ApiError("PERMISSION_DENIED","You can only edit your own personal reading plans.",403);
+        const updated=await admin.from("bible_reading_plans").update({
+          title,description,duration_days:rows.length,organization_id:organizationId,is_public:false,
+        }).eq("id",planId).select().single();
+        if(updated.error) throw new ApiError("BIBLE_PERSONAL_PLAN_FAILED","Unable to save your reading plan.",500,undefined,false);
+        plan=updated.data;
+        await admin.from("bible_reading_plan_days").delete().eq("plan_id",planId);
+      }else{
+        const slug=`personal-${auth.user.id.slice(0,8)}-${Date.now().toString(36)}`;
+        const inserted=await admin.from("bible_reading_plans").insert({
+          organization_id:organizationId,slug,title,description,duration_days:rows.length,is_public:false,created_by:auth.user.id,
+        }).select().single();
+        if(inserted.error) throw new ApiError("BIBLE_PERSONAL_PLAN_FAILED","Unable to create your reading plan.",500,undefined,false);
+        plan=inserted.data;
+      }
+
+      const dayRows=rows.map((day:any)=>({...day,plan_id:plan.id}));
+      const daysInsert=await admin.from("bible_reading_plan_days").insert(dayRows);
+      if(daysInsert.error) throw new ApiError("BIBLE_PERSONAL_PLAN_DAYS_FAILED","Unable to save the reading-plan days.",500,undefined,false);
+      return {data:{...plan,is_personal:true,plan_kind:"personal",days:dayRows.map((day:any)=>({...day,references:day.scripture_references}))}};
+    }
+
+    if(actionName==="personal_plan_delete"){
+      const planId=uuid(String(body.planId),"planId",true)!;
+      const admin=adminClient();
+      const existing=await admin.from("bible_reading_plans").select("id,created_by,is_public").eq("id",planId).maybeSingle();
+      if(!existing.data||existing.data.created_by!==auth.user.id||existing.data.is_public) throw new ApiError("PERMISSION_DENIED","You can only remove your own personal reading plans.",403);
+      const removed=await admin.from("bible_reading_plans").delete().eq("id",planId);
+      if(removed.error) throw new ApiError("BIBLE_PERSONAL_PLAN_DELETE_FAILED","Unable to remove your reading plan.",500,undefined,false);
+      return {data:{deleted:true,planId}};
+    }
+
+    if(actionName==="clone_plan"){
+      const sourceId=uuid(String(body.planId),"planId",true)!;
+      const admin=adminClient();
+      const {data:source,error}=await admin.from("bible_reading_plans").select("*").eq("id",sourceId).eq("is_public",true).single();
+      if(error||!source||!(source.organization_id===null||source.organization_id===organizationId)) throw new ApiError("BIBLE_PLAN_NOT_FOUND","Reading-plan template not found.",404);
+      const {data:sourceDays}=await admin.from("bible_reading_plan_days").select("*").eq("plan_id",sourceId).order("day_number");
+      if(!(sourceDays??[]).length) throw new ApiError("BIBLE_PLAN_NOT_FOUND","This template has no reading days.",404);
+      const slug=`personal-${auth.user.id.slice(0,8)}-${Date.now().toString(36)}`;
+      const inserted=await admin.from("bible_reading_plans").insert({
+        organization_id:organizationId,slug,title:source.title,description:source.description,duration_days:source.duration_days,is_public:false,created_by:auth.user.id,
+      }).select().single();
+      if(inserted.error) throw new ApiError("BIBLE_PERSONAL_PLAN_FAILED","Unable to create your copy of this plan.",500,undefined,false);
+      const copiedDays=(sourceDays??[]).map((day:any)=>({
+        plan_id:inserted.data.id,day_number:day.day_number,title:day.title,scripture_references:day.scripture_references,reflection:day.reflection,
+      }));
+      const copied=await admin.from("bible_reading_plan_days").insert(copiedDays);
+      if(copied.error) throw new ApiError("BIBLE_PERSONAL_PLAN_DAYS_FAILED","Unable to copy the reading-plan days.",500,undefined,false);
+      return {data:{...inserted.data,is_personal:true,plan_kind:"personal",days:copiedDays.map((day:any)=>({...day,references:day.scripture_references}))}};
     }
 
     if(["manage_daily","manage_pool","manage_provider","manage_plan"].includes(actionName)){
