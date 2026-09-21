@@ -109,10 +109,13 @@ export function ScripturePreviewCard({
           <Icon name="book-outline" size={16} color={colors.interactive} />
         </View>
         <View style={styles.previewCopy}>
-          <Text style={[styles.previewKicker, { color: colors.interactive }]}>SCRIPTURE</Text>
+          <Text style={[styles.previewKicker, { color: colors.interactive }]}>SCRIPTURE REFERENCE</Text>
           <Text style={[styles.previewReference, { color: colors.text }]} numberOfLines={1}>{first}</Text>
+          <Text style={[styles.previewHint, { color: colors.textMuted }]} numberOfLines={1}>
+            {/\:\d/.test(first) ? 'Preview this exact passage' : 'Preview this chapter'}
+          </Text>
         </View>
-        <Text style={[styles.previewAction, { color: colors.interactive }]}>Preview</Text>
+        <Text style={[styles.previewAction, { color: colors.interactive }]}>Open</Text>
         <Icon name="chevron-forward" size={15} color={colors.interactive} />
       </Pressable>
       <ScripturePreviewSheet reference={open ? first : null} onClose={() => setOpen(false)} />
@@ -134,8 +137,18 @@ export function ScripturePreviewSheet({ reference, onClose }: { reference: strin
     },
   );
 
+  const exactVerseRequest = Boolean(reference && /:\d/.test(reference));
+  const previewVerses = resource.data?.verses?.length
+    ? (exactVerseRequest ? resource.data.verses : resource.data.verses.slice(0, 2))
+    : [];
+  const previewLabel = exactVerseRequest
+    ? 'Exact passage'
+    : previewVerses.length
+      ? 'Chapter preview · verses ' + (previewVerses[0]?.verse ?? 1) + (previewVerses.length > 1 ? '–' + (previewVerses[previewVerses.length - 1]?.verse ?? 2) : '')
+      : 'Bible preview';
+
   return (
-    <BottomSheet visible={Boolean(reference)} onClose={onClose} title={reference || 'Scripture'} subtitle="Bible preview" compact maxHeightPercent={72}>
+    <BottomSheet visible={Boolean(reference)} onClose={onClose} title={reference || 'Scripture'} subtitle={previewLabel} compact maxHeightPercent={68}>
       <View style={styles.sheet}>
         {resource.loading && !resource.data ? (
           <><Skeleton height={24} width="48%" /><Skeleton height={92} /></>
@@ -155,7 +168,29 @@ export function ScripturePreviewSheet({ reference, onClose }: { reference: strin
               </View>
               <Icon name="book-outline" size={20} color={colors.interactive} />
             </View>
-            <Text style={[styles.sheetText, { color: colors.text }]}>{resource.data.text}</Text>
+            <View style={[styles.exactBadge, { backgroundColor: colors.primarySoft }]}>
+              <Icon name={exactVerseRequest ? 'locate-outline' : 'book-outline'} size={13} color={colors.interactive} />
+              <Text style={[styles.exactBadgeText, { color: colors.interactive }]}>
+                {exactVerseRequest ? 'Showing the exact reference requested' : 'Showing a short chapter preview'}
+              </Text>
+            </View>
+            {previewVerses.length ? (
+              <View style={styles.previewVerses}>
+                {previewVerses.map((verse, index) => (
+                  <View key={verse.verse ?? index} style={styles.previewVerseRow}>
+                    <Text style={[styles.previewVerseNumber, { color: colors.interactive }]}>{verse.verse ?? index + 1}</Text>
+                    <Text style={[styles.sheetText, { color: colors.text }]}>{verse.text}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={[styles.sheetText, { color: colors.text }]} numberOfLines={exactVerseRequest ? 8 : 5}>{resource.data.text}</Text>
+            )}
+            {!exactVerseRequest && resource.data.verses && resource.data.verses.length > previewVerses.length ? (
+              <Text style={[styles.moreContext, { color: colors.textMuted }]}>
+                Open the Bible to continue the full chapter.
+              </Text>
+            ) : null}
             {resource.data.copyright ? <Text style={[styles.copyright, { color: colors.textMuted }]}>{resource.data.copyright}</Text> : null}
             <Pressable
               onPress={() => { onClose(); router.push({ pathname: '/general/bible', params: { reference: resource.data!.reference } } as any); }}
@@ -177,13 +212,20 @@ const styles = StyleSheet.create({
   previewIcon: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   previewCopy: { flex: 1, minWidth: 0 },
   previewKicker: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.9 },
-  previewReference: { fontSize: 12.5, lineHeight: 17, fontWeight: '900', marginTop: 2 },
+  previewReference: { fontSize: 12.5, lineHeight: 17, fontWeight: '900', marginTop: 1 },
+  previewHint: { fontSize: 8.5, lineHeight: 12, marginTop: 1 },
   previewAction: { fontSize: 10, fontWeight: '900' },
   sheet: { gap: spacing.md },
   sheetHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sheetReference: { fontSize: 20, lineHeight: 25, fontWeight: '900' },
   sheetVersion: { fontSize: 10.5, fontWeight: '700', marginTop: 2 },
-  sheetText: { fontSize: 16, lineHeight: 27 },
+  exactBadge: { alignSelf: 'flex-start', minHeight: 28, borderRadius: radius.pill, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  exactBadgeText: { fontSize: 8.5, fontWeight: '900' },
+  previewVerses: { gap: 12 },
+  previewVerseRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 9 },
+  previewVerseNumber: { width: 24, paddingTop: 3, fontSize: 10, lineHeight: 17, textAlign: 'right', fontWeight: '900' },
+  sheetText: { flex: 1, fontSize: 15.5, lineHeight: 25 },
+  moreContext: { fontSize: 9.5, lineHeight: 14 },
   copyright: { fontSize: 9.5, lineHeight: 14 },
   openBible: { minHeight: 44, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   openBibleText: { color: '#fff', fontSize: 11.5, fontWeight: '900' },
