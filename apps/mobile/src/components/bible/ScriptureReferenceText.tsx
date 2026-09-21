@@ -124,15 +124,14 @@ export function ScripturePreviewSheet({ reference, onClose }: { reference: strin
   const { colors } = useTheme();
   const { api, context } = useSession();
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
-  const resource = useResource<Passage>(
+  const resource = useResource<Passage | null>(
     reference ? `scripture-preview:${organizationId || 'auto'}:${reference}` : 'scripture-preview:none',
     async (signal) => {
-      if (!reference) return null as any;
+      if (!reference) return null;
       const params = new URLSearchParams({ action: 'preview', reference });
       if (organizationId) params.set('organizationId', organizationId);
       return api.request<Passage>(`bible?${params.toString()}`, { signal, context: 'public' });
     },
-    { enabled: Boolean(reference) },
   );
 
   return (
