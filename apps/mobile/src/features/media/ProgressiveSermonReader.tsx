@@ -4,6 +4,7 @@ import * as Speech from 'expo-speech';
 import * as Clipboard from 'expo-clipboard';
 import { BottomSheet, Button, Icon, Skeleton } from '@/components';
 import { ReadAloudRateControl, useReadAloudRate } from '@/components/ReadAloudRateControl';
+import { ScripturePreviewCard } from '@/components/bible/ScriptureReferenceText';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -245,9 +246,9 @@ export function ProgressiveSermonReader({ sermon, initialBlocks }: Props) {
       <ReadAloudRateControl value={speechRate} onChange={setSpeechRate} compact />
 
       <View style={styles.blocks}>{visibleBlocks.map((block, index) => block.type === 'highlight' ? (
-        <View key={block.id} style={[styles.highlight, { backgroundColor: colors.primarySoft, borderColor: colors.interactive }]}><View style={[styles.highlightIcon, { backgroundColor: colors.card }]}><Text style={[styles.boldGlyph, { color: colors.interactive }]}>B</Text></View><Text style={[styles.highlightText, { color: colors.text }]}>{block.text}</Text></View>
+        <View key={block.id} style={[styles.highlight, { backgroundColor: colors.primarySoft, borderColor: colors.interactive }]}><View style={[styles.highlightIcon, { backgroundColor: colors.card }]}><Text style={[styles.boldGlyph, { color: colors.interactive }]}>B</Text></View><View style={styles.flex}><Text style={[styles.highlightText, { color: colors.text }]}>{block.text}</Text><ScripturePreviewCard text={block.text} compact /></View></View>
       ) : (
-        <View key={block.id} style={[styles.paragraphCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}><Text style={[styles.progressLabel, { color: colors.textMuted }]}>PART {index + 1}</Text><Text style={[styles.paragraphText, { color: colors.text }]}>{block.text}</Text></View>
+        <View key={block.id} style={[styles.paragraphCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}><Text style={[styles.progressLabel, { color: colors.textMuted }]}>PART {index + 1}</Text><Text style={[styles.paragraphText, { color: colors.text }]}>{block.text}</Text><ScripturePreviewCard text={block.text} compact /></View>
       ))}</View>
 
       {hasMore ? <View style={[styles.continueCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Text style={[styles.continueText, { color: colors.textSecondary }]}>{blocks.length - visibleCount} more section{blocks.length - visibleCount === 1 ? '' : 's'} in this sermon</Text><View style={styles.continueActions}><Button label="Continue reading" onPress={() => setVisibleCount((count) => Math.min(blocks.length, count + 3))} size="sm" /><Button label="Show all" onPress={() => setVisibleCount(blocks.length)} variant="outline" size="sm" /></View></View> : visibleCount > 3 ? <Button label="Collapse sermon" onPress={() => setVisibleCount(Math.min(3, blocks.length))} variant="outline" size="sm" /> : null}
