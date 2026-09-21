@@ -3,6 +3,7 @@ import { chatCallsHandler } from "../chat-calls/index.ts";
 import { libraryHandler } from "../library/index.ts";
 import { featureAccessHandler } from "../feature-access/index.ts";
 import { bibleHandler } from "../bible/index.ts";
+import { engagementHubHandler } from "../engagement-hub/index.ts";
 
 Deno.serve((request: Request) => {
   const service = new URL(request.url).searchParams.get("service");
@@ -10,6 +11,7 @@ Deno.serve((request: Request) => {
   if (service === "library") return libraryHandler(request);
   if (service === "feature-access") return featureAccessHandler(request);
   if (service === "bible") return bibleHandler(request);
+  if (service === "engagement-hub") return engagementHubHandler(request);
   return new Response(JSON.stringify({
     error: { code: "NOT_FOUND", message: "This endpoint is not available." },
   }), {

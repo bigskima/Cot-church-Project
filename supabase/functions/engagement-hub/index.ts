@@ -111,7 +111,7 @@ async function profileMap(admin:any,profileIds:string[]){
   return new Map((data??[]).map((profile:any)=>[profile.id,profile]));
 }
 
-Deno.serve(createHandler(
+export const engagementHubHandler=createHandler(
   {methods:["GET","POST","DELETE"],authentication:"optional",organization:"optional"},
   async({request,auth})=>{
     const admin=adminClient();
@@ -351,4 +351,6 @@ Deno.serve(createHandler(
 
     throw new ApiError("NOT_FOUND","Engagement action not recognized.",404);
   }
-));
+);
+
+if (import.meta.main) Deno.serve(engagementHubHandler);
