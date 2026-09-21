@@ -322,7 +322,7 @@ Deno.serve(createHandler(
         if(error) throw new ApiError("BIBLE_PLAN_NOT_FOUND","Reading plan not found.",404);
         let progress=null;
         if(auth?.user) progress=(await auth.client.from("bible_reading_plan_progress").select("*").eq("profile_id",auth.user.id).eq("plan_id",planId).maybeSingle()).data;
-        return { data:{...plan,days:days??[],progress} };
+        return { data:{...plan,days:(days??[]).map((day:any)=>({...day,references:day.scripture_references??[]})),progress} };
       }
       if (action==="manage") {
         if(!organizationId) throw new ApiError("ORGANIZATION_REQUIRED","Choose a church.",422);
@@ -424,7 +424,7 @@ Deno.serve(createHandler(
         const {data:plan,error}=await admin.from("bible_reading_plans").upsert({organization_id:organizationId,slug,title,description:String(body.description??"").slice(0,1200),duration_days:days.length,is_public:body.isPublic!==false,created_by:auth.user.id},{onConflict:"organization_id,slug"}).select().single();
         if(error) throw new ApiError("BIBLE_PLAN_SAVE_FAILED","Unable to save reading plan.",500,undefined,false);
         await admin.from("bible_reading_plan_days").delete().eq("plan_id",plan.id);
-        const rows=days.map((day:any,index:number)=>({plan_id:plan.id,day_number:index+1,title:String(day.title??`Day ${index+1}`).slice(0,160),references:Array.isArray(day.references)?day.references.map(String):[],reflection:day.reflection?String(day.reflection).slice(0,2000):null}));
+        const rows=days.map((day:any,index:number)=>({plan_id:plan.id,day_number:index+1,title:String(day.title??`Day ${index+1}`).slice(0,160),scripture_references:Array.isArray(day.references)?day.references.map(String):[],reflection:day.reflection?String(day.reflection).slice(0,2000):null}));
         const insert=await admin.from("bible_reading_plan_days").insert(rows); if(insert.error) throw new ApiError("BIBLE_PLAN_DAYS_FAILED","Unable to save plan days.",500,undefined,false);
         return {data:{...plan,days:rows}};
       }
