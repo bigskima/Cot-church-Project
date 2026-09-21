@@ -239,19 +239,68 @@ async function passage(reference: string, versionId = "web") {
   return versionId === "web" ? getWebPassage(parsed) : getYouVersionPassage(parsed,versionId);
 }
 
+async function fetchYouVersionBiblePages(key: string, language: string, allAvailable = false) {
+  const rows: any[] = [];
+  let pageToken = "";
+  for (let page = 0; page < 10; page += 1) {
+    const params = new URLSearchParams();
+    params.append("language_ranges[]", language || "en*");
+    params.set("page_size", "99");
+    if (allAvailable) params.set("all_available", "true");
+    if (pageToken) params.set("page_token", pageToken);
+    const result = await fetchJson(
+      `${YOUVERSION_BASE}/bibles?${params.toString()}`,
+      { headers:{ "X-YVP-App-Key":key,"Accept":"application/json" } },
+    );
+    rows.push(...(Array.isArray(result?.data) ? result.data : []));
+    pageToken = String(result?.next_page_token ?? "");
+    if (!pageToken) break;
+  }
+  return rows;
+}
+
+function versionPriority(item: any) {
+  const abbreviation = String(item?.localized_abbreviation ?? item?.abbreviation ?? "").toUpperCase();
+  const preferred = ["KJV","NKJV","NIV","ESV","NLT","AMP","CSB","NASB","BSB","ASV","WEBUS"];
+  const index = preferred.indexOf(abbreviation);
+  return index >= 0 ? index : preferred.length + 100;
+}
+
 async function versions(language = "en") {
   const free = [{
-    id:"web", abbreviation:"WEB", title:"World English Bible", language:{ name:"English", iso_639_1:"en" },
-    copyright:"Public Domain", provider:"getbible", available:true,
+    id:"web", abbreviation:"WEB", localized_abbreviation:"WEB", title:"World English Bible", localized_title:"World English Bible",
+    language:{ name:"English", iso_639_1:"en" }, language_tag:"en",
+    copyright:"Public Domain", provider:"getbible", available:true, accessStatus:"public_domain",
   }];
   const key = Deno.env.get("BIBLE_YOUVERSION_APP_KEY");
   if (!key) return free;
   try {
-    const result = await fetchJson(
-      `${YOUVERSION_BASE}/bibles?language_ranges[]=${encodeURIComponent(language || "en")}&page_size=99`,
-      { headers:{ "X-YVP-App-Key":key,"Accept":"application/json" } },
-    );
-    return [...free, ...(result?.data ?? []).map((item:any)=>({ ...item, id:String(item.id), provider:"youversion", available:true }))];
+    const range = language.includes("*") ? language : `${language || "en"}*`;
+    const [licensed, catalogue] = await Promise.all([
+      fetchYouVersionBiblePages(key, range, false),
+      fetchYouVersionBiblePages(key, range, true).catch(() => []),
+    ]);
+    const licensedIds = new Set(licensed.map((item:any) => String(item.id)));
+    const byId = new Map<string,any>();
+    for (const item of [...catalogue, ...licensed]) {
+      const id = String(item.id);
+      byId.set(id, {
+        ...byId.get(id),
+        ...item,
+        id,
+        provider:"youversion",
+        available:licensedIds.has(id),
+        accessStatus:licensedIds.has(id) ? "licensed" : "requires_license",
+      });
+    }
+    const items = [...byId.values()].sort((a:any,b:any) => {
+      const preferred = versionPriority(a) - versionPriority(b);
+      if (preferred !== 0) return preferred;
+      const aName = String(a.localized_title ?? a.title ?? a.abbreviation ?? "");
+      const bName = String(b.localized_title ?? b.title ?? b.abbreviation ?? "");
+      return aName.localeCompare(bName);
+    });
+    return [...free, ...items];
   } catch {
     return free;
   }
