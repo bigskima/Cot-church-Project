@@ -1,5 +1,5 @@
 import { Platform, Share } from 'react-native';
-import { File, Paths } from 'expo-file-system';
+import { File as ExpoFile, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
 export type ShareAttachment = {
@@ -69,7 +69,7 @@ async function nativeAttachmentUri(content: ShareContent) {
   const source = attachment.url;
   if (/^file:\/\//i.test(source)) return source;
 
-  const destination = new File(Paths.cache, `${Date.now()}-${safeFileName(content, attachment.mimeType)}`);
+  const destination = new ExpoFile(Paths.cache, `${Date.now()}-${safeFileName(content, attachment.mimeType)}`);
 
   if (/^data:/i.test(source)) {
     const comma = source.indexOf(',');
