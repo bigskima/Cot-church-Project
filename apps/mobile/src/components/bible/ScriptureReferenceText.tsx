@@ -130,7 +130,7 @@ export function ScripturePreviewSheet({ reference, onClose }: { reference: strin
       if (!reference) return null;
       const params = new URLSearchParams({ action: 'preview', reference });
       if (organizationId) params.set('organizationId', organizationId);
-      return api.request<Passage>(`bible?${params.toString()}`, { signal, context: 'public' });
+      return api.request<Passage>(`noop?service=bible&${params.toString()}`, { signal, context: 'public' });
     },
   );
 
