@@ -23,9 +23,14 @@ type ProviderRow = {
   configuration: Record<string, unknown> | null;
 };
 
-function envValue(name: unknown) {
+async function runtimeSecret(admin: any, name: unknown) {
   if (typeof name !== "string" || !name.trim()) return "";
-  return Deno.env.get(name.trim())?.trim() ?? "";
+  const reference = name.trim().toUpperCase();
+  const environmentValue = Deno.env.get(reference)?.trim() ?? "";
+  if (environmentValue) return environmentValue;
+  const { data, error } = await admin.rpc("resolve_runtime_secret", { target_reference: reference });
+  if (error) return "";
+  return typeof data === "string" ? data.trim() : "";
 }
 
 function decodeBase64(value: string) {
@@ -36,11 +41,13 @@ function decodeBase64(value: string) {
   return bytes;
 }
 
-function configuredCloudflare(row: ProviderRow) {
+async function configuredCloudflare(admin: any, row: ProviderRow) {
   const configuration = row.configuration ?? {};
   const accountIdSecret = typeof configuration.accountIdSecret === "string" ? configuration.accountIdSecret : "CLOUDFLARE_ACCOUNT_ID";
-  const token = envValue(row.secret_reference);
-  const accountId = envValue(accountIdSecret);
+  const [token, accountId] = await Promise.all([
+    runtimeSecret(admin, row.secret_reference),
+    runtimeSecret(admin, accountIdSecret),
+  ]);
   const model = typeof configuration.model === "string" && configuration.model.trim()
     ? configuration.model.trim()
     : "@cf/black-forest-labs/flux-1-schnell";
@@ -64,7 +71,7 @@ export async function imageProviderReadiness(admin: any): Promise<ImageProviderR
   if (!row) return { code: "", name: "No provider", configured: false, model: "", reason: "No active image provider is configured." };
 
   if (row.code === "cloudflare") {
-    const config = configuredCloudflare(row);
+    const config = await configuredCloudflare(admin, row);
     if (!config.accountId || !config.token) {
       return {
         code: row.code,
@@ -86,8 +93,8 @@ export async function imageProviderReadiness(admin: any): Promise<ImageProviderR
   };
 }
 
-async function generateCloudflare(row: ProviderRow, prompt: string, signal: AbortSignal): Promise<GeneratedImage> {
-  const config = configuredCloudflare(row);
+async function generateCloudflare(admin: any, row: ProviderRow, prompt: string, signal: AbortSignal): Promise<GeneratedImage> {
+  const config = await configuredCloudflare(admin, row);
   if (!config.accountId || !config.token) {
     throw new ApiError("IMAGE_PROVIDER_NOT_CONFIGURED", "Cloudflare image generation is not configured yet. Upload an image instead, or add the Cloudflare secrets.", 503);
   }
@@ -149,6 +156,6 @@ async function generateCloudflare(row: ProviderRow, prompt: string, signal: Abor
 export async function generateImage(admin: any, prompt: string, signal: AbortSignal): Promise<GeneratedImage> {
   const row = await activeProvider(admin);
   if (!row) throw new ApiError("IMAGE_PROVIDER_UNAVAILABLE", "No image-generation provider is active.", 503);
-  if (row.code === "cloudflare") return generateCloudflare(row, prompt, signal);
+  if (row.code === "cloudflare") return generateCloudflare(admin, row, prompt, signal);
   throw new ApiError("IMAGE_PROVIDER_UNSUPPORTED", `The ${row.code} image provider is not supported by this runtime yet.`, 503);
 }
