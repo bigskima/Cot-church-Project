@@ -42,6 +42,7 @@ type Passage = {
   audio?: { available?: boolean; provider?: string; url?: string; duration?: number | null; reason?: string } | null;
 };
 type Today = { reference: string; version_id: string; theme: string; source: string; message?: string | null; date: string; passage: Passage };
+type DailyVisual = { id: string; visual_date: string; content_kind: 'bible' | 'quote' | 'devotional'; image_url?: string | null; image_source?: 'ai' | 'upload' | 'inherited'; provider_code?: string | null; status?: string };
 type StudyState = {
   preferences?: {
     default_version_id?: string;
@@ -122,7 +123,7 @@ export function BibleExperience() {
   const insets = useSafeAreaInsets();
   const { api, context, mode } = useSession();
   const { colors } = useTheme();
-  const route = useLocalSearchParams<{ reference?: string; tab?: string }>();
+  const route = useLocalSearchParams<{ reference?: string; tab?: string; dailyDate?: string; dailyVisualKind?: string }>();
   const organizationId =
     context?.organization?.id ??
     context?.organizations?.[0]?.id ??
@@ -170,6 +171,8 @@ export function BibleExperience() {
   const [verseCardBusy, setVerseCardBusy] = useState(false);
   const [shareError, setShareError] = useState('');
   const cardRendererRef = useRef<SvgPngRendererHandle>(null);
+  const dailyDate = typeof route.dailyDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(route.dailyDate) ? route.dailyDate : '';
+  const dailyVisualKind = route.dailyVisualKind === 'quote' ? 'quote' : 'bible';
 
   const queryString = (extra: Record<string, string> = {}) => {
     const params = new URLSearchParams(extra);
@@ -191,6 +194,15 @@ export function BibleExperience() {
   );
   const today = useResource<Today>('bible:today:' + organizationId, (signal) =>
     api.request('noop?service=bible&' + queryString({ action: 'today' }), { signal, context: 'public' }),
+  );
+  const dailyVisual = useResource<DailyVisual | null>(
+    dailyDate ? 'bible:daily-visual:' + organizationId + ':' + dailyDate + ':' + dailyVisualKind : 'bible:daily-visual:none',
+    (signal) => dailyDate && organizationId
+      ? api.request<DailyVisual | null>(
+          'noop?service=engagement-hub&action=daily_visual&organizationId=' + encodeURIComponent(organizationId) + '&date=' + encodeURIComponent(dailyDate) + '&kind=' + encodeURIComponent(dailyVisualKind),
+          { signal, context: 'public' },
+        ).catch(() => null)
+      : Promise.resolve(null),
   );
   const study = useResource<StudyState>('bible:me:' + organizationId + ':' + mode, (signal) =>
     api.request('noop?service=bible&' + queryString({ action: 'me' }), { signal, context: 'public' }),
@@ -651,6 +663,18 @@ export function BibleExperience() {
 
   const reader = (
     <View style={styles.section}>
+      {dailyDate && dailyVisual.data?.image_url ? (
+        <View style={[styles.dailyVisualFrame, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+          <Image source={{ uri: dailyVisual.data.image_url }} style={styles.dailyVisualImage} resizeMode="cover" />
+          <View style={styles.dailyVisualOverlay}>
+            <View style={styles.dailyVisualBadge}>
+              <Icon name={dailyVisualKind === 'quote' ? 'chatbubble-ellipses-outline' : 'book-outline'} size={15} color="#FFFFFF" />
+              <Text style={styles.dailyVisualBadgeText}>{dailyVisualKind === 'quote' ? 'DAILY QUOTE' : 'DAILY BIBLE'}</Text>
+            </View>
+          </View>
+        </View>
+      ) : null}
+
       {today.data ? (
         <Pressable
           onPress={() => setReference(today.data!.reference)}
@@ -1603,6 +1627,11 @@ const styles = StyleSheet.create({
   section: { gap: spacing.md },
   flex: { flex: 1, minWidth: 0 },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  dailyVisualFrame: { width: '100%', aspectRatio: 16 / 7, borderWidth: 1, borderRadius: radius.xl, overflow: 'hidden' },
+  dailyVisualImage: { width: '100%', height: '100%' },
+  dailyVisualOverlay: { ...StyleSheet.absoluteFillObject, padding: spacing.md, justifyContent: 'flex-end' },
+  dailyVisualBadge: { alignSelf: 'flex-start', minHeight: 32, borderRadius: 16, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(4,12,24,.72)' },
+  dailyVisualBadgeText: { color: '#FFFFFF', fontSize: 8.5, fontWeight: '900', letterSpacing: 0.9 },
   todayCard: { borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: spacing.md, paddingVertical: 11, gap: 6 },
   todayCompactTop: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   todayCompactIcon: { width: 28, height: 28, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
