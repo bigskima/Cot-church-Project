@@ -6,7 +6,7 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { Icon } from '@/components/primitives/Icon';
-import { Skeleton } from '@/components/primitives/Skeleton';
+import { Skeleton } from '@/components/states';
 
 type TodayScripture = {
   reference: string;
