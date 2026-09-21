@@ -4,7 +4,6 @@ import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   EmptyState,
-  EventCard,
   HeroLiveCard,
   Icon,
   PostCard,
@@ -40,7 +39,6 @@ interface HomePayload {
   rankingMode?: 'personalized' | 'recent' | 'expression';
 }
 
-type Announcement = { id: string; title: string; body: string; published_at?: string | null; created_at?: string | null };
 type FeedPlanRow = { position: number | string; unit_kind: 'stream' | 'section'; content_kind: 'post' | 'reel' | 'video' | 'sermon' | 'event' | 'announcement'; content_ids: string[]; newest_at?: string | null; score?: number | string | null };
 type PublicBadge = { id?: string; code?: string; label: string; backgroundColor: string; textColor: string; priority?: number };
 type CommunityPost = SocialPost & {
@@ -57,9 +55,9 @@ type StreamUnit =
   | { key: string; kind: 'post'; post: CommunityPost & Ranked; timestamp: number; rank: number }
   | { key: string; kind: 'reel'; reel: Reel & Ranked; timestamp: number; rank: number }
   | { key: string; kind: 'video'; video: Video & Ranked; timestamp: number; rank: number };
-type SectionUnit = { key: string; kind: 'section'; contentKind: 'sermon' | 'event' | 'announcement'; ids: string[] };
+type SectionUnit = { key: string; kind: 'section'; contentKind: 'sermon'; ids: string[] };
 type HomeFeedUnit = StreamUnit | SectionUnit;
-type HomeResource = { payload: HomePayload; plan: FeedPlanRow[]; announcements: Announcement[] };
+type HomeResource = { payload: HomePayload; plan: FeedPlanRow[] };
 
 function timeValue(value?: string | null) {
   if (!value) return 0;
@@ -146,23 +144,16 @@ export default function GeneralHomeExperience() {
     }
 
     let plan: FeedPlanRow[] = [];
-    let announcements: Announcement[] = [];
     if (organizationId) {
       try {
         const supabase = await getRuntimeSupabase(accessToken);
-        const [planResult, announcementResult] = await Promise.all([
-          supabase.rpc('home_feed_layer_plan', { target_organization_id: organizationId, target_expression_id: null, stream_limit: 48, section_batch_size: 6, stream_items_between_sections: 4 }),
-          authenticated
-            ? supabase.from('announcements').select('id,title,body,published_at,created_at').eq('organization_id', organizationId).is('branch_id', null).eq('status', 'published').order('published_at', { ascending: false, nullsFirst: false }).limit(36)
-            : Promise.resolve({ data: [], error: null }),
-        ]);
+        const planResult = await supabase.rpc('home_feed_layer_plan', { target_organization_id: organizationId, target_expression_id: null, stream_limit: 48, section_batch_size: 6, stream_items_between_sections: 4 });
         if (!planResult.error && Array.isArray(planResult.data)) plan = planResult.data as FeedPlanRow[];
-        if (!announcementResult.error && Array.isArray(announcementResult.data)) announcements = announcementResult.data as Announcement[];
       } catch {
         // Edge data remains the fallback when a preview does not expose direct database reads.
       }
     }
-    return { payload, plan, announcements };
+    return { payload, plan };
   });
 
   const lastForegroundRefresh = useRef(0);
@@ -229,8 +220,6 @@ export default function GeneralHomeExperience() {
   const reels = communityAvailable && controls.isEnabled('reels') ? (payload?.reels ?? []) : [];
   const videos = communityAvailable && controls.isEnabled('long_form_video') ? (payload?.videos ?? []) : [];
   const sermons = controls.isEnabled('sermons') ? (payload?.sermons ?? []) : [];
-  const events = controls.isEnabled('events_gatherings') ? (payload?.events ?? []) : [];
-  const announcements = controls.isEnabled('announcements') ? (resource.data?.announcements ?? []) : [];
   const degradedSections = payload?.degradedSections ?? [];
   const rankingMode = (resource.data?.plan?.length ?? 0) > 0 || payload?.rankingMode === 'personalized' ? 'personalized' : 'recent';
   const activeStream = useMemo(
@@ -255,25 +244,21 @@ export default function GeneralHomeExperience() {
           const stream = makeStream(row.content_kind as 'post' | 'reel' | 'video', row.content_ids?.[0]);
           return stream ? [stream] : [];
         }
-        if (row.unit_kind === 'section' && ['sermon', 'event', 'announcement'].includes(row.content_kind)) return [{ key: `section:${row.content_kind}:${index}:${row.content_ids.join(':')}`, kind: 'section', contentKind: row.content_kind as SectionUnit['contentKind'], ids: row.content_ids }];
+        if (row.unit_kind === 'section' && row.content_kind === 'sermon') return [{ key: `section:sermon:${index}:${row.content_ids.join(':')}`, kind: 'section', contentKind: 'sermon', ids: row.content_ids }];
         return [];
       });
     }
 
     const stream = [...posts.map((post) => makeStream('post', post.id)), ...reels.map((reel) => makeStream('reel', reel.id)), ...videos.map((video) => makeStream('video', video.id))].filter(Boolean) as StreamUnit[];
     stream.sort((a, b) => b.rank - a.rank || b.timestamp - a.timestamp);
-    const sectionBatches: SectionUnit[] = [];
-    const grouped = { announcement: chunks(announcements.map((item) => item.id), 6), event: chunks(events.map((item) => item.id), 6), sermon: chunks(sermons.map((item) => item.id), 6) };
-    const depth = Math.max(grouped.announcement.length, grouped.event.length, grouped.sermon.length);
-    for (let chunkIndex = 0; chunkIndex < depth; chunkIndex += 1) {
-      (['announcement', 'event', 'sermon'] as const).forEach((contentKind) => { const ids = grouped[contentKind][chunkIndex]; if (ids?.length) sectionBatches.push({ key: `fallback:${contentKind}:${chunkIndex}`, kind: 'section', contentKind, ids }); });
-    }
+    const sectionBatches: SectionUnit[] = chunks(sermons.map((item) => item.id), 6)
+      .map((ids, chunkIndex) => ({ key: `fallback:sermon:${chunkIndex}`, kind: 'section' as const, contentKind: 'sermon' as const, ids }));
     const result: HomeFeedUnit[] = [];
     let sectionIndex = 0;
     stream.forEach((item, index) => { result.push(item); if ((index + 1) % 4 === 0 && sectionBatches[sectionIndex]) result.push(sectionBatches[sectionIndex++]); });
     while (sectionBatches[sectionIndex]) result.push(sectionBatches[sectionIndex++]);
     return result;
-  }, [announcements, events, posts, reels, resource.data?.plan, sermons, videos]);
+  }, [posts, reels, resource.data?.plan, sermons, videos]);
 
   const openGeneralComposer = (compose: 'post' | 'audio') => router.push({ pathname: '/general/community', params: { compose, intentId: String(Date.now()) } } as any);
   const openPost = (postId: string, focusComments = false) => router.push({ pathname: '/general/post/[id]', params: { id: postId, scope: 'general', ...(focusComments ? { focus: 'comments' } : {}) } } as any);
@@ -289,34 +274,23 @@ export default function GeneralHomeExperience() {
 
   const renderSection = (unit: SectionUnit) => {
     const sermonMap = new Map(sermons.map((item) => [item.id, item]));
-    const eventMap = new Map(events.map((item) => [item.id, item]));
-    const announcementMap = new Map(announcements.map((item) => [item.id, item]));
-    const config = unit.contentKind === 'sermon'
-      ? { eyebrow: 'WATCH · LISTEN · STUDY', title: 'Messages for the week', subtitle: 'Sermons presented as focused discovery, not another feed.', action: '/general/sermons', icon: 'book-outline' }
-      : unit.contentKind === 'event'
-        ? { eyebrow: 'GATHER', title: 'Coming up', subtitle: 'See what is happening and move straight into the event.', action: '/general/events', icon: 'calendar-outline' }
-        : { eyebrow: 'IMPORTANT', title: 'Announcements', subtitle: 'Church-wide updates without burying them in the timeline.', action: '/general/announcements', icon: 'megaphone-outline' };
-
     return (
       <View style={[styles.discoverySection, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
         <View style={styles.discoveryHeadingRow}>
-          <View style={[styles.discoveryIcon, { backgroundColor: colors.primarySoft }]}><Icon name={config.icon as any} size={18} color={colors.interactive} /></View>
-          <View style={styles.flex}><Text style={[styles.discoveryEyebrow, { color: colors.interactive }]}>{config.eyebrow}</Text><Text style={[styles.discoveryTitle, { color: colors.text }]}>{config.title}</Text><Text style={[styles.discoverySubtitle, { color: colors.textMuted }]}>{config.subtitle}</Text></View>
-          <Pressable onPress={() => router.push(config.action as any)} style={({ pressed }) => [styles.viewAllButton, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, pressed && styles.pressed]}><Text style={[styles.viewAllText, { color: colors.text }]}>View all</Text><Icon name="arrow-forward" size={14} color={colors.interactive} /></Pressable>
+          <View style={[styles.discoveryIcon, { backgroundColor: colors.primarySoft }]}><Icon name="book-outline" size={18} color={colors.interactive} /></View>
+          <View style={styles.flex}>
+            <Text style={[styles.discoveryEyebrow, { color: colors.interactive }]}>WATCH · LISTEN · STUDY</Text>
+            <Text style={[styles.discoveryTitle, { color: colors.text }]}>Messages for the week</Text>
+            <Text style={[styles.discoverySubtitle, { color: colors.textMuted }]}>Sermons presented as focused discovery, not another feed.</Text>
+          </View>
+          <Pressable onPress={() => router.push('/general/sermons' as any)} style={({ pressed }) => [styles.viewAllButton, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, pressed && styles.pressed]}>
+            <Text style={[styles.viewAllText, { color: colors.text }]}>View all</Text><Icon name="arrow-forward" size={14} color={colors.interactive} />
+          </Pressable>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalContent}>
           {unit.ids.map((id) => {
-            if (unit.contentKind === 'sermon') { const sermon = sermonMap.get(id); return sermon ? <View key={id} style={styles.discoveryCardWidth}><SermonCard sermon={sermon} variant="discovery" onPress={() => router.push(`/general/sermon/${sermon.id}` as any)} /></View> : null; }
-            if (unit.contentKind === 'event') { const event = eventMap.get(id); return event ? <View key={id} style={styles.discoveryCardWidth}><EventCard event={event} variant="discovery" onPress={() => router.push(`/general/event/${id}` as any)} /></View> : null; }
-            const announcement = announcementMap.get(id); if (!announcement) return null;
-            return (
-              <Pressable key={id} onPress={() => router.push('/general/announcements' as any)} style={({ pressed }) => [styles.announcementCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, pressed && styles.pressed]}>
-                <View style={styles.announcementTop}><View style={[styles.announcementIcon, { backgroundColor: colors.primarySoft }]}><Icon name="megaphone-outline" size={17} color={colors.interactive} /></View>{announcement.published_at ? <Text style={[styles.announcementDate, { color: colors.textMuted }]}>{new Date(announcement.published_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Text> : null}</View>
-                <Text style={[styles.announcementTitle, { color: colors.text }]} numberOfLines={2}>{announcement.title}</Text>
-                <Text style={[styles.announcementBody, { color: colors.textSecondary }]} numberOfLines={4}>{announcement.body}</Text>
-                <View style={styles.announcementFooter}><Text style={[styles.announcementLink, { color: colors.interactive }]}>Read update</Text><Icon name="arrow-forward" size={14} color={colors.interactive} /></View>
-              </Pressable>
-            );
+            const sermon = sermonMap.get(id);
+            return sermon ? <View key={id} style={styles.discoveryCardWidth}><SermonCard sermon={sermon} variant="discovery" onPress={() => router.push(`/general/sermon/${sermon.id}` as any)} /></View> : null;
           })}
         </ScrollView>
       </View>
@@ -348,7 +322,7 @@ export default function GeneralHomeExperience() {
           keyExtractor={(item) => item.key}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={header}
-          ListEmptyComponent={<View style={[styles.emptyHome, { width: contentWidth }]}><EmptyState title="General COT is ready" message="Sermons, events, media and community activity will form focused sections here as they are published." iconName="home-outline" /></View>}
+          ListEmptyComponent={<View style={[styles.emptyHome, { width: contentWidth }]}><EmptyState title="General COT is ready" message="Sermons, media and community activity will form the feed here. Events and announcements live in the Home spotlight above." iconName="home-outline" /></View>}
           contentContainerStyle={{ paddingBottom: insets.bottom + 132 }}
           refreshControl={<RefreshControl refreshing={resource.refreshing} onRefresh={refreshHome} tintColor={colors.interactive} colors={[colors.interactive]} progressBackgroundColor={colors.card} />}
           renderItem={({ item }) => {
