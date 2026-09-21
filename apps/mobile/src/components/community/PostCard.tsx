@@ -17,6 +17,7 @@ import { ContentReportSheet } from '../engagement/ContentReportSheet';
 import { InlineCommentsSheet } from '../engagement/InlineCommentsSheet';
 import { BottomSheet } from '../BottomSheet';
 import { QuotedContentCard } from './QuotedContentCard';
+import { ScripturePreviewCard } from '@/components/bible/ScriptureReferenceText';
 import type { MediaAsset, Post, SocialPost } from '@/types/content';
 import { CompactIdentityBadge, type PublicIdentityBadge } from '@/components/identity/PublicIdentityBadge';
 
@@ -418,6 +419,8 @@ export function PostCard({
             ) : null}
           </View>
         ) : null}
+
+        {body ? <ScripturePreviewCard text={body} compact /> : null}
 
         {quoteReferences.length ? (
           <View style={styles.quotedList}>
