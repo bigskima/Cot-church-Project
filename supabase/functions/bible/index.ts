@@ -95,10 +95,15 @@ async function getPublicPassage(parsed: ParsedReference, versionId: string) {
   const admin = adminClient();
   const key = `${versionId}:${parsed.display.toLowerCase()}`;
   const { data: cached } = await admin.from("bible_public_passage_cache").select("payload").eq("cache_key",key).maybeSingle();
-  if (cached?.payload) return cached.payload;
+  if (cached?.payload) {
+    const cachedVerses = Array.isArray(cached.payload.verses) ? cached.payload.verses : [];
+    if (!parsed.verseStart || cachedVerses.length) return cached.payload;
+    await admin.from("bible_public_passage_cache").delete().eq("cache_key",key);
+  }
 
   const chapter = await fetchJson(`${GETBIBLE_BASE}/${versionId}/${parsed.bookNumber}/${parsed.chapter}.json`);
-  const verses = (chapter?.verses ?? []).filter((verse: any) => {
+  const chapterVerses = chapter?.verses ?? [];
+  const verses = chapterVerses.filter((verse: any) => {
     const nr = Number(verse.nr ?? verse.verse ?? verse.number);
     if (!parsed.verseStart) return true;
     return nr >= parsed.verseStart! && nr <= (parsed.verseEnd ?? parsed.verseStart!);
@@ -109,6 +114,20 @@ async function getPublicPassage(parsed: ParsedReference, versionId: string) {
     verse: Number(verse.nr ?? verse.verse ?? verse.number),
     text: cleanText(verse.text),
   }));
+
+  if (parsed.verseStart && !verses.length) {
+    const available = chapterVerses
+      .map((verse: any) => Number(verse.nr ?? verse.verse ?? verse.number))
+      .filter((verse: number) => Number.isFinite(verse));
+    const lastVerse = available.length ? Math.max(...available) : null;
+    const requested = parsed.verseEnd && parsed.verseEnd !== parsed.verseStart
+      ? `${parsed.verseStart}-${parsed.verseEnd}`
+      : String(parsed.verseStart);
+    const message = lastVerse
+      ? `${parsed.bookName} ${parsed.chapter} ends at verse ${lastVerse}. Verse ${requested} is not in this chapter.`
+      : `Verse ${requested} could not be found in ${parsed.bookName} ${parsed.chapter}.`;
+    throw new ApiError("BIBLE_VERSE_NOT_FOUND",message,404);
+  }
 
   const payload = {
     reference: parsed.display,

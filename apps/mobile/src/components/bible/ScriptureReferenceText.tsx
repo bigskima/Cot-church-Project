@@ -131,14 +131,12 @@ export function ScripturePreviewCard({
 
 export function ScripturePreviewSheet({ reference, onClose }: { reference: string | null; onClose: () => void }) {
   const { colors } = useTheme();
-  const { api, context } = useSession();
-  const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
+  const { api } = useSession();
   const resource = useResource<Passage | null>(
-    reference ? `scripture-preview:${organizationId || 'auto'}:${reference}` : 'scripture-preview:none',
+    reference ? `scripture-preview:public:web:${reference}` : 'scripture-preview:none',
     async (signal) => {
       if (!reference) return null;
-      const params = new URLSearchParams({ action: 'preview', reference });
-      if (organizationId) params.set('organizationId', organizationId);
+      const params = new URLSearchParams({ action: 'preview', reference, versionId: 'web' });
       return api.request<Passage>(`noop?service=bible&${params.toString()}`, { signal, context: 'public' });
     },
   );

@@ -18,7 +18,7 @@ export function ActionFeedbackProvider({ children }: React.PropsWithChildren) {
     if (!feedback || feedback.kind !== 'success') return;
     const timer = setTimeout(
       () => setFeedback((current) => current?.id === feedback.id ? null : current),
-      feedback.details?.length ? 5200 : 3600,
+      2400,
     );
     return () => clearTimeout(timer);
   }, [feedback]);
@@ -42,7 +42,27 @@ export function ActionFeedbackProvider({ children }: React.PropsWithChildren) {
   return (
     <>
       {children}
-      <Modal visible={Boolean(feedback)} transparent animationType="fade" onRequestClose={() => setFeedback(null)}>
+      {feedback?.kind === 'success' ? (
+        <View pointerEvents="box-none" style={[styles.toastLayer, { bottom: Math.max(insets.bottom, 10) + 14 }]}>
+          <Pressable
+            onPress={() => setFeedback(null)}
+            style={[styles.toastCard, { backgroundColor: colors.card, borderColor: colors.success }, shadows.floating]}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss confirmation"
+          >
+            <View style={[styles.toastIcon, { backgroundColor: colors.successSoft }]}>
+              <Icon name="checkmark" size={16} color={colors.success} />
+            </View>
+            <View style={styles.toastCopy}>
+              <Text style={[styles.toastTitle, { color: colors.text }]} numberOfLines={1}>{feedback.title}</Text>
+              <Text style={[styles.toastMessage, { color: colors.textMuted }]} numberOfLines={2}>{feedback.message}</Text>
+            </View>
+            <Icon name="close" size={16} color={colors.textMuted} />
+          </Pressable>
+        </View>
+      ) : null}
+
+      <Modal visible={Boolean(feedback && feedback.kind === 'error')} transparent animationType="fade" onRequestClose={() => setFeedback(null)}>
         <View style={[styles.overlay, { paddingTop: Math.max(insets.top, spacing.md), paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: success ? colors.success : colors.live }, shadows.floating]}>
             <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -57,7 +77,7 @@ export function ActionFeedbackProvider({ children }: React.PropsWithChildren) {
 
             {feedback?.details?.length ? (
               <View style={[styles.detailBox, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
-                <Text style={[styles.detailHeading, { color: colors.text }]}>What happened</Text>
+                <Text style={[styles.detailHeading, { color: colors.text }]}>Details</Text>
                 {feedback.details.map((detail, index) => (
                   <View key={`${feedback.id}:${index}`} style={styles.detailRow}>
                     <View style={[styles.detailDot, { backgroundColor: success ? colors.success : colors.live }]} />
@@ -87,7 +107,13 @@ export function ActionFeedbackProvider({ children }: React.PropsWithChildren) {
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.56)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md },
+  toastLayer: { position: 'absolute', left: spacing.md, right: spacing.md, zIndex: 9999, alignItems: 'center' },
+  toastCard: { width: '100%', maxWidth: 520, minHeight: 58, borderWidth: 1, borderRadius: radius.xl, paddingHorizontal: spacing.sm, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 9 },
+  toastIcon: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  toastCopy: { flex: 1, minWidth: 0 },
+  toastTitle: { fontSize: 11.5, fontWeight: '900' },
+  toastMessage: { fontSize: 9.5, lineHeight: 14, marginTop: 1 },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.48)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md },
   card: { width: '100%', maxWidth: 460, maxHeight: '90%', borderWidth: 1, borderRadius: radius.xxl, overflow: 'hidden' },
   scroll: { width: '100%', flexShrink: 1 },
   scrollContent: { padding: spacing.xl, alignItems: 'center' },

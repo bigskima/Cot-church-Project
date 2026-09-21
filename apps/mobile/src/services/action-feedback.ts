@@ -84,6 +84,9 @@ function resourceName(path: string) {
     ['creator-studio', 'content'],
     ['content-media', 'content'],
   ];
+  const query = path.includes('?') ? new URLSearchParams(path.split('?')[1]) : null;
+  const service = query?.get('service');
+  if (service === 'bible') return 'Bible';
   return matches.find(([fragment]) => clean.includes(fragment))?.[1] ?? 'change';
 }
 
@@ -162,13 +165,17 @@ export function buildMutationSuccessFeedback(path: string, method: string, body?
   const target = description.target ? ` “${description.target}”` : '';
   const resultDetail = responseDetail(data);
   const resourceLabel = `${description.resource[0]?.toUpperCase() ?? ''}${description.resource.slice(1)}`;
+  const generic = description.resource === 'change';
   return {
-    title: `${resourceLabel} ${description.action.toLowerCase()}`,
+    title: generic ? 'Saved' : `${resourceLabel} ${description.action.toLowerCase()}`,
     message: description.target
-      ? `${resourceLabel}${target} was updated successfully.`
-      : `${resourceLabel} was updated successfully.`,
+      ? generic
+        ? `“${description.target}” was saved.`
+        : `${resourceLabel} “${description.target}” was saved.`
+      : generic
+        ? 'Your changes were saved.'
+        : `${resourceLabel} saved.`,
     details: [
-      ...(description.target ? [`Updated: ${description.target}`] : []),
       ...(resultDetail ? [resultDetail] : []),
     ],
   };
@@ -176,10 +183,7 @@ export function buildMutationSuccessFeedback(path: string, method: string, body?
 
 export function buildMutationFailureDetails(path: string, method: string, body?: unknown) {
   const description = describeMutation(path, method, body);
-  return [
-    ...(description.target ? [`Target: ${description.target}`] : []),
-    `The ${description.resource} update was not completed.`,
-  ];
+  return description.target ? [`Item: ${description.target}`] : [];
 }
 
 export function defaultMutationSuccess(path: string, method: string) {
@@ -218,4 +222,39 @@ const SILENT_MUTATION_PREFIXES = [
 export function shouldShowMutationFeedback(path: string) {
   const clean = path.replace(/^\/+/, '');
   return !SILENT_MUTATION_PREFIXES.some((prefix) => clean.startsWith(prefix));
+}
+
+const IMPORTANT_SUCCESS_PREFIXES = [
+  'announcements',
+  'events',
+  'invitations',
+  'roles',
+  'leadership',
+  'giving',
+  'finance',
+];
+
+const IMPORTANT_SUCCESS_ACTIONS = new Set([
+  'publish',
+  'create',
+  'delete',
+  'archive',
+  'terminate_stream',
+  'configure_provider',
+  'create_leader',
+  'archive_leader',
+]);
+
+export function shouldShowMutationSuccessFeedback(path: string, body?: unknown) {
+  const clean = path.replace(/^\/+/, '');
+  if (!shouldShowMutationFeedback(clean)) return false;
+
+  // Bible study actions, reading history and preferences already change visibly
+  // on the current screen and should never interrupt reading with global feedback.
+  if (clean.startsWith('noop?') && new URLSearchParams(clean.split('?')[1]).get('service') === 'bible') return false;
+
+  const parsed = parseMutationBody(body);
+  const action = readable(parsed.action).toLowerCase();
+  if (IMPORTANT_SUCCESS_ACTIONS.has(action)) return true;
+  return IMPORTANT_SUCCESS_PREFIXES.some((prefix) => clean.startsWith(prefix));
 }
