@@ -23,6 +23,7 @@ import { useResource } from '@/hooks/use-resource';
 import { putSignedUpload, type UploadFile } from '@/services/uploads';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
+import { MinistryImageGenerator } from '@/features/ministry/MinistryImageGenerator';
 
 type AnnouncementStatus = 'draft' | 'scheduled' | 'published' | 'cancelled' | 'archived';
 type Announcement = {
@@ -76,6 +77,7 @@ export default function GeneralAnnouncementsManageExperience() {
   const [status, setStatus] = useState<AnnouncementStatus>('draft');
   const [scheduledFor, setScheduledFor] = useState<Date | null>(null);
   const [bannerFile, setBannerFile] = useState<UploadFile | null>(null);
+  const [generatedBannerUrl, setGeneratedBannerUrl] = useState('');
   const [responseFormId, setResponseFormId] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -94,6 +96,7 @@ export default function GeneralAnnouncementsManageExperience() {
     setStatus('draft');
     setScheduledFor(null);
     setBannerFile(null);
+    setGeneratedBannerUrl('');
     setResponseFormId('');
     setError('');
   };
@@ -119,6 +122,7 @@ export default function GeneralAnnouncementsManageExperience() {
     setStatus(item.status);
     setScheduledFor(safeDate(item.scheduled_for));
     setBannerFile(null);
+    setGeneratedBannerUrl('');
     setResponseFormId(item.response_form_id ?? '');
     setError('');
     setSuccess('');
@@ -141,6 +145,7 @@ export default function GeneralAnnouncementsManageExperience() {
       setError('Choose a JPG, PNG, or WebP banner.');
       return;
     }
+    setGeneratedBannerUrl('');
     setBannerFile({ uri: asset.uri, name: asset.fileName || `announcement-banner-${Date.now()}.jpg`, mimeType, size: asset.fileSize, file: (asset as any).file });
   };
 
@@ -175,7 +180,7 @@ export default function GeneralAnnouncementsManageExperience() {
     setSaving(true);
     setError('');
     try {
-      let bannerUrl = editing?.banner_url ?? null;
+      let bannerUrl = generatedBannerUrl || editing?.banner_url || null;
       if (bannerFile) {
         const intent = await api.request<BannerUploadIntent>('announcements', { method: 'POST', body: JSON.stringify({ action: 'create_banner_upload', mimeType: bannerFile.mimeType }) });
         await putSignedUpload(intent.signedUploadUrl, bannerFile);
@@ -223,9 +228,17 @@ export default function GeneralAnnouncementsManageExperience() {
     if (step === 1) return (
       <View style={styles.stepBody}>
         <Pressable onPress={() => void chooseBanner()} style={[styles.uploadCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
-          {bannerFile?.uri || editing?.banner_url ? <Image source={{ uri: bannerFile?.uri || editing?.banner_url! }} style={styles.bannerPreview} /> : <View style={[styles.imagePlaceholder, { backgroundColor: colors.primarySoft }]}><Icon name="image-outline" size={25} color={colors.interactive} /></View>}
+          {bannerFile?.uri || generatedBannerUrl || editing?.banner_url ? <Image source={{ uri: bannerFile?.uri || generatedBannerUrl || editing?.banner_url! }} style={styles.bannerPreview} /> : <View style={[styles.imagePlaceholder, { backgroundColor: colors.primarySoft }]}><Icon name="image-outline" size={25} color={colors.interactive} /></View>}
           <View style={styles.flex}><Text style={[styles.uploadTitle, { color: colors.text }]}>Flyer or banner</Text><Text style={[styles.uploadHint, { color: colors.textMuted }]}>Optional. The announcement stays fully readable without an image.</Text></View><Icon name="chevron-forward" size={17} color={colors.textMuted} />
         </Pressable>
+        <MinistryImageGenerator
+          organizationId={organizationId}
+          useCase="announcement_banner"
+          title={title}
+          description={body}
+          currentImageUrl={bannerFile?.uri || generatedBannerUrl || editing?.banner_url}
+          onGenerated={(url) => { setBannerFile(null); setGeneratedBannerUrl(url); }}
+        />
       </View>
     );
     if (step === 2) return (
@@ -253,7 +266,7 @@ export default function GeneralAnnouncementsManageExperience() {
           <Text style={[styles.reviewTitle, { color: colors.text }]}>{title || 'Untitled announcement'}</Text>
           <Text style={[styles.reviewBody, { color: colors.textSecondary }]} numberOfLines={6}>{body || 'No message yet.'}</Text>
           {status === 'scheduled' && scheduledFor ? <Text style={[styles.reviewMeta, { color: colors.interactive }]}>Scheduled · {scheduledFor.toLocaleString()}</Text> : null}
-          <Text style={[styles.reviewMeta, { color: colors.textMuted }]}>{bannerFile || editing?.banner_url ? 'Visual attached' : 'Text-only announcement'}</Text>
+          <Text style={[styles.reviewMeta, { color: colors.textMuted }]}>{bannerFile || generatedBannerUrl || editing?.banner_url ? 'Visual attached' : 'Text-only announcement'}</Text>
           <Text style={[styles.reviewMeta, { color: colors.textMuted }]}>Response form · {availableForms.find((form) => form.id === responseFormId)?.title || 'None'}</Text>
         </View>
       </View>
