@@ -8,10 +8,21 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 
 type BibleToday = {
+  date?: string;
   reference: string;
   version_id: string;
   theme: string;
   passage: { text: string; abbreviation?: string; verses?: Array<{ verse?: number; text?: string }> };
+};
+
+type DailyVisual = {
+  id: string;
+  visual_date: string;
+  content_kind: 'bible' | 'quote' | 'devotional';
+  image_url?: string | null;
+  image_source?: 'ai' | 'upload' | 'inherited';
+  provider_code?: string | null;
+  status?: string;
 };
 
 type DailyQuote = {
@@ -61,11 +72,11 @@ export function GeneralHomeSpotlightCarousel() {
       ? api.request<BibleToday>('noop?service=bible&action=today&organizationId=' + encodeURIComponent(organizationId), { signal, context: 'public' }).catch(() => null)
       : Promise.resolve(null),
   );
-  const banners = useResource<{ banners: HomeBanner[]; dailyQuote?: DailyQuote | null }>(
+  const banners = useResource<{ banners: HomeBanner[]; dailyQuote?: DailyQuote | null; dailyVisuals?: Partial<Record<'bible' | 'quote' | 'devotional', DailyVisual>> }>(
     'home:spotlight:banners:' + organizationId,
     (signal) => organizationId
-      ? api.request<{ banners: HomeBanner[]; dailyQuote?: DailyQuote | null }>('noop?service=engagement-hub&action=home&organizationId=' + encodeURIComponent(organizationId), { signal, context: 'public' })
-      : Promise.resolve({ banners: [], dailyQuote: null }),
+      ? api.request<{ banners: HomeBanner[]; dailyQuote?: DailyQuote | null; dailyVisuals?: Partial<Record<'bible' | 'quote' | 'devotional', DailyVisual>> }>('noop?service=engagement-hub&action=home&organizationId=' + encodeURIComponent(organizationId), { signal, context: 'public' })
+      : Promise.resolve({ banners: [], dailyQuote: null, dailyVisuals: {} }),
   );
 
   const openBanner = (banner: HomeBanner) => {
@@ -82,6 +93,11 @@ export function GeneralHomeSpotlightCarousel() {
     const result: SpotlightItem[] = [];
     const today = bible.data;
     const dailyQuote = banners.data?.dailyQuote ?? null;
+    const dailyVisuals = banners.data?.dailyVisuals ?? {};
+    const dailyDate = today?.date || new Date().toISOString().slice(0, 10);
+    const bibleImage = dailyVisuals.bible?.image_url || null;
+    const quoteImage = dailyVisuals.quote?.image_url || bibleImage;
+    const devotionalImage = dailyVisuals.devotional?.image_url || null;
 
     if (dailyQuote?.body) {
       result.push({
@@ -91,9 +107,10 @@ export function GeneralHomeSpotlightCarousel() {
         title: 'Thought for today',
         body: dailyQuote.body,
         meta: dailyQuote.sourceReference ? 'INSPIRED BY ' + dailyQuote.sourceReference : 'BIBLE-INSPIRED',
+        imageUrl: quoteImage,
         onPress: () => dailyQuote.sourceReference
-          ? router.push({ pathname: '/general/bible', params: { reference: dailyQuote.sourceReference } } as any)
-          : router.push('/general/bible' as any),
+          ? router.push({ pathname: '/general/bible', params: { reference: dailyQuote.sourceReference, dailyDate, dailyVisualKind: 'quote' } } as any)
+          : router.push({ pathname: '/general/bible', params: { dailyDate, dailyVisualKind: 'quote' } } as any),
       });
     }
 
@@ -105,7 +122,8 @@ export function GeneralHomeSpotlightCarousel() {
         title: today.reference,
         body: today.passage.text,
         meta: today.theme ? today.theme.toUpperCase() : 'SCRIPTURE',
-        onPress: () => router.push({ pathname: '/general/bible', params: { reference: today.reference } } as any),
+        imageUrl: bibleImage,
+        onPress: () => router.push({ pathname: '/general/bible', params: { reference: today.reference, dailyDate, dailyVisualKind: 'bible' } } as any),
       });
     }
 
@@ -116,7 +134,8 @@ export function GeneralHomeSpotlightCarousel() {
       title: 'Read · reflect · pray',
       body: 'Open today’s devotional and continue your daily rhythm with COT.',
       meta: 'TODAY',
-      onPress: () => router.push('/general/devotional' as any),
+      imageUrl: devotionalImage,
+      onPress: () => router.push({ pathname: '/general/devotional', params: { date: dailyDate } } as any),
     });
 
     for (const banner of banners.data?.banners ?? []) {
@@ -138,7 +157,7 @@ export function GeneralHomeSpotlightCarousel() {
       });
     }
     return result;
-  }, [banners.data?.banners, bible.data]);
+  }, [banners.data?.banners, banners.data?.dailyQuote, banners.data?.dailyVisuals, bible.data]);
 
   useEffect(() => {
     if (items.length < 2) return;
