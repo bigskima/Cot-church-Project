@@ -123,6 +123,7 @@ export default function GeneralLayout() {
       <Tabs.Screen name="profile" options={{ title: 'You', tabBarAccessibilityLabel: 'Your General COT profile', tabBarIcon: renderIcon('person', 'person-outline') }} />
 
       <Tabs.Screen name="announcements" options={hidden as any} />
+      <Tabs.Screen name="announcement/[id]" options={hidden as any} />
       <Tabs.Screen name="participate" options={hidden as any} />
       <Tabs.Screen name="sermons" options={hidden as any} />
       <Tabs.Screen name="watch/index" options={hidden as any} />
