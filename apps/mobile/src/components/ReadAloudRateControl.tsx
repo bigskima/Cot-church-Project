@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import { Icon } from '@/components/Icon';
+import { Icon } from '@/components/primitives/Icon';
 import { radius, spacing } from '@/design-system/tokens';
 import { useTheme } from '@/state/theme';
 
