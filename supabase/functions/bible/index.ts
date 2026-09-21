@@ -254,7 +254,7 @@ async function providerAudio(reference:string,organizationId:string) {
   }
 }
 
-Deno.serve(createHandler(
+export const bibleHandler = createHandler(
   { methods:["GET","POST"], authentication:"optional", organization:"optional" },
   async ({ request,auth }) => {
     const url=new URL(request.url);
@@ -431,4 +431,6 @@ Deno.serve(createHandler(
     }
     throw new ApiError("NOT_FOUND","Bible action not recognized.",404);
   },
-));
+);
+
+if (import.meta.main) Deno.serve(bibleHandler);
