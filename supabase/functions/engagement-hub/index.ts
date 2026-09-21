@@ -351,7 +351,7 @@ async function ensureAutomaticTodayVisuals(admin:any,organizationId:string,date:
       generated_at:bibleVisual.generated_at??null,
       created_by:null,
       updated_at:new Date().toISOString(),
-    }).catch(()=>{});
+    });
   }
 }
 
