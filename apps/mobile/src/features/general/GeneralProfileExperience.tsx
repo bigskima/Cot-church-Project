@@ -89,6 +89,7 @@ export default function GeneralProfileExperience() {
   const displayName = profile?.display_name?.trim() || 'Church Member';
 
   const everydayLinks: HubLink[] = [
+    { key: 'bible', title: 'Bible & reading plans', subtitle: 'Read Scripture, continue plans and open My Bible', icon: 'book-outline', route: '/general/bible' },
     { key: 'messages', title: 'Messages', subtitle: 'Direct conversations across COT', icon: 'chatbubbles-outline', route: '/general/chat' },
     { key: 'notifications', title: 'Notifications', subtitle: 'General and Expression updates, kept scoped', icon: 'notifications-outline', route: '/general/notifications' },
     { key: 'saved', title: 'Saved', subtitle: 'Sermons, posts and media you kept', icon: 'bookmark-outline', route: '/general/saved' },

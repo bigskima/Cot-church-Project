@@ -127,6 +127,26 @@ export default function BibleManageScreen(){
     })),
   },'plan');
 
+  const loadPlanTemplate=async(planId:string)=>{
+    if(busy)return;
+    setBusy('template:'+planId);setError('');setSuccess('');
+    try{
+      const p=new URLSearchParams({action:'plan',planId});
+      if(organizationId)p.set('organizationId',organizationId);
+      const detail=await api.request<any>('noop?service=bible&'+p.toString(),{context:'public'});
+      setPlanTitle(detail.title||'');
+      setPlanDescription(detail.description||'');
+      setPlanDays((detail.days??[]).map((day:any,index:number)=>({
+        title:day.title||('Day '+(index+1)),
+        references:(day.references??day.scripture_references??[]).join(', '),
+        reflection:day.reflection||'',
+      })));
+      setSuccess('Template loaded. Edit anything before publishing.');
+    }catch(value){
+      setError(value instanceof Error?value.message:'Unable to load this reading-plan template.');
+    }finally{setBusy('');}
+  };
+
   if(mode!=='authenticated'){
     return <View style={[styles.state,{backgroundColor:colors.bg}]}><EmptyState title="Sign in for Bible ministry" message="Bible management follows your COT ministry role." iconName="book-outline"/><Button label="Sign in" onPress={()=>router.push({pathname:'/(auth)/login',params:{returnTo:'/general/leadership/bible-manage'}} as any)}/></View>;
   }
@@ -194,15 +214,17 @@ export default function BibleManageScreen(){
 
       {tab==='plans'?<View style={styles.section}>
         <View style={[styles.formCard,{backgroundColor:colors.card,borderColor:colors.borderSubtle},shadows.sm]}>
-          <Text style={[styles.cardTitle,{color:colors.text}]}>Create reading plan</Text>
+          <Text style={[styles.cardTitle,{color:colors.text}]}>Create or edit reading plan</Text>
+          <Text style={[styles.help,{color:colors.textMuted}]}>Start from an empty plan or load any catalogue plan below as a template, then change the title, passages, days and reflections before publishing.</Text>
           <LabeledInput label="Plan title" value={planTitle} onChangeText={setPlanTitle} placeholder="21 Days of Prayer"/>
           <LabeledInput label="Description" value={planDescription} onChangeText={setPlanDescription} placeholder="What will members walk through?" multiline/>
           {planDays.map((day,index)=><View key={index} style={[styles.dayEditor,{backgroundColor:colors.bgSecondary,borderColor:colors.borderSubtle}]}><View style={styles.rowBetween}><Text style={[styles.dayTitle,{color:colors.text}]}>Day {index+1}</Text>{planDays.length>1?<Pressable onPress={()=>setPlanDays(current=>current.filter((_,i)=>i!==index))}><Icon name="trash-outline" size={17} color={colors.live}/></Pressable>:null}</View><LabeledInput label="Title" value={day.title} onChangeText={value=>setPlanDays(current=>current.map((item,i)=>i===index?{...item,title:value}:item))} placeholder={'Day '+(index+1)}/><LabeledInput label="References (comma separated)" value={day.references} onChangeText={value=>setPlanDays(current=>current.map((item,i)=>i===index?{...item,references:value}:item))} placeholder="John 1:1-18, Psalm 1"/><LabeledInput label="Reflection" value={day.reflection} onChangeText={value=>setPlanDays(current=>current.map((item,i)=>i===index?{...item,reflection:value}:item))} placeholder="Short reflection or instruction" multiline/></View>)}
           <Button label="Add day" variant="outline" onPress={()=>setPlanDays(current=>[...current,{title:'Day '+(current.length+1),references:'',reflection:''}])}/>
           <Button label="Publish reading plan" loading={busy==='plan'} onPress={()=>void savePlan()}/>
         </View>
-        <Text style={[styles.sectionTitle,{color:colors.text}]}>Available plans</Text>
-        {(manage.data?.plans??[]).map(item=><View key={item.id} style={[styles.rowCard,{backgroundColor:colors.card,borderColor:colors.borderSubtle}]}><View style={styles.flex}><Text style={[styles.rowTitle,{color:colors.text}]}>{item.title}</Text><Text style={[styles.rowMeta,{color:colors.textMuted}]}>{item.duration_days} days · {item.organization_id?'COT ministry':'Built-in'}</Text></View><Icon name="map-outline" size={18} color={colors.interactive}/></View>)}
+        <Text style={[styles.sectionTitle,{color:colors.text}]}>Plan catalogue & templates</Text>
+        <Text style={[styles.help,{color:colors.textMuted}]}>Use a built-in or COT plan as a starting point. Loading a template never changes the original.</Text>
+        {(manage.data?.plans??[]).map(item=><View key={item.id} style={[styles.rowCard,{backgroundColor:colors.card,borderColor:colors.borderSubtle}]}><View style={styles.flex}><Text style={[styles.rowTitle,{color:colors.text}]}>{item.title}</Text><Text style={[styles.rowMeta,{color:colors.textMuted}]}>{item.duration_days} days · {item.organization_id?'COT ministry':'Built-in template'}</Text></View><Button label="Use template" variant="outline" size="sm" loading={busy==='template:'+item.id} onPress={()=>void loadPlanTemplate(item.id)}/></View>)}
       </View>:null}
 
       {error?<Text style={[styles.error,{color:colors.live}]}>{error}</Text>:null}

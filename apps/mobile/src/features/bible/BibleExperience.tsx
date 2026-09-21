@@ -56,11 +56,23 @@ type StudyState = {
   history?: Array<{ reference: string; version_id: string; last_read_at: string; read_count: number }>;
 };
 type SearchPayload = { verses: Array<{ reference?: string; text?: string }>; topics: Array<{ text?: string; reference?: string }>; query: string };
-type Plan = { id: string; slug: string; title: string; description: string; duration_days: number };
+type Plan = {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  duration_days: number;
+  organization_id?: string | null;
+  created_by?: string | null;
+  is_public?: boolean;
+  is_personal?: boolean;
+  plan_kind?: 'personal' | 'template' | 'ministry';
+};
 type PlanDetail = Plan & {
   days: Array<{ day_number: number; title?: string; references: string[]; reflection?: string | null }>;
   progress?: { current_day: number; completed_days: number[] } | null;
 };
+type PlanDraftDay = { title: string; references: string; reflection: string };
 type Tab = 'read' | 'search' | 'plans' | 'study';
 type StudyTab = 'overview' | 'bookmarks' | 'highlights' | 'notes' | 'history' | 'settings';
 
@@ -130,6 +142,16 @@ export function BibleExperience() {
   const searchInputRef = useRef<TextInput>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [planListMode, setPlanListMode] = useState<'catalogue' | 'mine'>('catalogue');
+  const [planEditorOpen, setPlanEditorOpen] = useState(false);
+  const [planEditorId, setPlanEditorId] = useState<string | null>(null);
+  const [planDraftTitle, setPlanDraftTitle] = useState('');
+  const [planDraftDescription, setPlanDraftDescription] = useState('');
+  const [planDraftDays, setPlanDraftDays] = useState<PlanDraftDay[]>([
+    { title: 'Day 1', references: 'John 1:1-18', reflection: '' },
+  ]);
+  const [planBusy, setPlanBusy] = useState('');
+  const [planError, setPlanError] = useState('');
   const [compareVersion, setCompareVersion] = useState<string | null>(null);
   const [compareSheet, setCompareSheet] = useState(false);
   const [moreToolsOpen, setMoreToolsOpen] = useState(false);
@@ -298,6 +320,98 @@ export function BibleExperience() {
     } catch (error) {
       setActionError(error instanceof Error ? error.message : 'Unable to save Bible activity.');
       return null;
+    }
+  };
+
+  const refreshPlans = () => {
+    invalidate('bible:plans:');
+    invalidate('bible:plan:');
+    plans.refresh();
+  };
+
+  const beginPlanEditor = (plan?: PlanDetail | null) => {
+    setPlanError('');
+    setSelectedPlan(null);
+    setPlanEditorId(plan?.is_personal ? plan.id : null);
+    setPlanDraftTitle(plan?.title ?? '');
+    setPlanDraftDescription(plan?.description ?? '');
+    setPlanDraftDays(
+      plan?.days?.length
+        ? plan.days.map((day) => ({
+            title: day.title || 'Day ' + day.day_number,
+            references: (day.references ?? []).join(', '),
+            reflection: day.reflection ?? '',
+          }))
+        : [{ title: 'Day 1', references: '', reflection: '' }],
+    );
+    setPlanEditorOpen(true);
+  };
+
+  const planMutation = async (body: Record<string, unknown>, key: string) => {
+    if (planBusy) return null;
+    setPlanBusy(key);
+    setPlanError('');
+    try {
+      const result = await api.request<any>('noop?service=bible', {
+        method: 'POST',
+        context: 'public',
+        body: JSON.stringify(body),
+      });
+      refreshPlans();
+      return result;
+    } catch (error) {
+      setPlanError(error instanceof Error ? error.message : 'Unable to update your reading plan.');
+      return null;
+    } finally {
+      setPlanBusy('');
+    }
+  };
+
+  const savePersonalPlan = async () => {
+    if (!planDraftTitle.trim()) {
+      setPlanError('Give your reading plan a title.');
+      return;
+    }
+    const days = planDraftDays.map((day, index) => ({
+      title: day.title.trim() || 'Day ' + (index + 1),
+      references: day.references.split(',').map((item) => item.trim()).filter(Boolean),
+      reflection: day.reflection.trim() || undefined,
+    }));
+    if (days.some((day) => !day.references.length)) {
+      setPlanError('Every day needs at least one Bible reference.');
+      return;
+    }
+
+    const saved = await planMutation({
+      action: 'personal_plan_save',
+      ...(planEditorId ? { planId: planEditorId } : {}),
+      title: planDraftTitle.trim(),
+      description: planDraftDescription.trim(),
+      days,
+    }, 'save');
+
+    if (saved?.id) {
+      setPlanEditorOpen(false);
+      setPlanEditorId(null);
+      setPlanListMode('mine');
+      setSelectedPlan(saved.id);
+    }
+  };
+
+  const customizeTemplate = async (planId: string) => {
+    const copied = await planMutation({ action: 'clone_plan', planId }, 'clone:' + planId);
+    if (copied?.id) {
+      setPlanListMode('mine');
+      beginPlanEditor(copied as PlanDetail);
+    }
+  };
+
+  const removePersonalPlan = async (planId: string) => {
+    const removed = await planMutation({ action: 'personal_plan_delete', planId }, 'delete:' + planId);
+    if (removed?.deleted) {
+      setSelectedPlan(null);
+      setPlanEditorOpen(false);
+      setPlanListMode('mine');
     }
   };
 
@@ -734,13 +848,135 @@ export function BibleExperience() {
     </View>
   );
 
+  const cataloguePlans = (plans.data ?? []).filter((plan) => !plan.is_personal);
+  const personalPlans = (plans.data ?? []).filter((plan) => plan.is_personal);
+  const visiblePlanList = planListMode === 'mine' ? personalPlans : cataloguePlans;
+
   const plansView = (
     <View style={styles.section}>
-      {selectedPlan && planDetail.data ? (
+      {planEditorOpen ? (
+        <>
+          <Button label="Back to plans" variant="outline" size="sm" onPress={() => { setPlanEditorOpen(false); setPlanError(''); }} />
+          <View style={[styles.planEditorCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+            <View style={styles.planEditorHeading}>
+              <View style={[styles.planEditorHeroIcon, { backgroundColor: colors.primarySoft }]}>
+                <Icon name="create-outline" size={22} color={colors.interactive} />
+              </View>
+              <View style={styles.flex}>
+                <Text style={[styles.planTitle, { color: colors.text }]}>{planEditorId ? 'Edit your plan' : 'Create your plan'}</Text>
+                <Text style={[styles.planEditorHelp, { color: colors.textMuted }]}>
+                  Build a private plan from scratch or customize one of the COT templates.
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.planField}>
+              <Text style={[styles.planFieldLabel, { color: colors.textMuted }]}>PLAN TITLE</Text>
+              <TextInput
+                value={planDraftTitle}
+                onChangeText={setPlanDraftTitle}
+                placeholder="My 14 days of prayer"
+                placeholderTextColor={colors.textMuted}
+                style={[styles.planInput, { color: colors.text, backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}
+              />
+            </View>
+            <View style={styles.planField}>
+              <Text style={[styles.planFieldLabel, { color: colors.textMuted }]}>DESCRIPTION</Text>
+              <TextInput
+                value={planDraftDescription}
+                onChangeText={setPlanDraftDescription}
+                placeholder="What do you want to focus on?"
+                placeholderTextColor={colors.textMuted}
+                multiline
+                style={[styles.planInput, styles.planTextArea, { color: colors.text, backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}
+              />
+            </View>
+
+            {planDraftDays.map((day, index) => (
+              <View key={'plan-day-' + index} style={[styles.planDayEditor, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+                <View style={styles.rowBetween}>
+                  <Text style={[styles.planDayTitle, { color: colors.text }]}>Day {index + 1}</Text>
+                  {planDraftDays.length > 1 ? (
+                    <Pressable
+                      onPress={() => setPlanDraftDays((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel={'Remove day ' + (index + 1)}
+                    >
+                      <Icon name="trash-outline" size={17} color={colors.live} />
+                    </Pressable>
+                  ) : null}
+                </View>
+                <TextInput
+                  value={day.title}
+                  onChangeText={(value) => setPlanDraftDays((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, title: value } : item))}
+                  placeholder={'Day ' + (index + 1) + ' title'}
+                  placeholderTextColor={colors.textMuted}
+                  style={[styles.planInput, { color: colors.text, backgroundColor: colors.card, borderColor: colors.borderSubtle }]}
+                />
+                <TextInput
+                  value={day.references}
+                  onChangeText={(value) => setPlanDraftDays((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, references: value } : item))}
+                  placeholder="John 3:16, Psalm 23:1-4"
+                  placeholderTextColor={colors.textMuted}
+                  style={[styles.planInput, { color: colors.text, backgroundColor: colors.card, borderColor: colors.borderSubtle }]}
+                />
+                <TextInput
+                  value={day.reflection}
+                  onChangeText={(value) => setPlanDraftDays((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, reflection: value } : item))}
+                  placeholder="Reflection or prayer prompt (optional)"
+                  placeholderTextColor={colors.textMuted}
+                  multiline
+                  style={[styles.planInput, styles.planReflectionInput, { color: colors.text, backgroundColor: colors.card, borderColor: colors.borderSubtle }]}
+                />
+              </View>
+            ))}
+
+            <Button
+              label="Add another day"
+              variant="outline"
+              onPress={() => setPlanDraftDays((current) => [...current, { title: 'Day ' + (current.length + 1), references: '', reflection: '' }])}
+            />
+            {planError ? <Text style={[styles.planError, { color: colors.live }]}>{planError}</Text> : null}
+            <Button label={planEditorId ? 'Save changes' : 'Create my plan'} loading={planBusy === 'save'} onPress={() => void savePersonalPlan()} />
+          </View>
+        </>
+      ) : selectedPlan && planDetail.data ? (
         <>
           <Button label="Back to plans" variant="outline" size="sm" onPress={() => setSelectedPlan(null)} />
-          <Text style={[styles.planTitle, { color: colors.text }]}>{planDetail.data.title}</Text>
-          <Text style={[styles.planDesc, { color: colors.textSecondary }]}>{planDetail.data.description}</Text>
+          <View style={styles.planDetailHeading}>
+            <View style={styles.flex}>
+              <View style={styles.planBadgeRow}>
+                <View style={[styles.planBadge, { backgroundColor: planDetail.data.is_personal ? colors.primarySoft : colors.bgSecondary }]}>
+                  <Text style={[styles.planBadgeText, { color: planDetail.data.is_personal ? colors.interactive : colors.textMuted }]}>
+                    {planDetail.data.is_personal ? 'MY PLAN' : planDetail.data.plan_kind === 'ministry' ? 'COT PLAN' : 'TEMPLATE'}
+                  </Text>
+                </View>
+              </View>
+              <Text style={[styles.planTitle, { color: colors.text }]}>{planDetail.data.title}</Text>
+              <Text style={[styles.planDesc, { color: colors.textSecondary }]}>{planDetail.data.description}</Text>
+            </View>
+          </View>
+
+          {mode === 'authenticated' ? (
+            <View style={styles.planDetailActions}>
+              {planDetail.data.is_personal ? (
+                <>
+                  <Button label="Edit my plan" variant="outline" size="sm" onPress={() => beginPlanEditor(planDetail.data)} />
+                  <Button label="Delete" variant="outline" size="sm" loading={planBusy === 'delete:' + planDetail.data.id} onPress={() => void removePersonalPlan(planDetail.data!.id)} />
+                </>
+              ) : (
+                <Button
+                  label="Customize this plan"
+                  variant="outline"
+                  size="sm"
+                  loading={planBusy === 'clone:' + planDetail.data.id}
+                  onPress={() => void customizeTemplate(planDetail.data!.id)}
+                />
+              )}
+            </View>
+          ) : null}
+
           {planDetail.data.days.map((day) => {
             const done = planDetail.data?.progress?.completed_days?.includes(day.day_number);
             return (
@@ -770,23 +1006,73 @@ export function BibleExperience() {
       ) : plans.loading && !plans.data ? (
         <Skeleton height={170} count={2} />
       ) : (
-        plans.data?.map((plan) => (
-          <Pressable
-            key={plan.id}
-            onPress={() => setSelectedPlan(plan.id)}
-            style={[styles.planCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}
-          >
-            <View style={[styles.planIcon, { backgroundColor: colors.primarySoft }]}>
-              <Icon name="map-outline" size={21} color={colors.interactive} />
+        <>
+          <View style={[styles.planHero, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+            <View style={[styles.planHeroIcon, { backgroundColor: colors.primarySoft }]}>
+              <Icon name="map-outline" size={24} color={colors.interactive} />
             </View>
             <View style={styles.flex}>
-              <Text style={[styles.planTitleSmall, { color: colors.text }]}>{plan.title}</Text>
-              <Text numberOfLines={2} style={[styles.planDescSmall, { color: colors.textMuted }]}>{plan.description}</Text>
-              <Text style={[styles.planMeta, { color: colors.interactive }]}>{plan.duration_days} days</Text>
+              <Text style={[styles.planHeroTitle, { color: colors.text }]}>Reading plans</Text>
+              <Text style={[styles.planHeroText, { color: colors.textMuted }]}>
+                Follow a COT plan, choose a template, or build a private plan around what you want to study.
+              </Text>
             </View>
-            <Icon name="chevron-forward" size={18} color={colors.textMuted} />
-          </Pressable>
-        ))
+          </View>
+
+          <View style={styles.planToolbar}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.planModeChips}>
+              <Chip label={'Catalogue · ' + cataloguePlans.length} selected={planListMode === 'catalogue'} onPress={() => setPlanListMode('catalogue')} />
+              {mode === 'authenticated' ? (
+                <Chip label={'My plans · ' + personalPlans.length} selected={planListMode === 'mine'} onPress={() => setPlanListMode('mine')} />
+              ) : null}
+            </ScrollView>
+            {mode === 'authenticated' ? (
+              <Button label="Create plan" size="sm" onPress={() => beginPlanEditor(null)} />
+            ) : null}
+          </View>
+
+          {planListMode === 'mine' && mode !== 'authenticated' ? (
+            <View style={[styles.signInCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+              <Icon name="person-circle-outline" size={26} color={colors.interactive} />
+              <Text style={[styles.resultTitle, { color: colors.text }]}>Sign in to create your own plans</Text>
+              <Button label="Sign in" onPress={() => router.push({ pathname: '/(auth)/login', params: { returnTo: '/general/bible?tab=plans' } } as any)} />
+            </View>
+          ) : visiblePlanList.length ? (
+            visiblePlanList.map((plan) => (
+              <Pressable
+                key={plan.id}
+                onPress={() => setSelectedPlan(plan.id)}
+                style={[styles.planCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}
+              >
+                <View style={[styles.planIcon, { backgroundColor: colors.primarySoft }]}>
+                  <Icon name={plan.is_personal ? 'create-outline' : 'map-outline'} size={21} color={colors.interactive} />
+                </View>
+                <View style={styles.flex}>
+                  <View style={styles.planCardTitleRow}>
+                    <Text style={[styles.planTitleSmall, { color: colors.text }]} numberOfLines={1}>{plan.title}</Text>
+                    <Text style={[styles.planKindText, { color: colors.textMuted }]}>
+                      {plan.is_personal ? 'Mine' : plan.plan_kind === 'ministry' ? 'COT' : 'Template'}
+                    </Text>
+                  </View>
+                  <Text numberOfLines={2} style={[styles.planDescSmall, { color: colors.textMuted }]}>{plan.description}</Text>
+                  <Text style={[styles.planMeta, { color: colors.interactive }]}>{plan.duration_days} days</Text>
+                </View>
+                <Icon name="chevron-forward" size={18} color={colors.textMuted} />
+              </Pressable>
+            ))
+          ) : (
+            <View style={[styles.planEmpty, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+              <Icon name="map-outline" size={26} color={colors.interactive} />
+              <Text style={[styles.resultTitle, { color: colors.text }]}>
+                {planListMode === 'mine' ? 'No personal plans yet' : 'No plans available'}
+              </Text>
+              <Text style={[styles.emptyHelp, { color: colors.textMuted }]}>
+                {planListMode === 'mine' ? 'Create one from scratch or customize a template from the catalogue.' : 'Check back when reading plans are published.'}
+              </Text>
+              {planListMode === 'mine' ? <Button label="Create my first plan" size="sm" onPress={() => beginPlanEditor(null)} /> : null}
+            </View>
+          )}
+        </>
       )}
     </View>
   );
@@ -1320,6 +1606,31 @@ const styles = StyleSheet.create({
   planDayTitle: { fontSize: 12.5, fontWeight: '900' },
   planRef: { fontSize: 12, fontWeight: '800' },
   planReflection: { fontSize: 11.5, lineHeight: 18 },
+  planHero: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  planHeroIcon: { width: 48, height: 48, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  planHeroTitle: { fontSize: 16, fontWeight: '900' },
+  planHeroText: { fontSize: 10.5, lineHeight: 15, marginTop: 2 },
+  planToolbar: { gap: spacing.sm },
+  planModeChips: { gap: 7, paddingRight: spacing.md },
+  planCardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  planKindText: { fontSize: 8.5, fontWeight: '900', textTransform: 'uppercase' },
+  planDetailHeading: { gap: 7 },
+  planDetailActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  planBadgeRow: { flexDirection: 'row', alignItems: 'center' },
+  planBadge: { minHeight: 24, borderRadius: radius.pill, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center' },
+  planBadgeText: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.6 },
+  planEditorCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.md },
+  planEditorHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  planEditorHeroIcon: { width: 46, height: 46, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  planEditorHelp: { fontSize: 10.5, lineHeight: 15, marginTop: 2 },
+  planField: { gap: 5 },
+  planFieldLabel: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.8 },
+  planInput: { minHeight: 46, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: 12, fontSize: 13 },
+  planTextArea: { minHeight: 86, paddingTop: 11, paddingBottom: 11, textAlignVertical: 'top' },
+  planReflectionInput: { minHeight: 74, paddingTop: 10, paddingBottom: 10, textAlignVertical: 'top' },
+  planDayEditor: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm, gap: 8 },
+  planError: { fontSize: 10.5, lineHeight: 15, fontWeight: '700' },
+  planEmpty: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.lg, gap: spacing.sm, alignItems: 'flex-start' },
   signInCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.lg, gap: spacing.sm, alignItems: 'flex-start' },
   settingsCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm },
   settingLabel: { fontSize: 11.5, fontWeight: '800' },
