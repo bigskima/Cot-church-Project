@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
   content: { width: '100%', maxWidth: 820, alignSelf: 'center', paddingHorizontal: spacing.md, gap: spacing.lg },
   visual: { width: '100%', aspectRatio: 16 / 7, borderWidth: 1, borderRadius: radius.xl, overflow: 'hidden' },
   image: { width: '100%', height: '100%' },
-  overlay: { ...StyleSheet.absoluteFillObject, padding: spacing.md, justifyContent: 'flex-end' },
+  overlay: { ...StyleSheet.absoluteFill as any, padding: spacing.md, justifyContent: 'flex-end' },
   badge: { alignSelf: 'flex-start', minHeight: 32, borderRadius: 16, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(4,12,24,.72)' },
   badgeText: { color: '#FFFFFF', fontSize: 8.5, fontWeight: '900', letterSpacing: 0.9 },
   quoteCard: { borderWidth: 1, borderRadius: radius.xxl, padding: spacing.xl, gap: spacing.lg },
