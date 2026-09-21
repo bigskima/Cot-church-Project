@@ -16,6 +16,19 @@ function timestamp(value: unknown, field: string) {
   return result;
 }
 
+async function responseFormIdForOrganization(value: unknown, organizationId: string) {
+  if (value === null || value === undefined || value === "") return null;
+  const id = uuid(String(value), "responseFormId", true)!;
+  const { data, error } = await adminClient()
+    .from("cot_forms")
+    .select("id")
+    .eq("id", id)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  if (error || !data) throw new ApiError("FORM_NOT_FOUND", "Choose a response form from this church.", 422);
+  return id;
+}
+
 Deno.serve(createHandler(
   { methods: ["GET", "POST", "PATCH"], authentication: "required", organization: "required" },
   async ({ request, auth }) => {
@@ -76,7 +89,7 @@ Deno.serve(createHandler(
         capacity,
         recurrence_rule: body.recurrenceRule ?? null,
         banner_url: optionalString(body.bannerUrl, "bannerUrl", 2000),
-        response_form_id: body.responseFormId ? uuid(String(body.responseFormId), "responseFormId", true) : null,
+        response_form_id: await responseFormIdForOrganization(body.responseFormId, auth.organizationId),
         created_by: auth.user.id,
       };
       const { data, error } = await auth.client.from("events").insert(record).select().single();
@@ -113,7 +126,7 @@ Deno.serve(createHandler(
       updates.capacity = capacity;
     }
     if (body.bannerUrl !== undefined) updates.banner_url = optionalString(body.bannerUrl, "bannerUrl", 2000);
-    if (body.responseFormId !== undefined) updates.response_form_id = body.responseFormId ? uuid(String(body.responseFormId), "responseFormId", true) : null;
+    if (body.responseFormId !== undefined) updates.response_form_id = await responseFormIdForOrganization(body.responseFormId, auth.organizationId);
     if (!Object.keys(updates).length) throw new ApiError("VALIDATION_FAILED", "At least one field is required", 422);
 
     let updateQuery = auth.client.from("events").update(updates).eq("id", id).eq("organization_id", auth.organizationId);
