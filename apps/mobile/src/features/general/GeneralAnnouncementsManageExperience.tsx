@@ -33,7 +33,9 @@ type Announcement = {
   scheduled_for?: string | null;
   published_at?: string | null;
   banner_url?: string | null;
+  response_form_id?: string | null;
 };
+type CotForm = { id: string; slug: string; title: string; status: 'draft' | 'published' | 'closed' | 'hidden' };
 type BannerUploadIntent = { signedUploadUrl: string; publicUrl: string };
 
 const STEPS: ProgressiveFlowStep[] = [
@@ -59,6 +61,12 @@ export default function GeneralAnnouncementsManageExperience() {
     `general:ministry:announcements:${organizationId || 'none'}`,
     (signal) => canManage ? api.request<Announcement[]>('announcements', { signal }) : Promise.resolve([]),
   );
+  const forms = useResource<{ forms: CotForm[]; banners: unknown[] }>(
+    `general:ministry:announcement-forms:${organizationId || 'none'}`,
+    (signal) => canManage && organizationId
+      ? api.request('noop?service=engagement-hub&action=manage&organizationId=' + encodeURIComponent(organizationId), { signal })
+      : Promise.resolve({ forms: [], banners: [] }),
+  );
 
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
@@ -68,11 +76,13 @@ export default function GeneralAnnouncementsManageExperience() {
   const [status, setStatus] = useState<AnnouncementStatus>('draft');
   const [scheduledFor, setScheduledFor] = useState<Date | null>(null);
   const [bannerFile, setBannerFile] = useState<UploadFile | null>(null);
+  const [responseFormId, setResponseFormId] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
   const list = resource.data ?? [];
+  const availableForms = (forms.data?.forms ?? []).filter((item) => item.status === 'published');
   const publishedCount = useMemo(() => list.filter((item) => item.status === 'published').length, [list]);
   const scheduledCount = useMemo(() => list.filter((item) => item.status === 'scheduled').length, [list]);
 
@@ -84,6 +94,7 @@ export default function GeneralAnnouncementsManageExperience() {
     setStatus('draft');
     setScheduledFor(null);
     setBannerFile(null);
+    setResponseFormId('');
     setError('');
   };
 
@@ -108,6 +119,7 @@ export default function GeneralAnnouncementsManageExperience() {
     setStatus(item.status);
     setScheduledFor(safeDate(item.scheduled_for));
     setBannerFile(null);
+    setResponseFormId(item.response_form_id ?? '');
     setError('');
     setSuccess('');
     setStep(0);
@@ -181,6 +193,7 @@ export default function GeneralAnnouncementsManageExperience() {
         status: persistedStatus,
         scheduledFor: status === 'scheduled' ? scheduledFor?.toISOString() : null,
         bannerUrl,
+        responseFormId: responseFormId || null,
       };
 
       let saved = editing
@@ -225,6 +238,12 @@ export default function GeneralAnnouncementsManageExperience() {
         </View>
         {status === 'scheduled' ? <DateTimeField label="Publish at" value={scheduledFor} onChange={setScheduledFor} minYear={new Date().getFullYear()} maxYear={new Date().getFullYear() + 2} helperText="The announcement will publish automatically at or shortly after this time." /> : null}
         <View style={[styles.deliveryNote, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Icon name="notifications-outline" size={18} color={colors.interactive} /><Text style={[styles.deliveryText, { color: colors.textSecondary }]}>Publishing continues to use the existing COT notification fan-out, so members can open the official announcement directly.</Text></View>
+        <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>RESPONSE FORM</Text>
+        <Text style={[styles.formHint, { color: colors.textMuted }]}>Optional. Attach a published configurable form so this announcement can collect registrations, applications, feedback or other responses.</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+          <Chip label="No form" selected={!responseFormId} onPress={() => setResponseFormId('')} />
+          {availableForms.map((form) => <Chip key={form.id} label={form.title} selected={responseFormId === form.id} onPress={() => setResponseFormId(form.id)} />)}
+        </ScrollView>
       </View>
     );
     return (
@@ -235,6 +254,7 @@ export default function GeneralAnnouncementsManageExperience() {
           <Text style={[styles.reviewBody, { color: colors.textSecondary }]} numberOfLines={6}>{body || 'No message yet.'}</Text>
           {status === 'scheduled' && scheduledFor ? <Text style={[styles.reviewMeta, { color: colors.interactive }]}>Scheduled · {scheduledFor.toLocaleString()}</Text> : null}
           <Text style={[styles.reviewMeta, { color: colors.textMuted }]}>{bannerFile || editing?.banner_url ? 'Visual attached' : 'Text-only announcement'}</Text>
+          <Text style={[styles.reviewMeta, { color: colors.textMuted }]}>Response form · {availableForms.find((form) => form.id === responseFormId)?.title || 'None'}</Text>
         </View>
       </View>
     );
@@ -282,6 +302,6 @@ const styles = StyleSheet.create({
   card: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm, overflow: 'hidden' }, cardBanner: { width: '100%', aspectRatio: 16 / 9, borderRadius: radius.lg }, cardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, cardTitle: { fontSize: 14, lineHeight: 19, fontWeight: '900' }, cardMeta: { fontSize: 10.5, marginTop: 2 }, cardBody: { fontSize: 12, lineHeight: 18 },
   stepBody: { gap: spacing.md }, fieldLabel: { fontSize: 9.5, fontWeight: '900', letterSpacing: 0.7 }, chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   uploadCard: { minHeight: 84, borderWidth: 1, borderRadius: radius.xl, padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, bannerPreview: { width: 100, aspectRatio: 16 / 9, borderRadius: radius.md }, imagePlaceholder: { width: 58, height: 58, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' }, uploadTitle: { fontSize: 12.5, fontWeight: '900' }, uploadHint: { fontSize: 10.5, lineHeight: 15, marginTop: 2 },
-  deliveryNote: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, deliveryText: { flex: 1, fontSize: 11, lineHeight: 16 },
+  deliveryNote: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, deliveryText: { flex: 1, fontSize: 11, lineHeight: 16 }, formHint: { fontSize: 10.5, lineHeight: 15 },
   reviewCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm }, reviewTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, reviewIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, reviewTitle: { fontSize: 19, lineHeight: 24, fontWeight: '900', letterSpacing: -0.3 }, reviewBody: { fontSize: 12, lineHeight: 19 }, reviewMeta: { fontSize: 10.5, fontWeight: '700' }, pressed: { opacity: 0.84 },
 });
