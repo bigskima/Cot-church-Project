@@ -1,5 +1,6 @@
-export function pdfViewerHtml(url: string) {
+export function pdfViewerHtml(url: string, initialSpeechRate = 1) {
   const source = JSON.stringify(url).replace(/</g, '\\u003c');
+  const rate = Number.isFinite(initialSpeechRate) ? Math.min(2, Math.max(0.5, initialSpeechRate)) : 1;
   return `<!doctype html>
 <html>
 <head>
@@ -12,13 +13,15 @@ export function pdfViewerHtml(url: string) {
   body{background:#080d15;color:#eef4ff}
   #shell{display:flex;flex-direction:column}
   #toolbar{z-index:10;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:9px 10px;background:#0b121d;border-bottom:1px solid #223047}
-  button,input{font:inherit}
+  button,input,select{font:inherit}
   button{border:1px solid #34435b;background:#111a28;color:#eef4ff;border-radius:999px;min-height:38px;padding:0 13px;font-weight:850;cursor:pointer}
   button:disabled{opacity:.38;cursor:default}
   button.primary{background:#168fe8;border-color:#168fe8;color:white}
   button.active{background:#0e3d62;border-color:#168fe8;color:#75c2ff}
   .pagebox{display:flex;align-items:center;gap:5px;color:#9cabc0;font-size:12px;font-weight:850}
   #pageInput{width:56px;height:36px;border-radius:11px;border:1px solid #34435b;background:#0d1522;color:#eef4ff;text-align:center;font-weight:900}
+  .speedbox{display:flex;align-items:center;gap:6px;color:#9cabc0;font-size:10px;font-weight:850}
+  #speechRate{height:36px;border:1px solid #34435b;border-radius:999px;background:#111a28;color:#eef4ff;padding:0 9px;font-weight:900}
   #zoomLabel{min-width:46px;text-align:center;color:#9cabc0;font-size:11px;font-weight:850}
   #outlineWrap{display:none;border-bottom:1px solid #1e2939;background:#0c131f;padding:8px 10px}
   #outlineTitle{font-size:9.5px;letter-spacing:1px;font-weight:900;color:#7e91aa;margin:0 0 7px}
@@ -29,7 +32,7 @@ export function pdfViewerHtml(url: string) {
   #paper{width:max-content;max-width:100%;margin:0 auto;background:#fff;box-shadow:0 16px 40px rgba(0,0,0,.28);line-height:0}
   canvas{display:block;max-width:100%;height:auto}
   #status{padding:42px 20px;text-align:center;color:#9cabc0;font-weight:750;line-height:1.5}
-  #textStatus{display:none;padding:7px 12px;background:#111a28;border-bottom:1px solid #223047;color:#8fa1b7;font-size:10px;font-weight:750}
+  #textStatus{display:none;padding:7px 12px;background:#111a28;border-bottom:1px solid #223047;color:#8fa1b7;font-size:10px;font-weight:750;line-height:1.45}
   #error{display:none;padding:32px 20px;text-align:center;color:#ffd1d6}
   #error a{display:inline-block;margin-top:14px;color:#79b9ff;font-weight:900}
   @media(max-width:560px){
@@ -38,6 +41,7 @@ export function pdfViewerHtml(url: string) {
     .hideSmall{display:none}
     #stage{padding:9px 3px 18px}
     #read,#autoRead{font-size:11px}
+    .speedbox span{display:none}
   }
 </style>
 </head>
@@ -49,6 +53,14 @@ export function pdfViewerHtml(url: string) {
     <button id="next" class="primary">Next ›</button>
     <button id="read">🔊 Read aloud</button>
     <button id="autoRead">▶ Auto read</button>
+    <label class="speedbox"><span>Voice speed</span><select id="speechRate" aria-label="Voice speed">
+      <option value="0.5">0.5×</option>
+      <option value="0.75">0.75×</option>
+      <option value="1">1×</option>
+      <option value="1.25">1.25×</option>
+      <option value="1.5">1.5×</option>
+      <option value="2">2×</option>
+    </select></label>
     <button id="zoomOut" class="hideSmall">−</button>
     <span id="zoomLabel" class="hideSmall">100%</span>
     <button id="zoomIn" class="hideSmall">+</button>
@@ -77,6 +89,7 @@ export function pdfViewerHtml(url: string) {
   const next = document.getElementById('next');
   const read = document.getElementById('read');
   const autoReadButton = document.getElementById('autoRead');
+  const speechRateSelect = document.getElementById('speechRate');
   const zoomIn = document.getElementById('zoomIn');
   const zoomOut = document.getElementById('zoomOut');
   const zoomLabel = document.getElementById('zoomLabel');
@@ -91,6 +104,14 @@ export function pdfViewerHtml(url: string) {
   let renderTask = null;
   let speaking = false;
   let autoRead = false;
+  let speechRate = normalizeRate(${rate});
+
+  function normalizeRate(value) {
+    const number = Number(value);
+    return [0.5,0.75,1,1.25,1.5,2].includes(number) ? number : 1;
+  }
+
+  speechRateSelect.value = String(speechRate);
 
   function updateReadButtons() {
     const hasText = Boolean(currentPageText.trim());
@@ -107,6 +128,14 @@ export function pdfViewerHtml(url: string) {
       return true;
     }
     return false;
+  }
+
+  function notifyHostRate() {
+    const payload = { type: 'pdf-rate-change', rate: speechRate };
+    if (nativeMessage(payload)) return;
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ source: 'cot-pdf-reader', ...payload }, '*');
+    }
   }
 
   function stopSpeech(keepAuto = false) {
@@ -130,6 +159,102 @@ export function pdfViewerHtml(url: string) {
     }
   };
 
+  function isNoiseLine(value) {
+    const line = String(value || '').replace(/\s+/g, ' ').trim();
+    if (!line) return true;
+    if (/^(?:page\s*)?\d{1,4}(?:\s*(?:of|\/)\s*\d{1,4})?$/i.test(line)) return true;
+    if (/^(?:[•·◆◇▪▫■□●○❖✦✧★☆*_=~—–\-\s]){3,}$/.test(line)) return true;
+    return false;
+  }
+
+  function joinLineItems(items) {
+    const ordered = items.slice().sort((a, b) => a.x - b.x);
+    let text = '';
+    let right = null;
+    let previousFont = 10;
+    for (const item of ordered) {
+      const raw = String(item.text || '').replace(/\s+/g, ' ').trim();
+      if (!raw) continue;
+      const gap = right === null ? 0 : item.x - right;
+      const needsSpace = Boolean(text) && gap > Math.max(1.2, Math.min(previousFont, item.fontSize) * 0.12)
+        && !/[-‐‑\/(]$/.test(text)
+        && !/^[,.;:!?%)\]}]/.test(raw);
+      if (needsSpace) text += ' ';
+      text += raw;
+      right = Math.max(right === null ? item.x : right, item.x + Math.max(0, item.width || 0));
+      previousFont = item.fontSize || previousFont;
+    }
+    return text.replace(/\s+/g, ' ').trim();
+  }
+
+  function extractReadableText(page, textContent) {
+    const rawItems = (textContent && textContent.items || []).map((item, index) => {
+      const transform = item && item.transform || [1,0,0,1,0,0];
+      const fontSize = Math.max(1, Math.abs(Number(transform[3]) || Number(item.height) || 10));
+      return {
+        index,
+        text: item && item.str || '',
+        x: Number(transform[4]) || 0,
+        y: Number(transform[5]) || 0,
+        width: Number(item && item.width) || 0,
+        fontSize,
+        hasEOL: Boolean(item && item.hasEOL),
+      };
+    }).filter((item) => item.text && item.text.trim());
+
+    if (!rawItems.length) return '';
+
+    const pageHeight = Math.max(1, Number(page.view && (page.view[3] - page.view[1])) || 1);
+    const mainItems = rawItems.filter((item) => (
+      item.fontSize >= 5
+      && item.y >= pageHeight * 0.055
+      && item.y <= pageHeight * 0.945
+    ));
+    const candidates = mainItems.length >= Math.min(4, rawItems.length) ? mainItems : rawItems;
+
+    const ordered = candidates.slice().sort((a, b) => {
+      if (Math.abs(a.y - b.y) > 2.5) return b.y - a.y;
+      return a.x - b.x;
+    });
+
+    const lines = [];
+    for (const item of ordered) {
+      const tolerance = Math.max(2.5, Math.min(7, item.fontSize * 0.42));
+      let line = lines.find((candidate) => Math.abs(candidate.y - item.y) <= tolerance);
+      if (!line) {
+        line = { y: item.y, items: [] };
+        lines.push(line);
+      }
+      line.items.push(item);
+    }
+    lines.sort((a, b) => b.y - a.y);
+
+    const textLines = [];
+    const seen = new Set();
+    for (const line of lines) {
+      const value = joinLineItems(line.items);
+      const key = value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+      if (!value || isNoiseLine(value) || !key || seen.has(key)) continue;
+      seen.add(key);
+      textLines.push(value);
+    }
+
+    let result = '';
+    for (const line of textLines) {
+      if (result && /[A-Za-z][-‐‑]$/.test(result) && /^[a-z]/.test(line)) {
+        result = result.replace(/[-‐‑]$/, '') + line;
+      } else {
+        result += (result ? '\n' : '') + line;
+      }
+    }
+
+    return result
+      .replace(/([A-Za-z])[-‐‑]\s*\n\s*([a-z])/g, '$1$2')
+      .replace(/\n+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   function speakCurrent(continuous = false) {
     if (!currentPageText.trim()) return;
     if (speaking) {
@@ -140,7 +265,7 @@ export function pdfViewerHtml(url: string) {
     speaking = true;
     updateReadButtons();
 
-    if (nativeMessage({ type: 'pdf-read-page', text: currentPageText, page: currentPage, continuous })) return;
+    if (nativeMessage({ type: 'pdf-read-page', text: currentPageText, page: currentPage, continuous, rate: speechRate })) return;
 
     if (!window.speechSynthesis || typeof window.SpeechSynthesisUtterance !== 'function') {
       speaking = false;
@@ -152,7 +277,7 @@ export function pdfViewerHtml(url: string) {
     }
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(currentPageText);
-    utterance.rate = 0.92;
+    utterance.rate = speechRate;
     utterance.onend = window.__cotPdfSpeechDone;
     utterance.onerror = () => { speaking = false; autoRead = false; updateReadButtons(); };
     window.speechSynthesis.speak(utterance);
@@ -198,14 +323,12 @@ export function pdfViewerHtml(url: string) {
       const ctx = canvas.getContext('2d', { alpha: false });
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
 
-      const textPromise = page.getTextContent().catch(() => null);
+      const textPromise = page.getTextContent({ normalizeWhitespace: true, disableCombineTextItems: false }).catch(() => null);
       renderTask = page.render({ canvasContext: ctx, viewport });
       const [, textContent] = await Promise.all([renderTask.promise, textPromise]);
       renderTask = null;
 
-      currentPageText = textContent
-        ? (textContent.items || []).map((item) => item && item.str ? item.str : '').filter(Boolean).join(' ').replace(/\s+/g, ' ').trim()
-        : '';
+      currentPageText = textContent ? extractReadableText(page, textContent) : '';
 
       status.style.display = 'none';
       paper.style.display = 'block';
@@ -213,7 +336,7 @@ export function pdfViewerHtml(url: string) {
 
       if (!currentPageText) {
         textStatus.style.display = 'block';
-        textStatus.textContent = 'This page has no selectable text. If it is a scanned image, OCR is required before read aloud can work.';
+        textStatus.textContent = 'This page has no reliable readable text. Decorative PDF objects are ignored; scanned pages need OCR before read aloud can work.';
       }
       updateReadButtons();
       if ((readAfterRender || autoRead) && currentPageText) speakCurrent(true);
@@ -254,6 +377,12 @@ export function pdfViewerHtml(url: string) {
   autoReadButton.onclick = () => {
     if (autoRead || speaking) { stopSpeech(); return; }
     speakCurrent(true);
+  };
+  speechRateSelect.onchange = () => {
+    speechRate = normalizeRate(speechRateSelect.value);
+    speechRateSelect.value = String(speechRate);
+    notifyHostRate();
+    if (speaking) stopSpeech();
   };
   pageInput.onchange = () => {
     if (!pdf) return;
