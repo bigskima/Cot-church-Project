@@ -27,6 +27,8 @@ type EventRegistration = {
 };
 
 type EventWithBanner = Event & { banner_url?: string | null };
+type EventInterest = { interested: boolean };
+type LinkedForm = { id: string; slug: string; title: string; status: string; requires_auth?: boolean };
 
 export function EventDetailScreen({ forcedScope }: { forcedScope?: 'general' | 'expression' } = {}) {
   const { id, context: requestedContext } = useLocalSearchParams<{ id: string; context?: string }>();
@@ -66,6 +68,26 @@ export function EventDetailScreen({ forcedScope }: { forcedScope?: 'general' | '
   );
   const registration = registrations.data?.find((item) => item.status !== 'cancelled');
 
+  const interest = useResource<EventInterest>(
+    `event:interest:${mode}:${id}:${event?.organization_id ?? 'none'}`,
+    (signal) => mode === 'authenticated' && event?.organization_id
+      ? api.request<EventInterest>(
+          'noop?service=engagement-hub&action=event_interest&eventId=' + encodeURIComponent(String(id)) + '&organizationId=' + encodeURIComponent(event.organization_id),
+          { signal },
+        )
+      : Promise.resolve({ interested: false }),
+  );
+  const linkedForm = useResource<LinkedForm | null>(
+    `event:response-form:${event?.response_form_id ?? 'none'}`,
+    (signal) => event?.response_form_id && event?.organization_id
+      ? api.request<LinkedForm>(
+          'noop?service=engagement-hub&action=form&id=' + encodeURIComponent(event.response_form_id) + '&organizationId=' + encodeURIComponent(event.organization_id),
+          { signal, context: 'public' },
+        ).catch(() => null)
+      : Promise.resolve(null),
+  );
+  const [interestBusy, setInterestBusy] = useState(false);
+
   const registrationAvailability = (() => {
     if (!event) return { allowed: false, label: 'RSVP / Register' };
     const now = Date.now();
@@ -98,6 +120,28 @@ export function EventDetailScreen({ forcedScope }: { forcedScope?: 'general' | '
     finally { setRegistering(false); }
   };
 
+  const handleInterest = async () => {
+    if (!event) return;
+    if (mode === 'visitor') {
+      router.push({ pathname: '/(auth)/login', params: { returnTo: forcedScope === 'general' ? `/general/event/${id}` : `/event/${id}${expressionMode ? '?context=expression' : ''}` } } as any);
+      return;
+    }
+    setInterestBusy(true); setActionError(''); setActionMessage('');
+    const nextInterested = !interest.data?.interested;
+    try {
+      await api.request('noop?service=engagement-hub', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'event_interest', organizationId: event.organization_id, eventId: id, interested: nextInterested }),
+      });
+      setActionMessage(nextInterested ? 'Saved to your interested events.' : 'Removed from your interested events.');
+      interest.refresh();
+    } catch (value) {
+      setActionError(value instanceof Error ? value.message : 'Unable to save your interest.');
+    } finally {
+      setInterestBusy(false);
+    }
+  };
+
   const handleShare = async () => {
     if (!event || expressionMode) return;
     const message = `Join us for ${event.title}!${event.location?.name ? ` At ${event.location.name}.` : ''}`;
@@ -127,6 +171,27 @@ export function EventDetailScreen({ forcedScope }: { forcedScope?: 'general' | '
               <Button label={registration && registration.status !== 'attended' ? 'Cancel Registration' : registration?.status === 'attended' ? 'Attendance Recorded' : registrationAvailability.label} onPress={registration && registration.status !== 'attended' ? handleCancel : handleRegister} loading={registering} disabled={registration?.status === 'attended' || (!registration && !registrationAvailability.allowed)} variant={registration ? 'outline' : 'primary'} size="lg" style={{ flex: 1 }} icon={<Icon name={registration ? 'checkmark-circle' : 'ticket-outline'} size={18} color={registration ? colors.interactive : colors.textInverse} />} />
               {!expressionMode ? <Button label="Share" onPress={handleShare} variant="outline" size="lg" icon={<Icon name="share-outline" size={18} color={colors.text} />} /> : null}
             </View>
+            <View style={styles.responseActions}>
+              <Button
+                label={interest.data?.interested ? 'Interested ✓' : 'I’m interested'}
+                onPress={() => void handleInterest()}
+                loading={interestBusy}
+                variant={interest.data?.interested ? 'secondary' : 'outline'}
+                size="lg"
+                style={{ flex: 1 }}
+                icon={<Icon name={interest.data?.interested ? 'heart' : 'heart-outline'} size={18} color={colors.interactive} />}
+              />
+              {linkedForm.data ? (
+                <Button
+                  label={linkedForm.data.title || 'Event form'}
+                  onPress={() => router.push(('/general/forms/' + linkedForm.data!.slug) as any)}
+                  variant="outline"
+                  size="lg"
+                  style={{ flex: 1 }}
+                  icon={<Icon name="document-text-outline" size={18} color={colors.interactive} />}
+                />
+              ) : null}
+            </View>
           </View>
         ) : null}
       </ScrollView>
@@ -141,5 +206,5 @@ export default function LegacyEventDetailRoute() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 }, content: { flexGrow: 1 }, body: { paddingHorizontal: spacing.md, gap: spacing.lg }, bannerFrame: { width: '100%', aspectRatio: 16 / 9, borderRadius: radius.xl, borderWidth: 1, overflow: 'hidden' }, bannerImage: { width: '100%', height: '100%' }, card: { padding: spacing.lg, borderRadius: radius.xl, borderWidth: 1, gap: spacing.md }, cardRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md }, iconCircle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }, cardInfo: { flex: 1, gap: 2 }, cardLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 }, cardValue: { fontSize: 15, fontWeight: '600' }, timeHint: { marginTop: 3, fontSize: 12, lineHeight: 17, fontWeight: '500' }, divider: { height: 1, width: '100%' }, cardKicker: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 }, bodyText: { fontSize: 14, lineHeight: 22 }, actionRow: { flexDirection: 'row', gap: spacing.sm, padding: spacing.sm, borderRadius: radius.xxl, borderWidth: 1 }, statusMessage: { fontSize: 13, lineHeight: 18, fontWeight: '600' }, registrationState: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md }, registrationHint: { fontSize: 12, lineHeight: 17 },
+  screen: { flex: 1 }, content: { flexGrow: 1 }, body: { paddingHorizontal: spacing.md, gap: spacing.lg }, responseActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, bannerFrame: { width: '100%', aspectRatio: 16 / 9, borderRadius: radius.xl, borderWidth: 1, overflow: 'hidden' }, bannerImage: { width: '100%', height: '100%' }, card: { padding: spacing.lg, borderRadius: radius.xl, borderWidth: 1, gap: spacing.md }, cardRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md }, iconCircle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }, cardInfo: { flex: 1, gap: 2 }, cardLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 }, cardValue: { fontSize: 15, fontWeight: '600' }, timeHint: { marginTop: 3, fontSize: 12, lineHeight: 17, fontWeight: '500' }, divider: { height: 1, width: '100%' }, cardKicker: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 }, bodyText: { fontSize: 14, lineHeight: 22 }, actionRow: { flexDirection: 'row', gap: spacing.sm, padding: spacing.sm, borderRadius: radius.xxl, borderWidth: 1 }, statusMessage: { fontSize: 13, lineHeight: 18, fontWeight: '600' }, registrationState: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md }, registrationHint: { fontSize: 12, lineHeight: 17 },
 });
