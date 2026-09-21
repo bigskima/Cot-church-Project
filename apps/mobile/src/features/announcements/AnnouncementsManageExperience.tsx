@@ -22,6 +22,7 @@ import { useResource } from '@/hooks/use-resource';
 import { putSignedUpload, type UploadFile } from '@/services/uploads';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
+import { MinistryImageGenerator } from '@/features/ministry/MinistryImageGenerator';
 
 type AnnouncementStatus = 'draft' | 'scheduled' | 'published' | 'cancelled' | 'archived';
 type Announcement = {
@@ -63,6 +64,7 @@ export default function AnnouncementsManageExperience() {
   const [status, setStatus] = useState<AnnouncementStatus>('draft');
   const [scheduledFor, setScheduledFor] = useState<Date | null>(null);
   const [bannerFile, setBannerFile] = useState<UploadFile | null>(null);
+  const [generatedBannerUrl, setGeneratedBannerUrl] = useState('');
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -86,6 +88,7 @@ export default function AnnouncementsManageExperience() {
     setStatus('draft');
     setScheduledFor(null);
     setBannerFile(null);
+    setGeneratedBannerUrl('');
     setErrorMsg('');
   };
 
@@ -104,6 +107,7 @@ export default function AnnouncementsManageExperience() {
     setStatus(item.status);
     setScheduledFor(safeDate(item.scheduled_for));
     setBannerFile(null);
+    setGeneratedBannerUrl('');
     setErrorMsg('');
     setSuccessMsg('');
     setComposerOpen(true);
@@ -117,6 +121,7 @@ export default function AnnouncementsManageExperience() {
     if (!asset) return;
     const mimeType = asset.mimeType?.toLowerCase() || 'image/jpeg';
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(mimeType)) return setErrorMsg('Choose a JPG, PNG, or WebP banner.');
+    setGeneratedBannerUrl('');
     setBannerFile({ uri: asset.uri, name: asset.fileName || `announcement-banner-${Date.now()}.jpg`, mimeType, size: asset.fileSize, file: (asset as any).file });
   };
 
@@ -131,7 +136,7 @@ export default function AnnouncementsManageExperience() {
     setErrorMsg('');
     setSuccessMsg('');
     try {
-      let bannerUrl = editing?.banner_url ?? null;
+      let bannerUrl = generatedBannerUrl || editing?.banner_url || null;
       if (bannerFile) {
         const intent = await api.request<BannerUploadIntent>('announcements', {
           method: 'POST',
@@ -227,7 +232,16 @@ export default function AnnouncementsManageExperience() {
           <InputField label="Title" value={title} onChangeText={setTitle} placeholder="Important update" />
           <InputField label="Message" value={body} onChangeText={setBody} multiline numberOfLines={6} placeholder="What does everyone need to know?" />
           <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>FLYER / BANNER (OPTIONAL)</Text>
-          <Pressable onPress={() => void chooseBanner()} style={[styles.uploadCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>{bannerFile?.uri || editing?.banner_url ? <Image source={{ uri: bannerFile?.uri || editing?.banner_url! }} style={styles.bannerPreview} /> : <View style={[styles.imagePlaceholder, { backgroundColor: colors.primarySoft }]}><Icon name="image-outline" size={25} color={colors.interactive} /></View>}<View style={styles.flex}><Text style={[styles.uploadTitle, { color: colors.text }]}>Choose flyer or banner</Text><Text style={[styles.uploadHint, { color: colors.textSecondary }]}>JPG, PNG or WebP. The text announcement remains readable without an image.</Text></View></Pressable>
+          <Pressable onPress={() => void chooseBanner()} style={[styles.uploadCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>{bannerFile?.uri || generatedBannerUrl || editing?.banner_url ? <Image source={{ uri: bannerFile?.uri || generatedBannerUrl || editing?.banner_url! }} style={styles.bannerPreview} /> : <View style={[styles.imagePlaceholder, { backgroundColor: colors.primarySoft }]}><Icon name="image-outline" size={25} color={colors.interactive} /></View>}<View style={styles.flex}><Text style={[styles.uploadTitle, { color: colors.text }]}>Choose flyer or banner</Text><Text style={[styles.uploadHint, { color: colors.textSecondary }]}>JPG, PNG or WebP. The text announcement remains readable without an image.</Text></View></Pressable>
+          <MinistryImageGenerator
+            organizationId={organizationId}
+            branchId={expression?.id ?? null}
+            useCase="announcement_banner"
+            title={title}
+            description={body}
+            currentImageUrl={bannerFile?.uri || generatedBannerUrl || editing?.banner_url}
+            onGenerated={(url) => { setBannerFile(null); setGeneratedBannerUrl(url); }}
+          />
           <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>DELIVERY</Text>
           <View style={styles.chips}><Chip label="Draft" selected={status === 'draft'} onPress={() => setStatus('draft')} /><Chip label="Schedule" selected={status === 'scheduled'} onPress={() => { setStatus('scheduled'); if (!scheduledFor) setScheduledFor(new Date(Date.now() + 60 * 60 * 1000)); }} /><Chip label="Publish now" selected={status === 'published'} onPress={() => setStatus('published')} /></View>
           {status === 'scheduled' ? <DateTimeField label="Publish at" value={scheduledFor} onChange={setScheduledFor} minYear={new Date().getFullYear()} maxYear={new Date().getFullYear() + 2} helperText="COT will publish the announcement automatically at or shortly after this time." /> : null}
