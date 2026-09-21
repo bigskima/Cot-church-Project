@@ -531,6 +531,22 @@ export const engagementHubHandler=createHandler(
         return {data:await readyVisual(admin,organizationId,date,kind)};
       }
 
+      if(action==="daily_visual_manage"){
+        const date=quoteDate(url.searchParams.get("date")??new Date().toISOString().slice(0,10));
+        const kind=visualKind(url.searchParams.get("kind"));
+        await requireVisualManager(auth,organizationId,kind);
+        const [{data:visual},provider]=await Promise.all([
+          admin.from("cot_daily_visuals")
+            .select("id,visual_date,content_kind,image_url,storage_path,image_source,provider_code,prompt,status,last_error,generated_at,updated_at")
+            .eq("organization_id",organizationId)
+            .eq("visual_date",date)
+            .eq("content_kind",kind)
+            .maybeSingle(),
+          imageProviderReadiness(admin),
+        ]);
+        return {data:{visual:visual??null,provider}};
+      }
+
       if(action==="manage"){
         await requireManager(auth,organizationId);
         const [banners,forms,events,announcements]=await Promise.all([
