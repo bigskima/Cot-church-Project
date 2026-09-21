@@ -393,7 +393,7 @@ export const engagementHubHandler=createHandler(
           admin.from("cot_daily_quotes").select("id,quote_date,body,source_reference,theme,source,status").eq("organization_id",organizationId).eq("quote_date",today).maybeSingle(),
           admin.from("cot_daily_visuals").select("id,visual_date,content_kind,image_url,image_source,provider_code,prompt,status,generated_at,updated_at").eq("organization_id",organizationId).eq("visual_date",today).eq("status","ready"),
         ]);
-        if(bannerResult.error||formResult.error||eventResult.error||announcementResult.error) throw new ApiError("HOME_BANNERS_FAILED","Unable to load COT highlights.",500,undefined,false);
+        if(bannerResult.error||formResult.error||eventResult.error||announcementResult.error||(visualRows as any)?.error) throw new ApiError("HOME_BANNERS_FAILED","Unable to load COT highlights.",500,undefined,false);
         const explicitBanners=bannerResult.data??[];
         const explicitDestinations=new Set(explicitBanners
           .filter((item:any)=>item.destination_type!=="none"&&item.destination_value)
