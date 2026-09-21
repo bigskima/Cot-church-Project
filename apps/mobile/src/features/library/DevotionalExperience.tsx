@@ -336,7 +336,7 @@ const styles = StyleSheet.create({
   emptyCopy: { fontSize: 12, lineHeight: 18, textAlign: 'center', maxWidth: 380 },
   visualFrame: { width: '100%', aspectRatio: 16 / 7, borderWidth: 1, borderRadius: radius.xl, overflow: 'hidden' },
   visualImage: { width: '100%', height: '100%' },
-  visualOverlay: { ...StyleSheet.absoluteFillObject, padding: spacing.md, justifyContent: 'flex-end' },
+  visualOverlay: { ...StyleSheet.absoluteFill as any, padding: spacing.md, justifyContent: 'flex-end' },
   visualBadge: { alignSelf: 'flex-start', minHeight: 32, borderRadius: 16, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 6 },
   visualBadgeText: { color: '#FFFFFF', fontSize: 8.5, fontWeight: '900', letterSpacing: 0.9 },
   seriesHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
