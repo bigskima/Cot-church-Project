@@ -110,6 +110,13 @@ export default function GeneralToolsScreen() {
       description: 'Open the daily devotional by year, month and day.',
       onPress: () => router.push('/general/devotional' as any),
     } : null,
+    features.isEnabled('bible') ? {
+      key: 'bible',
+      label: 'Bible',
+      icon: 'book-outline',
+      description: 'Read, listen, search, save Scripture and follow reading plans.',
+      onPress: () => router.push('/general/bible' as any),
+    } : null,
     features.isEnabled('locations') ? {
       key: 'location',
       label: 'Location',
