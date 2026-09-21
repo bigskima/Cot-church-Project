@@ -525,6 +525,31 @@ export const engagementHubHandler=createHandler(
         return {data:{fromDate,days,provider}};
       }
 
+      if(action==="daily_quote"){
+        const date=quoteDate(url.searchParams.get("date")??new Date().toISOString().slice(0,10));
+        const bible=await resolvedScripture(admin,organizationId,date);
+        const [{data:saved},visual]=await Promise.all([
+          admin.from("cot_daily_quotes")
+            .select("id,quote_date,body,source_reference,theme,source,status,updated_at")
+            .eq("organization_id",organizationId)
+            .eq("quote_date",date)
+            .maybeSingle(),
+          readyVisual(admin,organizationId,date,"quote"),
+        ]);
+        const quote=saved
+          ? saved.status==="hidden" ? null : {
+              id:saved.id,
+              date:saved.quote_date,
+              body:saved.body,
+              sourceReference:saved.source_reference,
+              theme:saved.theme,
+              source:saved.source,
+              isOverride:true,
+            }
+          : {...automaticQuote(bible,date),date};
+        return {data:quote?{...quote,visual:visual??await readyVisual(admin,organizationId,date,"bible")}:null};
+      }
+
       if(action==="daily_visual"){
         const date=quoteDate(url.searchParams.get("date")??new Date().toISOString().slice(0,10));
         const kind=visualKind(url.searchParams.get("kind"));
