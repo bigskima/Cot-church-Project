@@ -43,6 +43,7 @@ type Props = {
   provider?: ImageProviderReadiness | null;
   onChanged: () => void;
   allowBibleInheritance?: boolean;
+  seriesId?: string;
 };
 
 const LABELS = {
@@ -59,6 +60,7 @@ export function DailyVisualManagerCard({
   provider,
   onChanged,
   allowBibleInheritance = false,
+  seriesId,
 }: Props) {
   const { api } = useSession();
   const { colors } = useTheme();
@@ -69,7 +71,7 @@ export function DailyVisualManagerCard({
     return api.request<DailyVisual>('noop?service=engagement-hub', {
       method: 'POST',
       context: 'public',
-      body: JSON.stringify({ action, organizationId, date, kind, ...extra }),
+      body: JSON.stringify({ action, organizationId, date, kind, ...(seriesId ? { seriesId } : {}), ...extra }),
     });
   };
 
@@ -122,7 +124,7 @@ export function DailyVisualManagerCard({
       const intent = await api.request<UploadIntent>('noop?service=engagement-hub', {
         method: 'POST',
         context: 'public',
-        body: JSON.stringify({ action: 'visual_upload_intent', organizationId, date, kind, mimeType }),
+        body: JSON.stringify({ action: 'visual_upload_intent', organizationId, date, kind, mimeType, ...(seriesId ? { seriesId } : {}) }),
       });
       await putSignedUpload(intent.signedUploadUrl, file);
       await post('visual_save_upload', { storagePath: intent.storagePath });
