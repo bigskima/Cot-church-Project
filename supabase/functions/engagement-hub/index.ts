@@ -374,9 +374,9 @@ async function canManage(auth:any,organizationId:string){
 async function requireManager(auth:any,organizationId:string){
   if(!(await canManage(auth,organizationId))) throw new ApiError("PERMISSION_DENIED","Your ministry role cannot manage banners or forms.",403);
 }
-async function hasOrgPermission(auth:any,organizationId:string,permission:string){
+async function hasOrgPermission(auth:any,organizationId:string,permission:string,branchId:string|null=null){
   if(!auth?.user) return false;
-  const {data}=await auth.client.rpc("has_permission",{target_organization_id:organizationId,requested_permission:permission,target_branch_id:null});
+  const {data}=await auth.client.rpc("has_permission",{target_organization_id:organizationId,requested_permission:permission,target_branch_id:branchId});
   return data===true;
 }
 function ministryImageUseCase(value:unknown){
@@ -384,15 +384,19 @@ function ministryImageUseCase(value:unknown){
   if(!MINISTRY_IMAGE_USE_CASES.has(useCase)) throw new ApiError("VALIDATION_FAILED","Choose a supported ministry image type.",422);
   return useCase;
 }
-async function requireMinistryImagePermission(auth:any,organizationId:string,useCase:string){
+async function requireMinistryImagePermission(auth:any,organizationId:string,useCase:string,branchId:string|null=null){
   if(!auth?.user) throw new ApiError("AUTHENTICATION_REQUIRED","Sign in to generate ministry artwork.",401);
   if(useCase==="event_banner"){
-    if(await hasOrgPermission(auth,organizationId,"events.create")||await hasOrgPermission(auth,organizationId,"events.update")) return;
+    if(await hasOrgPermission(auth,organizationId,"events.create",branchId)||await hasOrgPermission(auth,organizationId,"events.update",branchId)) return;
   }else if(useCase==="announcement_banner"){
-    if(await hasOrgPermission(auth,organizationId,"announcements.manage")) return;
-  }else if(useCase==="sermon_artwork"||useCase==="library_cover"){
+    if(await hasOrgPermission(auth,organizationId,"announcements.manage",branchId)) return;
+  }else if(useCase==="sermon_artwork"){
     for(const permission of ["sermons.manage","sermons.create","sermons.publish"]){
-      if(await hasOrgPermission(auth,organizationId,permission)) return;
+      if(await hasOrgPermission(auth,organizationId,permission,branchId)) return;
+    }
+  }else if(useCase==="library_cover"){
+    for(const permission of ["sermons.manage","sermons.create","sermons.publish"]){
+      if(await hasOrgPermission(auth,organizationId,permission,null)) return;
     }
   }else if(useCase==="home_banner"||useCase==="form_banner"){
     if(await canManage(auth,organizationId)) return;
@@ -834,7 +838,8 @@ export const engagementHubHandler=createHandler(
 
     if(actionName==="ministry_image_generate"){
       const useCase=ministryImageUseCase(body.useCase);
-      await requireMinistryImagePermission(auth,organizationId,useCase);
+      const branchId=optionalUuid(body.branchId,"branchId");
+      await requireMinistryImagePermission(auth,organizationId,useCase,branchId);
       const title=text(body.title,220,true);
       const description=text(body.description??"",1800);
       const direction=text(body.direction??"",1200);
