@@ -139,6 +139,7 @@ async function enrichSocialReferences<T extends Record<string, any>>(rows: T[]) 
           .from("reels")
           .select("id,organization_id,caption,media_asset_id,content_items!inner(id,visibility,status,author_profile_id,expression_id,published_at),media_assets(id,media_type,duration_seconds,source_storage_path,media_renditions(rendition_kind,storage_path),media_thumbnails(storage_path,is_primary))")
           .in("id", reelIds)
+          .eq("content_items.visibility", "public")
           .eq("content_items.status", "published")
       : Promise.resolve({ data: [] as any[], error: null }),
     postIds.length
