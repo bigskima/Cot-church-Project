@@ -108,9 +108,7 @@ export function GeneralHomeSpotlightCarousel() {
         body: dailyQuote.body,
         meta: dailyQuote.sourceReference ? 'INSPIRED BY ' + dailyQuote.sourceReference : 'BIBLE-INSPIRED',
         imageUrl: quoteImage,
-        onPress: () => dailyQuote.sourceReference
-          ? router.push({ pathname: '/general/bible', params: { reference: dailyQuote.sourceReference, dailyDate, dailyVisualKind: 'quote' } } as any)
-          : router.push({ pathname: '/general/bible', params: { dailyDate, dailyVisualKind: 'quote' } } as any),
+        onPress: () => router.push({ pathname: '/general/daily-quote', params: { date: dailyDate } } as any),
       });
     }
 
