@@ -125,7 +125,7 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
   const [recordingAction, setRecordingAction] = useState(false);
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(audioRecorder, 250);
-  const { compose, intentId } = useLocalSearchParams<{ compose?: string; intentId?: string }>();
+  const { compose, intentId, scriptureReference, scriptureText, scriptureVersion } = useLocalSearchParams<{ compose?: string; intentId?: string; scriptureReference?: string; scriptureText?: string; scriptureVersion?: string }>();
   const handledComposeIntent = useRef<string | null>(null);
 
   useEffect(() => {
@@ -142,8 +142,12 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
     handledComposeIntent.current = key;
     setPostDestination(scope);
     setPostError('');
+    if (scriptureReference && scriptureText) {
+      const versionLabel = scriptureVersion ? ' ' + scriptureVersion : '';
+      setPostText('“' + scriptureText + '”\n\n' + scriptureReference + versionLabel);
+    }
     setComposerOpen(true);
-  }, [compose, expression?.id, intentId, mode, scope]);
+  }, [compose, expression?.id, intentId, mode, scope, scriptureReference, scriptureText, scriptureVersion]);
 
   const feedKey = `mobile:community:${activeTab}:${organizationId || 'auto'}:${activeTab === 'expression' ? expression?.id ?? 'none' : 'general'}:${mode}`;
   const resource = useResource<CommunityPost[]>(feedKey, (signal) => {
