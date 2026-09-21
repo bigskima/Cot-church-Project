@@ -94,7 +94,7 @@ export default function BibleManageScreen(){
     if(busy)return null;
     setBusy(key);setError('');setSuccess('');
     try{
-      const result=await api.request<any>('bible',{method:'POST',context:'public',body:JSON.stringify(body)});
+      const result=await api.request<any>('noop?service=bible',{method:'POST',context:'public',body:JSON.stringify(body)});
       setSuccess('Saved.');
       refresh();
       return result;
