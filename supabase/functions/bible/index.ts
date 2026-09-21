@@ -196,23 +196,10 @@ async function searchBible(query:string, versionId:string) {
   const { data: topicRows }=await admin.from("bible_daily_pool").select("reference,theme").eq("active",true).ilike("theme",`%${trimmed}%`).limit(12);
   const topics=(topicRows ?? []).map((row:any)=>({ text:row.theme,reference:row.reference }));
 
-  if (versionId !== "web") {
-    const key=Deno.env.get("BIBLE_YOUVERSION_APP_KEY");
-    if (key) {
-      // Search is provider-capable when YouVersion exposes the app's search catalogue.
-      // If search is unavailable for the app key, fall back to the public-domain WEB index below.
-      for (const path of [
-        `${YOUVERSION_BASE}/search?query=${encodeURIComponent(trimmed)}&bible_id=${encodeURIComponent(versionId)}`,
-        `${YOUVERSION_BASE}/search-verses?query=${encodeURIComponent(trimmed)}&bible_id=${encodeURIComponent(versionId)}`,
-      ]) {
-        try {
-          const result=await fetchJson(path,{headers:{"X-YVP-App-Key":key,"Accept":"application/json"}});
-          const refs=result?.verses ?? result?.data?.verses ?? result?.data ?? [];
-          if (Array.isArray(refs) && refs.length) return { verses:refs.slice(0,25),topics:result?.topics ?? topics,query:trimmed,provider:"youversion" };
-        } catch { /* try fallback */ }
-      }
-    }
-  }
+  // Keyword search uses the public-domain WEB corpus as COT's stable search
+  // index. Opening a result still uses the member's selected translation, so
+  // licensed providers never need their full corpus copied into COT.
+
 
   const data=await webFullBible();
   const needle=trimmed.toLowerCase();
