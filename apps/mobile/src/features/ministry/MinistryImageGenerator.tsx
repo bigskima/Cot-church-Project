@@ -11,7 +11,8 @@ export type MinistryImageUseCase =
   | 'home_banner'
   | 'form_banner'
   | 'sermon_artwork'
-  | 'library_cover';
+  | 'library_cover'
+  | 'expression_banner';
 
 type GeneratedImage = {
   publicUrl: string;
