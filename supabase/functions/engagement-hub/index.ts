@@ -264,6 +264,103 @@ async function readyVisual(admin:any,organizationId:string,date:string,kind:stri
   return data??null;
 }
 
+async function autoGenerateVisual(admin:any,organizationId:string,date:string,kind:"bible"|"devotional"){
+  const {data:existing}=await admin.from("cot_daily_visuals")
+    .select("id,status,updated_at")
+    .eq("organization_id",organizationId)
+    .eq("visual_date",date)
+    .eq("content_kind",kind)
+    .maybeSingle();
+  if(existing) return;
+
+  let content:any;
+  try{content=await visualContent(admin,organizationId,date,kind);}
+  catch{return;}
+
+  const prompt=visualPrompt(kind,date,content);
+  const {error:claimError}=await admin.from("cot_daily_visuals").insert({
+    organization_id:organizationId,
+    visual_date:date,
+    content_kind:kind,
+    image_url:null,
+    storage_path:null,
+    image_source:"ai",
+    provider_code:null,
+    prompt,
+    status:"generating",
+    last_error:"",
+    generated_at:null,
+    created_by:null,
+    updated_at:new Date().toISOString(),
+  });
+  if(claimError) return;
+
+  try{
+    const generated=await generateImage(admin,prompt,new AbortController().signal);
+    const ext=visualExtension(generated.contentType);
+    const storagePath="orgs/"+organizationId+"/"+kind+"/"+date+"/auto-"+crypto.randomUUID()+"."+ext;
+    const {error:uploadError}=await admin.storage.from(DAILY_VISUAL_BUCKET).upload(storagePath,generated.bytes,{contentType:generated.contentType,upsert:false});
+    if(uploadError) throw new Error("Generated image storage failed.");
+    const imageUrl=admin.storage.from(DAILY_VISUAL_BUCKET).getPublicUrl(storagePath).data.publicUrl;
+    await admin.from("cot_daily_visuals").update({
+      image_url:imageUrl,
+      storage_path:storagePath,
+      image_source:"ai",
+      provider_code:generated.providerCode,
+      prompt,
+      status:"ready",
+      last_error:"",
+      generated_at:new Date().toISOString(),
+      updated_at:new Date().toISOString(),
+    }).eq("organization_id",organizationId).eq("visual_date",date).eq("content_kind",kind);
+  }catch(value){
+    const message=value instanceof Error?value.message:"Automatic image generation failed.";
+    await admin.from("cot_daily_visuals").update({
+      status:"failed",
+      last_error:message.slice(0,1000),
+      updated_at:new Date().toISOString(),
+    }).eq("organization_id",organizationId).eq("visual_date",date).eq("content_kind",kind);
+  }
+}
+
+async function ensureAutomaticTodayVisuals(admin:any,organizationId:string,date:string){
+  const provider=await imageProviderReadiness(admin).catch(()=>null);
+  if(!provider?.configured) return;
+
+  await Promise.allSettled([
+    autoGenerateVisual(admin,organizationId,date,"bible"),
+    autoGenerateVisual(admin,organizationId,date,"devotional"),
+  ]);
+
+  const [{data:quoteVisual},bibleVisual]=await Promise.all([
+    admin.from("cot_daily_visuals").select("id").eq("organization_id",organizationId).eq("visual_date",date).eq("content_kind","quote").maybeSingle(),
+    readyVisual(admin,organizationId,date,"bible"),
+  ]);
+  if(!quoteVisual&&bibleVisual?.image_url){
+    await admin.from("cot_daily_visuals").insert({
+      organization_id:organizationId,
+      visual_date:date,
+      content_kind:"quote",
+      image_url:bibleVisual.image_url,
+      storage_path:null,
+      image_source:"inherited",
+      provider_code:bibleVisual.provider_code??null,
+      prompt:"",
+      status:"ready",
+      last_error:"",
+      generated_at:bibleVisual.generated_at??null,
+      created_by:null,
+      updated_at:new Date().toISOString(),
+    }).catch(()=>{});
+  }
+}
+
+function runInBackground(task:Promise<unknown>){
+  const runtime=(globalThis as any).EdgeRuntime;
+  if(runtime?.waitUntil) runtime.waitUntil(task);
+  else void task;
+}
+
 async function canManage(auth:any,organizationId:string){
   if(!auth?.user) return false;
   for(const permission of ["announcements.manage","events.create","events.update"]){
@@ -453,6 +550,7 @@ export const engagementHubHandler=createHandler(
               isOverride:true,
             }
           : scripture ? automaticQuote(scripture,today) : null;
+        runInBackground(ensureAutomaticTodayVisuals(admin,organizationId,today));
         return {data:{banners:[...explicitBanners,...automaticAnnouncementBanners,...automaticEventBanners,...automaticFormBanners],dailyQuote,dailyVisuals}};
       }
 
