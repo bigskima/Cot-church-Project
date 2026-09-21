@@ -31,8 +31,18 @@ export type DevotionalSeries = {
   id: string; organization_id: string; book_id?: string | null; title: string; author_name?: string; devotional_year: number;
   description?: string; status: 'draft' | 'published' | 'archived'; published_at?: string | null;
 };
+export type DailyVisual = {
+  id: string;
+  visual_date: string;
+  content_kind: 'bible' | 'quote' | 'devotional';
+  image_url?: string | null;
+  image_source?: 'ai' | 'upload' | 'inherited';
+  provider_code?: string | null;
+  status?: 'queued' | 'generating' | 'ready' | 'failed';
+  generated_at?: string | null;
+};
 export type DevotionalEntry = {
   id: string; series_id: string; chapter_id?: string | null; devotional_date: string; title: string; scripture: string;
   memory_verse: string; body: string; prayer: string;
 };
-export type DailyDevotionalPayload = { series: DevotionalSeries; entry: DevotionalEntry };
+export type DailyDevotionalPayload = { series: DevotionalSeries; entry: DevotionalEntry; visual?: DailyVisual | null };
