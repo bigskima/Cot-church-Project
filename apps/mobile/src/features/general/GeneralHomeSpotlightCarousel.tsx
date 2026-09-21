@@ -73,7 +73,7 @@ export function GeneralHomeSpotlightCarousel() {
     if (banner.destination_type === 'external') { void Linking.openURL(value); return; }
     if (banner.destination_type === 'route') { router.push(value as any); return; }
     if (banner.destination_type === 'event') { router.push('/general/event/' + value as any); return; }
-    if (banner.destination_type === 'announcement') { router.push('/general/announcements' as any); return; }
+    if (banner.destination_type === 'announcement') { router.push({ pathname: '/general/announcements', params: { announcementId: value } } as any); return; }
     if (banner.destination_type === 'form') { router.push('/general/forms/' + value as any); }
   };
 
