@@ -7,7 +7,7 @@ import { radius, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 import { BottomSheet } from '../BottomSheet';
 import { Icon } from '../primitives/Icon';
-import { Skeleton } from '../primitives/Skeleton';
+import { Skeleton } from '../states';
 
 const BOOK_PATTERN = '(?:Genesis|Exodus|Leviticus|Numbers|Deuteronomy|Joshua|Judges|Ruth|1\\s*Samuel|2\\s*Samuel|1\\s*Kings|2\\s*Kings|1\\s*Chronicles|2\\s*Chronicles|Ezra|Nehemiah|Esther|Job|Psalms?|Proverbs|Ecclesiastes|Song\\s+of\\s+Solomon|Isaiah|Jeremiah|Lamentations|Ezekiel|Daniel|Hosea|Joel|Amos|Obadiah|Jonah|Micah|Nahum|Habakkuk|Zephaniah|Haggai|Zechariah|Malachi|Matthew|Mark|Luke|John|Acts|Romans|1\\s*Corinthians|2\\s*Corinthians|Galatians|Ephesians|Philippians|Colossians|1\\s*Thessalonians|2\\s*Thessalonians|1\\s*Timothy|2\\s*Timothy|Titus|Philemon|Hebrews|James|1\\s*Peter|2\\s*Peter|1\\s*John|2\\s*John|3\\s*John|Jude|Revelation)';
 const REFERENCE_RE = new RegExp(`\\b(${BOOK_PATTERN})\\s+(\\d{1,3})(?::(\\d{1,3})(?:[–—-](\\d{1,3}))?)?`, 'gi');
