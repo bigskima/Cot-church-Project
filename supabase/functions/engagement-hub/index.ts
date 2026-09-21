@@ -11,7 +11,7 @@ const BANNER_BUCKET="home-banners";
 const DAILY_VISUAL_BUCKET="daily-visuals";
 const MINISTRY_GENERATED_BUCKET="ministry-generated-media";
 const DAILY_VISUAL_KINDS=new Set(["bible","quote","devotional"]);
-const MINISTRY_IMAGE_USE_CASES=new Set(["event_banner","announcement_banner","home_banner","form_banner","sermon_artwork","library_cover"]);
+const MINISTRY_IMAGE_USE_CASES=new Set(["event_banner","announcement_banner","home_banner","form_banner","sermon_artwork","library_cover","expression_banner"]);
 const FIELD_TYPES=new Set(["text","textarea","email","phone","number","select","checkbox","date"]);
 const BANNER_DESTINATIONS=new Set(["none","route","external","event","announcement","form"]);
 const BANNER_STATUSES=new Set(["draft","published","hidden","archived"]);
@@ -394,6 +394,8 @@ async function requireMinistryImagePermission(auth:any,organizationId:string,use
     for(const permission of ["sermons.manage","sermons.create","sermons.publish"]){
       if(await hasOrgPermission(auth,organizationId,permission,branchId)) return;
     }
+  }else if(useCase==="expression_banner"){
+    if(branchId&&await hasOrgPermission(auth,organizationId,"branches.update",branchId)) return;
   }else if(useCase==="library_cover"){
     for(const permission of ["sermons.manage","sermons.create","sermons.publish"]){
       if(await hasOrgPermission(auth,organizationId,permission,null)) return;
@@ -411,6 +413,7 @@ function ministryImagePrompt(useCase:string,title:string,description:string,dire
     form_banner:"a church registration, application or response form",
     sermon_artwork:"a sermon or teaching message",
     library_cover:"a Christian ministry library book cover",
+    expression_banner:"a church Expression community banner",
   };
   return [
     "Create premium original artwork for "+(purpose[useCase]??"church ministry content")+".",
