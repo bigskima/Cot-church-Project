@@ -82,7 +82,7 @@ async function nativeAttachmentUri(content: ShareContent) {
   }
 
   if (/^https?:\/\//i.test(source)) {
-    const downloaded = await File.downloadFileAsync(source, destination);
+    const downloaded = await ExpoFile.downloadFileAsync(source, destination);
     return downloaded.uri;
   }
 
