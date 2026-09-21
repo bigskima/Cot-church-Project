@@ -25,6 +25,7 @@ import { useResource } from '@/hooks/use-resource';
 import { putSignedUpload, type UploadFile } from '@/services/uploads';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
+import { MinistryImageGenerator } from '@/features/ministry/MinistryImageGenerator';
 import type { Event } from '@/types/content';
 
 type EventWithBanner = Event & { banner_url?: string | null };
@@ -92,6 +93,7 @@ export default function GeneralEventsManageExperience() {
   const [visibility, setVisibility] = useState<EventVisibility>('public');
   const [status, setStatus] = useState<EventStatus>('draft');
   const [bannerFile, setBannerFile] = useState<UploadFile | null>(null);
+  const [generatedBannerUrl, setGeneratedBannerUrl] = useState('');
   const [responseFormId, setResponseFormId] = useState('');
   const [responseEvent, setResponseEvent] = useState<EventWithBanner | null>(null);
   const [responsesOpen, setResponsesOpen] = useState(false);
@@ -127,6 +129,7 @@ export default function GeneralEventsManageExperience() {
     setVisibility('public');
     setStatus('draft');
     setBannerFile(null);
+    setGeneratedBannerUrl('');
     setResponseFormId('');
     setError('');
   };
@@ -160,6 +163,7 @@ export default function GeneralEventsManageExperience() {
     setVisibility(['members', 'public', 'private'].includes(event.visibility) ? event.visibility as EventVisibility : 'public');
     setStatus(['draft', 'published', 'cancelled', 'completed', 'archived'].includes(event.status ?? '') ? event.status as EventStatus : 'draft');
     setBannerFile(null);
+    setGeneratedBannerUrl('');
     setResponseFormId(event.response_form_id ?? '');
     setError('');
     setSuccess('');
@@ -182,6 +186,7 @@ export default function GeneralEventsManageExperience() {
       setError('Choose a JPG, PNG, or WebP banner.');
       return;
     }
+    setGeneratedBannerUrl('');
     setBannerFile({ uri: asset.uri, name: asset.fileName || `event-banner-${Date.now()}.jpg`, mimeType, size: asset.fileSize, file: (asset as any).file });
   };
 
@@ -233,7 +238,7 @@ export default function GeneralEventsManageExperience() {
     setSaving(true);
     setError('');
     try {
-      let bannerUrl = editing?.banner_url ?? null;
+      let bannerUrl = generatedBannerUrl || editing?.banner_url || null;
       if (bannerFile) {
         const intent = await api.request<BannerUploadIntent>('events', { method: 'POST', body: JSON.stringify({ action: 'create_banner_upload', mimeType: bannerFile.mimeType }) });
         await putSignedUpload(intent.signedUploadUrl, bannerFile);
@@ -273,9 +278,17 @@ export default function GeneralEventsManageExperience() {
         <InputField label="Description" value={description} onChangeText={setDescription} multiline numberOfLines={5} placeholder="What should people know about this gathering?" />
         <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>EVENT FLYER / BANNER</Text>
         <Pressable onPress={() => void chooseBanner()} style={[styles.uploadCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
-          {bannerFile?.uri || editing?.banner_url ? <Image source={{ uri: bannerFile?.uri || editing?.banner_url! }} style={styles.bannerPreview} resizeMode="cover" /> : <View style={[styles.imagePlaceholder, { backgroundColor: colors.primarySoft }]}><Icon name="image-outline" size={25} color={colors.interactive} /></View>}
+          {bannerFile?.uri || generatedBannerUrl || editing?.banner_url ? <Image source={{ uri: bannerFile?.uri || generatedBannerUrl || editing?.banner_url! }} style={styles.bannerPreview} resizeMode="cover" /> : <View style={[styles.imagePlaceholder, { backgroundColor: colors.primarySoft }]}><Icon name="image-outline" size={25} color={colors.interactive} /></View>}
           <View style={styles.flex}><Text style={[styles.uploadTitle, { color: colors.text }]}>Choose image</Text><Text style={[styles.uploadHint, { color: colors.textMuted }]}>Optional flyer or 16:9 banner.</Text></View><Icon name="chevron-forward" size={17} color={colors.textMuted} />
         </Pressable>
+        <MinistryImageGenerator
+          organizationId={organizationId}
+          useCase="event_banner"
+          title={title}
+          description={description}
+          currentImageUrl={bannerFile?.uri || generatedBannerUrl || editing?.banner_url}
+          onGenerated={(url) => { setBannerFile(null); setGeneratedBannerUrl(url); }}
+        />
       </View>
     );
     if (step === 1) return (
@@ -309,7 +322,7 @@ export default function GeneralEventsManageExperience() {
           {startsAt && endsAt ? <Text style={[styles.reviewMeta, { color: colors.interactive }]}>{startsAt.toLocaleString()} → {endsAt.toLocaleString()}</Text> : null}
           <Text style={[styles.reviewMeta, { color: colors.textSecondary }]}>{isOnline ? 'Online / hybrid' : locationName || 'Venue not set'} · {visibility}</Text>
           <Text style={[styles.reviewBody, { color: colors.textSecondary }]} numberOfLines={5}>{description || 'No description added.'}</Text>
-          <Text style={[styles.reviewMeta, { color: colors.textMuted }]}>{capacity.trim() ? `Capacity ${capacity}` : 'No capacity limit'} · {bannerFile || editing?.banner_url ? 'Banner attached' : 'No banner'}</Text>
+          <Text style={[styles.reviewMeta, { color: colors.textMuted }]}>{capacity.trim() ? `Capacity ${capacity}` : 'No capacity limit'} · {bannerFile || generatedBannerUrl || editing?.banner_url ? 'Banner attached' : 'No banner'}</Text>
           <Text style={[styles.reviewMeta, { color: colors.textMuted }]}>Response form · {availableForms.find((form) => form.id === responseFormId)?.title || 'None'}</Text>
         </View>
       </View>
