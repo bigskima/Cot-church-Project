@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as Speech from 'expo-speech';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,7 +12,7 @@ import { shareContent } from '@/services/share';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { radius, shadows, spacing } from '@/design-system/tokens';
-import { bibleVerseCardDataUri } from './bible-share-card';
+import { bibleVerseCardPngDataUri } from './bible-share-card';
 
 type BibleVersion = {
   id: string;
@@ -164,6 +164,10 @@ export function BibleExperience() {
   const autoReadingRef = useRef(false);
   const speechPageRef = useRef('');
   const [actionError, setActionError] = useState('');
+  const [verseCardOpen, setVerseCardOpen] = useState(false);
+  const [verseCardUri, setVerseCardUri] = useState('');
+  const [verseCardBusy, setVerseCardBusy] = useState(false);
+  const [shareError, setShareError] = useState('');
 
   const queryString = (extra: Record<string, string> = {}) => {
     const params = new URLSearchParams(extra);
@@ -557,29 +561,61 @@ export function BibleExperience() {
     speechRate,
   ]);
 
-  const shareVerse = async (graphic = false) => {
+  const cotLogoUri = Image.resolveAssetSource(require('../../../assets/icon.png')).uri;
+
+  const prepareVerseCard = async () => {
+    if (!passage.data || !visibleText) return '';
+    setVerseCardBusy(true);
+    setShareError('');
+    try {
+      const card = await bibleVerseCardPngDataUri({
+        reference: visibleReference,
+        text: visibleText,
+        version: passage.data.abbreviation || versionId.toUpperCase(),
+        logoUrl: cotLogoUri,
+      });
+      setVerseCardUri(card);
+      return card;
+    } catch (value) {
+      setShareError(value instanceof Error ? value.message : 'Unable to prepare the Scripture card.');
+      return '';
+    } finally {
+      setVerseCardBusy(false);
+    }
+  };
+
+  const openVerseCard = async () => {
+    setMoreToolsOpen(false);
+    setVerseCardOpen(true);
+    if (!verseCardUri) await prepareVerseCard();
+  };
+
+  const shareVerseExternal = async () => {
     if (!passage.data || !visibleText) return;
+    const card = verseCardUri || await prepareVerseCard();
     const message =
       '“' + visibleText + '”\n— ' +
       visibleReference + ' ' + (passage.data.abbreviation || '') +
       '\nShared from COT Bible';
-    await shareContent({
-      title: visibleReference,
-      message,
-      attachment: graphic ? {
-        url: bibleVerseCardDataUri({
-          reference: visibleReference,
-          text: visibleText,
-          version: passage.data.abbreviation,
-        }),
-        mimeType: 'image/svg+xml',
-        fileName: 'cot-scripture.svg',
-      } : null,
-    });
+    try {
+      await shareContent({
+        title: visibleReference + ' · COT Bible',
+        message,
+        attachment: card ? {
+          url: card,
+          mimeType: card.startsWith('data:image/png') ? 'image/png' : 'image/svg+xml',
+          fileName: 'cot-' + visibleReference.toLowerCase().replace(/[^a-z0-9]+/g, '-') + (card.startsWith('data:image/png') ? '.png' : '.svg'),
+        } : null,
+      });
+    } catch (value) {
+      setShareError(value instanceof Error ? value.message : 'Unable to open sharing.');
+    }
   };
 
   const shareToCot = () => {
     if (!passage.data || !visibleText) return;
+    setMoreToolsOpen(false);
+    setVerseCardOpen(false);
     router.push({
       pathname: '/general/community',
       params: {
@@ -1411,8 +1447,8 @@ export function BibleExperience() {
         <View style={styles.moreTools}>
           <View style={styles.moreToolsGrid}>
             <ReaderAction icon="git-compare-outline" label="Compare" active={Boolean(compareVersion)} onPress={() => { setMoreToolsOpen(false); setCompareSheet(true); }} />
-            <ReaderAction icon="share-social-outline" label="Share" onPress={() => void shareVerse(false)} />
-            <ReaderAction icon="image-outline" label="Verse card" onPress={() => void shareVerse(true)} />
+            <ReaderAction icon="share-social-outline" label="Share external" onPress={() => { setMoreToolsOpen(false); void shareVerseExternal(); }} />
+            <ReaderAction icon="image-outline" label="Verse card" onPress={() => void openVerseCard()} />
             <ReaderAction icon="people-outline" label="Share to COT" onPress={shareToCot} />
           </View>
           <View style={[styles.autoReadInfo, { backgroundColor: colors.primarySoft }]}>
@@ -1436,6 +1472,26 @@ export function BibleExperience() {
               Recorded Bible audio appears when Bible Brain is connected. COT read aloud remains available.
             </Text>
           )}
+        </View>
+      </BottomSheet>
+
+      <BottomSheet visible={verseCardOpen} onClose={() => { setVerseCardOpen(false); setShareError(''); }} title="Scripture card" subtitle="Ready to post or share anywhere" maxHeightPercent={92}>
+        <View style={styles.shareCardSheet}>
+          {verseCardBusy ? (
+            <Skeleton height={320} borderRadius={radius.xl} />
+          ) : verseCardUri ? (
+            <View style={[styles.shareCardFrame, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, shadows.sm]}>
+              <Image source={{ uri: verseCardUri }} style={styles.shareCardImage} resizeMode="contain" />
+            </View>
+          ) : (
+            <Button label="Generate card" onPress={() => void prepareVerseCard()} />
+          )}
+          {shareError ? <Text style={[styles.shareCardError, { color: colors.live }]}>{shareError}</Text> : null}
+          <View style={styles.shareCardActions}>
+            <Button label="Share externally" variant="outline" onPress={() => void shareVerseExternal()} />
+            <Button label="Share to COT" onPress={shareToCot} />
+          </View>
+          <Text style={[styles.shareCardHint, { color: colors.textMuted }]}>The shared card includes the Scripture reference, selected Bible version and COT identity.</Text>
         </View>
       </BottomSheet>
 
@@ -1573,6 +1629,12 @@ const styles = StyleSheet.create({
   dockAction: { flex: 1, minWidth: 0, alignItems: 'center', gap: 4 },
   dockIcon: { width: 38, height: 38, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   dockLabel: { fontSize: 8.5, fontWeight: '800' },
+  shareCardSheet: { gap: spacing.md },
+  shareCardFrame: { width: '100%', maxWidth: 520, alignSelf: 'center', aspectRatio: 1, borderWidth: 1, borderRadius: radius.xl, overflow: 'hidden' },
+  shareCardImage: { width: '100%', height: '100%' },
+  shareCardActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  shareCardError: { fontSize: 11, lineHeight: 16, fontWeight: '700' },
+  shareCardHint: { fontSize: 9.5, lineHeight: 14 },
   moreTools: { gap: spacing.md },
   moreToolsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   autoReadInfo: { borderRadius: radius.lg, padding: spacing.sm, flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
