@@ -44,8 +44,13 @@ export type MediaAsset = {
   organization_id?: string;
   expression_id?: string | null;
   media_type?: MediaAssetType;
-  type?: 'image' | 'video' | 'audio' | 'reel_reference';
+  type?: 'image' | 'video' | 'audio' | 'reel_reference' | 'post_reference';
   reelId?: string;
+  postId?: string;
+  quotedReel?: any;
+  quotedPost?: any;
+  quotedReelId?: string;
+  quotedPostId?: string;
   mediaAssetId?: string;
   caption?: string | null;
   fileName?: string | null;
