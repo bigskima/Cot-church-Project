@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Speech from 'expo-speech';
 import * as Clipboard from 'expo-clipboard';
-import { BottomSheet, Button, Chip, Icon, Skeleton } from '@/components';
+import { BottomSheet, Button, Icon, Skeleton } from '@/components';
+import { ReadAloudRateControl, useReadAloudRate } from '@/components/ReadAloudRateControl';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -122,7 +123,7 @@ export function ProgressiveSermonReader({ sermon, initialBlocks }: Props) {
   const blocks = useMemo(() => initialBlocks?.length ? initialBlocks : parseSermonMarkdown(sermon.transcript || sermon.description), [initialBlocks, sermon.description, sermon.transcript]);
   const [visibleCount, setVisibleCount] = useState(Math.min(3, Math.max(1, blocks.length)));
   const [speechTarget, setSpeechTarget] = useState<SpeechTarget>(null);
-  const [speechRate, setSpeechRate] = useState(1);
+  const [speechRate, setSpeechRate] = useReadAloudRate();
   const [copiedSermon, setCopiedSermon] = useState(false);
   const [copiedNotes, setCopiedNotes] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
@@ -241,7 +242,7 @@ export function ProgressiveSermonReader({ sermon, initialBlocks }: Props) {
         <Pressable onPress={() => void askAi()} style={[styles.toolButton, { backgroundColor: colors.bgSecondary }]} accessibilityRole="button"><Icon name="sparkles-outline" size={18} color={colors.interactive} /><Text style={[styles.toolText, { color: colors.text }]}>AI study helper</Text></Pressable>
       </View>
 
-      <View style={styles.speedRow}><Text style={[styles.speedLabel, { color: colors.textMuted }]}>Read speed</Text>{[0.85, 1, 1.15].map((rate) => <Chip key={rate} label={`${rate}×`} selected={speechRate === rate} onPress={() => setSpeechRate(rate)} />)}</View>
+      <ReadAloudRateControl value={speechRate} onChange={setSpeechRate} compact />
 
       <View style={styles.blocks}>{visibleBlocks.map((block, index) => block.type === 'highlight' ? (
         <View key={block.id} style={[styles.highlight, { backgroundColor: colors.primarySoft, borderColor: colors.interactive }]}><View style={[styles.highlightIcon, { backgroundColor: colors.card }]}><Text style={[styles.boldGlyph, { color: colors.interactive }]}>B</Text></View><Text style={[styles.highlightText, { color: colors.text }]}>{block.text}</Text></View>
@@ -265,7 +266,7 @@ export function ProgressiveSermonReader({ sermon, initialBlocks }: Props) {
 const styles = StyleSheet.create({
   wrap: { gap: spacing.md }, headingRow: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' }, flex: { flex: 1, minWidth: 0 }, eyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1 }, title: { fontSize: 20, lineHeight: 25, fontWeight: '900', marginTop: 2 }, subtitle: { fontSize: 12, lineHeight: 18, marginTop: 3 },
   tools: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, borderWidth: 1, borderRadius: radius.xl, padding: spacing.sm }, toolButton: { minHeight: 42, flex: 1, minWidth: 138, borderRadius: radius.lg, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 }, toolText: { fontSize: 11.5, fontWeight: '800' },
-  speedRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.xs }, speedLabel: { fontSize: 10.5, fontWeight: '700', marginRight: 3 }, blocks: { gap: spacing.sm }, paragraphCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.lg, gap: spacing.xs }, progressLabel: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.9 }, paragraphText: { fontSize: 15, lineHeight: 24 },
+  blocks: { gap: spacing.sm }, paragraphCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.lg, gap: spacing.xs }, progressLabel: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.9 }, paragraphText: { fontSize: 15, lineHeight: 24 },
   highlight: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.lg, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, highlightIcon: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }, boldGlyph: { fontSize: 16, fontWeight: '900' }, highlightText: { flex: 1, fontSize: 16, lineHeight: 24, fontWeight: '900' },
   continueCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm }, continueText: { fontSize: 11.5, lineHeight: 17 }, continueActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   aiSheet: { gap: spacing.md, paddingBottom: spacing.xl }, aiSourceNotice: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, aiSourceText: { flex: 1, fontSize: 11.5, lineHeight: 17 }, aiMarkdown: { gap: 4 }, aiSpace: { height: 5 }, aiHeading: { fontSize: 15, lineHeight: 21, fontWeight: '900', marginTop: spacing.sm }, aiHeadingLarge: { fontSize: 18, lineHeight: 24 }, aiParagraph: { fontSize: 13.5, lineHeight: 21 }, aiBold: { fontWeight: '900' }, aiBulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, aiBullet: { fontSize: 17, lineHeight: 21, fontWeight: '900' }, aiNumber: { minWidth: 22, fontSize: 12.5, lineHeight: 21, fontWeight: '900', textAlign: 'right' }, aiBulletBody: { flex: 1 },

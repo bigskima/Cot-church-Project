@@ -4,6 +4,7 @@ import * as Speech from 'expo-speech';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, EmptyState, Icon, ScreenHeader, Skeleton } from '@/components';
+import { ReadAloudRateControl, useReadAloudRate } from '@/components/ReadAloudRateControl';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 import { invalidate } from '@/services/query-cache';
@@ -11,6 +12,7 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { PdfBookFrame } from './PdfBookFrame';
 import type { BookChapter, BookDetailPayload } from './library-types';
+import { parseReaderContent } from './reader-content';
 
 function paginate(body: string, target = 1250) {
   const paragraphs = body.split(/\n{2,}/).map((item) => item.trim()).filter(Boolean);
@@ -60,6 +62,7 @@ export function BookReaderExperience({ bookId }: { bookId: string }) {
   const [chapterIndex, setChapterIndex] = useState(initialChapter);
   const [pageIndex, setPageIndex] = useState(Number(detail.data?.progress?.page_index ?? 0));
   const [speaking, setSpeaking] = useState(false);
+  const [speechRate, setSpeechRate] = useReadAloudRate();
   const [rating, setRating] = useState(5);
   const [reviewBody, setReviewBody] = useState('');
   const [reviewBusy, setReviewBusy] = useState(false);
@@ -75,6 +78,7 @@ export function BookReaderExperience({ bookId }: { bookId: string }) {
   const pages = useMemo(() => paginate(chapter?.body ?? ''), [chapter?.id, chapter?.body]);
   const safePageIndex = Math.min(Math.max(0, pageIndex), Math.max(0, pages.length - 1));
   const page = pages[safePageIndex] ?? '';
+  const readerContent = useMemo(() => parseReaderContent(chapter?.title ?? '', page, safePageIndex === 0), [chapter?.title, page, safePageIndex]);
   const totalPagesBefore = chapters.slice(0, chapterIndex).reduce((sum, item) => sum + paginate(item.body).length, 0);
   const totalPages = Math.max(1, chapters.reduce((sum, item) => sum + paginate(item.body).length, 0));
   const absolutePage = Math.min(totalPages, totalPagesBefore + safePageIndex + 1);
@@ -101,7 +105,7 @@ export function BookReaderExperience({ bookId }: { bookId: string }) {
   }, [api, bookId, chapter?.chapter_order, detail.data?.book.source_format, endpoint, mode, progressPercent, safePageIndex]);
 
   const speak = async () => {
-    if (!page.trim()) return;
+    if (!readerContent.speechText.trim()) return;
     if (speaking) {
       await Speech.stop();
       setSpeaking(false);
@@ -109,7 +113,7 @@ export function BookReaderExperience({ bookId }: { bookId: string }) {
     }
     await Speech.stop();
     setSpeaking(true);
-    Speech.speak(page, { rate: 0.92, onDone: () => setSpeaking(false), onStopped: () => setSpeaking(false), onError: () => setSpeaking(false) });
+    Speech.speak(readerContent.speechText, { rate: speechRate, onDone: () => setSpeaking(false), onStopped: () => setSpeaking(false), onError: () => setSpeaking(false) });
   };
 
   const move = (direction: 1 | -1) => {
@@ -161,7 +165,7 @@ export function BookReaderExperience({ bookId }: { bookId: string }) {
         </View>
         <View style={styles.pdfReaderFrame}>
           {book.source_url ? (
-            <PdfBookFrame url={book.source_url} />
+            <PdfBookFrame url={book.source_url} speechRate={speechRate} onSpeechRateChange={setSpeechRate} />
           ) : (
             <View style={styles.pdfUnavailable}>
               <EmptyState title='PDF unavailable' message='The secure book file could not be prepared.' iconName='document-outline' />
@@ -200,11 +204,39 @@ export function BookReaderExperience({ bookId }: { bookId: string }) {
                   <Text style={[styles.speakText, { color: colors.interactive }]}>{speaking ? 'Stop' : 'Read aloud'}</Text>
                 </Pressable>
               </View>
+              <ReadAloudRateControl value={speechRate} onChange={setSpeechRate} compact />
             </View>
 
             <View style={[styles.page, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
-              <Text style={[styles.chapterTitle, { color: colors.text }]}>{chapter.title || `Chapter ${chapterIndex + 1}`}</Text>
-              <Text style={[styles.pageText, { color: colors.text }]}>{page}</Text>
+              <Text style={[styles.entryKicker, { color: colors.interactive }]}>{chapter.title || `CHAPTER ${chapterIndex + 1}`}</Text>
+              {readerContent.heading ? <Text style={[styles.chapterTitle, { color: colors.text }]}>{readerContent.heading}</Text> : null}
+              {readerContent.scripture ? (
+                <View style={[styles.scriptureCard, { backgroundColor: colors.bgSecondary }]}>
+                  <Text style={[styles.sectionKicker, { color: colors.textMuted }]}>SCRIPTURE</Text>
+                  <Text style={[styles.scriptureText, { color: colors.text }]}>{readerContent.scripture}</Text>
+                </View>
+              ) : null}
+              {readerContent.memoryVerse ? (
+                <View style={styles.memoryBlock}>
+                  <Text style={[styles.sectionKicker, { color: colors.textMuted }]}>MEMORY VERSE</Text>
+                  <Text style={[styles.memoryVerse, { color: colors.text }]}>{readerContent.memoryVerse}</Text>
+                </View>
+              ) : null}
+              <View style={styles.readerParagraphs}>
+                {readerContent.paragraphs.map((paragraph, index) => (
+                  <Text key={`${safePageIndex}-${index}`} style={[styles.pageText, { color: colors.text }]}>{paragraph}</Text>
+                ))}
+              </View>
+              {readerContent.prayer ? (
+                <View style={[styles.prayerBlock, { borderColor: colors.borderSubtle }]}>
+                  <Icon name='heart-outline' size={18} color={colors.interactive} />
+                  <View style={styles.prayerCopy}>
+                    <Text style={[styles.sectionKicker, { color: colors.textMuted }]}>PRAYER / REFLECTION</Text>
+                    <Text style={[styles.prayerText, { color: colors.text }]}>{readerContent.prayer}</Text>
+                  </View>
+                </View>
+              ) : null}
+              {!readerContent.heading && !readerContent.paragraphs.length && !readerContent.scripture && !readerContent.memoryVerse && !readerContent.prayer ? <Text style={[styles.pageText, { color: colors.text }]}>{page}</Text> : null}
               <Text style={[styles.pageNumber, { color: colors.textMuted }]}>{absolutePage}</Text>
             </View>
             <View style={styles.paging}>
@@ -252,8 +284,15 @@ const styles = StyleSheet.create({
   pdfBlock: { gap: spacing.sm }, note: { borderRadius: radius.lg, padding: spacing.sm, flexDirection: 'row', gap: 8, alignItems: 'flex-start' }, noteText: { flex: 1, fontSize: 10.5, lineHeight: 15 },
   readerToolbar: { gap: spacing.sm }, chapterStrip: { gap: 6 }, chapterChip: { maxWidth: 180, height: 32, borderWidth: 1, borderRadius: radius.pill, justifyContent: 'center', paddingHorizontal: 11 }, chapterChipText: { fontSize: 9.5, fontWeight: '800' },
   toolbarRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm }, progress: { fontSize: 10.5, fontWeight: '800' }, speak: { height: 34, borderWidth: 1, borderRadius: 17, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 11 }, speakText: { fontSize: 10, fontWeight: '900' },
-  page: { minHeight: 560, borderWidth: 1, borderRadius: 22, paddingHorizontal: 24, paddingVertical: 30, justifyContent: 'flex-start' },
-  chapterTitle: { fontSize: 19, lineHeight: 25, fontWeight: '900', marginBottom: 22 }, pageText: { fontSize: 16, lineHeight: 27, letterSpacing: 0.05 }, pageNumber: { textAlign: 'center', fontSize: 10, marginTop: 28 },
+  page: { minHeight: 560, borderWidth: 1, borderRadius: 24, paddingHorizontal: 24, paddingVertical: 28, justifyContent: 'flex-start', gap: 20 },
+  entryKicker: { fontSize: 9.5, fontWeight: '900', letterSpacing: 1.2, textTransform: 'uppercase' },
+  chapterTitle: { fontSize: 26, lineHeight: 32, fontWeight: '900', letterSpacing: -0.45 },
+  sectionKicker: { fontSize: 9, fontWeight: '900', letterSpacing: 0.9 },
+  scriptureCard: { borderRadius: radius.lg, padding: spacing.md, gap: 6 }, scriptureText: { fontSize: 15, lineHeight: 22, fontWeight: '800' },
+  memoryBlock: { gap: 6 }, memoryVerse: { fontSize: 15, lineHeight: 23, fontStyle: 'italic' },
+  readerParagraphs: { gap: 16 }, pageText: { fontSize: 16, lineHeight: 28, letterSpacing: 0.05 },
+  prayerBlock: { borderTopWidth: 1, paddingTop: 18, flexDirection: 'row', gap: 10 }, prayerCopy: { flex: 1, minWidth: 0 }, prayerText: { fontSize: 14, lineHeight: 22, marginTop: 5 },
+  pageNumber: { textAlign: 'center', fontSize: 10, marginTop: 8 },
   paging: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md }, pageButton: { flex: 1, height: 46, borderWidth: 1, borderRadius: 23, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }, pageButtonText: { fontSize: 11, fontWeight: '900' }, disabled: { opacity: 0.35 },
   reviewSection: { gap: spacing.md, marginTop: spacing.md }, sectionTitle: { fontSize: 18, fontWeight: '900' }, reviewComposer: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm }, ratingRow: { flexDirection: 'row', gap: 5 }, star: { fontSize: 25 }, reviewInput: { minHeight: 82, borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm, textAlignVertical: 'top' }, reviewError: { fontSize: 10.5 }, submitReview: { alignSelf: 'flex-end', height: 38, borderRadius: 19, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' }, submitReviewText: { fontSize: 10.5, fontWeight: '900' },
   noReviews: { fontSize: 12 }, review: { flexDirection: 'row', gap: spacing.sm, paddingBottom: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth }, reviewCopy: { flex: 1, minWidth: 0 }, reviewHead: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 }, reviewer: { fontSize: 11.5, fontWeight: '900' }, reviewStars: { fontSize: 10 }, reviewText: { fontSize: 12, lineHeight: 18, marginTop: 4 },

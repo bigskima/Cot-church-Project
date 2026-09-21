@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import * as DocumentPicker from 'expo-document-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Chip, EmptyState, Icon, InputField, ScreenHeader, Skeleton } from '@/components';
+import { DateTimeField, formatDateOnly } from '@/components/DateTimeField';
 import { radius, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 import { putSignedUpload, readUploadFile, type UploadFile } from '@/services/uploads';
@@ -12,7 +13,8 @@ import type { DevotionalSeries, LibraryBook } from './library-types';
 
 type ManagePayload={series:DevotionalSeries[];books:Array<Pick<LibraryBook,'id'|'title'|'author_name'|'source_format'|'status'>>};
 type UploadIntent={signedUploadUrl:string;storagePath:string;sourceFormat:'epub'|'pdf'};
-function today(){return new Date().toISOString().slice(0,10);}
+function today(){return formatDateOnly(new Date());}
+function fromIso(value:string){const [year,month,day]=value.split('-').map(Number);return new Date(year,Math.max(0,month-1),day,12,0,0,0);}
 
 export function DevotionalManageExperience(){
  const insets=useSafeAreaInsets();
@@ -184,7 +186,7 @@ export function DevotionalManageExperience(){
 
    {editingSeries?<View style={[styles.entryForm,{backgroundColor:colors.card,borderColor:colors.borderSubtle}]}>
     <View style={styles.entryHead}><View style={styles.flex}><Text style={[styles.title,{color:colors.text}]}>Daily entry</Text><Text style={[styles.copy,{color:colors.textSecondary}]}>{editingSeries.title} · {editingSeries.devotional_year}</Text></View><Pressable onPress={()=>setEditingSeries(null)} style={styles.close}><Icon name='close' size={18} color={colors.text}/></Pressable></View>
-    <InputField label='Date (YYYY-MM-DD)' value={entryDate} onChangeText={setEntryDate} placeholder={`${editingSeries.devotional_year}-01-01`}/>
+    <DateTimeField label='Devotional date' value={fromIso(entryDate)} onChange={(next)=>setEntryDate(formatDateOnly(next))} includeTime={false} minYear={editingSeries.devotional_year} maxYear={editingSeries.devotional_year} placeholder='Choose devotional date' helperText={`Choose a day inside ${editingSeries.devotional_year}.`}/>
     <InputField label='Title' value={entryTitle} onChangeText={setEntryTitle} placeholder='Today’s title'/>
     <InputField label='Scripture' value={scripture} onChangeText={setScripture} placeholder='Bible reading / passage'/>
     <InputField label='Memory verse' value={memoryVerse} onChangeText={setMemoryVerse} placeholder='Optional verse'/>

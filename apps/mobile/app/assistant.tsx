@@ -16,6 +16,7 @@ import * as Speech from 'expo-speech';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { Badge, Button, Chip, Icon, ScreenHeader, Skeleton } from '@/components';
+import { ReadAloudRateControl, useReadAloudRate } from '@/components/ReadAloudRateControl';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { PLATFORM_KEYBOARD_BEHAVIOR, PLATFORM_KEYBOARD_DISMISS_MODE, PLATFORM_KEYBOARD_VERTICAL_OFFSET } from '@/utils/keyboard';
 
@@ -222,6 +223,7 @@ export function AssistantScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [speakingId, setSpeakingId] = useState<string | null>(null);
+  const [speechRate, setSpeechRate] = useReadAloudRate();
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -271,7 +273,7 @@ export function AssistantScreen() {
       if (run !== speechRun.current) return;
       if (index >= chunks.length) { setSpeakingId(null); return; }
       Speech.speak(chunks[index], {
-        rate: 0.98,
+        rate: speechRate,
         onDone: () => speakChunk(index + 1),
         onStopped: () => setSpeakingId(null),
         onError: () => setSpeakingId(null),
@@ -380,6 +382,9 @@ export function AssistantScreen() {
           <Badge label="AVAILABLE" variant="active" />
           <View style={[styles.scopeChip, { backgroundColor: colors.primarySoft }]}><Icon name={expressionId ? 'people-outline' : 'globe-outline'} size={12} color={colors.interactive} /><Text style={[styles.scopeText, { color: colors.interactive }]} numberOfLines={1}>{scopeLabel}</Text></View>
         </View>
+        <View style={styles.voiceSettings}>
+          <ReadAloudRateControl value={speechRate} onChange={setSpeechRate} compact />
+        </View>
       </View>
 
       <FlatList
@@ -467,7 +472,8 @@ const styles = StyleSheet.create({
   stateBody: { fontSize: 13, lineHeight: 20, textAlign: 'center', maxWidth: 460 },
   readinessError: { fontSize: 12, textAlign: 'center' },
   assistantHeader: { marginHorizontal: spacing.md, marginTop: spacing.xs, borderWidth: 1, borderRadius: radius.xxl, overflow: 'hidden' },
-  providerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, paddingBottom: spacing.md },
+  providerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, paddingBottom: spacing.xs },
+  voiceSettings: { paddingHorizontal: spacing.md, paddingBottom: spacing.md },
   scopeChip: { minHeight: 25, maxWidth: 260, borderRadius: radius.pill, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', gap: 5 },
   scopeText: { fontSize: 10, fontWeight: '800', flexShrink: 1 },
   chatList: { paddingHorizontal: spacing.md, paddingVertical: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
