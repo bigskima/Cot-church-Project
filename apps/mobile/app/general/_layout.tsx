@@ -147,6 +147,7 @@ export default function GeneralLayout() {
       <Tabs.Screen name="library/index" options={hidden as any} />
       <Tabs.Screen name="library/[bookId]" options={hidden as any} />
       <Tabs.Screen name="devotional" options={hidden as any} />
+      <Tabs.Screen name="daily-quote" options={hidden as any} />
       <Tabs.Screen name="bible" options={hidden as any} />
       <Tabs.Screen name="groups/index" options={hidden as any} />
       <Tabs.Screen name="groups/[groupId]" options={hidden as any} />
