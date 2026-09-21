@@ -14,7 +14,10 @@ import { useTheme } from '@/state/theme';
 type Destination='none'|'route'|'external'|'event'|'announcement'|'form';
 type BannerStatus='draft'|'published'|'hidden'|'archived';
 type Banner={id:string;title:string;subtitle?:string|null;image_url?:string|null;destination_type:Destination;destination_value?:string|null;status:BannerStatus;priority:number;starts_at?:string|null;ends_at?:string|null};
-type ManagePayload={banners:Banner[];forms:any[]};
+type FormOption={id:string;slug:string;title:string;status:string;banner_image_url?:string|null};
+type EventOption={id:string;title:string;status:string;starts_at?:string|null;ends_at?:string|null;banner_url?:string|null};
+type AnnouncementOption={id:string;title:string;status:string;scheduled_for?:string|null;published_at?:string|null;banner_url?:string|null};
+type ManagePayload={banners:Banner[];forms:FormOption[];events:EventOption[];announcements:AnnouncementOption[]};
 type UploadIntent={signedUploadUrl:string;publicUrl:string};
 
 function safeDate(value?:string|null){if(!value)return null;const date=new Date(value);return Number.isFinite(date.getTime())?date:null;}
@@ -25,7 +28,7 @@ export default function GeneralHomeBannersManageExperience(){
  const {colors}=useTheme();
  const organizationId=context?.organization?.id??context?.organizations?.[0]?.id??'';
  const canManage=hasOrganizationCapability('announcements.manage')||hasOrganizationCapability('events.create')||hasOrganizationCapability('events.update');
- const resource=useResource<ManagePayload>('engagement:manage:'+organizationId,(signal)=>canManage&&organizationId?api.request('noop?service=engagement-hub&action=manage&organizationId='+encodeURIComponent(organizationId),{signal,context:'public'}):Promise.resolve({banners:[],forms:[]}));
+ const resource=useResource<ManagePayload>('engagement:manage:'+organizationId,(signal)=>canManage&&organizationId?api.request('noop?service=engagement-hub&action=manage&organizationId='+encodeURIComponent(organizationId),{signal,context:'public'}):Promise.resolve({banners:[],forms:[],events:[],announcements:[]}));
 
  const [open,setOpen]=useState(false);
  const [editing,setEditing]=useState<Banner|null>(null);
@@ -59,6 +62,7 @@ export default function GeneralHomeBannersManageExperience(){
 
  const save=async()=>{
    if(!title.trim()||saving)return;
+   if(['event','announcement','form'].includes(destinationType)&&!destinationValue){setError('Choose what this banner should open.');return;}
    if(destinationType==='route'&&destinationValue&&!destinationValue.startsWith('/')){setError('Internal routes must begin with /.');return;}
    if(destinationType==='external'&&destinationValue&&!/^https?:\/\//i.test(destinationValue)){setError('External links must start with http:// or https://.');return;}
    setSaving(true);setError('');
@@ -115,8 +119,30 @@ export default function GeneralHomeBannersManageExperience(){
          <View style={styles.flex}><Text style={[styles.uploadTitle,{color:colors.text}]}>Choose image</Text><Text style={[styles.uploadHelp,{color:colors.textMuted}]}>Wide 16:7 artwork works best.</Text></View><Icon name="chevron-forward" size={17} color={colors.textMuted}/>
        </Pressable>
        <Text style={[styles.label,{color:colors.textSecondary}]}>ACTION</Text>
-       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>{(['none','route','external','event','announcement','form'] as const).map(type=><Chip key={type} label={type} selected={destinationType===type} onPress={()=>setDestinationType(type)}/>)}</ScrollView>
-       {destinationType!=='none'?<InputField label={destinationType==='route'?'Internal route':destinationType==='external'?'External URL':destinationType==='form'?'Form slug':destinationType+' ID'} value={destinationValue} onChangeText={setDestinationValue} placeholder={destinationType==='route'?'/general/event/...':destinationType==='external'?'https://...':destinationType==='form'?'conference-registration':'ID'}/>:null}
+       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>{(['none','route','external','event','announcement','form'] as const).map(type=><Chip key={type} label={type} selected={destinationType===type} onPress={()=>{setDestinationType(type);setDestinationValue('');}}/>)}</ScrollView>
+       {destinationType==='route'?<InputField label="Internal route" value={destinationValue} onChangeText={setDestinationValue} placeholder="/general/event/..."/>:null}
+       {destinationType==='external'?<InputField label="External URL" value={destinationValue} onChangeText={setDestinationValue} placeholder="https://..."/>:null}
+       {destinationType==='event'?<DestinationChoices
+         title="Choose event"
+         empty="No events are available yet. Create the event first, then return here."
+         value={destinationValue}
+         items={(resource.data?.events??[]).map(item=>({value:item.id,title:item.title,meta:item.status+(item.starts_at?' · '+new Date(item.starts_at).toLocaleDateString():'')}))}
+         onChange={setDestinationValue}
+       />:null}
+       {destinationType==='announcement'?<DestinationChoices
+         title="Choose announcement"
+         empty="No announcements are available yet. Publish or schedule an announcement first."
+         value={destinationValue}
+         items={(resource.data?.announcements??[]).map(item=>({value:item.id,title:item.title,meta:item.status+(item.published_at?' · '+new Date(item.published_at).toLocaleDateString():item.scheduled_for?' · scheduled '+new Date(item.scheduled_for).toLocaleDateString():'')}))}
+         onChange={setDestinationValue}
+       />:null}
+       {destinationType==='form'?<DestinationChoices
+         title="Choose form"
+         empty="No forms are available yet. Create the form first."
+         value={destinationValue}
+         items={(resource.data?.forms??[]).map(item=>({value:item.slug,title:item.title,meta:item.status+' · /'+item.slug}))}
+         onChange={setDestinationValue}
+       />:null}
        <Text style={[styles.label,{color:colors.textSecondary}]}>STATUS</Text>
        <View style={styles.chips}>{(['draft','published','hidden','archived'] as const).map(item=><Chip key={item} label={item} selected={status===item} onPress={()=>setStatus(item)}/>)}</View>
        <InputField label="Priority" value={priority} onChangeText={setPriority} keyboardType="number-pad" placeholder="0"/>
@@ -129,4 +155,18 @@ export default function GeneralHomeBannersManageExperience(){
  </View>;
 }
 
-const styles=StyleSheet.create({screen:{flex:1},content:{width:'100%',maxWidth:940,alignSelf:'center'},body:{paddingHorizontal:spacing.md,gap:spacing.md},flex:{flex:1,minWidth:0},card:{borderWidth:1,borderRadius:radius.xl,overflow:'hidden'},image:{width:'100%',aspectRatio:16/7},imagePlaceholder:{width:'100%',height:120,alignItems:'center',justifyContent:'center'},cardCopy:{padding:spacing.md,gap:spacing.sm},rowBetween:{flexDirection:'row',alignItems:'flex-start',justifyContent:'space-between',gap:spacing.sm},title:{fontSize:14,fontWeight:'900'},meta:{fontSize:9.5,marginTop:2},subtitle:{fontSize:11,lineHeight:16},actions:{flexDirection:'row',gap:7,flexWrap:'wrap'},sheet:{gap:spacing.md,paddingBottom:spacing.xl},label:{fontSize:9.5,fontWeight:'900',letterSpacing:.7},upload:{minHeight:84,borderWidth:1,borderRadius:radius.xl,padding:spacing.sm,flexDirection:'row',alignItems:'center',gap:spacing.sm},preview:{width:120,aspectRatio:16/7,borderRadius:radius.md},uploadIcon:{width:58,height:58,borderRadius:radius.lg,alignItems:'center',justifyContent:'center'},uploadTitle:{fontSize:12.5,fontWeight:'900'},uploadHelp:{fontSize:10,marginTop:2},chips:{flexDirection:'row',flexWrap:'wrap',gap:6,paddingRight:spacing.md},error:{fontSize:11,lineHeight:16,fontWeight:'700'}});
+function DestinationChoices({title,empty,value,items,onChange}:{title:string;empty:string;value:string;items:Array<{value:string;title:string;meta:string}>;onChange:(value:string)=>void}){
+ const {colors}=useTheme();
+ return <View style={styles.destinationWrap}>
+   <Text style={[styles.label,{color:colors.textSecondary}]}>{title.toUpperCase()}</Text>
+   {items.length?<View style={styles.destinationList}>{items.map(item=>{
+     const selected=value===item.value;
+     return <Pressable key={item.value} onPress={()=>onChange(item.value)} style={[styles.destinationCard,{backgroundColor:selected?colors.primarySoft:colors.bgSecondary,borderColor:selected?colors.interactive:colors.borderSubtle}]}>
+       <View style={styles.flex}><Text style={[styles.destinationTitle,{color:colors.text}]}>{item.title}</Text><Text style={[styles.destinationMeta,{color:colors.textMuted}]}>{item.meta}</Text></View>
+       <Icon name={selected?'checkmark-circle':'chevron-forward'} size={18} color={selected?colors.interactive:colors.textMuted}/>
+     </Pressable>;
+   })}</View>:<Text style={[styles.destinationEmpty,{color:colors.textMuted}]}>{empty}</Text>}
+ </View>;
+}
+
+const styles=StyleSheet.create({screen:{flex:1},content:{width:'100%',maxWidth:940,alignSelf:'center'},body:{paddingHorizontal:spacing.md,gap:spacing.md},flex:{flex:1,minWidth:0},card:{borderWidth:1,borderRadius:radius.xl,overflow:'hidden'},image:{width:'100%',aspectRatio:16/7},imagePlaceholder:{width:'100%',height:120,alignItems:'center',justifyContent:'center'},cardCopy:{padding:spacing.md,gap:spacing.sm},rowBetween:{flexDirection:'row',alignItems:'flex-start',justifyContent:'space-between',gap:spacing.sm},title:{fontSize:14,fontWeight:'900'},meta:{fontSize:9.5,marginTop:2},subtitle:{fontSize:11,lineHeight:16},actions:{flexDirection:'row',gap:7,flexWrap:'wrap'},sheet:{gap:spacing.md,paddingBottom:spacing.xl},label:{fontSize:9.5,fontWeight:'900',letterSpacing:.7},upload:{minHeight:84,borderWidth:1,borderRadius:radius.xl,padding:spacing.sm,flexDirection:'row',alignItems:'center',gap:spacing.sm},preview:{width:120,aspectRatio:16/7,borderRadius:radius.md},uploadIcon:{width:58,height:58,borderRadius:radius.lg,alignItems:'center',justifyContent:'center'},uploadTitle:{fontSize:12.5,fontWeight:'900'},uploadHelp:{fontSize:10,marginTop:2},chips:{flexDirection:'row',flexWrap:'wrap',gap:6,paddingRight:spacing.md},destinationWrap:{gap:7},destinationList:{gap:7},destinationCard:{minHeight:58,borderWidth:1,borderRadius:radius.lg,paddingHorizontal:12,paddingVertical:10,flexDirection:'row',alignItems:'center',gap:spacing.sm},destinationTitle:{fontSize:12,fontWeight:'900'},destinationMeta:{fontSize:9.5,lineHeight:14,marginTop:2},destinationEmpty:{fontSize:10.5,lineHeight:15,paddingVertical:6},error:{fontSize:11,lineHeight:16,fontWeight:'700'}});
