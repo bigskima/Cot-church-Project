@@ -119,13 +119,13 @@ async function getWebPassage(parsed: ParsedReference) {
 
 function stripVerseLabel(value: string) {
   return value
-    .replace(/<span[^>]*class=["'][^"']*\\byv-vlbl\\b[^"']*["'][^>]*>[\\s\\S]*?<\\/span>/gi, " ")
+    .replace(/<span[^>]*class=["\'][^"\']*\byv-vlbl\b[^"\']*["\'][^>]*>[\s\S]*?<\/span>/gi, " ")
     .replace(/&nbsp;/gi, " ");
 }
 
 function parseYouVersionVerses(html: string, parsed: ParsedReference) {
   const source = String(html || "");
-  const marker = /<span[^>]*class=["'][^"']*\\byv-v\\b[^"']*["'][^>]*\\bv=["']?(\\d+)["']?[^>]*>/gi;
+  const marker = /<span[^>]*class=["\'][^"\']*\byv-v\b[^"\']*["\'][^>]*\bv=["\']?(\d+)["\']?[^>]*>/gi;
   const starts: Array<{ verse: number; start: number; bodyStart: number }> = [];
   let match: RegExpExecArray | null;
   while ((match = marker.exec(source))) {
