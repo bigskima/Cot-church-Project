@@ -104,6 +104,7 @@ export function pdfViewerHtml(url: string, initialSpeechRate = 1) {
   let renderTask = null;
   let speaking = false;
   let autoRead = false;
+  let browserSpeechRun = 0;
   let speechRate = normalizeRate(${rate});
 
   function normalizeRate(value) {
@@ -141,6 +142,7 @@ export function pdfViewerHtml(url: string, initialSpeechRate = 1) {
   function stopSpeech(keepAuto = false) {
     if (!keepAuto) autoRead = false;
     speaking = false;
+    browserSpeechRun += 1;
     if (!nativeMessage({ type: 'pdf-stop-reading' }) && window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
@@ -255,6 +257,38 @@ export function pdfViewerHtml(url: string, initialSpeechRate = 1) {
       .trim();
   }
 
+  function splitSpeechText(value, maximum = 2200) {
+    const sentences = String(value || '').match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [value];
+    const chunks = [];
+    let current = '';
+    const push = () => {
+      if (current.trim()) chunks.push(current.trim());
+      current = '';
+    };
+
+    for (const rawSentence of sentences) {
+      const sentence = String(rawSentence || '').trim();
+      if (!sentence) continue;
+      if (sentence.length > maximum) {
+        push();
+        for (const word of sentence.split(/\s+/)) {
+          if (current && current.length + word.length + 1 > maximum) push();
+          current += (current ? ' ' : '') + word;
+        }
+        push();
+        continue;
+      }
+      if (!current) current = sentence;
+      else if (current.length + sentence.length + 1 <= maximum) current += ' ' + sentence;
+      else {
+        push();
+        current = sentence;
+      }
+    }
+    push();
+    return chunks;
+  }
+
   function speakCurrent(continuous = false) {
     if (!currentPageText.trim()) return;
     if (speaking) {
@@ -275,12 +309,32 @@ export function pdfViewerHtml(url: string, initialSpeechRate = 1) {
       updateReadButtons();
       return;
     }
+
+    const chunks = splitSpeechText(currentPageText);
+    const run = ++browserSpeechRun;
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(currentPageText);
-    utterance.rate = speechRate;
-    utterance.onend = window.__cotPdfSpeechDone;
-    utterance.onerror = () => { speaking = false; autoRead = false; updateReadButtons(); };
-    window.speechSynthesis.speak(utterance);
+
+    const speakChunk = (index) => {
+      if (run !== browserSpeechRun) return;
+      if (index >= chunks.length) {
+        window.__cotPdfSpeechDone();
+        return;
+      }
+      const utterance = new SpeechSynthesisUtterance(chunks[index]);
+      utterance.rate = speechRate;
+      utterance.onend = () => {
+        if (run === browserSpeechRun) speakChunk(index + 1);
+      };
+      utterance.onerror = () => {
+        if (run !== browserSpeechRun) return;
+        speaking = false;
+        autoRead = false;
+        updateReadButtons();
+      };
+      window.speechSynthesis.speak(utterance);
+    };
+
+    speakChunk(0);
   }
 
   function fail(message) {
