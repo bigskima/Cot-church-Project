@@ -72,7 +72,7 @@ function splitParagraphs(lines: string[]) {
   return paragraphs;
 }
 
-export function parseReaderContent(chapterTitle: string, pageText: string): ReaderContent {
+export function parseReaderContent(chapterTitle: string, pageText: string, allowPageHeading = true): ReaderContent {
   const lines = removeReadingNoise(pageText.replace(/\r/g, '').split(/\n+/), chapterTitle);
   let heading = '';
   let scripture = '';
@@ -106,7 +106,8 @@ export function parseReaderContent(chapterTitle: string, pageText: string): Read
     }
 
     if (
-      !heading
+      allowPageHeading
+      && !heading
       && !inPrayer
       && line.length <= 140
       && !DATE_HEADING.test(line)
