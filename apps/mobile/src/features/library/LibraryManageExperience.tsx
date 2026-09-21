@@ -9,6 +9,7 @@ import { useResource } from '@/hooks/use-resource';
 import { putSignedUpload, readUploadFile, type UploadFile } from '@/services/uploads';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
+import { MinistryImageGenerator } from '@/features/ministry/MinistryImageGenerator';
 import type { LibraryBook } from './library-types';
 
 type UploadIntent = { signedUploadUrl: string; storagePath: string; sourceFormat: 'epub' | 'pdf' };
@@ -44,6 +45,7 @@ export function LibraryManageExperience() {
   const [description,setDescription]=useState('');
   const [bookFile,setBookFile]=useState<UploadFile|null>(null);
   const [coverFile,setCoverFile]=useState<UploadFile|null>(null);
+  const [generatedCoverUrl,setGeneratedCoverUrl]=useState('');
   const [rightsBasis,setRightsBasis]=useState<typeof RIGHTS[number][0]>('church_owned');
   const [rightsNote,setRightsNote]=useState('');
   const [rightsConfirmed,setRightsConfirmed]=useState(false);
@@ -76,9 +78,10 @@ export function LibraryManageExperience() {
     const mime=asset.mimeType?.toLowerCase()||'image/jpeg';
     if(!['image/jpeg','image/png','image/webp'].includes(mime)){setError('Choose a JPG, PNG or WebP cover.');return;}
     if((asset.fileSize??0)>10*1024*1024){setError('Choose a cover smaller than 10 MB.');return;}
+    setGeneratedCoverUrl('');
     setCoverFile({uri:asset.uri,name:asset.fileName||`book-cover-${Date.now()}.jpg`,mimeType:mime,size:asset.fileSize,file:(asset as any).file});
   };
-  const reset=()=>{setTitle('');setSubtitle('');setAuthor('');setPublisher('');setDescription('');setBookFile(null);setCoverFile(null);setRightsBasis('church_owned');setRightsNote('');setRightsConfirmed(false);setPublishNow(false);};
+  const reset=()=>{setTitle('');setSubtitle('');setAuthor('');setPublisher('');setDescription('');setBookFile(null);setCoverFile(null);setGeneratedCoverUrl('');setRightsBasis('church_owned');setRightsNote('');setRightsConfirmed(false);setPublishNow(false);};
 
   const save=async()=>{
     if(busy)return;
@@ -90,7 +93,7 @@ export function LibraryManageExperience() {
       if(body.size>75*1024*1024)throw new Error('Choose a book that is 75 MB or smaller.');
       const intent=await api.request<UploadIntent>(endpoint,{method:'POST',context:'public',body:JSON.stringify({action:'create_book_upload',mimeType:bookFile.mimeType,sizeBytes:body.size,fileName:bookFile.name})});
       await putSignedUpload(intent.signedUploadUrl,{...bookFile,file:body});
-      let coverPath:string|null=null;
+      let coverPath:string|null=generatedCoverUrl||null;
       if(coverFile){
         const coverIntent=await api.request<CoverIntent>(endpoint,{method:'POST',context:'public',body:JSON.stringify({action:'create_cover_upload',mimeType:coverFile.mimeType})});
         await putSignedUpload(coverIntent.signedUploadUrl,coverFile);
@@ -138,8 +141,17 @@ export function LibraryManageExperience() {
         <InputField label='Description' value={description} onChangeText={setDescription} placeholder='What is this book about?' multiline />
         <View style={styles.fileRow}>
           <Pressable onPress={chooseBook} style={[styles.fileButton,{borderColor:colors.borderSubtle,backgroundColor:colors.bgSecondary}]}><Icon name='document-attach-outline' size={18} color={colors.interactive}/><View style={styles.flex}><Text style={[styles.fileTitle,{color:colors.text}]}>{bookFile?.name||'Choose EPUB / PDF'}</Text><Text style={[styles.fileMeta,{color:colors.textMuted}]}>Up to 75 MB</Text></View></Pressable>
-          <Pressable onPress={chooseCover} style={[styles.coverButton,{borderColor:colors.borderSubtle,backgroundColor:colors.bgSecondary}]}>{coverFile?<Image source={{uri:coverFile.uri}} style={styles.coverPreview}/>:<><Icon name='image-outline' size={19} color={colors.interactive}/><Text style={[styles.coverText,{color:colors.textSecondary}]}>Cover</Text></>}</Pressable>
+          <Pressable onPress={chooseCover} style={[styles.coverButton,{borderColor:colors.borderSubtle,backgroundColor:colors.bgSecondary}]}>{coverFile||generatedCoverUrl?<Image source={{uri:coverFile?.uri||generatedCoverUrl}} style={styles.coverPreview}/>:<><Icon name='image-outline' size={19} color={colors.interactive}/><Text style={[styles.coverText,{color:colors.textSecondary}]}>Cover</Text></>}</Pressable>
         </View>
+        <MinistryImageGenerator
+          organizationId={organizationId}
+          useCase="library_cover"
+          title={title}
+          description={[subtitle,author,description].filter(Boolean).join(' · ')}
+          currentImageUrl={coverFile?.uri||generatedCoverUrl}
+          onGenerated={(url)=>{setCoverFile(null);setGeneratedCoverUrl(url);}}
+          compact
+        />
         <View style={styles.rightsBlock}><Text style={[styles.label,{color:colors.text}]}>Distribution rights</Text><View style={styles.chips}>{RIGHTS.map(([key,label])=><Chip key={key} label={label} selected={rightsBasis===key} onPress={()=>setRightsBasis(key)}/>)}</View><InputField label='Rights note (optional)' value={rightsNote} onChangeText={setRightsNote} placeholder='Licence, permission, copyright holder…' /></View>
         <Pressable onPress={()=>setRightsConfirmed((value)=>!value)} style={styles.confirmRow}><View style={[styles.checkbox,{borderColor:rightsConfirmed?colors.interactive:colors.borderSubtle,backgroundColor:rightsConfirmed?colors.primarySoft:colors.bgSecondary}]}>{rightsConfirmed?<Icon name='checkmark' size={15} color={colors.interactive}/>:null}</View><Text style={[styles.confirmText,{color:colors.textSecondary}]}>I confirm COT/church has permission to distribute this book to readers.</Text></Pressable>
         {canPublish?<Pressable onPress={()=>setPublishNow((value)=>!value)} style={styles.confirmRow}><View style={[styles.checkbox,{borderColor:publishNow?colors.interactive:colors.borderSubtle,backgroundColor:publishNow?colors.primarySoft:colors.bgSecondary}]}>{publishNow?<Icon name='checkmark' size={15} color={colors.interactive}/>:null}</View><Text style={[styles.confirmText,{color:colors.textSecondary}]}>Publish immediately after processing</Text></Pressable>:null}
