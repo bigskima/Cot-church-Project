@@ -11,6 +11,75 @@ const FIELD_TYPES=new Set(["text","textarea","email","phone","number","select","
 const BANNER_DESTINATIONS=new Set(["none","route","external","event","announcement","form"]);
 const BANNER_STATUSES=new Set(["draft","published","hidden","archived"]);
 const FORM_STATUSES=new Set(["draft","published","closed","hidden"]);
+const DAILY_QUOTE_STATUSES=new Set(["published","hidden"]);
+
+const QUOTE_BANK:Record<string,string[]>={
+  peace:[
+    "Peace grows when prayer becomes our first response instead of our last resort.",
+    "A settled heart is not a life without pressure; it is a life anchored beyond the pressure.",
+    "You do not have to control every outcome to walk through today with peace.",
+  ],
+  faith:[
+    "Faith moves before certainty arrives because it trusts the One who leads.",
+    "The next faithful step matters more than seeing the whole road at once.",
+    "Trust becomes visible when obedience continues even before the answer appears.",
+  ],
+  hope:[
+    "Hope is the courage to expect God to keep working beyond what you can presently see.",
+    "A difficult chapter is not permission to conclude that the story is finished.",
+    "Hope keeps the heart open to what God can still redeem, rebuild, and restore.",
+  ],
+  love:[
+    "Love becomes powerful when it chooses patience, truth, and service in ordinary moments.",
+    "The strongest witness is often a life that keeps choosing love when convenience says otherwise.",
+    "Love is not merely something we feel; it is something we practice toward people.",
+  ],
+  wisdom:[
+    "Wisdom is not knowing everything; it is knowing what deserves your obedience today.",
+    "A wise decision often begins by becoming quiet enough to hear what hurry was hiding.",
+    "Clarity grows when truth is allowed to lead desire instead of following it.",
+  ],
+  courage:[
+    "Courage is not the absence of fear; it is refusing to let fear become your leader.",
+    "You can be honest about what scares you and still choose the faithful next step.",
+    "Strength often looks like moving forward while your feelings are still catching up.",
+  ],
+  prayer:[
+    "Prayer changes the posture of the heart before it changes the circumstances around it.",
+    "Bring God the real weight, not the polished version of what you are carrying.",
+    "Prayer is where anxiety is given a name and trust is given room to grow.",
+  ],
+  grace:[
+    "Grace gives you room to grow without pretending you never needed mercy.",
+    "You are called to become better without forgetting that transformation begins with grace.",
+    "Grace does not excuse a careless life; it empowers a changed one.",
+  ],
+  strength:[
+    "Strength is sometimes the quiet decision to keep showing up with God one more day.",
+    "You do not need tomorrow’s strength today; receive enough grace for the step in front of you.",
+    "Endurance grows when you stop measuring strength only by how powerful you feel.",
+  ],
+  purpose:[
+    "Purpose is often discovered by serving faithfully where responsibility has already placed you.",
+    "You do not need a bigger platform to live a meaningful life today.",
+    "Calling becomes clearer when gifts, obedience, and service begin moving in the same direction.",
+  ],
+  gratitude:[
+    "Gratitude trains the heart to notice grace that hurry would normally overlook.",
+    "Thankfulness does not deny what is difficult; it refuses to let difficulty become the whole story.",
+    "A grateful heart remembers that ordinary mercies are still mercies.",
+  ],
+  obedience:[
+    "Obedience turns conviction into movement.",
+    "What you already know to do faithfully may matter more than the answer you are still waiting to receive.",
+    "Small acts of obedience can carry consequences much larger than the moment that produced them.",
+  ],
+  general:[
+    "Let today’s Scripture shape not only what you believe, but how you live the next moment.",
+    "Truth becomes transformational when it moves from something you admire into something you practice.",
+    "Carry one clear truth from Scripture into one deliberate action today.",
+  ],
+};
 
 function text(value:unknown,max:number,required=false){
   const valueText=String(value??"").trim();
@@ -33,6 +102,56 @@ function slugify(value:unknown){
   if(!slug) throw new ApiError("VALIDATION_FAILED","Add a form slug.",422);
   return slug;
 }
+function quoteDate(value:unknown,field="date"){
+  const raw=String(value??"").trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(raw)||Number.isNaN(Date.parse(raw+"T12:00:00Z"))) throw new ApiError("VALIDATION_FAILED",field+" must be YYYY-MM-DD.",422);
+  return raw;
+}
+function plusDays(date:string,offset:number){
+  const next=new Date(date+"T12:00:00Z");
+  next.setUTCDate(next.getUTCDate()+offset);
+  return next.toISOString().slice(0,10);
+}
+function stableIndex(value:string,length:number){
+  let hash=2166136261;
+  for(let i=0;i<value.length;i++){hash^=value.charCodeAt(i);hash=Math.imul(hash,16777619);}
+  return Math.abs(hash)%(length||1);
+}
+function normalizedTheme(value:unknown){
+  const theme=String(value??"general").trim().toLowerCase();
+  for(const key of Object.keys(QUOTE_BANK)){
+    if(key!=="general"&&theme.includes(key)) return key;
+  }
+  return "general";
+}
+function automaticQuote(scripture:any,date:string){
+  const theme=String(scripture?.theme??"general").trim()||"general";
+  const key=normalizedTheme(theme);
+  const choices=QUOTE_BANK[key]??QUOTE_BANK.general;
+  const body=choices[stableIndex(date+":"+String(scripture?.reference??"")+":"+theme,choices.length)];
+  return {
+    body,
+    sourceReference:String(scripture?.reference??"").trim(),
+    theme,
+    source:"automatic",
+    status:"published",
+    isOverride:false,
+  };
+}
+async function resolvedScripture(admin:any,organizationId:string,date:string){
+  const {data,error}=await admin.rpc("resolve_daily_scripture",{target_organization_id:organizationId,target_date:date});
+  if(error||!data?.[0]) throw new ApiError("DAILY_SCRIPTURE_UNAVAILABLE","Daily Scripture is unavailable for "+date+".",404);
+  return data[0];
+}
+async function canManageDailyHighlights(auth:any,organizationId:string){
+  if(!auth?.user) return false;
+  const {data}=await auth.client.rpc("has_permission",{target_organization_id:organizationId,requested_permission:"bible.manage",target_branch_id:null});
+  return data===true;
+}
+async function requireDailyHighlightsManager(auth:any,organizationId:string){
+  if(!(await canManageDailyHighlights(auth,organizationId))) throw new ApiError("PERMISSION_DENIED","Your ministry role cannot manage Daily Quote or Daily Scripture.",403);
+}
+
 async function canManage(auth:any,organizationId:string){
   if(!auth?.user) return false;
   for(const permission of ["announcements.manage","events.create","events.update"]){
@@ -123,17 +242,34 @@ export const engagementHubHandler=createHandler(
 
       if(action==="home"){
         const now=new Date().toISOString();
-        const {data,error}=await admin.from("cot_home_banners")
-          .select("id,title,subtitle,image_url,destination_type,destination_value,priority,starts_at,ends_at")
-          .eq("organization_id",organizationId)
-          .eq("status","published")
-          .or("starts_at.is.null,starts_at.lte."+now)
-          .or("ends_at.is.null,ends_at.gte."+now)
-          .order("priority",{ascending:false})
-          .order("created_at",{ascending:false})
-          .limit(20);
+        const today=now.slice(0,10);
+        const [{data,error},scripture,storedQuote]=await Promise.all([
+          admin.from("cot_home_banners")
+            .select("id,title,subtitle,image_url,destination_type,destination_value,priority,starts_at,ends_at")
+            .eq("organization_id",organizationId)
+            .eq("status","published")
+            .or("starts_at.is.null,starts_at.lte."+now)
+            .or("ends_at.is.null,ends_at.gte."+now)
+            .order("priority",{ascending:false})
+            .order("created_at",{ascending:false})
+            .limit(20),
+          resolvedScripture(admin,organizationId,today),
+          admin.from("cot_daily_quotes").select("id,quote_date,body,source_reference,theme,source,status").eq("organization_id",organizationId).eq("quote_date",today).maybeSingle(),
+        ]);
         if(error) throw new ApiError("HOME_BANNERS_FAILED","Unable to load COT highlights.",500,undefined,false);
-        return {data:{banners:data??[]}};
+        const stored=(storedQuote as any)?.data??null;
+        const dailyQuote=stored
+          ? stored.status==="hidden" ? null : {
+              id:stored.id,
+              body:stored.body,
+              sourceReference:stored.source_reference,
+              theme:stored.theme,
+              source:stored.source,
+              status:stored.status,
+              isOverride:true,
+            }
+          : automaticQuote(scripture,today);
+        return {data:{banners:data??[],dailyQuote}};
       }
 
       if(action==="form"){
@@ -155,6 +291,37 @@ export const engagementHubHandler=createHandler(
         const {data,error}=await query.limit(100);
         if(error) throw new ApiError("FORMS_LOAD_FAILED","Unable to load forms.",500,undefined,false);
         return {data:data??[]};
+      }
+
+      if(action==="daily_highlights_manage"){
+        await requireDailyHighlightsManager(auth,organizationId);
+        const fromDate=quoteDate(url.searchParams.get("fromDate")??new Date().toISOString().slice(0,10),"fromDate");
+        const dayCount=Math.max(1,Math.min(30,Number(url.searchParams.get("days")??30)||30));
+        const dates=Array.from({length:dayCount},(_,index)=>plusDays(fromDate,index));
+        const {data:stored,error:storedError}=await admin.from("cot_daily_quotes")
+          .select("id,quote_date,body,source_reference,theme,source,status,updated_at")
+          .eq("organization_id",organizationId)
+          .gte("quote_date",dates[0])
+          .lte("quote_date",dates[dates.length-1]);
+        if(storedError) throw new ApiError("DAILY_QUOTES_LOAD_FAILED","Unable to load Daily Quote schedule.",500,undefined,false);
+        const byDate=new Map((stored??[]).map((row:any)=>[row.quote_date,row]));
+        const days=await Promise.all(dates.map(async(date)=>{
+          const bible=await resolvedScripture(admin,organizationId,date);
+          const automatic=automaticQuote(bible,date);
+          const saved:any=byDate.get(date)??null;
+          const quote=saved?{
+            id:saved.id,
+            body:saved.body,
+            sourceReference:saved.source_reference,
+            theme:saved.theme,
+            source:saved.source,
+            status:saved.status,
+            isOverride:true,
+            updatedAt:saved.updated_at,
+          }:automatic;
+          return {date,bible,automaticQuote:automatic,quote};
+        }));
+        return {data:{fromDate,days}};
       }
 
       if(action==="manage"){
@@ -257,6 +424,69 @@ export const engagementHubHandler=createHandler(
     }
 
     const organizationId=await resolveOrganization(auth,url,body);
+
+    if(["quote_save","quote_delete","quote_provision"].includes(actionName)){
+      await requireDailyHighlightsManager(auth,organizationId);
+
+      if(actionName==="quote_save"){
+        const date=quoteDate(body.date);
+        const status=text(body.status??"published",20,true);
+        if(!DAILY_QUOTE_STATUSES.has(status)) throw new ApiError("VALIDATION_FAILED","Invalid Daily Quote status.",422);
+        const record={
+          organization_id:organizationId,
+          quote_date:date,
+          body:text(body.body,500,true),
+          source_reference:text(body.sourceReference??"",120),
+          theme:text(body.theme??"general",80)||"general",
+          source:"ministry",
+          status,
+          created_by:auth.user.id,
+          updated_at:new Date().toISOString(),
+        };
+        const {data,error}=await admin.from("cot_daily_quotes").upsert(record,{onConflict:"organization_id,quote_date"}).select().single();
+        if(error) throw new ApiError("DAILY_QUOTE_SAVE_FAILED","Unable to save Daily Quote.",500,undefined,false);
+        return {data};
+      }
+
+      if(actionName==="quote_delete"){
+        const date=quoteDate(body.date);
+        const {error}=await admin.from("cot_daily_quotes").delete().eq("organization_id",organizationId).eq("quote_date",date);
+        if(error) throw new ApiError("DAILY_QUOTE_DELETE_FAILED","Unable to return this day to automatic Daily Quote.",500,undefined,false);
+        return {data:{date,automatic:true}};
+      }
+
+      const fromDate=quoteDate(body.fromDate??new Date().toISOString().slice(0,10),"fromDate");
+      const dayCount=Math.max(1,Math.min(30,Number(body.days??30)||30));
+      const dates=Array.from({length:dayCount},(_,index)=>plusDays(fromDate,index));
+      const {data:existing}=await admin.from("cot_daily_quotes").select("quote_date,source").eq("organization_id",organizationId).gte("quote_date",dates[0]).lte("quote_date",dates[dates.length-1]);
+      const existingMap=new Map((existing??[]).map((row:any)=>[row.quote_date,row.source]));
+      const overwriteProvisioned=body.overwriteProvisioned===true;
+      const generated=await Promise.all(dates.map(async(date)=>{
+        const existingSource=existingMap.get(date);
+        if(existingSource==="ministry") return null;
+        if(existingSource==="provisioned"&&!overwriteProvisioned) return null;
+        const bible=await resolvedScripture(admin,organizationId,date);
+        const quote=automaticQuote(bible,date);
+        return {
+          organization_id:organizationId,
+          quote_date:date,
+          body:quote.body,
+          source_reference:quote.sourceReference,
+          theme:quote.theme,
+          source:"provisioned",
+          status:"published",
+          created_by:auth.user.id,
+          updated_at:new Date().toISOString(),
+        };
+      }));
+      const rows=generated.filter(Boolean);
+      if(rows.length){
+        const {error}=await admin.from("cot_daily_quotes").upsert(rows,{onConflict:"organization_id,quote_date"});
+        if(error) throw new ApiError("DAILY_QUOTE_PROVISION_FAILED","Unable to provision Daily Quotes.",500,undefined,false);
+      }
+      return {data:{fromDate,days:dayCount,provisioned:rows.length,preserved:dayCount-rows.length}};
+    }
+
     await requireManager(auth,organizationId);
 
     if(actionName==="create_banner_upload"){
