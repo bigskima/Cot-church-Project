@@ -1,15 +1,25 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import * as Speech from 'expo-speech';
 import WebView, { type WebViewMessageEvent } from 'react-native-webview';
 import { pdfViewerHtml } from './pdf-viewer-html';
 
 type PdfReaderMessage =
-  | { type: 'pdf-read-page'; text?: string }
-  | { type: 'pdf-stop-reading' };
+  | { type: 'pdf-read-page'; text?: string; rate?: number }
+  | { type: 'pdf-stop-reading' }
+  | { type: 'pdf-rate-change'; rate?: number };
 
-export function PdfBookFrame({ url }: { url: string }) {
+export function PdfBookFrame({
+  url,
+  speechRate = 1,
+  onSpeechRateChange,
+}: {
+  url: string;
+  speechRate?: number;
+  onSpeechRateChange?: (rate: any) => void;
+}) {
   const webViewRef = useRef<React.ElementRef<typeof WebView>>(null);
+  const html = useMemo(() => pdfViewerHtml(url, speechRate), [url]);
 
   useEffect(() => () => { void Speech.stop(); }, []);
 
@@ -26,10 +36,15 @@ export function PdfBookFrame({ url }: { url: string }) {
         void Speech.stop();
         return;
       }
+      if (message.type === 'pdf-rate-change') {
+        const next = Number(message.rate);
+        if ([0.5, 0.75, 1, 1.25, 1.5, 2].includes(next)) onSpeechRateChange?.(next);
+        return;
+      }
       if (message.type === 'pdf-read-page' && message.text?.trim()) {
         void Speech.stop().then(() => {
           Speech.speak(message.text!.trim(), {
-            rate: 0.92,
+            rate: [0.5, 0.75, 1, 1.25, 1.5, 2].includes(Number(message.rate)) ? Number(message.rate) : speechRate,
             onDone: notifySpeechDone,
             onStopped: notifySpeechDone,
             onError: notifySpeechDone,
@@ -46,7 +61,7 @@ export function PdfBookFrame({ url }: { url: string }) {
       <WebView
         ref={webViewRef}
         originWhitelist={['*']}
-        source={{ html: pdfViewerHtml(url) }}
+        source={{ html }}
         style={styles.web}
         startInLoadingState
         javaScriptEnabled
