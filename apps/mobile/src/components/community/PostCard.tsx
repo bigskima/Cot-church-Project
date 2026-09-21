@@ -294,13 +294,6 @@ export function PostCard({
 
   return (
     <>
-      {resolvedVariant === 'feed' ? (
-        <View style={styles.detachedIdentity}>
-          {identityHeader}
-          {contextRow}
-        </View>
-      ) : null}
-
       <Pressable
         onPress={onPress}
         style={({ pressed }) => [
@@ -312,15 +305,20 @@ export function PostCard({
           style,
         ]}
       >
-        {resolvedVariant !== 'feed' ? (
+        {resolvedVariant === 'feed' ? (
+          <View style={[styles.feedIdentityBlock, { borderBottomColor: colors.borderSubtle }]}>
+            {identityHeader}
+            {contextRow}
+          </View>
+        ) : (
           <>
             {contextRow}
             {identityHeader}
           </>
-        ) : null}
+        )}
 
         {body ? (
-          <View style={styles.bodyBlock}>
+          <View style={[styles.bodyBlock, resolvedVariant === 'feed' && styles.feedBodyBlock]}>
             <Text style={[styles.bodyText, resolvedVariant === 'feed' && styles.feedBodyText, { color: colors.text }]}>
               {revealedBody.text}
               {revealedBody.hasMore ? '…' : ''}
@@ -530,7 +528,8 @@ export function PostCard({
 const styles = StyleSheet.create({
   container: { marginHorizontal: spacing.sm, marginVertical: spacing.xs, padding: spacing.md, borderWidth: 1, borderRadius: radius.card },
   feedContainer: { marginHorizontal: 0, marginTop: 0, paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: spacing.sm, borderRadius: 0, borderLeftWidth: 0, borderRightWidth: 0 },
-  detachedIdentity: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, gap: 5 },
+  feedIdentityBlock: { paddingBottom: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, gap: 5 },
+  feedBodyBlock: { marginTop: spacing.sm },
   publicCard: { ...shadows.sm },
   expressionCard: { ...shadows.md },
   contextRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginTop: 2, marginBottom: 2 },
@@ -538,14 +537,14 @@ const styles = StyleSheet.create({
   contextText: { fontSize: 10, lineHeight: 14, fontWeight: '800', letterSpacing: 0.15, flexShrink: 1 },
   privatePill: { minHeight: 26, borderRadius: radius.pill, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 4 },
   privateText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.15 },
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  identityColumn: { flex: 1, minWidth: 0 },
-  authorLine: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  nameGroup: { flexDirection: 'row', alignItems: 'center', flexShrink: 1, gap: 4 },
+  headerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  identityColumn: { flex: 1, minWidth: 0, paddingTop: 1 },
+  authorLine: { flexDirection: 'row', alignItems: 'center', minWidth: 0, gap: 6 },
+  nameGroup: { flexDirection: 'row', alignItems: 'center', flexShrink: 1, minWidth: 0, gap: 4 },
   displayName: { fontSize: 15, fontWeight: '800', flexShrink: 1, letterSpacing: -0.2 },
   timestamp: { fontSize: 10.5, fontWeight: '600' },
   handleText: { fontSize: 10.5, marginTop: 2 },
-  moreButton: { width: 34, height: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  moreButton: { width: 34, height: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start' },
   identityMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, marginTop: 2 },
   identityBadge: { borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3 },
   identityBadgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.2 },
