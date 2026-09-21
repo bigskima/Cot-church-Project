@@ -11,6 +11,7 @@ import { toUserFacingErrorMessage } from '@/api';
 import { ExpressionManagementGate } from '@/features/expression-management/ExpressionManagementGate';
 import { LocationFinder, type VerifiedLocationResult } from '@/components/location/LocationFinder';
 import { useExpressionManagementAccess } from '@/features/expression-management/useExpressionManagementAccess';
+import { MinistryImageGenerator } from '@/features/ministry/MinistryImageGenerator';
 
 type ExpressionLocation = {
   line1?: string | null;
@@ -58,6 +59,7 @@ export default function ExpressionSettingsScreen() {
   const { colors } = useTheme();
   const access = useExpressionManagementAccess();
   const id = access.expressionId;
+  const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
   const expressionName = context?.expression?.name ?? 'This Expression';
 
   const records = useResource<ExpressionRecord[]>(
@@ -171,6 +173,23 @@ export default function ExpressionSettingsScreen() {
     }
   };
 
+  const applyGeneratedBanner = async (url: string) => {
+    if (!id) return;
+    setError('');
+    setFeedback('');
+    try {
+      await api.request<ExpressionRecord>(`branches?id=${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ bannerUrl: url }),
+      });
+      setFeedback('Expression banner generated and applied.');
+      records.refresh();
+      refreshContext();
+    } catch (value) {
+      setError(toUserFacingErrorMessage(value, 'We couldn’t apply the generated Expression banner. Please try again.'));
+    }
+  };
+
   const save = async () => {
     const normalizedName = name.trim();
     const normalizedCode = code.trim().toUpperCase();
@@ -262,6 +281,16 @@ export default function ExpressionSettingsScreen() {
                   </View>
                 </View>
                 <Text style={[styles.mediaFootnote, { color: colors.textMuted }]}>JPG, PNG or WebP · up to 8 MB. Tap either image to replace it later.</Text>
+                <MinistryImageGenerator
+                  organizationId={organizationId}
+                  branchId={id}
+                  useCase="expression_banner"
+                  title={name || expressionName}
+                  description={[city, state, country].filter(Boolean).join(', ')}
+                  currentImageUrl={current.banner_url}
+                  onGenerated={(url) => { void applyGeneratedBanner(url); }}
+                />
+                <Text style={[styles.mediaFootnote, { color: colors.textMuted }]}>AI is available for the Expression banner only. The square profile image remains upload-only so COT never fabricates identity imagery.</Text>
               </View>
 
               <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
