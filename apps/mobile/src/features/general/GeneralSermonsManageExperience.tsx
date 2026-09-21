@@ -25,6 +25,7 @@ import { useResource } from '@/hooks/use-resource';
 import { putSignedUpload, readUploadFile, type UploadFile } from '@/services/uploads';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
+import { MinistryImageGenerator } from '@/features/ministry/MinistryImageGenerator';
 import type { Sermon } from '@/types/content';
 import { SermonRichEditor } from '@/features/media/SermonRichEditor';
 import {
@@ -83,6 +84,7 @@ export default function GeneralSermonsManageExperience() {
   const [scripture, setScripture] = useState('');
   const [blocks, setBlocks] = useState<SermonRichBlock[]>([newSermonBlock()]);
   const [bannerFile, setBannerFile] = useState<UploadFile | null>(null);
+  const [generatedBannerUrl, setGeneratedBannerUrl] = useState('');
   const [audioFile, setAudioFile] = useState<UploadFile | null>(null);
   const [status, setStatus] = useState<Sermon['status']>('draft');
   const [busy, setBusy] = useState(false);
@@ -101,6 +103,7 @@ export default function GeneralSermonsManageExperience() {
     setScripture('');
     setBlocks([newSermonBlock()]);
     setBannerFile(null);
+    setGeneratedBannerUrl('');
     setAudioFile(null);
     setStatus('draft');
     setError('');
@@ -127,6 +130,7 @@ export default function GeneralSermonsManageExperience() {
     setScripture((sermon.scripture_references ?? []).join(', '));
     setBlocks(parseSermonMarkdown(sermon.transcript || sermon.description));
     setBannerFile(null);
+    setGeneratedBannerUrl('');
     setAudioFile(null);
     setStatus(sermon.status ?? 'draft');
     setError('');
@@ -150,6 +154,7 @@ export default function GeneralSermonsManageExperience() {
       setError('Choose a JPG, PNG, or WebP banner.');
       return;
     }
+    setGeneratedBannerUrl('');
     setBannerFile({ uri: asset.uri, name: asset.fileName || `sermon-banner-${Date.now()}.jpg`, mimeType, size: asset.fileSize, file: (asset as any).file });
   };
 
@@ -169,7 +174,7 @@ export default function GeneralSermonsManageExperience() {
   const currentCanContinue = () => {
     if (step === 0) return Boolean(title.trim() && preacher.trim());
     if (step === 1) return Boolean(sermonBlocksToPlainText(blocks).trim() || audioFile || editing?.audio_asset_id);
-    if (step === 2) return Boolean(bannerFile || editing?.thumbnail_url);
+    if (step === 2) return Boolean(bannerFile || generatedBannerUrl || editing?.thumbnail_url);
     return true;
   };
 
@@ -189,7 +194,7 @@ export default function GeneralSermonsManageExperience() {
       setStep(0);
       return;
     }
-    if (!bannerFile && !editing?.thumbnail_url) {
+    if (!bannerFile && !generatedBannerUrl && !editing?.thumbnail_url) {
       setError('Choose a 16:9 banner for this sermon.');
       setStep(2);
       return;
@@ -208,7 +213,7 @@ export default function GeneralSermonsManageExperience() {
     setBusy(true);
     setError('');
     try {
-      let thumbnailUrl = editing?.thumbnail_url ?? null;
+      let thumbnailUrl = generatedBannerUrl || editing?.thumbnail_url || null;
       let audioAssetId = editing?.audio_asset_id ?? null;
 
       if (bannerFile) {
@@ -266,9 +271,17 @@ export default function GeneralSermonsManageExperience() {
       <View style={styles.stepBody}>
         <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>SERMON BANNER</Text>
         <Pressable onPress={() => void chooseBanner()} style={[styles.uploadCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
-          {bannerFile?.uri || editing?.thumbnail_url ? <Image source={{ uri: bannerFile?.uri || editing?.thumbnail_url! }} style={styles.bannerPreview} /> : <View style={[styles.mediaIcon, { backgroundColor: colors.primarySoft }]}><Icon name="image-outline" size={25} color={colors.interactive} /></View>}
+          {bannerFile?.uri || generatedBannerUrl || editing?.thumbnail_url ? <Image source={{ uri: bannerFile?.uri || generatedBannerUrl || editing?.thumbnail_url! }} style={styles.bannerPreview} /> : <View style={[styles.mediaIcon, { backgroundColor: colors.primarySoft }]}><Icon name="image-outline" size={25} color={colors.interactive} /></View>}
           <View style={styles.flex}><Text style={[styles.uploadTitle, { color: colors.text }]}>Choose 16:9 banner</Text><Text style={[styles.uploadHint, { color: colors.textMuted }]}>Used on sermon cards and the reading screen.</Text></View><Icon name="chevron-forward" size={17} color={colors.textMuted} />
         </Pressable>
+        <MinistryImageGenerator
+          organizationId={organizationId}
+          useCase="sermon_artwork"
+          title={title}
+          description={[scripture, sermonExcerpt(blocks)].filter(Boolean).join(' · ')}
+          currentImageUrl={bannerFile?.uri || generatedBannerUrl || editing?.thumbnail_url}
+          onGenerated={(url) => { setBannerFile(null); setGeneratedBannerUrl(url); }}
+        />
         <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>OPTIONAL AUDIO</Text>
         <Pressable onPress={() => void chooseAudio()} style={[styles.uploadCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
           <View style={[styles.mediaIcon, { backgroundColor: colors.primarySoft }]}><Icon name={audioFile || editing?.audio_asset_id ? 'checkmark-circle-outline' : 'headset-outline'} size={24} color={colors.interactive} /></View>
@@ -284,7 +297,7 @@ export default function GeneralSermonsManageExperience() {
           <Text style={[styles.reviewMeta, { color: colors.textSecondary }]}>{preacher || 'No speaker'}{scripture.trim() ? ` · ${scripture}` : ''}</Text>
           <View style={styles.reviewChecklist}>
             <ReviewLine label="Structured message" ready={Boolean(sermonBlocksToPlainText(blocks).trim())} />
-            <ReviewLine label="16:9 banner" ready={Boolean(bannerFile || editing?.thumbnail_url)} />
+            <ReviewLine label="16:9 banner" ready={Boolean(bannerFile || generatedBannerUrl || editing?.thumbnail_url)} />
             <ReviewLine label="Audio" ready={Boolean(audioFile || editing?.audio_asset_id)} optional />
           </View>
         </View>
