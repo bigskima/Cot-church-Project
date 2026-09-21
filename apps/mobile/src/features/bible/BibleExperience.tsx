@@ -12,7 +12,8 @@ import { shareContent } from '@/services/share';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { radius, shadows, spacing } from '@/design-system/tokens';
-import { bibleVerseCardPngDataUri } from './bible-share-card';
+import { buildBibleShareCardPng } from './bible-share-card-runtime';
+import { SvgPngRenderer, type SvgPngRendererHandle } from './SvgPngRenderer';
 
 type BibleVersion = {
   id: string;
@@ -168,6 +169,7 @@ export function BibleExperience() {
   const [verseCardUri, setVerseCardUri] = useState('');
   const [verseCardBusy, setVerseCardBusy] = useState(false);
   const [shareError, setShareError] = useState('');
+  const cardRendererRef = useRef<SvgPngRendererHandle>(null);
 
   const queryString = (extra: Record<string, string> = {}) => {
     const params = new URLSearchParams(extra);
@@ -561,19 +563,28 @@ export function BibleExperience() {
     speechRate,
   ]);
 
-  const cotLogoUri = Image.resolveAssetSource(require('../../../assets/icon.png')).uri;
+  useEffect(() => {
+    setVerseCardUri('');
+    setShareError('');
+  }, [visibleReference, visibleText, versionId]);
 
   const prepareVerseCard = async () => {
     if (!passage.data || !visibleText) return '';
     setVerseCardBusy(true);
     setShareError('');
     try {
-      const card = await bibleVerseCardPngDataUri({
-        reference: visibleReference,
-        text: visibleText,
-        version: passage.data.abbreviation || versionId.toUpperCase(),
-        logoUrl: cotLogoUri,
-      });
+      const card = await buildBibleShareCardPng(
+        {
+          reference: visibleReference,
+          text: visibleText,
+          version: passage.data.abbreviation || versionId.toUpperCase(),
+        },
+        (svgDataUri) => {
+          const renderer = cardRendererRef.current;
+          if (!renderer) return Promise.reject(new Error('The Scripture card renderer is still preparing.'));
+          return renderer.render(svgDataUri);
+        },
+      );
       setVerseCardUri(card);
       return card;
     } catch (value) {
@@ -603,8 +614,8 @@ export function BibleExperience() {
         message,
         attachment: card ? {
           url: card,
-          mimeType: card.startsWith('data:image/png') ? 'image/png' : 'image/svg+xml',
-          fileName: 'cot-' + visibleReference.toLowerCase().replace(/[^a-z0-9]+/g, '-') + (card.startsWith('data:image/png') ? '.png' : '.svg'),
+          mimeType: 'image/png',
+          fileName: 'cot-' + visibleReference.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.png',
         } : null,
       });
     } catch (value) {
@@ -1507,6 +1518,8 @@ export function BibleExperience() {
           </Pressable>
         ))}
       </BottomSheet>
+
+      <SvgPngRenderer ref={cardRendererRef} />
     </View>
   );
 }
