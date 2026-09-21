@@ -10,6 +10,7 @@ import { invalidate } from '@/services/query-cache';
 import { putSignedUpload, type UploadFile } from '@/services/uploads';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
+import { MinistryImageGenerator } from '@/features/ministry/MinistryImageGenerator';
 
 type Destination='none'|'route'|'external'|'event'|'announcement'|'form';
 type BannerStatus='draft'|'published'|'hidden'|'archived';
@@ -41,12 +42,13 @@ export default function GeneralHomeBannersManageExperience(){
  const [startsAt,setStartsAt]=useState<Date|null>(null);
  const [endsAt,setEndsAt]=useState<Date|null>(null);
  const [imageFile,setImageFile]=useState<UploadFile|null>(null);
+ const [generatedImageUrl,setGeneratedImageUrl]=useState('');
  const [saving,setSaving]=useState(false);
  const [error,setError]=useState('');
 
- const reset=()=>{setEditing(null);setTitle('');setSubtitle('');setDestinationType('none');setDestinationValue('');setStatus('draft');setPriority('0');setStartsAt(null);setEndsAt(null);setImageFile(null);setError('');};
+ const reset=()=>{setEditing(null);setTitle('');setSubtitle('');setDestinationType('none');setDestinationValue('');setStatus('draft');setPriority('0');setStartsAt(null);setEndsAt(null);setImageFile(null);setGeneratedImageUrl('');setError('');};
  const openCreate=()=>{reset();setOpen(true);};
- const openEdit=(item:Banner)=>{setEditing(item);setTitle(item.title);setSubtitle(item.subtitle??'');setDestinationType(item.destination_type);setDestinationValue(item.destination_value??'');setStatus(item.status);setPriority(String(item.priority??0));setStartsAt(safeDate(item.starts_at));setEndsAt(safeDate(item.ends_at));setImageFile(null);setError('');setOpen(true);};
+ const openEdit=(item:Banner)=>{setEditing(item);setTitle(item.title);setSubtitle(item.subtitle??'');setDestinationType(item.destination_type);setDestinationValue(item.destination_value??'');setStatus(item.status);setPriority(String(item.priority??0));setStartsAt(safeDate(item.starts_at));setEndsAt(safeDate(item.ends_at));setImageFile(null);setGeneratedImageUrl('');setError('');setOpen(true);};
 
  const chooseImage=async()=>{
    setError('');
@@ -57,6 +59,7 @@ export default function GeneralHomeBannersManageExperience(){
    if(!asset)return;
    const mimeType=asset.mimeType?.toLowerCase()||'image/jpeg';
    if(!['image/jpeg','image/png','image/webp'].includes(mimeType)){setError('Choose a JPG, PNG or WebP image.');return;}
+   setGeneratedImageUrl('');
    setImageFile({uri:asset.uri,name:asset.fileName||'cot-home-banner.jpg',mimeType,size:asset.fileSize,file:(asset as any).file});
  };
 
@@ -67,7 +70,7 @@ export default function GeneralHomeBannersManageExperience(){
    if(destinationType==='external'&&destinationValue&&!/^https?:\/\//i.test(destinationValue)){setError('External links must start with http:// or https://.');return;}
    setSaving(true);setError('');
    try{
-     let imageUrl=editing?.image_url??null;
+     let imageUrl=generatedImageUrl||editing?.image_url||null;
      if(imageFile){
        const intent=await api.request<UploadIntent>('noop?service=engagement-hub',{method:'POST',context:'public',body:JSON.stringify({action:'create_banner_upload',organizationId,mimeType:imageFile.mimeType})});
        await putSignedUpload(intent.signedUploadUrl,imageFile);
@@ -115,9 +118,17 @@ export default function GeneralHomeBannersManageExperience(){
        <InputField label="Subtitle" value={subtitle} onChangeText={setSubtitle} multiline numberOfLines={3} placeholder="Short supporting message"/>
        <Text style={[styles.label,{color:colors.textSecondary}]}>BANNER IMAGE</Text>
        <Pressable onPress={()=>void chooseImage()} style={[styles.upload,{backgroundColor:colors.bgSecondary,borderColor:colors.borderSubtle}]}>
-         {imageFile?.uri||editing?.image_url?<Image source={{uri:imageFile?.uri||editing?.image_url!}} style={styles.preview} resizeMode="cover"/>:<View style={[styles.uploadIcon,{backgroundColor:colors.primarySoft}]}><Icon name="image-outline" size={23} color={colors.interactive}/></View>}
+         {imageFile?.uri||generatedImageUrl||editing?.image_url?<Image source={{uri:imageFile?.uri||generatedImageUrl||editing?.image_url!}} style={styles.preview} resizeMode="cover"/>:<View style={[styles.uploadIcon,{backgroundColor:colors.primarySoft}]}><Icon name="image-outline" size={23} color={colors.interactive}/></View>}
          <View style={styles.flex}><Text style={[styles.uploadTitle,{color:colors.text}]}>Choose image</Text><Text style={[styles.uploadHelp,{color:colors.textMuted}]}>Wide 16:7 artwork works best.</Text></View><Icon name="chevron-forward" size={17} color={colors.textMuted}/>
        </Pressable>
+       <MinistryImageGenerator
+         organizationId={organizationId}
+         useCase="home_banner"
+         title={title}
+         description={subtitle}
+         currentImageUrl={imageFile?.uri||generatedImageUrl||editing?.image_url}
+         onGenerated={(url)=>{setImageFile(null);setGeneratedImageUrl(url);}}
+       />
        <Text style={[styles.label,{color:colors.textSecondary}]}>ACTION</Text>
        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>{(['none','route','external','event','announcement','form'] as const).map(type=><Chip key={type} label={type} selected={destinationType===type} onPress={()=>{setDestinationType(type);setDestinationValue('');}}/>)}</ScrollView>
        {destinationType==='route'?<InputField label="Internal route" value={destinationValue} onChangeText={setDestinationValue} placeholder="/general/event/..."/>:null}
