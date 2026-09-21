@@ -14,6 +14,16 @@ type BibleToday = {
   passage: { text: string; abbreviation?: string; verses?: Array<{ verse?: number; text?: string }> };
 };
 
+type DailyQuote = {
+  id?: string;
+  body: string;
+  sourceReference?: string | null;
+  theme?: string | null;
+  source: 'automatic' | 'ministry' | 'provisioned';
+  status?: 'published' | 'hidden';
+  isOverride?: boolean;
+};
+
 type HomeBanner = {
   id: string;
   title: string;
@@ -50,11 +60,11 @@ export function GeneralHomeSpotlightCarousel() {
       ? api.request<BibleToday>('noop?service=bible&action=today&organizationId=' + encodeURIComponent(organizationId), { signal, context: 'public' }).catch(() => null)
       : Promise.resolve(null),
   );
-  const banners = useResource<{ banners: HomeBanner[] }>(
+  const banners = useResource<{ banners: HomeBanner[]; dailyQuote?: DailyQuote | null }>(
     'home:spotlight:banners:' + organizationId,
     (signal) => organizationId
-      ? api.request<{ banners: HomeBanner[] }>('noop?service=engagement-hub&action=home&organizationId=' + encodeURIComponent(organizationId), { signal, context: 'public' })
-      : Promise.resolve({ banners: [] }),
+      ? api.request<{ banners: HomeBanner[]; dailyQuote?: DailyQuote | null }>('noop?service=engagement-hub&action=home&organizationId=' + encodeURIComponent(organizationId), { signal, context: 'public' })
+      : Promise.resolve({ banners: [], dailyQuote: null }),
   );
 
   const openBanner = (banner: HomeBanner) => {
@@ -70,18 +80,23 @@ export function GeneralHomeSpotlightCarousel() {
   const items = useMemo<SpotlightItem[]>(() => {
     const result: SpotlightItem[] = [];
     const today = bible.data;
-    const firstVerse = today?.passage?.verses?.find((verse) => verse.text)?.text?.trim() || today?.passage?.text?.trim() || '';
+    const dailyQuote = banners.data?.dailyQuote ?? null;
 
-    if (today && firstVerse) {
+    if (dailyQuote?.body) {
       result.push({
-        key: 'quote:' + today.reference,
+        key: 'quote:' + (dailyQuote.id || dailyQuote.sourceReference || 'today'),
         kind: 'quote',
         eyebrow: 'DAILY QUOTE',
-        title: 'A word for today',
-        body: firstVerse,
-        meta: today.reference + (today.passage.abbreviation ? ' · ' + today.passage.abbreviation : ''),
-        onPress: () => router.push({ pathname: '/general/bible', params: { reference: today.reference } } as any),
+        title: 'Thought for today',
+        body: dailyQuote.body,
+        meta: dailyQuote.sourceReference ? 'INSPIRED BY ' + dailyQuote.sourceReference : 'BIBLE-INSPIRED',
+        onPress: () => dailyQuote.sourceReference
+          ? router.push({ pathname: '/general/bible', params: { reference: dailyQuote.sourceReference } } as any)
+          : router.push('/general/bible' as any),
       });
+    }
+
+    if (today) {
       result.push({
         key: 'scripture:' + today.reference,
         kind: 'scripture',
