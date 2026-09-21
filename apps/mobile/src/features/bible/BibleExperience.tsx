@@ -25,7 +25,7 @@ type BibleVersion = {
   language?: { name?: string; iso_639_1?: string };
   language_tag?: string;
   available?: boolean;
-  accessStatus?: 'public_domain' | 'licensed' | 'requires_license' | 'metadata_only';
+  accessStatus?: 'public_domain' | 'licensed' | 'requires_license' | 'platform_unavailable';
 };
 
 type BibleBook = { name: string; usfm: string; number: number; chapters: number };
@@ -235,7 +235,8 @@ export function BibleExperience() {
     const needle = versionSearch.trim().toLowerCase();
     const source = versions.data ?? [];
     if (!needle) return source;
-    return source.filter((item) => {
+
+    const matches = source.filter((item) => {
       const haystack = [
         item.abbreviation,
         item.localized_abbreviation,
@@ -245,6 +246,23 @@ export function BibleExperience() {
       ].filter(Boolean).join(' ').toLowerCase();
       return haystack.includes(needle);
     });
+
+    const platformUnavailable: BibleVersion[] = [
+      { id: 'yv-public-1', abbreviation: 'KJV', localized_abbreviation: 'KJV', title: 'King James Version', localized_title: 'King James Version', provider: 'youversion', language_tag: 'en', available: false, accessStatus: 'platform_unavailable' },
+      { id: 'yv-public-114', abbreviation: 'NKJV', localized_abbreviation: 'NKJV', title: 'New King James Version', localized_title: 'New King James Version', provider: 'youversion', language_tag: 'en', available: false, accessStatus: 'platform_unavailable' },
+      { id: 'yv-public-68', abbreviation: 'GNT', localized_abbreviation: 'GNT', title: 'Good News Translation', localized_title: 'Good News Translation', provider: 'youversion', language_tag: 'en', available: false, accessStatus: 'platform_unavailable' },
+      { id: 'yv-public-116', abbreviation: 'NLT', localized_abbreviation: 'NLT', title: 'New Living Translation', localized_title: 'New Living Translation', provider: 'youversion', language_tag: 'en', available: false, accessStatus: 'platform_unavailable' },
+    ];
+
+    for (const item of platformUnavailable) {
+      const haystack = [item.abbreviation, item.title].filter(Boolean).join(' ').toLowerCase();
+      const alreadyPresent = source.some((candidate) =>
+        String(candidate.abbreviation || candidate.localized_abbreviation || '').toLowerCase() === String(item.abbreviation).toLowerCase()
+      );
+      if (!alreadyPresent && haystack.includes(needle)) matches.push(item);
+    }
+
+    return matches;
   }, [versions.data, versionSearch]);
 
   useEffect(() => {
@@ -929,8 +947,8 @@ export function BibleExperience() {
                   <Text style={[styles.versionMeta, { color: available ? colors.textMuted : colors.live }]}>
                     {available
                       ? ((item.language?.name || item.language_tag || '') + (item.provider ? ' · ' + item.provider : ''))
-                      : item.accessStatus === 'metadata_only'
-                        ? 'Available on YouVersion · not exposed for Bible text through this COT Platform App Key'
+                      : item.accessStatus === 'platform_unavailable'
+                        ? 'Available in the YouVersion Bible App, but not exposed through the YouVersion Platform API to COT'
                         : 'Listed by YouVersion · publisher license not enabled for this COT App Key'}
                   </Text>
                 </View>
@@ -944,7 +962,7 @@ export function BibleExperience() {
           })}
           {!visibleVersions.length ? (
             <Text style={[styles.emptyHelp, { color: colors.textMuted }]}>
-              No translation matches this search in the YouVersion Platform catalogue available to COT.
+              No translation matches this search in the YouVersion Platform catalogue currently exposed to COT.
             </Text>
           ) : null}
         </ScrollView>

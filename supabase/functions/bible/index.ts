@@ -296,20 +296,6 @@ async function versions(language = "en") {
         accessStatus:licensedIds.has(id) ? "licensed" : "requires_license",
       });
     }
-    const popularMetadataIds = ["1","68","114","116"];
-    for (const id of popularMetadataIds) {
-      if (byId.has(id)) continue;
-      const metadata = await getYouVersionMetadata(id, key);
-      if (!metadata) continue;
-      byId.set(id, {
-        ...metadata,
-        id,
-        provider:"youversion",
-        available:licensedIds.has(id),
-        accessStatus:licensedIds.has(id) ? "licensed" : "metadata_only",
-      });
-    }
-
     const items = [...byId.values()].sort((a:any,b:any) => {
       const preferred = versionPriority(a) - versionPriority(b);
       if (preferred !== 0) return preferred;
