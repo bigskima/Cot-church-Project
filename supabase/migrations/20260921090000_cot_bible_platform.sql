@@ -137,7 +137,7 @@ create table if not exists public.bible_reading_plan_days (
   plan_id uuid not null references public.bible_reading_plans(id) on delete cascade,
   day_number integer not null check(day_number>=1),
   title text null,
-  references text[] not null default '{}',
+  scripture_references text[] not null default '{}',
   reflection text null,
   primary key(plan_id,day_number)
 );
@@ -216,7 +216,7 @@ begin
   values(null,'start-with-john','Start with John','A seven-day introduction to Jesus through the Gospel of John.',7,true)
   on conflict(organization_id,slug) do update set title=excluded.title,description=excluded.description,duration_days=excluded.duration_days
   returning id into pid;
-  insert into public.bible_reading_plan_days(plan_id,day_number,title,references,reflection) values
+  insert into public.bible_reading_plan_days(plan_id,day_number,title,scripture_references,reflection) values
     (pid,1,'The Word became flesh',array['John 1:1-18'],'Notice how John introduces Jesus before describing His earthly ministry.'),
     (pid,2,'A new beginning',array['John 3:1-21'],'Reflect on what Jesus means by being born again.'),
     (pid,3,'Living water',array['John 4:1-30'],'Bring your deepest thirst honestly before Christ.'),
@@ -224,7 +224,7 @@ begin
     (pid,5,'Light in darkness',array['John 8:12-20'],'Consider one area where you need to walk in Christ''s light.'),
     (pid,6,'The good shepherd',array['John 10:1-18'],'Listen for the Shepherd''s voice and care.'),
     (pid,7,'Resurrection and life',array['John 20:1-31'],'End the week by reflecting on why John says he wrote his Gospel.')
-  on conflict(plan_id,day_number) do update set title=excluded.title,references=excluded.references,reflection=excluded.reflection;
+  on conflict(plan_id,day_number) do update set title=excluded.title,scripture_references=excluded.scripture_references,reflection=excluded.reflection;
 end $$;
 
 create or replace function public.resolve_daily_scripture(target_organization_id uuid,target_date date default current_date)
