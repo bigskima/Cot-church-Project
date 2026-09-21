@@ -127,6 +127,7 @@ export function BibleExperience() {
   const [noteSheet, setNoteSheet] = useState(false);
   const [noteText, setNoteText] = useState('');
   const [searchInput, setSearchInput] = useState('');
+  const searchInputRef = useRef<TextInput>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [compareVersion, setCompareVersion] = useState<string | null>(null);
@@ -532,20 +533,45 @@ export function BibleExperience() {
 
   const searchView = (
     <View style={styles.section}>
-      <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
-        <Icon name="search-outline" size={18} color={colors.textMuted} />
+      <Pressable
+        onPress={() => searchInputRef.current?.focus()}
+        accessibilityRole="search"
+        accessibilityLabel="Search the Bible"
+        style={({ pressed }) => [
+          styles.searchBar,
+          {
+            backgroundColor: colors.card,
+            borderColor: searchInput ? colors.interactive : colors.borderSubtle,
+          },
+          pressed && { opacity: 0.94 },
+        ]}
+      >
+        <View style={[styles.searchIconWrap, { backgroundColor: colors.bgSecondary }]}>
+          <Icon name="search-outline" size={21} color={colors.interactive} />
+        </View>
         <TextInput
+          ref={searchInputRef}
           value={searchInput}
           onChangeText={setSearchInput}
           onSubmitEditing={() => setSearchQuery(searchInput.trim())}
-          placeholder="Search words, topics, or John 3:16"
+          placeholder="Search love, faith, peace, or John 3:16"
           placeholderTextColor={colors.textMuted}
+          returnKeyType="search"
           style={[styles.searchInput, { color: colors.text }]}
         />
-        <Pressable onPress={() => setSearchQuery(searchInput.trim())}>
-          <Icon name="arrow-forward-circle" size={25} color={colors.interactive} />
+        <Pressable
+          onPress={(event) => {
+            event.stopPropagation?.();
+            setSearchQuery(searchInput.trim());
+          }}
+          hitSlop={8}
+          style={[styles.searchSubmit, { backgroundColor: colors.interactive }]}
+          accessibilityRole="button"
+          accessibilityLabel="Run Bible search"
+        >
+          <Icon name="arrow-forward" size={20} color={colors.bg} />
         </Pressable>
-      </View>
+      </Pressable>
       {searchQuery && search.loading && !search.data ? (
         <Skeleton height={160} />
       ) : search.error ? (
@@ -1146,8 +1172,10 @@ const styles = StyleSheet.create({
   compareTitle: { fontSize: 12, fontWeight: '900' },
   compareText: { fontSize: 14, lineHeight: 22 },
   error: { fontSize: 11, lineHeight: 16 },
-  searchBar: { minHeight: 50, borderWidth: 1, borderRadius: radius.xl, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  searchInput: { flex: 1, fontSize: 13 },
+  searchBar: { minHeight: 64, borderWidth: 1.5, borderRadius: radius.xl, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  searchIconWrap: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  searchInput: { flex: 1, minWidth: 0, minHeight: 60, fontSize: 16, lineHeight: 22, paddingVertical: 12, paddingHorizontal: 2 },
+  searchSubmit: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   resultTitle: { fontSize: 15, fontWeight: '900' },
   topicRow: { minHeight: 38, borderRadius: radius.pill, paddingHorizontal: 12, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6 },
   topicText: { fontSize: 10.5, fontWeight: '800' },
