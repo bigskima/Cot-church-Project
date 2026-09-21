@@ -123,80 +123,159 @@ async function enrichMembershipAuthors<T extends MembershipAuthoredRow>(rows: T[
   });
 }
 
-async function enrichReelReferences<T extends Record<string, any>>(rows: T[]) {
+async function enrichSocialReferences<T extends Record<string, any>>(rows: T[]) {
   const reelIds = [...new Set(rows.flatMap((row) => Array.isArray(row.media)
     ? row.media.filter((item: any) => item?.type === "reel_reference" && typeof item.reelId === "string").map((item: any) => item.reelId)
     : []))] as string[];
-  if (!reelIds.length) return rows;
+  const postIds = [...new Set(rows.flatMap((row) => Array.isArray(row.media)
+    ? row.media.filter((item: any) => item?.type === "post_reference" && typeof item.postId === "string").map((item: any) => item.postId)
+    : []))] as string[];
+  if (!reelIds.length && !postIds.length) return rows;
 
   const admin = adminClient();
-  const { data: reels, error } = await admin
-    .from("reels")
-    .select("id,caption,media_asset_id,content_items!inner(id,visibility,status),media_assets(id,media_type,duration_seconds,source_storage_path,media_renditions(rendition_kind,storage_path),media_thumbnails(storage_path,is_primary))")
-    .in("id", reelIds)
-    .eq("content_items.visibility", "public")
-    .eq("content_items.status", "published");
-  if (error) return rows;
+  const [reelsResult, postsResult] = await Promise.all([
+    reelIds.length
+      ? admin
+          .from("reels")
+          .select("id,organization_id,caption,media_asset_id,content_items!inner(id,visibility,status,author_profile_id,expression_id,published_at),media_assets(id,media_type,duration_seconds,source_storage_path,media_renditions(rendition_kind,storage_path),media_thumbnails(storage_path,is_primary))")
+          .in("id", reelIds)
+          .eq("content_items.status", "published")
+      : Promise.resolve({ data: [] as any[], error: null }),
+    postIds.length
+      ? admin
+          .from("social_posts")
+          .select("id,organization_id,author_membership_id,branch_id,group_id,visibility,status,body,media,published_at,created_at")
+          .in("id", postIds)
+          .eq("status", "published")
+      : Promise.resolve({ data: [] as any[], error: null }),
+  ]);
 
-  const previewByReel = new Map<string, any>();
-  await Promise.all((reels ?? []).map(async (reel: any) => {
+  const quotedPosts = postsResult.error
+    ? []
+    : await enrichMembershipAuthors(postsResult.data ?? []);
+  const quotedPostMap = new Map((quotedPosts ?? []).map((post: any) => [post.id, post]));
+
+  const reelRows = reelsResult.error ? [] : (reelsResult.data ?? []);
+  const reelProfileIds = [...new Set(reelRows.map((reel: any) => nestedItem(reel.content_items)?.author_profile_id).filter(Boolean))] as string[];
+  const reelExpressionIds = [...new Set(reelRows.map((reel: any) => nestedItem(reel.content_items)?.expression_id).filter(Boolean))] as string[];
+  const [profilesResult, expressionsResult] = await Promise.all([
+    reelProfileIds.length
+      ? admin.from("profiles").select("id,display_name,username,avatar_url").in("id", reelProfileIds)
+      : Promise.resolve({ data: [] as any[], error: null }),
+    reelExpressionIds.length
+      ? admin.from("branches").select("id,name,code").in("id", reelExpressionIds)
+      : Promise.resolve({ data: [] as any[], error: null }),
+  ]);
+  const profileMap = new Map((profilesResult.data ?? []).map((profile: any) => [profile.id, profile]));
+  const expressionMap = new Map((expressionsResult.data ?? []).map((expression: any) => [expression.id, expression]));
+
+  const quotedReelMap = new Map<string, any>();
+  await Promise.all(reelRows.map(async (reel: any) => {
+    const content = nestedItem(reel.content_items);
+    if (!content) return;
     const asset = nestedItem(reel.media_assets);
-    if (!asset) return;
-    const renditions = Array.isArray(asset.media_renditions) ? asset.media_renditions : [];
-    const thumbnails = Array.isArray(asset.media_thumbnails) ? asset.media_thumbnails : [];
-    const stream = renditions.find((item: any) => item.rendition_kind === "video_stream") ?? renditions[0];
-    const thumbnail = thumbnails.find((item: any) => item.is_primary) ?? thumbnails[0];
-    const videoPath = stream?.storage_path ?? asset.source_storage_path ?? null;
-    const thumbnailPath = thumbnail?.storage_path ?? null;
+    const author = content.author_profile_id ? profileMap.get(content.author_profile_id) : null;
+    const expression = content.expression_id ? expressionMap.get(content.expression_id) ?? null : null;
+    let preview: any = null;
 
-    const [videoSigned, thumbnailSigned] = await Promise.all([
-      typeof videoPath === "string" && videoPath
-        ? admin.storage.from("content-media").createSignedUrl(videoPath, 3600)
-        : Promise.resolve({ data: null, error: null }),
-      typeof thumbnailPath === "string" && thumbnailPath
-        ? admin.storage.from("content-media").createSignedUrl(thumbnailPath, 3600)
-        : Promise.resolve({ data: null, error: null }),
-    ]);
+    if (asset) {
+      const renditions = Array.isArray(asset.media_renditions) ? asset.media_renditions : [];
+      const thumbnails = Array.isArray(asset.media_thumbnails) ? asset.media_thumbnails : [];
+      const stream = renditions.find((item: any) => item.rendition_kind === "video_stream") ?? renditions[0];
+      const thumbnail = thumbnails.find((item: any) => item.is_primary) ?? thumbnails[0];
+      const videoPath = stream?.storage_path ?? asset.source_storage_path ?? null;
+      const thumbnailPath = thumbnail?.storage_path ?? null;
+      const [videoSigned, thumbnailSigned] = await Promise.all([
+        typeof videoPath === "string" && videoPath
+          ? admin.storage.from("content-media").createSignedUrl(videoPath, 3600)
+          : Promise.resolve({ data: null, error: null }),
+        typeof thumbnailPath === "string" && thumbnailPath
+          ? admin.storage.from("content-media").createSignedUrl(thumbnailPath, 3600)
+          : Promise.resolve({ data: null, error: null }),
+      ]);
+      const videoUrl = videoSigned.error ? null : videoSigned.data?.signedUrl ?? null;
+      const thumbnailUrl = thumbnailSigned.error ? null : thumbnailSigned.data?.signedUrl ?? null;
+      if (videoUrl || thumbnailUrl) {
+        preview = {
+          type: videoUrl ? "video" : "image",
+          media_type: videoUrl ? "video" : "image",
+          url: videoUrl ?? thumbnailUrl,
+          thumbnailUrl,
+          duration_seconds: asset.duration_seconds ?? null,
+          alt: reel.caption?.trim() || "Original COT Reel",
+        };
+      }
+    }
 
-    const videoUrl = videoSigned.error ? null : videoSigned.data?.signedUrl ?? null;
-    const thumbnailUrl = thumbnailSigned.error ? null : thumbnailSigned.data?.signedUrl ?? null;
-    if (!videoUrl && !thumbnailUrl) return;
-
-    previewByReel.set(reel.id, videoUrl ? {
-      id: `reel-preview-${reel.id}`,
-      type: "video",
-      media_type: "video",
-      url: videoUrl,
-      thumbnailUrl,
-      duration_seconds: asset.duration_seconds ?? null,
-      alt: reel.caption?.trim() || "Original COT Reel",
-      quotedReelId: reel.id,
-    } : {
-      id: `reel-preview-${reel.id}`,
-      type: "image",
-      media_type: "image",
-      url: thumbnailUrl,
-      alt: reel.caption?.trim() || "Original COT Reel preview",
-      quotedReelId: reel.id,
+    quotedReelMap.set(reel.id, {
+      id: reel.id,
+      organization_id: reel.organization_id,
+      caption: reel.caption ?? "",
+      visibility: content.visibility,
+      publishedAt: content.published_at,
+      author: author ? {
+        id: author.id,
+        displayName: author.display_name,
+        username: author.username,
+        avatarUrl: author.avatar_url,
+      } : null,
+      expression,
+      preview,
     });
   }));
 
   return rows.map((row) => {
     if (!Array.isArray(row.media)) return row;
-    const media: any[] = [];
-    for (const item of row.media) {
-      media.push(item);
-      if (item?.type !== "reel_reference" || typeof item.reelId !== "string") continue;
-      const preview = previewByReel.get(item.reelId);
-      if (preview) media.push(preview);
-    }
+    const media = row.media.map((item: any) => {
+      if (item?.type === "reel_reference" && typeof item.reelId === "string") {
+        const quotedReel = quotedReelMap.get(item.reelId) ?? null;
+        return { ...item, quotedReel };
+      }
+      if (item?.type === "post_reference" && typeof item.postId === "string") {
+        const quotedPost: any = quotedPostMap.get(item.postId) ?? null;
+        const canReveal = Boolean(
+          quotedPost
+          && quotedPost.group_id === null
+          && (
+            quotedPost.visibility === "public"
+            || (quotedPost.visibility === "branch" && quotedPost.branch_id && quotedPost.branch_id === row.branch_id)
+          )
+        );
+        if (!canReveal) return { ...item, quotedPost: null };
+
+        const previewMedia = Array.isArray(quotedPost.media)
+          ? quotedPost.media.find((mediaItem: any) => (
+              mediaItem?.type !== "reel_reference"
+              && mediaItem?.type !== "post_reference"
+              && !mediaItem?.quotedReelId
+              && !mediaItem?.quotedPostId
+            )) ?? null
+          : null;
+
+        return {
+          ...item,
+          quotedPost: {
+            id: quotedPost.id,
+            organization_id: quotedPost.organization_id,
+            branch_id: quotedPost.branch_id,
+            visibility: quotedPost.visibility,
+            body: quotedPost.body ?? "",
+            published_at: quotedPost.published_at ?? quotedPost.created_at ?? null,
+            author: quotedPost.author ?? null,
+            expression: quotedPost.expression ?? null,
+            previewMedia,
+          },
+        };
+      }
+      return item;
+    });
     return { ...row, media };
   });
 }
 
 export async function enrichSocialPosts<T extends MembershipAuthoredRow>(rows: T[]) {
   const authored = await enrichMembershipAuthors(rows);
-  return enrichReelReferences(authored);
+  return enrichSocialReferences(authored);
 }
 export const enrichSocialComments = enrichMembershipAuthors;
 
