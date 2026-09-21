@@ -10,6 +10,7 @@ import { invalidate } from '@/services/query-cache';
 import { putSignedUpload, type UploadFile } from '@/services/uploads';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
+import { MinistryImageGenerator } from '@/features/ministry/MinistryImageGenerator';
 
 type FieldType = 'text' | 'textarea' | 'email' | 'phone' | 'number' | 'select' | 'checkbox' | 'date';
 type FormField = { id: string; label: string; type: FieldType; required: boolean; placeholder?: string; help?: string; options?: string[] };
@@ -57,6 +58,7 @@ export default function GeneralFormsManageExperience() {
   const [successMessage, setSuccessMessage] = useState('Thank you. Your response has been received.');
   const [requiresAuth, setRequiresAuth] = useState(true);
   const [bannerFile, setBannerFile] = useState<UploadFile | null>(null);
+  const [generatedBannerUrl, setGeneratedBannerUrl] = useState('');
   const [fields, setFields] = useState<FormField[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -75,12 +77,12 @@ export default function GeneralFormsManageExperience() {
 
   const reset = () => {
     setEditing(null); setTitle(''); setSlug(''); setDescription(''); setStatus('draft');
-    setSubmitLabel('Submit'); setSuccessMessage('Thank you. Your response has been received.'); setRequiresAuth(true); setBannerFile(null); setFields([]); setError('');
+    setSubmitLabel('Submit'); setSuccessMessage('Thank you. Your response has been received.'); setRequiresAuth(true); setBannerFile(null); setGeneratedBannerUrl(''); setFields([]); setError('');
   };
   const openCreate = () => { reset(); setFields([{ id: 'name', label: 'Name', type: 'text', required: true }]); setEditorOpen(true); };
   const openEdit = (item: CotForm) => {
     setEditing(item); setTitle(item.title); setSlug(item.slug); setDescription(item.description); setStatus(item.status);
-    setSubmitLabel(item.submit_label); setSuccessMessage(item.success_message); setRequiresAuth(item.requires_auth); setBannerFile(null);
+    setSubmitLabel(item.submit_label); setSuccessMessage(item.success_message); setRequiresAuth(item.requires_auth); setBannerFile(null); setGeneratedBannerUrl('');
     setFields((item.fields ?? []).map((field) => ({ ...field, options: field.options ?? [] }))); setError(''); setEditorOpen(true);
   };
 
@@ -98,6 +100,7 @@ export default function GeneralFormsManageExperience() {
     if (!asset) return;
     const mimeType = asset.mimeType?.toLowerCase() || 'image/jpeg';
     if (!['image/jpeg','image/png','image/webp'].includes(mimeType)) { setError('Choose a JPG, PNG or WebP image.'); return; }
+    setGeneratedBannerUrl('');
     setBannerFile({ uri: asset.uri, name: asset.fileName || 'cot-form-banner.jpg', mimeType, size: asset.fileSize, file: (asset as any).file });
   };
 
@@ -110,7 +113,7 @@ export default function GeneralFormsManageExperience() {
         id: fieldKey(field.label, 'field_' + (index + 1)),
         options: field.type === 'select' ? (field.options ?? []).filter(Boolean) : [],
       }));
-      let bannerImageUrl = editing?.banner_image_url ?? null;
+      let bannerImageUrl = generatedBannerUrl || editing?.banner_image_url || null;
       if (bannerFile) {
         const intent = await api.request<UploadIntent>('noop?service=engagement-hub', {
           method: 'POST',
@@ -215,15 +218,23 @@ export default function GeneralFormsManageExperience() {
           <InputField label="Description" value={description} onChangeText={setDescription} multiline numberOfLines={4} placeholder="Explain what this form is for."/>
           <Text style={[styles.label,{color:colors.textSecondary}]}>HOME BANNER IMAGE</Text>
           <Pressable onPress={()=>void chooseBannerImage()} style={[styles.upload,{backgroundColor:colors.bgSecondary,borderColor:colors.borderSubtle}]}>
-            {bannerFile?.uri || editing?.banner_image_url
-              ? <Image source={{ uri: bannerFile?.uri || editing?.banner_image_url! }} style={styles.uploadPreview} resizeMode="cover" />
+            {bannerFile?.uri || generatedBannerUrl || editing?.banner_image_url
+              ? <Image source={{ uri: bannerFile?.uri || generatedBannerUrl || editing?.banner_image_url! }} style={styles.uploadPreview} resizeMode="cover" />
               : <View style={[styles.uploadIcon,{backgroundColor:colors.primarySoft}]}><Icon name="image-outline" size={23} color={colors.interactive}/></View>}
             <View style={styles.flex}>
-              <Text style={[styles.uploadTitle,{color:colors.text}]}>{bannerFile || editing?.banner_image_url ? 'Change banner image' : 'Choose banner image'}</Text>
+              <Text style={[styles.uploadTitle,{color:colors.text}]}>{bannerFile || generatedBannerUrl || editing?.banner_image_url ? 'Change banner image' : 'Choose banner image'}</Text>
               <Text style={[styles.uploadHelp,{color:colors.textMuted}]}>Published forms automatically appear in the Home spotlight. Wide 16:7 artwork is used there.</Text>
             </View>
             <Icon name="chevron-forward" size={17} color={colors.textMuted}/>
           </Pressable>
+          <MinistryImageGenerator
+            organizationId={organizationId}
+            useCase="form_banner"
+            title={title}
+            description={description}
+            currentImageUrl={bannerFile?.uri || generatedBannerUrl || editing?.banner_image_url}
+            onGenerated={(url)=>{setBannerFile(null);setGeneratedBannerUrl(url);}}
+          />
           <Text style={[styles.label,{color:colors.textSecondary}]}>STATUS</Text>
           <View style={styles.chips}>{(['draft','published','closed','hidden'] as const).map((item)=><Chip key={item} label={item} selected={status===item} onPress={()=>setStatus(item)}/>)}</View>
           <View style={styles.toggleRow}><Text style={[styles.toggleText,{color:colors.text}]}>Require signed-in member</Text><Chip label={requiresAuth?'Yes':'No'} selected={requiresAuth} onPress={()=>setRequiresAuth(v=>!v)}/></View>
