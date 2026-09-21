@@ -164,6 +164,8 @@ export default function GeneralHomeExperience() {
     invalidate('general-home-context-drawer:');
     invalidate('general-home-notice');
     invalidate('participation:home:general');
+    invalidate('home:spotlight:banners:');
+    invalidate('home:spotlight:bible:');
     resource.refresh();
   }, [resource.refresh]);
 
