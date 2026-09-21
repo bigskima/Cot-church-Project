@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { useResource } from '@/hooks/use-resource';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
-import { radius, shadows, spacing } from '@/design-system/tokens';
+import { radius, spacing } from '@/design-system/tokens';
 import { Icon } from '@/components/primitives/Icon';
 import { Skeleton } from '@/components/states';
 
@@ -45,7 +45,6 @@ export function DailyScriptureHomeCard() {
       style={({ pressed }) => [
         styles.card,
         { backgroundColor: colors.card, borderColor: colors.borderSubtle },
-        shadows.sm,
         pressed && { opacity: 0.9 },
       ]}
       accessibilityRole="button"
@@ -86,7 +85,7 @@ const styles = StyleSheet.create({
   kicker: { fontSize: 8.5, lineHeight: 11, fontWeight: '900', letterSpacing: 0.75 },
   themeChip: { maxWidth: 92, minHeight: 21, borderRadius: radius.pill, paddingHorizontal: 7, justifyContent: 'center' },
   theme: { fontSize: 8.5, lineHeight: 11, fontWeight: '800', textTransform: 'capitalize' },
-  verse: { fontSize: 13.5, lineHeight: 19, fontWeight: '650' },
+  verse: { fontSize: 13.5, lineHeight: 19, fontWeight: '600' },
   end: { width: 32, alignItems: 'center', gap: 2 },
   readLabel: { fontSize: 8, fontWeight: '900' },
   bottom: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 43 },
