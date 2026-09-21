@@ -505,7 +505,7 @@ export const engagementHubHandler=createHandler(
       if(action==="home"){
         const now=new Date().toISOString();
         const today=now.slice(0,10);
-        const [bannerResult,formResult,eventResult,announcementResult,scripture,storedQuote,visualRows]=await Promise.all([
+        const [bannerResult,formResult,eventResult,announcementResult,scripture,storedQuote,visualRows,dailyDevotional]=await Promise.all([
           admin.from("cot_home_banners")
             .select("id,title,subtitle,image_url,destination_type,destination_value,priority,starts_at,ends_at")
             .eq("organization_id",organizationId)
@@ -542,6 +542,7 @@ export const engagementHubHandler=createHandler(
           resolvedScripture(admin,organizationId,today).catch(()=>null),
           admin.from("cot_daily_quotes").select("id,quote_date,body,source_reference,theme,source,status").eq("organization_id",organizationId).eq("quote_date",today).maybeSingle(),
           admin.from("cot_daily_visuals").select("id,visual_date,content_kind,image_url,image_source,provider_code,prompt,status,generated_at,updated_at").eq("organization_id",organizationId).eq("visual_date",today).eq("status","ready"),
+          devotionalVisualContent(admin,organizationId,today).catch(()=>null),
         ]);
         if(bannerResult.error||formResult.error||eventResult.error||announcementResult.error||(visualRows as any)?.error) throw new ApiError("HOME_BANNERS_FAILED","Unable to load COT highlights.",500,undefined,false);
         const explicitBanners=bannerResult.data??[];
@@ -604,7 +605,7 @@ export const engagementHubHandler=createHandler(
             }
           : scripture ? automaticQuote(scripture,today) : null;
         runInBackground(ensureAutomaticTodayVisuals(admin,organizationId,today));
-        return {data:{banners:[...explicitBanners,...automaticAnnouncementBanners,...automaticEventBanners,...automaticFormBanners],dailyQuote,dailyVisuals}};
+        return {data:{banners:[...explicitBanners,...automaticAnnouncementBanners,...automaticEventBanners,...automaticFormBanners],dailyQuote,dailyVisuals,dailyDevotional}};
       }
 
       if(action==="form"){
