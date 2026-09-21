@@ -25,6 +25,13 @@ type DailyVisual = {
   status?: string;
 };
 
+type DailyDevotionalSummary = {
+  title?: string | null;
+  scripture?: string | null;
+  body?: string | null;
+  seriesTitle?: string | null;
+};
+
 type DailyQuote = {
   id?: string;
   body: string;
@@ -72,11 +79,11 @@ export function GeneralHomeSpotlightCarousel() {
       ? api.request<BibleToday>('noop?service=bible&action=today&organizationId=' + encodeURIComponent(organizationId), { signal, context: 'public' }).catch(() => null)
       : Promise.resolve(null),
   );
-  const banners = useResource<{ banners: HomeBanner[]; dailyQuote?: DailyQuote | null; dailyVisuals?: Partial<Record<'bible' | 'quote' | 'devotional', DailyVisual>> }>(
+  const banners = useResource<{ banners: HomeBanner[]; dailyQuote?: DailyQuote | null; dailyVisuals?: Partial<Record<'bible' | 'quote' | 'devotional', DailyVisual>>; dailyDevotional?: DailyDevotionalSummary | null }>(
     'home:spotlight:banners:' + organizationId,
     (signal) => organizationId
-      ? api.request<{ banners: HomeBanner[]; dailyQuote?: DailyQuote | null; dailyVisuals?: Partial<Record<'bible' | 'quote' | 'devotional', DailyVisual>> }>('noop?service=engagement-hub&action=home&organizationId=' + encodeURIComponent(organizationId), { signal, context: 'public' })
-      : Promise.resolve({ banners: [], dailyQuote: null, dailyVisuals: {} }),
+      ? api.request<{ banners: HomeBanner[]; dailyQuote?: DailyQuote | null; dailyVisuals?: Partial<Record<'bible' | 'quote' | 'devotional', DailyVisual>>; dailyDevotional?: DailyDevotionalSummary | null }>('noop?service=engagement-hub&action=home&organizationId=' + encodeURIComponent(organizationId), { signal, context: 'public' })
+      : Promise.resolve({ banners: [], dailyQuote: null, dailyVisuals: {}, dailyDevotional: null }),
   );
 
   const openBanner = (banner: HomeBanner) => {
@@ -125,16 +132,19 @@ export function GeneralHomeSpotlightCarousel() {
       });
     }
 
-    result.push({
-      key: 'devotional',
-      kind: 'devotional',
-      eyebrow: 'DAILY DEVOTIONAL',
-      title: 'Read · reflect · pray',
-      body: 'Open today’s devotional and continue your daily rhythm with COT.',
-      meta: 'TODAY',
-      imageUrl: devotionalImage,
-      onPress: () => router.push({ pathname: '/general/devotional', params: { date: dailyDate } } as any),
-    });
+    const dailyDevotional = banners.data?.dailyDevotional ?? null;
+    if (dailyDevotional) {
+      result.push({
+        key: 'devotional:' + dailyDate,
+        kind: 'devotional',
+        eyebrow: 'DAILY DEVOTIONAL',
+        title: dailyDevotional.title || 'Read · reflect · pray',
+        body: dailyDevotional.body || 'Open today’s devotional and continue your daily rhythm with COT.',
+        meta: dailyDevotional.scripture || 'TODAY',
+        imageUrl: devotionalImage,
+        onPress: () => router.push({ pathname: '/general/devotional', params: { date: dailyDate } } as any),
+      });
+    }
 
     for (const banner of banners.data?.banners ?? []) {
       result.push({
@@ -155,7 +165,7 @@ export function GeneralHomeSpotlightCarousel() {
       });
     }
     return result;
-  }, [banners.data?.banners, banners.data?.dailyQuote, banners.data?.dailyVisuals, bible.data]);
+  }, [banners.data?.banners, banners.data?.dailyDevotional, banners.data?.dailyQuote, banners.data?.dailyVisuals, bible.data]);
 
   useEffect(() => {
     if (items.length < 2) return;
