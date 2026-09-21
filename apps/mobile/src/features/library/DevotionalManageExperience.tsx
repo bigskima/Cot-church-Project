@@ -10,6 +10,7 @@ import { putSignedUpload, readUploadFile, type UploadFile } from '@/services/upl
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import type { DevotionalSeries, LibraryBook } from './library-types';
+import { DailyVisualManagerCard, type DailyVisual, type ImageProviderReadiness } from '@/features/daily-visuals/DailyVisualManagerCard';
 
 type ManagePayload={series:DevotionalSeries[];books:Array<Pick<LibraryBook,'id'|'title'|'author_name'|'source_format'|'status'>>};
 type UploadIntent={signedUploadUrl:string;storagePath:string;sourceFormat:'epub'|'pdf'};
@@ -41,6 +42,15 @@ export function DevotionalManageExperience(){
  const [prayer,setPrayer]=useState('');
  const [epubFile,setEpubFile]=useState<UploadFile|null>(null);
  const [rightsConfirmed,setRightsConfirmed]=useState(false);
+ const visualManager=useResource<{visual:DailyVisual|null;provider:ImageProviderReadiness|null}>(
+  `devotional:visual-manage:${organizationId||'none'}:${editingSeries?.id||'none'}:${entryDate}`,
+  (signal)=>editingSeries&&organizationId
+   ? api.request<{visual:DailyVisual|null;provider:ImageProviderReadiness|null}>(
+      `noop?service=engagement-hub&action=daily_visual_manage&organizationId=${encodeURIComponent(organizationId)}&date=${encodeURIComponent(entryDate)}&kind=devotional`,
+      {signal,context:'public'},
+     )
+   : Promise.resolve({visual:null,provider:null}),
+ );
  const availableEpubBooks=useMemo(()=> (resource.data?.books??[]).filter((book)=>book.source_format==='epub'&&!['archived','failed','processing'].includes(book.status)),[resource.data?.books]);
 
  const chooseEpub=async()=>{
@@ -147,7 +157,7 @@ export function DevotionalManageExperience(){
   setBusy(true);setError('');setSuccess('');
   try{
    await api.request(endpoint,{method:'POST',context:'public',body:JSON.stringify({action:'upsert_devotional_entry',seriesId:editingSeries.id,date:entryDate,title:entryTitle.trim(),scripture:scripture.trim(),memoryVerse:memoryVerse.trim(),body:body.trim(),prayer:prayer.trim()})});
-   setSuccess(`Saved the reading for ${entryDate}.`);setEntryTitle('');setScripture('');setMemoryVerse('');setBody('');setPrayer('');
+   setSuccess(`Saved the reading for ${entryDate}. You can now generate or upload its visual below.`);setEntryTitle('');setScripture('');setMemoryVerse('');setBody('');setPrayer('');visualManager.refresh();
   }catch(value){setError(value instanceof Error?value.message:'Unable to save this daily reading.');}
   finally{setBusy(false);}
  };
@@ -193,6 +203,21 @@ export function DevotionalManageExperience(){
     <Text style={[styles.label,{color:colors.text}]}>Devotional message</Text><TextInput value={body} onChangeText={setBody} multiline placeholder='Write the daily devotional…' placeholderTextColor={colors.textMuted} style={[styles.longInput,{color:colors.text,borderColor:colors.borderSubtle}]}/>
     <Text style={[styles.label,{color:colors.text}]}>Prayer / reflection</Text><TextInput value={prayer} onChangeText={setPrayer} multiline placeholder='Prayer or reflection prompt…' placeholderTextColor={colors.textMuted} style={[styles.longInput,styles.prayerInput,{color:colors.text,borderColor:colors.borderSubtle}]}/>
     <Button label={busy?'Saving…':'Save daily entry'} disabled={busy} onPress={()=>void saveEntry()}/>
+    <View style={styles.visualSection}>
+      <View>
+        <Text style={[styles.label,{color:colors.text}]}>Daily artwork</Text>
+        <Text style={[styles.copy,{color:colors.textSecondary}]}>Save the daily entry first, then generate with the configured AI provider or upload your own 16:7 image. The same stored image is reused on Home and this devotional screen.</Text>
+      </View>
+      <DailyVisualManagerCard
+        date={entryDate}
+        kind='devotional'
+        organizationId={organizationId}
+        seriesId={editingSeries.id}
+        visual={visualManager.data?.visual??null}
+        provider={visualManager.data?.provider??null}
+        onChanged={visualManager.refresh}
+      />
+    </View>
    </View>:null}
   </ScrollView>
  </View>;
@@ -202,5 +227,5 @@ const styles=StyleSheet.create({
  epubBlock:{gap:8},epubButton:{minHeight:64,borderWidth:1,borderRadius:radius.lg,padding:spacing.sm,flexDirection:'row',alignItems:'center',gap:9},epubTitle:{fontSize:11,fontWeight:'900'},epubMeta:{fontSize:9.5,lineHeight:14,marginTop:2},confirmRow:{flexDirection:'row',alignItems:'flex-start',gap:9},checkbox:{width:22,height:22,borderRadius:7,borderWidth:1,alignItems:'center',justifyContent:'center'},confirmText:{flex:1,fontSize:10.5,lineHeight:15},bookPicker:{gap:8},label:{fontSize:11,fontWeight:'900'},chips:{flexDirection:'row',flexWrap:'wrap',gap:6},feedback:{fontSize:11,fontWeight:'800'},section:{gap:spacing.sm},sectionTitle:{fontSize:17,fontWeight:'900'},
  seriesCard:{borderWidth:1,borderRadius:radius.xl,padding:spacing.md,gap:spacing.md},seriesHead:{flexDirection:'row',alignItems:'flex-start',gap:spacing.sm},flex:{flex:1,minWidth:0},seriesTitle:{fontSize:13,fontWeight:'900'},seriesMeta:{fontSize:10.5,marginTop:3},attached:{fontSize:9.5,marginTop:3},yearBadge:{borderRadius:12,paddingHorizontal:9,paddingVertical:6},yearText:{fontSize:10,fontWeight:'900'},
  actions:{flexDirection:'row',flexWrap:'wrap',gap:6},action:{minHeight:34,borderWidth:1,borderRadius:17,paddingHorizontal:10,flexDirection:'row',alignItems:'center',gap:5},actionText:{fontSize:9.5,fontWeight:'800'},
- entryForm:{borderWidth:1,borderRadius:radius.xl,padding:spacing.md,gap:spacing.md},entryHead:{flexDirection:'row',alignItems:'flex-start'},close:{width:36,height:36,alignItems:'center',justifyContent:'center'},longInput:{minHeight:160,borderWidth:1,borderRadius:radius.lg,padding:12,textAlignVertical:'top',fontSize:14,lineHeight:21},prayerInput:{minHeight:100},
+ entryForm:{borderWidth:1,borderRadius:radius.xl,padding:spacing.md,gap:spacing.md},entryHead:{flexDirection:'row',alignItems:'flex-start'},close:{width:36,height:36,alignItems:'center',justifyContent:'center'},longInput:{minHeight:160,borderWidth:1,borderRadius:radius.lg,padding:12,textAlignVertical:'top',fontSize:14,lineHeight:21},prayerInput:{minHeight:100},visualSection:{gap:spacing.sm,paddingTop:spacing.sm},
 });
