@@ -141,7 +141,7 @@ export function DevotionalExperience() {
           <View style={[styles.jumpPanel, { borderTopColor: colors.borderSubtle }]}>
             <View style={styles.jumpCopy}>
               <Text style={[styles.jumpKicker, { color: colors.textMuted }]}>JUMP TO A DAY</Text>
-              <Text style={[styles.jumpHint, { color: colors.textSecondary }]}>Enter any devotional date</Text>
+              <Text style={[styles.jumpHint, { color: colors.textSecondary }]}>Choose any devotional date</Text>
             </View>
             <View style={styles.jumpControls}>
               <View style={styles.datePickerWrap}>
