@@ -1,6 +1,6 @@
 import React from 'react';
 import { Image, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, EmptyState, Icon, ResourceError, ScreenHeader, Skeleton } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
@@ -33,6 +33,8 @@ function dateLabel(value?: string | null) {
 
 export default function GeneralAnnouncementsScreen() {
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ announcementId?: string }>();
+  const selectedAnnouncementId = typeof params.announcementId === 'string' ? params.announcementId : '';
   const { auth, context, mode, hasOrganizationCapability } = useSession();
   const { colors } = useTheme();
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
@@ -58,8 +60,9 @@ export default function GeneralAnnouncementsScreen() {
   );
 
   const announcements = resource.data ?? [];
-  const latest = announcements[0];
-  const remaining = announcements.slice(1);
+  const selected = selectedAnnouncementId ? announcements.find((item) => item.id === selectedAnnouncementId) : undefined;
+  const latest = selected ?? announcements[0];
+  const remaining = latest ? announcements.filter((item) => item.id !== latest.id) : [];
 
   return (
     <ScrollView
@@ -98,7 +101,7 @@ export default function GeneralAnnouncementsScreen() {
             </View>
           </View>
 
-          <Text style={[styles.eyebrow, { color: colors.interactive }]}>LATEST</Text>
+          <Text style={[styles.eyebrow, { color: colors.interactive }]}>{selected ? 'SELECTED ANNOUNCEMENT' : 'LATEST'}</Text>
           <View style={[styles.featured, { backgroundColor: colors.card, borderColor: colors.interactive }, shadows.sm]}>
             {latest.banner_url ? <Image source={{ uri: latest.banner_url }} style={styles.banner} resizeMode="cover" /> : null}
             <Text style={[styles.title, { color: colors.text }]}>{latest.title}</Text>
