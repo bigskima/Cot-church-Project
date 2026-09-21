@@ -9,7 +9,9 @@ import { assertObject, requiredString, uuid } from "../_shared/validation.ts";
 
 const BANNER_BUCKET="home-banners";
 const DAILY_VISUAL_BUCKET="daily-visuals";
+const MINISTRY_GENERATED_BUCKET="ministry-generated-media";
 const DAILY_VISUAL_KINDS=new Set(["bible","quote","devotional"]);
+const MINISTRY_IMAGE_USE_CASES=new Set(["event_banner","announcement_banner","home_banner","form_banner","sermon_artwork","library_cover"]);
 const FIELD_TYPES=new Set(["text","textarea","email","phone","number","select","checkbox","date"]);
 const BANNER_DESTINATIONS=new Set(["none","route","external","event","announcement","form"]);
 const BANNER_STATUSES=new Set(["draft","published","hidden","archived"]);
@@ -371,6 +373,57 @@ async function canManage(auth:any,organizationId:string){
 }
 async function requireManager(auth:any,organizationId:string){
   if(!(await canManage(auth,organizationId))) throw new ApiError("PERMISSION_DENIED","Your ministry role cannot manage banners or forms.",403);
+}
+async function hasOrgPermission(auth:any,organizationId:string,permission:string){
+  if(!auth?.user) return false;
+  const {data}=await auth.client.rpc("has_permission",{target_organization_id:organizationId,requested_permission:permission,target_branch_id:null});
+  return data===true;
+}
+function ministryImageUseCase(value:unknown){
+  const useCase=String(value??"").trim().toLowerCase();
+  if(!MINISTRY_IMAGE_USE_CASES.has(useCase)) throw new ApiError("VALIDATION_FAILED","Choose a supported ministry image type.",422);
+  return useCase;
+}
+async function requireMinistryImagePermission(auth:any,organizationId:string,useCase:string){
+  if(!auth?.user) throw new ApiError("AUTHENTICATION_REQUIRED","Sign in to generate ministry artwork.",401);
+  if(useCase==="event_banner"){
+    if(await hasOrgPermission(auth,organizationId,"events.create")||await hasOrgPermission(auth,organizationId,"events.update")) return;
+  }else if(useCase==="announcement_banner"){
+    if(await hasOrgPermission(auth,organizationId,"announcements.manage")) return;
+  }else if(useCase==="sermon_artwork"||useCase==="library_cover"){
+    for(const permission of ["sermons.manage","sermons.create","sermons.publish"]){
+      if(await hasOrgPermission(auth,organizationId,permission)) return;
+    }
+  }else if(useCase==="home_banner"||useCase==="form_banner"){
+    if(await canManage(auth,organizationId)) return;
+  }
+  throw new ApiError("PERMISSION_DENIED","Your ministry role cannot generate artwork for this content.",403);
+}
+function ministryImagePrompt(useCase:string,title:string,description:string,direction:string){
+  const purpose:Record<string,string>={
+    event_banner:"a church event or gathering",
+    announcement_banner:"an official church announcement",
+    home_banner:"a church Home spotlight campaign",
+    form_banner:"a church registration, application or response form",
+    sermon_artwork:"a sermon or teaching message",
+    library_cover:"a Christian ministry library book cover",
+  };
+  return [
+    "Create premium original artwork for "+(purpose[useCase]??"church ministry content")+".",
+    title?"Content title/context: "+title+".":"",
+    description?"Meaning and supporting context: "+description+".":"",
+    direction?"Additional visual direction from ministry: "+direction+".":"",
+    useCase==="library_cover"
+      ?"Use a strong portrait editorial composition suitable for a 2:3 book cover. Leave clean visual space where the app can render the real title separately."
+      :"Use a cinematic editorial composition suitable for a responsive ministry banner. Keep important subjects away from the extreme edges and leave safe negative space for COT interface text.",
+    "Use a polished, reverent, contemporary Christian visual language. Avoid kitsch, sensationalism, horror, gore or misleading depictions of real identifiable people.",
+    "Do not render text, letters, Bible verses, captions, logos, watermarks, UI, frames or readable signage inside the image.",
+  ].filter(Boolean).join(" ");
+}
+function ministryImageDimensions(useCase:string){
+  if(useCase==="library_cover") return {width:800,height:1200};
+  if(useCase==="home_banner"||useCase==="form_banner") return {width:1280,height:560};
+  return {width:1280,height:720};
 }
 async function resolveOrganization(auth:any,url:URL,body?:Record<string,unknown>){
   const requested=body?.organizationId?String(body.organizationId):url.searchParams.get("organizationId")??auth?.organizationId??null;
@@ -777,6 +830,34 @@ export const engagementHubHandler=createHandler(
     }
 
     const organizationId=await resolveOrganization(auth,url,body);
+
+    if(actionName==="ministry_image_generate"){
+      const useCase=ministryImageUseCase(body.useCase);
+      await requireMinistryImagePermission(auth,organizationId,useCase);
+      const title=text(body.title,220,true);
+      const description=text(body.description??"",1800);
+      const direction=text(body.direction??"",1200);
+      const prompt=ministryImagePrompt(useCase,title,description,direction);
+      const dimensions=ministryImageDimensions(useCase);
+      const generated=await generateImage(admin,prompt,request.signal,dimensions);
+      const ext=visualExtension(generated.contentType);
+      const storagePath="orgs/"+organizationId+"/"+useCase+"/"+new Date().toISOString().slice(0,10)+"/"+crypto.randomUUID()+"."+ext;
+      const {error:uploadError}=await admin.storage.from(MINISTRY_GENERATED_BUCKET).upload(storagePath,generated.bytes,{contentType:generated.contentType,upsert:false});
+      if(uploadError) throw new ApiError("MINISTRY_IMAGE_STORAGE_FAILED","The artwork was generated but could not be stored.",500,undefined,false);
+      const publicUrl=admin.storage.from(MINISTRY_GENERATED_BUCKET).getPublicUrl(storagePath).data.publicUrl;
+      const {error:auditError}=await admin.from("cot_ministry_generated_media").insert({
+        organization_id:organizationId,
+        use_case:useCase,
+        image_url:publicUrl,
+        storage_path:storagePath,
+        provider_code:generated.providerCode,
+        model:generated.model,
+        prompt,
+        created_by:auth.user.id,
+      });
+      if(auditError) console.warn("ministry generated media audit failed",auditError.message);
+      return {data:{publicUrl,storagePath,providerCode:generated.providerCode,model:generated.model}};
+    }
 
     if(["visual_upload_intent","visual_save_upload","visual_generate","visual_inherit","visual_clear"].includes(actionName)){
       if(!auth?.user) throw new ApiError("AUTHENTICATION_REQUIRED","Sign in to manage Daily visuals.",401);
