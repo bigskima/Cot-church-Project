@@ -15,7 +15,7 @@ Deno.serve(createHandler(
 
     let query = client
       .from("events")
-      .select("id,organization_id,branch_id,title,description,status,visibility,location,timezone,starts_at,ends_at,registration_opens_at,registration_closes_at,capacity,banner_url")
+      .select("id,organization_id,branch_id,title,description,status,visibility,location,timezone,starts_at,ends_at,registration_opens_at,registration_closes_at,capacity,banner_url,response_form_id")
       .eq("id", eventId)
       .eq("visibility", "public")
       .eq("status", "published");
