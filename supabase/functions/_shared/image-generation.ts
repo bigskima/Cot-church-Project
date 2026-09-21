@@ -50,7 +50,7 @@ async function configuredCloudflare(admin: any, row: ProviderRow) {
   ]);
   const model = typeof configuration.model === "string" && configuration.model.trim()
     ? configuration.model.trim()
-    : "@cf/black-forest-labs/flux-1-schnell";
+    : "@cf/bytedance/stable-diffusion-xl-lightning";
   return { token, accountId, model, accountIdSecret };
 }
 
@@ -102,7 +102,7 @@ async function generateCloudflare(admin: any, row: ProviderRow, prompt: string, 
   const configuration = row.configuration ?? {};
   const width = Number(configuration.width ?? 1200);
   const height = Number(configuration.height ?? 525);
-  const steps = Math.max(1, Math.min(8, Number(configuration.steps ?? 4) || 4));
+  const steps = Math.max(1, Math.min(20, Number(configuration.steps ?? 4) || 4));
   const endpoint = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(config.accountId)}/ai/run/${config.model}`;
   const response = await fetch(endpoint, {
     method: "POST",
@@ -112,9 +112,10 @@ async function generateCloudflare(admin: any, row: ProviderRow, prompt: string, 
     },
     body: JSON.stringify({
       prompt,
+      negative_prompt: "text, letters, words, captions, watermark, logo, UI, frame, border, distorted hands, extra fingers, grotesque, horror, gore",
       num_steps: steps,
-      width: Number.isFinite(width) ? Math.max(512, Math.min(2048, Math.round(width))) : 1200,
-      height: Number.isFinite(height) ? Math.max(320, Math.min(2048, Math.round(height))) : 525,
+      width: Number.isFinite(width) ? Math.max(512, Math.min(2048, Math.round(width))) : 1280,
+      height: Number.isFinite(height) ? Math.max(320, Math.min(2048, Math.round(height))) : 560,
     }),
     signal,
   });
