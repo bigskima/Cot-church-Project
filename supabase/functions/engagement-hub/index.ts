@@ -355,7 +355,7 @@ export const engagementHubHandler=createHandler(
       if(action==="home"){
         const now=new Date().toISOString();
         const today=now.slice(0,10);
-        const [bannerResult,formResult,eventResult,announcementResult,scripture,storedQuote]=await Promise.all([
+        const [bannerResult,formResult,eventResult,announcementResult,scripture,storedQuote,visualRows]=await Promise.all([
           admin.from("cot_home_banners")
             .select("id,title,subtitle,image_url,destination_type,destination_value,priority,starts_at,ends_at")
             .eq("organization_id",organizationId)
@@ -391,6 +391,7 @@ export const engagementHubHandler=createHandler(
             : Promise.resolve({data:[] as any[],error:null}),
           resolvedScripture(admin,organizationId,today).catch(()=>null),
           admin.from("cot_daily_quotes").select("id,quote_date,body,source_reference,theme,source,status").eq("organization_id",organizationId).eq("quote_date",today).maybeSingle(),
+          admin.from("cot_daily_visuals").select("id,visual_date,content_kind,image_url,image_source,provider_code,prompt,status,generated_at,updated_at").eq("organization_id",organizationId).eq("visual_date",today).eq("status","ready"),
         ]);
         if(bannerResult.error||formResult.error||eventResult.error||announcementResult.error) throw new ApiError("HOME_BANNERS_FAILED","Unable to load COT highlights.",500,undefined,false);
         const explicitBanners=bannerResult.data??[];
@@ -440,6 +441,7 @@ export const engagementHubHandler=createHandler(
             source:"published_announcement",
           }));
         const stored=(storedQuote as any)?.data??null;
+        const dailyVisuals=Object.fromEntries((((visualRows as any)?.data??[]) as any[]).map((row:any)=>[row.content_kind,row]));
         const dailyQuote=stored
           ? stored.status==="hidden" ? null : {
               id:stored.id,
@@ -451,7 +453,7 @@ export const engagementHubHandler=createHandler(
               isOverride:true,
             }
           : scripture ? automaticQuote(scripture,today) : null;
-        return {data:{banners:[...explicitBanners,...automaticAnnouncementBanners,...automaticEventBanners,...automaticFormBanners],dailyQuote}};
+        return {data:{banners:[...explicitBanners,...automaticAnnouncementBanners,...automaticEventBanners,...automaticFormBanners],dailyQuote,dailyVisuals}};
       }
 
       if(action==="form"){
@@ -480,13 +482,23 @@ export const engagementHubHandler=createHandler(
         const fromDate=quoteDate(url.searchParams.get("fromDate")??new Date().toISOString().slice(0,10),"fromDate");
         const dayCount=Math.max(1,Math.min(30,Number(url.searchParams.get("days")??30)||30));
         const dates=Array.from({length:dayCount},(_,index)=>plusDays(fromDate,index));
-        const {data:stored,error:storedError}=await admin.from("cot_daily_quotes")
-          .select("id,quote_date,body,source_reference,theme,source,status,updated_at")
-          .eq("organization_id",organizationId)
-          .gte("quote_date",dates[0])
-          .lte("quote_date",dates[dates.length-1]);
-        if(storedError) throw new ApiError("DAILY_QUOTES_LOAD_FAILED","Unable to load Daily Quote schedule.",500,undefined,false);
+        const [{data:stored,error:storedError},{data:visuals,error:visualError},provider]=await Promise.all([
+          admin.from("cot_daily_quotes")
+            .select("id,quote_date,body,source_reference,theme,source,status,updated_at")
+            .eq("organization_id",organizationId)
+            .gte("quote_date",dates[0])
+            .lte("quote_date",dates[dates.length-1]),
+          admin.from("cot_daily_visuals")
+            .select("id,visual_date,content_kind,image_url,image_source,provider_code,prompt,status,last_error,generated_at,updated_at")
+            .eq("organization_id",organizationId)
+            .gte("visual_date",dates[0])
+            .lte("visual_date",dates[dates.length-1]),
+          imageProviderReadiness(admin),
+        ]);
+        if(storedError||visualError) throw new ApiError("DAILY_QUOTES_LOAD_FAILED","Unable to load Daily Highlights schedule.",500,undefined,false);
         const byDate=new Map((stored??[]).map((row:any)=>[row.quote_date,row]));
+        const visualMap=new Map<string,any>();
+        for(const row of visuals??[]) visualMap.set(row.visual_date+":"+row.content_kind,row);
         const days=await Promise.all(dates.map(async(date)=>{
           const bible=await resolvedScripture(admin,organizationId,date);
           const automatic=automaticQuote(bible,date);
@@ -501,9 +513,22 @@ export const engagementHubHandler=createHandler(
             isOverride:true,
             updatedAt:saved.updated_at,
           }:automatic;
-          return {date,bible,automaticQuote:automatic,quote};
+          return {
+            date,bible,automaticQuote:automatic,quote,
+            visuals:{
+              bible:visualMap.get(date+":bible")??null,
+              quote:visualMap.get(date+":quote")??null,
+              devotional:visualMap.get(date+":devotional")??null,
+            },
+          };
         }));
-        return {data:{fromDate,days}};
+        return {data:{fromDate,days,provider}};
+      }
+
+      if(action==="daily_visual"){
+        const date=quoteDate(url.searchParams.get("date")??new Date().toISOString().slice(0,10));
+        const kind=visualKind(url.searchParams.get("kind"));
+        return {data:await readyVisual(admin,organizationId,date,kind)};
       }
 
       if(action==="manage"){
