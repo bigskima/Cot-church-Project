@@ -78,7 +78,7 @@ export async function imageProviderReadiness(admin: any): Promise<ImageProviderR
         name: row.name,
         configured: false,
         model: config.model,
-        reason: `Add ${config.accountIdSecret} and ${row.secret_reference} to Supabase Edge Function secrets.`,
+        reason: `Add ${config.accountIdSecret} and ${row.secret_reference} in Platform Administration → Secure Credentials (or the hosting environment).`,
       };
     }
     return { code: row.code, name: row.name, configured: true, model: config.model };
