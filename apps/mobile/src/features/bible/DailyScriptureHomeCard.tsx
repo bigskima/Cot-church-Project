@@ -34,7 +34,7 @@ export function DailyScriptureHomeCard() {
   );
 
   if (resource.loading && !resource.data) {
-    return <Skeleton height={154} borderRadius={radius.xl} />;
+    return <Skeleton height={108} borderRadius={radius.xl} />;
   }
   if (!resource.data) return null;
 
@@ -53,15 +53,22 @@ export function DailyScriptureHomeCard() {
     >
       <View style={styles.top}>
         <View style={[styles.icon, { backgroundColor: colors.primarySoft }]}>
-          <Icon name="book-outline" size={18} color={colors.interactive} />
+          <Icon name="book-outline" size={16} color={colors.interactive} />
         </View>
         <View style={styles.heading}>
-          <Text style={[styles.kicker, { color: colors.interactive }]}>TODAY'S SCRIPTURE</Text>
-          <Text style={[styles.theme, { color: colors.textMuted }]}>{item.theme}</Text>
+          <View style={styles.titleRow}>
+            <Text style={[styles.kicker, { color: colors.interactive }]}>TODAY'S SCRIPTURE</Text>
+            <View style={[styles.themeChip, { backgroundColor: colors.primarySoft }]}>
+              <Text style={[styles.theme, { color: colors.interactive }]} numberOfLines={1}>{item.theme}</Text>
+            </View>
+          </View>
+          <Text style={[styles.verse, { color: colors.text }]} numberOfLines={2}>{item.passage.text}</Text>
         </View>
-        <Icon name="chevron-forward" size={18} color={colors.textMuted} />
+        <View style={styles.end}>
+          <Icon name="chevron-forward" size={17} color={colors.textMuted} />
+          <Text style={[styles.readLabel, { color: colors.interactive }]}>Read</Text>
+        </View>
       </View>
-      <Text style={[styles.verse, { color: colors.text }]} numberOfLines={4}>{item.passage.text}</Text>
       <View style={styles.bottom}>
         <Text style={[styles.reference, { color: colors.text }]}>{item.reference}</Text>
         <Text style={[styles.version, { color: colors.textMuted }]}>{item.passage.abbreviation || 'WEB'}</Text>
@@ -71,14 +78,18 @@ export function DailyScriptureHomeCard() {
 }
 
 const styles = StyleSheet.create({
-  card: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: 12 },
+  card: { borderWidth: 1, borderRadius: radius.xl, paddingHorizontal: spacing.md, paddingVertical: 11, gap: 7, overflow: 'hidden' },
   top: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  icon: { width: 38, height: 38, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  heading: { flex: 1, minWidth: 0 },
-  kicker: { fontSize: 9.5, lineHeight: 13, fontWeight: '900', letterSpacing: 0.9 },
-  theme: { fontSize: 10.5, lineHeight: 15, textTransform: 'capitalize', marginTop: 1 },
-  verse: { fontSize: 15.5, lineHeight: 24, fontWeight: '600' },
-  bottom: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  reference: { fontSize: 11.5, fontWeight: '900' },
-  version: { fontSize: 9.5, fontWeight: '700' },
+  icon: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  heading: { flex: 1, minWidth: 0, gap: 4 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  kicker: { fontSize: 8.5, lineHeight: 11, fontWeight: '900', letterSpacing: 0.75 },
+  themeChip: { maxWidth: 92, minHeight: 21, borderRadius: radius.pill, paddingHorizontal: 7, justifyContent: 'center' },
+  theme: { fontSize: 8.5, lineHeight: 11, fontWeight: '800', textTransform: 'capitalize' },
+  verse: { fontSize: 13.5, lineHeight: 19, fontWeight: '650' },
+  end: { width: 32, alignItems: 'center', gap: 2 },
+  readLabel: { fontSize: 8, fontWeight: '900' },
+  bottom: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 43 },
+  reference: { fontSize: 10.5, fontWeight: '900' },
+  version: { fontSize: 8.5, fontWeight: '700' },
 });
