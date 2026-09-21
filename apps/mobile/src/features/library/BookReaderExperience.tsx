@@ -78,7 +78,7 @@ export function BookReaderExperience({ bookId }: { bookId: string }) {
   const pages = useMemo(() => paginate(chapter?.body ?? ''), [chapter?.id, chapter?.body]);
   const safePageIndex = Math.min(Math.max(0, pageIndex), Math.max(0, pages.length - 1));
   const page = pages[safePageIndex] ?? '';
-  const readerContent = useMemo(() => parseReaderContent(chapter?.title ?? '', page), [chapter?.title, page]);
+  const readerContent = useMemo(() => parseReaderContent(chapter?.title ?? '', page, safePageIndex === 0), [chapter?.title, page, safePageIndex]);
   const totalPagesBefore = chapters.slice(0, chapterIndex).reduce((sum, item) => sum + paginate(item.body).length, 0);
   const totalPages = Math.max(1, chapters.reduce((sum, item) => sum + paginate(item.body).length, 0));
   const absolutePage = Math.min(totalPages, totalPagesBefore + safePageIndex + 1);
