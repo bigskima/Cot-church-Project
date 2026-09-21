@@ -27,6 +27,7 @@ export function MinistryImageGenerator({
   description,
   currentImageUrl,
   onGenerated,
+  branchId,
   compact = false,
 }: {
   organizationId: string;
@@ -35,6 +36,7 @@ export function MinistryImageGenerator({
   description?: string;
   currentImageUrl?: string | null;
   onGenerated: (url: string) => void;
+  branchId?: string | null;
   compact?: boolean;
 }) {
   const { api } = useSession();
@@ -54,6 +56,7 @@ export function MinistryImageGenerator({
         body: JSON.stringify({
           action: 'ministry_image_generate',
           organizationId,
+          branchId: branchId || null,
           useCase,
           title: title.trim(),
           description: String(description || '').trim(),
