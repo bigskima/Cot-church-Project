@@ -8,6 +8,7 @@ import { Avatar } from '../primitives/Avatar';
 import { Icon } from '../primitives/Icon';
 import { ContentReportSheet, type ContentReportContext } from './ContentReportSheet';
 import { CompactIdentityBadge } from '@/components/identity/PublicIdentityBadge';
+import { ScripturePreviewCard } from '@/components/bible/ScriptureReferenceText';
 
 const MAX_COMMENT_LENGTH = 3000;
 
@@ -176,6 +177,7 @@ export function CommentsThread({
           ) : null}
 
           <Text style={[styles.bodyText, { color: colors.text }]}>{item.body}</Text>
+          <ScripturePreviewCard text={item.body} compact />
 
           <View style={styles.commentActions}>
             <Pressable
