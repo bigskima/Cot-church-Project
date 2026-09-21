@@ -40,7 +40,7 @@ Deno.serve(createHandler(
 
       let query = auth.client
         .from("announcements")
-        .select("id,organization_id,branch_id,title,body,status,audience,channels,scheduled_for,published_at,banner_url,created_at,updated_at")
+        .select("id,organization_id,branch_id,title,body,status,audience,channels,scheduled_for,published_at,banner_url,response_form_id,created_at,updated_at")
         .eq("organization_id", auth.organizationId);
 
       if (requestedBranchId) {
@@ -82,7 +82,7 @@ Deno.serve(createHandler(
     }
 
     await authorize(auth, "announcements.manage");
-    assertNoUnknownFields(body, ["id", "branchId", "title", "body", "audience", "channels", "scheduledFor", "status", "bannerUrl"]);
+    assertNoUnknownFields(body, ["id", "branchId", "title", "body", "audience", "channels", "scheduledFor", "status", "bannerUrl", "responseFormId"]);
     const record: Record<string, unknown> = {};
     if (request.method === "POST" || body.title !== undefined) record.title = requiredString(body.title, "title", 180);
     if (request.method === "POST" || body.body !== undefined) record.body = requiredString(body.body, "body", 20000);
@@ -108,6 +108,7 @@ Deno.serve(createHandler(
       if (status !== "scheduled" && body.scheduledFor === undefined) record.scheduled_for = null;
     }
     if (body.bannerUrl !== undefined) record.banner_url = optionalString(body.bannerUrl, "bannerUrl", 2000);
+    if (body.responseFormId !== undefined) record.response_form_id = body.responseFormId ? uuid(String(body.responseFormId), "responseFormId", true) : null;
 
     if (request.method === "POST") {
       if (record.status === "scheduled") assertFutureSchedule(record.scheduled_for as string | null | undefined);
