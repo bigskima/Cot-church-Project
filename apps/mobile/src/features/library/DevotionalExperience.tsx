@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EmptyState, Icon, ScreenHeader, Skeleton } from '@/components';
 import { DateTimeField } from '@/components/DateTimeField';
 import { ReadAloudRateControl, useReadAloudRate } from '@/components/ReadAloudRateControl';
+import { ScripturePreviewCard } from '@/components/bible/ScriptureReferenceText';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 import { useSession } from '@/state/session';
@@ -225,6 +226,7 @@ export function DevotionalExperience() {
                   <Text style={[styles.scriptureText, { color: colors.text }]}>{devotional.data.entry.scripture}</Text>
                 </View>
               ) : null}
+              {devotional.data.entry.scripture ? <ScripturePreviewCard text={devotional.data.entry.scripture} compact /> : null}
               {devotional.data.entry.memory_verse ? (
                 <View style={styles.block}>
                   <Text style={[styles.kicker, { color: colors.textMuted }]}>MEMORY VERSE</Text>
@@ -232,6 +234,7 @@ export function DevotionalExperience() {
                 </View>
               ) : null}
               <Text style={[styles.body, { color: colors.text }]}>{devotional.data.entry.body}</Text>
+              <ScripturePreviewCard text={devotional.data.entry.body} compact />
               {devotional.data.entry.prayer ? (
                 <View style={[styles.prayer, { borderColor: colors.borderSubtle }]}>
                   <Icon name='heart-outline' size={18} color={colors.interactive} />
