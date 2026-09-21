@@ -683,13 +683,19 @@ export const bibleHandler = createHandler(
       return {data:{...inserted.data,is_personal:true,plan_kind:"personal",days:copiedDays.map((day:any)=>({...day,references:day.scripture_references}))}};
     }
 
-    if(["manage_daily","manage_pool","manage_provider","manage_plan"].includes(actionName)){
+    if(["manage_daily","manage_daily_reset","manage_pool","manage_provider","manage_plan"].includes(actionName)){
       await requireBibleManager(auth,organizationId);
       const admin=adminClient();
       if(actionName==="manage_daily"){
         const date=requiredString(body.date,"date",10); const reference=requiredString(body.reference,"reference",80); parseReference(reference);
         const {data,error}=await admin.from("bible_daily_schedule").upsert({organization_id:organizationId,scripture_date:date,reference,version_id:String(body.versionId??"web"),theme:String(body.theme??"general").slice(0,80),source:"ministry",message:body.message?String(body.message).slice(0,280):null,created_by:auth.user.id,updated_at:new Date().toISOString()},{onConflict:"organization_id,scripture_date"}).select().single();
         if(error) throw new ApiError("DAILY_SCRIPTURE_SAVE_FAILED","Unable to schedule Daily Scripture.",500,undefined,false); return {data};
+      }
+      if(actionName==="manage_daily_reset"){
+        const date=requiredString(body.date,"date",10);
+        const {error}=await admin.from("bible_daily_schedule").delete().eq("organization_id",organizationId).eq("scripture_date",date);
+        if(error) throw new ApiError("DAILY_SCRIPTURE_RESET_FAILED","Unable to return Daily Scripture to automatic selection.",500,undefined,false);
+        return {data:{date,automatic:true}};
       }
       if(actionName==="manage_pool"){
         const reference=requiredString(body.reference,"reference",80); parseReference(reference);
