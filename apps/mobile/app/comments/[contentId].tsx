@@ -79,6 +79,15 @@ export function CommentsScreen({ forcedScope }: { forcedScope?: 'general' | 'exp
                 pathname: '/(auth)/login',
                 params: { returnTo },
               } as any)}
+              onDeleteComment={async (commentId) => {
+                await api.request('engagement', {
+                  method: 'POST',
+                  context: requestContext,
+                  feedback: false,
+                  body: JSON.stringify({ action: 'delete_comment', commentId }),
+                });
+                comments.refresh();
+              }}
               onSubmitComment={async (body, parentCommentId) => {
                 if (!contentId) throw new Error('This conversation is unavailable.');
                 await api.request('engagement', {

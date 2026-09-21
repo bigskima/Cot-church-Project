@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '@/state/theme';
+import { useSession } from '@/state/session';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import type { ContentComment } from '@/types/content';
 import { Avatar } from '../primitives/Avatar';
@@ -19,6 +20,7 @@ export interface CommentsThreadProps {
   focusRequest?: number;
   onRequireSignIn?: () => void;
   onSubmitComment: (body: string, parentCommentId?: string | null) => Promise<void>;
+  onDeleteComment?: (commentId: string) => Promise<void>;
   canReport?: boolean;
   reportContext?: ContentReportContext;
 }
@@ -52,10 +54,12 @@ export function CommentsThread({
   focusRequest = 0,
   onRequireSignIn,
   onSubmitComment,
+  onDeleteComment,
   canReport = canComment,
   reportContext = 'public',
 }: CommentsThreadProps) {
   const { colors } = useTheme();
+  const { context } = useSession();
   const inputRef = useRef<TextInput>(null);
   const [text, setText] = useState('');
   const [replyingTo, setReplyingTo] = useState<ContentComment | null>(null);
@@ -63,6 +67,8 @@ export function CommentsThread({
   const [submitError, setSubmitError] = useState('');
   const [composerFocused, setComposerFocused] = useState(false);
   const [reportTarget, setReportTarget] = useState<ContentComment | null>(null);
+  const [deletingId, setDeletingId] = useState('');
+  const [deleteError, setDeleteError] = useState('');
 
   const commentById = useMemo(() => new Map(comments.map((item) => [item.id, item])), [comments]);
   const roots = useMemo(
@@ -126,8 +132,22 @@ export function CommentsThread({
     }
   };
 
+  const removeComment = async (item: ContentComment) => {
+    if (!onDeleteComment || item.author_profile_id !== context?.profile?.id || deletingId) return;
+    setDeletingId(item.id);
+    setDeleteError('');
+    try {
+      await onDeleteComment(item.id);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : 'Unable to delete this comment.');
+    } finally {
+      setDeletingId('');
+    }
+  };
+
   const renderComment = (item: ContentComment, isReply = false, parent?: ContentComment | null) => {
     const identity = commentIdentity(item);
+    const mine = item.author_profile_id === context?.profile?.id;
     const parentIdentity = parent ? commentIdentity(parent) : null;
     return (
       <View
@@ -190,16 +210,30 @@ export function CommentsThread({
               <Icon name="arrow-undo-outline" size={13} color={colors.textMuted} />
               <Text style={[styles.replyActionText, { color: colors.textSecondary }]}>Reply</Text>
             </Pressable>
-            <Pressable
-              onPress={() => startReport(item)}
-              hitSlop={6}
-              accessibilityRole="button"
-              accessibilityLabel={`Report comment by ${identity.displayName}`}
-              style={({ pressed }) => [styles.replyAction, pressed && styles.pressed]}
-            >
-              <Icon name="flag-outline" size={13} color={colors.textMuted} />
-              <Text style={[styles.replyActionText, { color: colors.textSecondary }]}>Report</Text>
-            </Pressable>
+            {mine && onDeleteComment ? (
+              <Pressable
+                onPress={() => void removeComment(item)}
+                disabled={deletingId === item.id}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel="Delete your comment"
+                style={({ pressed }) => [styles.replyAction, pressed && styles.pressed]}
+              >
+                <Icon name={deletingId === item.id ? 'hourglass-outline' : 'trash-outline'} size={13} color={colors.live} />
+                <Text style={[styles.replyActionText, { color: colors.live }]}>{deletingId === item.id ? 'Deleting…' : 'Delete'}</Text>
+              </Pressable>
+            ) : (
+              <Pressable
+                onPress={() => startReport(item)}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={`Report comment by ${identity.displayName}`}
+                style={({ pressed }) => [styles.replyAction, pressed && styles.pressed]}
+              >
+                <Icon name="flag-outline" size={13} color={colors.textMuted} />
+                <Text style={[styles.replyActionText, { color: colors.textSecondary }]}>Report</Text>
+              </Pressable>
+            )}
           </View>
         </View>
       </View>
@@ -267,6 +301,14 @@ export function CommentsThread({
           {roots.map((root) => renderThreadNode(root))}
         </View>
       )}
+
+      {deleteError ? (
+        <Pressable onPress={() => setDeleteError('')} style={[styles.error, { backgroundColor: colors.liveSoft }]} accessibilityRole="button">
+          <Icon name="alert-circle-outline" size={15} color={colors.live} />
+          <Text style={[styles.errorText, { color: colors.live }]}>{deleteError}</Text>
+          <Icon name="close" size={13} color={colors.live} />
+        </Pressable>
+      ) : null}
 
       <View style={[styles.composerShell, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
         {replyIdentity ? (
