@@ -49,6 +49,13 @@ export function GeneralHomeActionDeck() {
       accessibilityLabel: 'Daily Devotional',
       onPress: () => router.push('/general/devotional' as any),
     } : null,
+    features.isEnabled('bible') ? {
+      key: 'bible',
+      label: 'Bible',
+      icon: 'book-outline',
+      accessibilityLabel: 'COT Bible',
+      onPress: () => router.push('/general/bible' as any),
+    } : null,
   ].filter(Boolean) as Array<{ key: string; label: string; icon: string; accessibilityLabel: string; onPress: () => void }>;
 
   const items = [
