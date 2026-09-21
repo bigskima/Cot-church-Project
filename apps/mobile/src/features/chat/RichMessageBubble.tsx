@@ -11,6 +11,7 @@ import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import { AdaptiveMediaImage, AudioPlayer, Avatar, Icon, MediaPreviewModal, VideoPlayer } from '@/components';
 import { CompactIdentityBadge } from '@/components/identity/PublicIdentityBadge';
+import { ScripturePreviewCard } from '@/components/bible/ScriptureReferenceText';
 import { radius, spacing } from '@/design-system/tokens';
 import { useTheme } from '@/state/theme';
 import { downloadFile } from '@/utils/download-file';
@@ -297,6 +298,7 @@ export function RichMessageBubble({
               {new Date(message.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </Text>
           </Pressable>
+          {message.body ? <ScripturePreviewCard text={message.body} compact /> : null}
 
           {(message.reactions ?? []).length ? (
             <View style={[styles.reactions, mine && styles.reactionsMine]}>
