@@ -79,13 +79,13 @@ export default function BibleManageScreen(){
   },[organizationId]);
 
   const manage=useResource<ManagePayload>('bible:manage:'+organizationId,(signal)=>
-    api.request('bible?'+query,{signal,context:'public'})
+    api.request('noop?service=bible&'+query,{signal,context:'public'})
   );
   const providers=useResource<ProviderStatus>('bible:providers:'+organizationId,(signal)=>
-    api.request('bible?'+statusQuery,{signal,context:'public'})
+    api.request('noop?service=bible&'+statusQuery,{signal,context:'public'})
   );
   const versions=useResource<Version[]>('bible:manage-versions:'+organizationId,(signal)=>
-    api.request('bible?'+versionsQuery,{signal,context:'public'})
+    api.request('noop?service=bible&'+versionsQuery,{signal,context:'public'})
   );
 
   const refresh=()=>{invalidate('bible:manage:');invalidate('bible:providers:');manage.refresh();providers.refresh();};
