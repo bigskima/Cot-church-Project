@@ -80,17 +80,37 @@ export function parseReaderContent(chapterTitle: string, pageText: string, allow
   let prayer = '';
   const bodyLines: string[] = [];
   let inPrayer = false;
+  let expectScripture = false;
+  let expectMemoryVerse = false;
 
   for (const line of lines) {
+    if (expectScripture && !scripture) {
+      scripture = line;
+      expectScripture = false;
+      continue;
+    }
+    if (expectMemoryVerse && !memoryVerse) {
+      memoryVerse = line;
+      expectMemoryVerse = false;
+      continue;
+    }
     const scriptureMatch = line.match(/^(?:scripture|bible reading|reading)\s*[:\-–—]\s*(.+)$/i);
     if (scriptureMatch && !scripture) {
       scripture = scriptureMatch[1].trim();
+      continue;
+    }
+    if (/^(?:scripture|bible reading|reading)$/i.test(line) && !scripture) {
+      expectScripture = true;
       continue;
     }
 
     const memoryMatch = line.match(/^(?:memory verse|key verse|verse)\s*[:\-–—]\s*(.+)$/i);
     if (memoryMatch && !memoryVerse) {
       memoryVerse = memoryMatch[1].trim();
+      continue;
+    }
+    if (/^(?:memory verse|key verse|verse)$/i.test(line) && !memoryVerse) {
+      expectMemoryVerse = true;
       continue;
     }
 
@@ -110,6 +130,8 @@ export function parseReaderContent(chapterTitle: string, pageText: string, allow
       && !heading
       && !inPrayer
       && line.length <= 140
+      && line.split(/\s+/).length <= 12
+      && !/[.!?]$/.test(line)
       && !DATE_HEADING.test(line)
       && !/^(?:scripture|memory verse|key verse|bible reading|reading)\b/i.test(line)
     ) {
