@@ -257,7 +257,7 @@ export const engagementHubHandler=createHandler(
       if(action==="home"){
         const now=new Date().toISOString();
         const today=now.slice(0,10);
-        const [{data,error},scripture,storedQuote]=await Promise.all([
+        const [bannerResult,formResult,scripture,storedQuote]=await Promise.all([
           admin.from("cot_home_banners")
             .select("id,title,subtitle,image_url,destination_type,destination_value,priority,starts_at,ends_at")
             .eq("organization_id",organizationId)
@@ -267,10 +267,34 @@ export const engagementHubHandler=createHandler(
             .order("priority",{ascending:false})
             .order("created_at",{ascending:false})
             .limit(20),
+          admin.from("cot_forms")
+            .select("id,slug,title,description,banner_image_url,updated_at")
+            .eq("organization_id",organizationId)
+            .eq("status","published")
+            .order("updated_at",{ascending:false})
+            .limit(20),
           resolvedScripture(admin,organizationId,today).catch(()=>null),
           admin.from("cot_daily_quotes").select("id,quote_date,body,source_reference,theme,source,status").eq("organization_id",organizationId).eq("quote_date",today).maybeSingle(),
         ]);
-        if(error) throw new ApiError("HOME_BANNERS_FAILED","Unable to load COT highlights.",500,undefined,false);
+        if(bannerResult.error||formResult.error) throw new ApiError("HOME_BANNERS_FAILED","Unable to load COT highlights.",500,undefined,false);
+        const explicitBanners=bannerResult.data??[];
+        const explicitForms=new Set(explicitBanners
+          .filter((item:any)=>item.destination_type==="form"&&item.destination_value)
+          .map((item:any)=>String(item.destination_value)));
+        const automaticFormBanners=(formResult.data??[])
+          .filter((form:any)=>!explicitForms.has(String(form.slug)))
+          .map((form:any)=>({
+            id:"form:"+form.id,
+            title:form.title,
+            subtitle:form.description||"Open this COT form to respond.",
+            image_url:form.banner_image_url??null,
+            destination_type:"form",
+            destination_value:form.slug,
+            priority:0,
+            starts_at:null,
+            ends_at:null,
+            source:"published_form",
+          }));
         const stored=(storedQuote as any)?.data??null;
         const dailyQuote=stored
           ? stored.status==="hidden" ? null : {
@@ -283,7 +307,7 @@ export const engagementHubHandler=createHandler(
               isOverride:true,
             }
           : scripture ? automaticQuote(scripture,today) : null;
-        return {data:{banners:data??[],dailyQuote}};
+        return {data:{banners:[...explicitBanners,...automaticFormBanners],dailyQuote}};
       }
 
       if(action==="form"){
@@ -300,7 +324,7 @@ export const engagementHubHandler=createHandler(
 
       if(action==="forms"){
         const manager=await canManage(auth,organizationId);
-        let query=admin.from("cot_forms").select("id,organization_id,slug,title,description,status,fields,submit_label,success_message,requires_auth,created_at,updated_at").eq("organization_id",organizationId).order("updated_at",{ascending:false});
+        let query=admin.from("cot_forms").select("id,organization_id,slug,title,description,status,fields,submit_label,success_message,requires_auth,banner_image_url,created_at,updated_at").eq("organization_id",organizationId).order("updated_at",{ascending:false});
         if(!manager) query=query.eq("status","published");
         const {data,error}=await query.limit(100);
         if(error) throw new ApiError("FORMS_LOAD_FAILED","Unable to load forms.",500,undefined,false);
@@ -340,11 +364,18 @@ export const engagementHubHandler=createHandler(
 
       if(action==="manage"){
         await requireManager(auth,organizationId);
-        const [banners,forms]=await Promise.all([
+        const [banners,forms,events,announcements]=await Promise.all([
           admin.from("cot_home_banners").select("*").eq("organization_id",organizationId).order("priority",{ascending:false}).order("updated_at",{ascending:false}),
           admin.from("cot_forms").select("*").eq("organization_id",organizationId).order("updated_at",{ascending:false}),
+          admin.from("events").select("id,title,status,starts_at,ends_at,banner_url").eq("organization_id",organizationId).order("starts_at",{ascending:false}).limit(200),
+          admin.from("announcements").select("id,title,status,scheduled_for,published_at,banner_url").eq("organization_id",organizationId).order("updated_at",{ascending:false}).limit(200),
         ]);
-        return {data:{banners:banners.data??[],forms:forms.data??[]}};
+        return {data:{
+          banners:banners.data??[],
+          forms:forms.data??[],
+          events:events.data??[],
+          announcements:announcements.data??[],
+        }};
       }
 
       if(action==="submissions"){
@@ -567,6 +598,7 @@ export const engagementHubHandler=createHandler(
         submit_label:text(body.submitLabel??"Submit",80,true),
         success_message:text(body.successMessage??"Thank you. Your response has been received.",500,true),
         requires_auth:body.requiresAuth!==false,
+        banner_image_url:text(body.bannerImageUrl??"",2000)||null,
         updated_at:new Date().toISOString(),
       };
       if(id){
