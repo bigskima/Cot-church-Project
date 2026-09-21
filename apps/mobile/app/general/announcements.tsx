@@ -14,9 +14,11 @@ type Announcement = {
   title: string;
   body: string;
   banner_url?: string | null;
+  response_form_id?: string | null;
   published_at?: string | null;
   created_at?: string | null;
 };
+type LinkedForm = { id: string; slug: string; title: string; status: string };
 
 function dateLabel(value?: string | null) {
   if (!value) return '';
@@ -44,7 +46,7 @@ export default function GeneralAnnouncementsScreen() {
       const supabase = await getRuntimeSupabase(accessToken);
       const { data, error } = await supabase
         .from('announcements')
-        .select('id,title,body,banner_url,published_at,created_at')
+        .select('id,title,body,banner_url,response_form_id,published_at,created_at')
         .eq('organization_id', organizationId)
         .is('branch_id', null)
         .eq('status', 'published')
@@ -102,6 +104,7 @@ export default function GeneralAnnouncementsScreen() {
             <Text style={[styles.title, { color: colors.text }]}>{latest.title}</Text>
             <Text style={[styles.meta, { color: colors.textMuted }]}>{dateLabel(latest.published_at ?? latest.created_at)}</Text>
             <Text style={[styles.body, { color: colors.textSecondary }]}>{latest.body}</Text>
+            {latest.response_form_id ? <AnnouncementFormAction formId={latest.response_form_id} organizationId={organizationId} /> : null}
           </View>
 
           {remaining.length ? (
@@ -113,6 +116,7 @@ export default function GeneralAnnouncementsScreen() {
                   <Text style={[styles.cardTitle, { color: colors.text }]}>{item.title}</Text>
                   <Text style={[styles.meta, { color: colors.textMuted }]}>{dateLabel(item.published_at ?? item.created_at)}</Text>
                   <Text style={[styles.body, { color: colors.textSecondary }]}>{item.body}</Text>
+                  {item.response_form_id ? <AnnouncementFormAction formId={item.response_form_id} organizationId={organizationId} /> : null}
                 </View>
               ))}
             </View>
@@ -128,6 +132,29 @@ export default function GeneralAnnouncementsScreen() {
         />
       )}
     </ScrollView>
+  );
+}
+
+function AnnouncementFormAction({ formId, organizationId }: { formId: string; organizationId: string }) {
+  const { api } = useSession();
+  const { colors } = useTheme();
+  const form = useResource<LinkedForm | null>(
+    'announcement:form:' + formId,
+    (signal) => api.request<LinkedForm>(
+      'noop?service=engagement-hub&action=form&id=' + encodeURIComponent(formId) + '&organizationId=' + encodeURIComponent(organizationId),
+      { signal, context: 'public' },
+    ).catch(() => null),
+  );
+  if (!form.data) return null;
+  return (
+    <Button
+      label={form.data.title || 'Respond'}
+      variant="outline"
+      size="sm"
+      onPress={() => router.push(('/general/forms/' + form.data!.slug) as any)}
+      icon={<Icon name="document-text-outline" size={16} color={colors.interactive} />}
+      style={{ alignSelf: 'flex-start', marginTop: spacing.sm }}
+    />
   );
 }
 
