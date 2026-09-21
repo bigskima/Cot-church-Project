@@ -195,6 +195,13 @@ export const libraryHandler = createHandler(
         await assertFeatureEnabled(admin, "devotionals", { organizationId }, "Devotionals are currently unavailable.");
         const date = isoDate(url.searchParams.get("date") ?? new Date().toISOString().slice(0, 10));
         const year = Number(date.slice(0, 4));
+        const { data: visual } = await admin.from("cot_daily_visuals")
+          .select("id,visual_date,content_kind,image_url,image_source,provider_code,status,generated_at")
+          .eq("organization_id", organizationId)
+          .eq("visual_date", date)
+          .eq("content_kind", "devotional")
+          .eq("status", "ready")
+          .maybeSingle();
         const { data: seriesRows, error: seriesError } = await admin.from("devotional_series")
           .select("id,title,author_name,devotional_year,description,book_id")
           .eq("organization_id", organizationId)
@@ -209,7 +216,7 @@ export const libraryHandler = createHandler(
         if (entryError) throw new ApiError("DEVOTIONAL_LOAD_FAILED", "Unable to load the devotional.", 500, undefined, false);
         const entry = entries?.[0] ?? null;
         const series = entry ? (seriesRows ?? []).find((row: any) => row.id === entry.series_id) ?? null : null;
-        if (entry && series) return { data: { series, entry } };
+        if (entry && series) return { data: { series, entry, visual: visual ?? null } };
 
         // Keep the original one-day devotional domain readable while churches
         // migrate into yearly/monthly devotional books.
@@ -225,6 +232,7 @@ export const libraryHandler = createHandler(
         if (!legacy) return { data: null };
         return {
           data: {
+            visual: visual ?? null,
             series: {
               id: `legacy-${legacy.id}`,
               organization_id: organizationId,
