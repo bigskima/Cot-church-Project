@@ -28,6 +28,14 @@ import { useTheme } from '@/state/theme';
 import type { Event } from '@/types/content';
 
 type EventWithBanner = Event & { banner_url?: string | null };
+type CotForm = { id: string; slug: string; title: string; status: 'draft' | 'published' | 'closed' | 'hidden' };
+type PersonRef = { display_name?: string | null; username?: string | null } | null;
+type EventResponseOverview = {
+  interested: Array<{ profile_id: string; created_at: string; profile?: PersonRef }>;
+  registered: Array<{ id: string; status: string; registered_at: string; profile?: PersonRef }>;
+  form?: { id: string; slug: string; title: string; fields?: Array<{ id: string; label?: string }> } | null;
+  formResponses: Array<{ id: string; status: string; created_at: string; values: Record<string, unknown>; profile?: PersonRef }>;
+};
 type EventVisibility = 'members' | 'public' | 'private';
 type EventStatus = 'draft' | 'published' | 'cancelled' | 'completed' | 'archived';
 type BannerUploadIntent = { signedUploadUrl: string; publicUrl: string };
@@ -64,6 +72,12 @@ export default function GeneralEventsManageExperience() {
     `general:ministry:events:${organizationId || 'none'}`,
     (signal) => api.request<EventWithBanner[]>('events', { signal }),
   );
+  const forms = useResource<{ forms: CotForm[]; banners: unknown[] }>(
+    `general:ministry:event-forms:${organizationId || 'none'}`,
+    (signal) => (canCreate || canUpdate) && organizationId
+      ? api.request('noop?service=engagement-hub&action=manage&organizationId=' + encodeURIComponent(organizationId), { signal })
+      : Promise.resolve({ forms: [], banners: [] }),
+  );
 
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
@@ -78,11 +92,25 @@ export default function GeneralEventsManageExperience() {
   const [visibility, setVisibility] = useState<EventVisibility>('public');
   const [status, setStatus] = useState<EventStatus>('draft');
   const [bannerFile, setBannerFile] = useState<UploadFile | null>(null);
+  const [responseFormId, setResponseFormId] = useState('');
+  const [responseEvent, setResponseEvent] = useState<EventWithBanner | null>(null);
+  const [responsesOpen, setResponsesOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const responseOverview = useResource<EventResponseOverview>(
+    `general:ministry:event-responses:${responseEvent?.id ?? 'none'}`,
+    (signal) => responseEvent && organizationId
+      ? api.request(
+          'noop?service=engagement-hub&action=event_responses&eventId=' + encodeURIComponent(responseEvent.id) + '&organizationId=' + encodeURIComponent(organizationId),
+          { signal },
+        )
+      : Promise.resolve({ interested: [], registered: [], form: null, formResponses: [] }),
+  );
+
   const list = events.data ?? [];
+  const availableForms = (forms.data?.forms ?? []).filter((item) => item.status === 'published');
   const upcomingCount = useMemo(() => list.filter((event) => Date.parse(event.ends_at) > Date.now()).length, [list]);
   const publishedCount = useMemo(() => list.filter((event) => event.status === 'published').length, [list]);
 
@@ -99,6 +127,7 @@ export default function GeneralEventsManageExperience() {
     setVisibility('public');
     setStatus('draft');
     setBannerFile(null);
+    setResponseFormId('');
     setError('');
   };
 
@@ -131,6 +160,7 @@ export default function GeneralEventsManageExperience() {
     setVisibility(['members', 'public', 'private'].includes(event.visibility) ? event.visibility as EventVisibility : 'public');
     setStatus(['draft', 'published', 'cancelled', 'completed', 'archived'].includes(event.status ?? '') ? event.status as EventStatus : 'draft');
     setBannerFile(null);
+    setResponseFormId(event.response_form_id ?? '');
     setError('');
     setSuccess('');
     setStep(0);
@@ -219,6 +249,7 @@ export default function GeneralEventsManageExperience() {
         endsAt: endsAt.toISOString(),
         capacity: capacityValue,
         bannerUrl,
+        responseFormId: responseFormId || null,
       };
       await api.request('events', {
         method: editing ? 'PATCH' : 'POST',
@@ -261,6 +292,12 @@ export default function GeneralEventsManageExperience() {
         <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>AUDIENCE</Text>
         <View style={styles.chips}><Chip label="Public" selected={visibility === 'public'} onPress={() => setVisibility('public')} /><Chip label="Members" selected={visibility === 'members'} onPress={() => setVisibility('members')} /><Chip label="Private" selected={visibility === 'private'} onPress={() => setVisibility('private')} /></View>
         <InputField label="Capacity (optional)" value={capacity} onChangeText={setCapacity} placeholder="No limit" keyboardType="number-pad" />
+        <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>RESPONSE FORM</Text>
+        <Text style={[styles.formHint, { color: colors.textMuted }]}>Optional. Link one published configurable form to this event for extra registration questions, applications or follow-up.</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+          <Chip label="No form" selected={!responseFormId} onPress={() => setResponseFormId('')} />
+          {availableForms.map((form) => <Chip key={form.id} label={form.title} selected={responseFormId === form.id} onPress={() => setResponseFormId(form.id)} />)}
+        </ScrollView>
         {editing ? <><Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>STATUS</Text><View style={styles.chips}><Chip label="Draft" selected={status === 'draft'} onPress={() => setStatus('draft')} /><Chip label="Published" selected={status === 'published'} onPress={() => setStatus('published')} /><Chip label="Completed" selected={status === 'completed'} onPress={() => setStatus('completed')} /><Chip label="Cancelled" selected={status === 'cancelled'} onPress={() => setStatus('cancelled')} /><Chip label="Archived" selected={status === 'archived'} onPress={() => setStatus('archived')} /></View></> : null}
       </View>
     );
@@ -273,9 +310,16 @@ export default function GeneralEventsManageExperience() {
           <Text style={[styles.reviewMeta, { color: colors.textSecondary }]}>{isOnline ? 'Online / hybrid' : locationName || 'Venue not set'} · {visibility}</Text>
           <Text style={[styles.reviewBody, { color: colors.textSecondary }]} numberOfLines={5}>{description || 'No description added.'}</Text>
           <Text style={[styles.reviewMeta, { color: colors.textMuted }]}>{capacity.trim() ? `Capacity ${capacity}` : 'No capacity limit'} · {bannerFile || editing?.banner_url ? 'Banner attached' : 'No banner'}</Text>
+          <Text style={[styles.reviewMeta, { color: colors.textMuted }]}>Response form · {availableForms.find((form) => form.id === responseFormId)?.title || 'None'}</Text>
         </View>
       </View>
     );
+  };
+
+  const openResponses = (event: EventWithBanner) => {
+    setResponseEvent(event);
+    setResponsesOpen(true);
+    setTimeout(() => responseOverview.refresh(), 0);
   };
 
   return (
@@ -293,7 +337,13 @@ export default function GeneralEventsManageExperience() {
             <View key={event.id} style={styles.eventWrap}>
               {event.banner_url ? <Image source={{ uri: event.banner_url }} style={styles.listBanner} resizeMode="cover" /> : null}
               <EventCard event={event} variant="row" onPress={() => router.push(`/general/event/${event.id}` as any)} />
-              <View style={styles.statusRow}><View style={styles.statusMeta}><Badge label={(event.status || 'draft').toUpperCase()} variant={event.status === 'published' ? 'success' : 'neutral'} /><Text style={[styles.scopeText, { color: colors.textMuted }]}>{event.visibility === 'public' ? 'Public' : event.visibility === 'private' ? 'Private' : 'Members'}</Text></View>{canUpdate ? <Button label="Edit" onPress={() => openEdit(event)} variant="outline" size="sm" /> : null}</View>
+              <View style={styles.statusRow}>
+                <View style={styles.statusMeta}><Badge label={(event.status || 'draft').toUpperCase()} variant={event.status === 'published' ? 'success' : 'neutral'} /><Text style={[styles.scopeText, { color: colors.textMuted }]}>{event.visibility === 'public' ? 'Public' : event.visibility === 'private' ? 'Private' : 'Members'}</Text></View>
+                <View style={styles.inlineActions}>
+                  {(canCreate || canUpdate) ? <Button label="Responses" onPress={() => openResponses(event)} variant="outline" size="sm" /> : null}
+                  {canUpdate ? <Button label="Edit" onPress={() => openEdit(event)} variant="outline" size="sm" /> : null}
+                </View>
+              </View>
             </View>
           )) : <EmptyState title="No events yet" message={canCreate ? 'Create a gathering and move through a focused four-step flow.' : 'Events will appear here when they are created.'} iconName="calendar-outline" actionLabel={canCreate ? 'Create event' : undefined} onAction={canCreate ? openCreate : undefined} />}
         </View>
@@ -305,6 +355,47 @@ export default function GeneralEventsManageExperience() {
           {renderStep()}
         </ProgressiveFlow>
       </BottomSheet>
+
+      <BottomSheet visible={responsesOpen} onClose={() => setResponsesOpen(false)} title={responseEvent?.title || 'Event responses'} subtitle="Interest, registration and linked form data" maxHeightPercent={94}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.responseSheet}>
+          {responseOverview.loading && !responseOverview.data ? <Skeleton height={86} count={3} /> : responseOverview.error && !responseOverview.data ? <ResourceError message={responseOverview.error} retry={responseOverview.refresh} /> : (
+            <>
+              <View style={styles.responseSummary}>
+                <View style={[styles.responseMetric, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Text style={[styles.responseNumber, { color: colors.text }]}>{responseOverview.data?.interested.length ?? 0}</Text><Text style={[styles.responseLabel, { color: colors.textMuted }]}>Interested</Text></View>
+                <View style={[styles.responseMetric, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Text style={[styles.responseNumber, { color: colors.text }]}>{responseOverview.data?.registered.filter((item) => item.status !== 'cancelled').length ?? 0}</Text><Text style={[styles.responseLabel, { color: colors.textMuted }]}>Registered</Text></View>
+                <View style={[styles.responseMetric, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Text style={[styles.responseNumber, { color: colors.text }]}>{responseOverview.data?.formResponses.length ?? 0}</Text><Text style={[styles.responseLabel, { color: colors.textMuted }]}>Form</Text></View>
+              </View>
+
+              <SectionHeader title="Interested" badge={responseOverview.data?.interested.length ?? 0} />
+              {(responseOverview.data?.interested ?? []).length ? (responseOverview.data?.interested ?? []).map((item) => (
+                <View key={item.profile_id} style={[styles.personRow, { borderColor: colors.borderSubtle }]}>
+                  <View style={styles.flex}><Text style={[styles.personName, { color: colors.text }]}>{item.profile?.display_name || 'Member'}</Text><Text style={[styles.personMeta, { color: colors.textMuted }]}>{item.profile?.username ? '@' + item.profile.username + ' · ' : ''}{new Date(item.created_at).toLocaleString()}</Text></View>
+                </View>
+              )) : <Text style={[styles.formHint, { color: colors.textMuted }]}>No one has marked interest yet.</Text>}
+
+              <SectionHeader title="Registrations" badge={responseOverview.data?.registered.length ?? 0} />
+              {(responseOverview.data?.registered ?? []).length ? (responseOverview.data?.registered ?? []).map((item) => (
+                <View key={item.id} style={[styles.personRow, { borderColor: colors.borderSubtle }]}>
+                  <View style={styles.flex}><Text style={[styles.personName, { color: colors.text }]}>{item.profile?.display_name || 'Member'}</Text><Text style={[styles.personMeta, { color: colors.textMuted }]}>{item.profile?.username ? '@' + item.profile.username + ' · ' : ''}{item.status} · {new Date(item.registered_at).toLocaleString()}</Text></View>
+                </View>
+              )) : <Text style={[styles.formHint, { color: colors.textMuted }]}>No registrations yet.</Text>}
+
+              {responseOverview.data?.form ? (
+                <>
+                  <View style={styles.responseHeader}><View style={styles.flex}><Text style={[styles.responseTitle, { color: colors.text }]}>{responseOverview.data.form.title}</Text><Text style={[styles.formHint, { color: colors.textMuted }]}>Linked event form responses</Text></View><Button label="Manage form" size="sm" variant="outline" onPress={() => { setResponsesOpen(false); router.push('/general/leadership/forms-manage' as any); }} /></View>
+                  {(responseOverview.data.formResponses ?? []).length ? responseOverview.data.formResponses.map((row) => (
+                    <View key={row.id} style={[styles.formResponseCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle, opacity: row.status === 'hidden' ? 0.56 : 1 }]}>
+                      <Text style={[styles.personName, { color: colors.text }]}>{row.profile?.display_name || 'Anonymous response'}</Text>
+                      <Text style={[styles.personMeta, { color: colors.textMuted }]}>{new Date(row.created_at).toLocaleString()}</Text>
+                      {Object.entries(row.values ?? {}).map(([key, value]) => <Text key={key} style={[styles.answerText, { color: colors.textSecondary }]}><Text style={{ fontWeight: '900' }}>{key.replace(/_/g, ' ')}: </Text>{String(value ?? '')}</Text>)}
+                    </View>
+                  )) : <Text style={[styles.formHint, { color: colors.textMuted }]}>The linked form has no responses yet.</Text>}
+                </>
+              ) : null}
+            </>
+          )}
+        </ScrollView>
+      </BottomSheet>
     </View>
   );
 }
@@ -313,8 +404,9 @@ const styles = StyleSheet.create({
   screen: { flex: 1 }, content: { flexGrow: 1 }, body: { paddingHorizontal: spacing.md, gap: spacing.lg }, flex: { flex: 1, minWidth: 0 },
   notice: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.sm }, noticeText: { flex: 1, fontSize: 12, lineHeight: 17, fontWeight: '700' },
   summaryGrid: { flexDirection: 'row', gap: spacing.sm }, summaryCard: { flex: 1, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md }, summaryValue: { fontSize: 24, lineHeight: 29, fontWeight: '900' }, summaryLabel: { fontSize: 10.5, marginTop: 2 },
-  eventWrap: { marginBottom: spacing.md }, listBanner: { width: '100%', aspectRatio: 16 / 9, borderRadius: radius.xl, marginBottom: spacing.xs }, statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginTop: -spacing.xs, paddingHorizontal: spacing.xs }, statusMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' }, scopeText: { fontSize: 10.5, fontWeight: '700' },
-  stepBody: { gap: spacing.md }, fieldLabel: { fontSize: 9.5, fontWeight: '900', letterSpacing: 0.7 }, chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  eventWrap: { marginBottom: spacing.md }, inlineActions: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }, listBanner: { width: '100%', aspectRatio: 16 / 9, borderRadius: radius.xl, marginBottom: spacing.xs }, statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginTop: -spacing.xs, paddingHorizontal: spacing.xs }, statusMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' }, scopeText: { fontSize: 10.5, fontWeight: '700' },
+  stepBody: { gap: spacing.md }, fieldLabel: { fontSize: 9.5, fontWeight: '900', letterSpacing: 0.7 }, formHint: { fontSize: 10.5, lineHeight: 15 }, chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   uploadCard: { minHeight: 84, borderWidth: 1, borderRadius: radius.xl, padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, bannerPreview: { width: 100, aspectRatio: 16 / 9, borderRadius: radius.md }, imagePlaceholder: { width: 58, height: 58, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' }, uploadTitle: { fontSize: 12.5, fontWeight: '900' }, uploadHint: { fontSize: 10.5, lineHeight: 15, marginTop: 2 },
+  responseSheet: { gap: spacing.md, paddingBottom: spacing.xl }, responseSummary: { flexDirection: 'row', gap: spacing.sm }, responseMetric: { flex: 1, borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm }, responseNumber: { fontSize: 20, fontWeight: '900' }, responseLabel: { fontSize: 9.5, marginTop: 2 }, personRow: { borderBottomWidth: 1, paddingVertical: spacing.sm }, personName: { fontSize: 12.5, fontWeight: '900' }, personMeta: { fontSize: 9.5, lineHeight: 14, marginTop: 2 }, responseHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, responseTitle: { fontSize: 14, fontWeight: '900' }, formResponseCard: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, gap: 4 }, answerText: { fontSize: 10.5, lineHeight: 16 },
   reviewCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm }, reviewTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, reviewIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, reviewTitle: { fontSize: 19, lineHeight: 24, fontWeight: '900', letterSpacing: -0.3 }, reviewMeta: { fontSize: 10.5, lineHeight: 16, fontWeight: '700' }, reviewBody: { fontSize: 12, lineHeight: 18 },
 });
