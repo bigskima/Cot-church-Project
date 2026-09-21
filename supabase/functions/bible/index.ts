@@ -49,8 +49,8 @@ function normalizeBook(value: string) {
 
 function parseReference(input: string): ParsedReference {
   const raw = input.trim().replace(/[–—]/g,"-").replace(/\s+/g," ");
-  const match = raw.match(/^((?:[1-3]\s*)?[A-Za-z]+(?:\s+of\s+[A-Za-z]+|\s+[A-Za-z]+)*)\s+(\d{1,3})(?::(\d{1,3})(?:-(\d{1,3}))?)?$/i);
-  if (!match) throw new ApiError("BIBLE_REFERENCE_INVALID","Enter a Bible reference such as John 3:16 or Psalm 23.",422);
+  const match = raw.match(/^((?:[1-3]\s*)?[A-Za-z]+(?:\s+of\s+[A-Za-z]+|\s+[A-Za-z]+)*)\s+(\d{1,3})(?:\s*(?::|v(?:s\.?|erse(?:s)?)?\.?)\s*(\d{1,3})(?:\s*-\s*(\d{1,3}))?)?$/i);
+  if (!match) throw new ApiError("BIBLE_REFERENCE_INVALID","Enter a Bible reference such as John 3:16, John 3 vs 16, or Psalm 23.",422);
   const book = normalizeBook(match[1]);
   if (!book) throw new ApiError("BIBLE_BOOK_INVALID","Bible book not recognized.",422);
   const chapter = Number(match[2]);

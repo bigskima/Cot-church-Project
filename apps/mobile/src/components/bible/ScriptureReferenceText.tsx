@@ -10,7 +10,7 @@ import { Icon } from '../primitives/Icon';
 import { Skeleton } from '../states';
 
 const BOOK_PATTERN = '(?:Genesis|Exodus|Leviticus|Numbers|Deuteronomy|Joshua|Judges|Ruth|1\\s*Samuel|2\\s*Samuel|1\\s*Kings|2\\s*Kings|1\\s*Chronicles|2\\s*Chronicles|Ezra|Nehemiah|Esther|Job|Psalms?|Proverbs|Ecclesiastes|Song\\s+of\\s+Solomon|Isaiah|Jeremiah|Lamentations|Ezekiel|Daniel|Hosea|Joel|Amos|Obadiah|Jonah|Micah|Nahum|Habakkuk|Zephaniah|Haggai|Zechariah|Malachi|Matthew|Mark|Luke|John|Acts|Romans|1\\s*Corinthians|2\\s*Corinthians|Galatians|Ephesians|Philippians|Colossians|1\\s*Thessalonians|2\\s*Thessalonians|1\\s*Timothy|2\\s*Timothy|Titus|Philemon|Hebrews|James|1\\s*Peter|2\\s*Peter|1\\s*John|2\\s*John|3\\s*John|Jude|Revelation)';
-const REFERENCE_RE = new RegExp(`\\b(${BOOK_PATTERN})\\s+(\\d{1,3})(?::(\\d{1,3})(?:[–—-](\\d{1,3}))?)?`, 'gi');
+const REFERENCE_RE = new RegExp(`\\b(${BOOK_PATTERN})\\s+(\\d{1,3})(?:\\s*(?::|v(?:s\\.?|erse(?:s)?)?\\.?)\\s*(\\d{1,3})(?:\\s*[–—-]\\s*(\\d{1,3}))?)?`, 'gi');
 
 export type ScriptureReferenceMatch = { reference: string; start: number; end: number };
 
@@ -21,7 +21,13 @@ export function detectScriptureReferences(value: string, limit = 6): ScriptureRe
   REFERENCE_RE.lastIndex = 0;
   let match: RegExpExecArray | null;
   while ((match = REFERENCE_RE.exec(value)) && matches.length < limit) {
-    const reference = match[0].replace(/\s+/g, ' ').replace(/[–—]/g, '-').trim();
+    const book = match[1].replace(/\s+/g, ' ').trim();
+    const chapter = match[2];
+    const verseStart = match[3];
+    const verseEnd = match[4];
+    const reference = verseStart
+      ? book + ' ' + chapter + ':' + verseStart + (verseEnd ? '-' + verseEnd : '')
+      : book + ' ' + chapter;
     const key = reference.toLowerCase();
     if (!seen.has(key)) {
       seen.add(key);
