@@ -97,40 +97,40 @@ export function BibleExperience() {
   };
 
   const books = useResource<BibleBook[]>('bible:books', (signal) =>
-    api.request('bible?' + queryString({ action: 'books' }), { signal, context: 'public' }),
+    api.request('noop?service=bible&' + queryString({ action: 'books' }), { signal, context: 'public' }),
   );
   const versions = useResource<BibleVersion[]>('bible:versions:' + language, (signal) =>
-    api.request('bible?' + queryString({ action: 'versions', language }), { signal, context: 'public' }),
+    api.request('noop?service=bible&' + queryString({ action: 'versions', language }), { signal, context: 'public' }),
   );
   const passage = useResource<Passage>(
     'bible:passage:' + versionId + ':' + reference + ':' + organizationId,
-    (signal) => api.request('bible?' + queryString({ action: 'passage', reference, versionId }), { signal, context: 'public' }),
+    (signal) => api.request('noop?service=bible&' + queryString({ action: 'passage', reference, versionId }), { signal, context: 'public' }),
   );
   const today = useResource<Today>('bible:today:' + organizationId, (signal) =>
-    api.request('bible?' + queryString({ action: 'today' }), { signal, context: 'public' }),
+    api.request('noop?service=bible&' + queryString({ action: 'today' }), { signal, context: 'public' }),
   );
   const study = useResource<StudyState>('bible:me:' + organizationId + ':' + mode, (signal) =>
-    api.request('bible?' + queryString({ action: 'me' }), { signal, context: 'public' }),
+    api.request('noop?service=bible&' + queryString({ action: 'me' }), { signal, context: 'public' }),
   );
   const plans = useResource<Plan[]>('bible:plans:' + organizationId, (signal) =>
-    api.request('bible?' + queryString({ action: 'plans' }), { signal, context: 'public' }),
+    api.request('noop?service=bible&' + queryString({ action: 'plans' }), { signal, context: 'public' }),
   );
   const planDetail = useResource<PlanDetail | null>(
     selectedPlan ? 'bible:plan:' + selectedPlan + ':' + mode : 'bible:plan:none',
     async (signal) => selectedPlan
-      ? api.request('bible?' + queryString({ action: 'plan', planId: selectedPlan }), { signal, context: 'public' })
+      ? api.request('noop?service=bible&' + queryString({ action: 'plan', planId: selectedPlan }), { signal, context: 'public' })
       : null,
   );
   const search = useResource<SearchPayload | null>(
     searchQuery ? 'bible:search:' + versionId + ':' + searchQuery : 'bible:search:none',
     async (signal) => searchQuery
-      ? api.request('bible?' + queryString({ action: 'search', q: searchQuery, versionId }), { signal, context: 'public' })
+      ? api.request('noop?service=bible&' + queryString({ action: 'search', q: searchQuery, versionId }), { signal, context: 'public' })
       : null,
   );
   const compare = useResource<Passage | null>(
     compareVersion ? 'bible:compare:' + compareVersion + ':' + reference : 'bible:compare:none',
     async (signal) => compareVersion
-      ? api.request('bible?' + queryString({ action: 'passage', reference, versionId: compareVersion }), { signal, context: 'public' })
+      ? api.request('noop?service=bible&' + queryString({ action: 'passage', reference, versionId: compareVersion }), { signal, context: 'public' })
       : null,
   );
 
@@ -146,7 +146,7 @@ export function BibleExperience() {
 
   useEffect(() => {
     if (mode !== 'authenticated' || !passage.data?.reference) return;
-    void api.request('bible', {
+    void api.request('noop?service=bible', {
       method: 'POST',
       context: 'public',
       body: JSON.stringify({ action: 'history', reference: passage.data.reference, versionId }),
@@ -167,7 +167,7 @@ export function BibleExperience() {
   const postAction = async (body: Record<string, unknown>) => {
     setActionError('');
     try {
-      const value = await api.request<any>('bible', {
+      const value = await api.request<any>('noop?service=bible', {
         method: 'POST',
         context: 'public',
         body: JSON.stringify(body),
