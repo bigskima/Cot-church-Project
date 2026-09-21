@@ -268,6 +268,30 @@ Deno.serve(createHandler(
 
     const body = assertObject(await jsonBody(request));
 
+    if (body.action === "delete_comment") {
+      assertNoUnknownFields(body, ["action", "commentId"]);
+      const commentId = uuid(requiredString(body.commentId, "commentId", 36), "commentId", true)!;
+      const admin = adminClient();
+      const { data: comment, error: commentError } = await admin
+        .from("content_comments")
+        .select("id,content_item_id,author_profile_id,is_hidden")
+        .eq("id", commentId)
+        .maybeSingle();
+      if (commentError || !comment || comment.is_hidden) {
+        throw new ApiError("COMMENT_NOT_FOUND", "This comment is unavailable", 404);
+      }
+      if (comment.author_profile_id !== auth.user.id) {
+        throw new ApiError("COMMENT_DELETE_DENIED", "You can delete only comments you wrote.", 403);
+      }
+      await assertContentAccess(auth, comment.content_item_id);
+      const { error: hideError } = await admin.from("content_comments")
+        .update({ is_hidden: true, updated_at: new Date().toISOString() })
+        .eq("id", commentId)
+        .eq("author_profile_id", auth.user.id);
+      if (hideError) throw new ApiError("COMMENT_DELETE_FAILED", "Unable to delete this comment.", 500, undefined, false);
+      return { data: { commentId, deleted: true } };
+    }
+
     // 1. React
     if (body.action === "react") {
       assertNoUnknownFields(body, ["action", "contentId", "reaction"]);

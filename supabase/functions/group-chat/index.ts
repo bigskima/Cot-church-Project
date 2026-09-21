@@ -7,6 +7,7 @@ import {
   deleteChatUpload,
   hydrateChatMessages,
   markChatUploadsAttached,
+  purgeAttachedChatUploads,
   validateChatUploads,
 } from "../_shared/chat-media.ts";
 import { createHandler } from "../_shared/handler.ts";
@@ -434,7 +435,7 @@ Deno.serve(createHandler(
       expressionId: group.branch_id ?? null,
       groupId,
     };
-    if (["create_upload", "complete_upload", "delete_upload", "send", "react", "pin"].includes(action)) {
+    if (["create_upload", "complete_upload", "delete_upload", "send", "delete_message", "react", "pin"].includes(action)) {
       await assertFeatureEnabled(admin, "group_chat", featureScope, "Group chat is currently unavailable in this Group.");
     }
     if (action === "create_upload") {
@@ -611,6 +612,31 @@ Deno.serve(createHandler(
         ))[0],
         status: 201,
       };
+    }
+
+    if (action === "delete_message") {
+      assertNoUnknownFields(body, ["action", "groupId", "sectionId", "messageId"]);
+      assertMayChat(membership);
+      const messageId = uuid(requiredString(body.messageId, "messageId", 36), "messageId", true)!;
+      const message = await requireMessage(admin, groupId, sectionId, messageId);
+      if (message.sender_profile_id !== auth.user.id) {
+        throw new ApiError("MESSAGE_DELETE_DENIED", "You can delete only messages you sent.", 403);
+      }
+      const { data: ownedMessage, error: ownedError } = await admin.from("group_messages")
+        .select("id,attachment_ids")
+        .eq("id", messageId)
+        .eq("group_id", groupId)
+        .eq("sender_profile_id", auth.user.id)
+        .maybeSingle();
+      if (ownedError || !ownedMessage) throw new ApiError("MESSAGE_NOT_FOUND", "This message is unavailable.", 404);
+      const { error: deleteError } = await admin.from("group_messages")
+        .delete()
+        .eq("id", messageId)
+        .eq("group_id", groupId)
+        .eq("sender_profile_id", auth.user.id);
+      if (deleteError) throw new ApiError("MESSAGE_DELETE_FAILED", "Unable to delete this message.", 500, undefined, false);
+      await purgeAttachedChatUploads(admin, auth.user.id, ownedMessage.attachment_ids ?? []);
+      return { data: { messageId, deleted: true } };
     }
 
     if (action === "react") {

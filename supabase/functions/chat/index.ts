@@ -7,6 +7,7 @@ import {
   deleteChatUpload,
   hydrateChatMessages,
   markChatUploadsAttached,
+  purgeAttachedChatUploads,
   validateChatUploads,
 } from "../_shared/chat-media.ts";
 import { createHandler } from "../_shared/handler.ts";
@@ -466,6 +467,31 @@ Deno.serve(createHandler(
         ))[0],
         status: 201,
       };
+    }
+
+    if (action === "delete_message") {
+      assertNoUnknownFields(body, ["action", "conversationId", "messageId"]);
+      const conversationId = uuid(requiredString(body.conversationId, "conversationId", 36), "conversationId", true)!;
+      const messageId = uuid(requiredString(body.messageId, "messageId", 36), "messageId", true)!;
+      const conversation = await requireConversation(admin, conversationId, viewerId);
+      await assertConversationInteraction(admin, conversation, viewerId);
+      const { data: message, error: messageError } = await admin.from("direct_messages")
+        .select("id,sender_profile_id,attachment_ids")
+        .eq("id", messageId)
+        .eq("conversation_id", conversationId)
+        .maybeSingle();
+      if (messageError || !message) throw new ApiError("MESSAGE_NOT_FOUND", "This message is unavailable.", 404);
+      if (message.sender_profile_id !== viewerId) {
+        throw new ApiError("MESSAGE_DELETE_DENIED", "You can delete only messages you sent.", 403);
+      }
+      const { error: deleteError } = await admin.from("direct_messages")
+        .delete()
+        .eq("id", messageId)
+        .eq("conversation_id", conversationId)
+        .eq("sender_profile_id", viewerId);
+      if (deleteError) throw new ApiError("MESSAGE_DELETE_FAILED", "We couldn’t delete this message.", 500, undefined, false);
+      await purgeAttachedChatUploads(admin, viewerId, message.attachment_ids ?? []);
+      return { data: { messageId, deleted: true } };
     }
 
     if (action === "react") {

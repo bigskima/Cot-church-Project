@@ -235,7 +235,7 @@ Deno.serve(createHandler(
       organizationId: auth.organizationId,
       expressionId: branchId,
     };
-    if (["create_upload", "complete_upload", "delete_upload", "send", "react", "pin"].includes(action)) {
+    if (["create_upload", "complete_upload", "delete_upload", "send", "delete_message", "react", "pin"].includes(action)) {
       await assertFeatureEnabled(admin, "expression_discussion", featureScope, "Expression discussion is currently unavailable.");
     }
     if (action === "create_upload") {
@@ -362,6 +362,44 @@ Deno.serve(createHandler(
         });
       }
       return { data: (await hydrate(admin, [created], auth.user.id, auth.organizationId!, branchId))[0] };
+    }
+
+    if (action === "delete_message") {
+      const messageId = uuid(String(body.messageId ?? ""), "messageId", true)!;
+      const { data: message, error: messageError } = await admin.from("expression_chat_messages")
+        .select("id,sender_profile_id,attachment_ids")
+        .eq("id", messageId)
+        .eq("organization_id", auth.organizationId)
+        .eq("branch_id", branchId)
+        .maybeSingle();
+      if (messageError || !message) throw new ApiError("MESSAGE_NOT_FOUND", "This message is unavailable.", 404);
+      if (message.sender_profile_id !== auth.user.id) {
+        throw new ApiError("MESSAGE_DELETE_DENIED", "You can delete only messages you sent.", 403);
+      }
+      const attachmentIds = Array.isArray(message.attachment_ids) ? message.attachment_ids : [];
+      const { data: uploads } = attachmentIds.length
+        ? await admin.from("expression_chat_uploads")
+            .select("id,storage_path,status")
+            .in("id", attachmentIds)
+            .eq("uploader_profile_id", auth.user.id)
+            .eq("branch_id", branchId)
+        : { data: [] as any[] };
+      const { error: deleteError } = await admin.from("expression_chat_messages")
+        .delete()
+        .eq("id", messageId)
+        .eq("organization_id", auth.organizationId)
+        .eq("branch_id", branchId)
+        .eq("sender_profile_id", auth.user.id);
+      if (deleteError) throw new ApiError("MESSAGE_DELETE_FAILED", "Unable to delete this message.", 500, undefined, false);
+      const storagePaths = (uploads ?? []).filter((item: any) => item.status !== "deleted" && item.storage_path).map((item: any) => item.storage_path);
+      if (storagePaths.length) await admin.storage.from(BUCKET).remove(storagePaths);
+      if ((uploads ?? []).length) {
+        await admin.from("expression_chat_uploads")
+          .update({ status: "deleted", deleted_at: new Date().toISOString() })
+          .in("id", (uploads ?? []).map((item: any) => item.id))
+          .eq("uploader_profile_id", auth.user.id);
+      }
+      return { data: { messageId, deleted: true } };
     }
 
     if (action === "react") {
