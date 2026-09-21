@@ -83,8 +83,8 @@ const realtimeDomains: RealtimeDomain[] = [
   {
     name: 'ministry-content',
     tables: {
-      events: ['events:', 'event:', 'discover:events:', 'leadership:events:', 'general:ministry:events:', 'mobile:home-feed:', 'expression:'],
-      announcements: ['general:announcements:', 'expression:announcements:', 'leadership:announcements:', 'general:ministry:announcements:', 'mobile:home-feed:', 'expression:'],
+      events: ['events:', 'event:', 'discover:events:', 'leadership:events:', 'general:ministry:events:', 'home:spotlight:banners:', 'expression:'],
+      announcements: ['general:announcements:', 'general:announcement:', 'expression:announcements:', 'leadership:announcements:', 'general:ministry:announcements:', 'home:spotlight:banners:', 'expression:'],
       sermons: ['sermon:', 'general:sermons:', 'discover:sermons:', 'discover:series:', 'leadership:sermons:', 'general:ministry:sermons:', 'mobile:home-feed:', 'expression:', 'saved:'],
       library_books: ['library:'],
       library_reviews: ['library:'],
