@@ -257,7 +257,7 @@ export const engagementHubHandler=createHandler(
       if(action==="home"){
         const now=new Date().toISOString();
         const today=now.slice(0,10);
-        const [bannerResult,formResult,scripture,storedQuote]=await Promise.all([
+        const [bannerResult,formResult,eventResult,announcementResult,scripture,storedQuote]=await Promise.all([
           admin.from("cot_home_banners")
             .select("id,title,subtitle,image_url,destination_type,destination_value,priority,starts_at,ends_at")
             .eq("organization_id",organizationId)
@@ -272,17 +272,35 @@ export const engagementHubHandler=createHandler(
             .eq("organization_id",organizationId)
             .eq("status","published")
             .order("updated_at",{ascending:false})
-            .limit(20),
+            .limit(12),
+          admin.from("events")
+            .select("id,title,description,banner_url,visibility,starts_at,ends_at")
+            .eq("organization_id",organizationId)
+            .is("branch_id",null)
+            .eq("status","published")
+            .gte("ends_at",now)
+            .in("visibility",auth?.user?["public","members"]:["public"])
+            .order("starts_at",{ascending:true})
+            .limit(10),
+          auth?.user
+            ? admin.from("announcements")
+                .select("id,title,body,banner_url,published_at")
+                .eq("organization_id",organizationId)
+                .is("branch_id",null)
+                .eq("status","published")
+                .order("published_at",{ascending:false,nullsFirst:false})
+                .limit(10)
+            : Promise.resolve({data:[] as any[],error:null}),
           resolvedScripture(admin,organizationId,today).catch(()=>null),
           admin.from("cot_daily_quotes").select("id,quote_date,body,source_reference,theme,source,status").eq("organization_id",organizationId).eq("quote_date",today).maybeSingle(),
         ]);
-        if(bannerResult.error||formResult.error) throw new ApiError("HOME_BANNERS_FAILED","Unable to load COT highlights.",500,undefined,false);
+        if(bannerResult.error||formResult.error||eventResult.error||announcementResult.error) throw new ApiError("HOME_BANNERS_FAILED","Unable to load COT highlights.",500,undefined,false);
         const explicitBanners=bannerResult.data??[];
-        const explicitForms=new Set(explicitBanners
-          .filter((item:any)=>item.destination_type==="form"&&item.destination_value)
-          .map((item:any)=>String(item.destination_value)));
+        const explicitDestinations=new Set(explicitBanners
+          .filter((item:any)=>item.destination_type!=="none"&&item.destination_value)
+          .map((item:any)=>item.destination_type+":"+String(item.destination_value)));
         const automaticFormBanners=(formResult.data??[])
-          .filter((form:any)=>!explicitForms.has(String(form.slug)))
+          .filter((form:any)=>!explicitDestinations.has("form:"+String(form.slug)))
           .map((form:any)=>({
             id:"form:"+form.id,
             title:form.title,
@@ -294,6 +312,34 @@ export const engagementHubHandler=createHandler(
             starts_at:null,
             ends_at:null,
             source:"published_form",
+          }));
+        const automaticEventBanners=(eventResult.data??[])
+          .filter((event:any)=>!explicitDestinations.has("event:"+String(event.id)))
+          .map((event:any)=>({
+            id:"event:"+event.id,
+            title:event.title,
+            subtitle:event.description||("Starts "+new Date(event.starts_at).toLocaleString()),
+            image_url:event.banner_url??null,
+            destination_type:"event",
+            destination_value:event.id,
+            priority:0,
+            starts_at:event.starts_at,
+            ends_at:event.ends_at,
+            source:"published_event",
+          }));
+        const automaticAnnouncementBanners=(announcementResult.data??[])
+          .filter((announcement:any)=>!explicitDestinations.has("announcement:"+String(announcement.id)))
+          .map((announcement:any)=>({
+            id:"announcement:"+announcement.id,
+            title:announcement.title,
+            subtitle:announcement.body||"Open this COT announcement.",
+            image_url:announcement.banner_url??null,
+            destination_type:"announcement",
+            destination_value:announcement.id,
+            priority:0,
+            starts_at:announcement.published_at??null,
+            ends_at:null,
+            source:"published_announcement",
           }));
         const stored=(storedQuote as any)?.data??null;
         const dailyQuote=stored
@@ -307,7 +353,7 @@ export const engagementHubHandler=createHandler(
               isOverride:true,
             }
           : scripture ? automaticQuote(scripture,today) : null;
-        return {data:{banners:[...explicitBanners,...automaticFormBanners],dailyQuote}};
+        return {data:{banners:[...explicitBanners,...automaticAnnouncementBanners,...automaticEventBanners,...automaticFormBanners],dailyQuote}};
       }
 
       if(action==="form"){
