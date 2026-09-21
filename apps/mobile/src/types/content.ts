@@ -299,6 +299,7 @@ export type Event = {
   registration_opens_at?: string | null;
   registration_closes_at?: string | null;
   capacity?: number | null;
+  response_form_id?: string | null;
 };
 
 export type SermonSeries = {
