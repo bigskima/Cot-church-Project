@@ -188,15 +188,15 @@ function visualKind(value:unknown){
   if(!DAILY_VISUAL_KINDS.has(kind)) throw new ApiError("VALIDATION_FAILED","Choose Daily Bible, Daily Quote or Daily Devotional.",422);
   return kind;
 }
-async function devotionalVisualContent(admin:any,organizationId:string,date:string){
+async function devotionalVisualContent(admin:any,organizationId:string,date:string,seriesId?:string|null){
   const year=Number(date.slice(0,4));
-  const {data:series}=await admin.from("devotional_series")
-    .select("id,title,author_name")
+  let seriesQuery=admin.from("devotional_series")
+    .select("id,title,author_name,status")
     .eq("organization_id",organizationId)
-    .eq("devotional_year",year)
-    .eq("status","published")
-    .order("published_at",{ascending:false})
-    .limit(12);
+    .eq("devotional_year",year);
+  if(seriesId) seriesQuery=seriesQuery.eq("id",seriesId);
+  else seriesQuery=seriesQuery.eq("status","published").order("published_at",{ascending:false});
+  const {data:series}=await seriesQuery.limit(12);
   const ids=(series??[]).map((row:any)=>row.id);
   if(ids.length){
     const {data:entry}=await admin.from("devotional_entries")
@@ -221,7 +221,7 @@ async function devotionalVisualContent(admin:any,organizationId:string,date:stri
   if(legacy) return {title:legacy.title||"Daily Devotional",scripture:legacy.scripture||"",body:legacy.content||"",seriesTitle:"Daily Devotional"};
   throw new ApiError("DEVOTIONAL_NOT_FOUND","There is no published devotional for this date.",404);
 }
-async function visualContent(admin:any,organizationId:string,date:string,kind:string){
+async function visualContent(admin:any,organizationId:string,date:string,kind:string,seriesId?:string|null){
   const bible=await resolvedScripture(admin,organizationId,date);
   if(kind==="bible") return {reference:String(bible.reference??""),theme:String(bible.theme??"general"),title:"Daily Bible",body:String(bible.message??"")};
   if(kind==="quote"){
@@ -231,7 +231,7 @@ async function visualContent(admin:any,organizationId:string,date:string,kind:st
       : automaticQuote(bible,date);
     return {reference:String(quote.sourceReference??bible.reference??""),theme:String(quote.theme??bible.theme??"general"),title:"Daily Quote",body:String(quote.body??"")};
   }
-  const devotional=await devotionalVisualContent(admin,organizationId,date);
+  const devotional=await devotionalVisualContent(admin,organizationId,date,seriesId);
   return {reference:String(devotional.scripture??bible.reference??""),theme:String(bible.theme??"general"),title:String(devotional.title??"Daily Devotional"),body:String(devotional.body??"")};
 }
 function visualPrompt(kind:string,date:string,content:any){
@@ -734,7 +734,8 @@ export const engagementHubHandler=createHandler(
         return {data:{date,kind,deleted:true}};
       }
 
-      const content=await visualContent(admin,organizationId,date,kind);
+      const seriesId=kind==="devotional"?optionalUuid(body.seriesId,"seriesId"):null;
+      const content=await visualContent(admin,organizationId,date,kind,seriesId);
       const prompt=visualPrompt(kind,date,content);
       const {data:existing}=await admin.from("cot_daily_visuals").select("storage_path,image_source").eq("organization_id",organizationId).eq("visual_date",date).eq("content_kind",kind).maybeSingle();
       await admin.from("cot_daily_visuals").upsert({
