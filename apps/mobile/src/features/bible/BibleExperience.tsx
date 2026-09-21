@@ -25,7 +25,7 @@ type BibleVersion = {
   language?: { name?: string; iso_639_1?: string };
   language_tag?: string;
   available?: boolean;
-  accessStatus?: 'public_domain' | 'licensed' | 'requires_license';
+  accessStatus?: 'public_domain' | 'licensed' | 'requires_license' | 'metadata_only';
 };
 
 type BibleBook = { name: string; usfm: string; number: number; chapters: number };
@@ -929,7 +929,9 @@ export function BibleExperience() {
                   <Text style={[styles.versionMeta, { color: available ? colors.textMuted : colors.live }]}>
                     {available
                       ? ((item.language?.name || item.language_tag || '') + (item.provider ? ' · ' + item.provider : ''))
-                      : 'Listed by YouVersion · publisher license not enabled for this COT App Key'}
+                      : item.accessStatus === 'metadata_only'
+                        ? 'Available on YouVersion · not exposed for Bible text through this COT Platform App Key'
+                        : 'Listed by YouVersion · publisher license not enabled for this COT App Key'}
                   </Text>
                 </View>
                 {String(item.id) === String(versionId)
@@ -942,7 +944,7 @@ export function BibleExperience() {
           })}
           {!visibleVersions.length ? (
             <Text style={[styles.emptyHelp, { color: colors.textMuted }]}>
-              No translation matches this search. If a YouVersion translation is missing, its publisher license may not be enabled for this App Key yet.
+              No translation matches this search in the YouVersion Platform catalogue available to COT.
             </Text>
           ) : null}
         </ScrollView>
