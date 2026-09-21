@@ -119,6 +119,20 @@ function stableIndex(value:string,length:number){
 }
 function normalizedTheme(value:unknown){
   const theme=String(value??"general").trim().toLowerCase();
+  const aliases:Record<string,string>={
+    anxiety:"peace", worry:"peace", rest:"peace",
+    trust:"faith", believe:"faith",
+    future:"hope", waiting:"hope",
+    mercy:"grace", forgiveness:"grace",
+    direction:"wisdom", discernment:"wisdom",
+    fear:"courage", boldness:"courage",
+    intercession:"prayer",
+    endurance:"strength", perseverance:"strength",
+    calling:"purpose", service:"purpose",
+    joy:"gratitude", thanksgiving:"gratitude",
+    surrender:"obedience",
+  };
+  for(const [needle,key] of Object.entries(aliases)) if(theme.includes(needle)) return key;
   for(const key of Object.keys(QUOTE_BANK)){
     if(key!=="general"&&theme.includes(key)) return key;
   }
@@ -253,7 +267,7 @@ export const engagementHubHandler=createHandler(
             .order("priority",{ascending:false})
             .order("created_at",{ascending:false})
             .limit(20),
-          resolvedScripture(admin,organizationId,today),
+          resolvedScripture(admin,organizationId,today).catch(()=>null),
           admin.from("cot_daily_quotes").select("id,quote_date,body,source_reference,theme,source,status").eq("organization_id",organizationId).eq("quote_date",today).maybeSingle(),
         ]);
         if(error) throw new ApiError("HOME_BANNERS_FAILED","Unable to load COT highlights.",500,undefined,false);
@@ -268,7 +282,7 @@ export const engagementHubHandler=createHandler(
               status:stored.status,
               isOverride:true,
             }
-          : automaticQuote(scripture,today);
+          : scripture ? automaticQuote(scripture,today) : null;
         return {data:{banners:data??[],dailyQuote}};
       }
 
