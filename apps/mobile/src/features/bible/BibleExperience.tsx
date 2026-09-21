@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as Speech from 'expo-speech';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -121,6 +121,7 @@ export function BibleExperience() {
   const [language, setLanguage] = useState('en');
   const [versionSheet, setVersionSheet] = useState(false);
   const [versionSearch, setVersionSearch] = useState('');
+  const versionSearchRef = useRef<TextInput>(null);
   const [bookSheet, setBookSheet] = useState(false);
   const [noteSheet, setNoteSheet] = useState(false);
   const [noteText, setNoteText] = useState('');
@@ -745,23 +746,20 @@ export function BibleExperience() {
 
       <BottomSheet visible={versionSheet} onClose={() => setVersionSheet(false)} title="Bible version" subtitle="KJV, NKJV and other YouVersion translations appear according to your app's publisher licenses." maxHeightPercent={82}>
         <View style={styles.versionFilters}>
-          <TextInput
-            value={language}
-            onChangeText={setLanguage}
-            placeholder="Language code e.g. en, ig, fr"
-            placeholderTextColor={colors.textMuted}
-            style={[styles.languageInput, { color: colors.text, borderColor: colors.borderSubtle, backgroundColor: colors.bgSecondary }]}
-          />
-          <View style={[styles.versionSearch, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
-            <Icon name="search-outline" size={16} color={colors.textMuted} />
-            <TextInput
-              value={versionSearch}
-              onChangeText={setVersionSearch}
-              placeholder="Search KJV, NKJV, NIV…"
-              placeholderTextColor={colors.textMuted}
-              style={[styles.versionSearchInput, { color: colors.text }]}
-            />
-            {versionSearch ? <Pressable onPress={() => setVersionSearch('')}><Icon name="close-circle" size={16} color={colors.textMuted} /></Pressable> : null}
+          <Text style={[styles.versionSearchLabel, { color: colors.textMuted }]}>SEARCH TRANSLATIONS</Text>
+          <Pressable onPress={() => versionSearchRef.current?.focus()} accessibilityRole="search" accessibilityLabel="Search Bible translations" style={({ pressed }) => [styles.versionSearch, { backgroundColor: colors.bgSecondary, borderColor: versionSearch ? colors.interactive : colors.borderSubtle }, pressed && { opacity: 0.92 }]}>
+            <View style={[styles.versionSearchIcon, { backgroundColor: colors.card }]}>
+              <Icon name="search-outline" size={20} color={colors.interactive} />
+            </View>
+            <TextInput ref={versionSearchRef} value={versionSearch} onChangeText={setVersionSearch} placeholder="Search KJV, NKJV, NIV, NLT, GNT…" placeholderTextColor={colors.textMuted} autoCapitalize="characters" returnKeyType="search" style={[styles.versionSearchInput, { color: colors.text }]} />
+            {versionSearch ? <Pressable onPress={(event) => { event.stopPropagation?.(); setVersionSearch(''); versionSearchRef.current?.focus(); }} hitSlop={10} style={styles.versionSearchClear} accessibilityRole="button" accessibilityLabel="Clear translation search"><Icon name="close-circle" size={21} color={colors.textMuted} /></Pressable> : null}
+          </Pressable>
+          <View style={styles.languageRow}>
+            <View style={styles.languageCopy}>
+              <Text style={[styles.languageTitle, { color: colors.text }]}>Language</Text>
+              <Text style={[styles.languageHelp, { color: colors.textMuted }]}>Narrow the catalogue only when you need another language.</Text>
+            </View>
+            <TextInput value={language} onChangeText={setLanguage} placeholder="en" placeholderTextColor={colors.textMuted} autoCapitalize="none" style={[styles.languageInput, { color: colors.text, borderColor: colors.borderSubtle, backgroundColor: colors.bgSecondary }]} />
           </View>
         </View>
         <ScrollView style={styles.versionScroll}>
@@ -1007,10 +1005,17 @@ const styles = StyleSheet.create({
   chapterGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chapterChip: { width: 42, height: 38, borderWidth: 1, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   chapterChipText: { fontSize: 10.5, fontWeight: '800' },
-  versionFilters: { gap: 8, marginBottom: spacing.sm },
-  languageInput: { minHeight: 44, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: 12 },
-  versionSearch: { minHeight: 44, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 7 },
-  versionSearchInput: { flex: 1, fontSize: 12.5 },
+  versionFilters: { gap: 10, marginBottom: spacing.sm },
+  versionSearchLabel: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.9, marginLeft: 2 },
+  versionSearch: { minHeight: 62, borderWidth: 1.5, borderRadius: radius.xl, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  versionSearchIcon: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  versionSearchInput: { flex: 1, minWidth: 0, minHeight: 58, fontSize: 16, lineHeight: 22, paddingVertical: 12, paddingHorizontal: 2 },
+  versionSearchClear: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  languageRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  languageCopy: { flex: 1, minWidth: 0 },
+  languageTitle: { fontSize: 10.5, fontWeight: '900' },
+  languageHelp: { fontSize: 8.5, lineHeight: 12, marginTop: 1 },
+  languageInput: { width: 76, minHeight: 44, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: 10, textAlign: 'center', fontSize: 13, fontWeight: '800' },
   versionScroll: { maxHeight: 460 },
   versionRow: { minHeight: 62, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 8 },
   versionBadge: { width: 48, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },

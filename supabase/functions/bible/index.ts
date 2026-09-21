@@ -241,8 +241,9 @@ async function passage(reference: string, versionId = "web") {
 
 async function fetchYouVersionBiblePages(key: string, language: string, allAvailable = false) {
   const rows: any[] = [];
+  const seenTokens = new Set<string>();
   let pageToken = "";
-  for (let page = 0; page < 10; page += 1) {
+  for (let page = 0; page < 100; page += 1) {
     const params = new URLSearchParams();
     params.append("language_ranges[]", language || "en*");
     params.set("page_size", "99");
@@ -253,8 +254,10 @@ async function fetchYouVersionBiblePages(key: string, language: string, allAvail
       { headers:{ "X-YVP-App-Key":key,"Accept":"application/json" } },
     );
     rows.push(...(Array.isArray(result?.data) ? result.data : []));
-    pageToken = String(result?.next_page_token ?? "");
-    if (!pageToken) break;
+    const nextToken = String(result?.next_page_token ?? "");
+    if (!nextToken || seenTokens.has(nextToken)) break;
+    seenTokens.add(nextToken);
+    pageToken = nextToken;
   }
   return rows;
 }
