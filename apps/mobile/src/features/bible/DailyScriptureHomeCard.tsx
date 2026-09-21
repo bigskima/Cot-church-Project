@@ -29,7 +29,7 @@ export function DailyScriptureHomeCard() {
     (signal) => {
       const query = new URLSearchParams({ action: 'today' });
       if (organizationId) query.set('organizationId', organizationId);
-      return api.request('bible?' + query.toString(), { signal, context: 'public' });
+      return api.request('noop?service=bible&' + query.toString(), { signal, context: 'public' });
     },
   );
 
