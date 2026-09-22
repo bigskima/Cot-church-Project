@@ -22,6 +22,7 @@ const guides: Record<string, Guide> = {
   "expression-creators":{title:"Expression Creation Access",purpose:"Choose who may create new Expressions.",boundaries:["Creation access does not grant wider platform administration."]},
   branding:{title:"Branding & Identity",purpose:"Control official COT names, logos and appearance.",boundaries:["Keep official identity consistent across COT."]},
   features:{title:"Feature Availability",purpose:"Choose which product features are currently available.",boundaries:["Keep unfinished or unapproved features unavailable."]},
+  bible:{title:"Bible Experience",purpose:"Control Bible services, active translations and the default Bible version across COT.",boundaries:["Keep at least one usable translation active. Ministry still owns Daily Scripture content and reading plans."]},
   credentials:{title:"Secure Credentials",purpose:"Store protected keys used by approved external services.",boundaries:["Never place credentials in descriptions, notes or screenshots."]},
   streaming:{title:"Streaming Services",purpose:"Prepare and monitor services used for live broadcasts.",boundaries:["Test service readiness before relying on it for a programme."]},
   ai:{title:"AI Services",purpose:"Choose AI services and models for approved COT tasks.",boundaries:["A credential, active model and task assignment are all required."]},
@@ -33,7 +34,7 @@ const guides: Record<string, Guide> = {
 const pagePermissions: Record<string, string> = {
   overview:"platform.overview.read", organizations:"platform.organizations.read", expressions:"platform.expressions.read", users:"platform.users.read",
   moderation:"platform.moderation.read", "roles-access":"platform.roles.read", "admin-invitations":"platform.roles.manage",
-  "expression-creators":"platform.expression_creators.manage", branding:"platform.branding.manage", features:"platform.features.read",
+  "expression-creators":"platform.expression_creators.manage", branding:"platform.branding.manage", features:"platform.features.read", bible:"platform.bible.read",
   credentials:"platform.secrets.manage", streaming:"platform.streaming.read", ai:"platform.ai.read", payments:"platform.payments.read",
   integrations:"platform.integrations.read", audit:"platform.audit.read"
 };
