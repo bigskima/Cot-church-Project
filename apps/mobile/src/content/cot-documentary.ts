@@ -232,8 +232,7 @@ export const COT_DOCUMENTARY = {
   "builder": "Okonkwo Chiemerie Nathaniel",
   "contributors": [
     "Nwa Chukwu Daniel",
-    "Sister Divine",
-    "Nwa Chukwu Daniel and Sister Divine are recognised as contributors to the COT App project."
+    "Sister Divine"
   ],
   "sourceDocumentId": "18TlsJUk3tdWpBEyxmKvLiIYs3CqxTYVoQpkfmCj0VFU"
 } as const;
