@@ -1,0 +1,28 @@
+name: Inspect EAS Android Build
+
+on:
+  push:
+    paths:
+      - .github/eas-build-inspect-trigger
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      CI: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Inspect failed EAS build
+        working-directory: apps/mobile
+        run: |
+          npx eas-cli@latest build:view 46e6a311-7a81-4df1-81e1-75695bb06c49 --json | tee ../../eas-build-view.json
