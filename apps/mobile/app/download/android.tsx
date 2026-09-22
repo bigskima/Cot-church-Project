@@ -27,7 +27,9 @@ export default function AndroidDownloadRoute() {
         'public-content?type=app-release&platform=android&channel=testing',
         { context: 'public', feedback: false, timeoutMs: 20_000 },
       );
-      if (!release?.downloadUrl) throw new Error('The Android download is not available yet.');
+      if (!release?.downloadUrl || !Number.isInteger(Number(release.versionCode))) {
+        throw new Error('The latest COT Android testing APK is being prepared. Please check this same link again after the release is published.');
+      }
 
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         window.location.replace(release.downloadUrl);
