@@ -9,6 +9,7 @@ import { adminClient } from "../_shared/supabase.ts";
 import { resolveSecretValue } from "../_shared/secrets.ts";
 import { assertFeatureEnabled } from "../_shared/feature-controls.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString, uuid } from "../_shared/validation.ts";
+import { formatCotGuideContext, type CotGuideAudience } from "../_shared/cot-guides.ts";
 
 const allowed = new Set(["assistant.answer", "sermon.summarize", "translate.text", "content.moderate", "pastoral.triage", "admin.insight"]);
 const adapterMethod: Record<string, string> = {
@@ -24,6 +25,38 @@ async function requireActiveMembership(auth: any) {
   const { data, error } = await auth.client.from("memberships").select("id").eq("organization_id", auth.organizationId).eq("profile_id", auth.user.id).eq("status", "active").maybeSingle();
   if (error) throw new ApiError("MEMBERSHIP_LOOKUP_FAILED", "Unable to verify church membership", 500, undefined, false);
   if (!data) throw new ApiError("ACTIVE_MEMBERSHIP_REQUIRED", "Active church membership is required", 403);
+  return data;
+}
+
+const MINISTRY_GUIDE_PERMISSIONS = [
+  "announcements.manage","events.create","events.update","attendance.read","attendance.manage","groups.manage","groups.members.manage",
+  "prayer.moderate","prayer.pastoral.receive","prayer.team.receive","volunteers.manage","giving.campaigns.manage","giving.finance.read",
+  "giving.refunds.manage","finance.read","finance.manage","streams.manage","streams.broadcast","streams.recordings.manage","sermons.create",
+  "sermons.manage","sermons.publish","bible.manage","roles.read","roles.manage","roles.assign","members.read","members.update","members.invite",
+  "organization.leadership.manage","branches.update","polls.manage","testimonies.review","testimonies.manage","units.manage","media.upload",
+  "posts.publish","reels.create","videos.create","feed.post"
+];
+
+async function assistantGuideAccess(auth: any, membershipId: string) {
+  const branchClause = auth.branchId ?? "00000000-0000-0000-0000-000000000000";
+  const { data, error } = await auth.client
+    .from("role_assignments")
+    .select("branch_id,expires_at,role:roles(role_permissions(permission:permissions(code,is_active)))")
+    .eq("membership_id", membershipId)
+    .or(`branch_id.is.null,branch_id.eq.${branchClause}`);
+  if (error) throw new ApiError("AI_GUIDE_ACCESS_FAILED", "Unable to resolve guide access", 500, undefined, false);
+  const now = Date.now();
+  const permissionCodes = [...new Set((data ?? [])
+    .filter((assignment: any) => !assignment.expires_at || Date.parse(assignment.expires_at) > now)
+    .flatMap((assignment: any) => {
+      const role = Array.isArray(assignment.role) ? assignment.role[0] : assignment.role;
+      return (role?.role_permissions ?? [])
+        .filter((entry: any) => entry.permission?.is_active && entry.permission?.code)
+        .map((entry: any) => String(entry.permission.code));
+    }))].sort();
+  const hasMinistryGuide = permissionCodes.some((code) => MINISTRY_GUIDE_PERMISSIONS.includes(code));
+  const audiences: CotGuideAudience[] = hasMinistryGuide ? ["member", "ministry"] : ["member"];
+  return { audiences, permissionCodes };
 }
 
 async function readiness(organizationId: string, capability: string) {
@@ -225,7 +258,7 @@ Deno.serve(createHandler(
   { methods: ["GET", "POST"], authentication: "required", organization: "required" },
   async ({ request, auth }) => {
     if (!auth?.organizationId) throw new ApiError("ORGANIZATION_REQUIRED", "Organization context is required", 400);
-    await requireActiveMembership(auth);
+    const activeMembership = await requireActiveMembership(auth);
 
     if (request.method === "GET") {
       const url = new URL(request.url);
@@ -252,8 +285,12 @@ Deno.serve(createHandler(
     const entityType = optionalString(body.entityType, "entityType", 50);
     const entityId = body.entityId ? uuid(String(body.entityId), "entityId", true) : undefined;
     const verifiedContext = capability === "assistant.answer" ? await assistantContext(auth, entityType, entityId) : "";
+    const guideAccess = capability === "assistant.answer" ? await assistantGuideAccess(auth, activeMembership.id) : { audiences: [] as CotGuideAudience[], permissionCodes: [] as string[] };
+    const guideContext = capability === "assistant.answer"
+      ? formatCotGuideContext({ audiences: guideAccess.audiences, query: prompt, permissionCodes: guideAccess.permissionCodes, limit: 8 })
+      : "";
     const sermonRule = entityType === "sermon" ? " The verified context contains the exact saved sermon. Base the answer on that sermon, including its content_blocks/description/transcript, and never claim that only a fragment was supplied when the verified sermon contains more content." : "";
-    const system = `You are COT AI, the conversational assistant inside City of Transformation. Be natural and useful for ordinary everyday conversation. For church-specific facts, Quick Facts, schedules, leaders, locations, story, sermons, announcements, groups, posts, permissions and navigation, rely on the verified tenant-scoped context and never invent facts or routes. When a verified route exists, tell the member the exact destination in plain language; the app will render matching action buttons. Keep the active General/Expression scope clear. Never reveal private prayer, counselling, giving, attendance, identity/KYC or private messaging records. Do not pretend to be a pastor or replace human pastoral care. If a church-specific fact is absent from verified context, say that it has not been published or configured yet rather than guessing.${sermonRule} Verified context: ${verifiedContext}`;
+    const system = `You are COT AI, the conversational assistant inside City of Transformation. Be natural and useful for ordinary everyday conversation. For church-specific facts, Quick Facts, schedules, leaders, locations, story, sermons, announcements, groups, posts, permissions and navigation, rely on the verified tenant-scoped context and never invent facts or routes. When a verified route exists, tell the member the exact destination in plain language; the app will render matching action buttons. When the person asks how COT works, how to use a screen, what a control does, or how to perform a member or ministry workflow, use the retrieved COT Guide context below as the operating authority. Give practical step-by-step instructions with the visible screen names and expected result. The guide audiences were resolved from the signed-in account. Never expose internal permission codes, and never imply that a ministry tool is available when the verified guide audience does not include ministry or the relevant guide section was filtered out. Keep the active General/Expression scope clear. Never reveal private prayer, counselling, giving, attendance, identity/KYC or private messaging records. Do not pretend to be a pastor or replace human pastoral care. If a church-specific fact is absent from verified context, say that it has not been published or configured yet rather than guessing.${sermonRule} Verified context: ${verifiedContext}\n\nRetrieved COT Guide context:\n${guideContext || "No matching guide section was available for this account and question."}`;
 
     const result = await runAi({
       organizationId: auth.organizationId,
