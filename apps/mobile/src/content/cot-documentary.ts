@@ -183,7 +183,7 @@ export const COT_DOCUMENTARY = {
       ]
     },
     {
-      "title": "12. COT Guide and accessibility",
+      "title": "12. COT App Guide and accessibility",
       "sections": [
         {
           "title": "Guidance for the screen you are using",
