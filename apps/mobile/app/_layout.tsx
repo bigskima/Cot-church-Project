@@ -11,6 +11,7 @@ import { OnboardingGate } from '@/components/OnboardingGate';
 import { RealtimeBridge } from '@/components/RealtimeBridge';
 import { PushNotificationsBridge } from '@/components/PushNotificationsBridge';
 import { IncomingCallBridge } from '@/components/IncomingCallBridge';
+import { AppUpdateBridge } from '@/components/AppUpdateBridge';
 import { ActionFeedbackProvider } from '@/components/ActionFeedbackProvider';
 import { AppTourProvider } from '@/features/tour/AppTourProvider';
 import { CotGlobalActions } from '@/features/ai/CotGlobalActions';
@@ -24,9 +25,11 @@ function AppContent() {
   const { mode, accessReady, contextStatus } = useSession();
   const pathname = usePathname();
   const directDownload = pathname.startsWith('/download/');
-  // Direct-download routes intentionally bypass account/bootstrap gates so a shared
-  // install link never opens Home, onboarding, notifications or other app chrome.
-  const resolvingAccess = !directDownload && (mode === 'restoring' || (mode === 'authenticated' && !accessReady && contextStatus !== 'error'));
+  // Getting COT ready still waits for resolved account context. Direct-download
+  // routes intentionally bypass that gate so a shared install link never opens
+  // Home, onboarding, notifications or other app chrome.
+  const resolvingAccountAccess = mode === 'restoring' || (mode === 'authenticated' && !accessReady && contextStatus !== 'error');
+  const resolvingAccess = !directDownload && resolvingAccountAccess;
 
   useEffect(() => {
     void fetchPlatformBranding();
@@ -89,6 +92,7 @@ function AppContent() {
         <Stack.Screen name="leadership/directory" options={{ headerShown: false }} />
         <Stack.Screen name="leadership/invite-codes" options={{ headerShown: false }} />
       </Stack>
+      {!directDownload ? <AppUpdateBridge /> : null}
       {!directDownload ? <CotGlobalActions /> : null}
       {!directDownload ? <IncomingCallBridge /> : null}
     </AppTourProvider>
