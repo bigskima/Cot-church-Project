@@ -226,6 +226,16 @@ export default function ProfileScreen() {
           </Pressable>
         </View>
 
+        <View style={styles.sectionWrap}>
+          <SectionHeader title="About COT" subtitle="The vision, purpose and people behind the platform" />
+          {compactLink(
+            '/general/about-cot',
+            'information-circle-outline',
+            'Vision & product story',
+            'Read the COT documentary, explore use cases, meet the builder and contributors, or listen with Read aloud.',
+          )}
+        </View>
+
         {mode === 'authenticated' ? (
           <View style={styles.sectionWrap}>
             <Button label="Sign out" onPress={() => signOut()} variant="destructive" size="lg" />
