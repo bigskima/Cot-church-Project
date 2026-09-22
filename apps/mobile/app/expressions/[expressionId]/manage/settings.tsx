@@ -287,8 +287,10 @@ export default function ExpressionSettingsScreen() {
                   useCase="expression_banner"
                   title={name || expressionName}
                   description={[city, state, country].filter(Boolean).join(', ')}
+                  context={{ location: [city, state, country].filter(Boolean).join(', ') }}
                   currentImageUrl={current.banner_url}
                   onGenerated={(url) => { void applyGeneratedBanner(url); }}
+                  onUploadInstead={() => void uploadMedia('banner')}
                 />
                 <Text style={[styles.mediaFootnote, { color: colors.textMuted }]}>AI is available for the Expression banner only. The square profile image remains upload-only so COT never fabricates identity imagery.</Text>
               </View>
