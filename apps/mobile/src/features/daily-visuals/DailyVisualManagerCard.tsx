@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Button, Icon } from '@/components';
 import { radius, spacing } from '@/design-system/tokens';
@@ -35,6 +35,9 @@ type UploadIntent = {
   publicUrl: string;
 };
 
+type VisualStyle = 'auto' | 'photographic' | 'illustrated' | 'minimal' | 'cinematic';
+type VisualMood = 'auto' | 'warm' | 'reflective' | 'energetic' | 'elegant';
+
 type Props = {
   date: string;
   kind: 'bible' | 'quote' | 'devotional';
@@ -52,6 +55,22 @@ const LABELS = {
   devotional: 'Daily Devotional visual',
 } as const;
 
+const STYLE_OPTIONS: Array<{ value: VisualStyle; label: string }> = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'photographic', label: 'Photographic' },
+  { value: 'illustrated', label: 'Illustrated' },
+  { value: 'minimal', label: 'Minimal' },
+  { value: 'cinematic', label: 'Cinematic' },
+];
+
+const MOOD_OPTIONS: Array<{ value: VisualMood; label: string }> = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'warm', label: 'Warm' },
+  { value: 'reflective', label: 'Reflective' },
+  { value: 'energetic', label: 'Energetic' },
+  { value: 'elegant', label: 'Elegant' },
+];
+
 export function DailyVisualManagerCard({
   date,
   kind,
@@ -66,6 +85,10 @@ export function DailyVisualManagerCard({
   const { colors } = useTheme();
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
+  const [style, setStyle] = useState<VisualStyle>('auto');
+  const [mood, setMood] = useState<VisualMood>('auto');
+  const [direction, setDirection] = useState('');
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const post = async (action: string, extra: Record<string, unknown> = {}) => {
     return api.request<DailyVisual>('noop?service=engagement-hub', {
@@ -80,7 +103,7 @@ export function DailyVisualManagerCard({
     setBusy('generate');
     setError('');
     try {
-      await post('visual_generate');
+      await post('visual_generate', { style, mood, direction: direction.trim() });
       onChanged();
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to generate this image.');
@@ -194,14 +217,43 @@ export function DailyVisualManagerCard({
         <View style={[styles.empty, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
           <Icon name="image-outline" size={25} color={colors.textMuted} />
           <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-            {visual?.status === 'failed' ? 'Generation failed. Upload an image or retry.' : 'Text-only fallback remains available until an image is ready.'}
+            {visual?.status === 'failed' ? 'Generation failed. Upload an image or retry.' : 'COT can build the artwork automatically from the Daily content.'}
           </Text>
         </View>
       )}
 
+      <View style={styles.controlBlock}>
+        <Text style={[styles.controlLabel, { color: colors.textSecondary }]}>STYLE</Text>
+        <View style={styles.pills}>
+          {STYLE_OPTIONS.map((option) => {
+            const selected = style === option.value;
+            return <Pressable key={option.value} onPress={() => setStyle(option.value)} style={[styles.pill, { borderColor: selected ? colors.interactive : colors.borderSubtle, backgroundColor: selected ? colors.primarySoft : colors.card }]}><Text style={[styles.pillText, { color: selected ? colors.interactive : colors.textSecondary }]}>{option.label}</Text></Pressable>;
+          })}
+        </View>
+      </View>
+
+      <View style={styles.controlBlock}>
+        <Text style={[styles.controlLabel, { color: colors.textSecondary }]}>MOOD</Text>
+        <View style={styles.pills}>
+          {MOOD_OPTIONS.map((option) => {
+            const selected = mood === option.value;
+            return <Pressable key={option.value} onPress={() => setMood(option.value)} style={[styles.pill, { borderColor: selected ? colors.interactive : colors.borderSubtle, backgroundColor: selected ? colors.primarySoft : colors.card }]}><Text style={[styles.pillText, { color: selected ? colors.interactive : colors.textSecondary }]}>{option.label}</Text></Pressable>;
+          })}
+        </View>
+      </View>
+
+      <Pressable onPress={() => setAdvancedOpen((value) => !value)} style={styles.advancedToggle}>
+        <View style={styles.flex}>
+          <Text style={[styles.advancedTitle, { color: colors.text }]}>Advanced direction</Text>
+          <Text style={[styles.advancedHint, { color: colors.textMuted }]}>Optional. The verse/devotional content already drives the image.</Text>
+        </View>
+        <Icon name={advancedOpen ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
+      </Pressable>
+      {advancedOpen ? <TextInput value={direction} onChangeText={setDirection} placeholder="Example: dawn light, more minimal, prayerful atmosphere" placeholderTextColor={colors.textMuted} multiline maxLength={1200} style={[styles.input, { color: colors.text, backgroundColor: colors.card, borderColor: colors.borderSubtle }]} /> : null}
+
       <View style={styles.actions}>
         <Button
-          label={ready && visual?.image_source === 'ai' ? 'Regenerate' : 'Generate AI'}
+          label={ready && visual?.image_source === 'ai' ? 'Generate another' : 'Generate artwork'}
           size="sm"
           variant="outline"
           loading={busy === 'generate'}
@@ -210,7 +262,7 @@ export function DailyVisualManagerCard({
           icon={<Icon name="sparkles-outline" size={15} color={colors.interactive} />}
         />
         <Button
-          label={ready ? 'Replace upload' : 'Upload image'}
+          label={ready ? 'Upload instead' : 'Upload image'}
           size="sm"
           variant="outline"
           loading={busy === 'upload'}
@@ -263,6 +315,15 @@ const styles = StyleSheet.create({
   previewTagText: { color: '#fff', fontSize: 7.5, fontWeight: '900', letterSpacing: 0.7 },
   empty: { minHeight: 82, borderWidth: 1, borderStyle: 'dashed', borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', padding: spacing.sm, gap: 5 },
   emptyText: { fontSize: 9.5, lineHeight: 14, textAlign: 'center', maxWidth: 380 },
+  controlBlock: { gap: 5 },
+  controlLabel: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.8 },
+  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  pill: { minHeight: 30, borderWidth: 1, borderRadius: 15, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center' },
+  pillText: { fontSize: 9.5, fontWeight: '800' },
+  advancedToggle: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  advancedTitle: { fontSize: 10.5, fontWeight: '900' },
+  advancedHint: { fontSize: 8.7, lineHeight: 12, marginTop: 1 },
+  input: { minHeight: 72, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: 10, paddingVertical: 9, fontSize: 11.5, textAlignVertical: 'top' },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   providerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
   providerDot: { width: 7, height: 7, borderRadius: 4, marginTop: 4 },
