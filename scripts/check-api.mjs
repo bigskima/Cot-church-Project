@@ -65,6 +65,7 @@ const requiredFiles = [
   'supabase/functions/streaming-recordings/index.ts',
   'supabase/functions/stream-access/index.ts',
   'supabase/functions/ai-gateway/index.ts',
+  'supabase/functions/bible/index.ts',
   'supabase/functions/ai-review/index.ts',
   'supabase/functions/sermons/index.ts',
   'supabase/functions/branding/index.ts',
@@ -156,6 +157,7 @@ const platformPayments = await readFile('supabase/functions/platform-payments/in
 const platformStreaming = await readFile('supabase/functions/platform-streaming/index.ts', 'utf8');
 const platformAi = await readFile('supabase/functions/platform-ai/index.ts', 'utf8');
 const platformAdminGuide = await readFile('supabase/functions/platform-admin-guide/index.ts', 'utf8');
+const bible = await readFile('supabase/functions/bible/index.ts', 'utf8');
 const aiRouter = await readFile('supabase/functions/_shared/ai/router.ts', 'utf8');
 const adminGuidePage = await readFile('apps/admin/src/components/AdminGuide.tsx', 'utf8');
 const adminShell = await readFile('apps/admin/src/components/Shell.tsx', 'utf8');
@@ -174,6 +176,7 @@ const mobileNotificationsPage = await readFile('apps/mobile/app/(tabs)/profile/n
 const mobileNotificationsExperience = await readFile('apps/mobile/src/features/notifications/NotificationsExperience.tsx', 'utf8');
 const adminLoginPage = await readFile('apps/admin/src/components/Login.tsx', 'utf8');
 const adminAiPage = await readFile('apps/admin/src/pages/AiInfrastructure.tsx', 'utf8');
+const adminBiblePage = await readFile('apps/admin/src/pages/BibleInfrastructure.tsx', 'utf8');
 const adminStreamingPage = await readFile('apps/admin/src/pages/StreamingInfrastructure.tsx', 'utf8');
 const adminPaymentsPage = await readFile('apps/admin/src/pages/PaymentInfrastructure.tsx', 'utf8');
 const adminIntegrationsPage = await readFile('apps/admin/src/pages/IntegrationsJobs.tsx', 'utf8');
@@ -195,6 +198,12 @@ const socialChatContracts = [
 
 const invariants = [
   [socialChatContracts, /direct_conversations[\s\S]*direct_messages/, 'global profile-to-profile direct messaging contract'],
+  [bible, /platform-config[\s\S]*platform\.bible\.read/, 'Bible platform configuration uses platform read authority'],
+  [bible, /platform_translation_save[\s\S]*platform\.bible\.manage/, 'Bible translation governance uses platform manage authority'],
+  [bible, /kjvFullBible[\s\S]*GETBIBLE_BASE.*kjv\.json/, 'Bible keyword search uses KJV public-domain corpus'],
+  [adminShell, /key: 'bible'[\s\S]*label: 'Bible Experience'[\s\S]*platform\.bible\.read/, 'Platform Administration exposes dedicated Bible navigation'],
+  [adminBiblePage, /WEB \(World English Bible\)[\s\S]*disabled governance entry/, 'Bible administration explains WEB retirement'],
+  [adminBiblePage, /Set default/, 'Bible administration supports selecting the platform default translation'],
   [socialChatContracts, /organization:\s*"none"/, 'direct chat is independent of Expression membership context'],
   [socialChatContracts, /group_memberships[\s\S]*group_messages/, 'Group chat remains a separate membership-scoped conversation'],
   [socialChatContracts, /targetProfileId|target_profile_id/, 'individual member follow target contract'],

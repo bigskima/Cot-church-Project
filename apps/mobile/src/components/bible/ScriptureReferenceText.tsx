@@ -133,10 +133,10 @@ export function ScripturePreviewSheet({ reference, onClose }: { reference: strin
   const { colors } = useTheme();
   const { api } = useSession();
   const resource = useResource<Passage | null>(
-    reference ? `scripture-preview:public:web:${reference}` : 'scripture-preview:none',
+    reference ? `scripture-preview:public:kjv:${reference}` : 'scripture-preview:none',
     async (signal) => {
       if (!reference) return null;
-      const params = new URLSearchParams({ action: 'preview', reference, versionId: 'web' });
+      const params = new URLSearchParams({ action: 'preview', reference, versionId: 'kjv' });
       return api.request<Passage>(`noop?service=bible&${params.toString()}`, { signal, context: 'public' });
     },
   );
@@ -167,7 +167,7 @@ export function ScripturePreviewSheet({ reference, onClose }: { reference: strin
               <View>
                 <Text style={[styles.sheetReference, { color: colors.text }]}>{resource.data.reference}</Text>
                 <Text style={[styles.sheetVersion, { color: colors.textMuted }]}>
-                  {resource.data.abbreviation || resource.data.versionName || 'WEB'}
+                  {resource.data.abbreviation || resource.data.versionName || 'KJV'}
                 </Text>
               </View>
               <Icon name="book-outline" size={20} color={colors.interactive} />

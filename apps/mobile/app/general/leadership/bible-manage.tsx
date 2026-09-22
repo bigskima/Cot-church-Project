@@ -16,14 +16,8 @@ type ManagePayload = {
   pool: Array<{ id:string; reference:string; theme:string; weight:number; active:boolean; organization_id?:string|null }>;
   plans: Array<{ id:string; title:string; description:string; duration_days:number; slug:string; organization_id?:string|null }>;
 };
-type ProviderStatus = {
-  freeProvider:{key:string;ready:boolean;label:string};
-  youversion:{ready:boolean;secretName:string};
-  bibleBrain:{ready:boolean;secretName:string};
-  configured:Array<{provider_key:string;enabled:boolean;priority:number;configuration:Record<string,unknown>}>;
-};
 type Version={id:string;abbreviation?:string;title?:string;localized_title?:string};
-type Tab='daily'|'pool'|'providers'|'plans';
+type Tab='daily'|'pool'|'plans';
 
 function middayDate(value:string){
   const parts=value.split('-').map(Number);
@@ -46,15 +40,12 @@ export default function BibleManageScreen(){
   const [reference,setReference]=useState('Philippians 4:6-7');
   const [theme,setTheme]=useState('peace');
   const [message,setMessage]=useState('');
-  const [versionId,setVersionId]=useState('web');
+  const [versionId,setVersionId]=useState('kjv');
 
   const [poolReference,setPoolReference]=useState('Psalm 46:10');
   const [poolTheme,setPoolTheme]=useState('peace');
   const [poolWeight,setPoolWeight]=useState('100');
 
-  const [audioFileset,setAudioFileset]=useState('');
-  const [youVersionEnabled,setYouVersionEnabled]=useState(true);
-  const [bibleBrainEnabled,setBibleBrainEnabled]=useState(true);
 
   const [planTitle,setPlanTitle]=useState('');
   const [planDescription,setPlanDescription]=useState('');
@@ -67,11 +58,6 @@ export default function BibleManageScreen(){
     if(organizationId)p.set('organizationId',organizationId);
     return p.toString();
   },[organizationId]);
-  const statusQuery=useMemo(()=>{
-    const p=new URLSearchParams({action:'provider-status'});
-    if(organizationId)p.set('organizationId',organizationId);
-    return p.toString();
-  },[organizationId]);
   const versionsQuery=useMemo(()=>{
     const p=new URLSearchParams({action:'versions',language:'en'});
     if(organizationId)p.set('organizationId',organizationId);
@@ -81,14 +67,11 @@ export default function BibleManageScreen(){
   const manage=useResource<ManagePayload>('bible:manage:'+organizationId,(signal)=>
     api.request('noop?service=bible&'+query,{signal,context:'public'})
   );
-  const providers=useResource<ProviderStatus>('bible:providers:'+organizationId,(signal)=>
-    api.request('noop?service=bible&'+statusQuery,{signal,context:'public'})
-  );
   const versions=useResource<Version[]>('bible:manage-versions:'+organizationId,(signal)=>
     api.request('noop?service=bible&'+versionsQuery,{signal,context:'public'})
   );
 
-  const refresh=()=>{invalidate('bible:manage:');invalidate('bible:providers:');manage.refresh();providers.refresh();};
+  const refresh=()=>{invalidate('bible:manage:');manage.refresh();};
 
   const save=async(body:Record<string,unknown>,key:string)=>{
     if(busy)return null;
@@ -112,8 +95,6 @@ export default function BibleManageScreen(){
     action:'manage_pool',reference:poolReference,theme:poolTheme,weight:Number(poolWeight)||100,active:true,
   },'pool');
 
-  const saveProvider=(providerKey:string,enabled:boolean,configuration:Record<string,unknown>={})=>
-    save({action:'manage_provider',providerKey,enabled,priority:100,configuration},'provider:'+providerKey);
 
   const savePlan=()=>save({
     action:'manage_plan',
@@ -157,15 +138,13 @@ export default function BibleManageScreen(){
     return <View style={[styles.state,{backgroundColor:colors.bg}]}><EmptyState title="Bible management is not assigned" message="A ministry role with Bible management access is required." iconName="lock-closed-outline"/><Button label="Back to Ministry Tools" variant="outline" onPress={()=>router.replace('/general/leadership')}/></View>;
   }
 
-  const providerConfig=(key:string)=>providers.data?.configured?.find(item=>item.provider_key===key);
 
   return <View style={[styles.screen,{backgroundColor:colors.bg}]}>
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content,{paddingTop:insets.top+spacing.sm,paddingBottom:insets.bottom+120}]}>
-      <ScreenHeader title="Bible & Daily Scripture" subtitle="Manage Scripture discovery without hardcoding a Bible provider." showBack compact/>
+      <ScreenHeader title="Bible & Daily Scripture" subtitle="Manage Daily Scripture, the curated verse pool and reading plans. Platform Bible providers and translations are controlled in Platform Administration." showBack compact/>
       <View style={styles.tabs}>
         <Chip label="Daily Scripture" selected={tab==='daily'} onPress={()=>setTab('daily')}/>
         <Chip label="Verse pool" selected={tab==='pool'} onPress={()=>setTab('pool')}/>
-        <Chip label="Providers" selected={tab==='providers'} onPress={()=>setTab('providers')}/>
         <Chip label="Reading plans" selected={tab==='plans'} onPress={()=>setTab('plans')}/>
       </View>
 
@@ -202,16 +181,6 @@ export default function BibleManageScreen(){
         <View style={styles.poolWrap}>{(manage.data?.pool??[]).map(item=><View key={item.id} style={[styles.poolPill,{backgroundColor:item.organization_id?colors.primarySoft:colors.bgSecondary,borderColor:colors.borderSubtle}]}><Text style={[styles.poolRef,{color:colors.text}]}>{item.reference}</Text><Text style={[styles.poolTheme,{color:colors.textMuted}]}>{item.theme}</Text></View>)}</View>
       </View>:null}
 
-      {tab==='providers'?<View style={styles.section}>
-        <ProviderCard title="World English Bible" subtitle="Public-domain fallback. Works immediately without a secret." ready={providers.data?.freeProvider?.ready===true} enabled={true} onToggle={()=>undefined} locked/>
-        <ProviderCard title="YouVersion" subtitle={providers.data?.youversion?.ready?'Connected. Licensed versions can be fetched through the COT Bible adapter.':'Adapter is built. Add the YouVersion App Key to the server secret shown below.'} ready={providers.data?.youversion?.ready===true} enabled={providerConfig('youversion')?.enabled??youVersionEnabled} onToggle={()=>{const next=!(providerConfig('youversion')?.enabled??youVersionEnabled);setYouVersionEnabled(next);void saveProvider('youversion',next);}}/>
-        <View style={[styles.secretBox,{backgroundColor:colors.bgSecondary,borderColor:colors.borderSubtle}]}><Text style={[styles.secretLabel,{color:colors.textMuted}]}>SERVER SECRET</Text><Text selectable style={[styles.secretValue,{color:colors.text}]}>{providers.data?.youversion?.secretName||'BIBLE_YOUVERSION_APP_KEY'}</Text></View>
-        <ProviderCard title="Bible Brain" subtitle={providers.data?.bibleBrain?.ready?'API key connected. Choose the audio fileset COT should use.':'Recorded-audio adapter is built. Add the Bible Brain key, then select a fileset.'} ready={providers.data?.bibleBrain?.ready===true} enabled={providerConfig('bible_brain')?.enabled??bibleBrainEnabled} onToggle={()=>{const next=!(providerConfig('bible_brain')?.enabled??bibleBrainEnabled);setBibleBrainEnabled(next);void saveProvider('bible_brain',next,{audioFilesetId:audioFileset});}}/>
-        <View style={[styles.secretBox,{backgroundColor:colors.bgSecondary,borderColor:colors.borderSubtle}]}><Text style={[styles.secretLabel,{color:colors.textMuted}]}>SERVER SECRET</Text><Text selectable style={[styles.secretValue,{color:colors.text}]}>{providers.data?.bibleBrain?.secretName||'BIBLE_BRAIN_API_KEY'}</Text></View>
-        <View style={[styles.formCard,{backgroundColor:colors.card,borderColor:colors.borderSubtle}]}><LabeledInput label="Bible Brain audio fileset ID" value={audioFileset||String(providerConfig('bible_brain')?.configuration?.audioFilesetId??'')} onChangeText={setAudioFileset} placeholder="e.g. ENGWEBN2DA"/><Button label="Save audio fileset" loading={busy==='provider:bible_brain'} onPress={()=>void saveProvider('bible_brain',bibleBrainEnabled,{audioFilesetId:audioFileset||String(providerConfig('bible_brain')?.configuration?.audioFilesetId??'')})}/></View>
-        <Text style={[styles.help,{color:colors.textMuted}]}>COT never stores licensed Bible text as its own permanent corpus. Public-domain WEB can be cached; licensed translations remain provider-backed.</Text>
-      </View>:null}
-
       {tab==='plans'?<View style={styles.section}>
         <View style={[styles.formCard,{backgroundColor:colors.card,borderColor:colors.borderSubtle},shadows.sm]}>
           <Text style={[styles.cardTitle,{color:colors.text}]}>Create or edit reading plan</Text>
@@ -237,11 +206,6 @@ function LabeledInput({label,value,onChangeText,placeholder,multiline=false}:{la
   const {colors}=useTheme();
   return <View style={styles.field}><Text style={[styles.label,{color:colors.textMuted}]}>{label}</Text><TextInput value={value} onChangeText={onChangeText} multiline={multiline} placeholder={placeholder} placeholderTextColor={colors.textMuted} style={[styles.input,multiline&&styles.multiline,{color:colors.text,backgroundColor:colors.bgSecondary,borderColor:colors.borderSubtle}]}/></View>;
 }
-function ProviderCard({title,subtitle,ready,enabled,onToggle,locked=false}:{title:string;subtitle:string;ready:boolean;enabled:boolean;onToggle:()=>void;locked?:boolean}){
-  const {colors}=useTheme();
-  return <View style={[styles.providerCard,{backgroundColor:colors.card,borderColor:colors.borderSubtle},shadows.sm]}><View style={[styles.providerIcon,{backgroundColor:ready?colors.primarySoft:colors.bgSecondary}]}><Icon name={ready?'checkmark-circle':'cloud-offline-outline'} size={21} color={ready?colors.interactive:colors.textMuted}/></View><View style={styles.flex}><Text style={[styles.providerTitle,{color:colors.text}]}>{title}</Text><Text style={[styles.providerSubtitle,{color:colors.textMuted}]}>{subtitle}</Text></View>{locked?<Text style={[styles.readyText,{color:colors.interactive}]}>READY</Text>:<Chip label={enabled?'Enabled':'Disabled'} selected={enabled} onPress={onToggle}/>}</View>;
-}
-
 const styles=StyleSheet.create({
   screen:{flex:1},state:{flex:1,padding:spacing.xl,justifyContent:'center',gap:spacing.md},content:{width:'100%',maxWidth:900,alignSelf:'center',paddingHorizontal:spacing.md,gap:spacing.md},tabs:{flexDirection:'row',flexWrap:'wrap',gap:7},section:{gap:spacing.md},flex:{flex:1,minWidth:0},rowBetween:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:spacing.sm},
   info:{borderWidth:1,borderRadius:radius.xl,padding:spacing.md,flexDirection:'row',alignItems:'flex-start',gap:spacing.sm},infoTitle:{fontSize:12.5,fontWeight:'900'},infoText:{fontSize:10.5,lineHeight:16,marginTop:3},
