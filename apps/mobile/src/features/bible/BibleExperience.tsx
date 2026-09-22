@@ -132,7 +132,7 @@ export function BibleExperience() {
 
   const [tab, setTab] = useState<Tab>((route.tab as Tab) || 'read');
   const [reference, setReference] = useState(route.reference?.trim() || 'John 3');
-  const [versionId, setVersionId] = useState('web');
+  const [versionId, setVersionId] = useState('kjv');
   const [language, setLanguage] = useState('en');
   const [versionSheet, setVersionSheet] = useState(false);
   const [versionSearch, setVersionSearch] = useState('');
@@ -235,7 +235,7 @@ export function BibleExperience() {
 
   useEffect(() => {
     const preference = study.data?.preferences;
-    if (preference?.default_version_id && versionId === 'web') setVersionId(preference.default_version_id);
+    if (preference?.default_version_id && versionId === 'kjv') setVersionId(preference.default_version_id);
     if (preference?.language_tag) setLanguage(preference.language_tag);
   }, [study.data?.preferences]);
 
@@ -283,8 +283,7 @@ export function BibleExperience() {
     const needle = versionSearch.trim().toLowerCase();
     const source = versions.data ?? [];
     if (!needle) return source;
-
-    const matches = source.filter((item) => {
+    return source.filter((item) => {
       const haystack = [
         item.abbreviation,
         item.localized_abbreviation,
@@ -294,24 +293,16 @@ export function BibleExperience() {
       ].filter(Boolean).join(' ').toLowerCase();
       return haystack.includes(needle);
     });
-
-    const platformUnavailable: BibleVersion[] = [
-      { id: 'yv-public-1', abbreviation: 'KJV', localized_abbreviation: 'KJV', title: 'King James Version', localized_title: 'King James Version', provider: 'youversion', language_tag: 'en', available: false, accessStatus: 'platform_unavailable' },
-      { id: 'yv-public-114', abbreviation: 'NKJV', localized_abbreviation: 'NKJV', title: 'New King James Version', localized_title: 'New King James Version', provider: 'youversion', language_tag: 'en', available: false, accessStatus: 'platform_unavailable' },
-      { id: 'yv-public-68', abbreviation: 'GNT', localized_abbreviation: 'GNT', title: 'Good News Translation', localized_title: 'Good News Translation', provider: 'youversion', language_tag: 'en', available: false, accessStatus: 'platform_unavailable' },
-      { id: 'yv-public-116', abbreviation: 'NLT', localized_abbreviation: 'NLT', title: 'New Living Translation', localized_title: 'New Living Translation', provider: 'youversion', language_tag: 'en', available: false, accessStatus: 'platform_unavailable' },
-    ];
-
-    for (const item of platformUnavailable) {
-      const haystack = [item.abbreviation, item.title].filter(Boolean).join(' ').toLowerCase();
-      const alreadyPresent = source.some((candidate) =>
-        String(candidate.abbreviation || candidate.localized_abbreviation || '').toLowerCase() === String(item.abbreviation).toLowerCase()
-      );
-      if (!alreadyPresent && haystack.includes(needle)) matches.push(item);
-    }
-
-    return matches;
   }, [versions.data, versionSearch]);
+
+  useEffect(() => {
+    const available = versions.data ?? [];
+    if (!available.length) return;
+    if (available.some((item) => String(item.id) === String(versionId))) return;
+    const preferred = study.data?.preferences?.default_version_id;
+    const fallback = available.find((item) => String(item.id) === String(preferred)) ?? available[0];
+    if (fallback) setVersionId(String(fallback.id));
+  }, [versions.data, study.data?.preferences?.default_version_id, versionId]);
 
   useEffect(() => {
     if (!passage.data) return;
@@ -789,7 +780,7 @@ export function BibleExperience() {
               ))}
               <View style={[styles.rule, { backgroundColor: colors.borderSubtle }]} />
               <Text style={[styles.copyright, { color: colors.textMuted }]}>
-                {passage.data.versionName || currentVersion?.title || 'World English Bible'}
+                {passage.data.versionName || currentVersion?.title || 'King James Version'}
                 {passage.data.copyright ? ' · ' + passage.data.copyright : ''}
               </Text>
             </View>
@@ -1394,7 +1385,7 @@ export function BibleExperience() {
         </ScrollView>
       </BottomSheet>
 
-      <BottomSheet visible={versionSheet} onClose={() => setVersionSheet(false)} title="Bible version" subtitle="KJV, NKJV and other YouVersion translations appear according to your app's publisher licenses." maxHeightPercent={82}>
+      <BottomSheet visible={versionSheet} onClose={() => setVersionSheet(false)} title="Bible version" subtitle="Only Bible translations enabled by Platform Administration appear here. Licensed YouVersion translations also depend on the connected publisher access." maxHeightPercent={82}>
         <View style={styles.versionFilters}>
           <Text style={[styles.versionSearchLabel, { color: colors.textMuted }]}>SEARCH TRANSLATIONS</Text>
           <Pressable onPress={() => versionSearchRef.current?.focus()} accessibilityRole="search" accessibilityLabel="Search Bible translations" style={({ pressed }) => [styles.versionSearch, { backgroundColor: colors.bgSecondary, borderColor: versionSearch ? colors.interactive : colors.borderSubtle }, pressed && { opacity: 0.92 }]}>
