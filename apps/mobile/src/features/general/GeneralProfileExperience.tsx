@@ -8,6 +8,7 @@ import type { PublicIdentityBadge } from '@/components/identity/PublicIdentityBa
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 import { setFloatingActionsHidden } from '@/features/ai/floatingActionsPreference';
+import { TourAnchor } from '@/features/tour/AppTourProvider';
 import { useGeneralMinistryAccess } from './useGeneralMinistryAccess';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -212,7 +213,7 @@ export default function GeneralProfileExperience() {
         <ResourceError message={contextError || 'We couldn’t load your account right now.'} retry={refreshContext} />
       ) : (
         <>
-          <View style={styles.heroWrap}>
+          <TourAnchor targetKey="general.profile.header" style={styles.heroWrap}>
             <SocialProfileHero
               displayName={displayName}
               username={profile?.username}
@@ -234,7 +235,7 @@ export default function GeneralProfileExperience() {
                 </>
               }
             />
-          </View>
+          </TourAnchor>
 
           <View style={[styles.postsHeader, { borderBottomColor: colors.borderSubtle }]}>
             <View>
