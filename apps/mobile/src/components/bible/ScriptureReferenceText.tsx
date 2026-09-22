@@ -136,7 +136,7 @@ export function ScripturePreviewSheet({ reference, onClose }: { reference: strin
     reference ? `scripture-preview:public:web:${reference}` : 'scripture-preview:none',
     async (signal) => {
       if (!reference) return null;
-      const params = new URLSearchParams({ action: 'preview', reference, versionId: 'web' });
+      const params = new URLSearchParams({ action: 'preview', reference, versionId: 'kjv' });
       return api.request<Passage>(`noop?service=bible&${params.toString()}`, { signal, context: 'public' });
     },
   );
