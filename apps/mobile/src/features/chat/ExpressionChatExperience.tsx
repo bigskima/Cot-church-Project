@@ -15,6 +15,7 @@ import type { ChatReaction, ChatReply, ChatSendPayload, RichChatMessage } from '
 import { ChatCallActions } from '@/features/calls/ChatCallActions';
 import { CallHistoryBubble } from '@/features/calls/CallHistoryBubble';
 import type { CallHistoryPayload } from '@/features/calls/call-types';
+import { TourAnchor } from '@/features/tour/AppTourProvider';
 
 type ExpressionChatMember = {
   id: string;
@@ -222,7 +223,9 @@ export function ExpressionChatExperience({ expressionId }: { expressionId: strin
       behavior={PLATFORM_KEYBOARD_BEHAVIOR}
       keyboardVerticalOffset={Platform.select({ ios: insets.top, android: 0, web: 0, default: 0 })}
     >
-      <ExpressionPeopleHeader expressionId={expressionId} expressionName={expressionName} active="chat" title="General discussion" subtitle="One conversation for everyone in this Expression." icon="chatbubbles-outline" />
+      <TourAnchor targetKey="expression.discussion.header">
+        <ExpressionPeopleHeader expressionId={expressionId} expressionName={expressionName} active="chat" title="General discussion" subtitle="One conversation for everyone in this Expression." icon="chatbubbles-outline" />
+      </TourAnchor>
       <View style={styles.quickTools}>
         <Pressable onPress={() => setSearchOpen((current) => !current)} style={[styles.quickTool, { backgroundColor: searchOpen || !!normalizedSearch ? colors.primarySoft : colors.card, borderColor: searchOpen || !!normalizedSearch ? colors.interactive : colors.borderSubtle }]} accessibilityRole="button" accessibilityState={{ selected: searchOpen || !!normalizedSearch }}>
           <Icon name="search-outline" size={14} color={searchOpen || !!normalizedSearch ? colors.interactive : colors.textSecondary} />
