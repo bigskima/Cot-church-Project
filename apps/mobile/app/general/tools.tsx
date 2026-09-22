@@ -234,9 +234,9 @@ export default function GeneralToolsScreen() {
     } : null,
     {
       key: 'about-cot',
-      label: 'About COT',
+      label: 'About the COT App',
       icon: 'information-circle-outline',
-      description: 'Vision, product story, builder and use cases.',
+      description: 'Vision, church use cases, builder and contributors.',
       onPress: () => router.push('/general/about-cot' as any),
     },
     {

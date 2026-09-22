@@ -202,7 +202,7 @@ const invariants = [
   [bible, /platform_translation_save[\s\S]*platform\.bible\.manage/, 'Bible translation governance uses platform manage authority'],
   [bible, /kjvFullBible[\s\S]*GETBIBLE_BASE.*kjv\.json/, 'Bible keyword search uses KJV public-domain corpus'],
   [adminShell, /key: 'bible'[\s\S]*label: 'Bible Experience'[\s\S]*platform\.bible\.read/, 'Platform Administration exposes dedicated Bible navigation'],
-  [adminBiblePage, /WEB \(World English Bible\)[\s\S]*disabled governance entry/, 'Bible administration explains WEB retirement'],
+  [adminBiblePage, /WEB \(World English Bible\)[\s\S]*disabled[\s\S]*not shown to members/, 'Bible administration explains WEB retirement'],
   [adminBiblePage, /Set default/, 'Bible administration supports selecting the platform default translation'],
   [socialChatContracts, /organization:\s*"none"/, 'direct chat is independent of Expression membership context'],
   [socialChatContracts, /group_memberships[\s\S]*group_messages/, 'Group chat remains a separate membership-scoped conversation'],

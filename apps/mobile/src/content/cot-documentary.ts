@@ -224,8 +224,7 @@ export const COT_DOCUMENTARY = {
       "paragraphs": [
         "The COT App can continue growing as the needs of City of Transformation grow. New experiences should make church participation clearer and more connected rather than making the app harder to understand.",
         "The goal is a digital home where a visitor can discover COT, a member can belong and participate, an Expression can nurture its community, a ministry worker can serve responsibly, and an authorised administrator can keep the app ready for the people who depend on it.",
-        "The measure of the COT App is not simply how many features it contains, but how well it helps people connect with the life, teaching, community, service, and mission of City of Transformation.",
-        "."
+        "The measure of the COT App is not simply how many features it contains, but how well it helps people connect with the life, teaching, community, service, and mission of City of Transformation."
       ]
     }
   ],

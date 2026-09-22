@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 interface ModalProps {
   isOpen: boolean;
@@ -99,9 +100,9 @@ export function Modal({
     };
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen || typeof document === 'undefined') return null;
 
-  return (
+  return createPortal(
     <div className="admin-modal-overlay" role="presentation">
       <button type="button" className="admin-modal-backdrop" onClick={onClose} aria-label="Close dialog" />
       <section
@@ -125,6 +126,7 @@ export function Modal({
         <div className="admin-modal-body">{children}</div>
         {footer ? <div className="admin-modal-footer">{footer}</div> : null}
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }
