@@ -139,7 +139,7 @@ export function ExpressionManagementHeader({
         <Pressable
           onPress={() => void Linking.openURL(COT_MINISTRY_GUIDE_URL)}
           accessibilityRole="link"
-          accessibilityLabel="Open the COT Ministry Roles and Operations Guide"
+          accessibilityLabel="Open the COT App Ministry Roles and Operations Guide"
           style={({ pressed }) => [styles.roundButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.pressed]}
         >
           <Icon name="book-outline" size={17} color={colors.interactive} />
