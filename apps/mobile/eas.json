@@ -12,6 +12,9 @@
       "android": {
         "buildType": "apk",
         "image": "latest"
+      },
+      "env": {
+        "EXPO_PUBLIC_DISTRIBUTION_CHANNEL": "testing"
       }
     },
     "production-apk": {
@@ -22,6 +25,9 @@
       "android": {
         "buildType": "apk",
         "image": "latest"
+      },
+      "env": {
+        "EXPO_PUBLIC_DISTRIBUTION_CHANNEL": "testing"
       }
     },
     "production": {
@@ -31,6 +37,9 @@
       "android": {
         "buildType": "app-bundle",
         "image": "latest"
+      },
+      "env": {
+        "EXPO_PUBLIC_DISTRIBUTION_CHANNEL": "play_store"
       }
     }
   },
