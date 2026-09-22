@@ -15,6 +15,7 @@ import type { ChatReaction, ChatReply, ChatSendPayload, RichChatMessage } from '
 import { ChatCallActions } from '@/features/calls/ChatCallActions';
 import { CallHistoryBubble } from '@/features/calls/CallHistoryBubble';
 import type { CallHistoryPayload } from '@/features/calls/call-types';
+import { TourAnchor } from '@/features/tour/AppTourProvider';
 
 type ExpressionChatMember = {
   id: string;
@@ -145,6 +146,20 @@ export function ExpressionChatExperience({ expressionId }: { expressionId: strin
     }
   };
 
+  const deleteMessage = async (message: RichChatMessage) => {
+    if (message.sender_profile_id !== context?.profile?.id) return;
+    setActionError('');
+    await api.request('expression-chat', {
+      method: 'POST',
+      context: 'current',
+      feedback: false,
+      body: JSON.stringify({ action: 'delete_message', branchId: expressionId, messageId: message.id }),
+    });
+    setMessages((current) => current.filter((item) => item.id !== message.id));
+    if (replyTo?.id === message.id) setReplyTo(null);
+    invalidate(key);
+  };
+
   const moderate = async (action: 'restrict_member' | 'ban_member' | 'remove_member', extra: Record<string, unknown> = {}) => {
     if (!selectedMember || moderating) return;
     setModerating(true);
@@ -208,7 +223,9 @@ export function ExpressionChatExperience({ expressionId }: { expressionId: strin
       behavior={PLATFORM_KEYBOARD_BEHAVIOR}
       keyboardVerticalOffset={Platform.select({ ios: insets.top, android: 0, web: 0, default: 0 })}
     >
-      <ExpressionPeopleHeader expressionId={expressionId} expressionName={expressionName} active="chat" title="General discussion" subtitle="One conversation for everyone in this Expression." icon="chatbubbles-outline" />
+      <TourAnchor targetKey="expression.discussion.header">
+        <ExpressionPeopleHeader expressionId={expressionId} expressionName={expressionName} active="chat" title="General discussion" subtitle="One conversation for everyone in this Expression." icon="chatbubbles-outline" />
+      </TourAnchor>
       <View style={styles.quickTools}>
         <Pressable onPress={() => setSearchOpen((current) => !current)} style={[styles.quickTool, { backgroundColor: searchOpen || !!normalizedSearch ? colors.primarySoft : colors.card, borderColor: searchOpen || !!normalizedSearch ? colors.interactive : colors.borderSubtle }]} accessibilityRole="button" accessibilityState={{ selected: searchOpen || !!normalizedSearch }}>
           <Icon name="search-outline" size={14} color={searchOpen || !!normalizedSearch ? colors.interactive : colors.textSecondary} />
@@ -246,7 +263,7 @@ export function ExpressionChatExperience({ expressionId }: { expressionId: strin
         ListEmptyComponent={<View style={styles.empty}><Icon name={normalizedSearch || pinnedOnly ? 'search-outline' : 'chatbubbles-outline'} size={30} color={colors.textMuted} /><Text style={[styles.emptyTitle, { color: colors.text }]}>{normalizedSearch || pinnedOnly ? 'No matching messages' : 'No messages yet'}</Text></View>}
         renderItem={({ item }) => item.kind === 'call'
           ? <CallHistoryBubble entry={item.entry} viewerId={context?.profile?.id ?? ''} />
-          : <RichMessageBubble message={item.message} mine={item.message.sender_profile_id === context?.profile?.id} showSender canPin={resource.data?.permissions.pinMessages === true} onReply={beginReply} onReact={(target, emoji) => void react(target, emoji)} onPin={(target, value) => void pin(target, value)} onJumpToMessage={jumpToMessage} />}
+          : <RichMessageBubble message={item.message} mine={item.message.sender_profile_id === context?.profile?.id} showSender canPin={resource.data?.permissions.pinMessages === true} onReply={beginReply} onReact={(target, emoji) => void react(target, emoji)} onPin={(target, value) => void pin(target, value)} onDelete={(target) => deleteMessage(target)} onJumpToMessage={jumpToMessage} />}
       />
       {actionError ? <Text style={[styles.error, { color: colors.live }]} accessibilityRole="alert">{actionError}</Text> : null}
       <RichChatComposer endpoint="expression-chat" requestContext="current" scope={{ branchId: expressionId }} replyTo={replyTo} disabledReason={disabledReason} bottomInset={Math.max(insets.bottom, 10)} onCancelReply={() => setReplyTo(null)} onSend={send} />

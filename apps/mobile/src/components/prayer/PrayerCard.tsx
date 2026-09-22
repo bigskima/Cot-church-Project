@@ -5,6 +5,7 @@ import { radius, shadows, spacing, typography } from '@/design-system/tokens';
 import { Badge } from '../Badge';
 import { Icon } from '../primitives/Icon';
 import type { PrayerRequest } from '@/types/content';
+import { ScripturePreviewCard } from '@/components/bible/ScriptureReferenceText';
 
 export interface PrayerCardProps {
   prayer: PrayerRequest;
@@ -62,6 +63,7 @@ export function PrayerCard({ prayer, onPray, busy = false, style }: PrayerCardPr
           {prayer.request || prayer.description}
         </Text>
       ) : null}
+      {prayer.request || prayer.description ? <ScripturePreviewCard text={prayer.request || prayer.description || ''} compact /> : null}
 
       <View style={[styles.footer, { borderTopColor: colors.borderSubtle }]}>
         <View style={styles.memberInfo}>

@@ -23,6 +23,7 @@ import { useResource } from '@/hooks/use-resource';
 import { putSignedUpload, readUploadFile, type UploadFile } from '@/services/uploads';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
+import { MinistryImageGenerator } from '@/features/ministry/MinistryImageGenerator';
 import type { Sermon } from '@/types/content';
 import { SermonRichEditor } from './SermonRichEditor';
 import {
@@ -53,6 +54,7 @@ export default function SermonsManageExperience() {
   const [scripture, setScripture] = useState('');
   const [blocks, setBlocks] = useState<SermonRichBlock[]>([newSermonBlock()]);
   const [bannerFile, setBannerFile] = useState<UploadFile | null>(null);
+  const [generatedBannerUrl, setGeneratedBannerUrl] = useState('');
   const [audioFile, setAudioFile] = useState<UploadFile | null>(null);
   const [status, setStatus] = useState<Sermon['status']>('draft');
   const [creating, setCreating] = useState(false);
@@ -78,6 +80,7 @@ export default function SermonsManageExperience() {
     setScripture('');
     setBlocks([newSermonBlock()]);
     setBannerFile(null);
+    setGeneratedBannerUrl('');
     setAudioFile(null);
     setStatus('draft');
     setErrorMsg('');
@@ -102,6 +105,7 @@ export default function SermonsManageExperience() {
       setErrorMsg('Choose a JPG, PNG, or WebP banner.');
       return;
     }
+    setGeneratedBannerUrl('');
     setBannerFile({
       uri: asset.uri,
       name: asset.fileName || `sermon-banner-${Date.now()}.jpg`,
@@ -154,7 +158,7 @@ export default function SermonsManageExperience() {
       setErrorMsg('Enter both a sermon title and speaker.');
       return;
     }
-    if (!bannerFile && !editingSermon?.thumbnail_url) {
+    if (!bannerFile && !generatedBannerUrl && !editingSermon?.thumbnail_url) {
       setErrorMsg('Choose a 16:9 banner for this sermon.');
       return;
     }
@@ -177,7 +181,7 @@ export default function SermonsManageExperience() {
     setSuccessMsg('');
     try {
       const scriptures = scripture.split(',').map((item) => item.trim()).filter(Boolean);
-      let thumbnailUrl = editingSermon?.thumbnail_url ?? null;
+      let thumbnailUrl = generatedBannerUrl || editingSermon?.thumbnail_url || null;
       let audioAssetId = editingSermon?.audio_asset_id ?? null;
 
       if (bannerFile) {
@@ -353,8 +357,8 @@ export default function SermonsManageExperience() {
 
           <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>SERMON BANNER</Text>
           <Pressable onPress={() => void chooseBanner()} style={[styles.uploadCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
-            {bannerFile?.uri || editingSermon?.thumbnail_url ? (
-              <Image source={{ uri: bannerFile?.uri || editingSermon?.thumbnail_url! }} style={styles.bannerPreview} />
+            {bannerFile?.uri || generatedBannerUrl || editingSermon?.thumbnail_url ? (
+              <Image source={{ uri: bannerFile?.uri || generatedBannerUrl || editingSermon?.thumbnail_url! }} style={styles.bannerPreview} />
             ) : (
               <Icon name="image-outline" size={28} color={colors.interactive} />
             )}
@@ -363,6 +367,17 @@ export default function SermonsManageExperience() {
               <Text style={[styles.uploadHint, { color: colors.textSecondary }]}>Shown on sermon cards and the reading screen.</Text>
             </View>
           </Pressable>
+          <MinistryImageGenerator
+            organizationId={organizationId}
+            branchId={expression?.id ?? null}
+            useCase="sermon_artwork"
+            title={title}
+            description={[scripture, sermonExcerpt(blocks)].filter(Boolean).join(' · ')}
+            context={{ scripture, excerpt: sermonExcerpt(blocks), speaker: preacher }}
+            currentImageUrl={bannerFile?.uri || generatedBannerUrl || editingSermon?.thumbnail_url}
+            onGenerated={(url) => { setBannerFile(null); setGeneratedBannerUrl(url); }}
+            onUploadInstead={() => void chooseBanner()}
+          />
 
           <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>OPTIONAL AUDIO</Text>
           <View style={[styles.uploadCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>

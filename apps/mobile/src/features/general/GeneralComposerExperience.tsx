@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
@@ -13,6 +13,8 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, Button, Icon } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
+import { buildBibleShareCardPng } from '@/features/bible/bible-share-card-runtime';
+import { SvgPngRenderer, type SvgPngRendererHandle } from '@/features/bible/SvgPngRenderer';
 import { putSignedUpload, readUploadFile, type UploadFile } from '@/services/uploads';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
@@ -67,7 +69,9 @@ function inferAudioMime(name: string, supplied?: string | null) {
   return 'audio/mpeg';
 }
 
-export default function GeneralComposerExperience({ mode: composerMode = 'post' }: { mode?: ComposerMode }) {
+type ScriptureShare = { reference: string; text: string; version?: string };
+
+export default function GeneralComposerExperience({ mode: composerMode = 'post', initialScripture }: { mode?: ComposerMode; initialScripture?: ScriptureShare }) {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { api, context, mode, hasOrganizationCapability } = useSession();
@@ -75,7 +79,9 @@ export default function GeneralComposerExperience({ mode: composerMode = 'post' 
   const elevatedPublisher = hasOrganizationCapability('feed.post');
   const attachmentLimit = elevatedPublisher ? 10 : 4;
   const postTextLimit = elevatedPublisher ? 10000 : 2200;
-  const [text, setText] = useState('');
+  const [text, setText] = useState(() => initialScripture ? '“' + initialScripture.text + '”\n— ' + initialScripture.reference + ' ' + (initialScripture.version || '') : '');
+  const scripturePreparedRef = useRef(false);
+  const cardRendererRef = useRef<SvgPngRendererHandle>(null);
   const [attachments, setAttachments] = useState<MediaAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const [posting, setPosting] = useState(false);
@@ -134,6 +140,42 @@ export default function GeneralComposerExperience({ mode: composerMode = 'post' 
       throw value;
     }
   };
+
+  useEffect(() => {
+    if (!initialScripture || scripturePreparedRef.current || mode !== 'authenticated') return;
+    scripturePreparedRef.current = true;
+    let disposed = false;
+    const attachCard = async () => {
+      try {
+        const uri = await buildBibleShareCardPng(
+          {
+            reference: initialScripture.reference,
+            text: initialScripture.text,
+            version: initialScripture.version,
+          },
+          (svgDataUri) => {
+            const renderer = cardRendererRef.current;
+            if (!renderer) return Promise.reject(new Error('The Scripture card renderer is still preparing.'));
+            return renderer.render(svgDataUri);
+          },
+        );
+        if (disposed) return;
+        setUploading(true);
+        const uploaded = await uploadMedia({
+          uri,
+          fileName: 'cot-scripture-' + Date.now() + '.png',
+          mimeType: 'image/png',
+        });
+        if (!disposed) setAttachments((current) => current.some((item) => item.uploadId === uploaded.uploadId) ? current : [...current, uploaded].slice(0, attachmentLimit));
+      } catch (value) {
+        if (!disposed) setError(value instanceof Error ? value.message : 'The Scripture card could not be attached. The verse text is still ready to post.');
+      } finally {
+        if (!disposed) setUploading(false);
+      }
+    };
+    void attachCard();
+    return () => { disposed = true; };
+  }, [initialScripture, mode]);
 
   const appendUploads = async (selected: UploadableMedia[]) => {
     if (!selected.length || uploading) return;
@@ -375,6 +417,7 @@ export default function GeneralComposerExperience({ mode: composerMode = 'post' 
           <Pressable onPress={() => router.push('/general/studio/video' as any)} style={({ pressed }) => [styles.formatCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, pressed && styles.pressed]}><View style={[styles.formatIcon, { backgroundColor: colors.primarySoft }]}><Icon name="videocam-outline" size={20} color={colors.interactive} /></View><View style={styles.flex}><Text style={[styles.formatTitle, { color: colors.text }]}>Create Video</Text><Text style={[styles.formatCopy, { color: colors.textMuted }]}>Long-form public video</Text></View><Icon name="chevron-forward" size={16} color={colors.textMuted} /></Pressable>
         </View>
       </ScrollView>
+      <SvgPngRenderer ref={cardRendererRef} />
     </KeyboardAvoidingView>
   );
 }

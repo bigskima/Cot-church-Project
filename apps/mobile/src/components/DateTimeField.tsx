@@ -123,6 +123,94 @@ export function DateTimeField({
   );
 }
 
+export function TimeField({
+  label,
+  value,
+  onChange,
+  placeholder = 'Choose time',
+  helperText,
+}: {
+  label: string;
+  value: Date | null;
+  onChange: (date: Date) => void;
+  placeholder?: string;
+  helperText?: string;
+}) {
+  const { colors } = useTheme();
+  const now = new Date();
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(value ?? now);
+  const hours = Array.from({ length: 24 }, (_, index) => index);
+  const minutes = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+
+  useEffect(() => {
+    if (open) setDraft(value ?? now);
+  }, [open, value]);
+
+  const setTime = (part: 'hour' | 'minute', next: number) => {
+    const current = new Date(draft);
+    if (part === 'hour') current.setHours(next);
+    if (part === 'minute') current.setMinutes(next, 0, 0);
+    setDraft(current);
+  };
+
+  const pickerRow = (title: string, items: number[], selected: number, choose: (item: number) => void) => (
+    <View style={styles.pickerGroup}>
+      <Text style={[styles.pickerLabel, { color: colors.textSecondary }]}>{title}</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pickerRow}>
+        {items.map((item) => {
+          const active = item === selected;
+          return (
+            <Pressable
+              key={item}
+              onPress={() => choose(item)}
+              style={[
+                styles.choice,
+                {
+                  backgroundColor: active ? colors.primarySoft : colors.bgSecondary,
+                  borderColor: active ? colors.interactive : colors.borderSubtle,
+                },
+              ]}
+            >
+              <Text style={[styles.choiceText, { color: active ? colors.interactive : colors.textSecondary }]}>{pad(item)}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+
+  const labelText = value
+    ? value.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    : placeholder;
+
+  return (
+    <View style={styles.wrap}>
+      <Text style={[styles.label, { color: colors.textSecondary }]}>{label.toUpperCase()}</Text>
+      <Pressable onPress={() => setOpen(true)} style={[styles.field, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+        <Icon name="time-outline" size={18} color={colors.interactive} />
+        <Text style={[styles.value, { color: value ? colors.text : colors.textMuted }]}>{labelText}</Text>
+        <Icon name="chevron-down" size={16} color={colors.textMuted} />
+      </Pressable>
+      {helperText ? <Text style={[styles.helper, { color: colors.textMuted }]}>{helperText}</Text> : null}
+
+      <BottomSheet visible={open} onClose={() => setOpen(false)} title={'Choose ' + label.toLowerCase()} subtitle="Choose the local time COT should use." maxHeightPercent={70}>
+        <View style={styles.sheetContent}>
+          <View style={[styles.preview, { backgroundColor: colors.primarySoft, borderColor: colors.interactive }]}>
+            <Icon name="time" size={20} color={colors.interactive} />
+            <Text style={[styles.previewText, { color: colors.text }]}>
+              {draft.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+            </Text>
+          </View>
+          {pickerRow('Hour', hours, draft.getHours(), (item) => setTime('hour', item))}
+          {pickerRow('Minute', minutes, Math.floor(draft.getMinutes() / 5) * 5, (item) => setTime('minute', item))}
+          <Button label="Use this time" onPress={() => { onChange(draft); setOpen(false); }} size="lg" fullWidth />
+        </View>
+      </BottomSheet>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   wrap: { gap: 5 },
   label: { fontSize: 10, fontWeight: '800', letterSpacing: 0.65 },

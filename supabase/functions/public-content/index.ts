@@ -35,6 +35,64 @@ Deno.serve(createHandler(
     const type = url.searchParams.get("type") ?? "feed";
     const client = publicClient();
     const admin = adminClient();
+
+    if (type === "app-release") {
+      const platform = (url.searchParams.get("platform") ?? "android").trim().toLowerCase();
+      const channel = (url.searchParams.get("channel") ?? "testing").trim().toLowerCase();
+      if (!["android", "ios"].includes(platform)) throw new ApiError("VALIDATION_FAILED", "Unsupported app platform", 422);
+      if (!/^[a-z0-9_-]{1,40}$/.test(channel)) throw new ApiError("VALIDATION_FAILED", "Invalid release channel", 422);
+
+      const { data, error } = await admin
+        .from("app_distribution_channels")
+        .select("platform,channel,distribution,download_url,metadata_url,version_name,version_code,minimum_supported_version_code,release_notes,remind_after_hours,published_at")
+        .eq("platform", platform)
+        .eq("channel", channel)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (error) throw new ApiError("APP_RELEASE_READ_FAILED", "Unable to load the current app release", 500, undefined, false);
+      if (!data) throw new ApiError("APP_RELEASE_NOT_FOUND", "This app download is not available yet", 404);
+
+      let manifest: Record<string, unknown> = {};
+      if (typeof data.metadata_url === "string" && data.metadata_url.startsWith("https://")) {
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 3500);
+          const response = await fetch(data.metadata_url, {
+            headers: { Accept: "application/json" },
+            signal: controller.signal,
+          });
+          clearTimeout(timeout);
+          if (response.ok) {
+            const value = await response.json();
+            if (value && typeof value === "object" && !Array.isArray(value)) manifest = value as Record<string, unknown>;
+          }
+        } catch {
+          // Release metadata is an enhancement. Database values remain the fallback.
+        }
+      }
+
+      const numeric = (value: unknown) => {
+        const parsed = Number(value);
+        return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+      };
+
+      return {
+        data: {
+          platform: data.platform,
+          channel: data.channel,
+          distribution: data.distribution,
+          downloadUrl: data.download_url,
+          versionName: typeof manifest.versionName === "string" ? manifest.versionName : data.version_name,
+          versionCode: numeric(manifest.versionCode) ?? numeric(data.version_code),
+          minimumSupportedVersionCode: numeric(manifest.minimumSupportedVersionCode) ?? numeric(data.minimum_supported_version_code),
+          releaseNotes: typeof manifest.releaseNotes === "string" ? manifest.releaseNotes : data.release_notes,
+          remindAfterHours: data.remind_after_hours,
+          publishedAt: typeof manifest.publishedAt === "string" ? manifest.publishedAt : data.published_at,
+        },
+      };
+    }
+
     const safety = await loadSafetyProfileSets(admin, auth?.user.id);
 
     if (type === "event") {
@@ -42,7 +100,7 @@ Deno.serve(createHandler(
       if (!eventId) throw new ApiError("VALIDATION_FAILED", "id is required", 422);
       let query = client
         .from("events")
-        .select("id,organization_id,branch_id,title,description,status,visibility,location,timezone,starts_at,ends_at,registration_opens_at,registration_closes_at,capacity")
+        .select("id,organization_id,branch_id,title,description,status,visibility,location,timezone,starts_at,ends_at,registration_opens_at,registration_closes_at,capacity,response_form_id")
         .eq("id", eventId)
         .eq("visibility", "public")
         .eq("status", "published");

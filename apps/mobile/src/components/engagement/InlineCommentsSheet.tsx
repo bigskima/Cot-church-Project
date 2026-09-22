@@ -73,6 +73,15 @@ export function InlineCommentsSheet({
             canReport={mode === 'authenticated'}
             reportContext={context}
             onRequireSignIn={requireSignIn}
+            onDeleteComment={async (commentId) => {
+              await api.request('engagement', {
+                method: 'POST',
+                context,
+                feedback: false,
+                body: JSON.stringify({ action: 'delete_comment', commentId }),
+              });
+              comments.refresh();
+            }}
             onSubmitComment={async (body, parentCommentId) => {
               await api.request('engagement', {
                 method: 'POST',

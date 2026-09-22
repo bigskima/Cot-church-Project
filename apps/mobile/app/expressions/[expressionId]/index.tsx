@@ -35,7 +35,7 @@ export default function ExpressionHomeScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <TourAnchor targetKey="expression.header">
+      <TourAnchor targetKey="expression.home.notifications">
         <Pressable
           onPress={() => id && router.push(`/expressions/${id}/notifications` as any)}
           accessibilityRole="button"
@@ -61,9 +61,9 @@ export default function ExpressionHomeScreen() {
         </Pressable>
       ) : null}
 
-      <TourAnchor targetKey="expression.home.hero" style={styles.content}>
+      <View style={styles.content}>
         <ExpressionLayeredHomeExperience expressionId={id} />
-      </TourAnchor>
+      </View>
     </View>
   );
 }

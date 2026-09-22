@@ -1,4 +1,6 @@
 import { Platform, Share } from 'react-native';
+import { File as ExpoFile, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 
 export type ShareAttachment = {
   url: string;
@@ -54,18 +56,68 @@ async function shareFileOnWeb(content: ShareContent) {
   }
 }
 
+function base64Bytes(value: string) {
+  const binary = globalThis.atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}
+
+async function nativeAttachmentUri(content: ShareContent) {
+  const attachment = content.attachment;
+  if (!attachment?.url) return null;
+  const source = attachment.url;
+  if (/^file:\/\//i.test(source)) return source;
+
+  const destination = new ExpoFile(Paths.cache, `${Date.now()}-${safeFileName(content, attachment.mimeType)}`);
+
+  if (/^data:/i.test(source)) {
+    const comma = source.indexOf(',');
+    if (comma < 0) throw new Error('The shared media is invalid.');
+    const metadata = source.slice(0, comma);
+    const payload = source.slice(comma + 1);
+    if (/;base64/i.test(metadata)) destination.write(base64Bytes(payload));
+    else destination.write(decodeURIComponent(payload));
+    return destination.uri;
+  }
+
+  if (/^https?:\/\//i.test(source)) {
+    const downloaded = await ExpoFile.downloadFileAsync(source, destination);
+    return downloaded.uri;
+  }
+
+  return source;
+}
+
+async function shareFileOnNative(content: ShareContent) {
+  if (Platform.OS === 'web' || !content.attachment?.url) return false;
+  try {
+    if (!await Sharing.isAvailableAsync()) return false;
+    const uri = await nativeAttachmentUri(content);
+    if (!uri) return false;
+    await Sharing.shareAsync(uri, {
+      dialogTitle: content.title || 'Share from COT',
+      mimeType: content.attachment.mimeType || undefined,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Shares the actual media file where the browser exposes Web Share Level 2.
- * Native uses the operating-system share sheet with the media URL so receiving
- * apps can fetch the attachment; text-only sharing remains the final fallback.
+ * Shares real media files on web and native. Native attachments are first
+ * materialized into the app cache when needed so Android/iOS receiving apps get
+ * an actual image/video/audio file instead of an inaccessible data URI.
  */
 export async function shareContent(content: ShareContent) {
   if (Platform.OS === 'web' && await shareFileOnWeb(content)) return;
+  if (Platform.OS !== 'web' && await shareFileOnNative(content)) return;
 
-  const url = content.attachment?.url || content.url || undefined;
+  const fallbackUrl = content.url || (content.attachment?.url && /^https?:\/\//i.test(content.attachment.url) ? content.attachment.url : undefined);
   await Share.share({
     title: content.title,
     message: content.message,
-    ...(url ? { url } : {}),
+    ...(fallbackUrl ? { url: fallbackUrl } : {}),
   });
 }

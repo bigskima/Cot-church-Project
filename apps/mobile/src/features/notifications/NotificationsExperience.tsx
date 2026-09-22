@@ -70,7 +70,7 @@ function inferredRoute(item: NotificationItem) {
     if (item.type.toLowerCase().includes('status')) return branchId ? `/expressions/${branchId}/testimonies` : '/general/participate';
     return branchId ? `/expressions/${branchId}/manage/testimonies` : '/general/leadership/pastoral-triage';
   }
-  if (type.includes('announcement')) return branchId ? `/expressions/${branchId}/announcements` : '/general/announcements';
+  if (type.includes('announcement')) return branchId ? `/expressions/${branchId}/announcements` : (entityId ? `/general/announcement/${entityId}` : '/general/announcements');
   if (type.includes('event')) return branchId ? (entityId ? `/expressions/${branchId}/event/${entityId}` : `/expressions/${branchId}/events`) : (entityId ? `/general/event/${entityId}` : '/general/events');
   return branchId ? `/expressions/${branchId}` : '';
 }

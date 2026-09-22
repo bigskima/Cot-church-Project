@@ -112,6 +112,48 @@ Deno.serve(createHandler(
     }
 
     const body = assertObject(await jsonBody(request));
+    if (body.action === "delete_post") {
+      assertNoUnknownFields(body, ["action", "postId"]);
+      const postId = uuid(requiredString(body.postId, "postId", 36), "postId", true)!;
+      const admin = adminClient();
+      const { data: content, error: contentError } = await admin
+        .from("content_items")
+        .select("id,author_profile_id,content_type")
+        .eq("id", postId)
+        .maybeSingle();
+      if (contentError || !content || content.content_type !== "post") {
+        throw new ApiError("POST_NOT_FOUND", "This post is no longer available", 404);
+      }
+      if (content.author_profile_id !== auth.user.id) {
+        throw new ApiError("POST_DELETE_DENIED", "You can delete only posts you created.", 403);
+      }
+
+      const { data: uploads } = await admin
+        .from("social_media_uploads")
+        .select("id,storage_path,status")
+        .eq("post_id", postId)
+        .eq("uploader_profile_id", auth.user.id);
+
+      const { error: deleteError } = await admin
+        .from("content_items")
+        .delete()
+        .eq("id", postId)
+        .eq("author_profile_id", auth.user.id);
+      if (deleteError) throw new ApiError("POST_DELETE_FAILED", "Unable to delete this post.", 500, undefined, false);
+
+      const storagePaths = (uploads ?? [])
+        .filter((item: any) => item.status !== "deleted" && item.storage_path)
+        .map((item: any) => item.storage_path);
+      if (storagePaths.length) await admin.storage.from("community-public-media").remove(storagePaths);
+      if ((uploads ?? []).length) {
+        await admin.from("social_media_uploads")
+          .update({ status: "deleted", deleted_at: new Date().toISOString(), post_id: null })
+          .in("id", (uploads ?? []).map((item: any) => item.id))
+          .eq("uploader_profile_id", auth.user.id);
+      }
+      return { data: { postId, deleted: true } };
+    }
+
     const requestedOrganizationId = body.organizationId
       ? uuid(String(body.organizationId), "organizationId", true)!
       : auth.organizationId;

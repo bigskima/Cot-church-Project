@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, EmptyState, Icon, ScreenHeader, Skeleton } from '@/components';
 import { ReadAloudRateControl, useReadAloudRate } from '@/components/ReadAloudRateControl';
+import { ScripturePreviewCard } from '@/components/bible/ScriptureReferenceText';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 import { invalidate } from '@/services/query-cache';
@@ -216,6 +217,7 @@ export function BookReaderExperience({ bookId }: { bookId: string }) {
                   <Text style={[styles.scriptureText, { color: colors.text }]}>{readerContent.scripture}</Text>
                 </View>
               ) : null}
+              {readerContent.scripture ? <ScripturePreviewCard text={readerContent.scripture} compact /> : null}
               {readerContent.memoryVerse ? (
                 <View style={styles.memoryBlock}>
                   <Text style={[styles.sectionKicker, { color: colors.textMuted }]}>MEMORY VERSE</Text>
@@ -227,6 +229,7 @@ export function BookReaderExperience({ bookId }: { bookId: string }) {
                   <Text key={`${safePageIndex}-${index}`} style={[styles.pageText, { color: colors.text }]}>{paragraph}</Text>
                 ))}
               </View>
+              <ScripturePreviewCard text={page} compact />
               {readerContent.prayer ? (
                 <View style={[styles.prayerBlock, { borderColor: colors.borderSubtle }]}>
                   <Icon name='heart-outline' size={18} color={colors.interactive} />

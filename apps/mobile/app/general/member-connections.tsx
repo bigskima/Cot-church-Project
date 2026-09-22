@@ -32,19 +32,23 @@ export default function MemberConnectionsScreen() {
   const type = params.type === 'following' ? 'following' : 'followers';
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
-  const { api, mode } = useSession();
+  const { api, mode, context } = useSession();
+  const profileId = context?.profile?.id ?? '';
+  const profileKey = username ? 'username:' + username : profileId ? 'profile:' + profileId : 'missing';
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
 
   const resource = useResource<ConnectionsPayload>(
-    `public-profile:connections:${username || 'none'}:${type}:${mode}`,
-    (signal) => username
+    `public-profile:connections:${profileKey}:${type}:${mode}`,
+    (signal) => username || profileId
       ? api.request<ConnectionsPayload>(
-          `public-profile?username=${encodeURIComponent(username)}&view=${type}`,
+          username
+            ? `public-profile?username=${encodeURIComponent(username)}&view=${type}`
+            : `public-profile?profileId=${encodeURIComponent(profileId)}&view=${type}`,
           { signal, context: 'public' },
         )
-      : Promise.reject(new Error('Profile username is missing.')),
+      : Promise.reject(new Error('Your profile could not be resolved.')),
   );
 
   const people = useMemo(
@@ -61,7 +65,7 @@ export default function MemberConnectionsScreen() {
   const openLogin = () => {
     router.push({
       pathname: '/(auth)/login',
-      params: { returnTo: `/general/member-connections?username=${encodeURIComponent(username)}&type=${type}` },
+      params: { returnTo: username ? `/general/member-connections?username=${encodeURIComponent(username)}&type=${type}` : `/general/member-connections?type=${type}` },
     } as any);
   };
 
@@ -159,7 +163,9 @@ export default function MemberConnectionsScreen() {
         ) : (
           <EmptyState
             title={type === 'followers' ? 'No followers yet' : 'Not following anyone yet'}
-            message={type === 'followers' ? `@${username} does not have followers yet.` : `@${username} is not following another COT member yet.`}
+            message={type === 'followers'
+              ? (resource.data?.profile?.username ? `@${resource.data.profile.username} does not have followers yet.` : 'This profile does not have followers yet.')
+              : (resource.data?.profile?.username ? `@${resource.data.profile.username} is not following another COT member yet.` : 'This profile is not following another COT member yet.')}
             iconName="people-outline"
           />
         )}

@@ -74,7 +74,60 @@ export default function GeneralToolsScreen() {
     } : null,
   ].filter(Boolean) as Array<{ key: string; label: string; icon: string; description: string; onPress: () => void }> : [];
 
-  const cotItems = [
+  type ToolItem = {
+    key: string;
+    label: string;
+    icon: string;
+    description: string;
+    onPress: () => void;
+  };
+
+  const wordItems = [
+    features.isEnabled('sermons') ? {
+      key: 'sermons',
+      label: 'Sermons',
+      icon: 'book-outline',
+      description: 'Messages, teaching series and sermon notes.',
+      onPress: () => router.push('/general/sermons' as any),
+    } : null,
+    features.isEnabled('bible') ? {
+      key: 'bible',
+      label: 'Bible',
+      icon: 'book-outline',
+      description: 'Read, listen, search, save Scripture and follow reading plans.',
+      onPress: () => router.push('/general/bible' as any),
+    } : null,
+    features.isEnabled('devotionals') ? {
+      key: 'devotional',
+      label: 'Devotional',
+      icon: 'sunny-outline',
+      description: 'Open the daily devotional by year, month and day.',
+      onPress: () => router.push('/general/devotional' as any),
+    } : null,
+    features.isEnabled('library_books') ? {
+      key: 'library',
+      label: 'Library',
+      icon: 'library-outline',
+      description: 'Browse books, authors and continue reading.',
+      onPress: () => router.push('/general/library' as any),
+    } : null,
+    features.isEnabled('prayer_request_ministry') ? {
+      key: 'prayer',
+      label: 'Prayer',
+      icon: 'heart-outline',
+      description: 'Prayer wall and private petitions.',
+      onPress: () => router.push('/general/prayer'),
+    } : null,
+  ].filter(Boolean) as ToolItem[];
+
+  const communityItems = [
+    features.isEnabled('social_community_feed') ? {
+      key: 'community',
+      label: 'Community',
+      icon: 'people-outline',
+      description: 'Church-wide posts and conversations.',
+      onPress: () => router.push('/general/community' as any),
+    } : null,
     mode === 'authenticated' && features.isEnabled('direct_messages') ? {
       key: 'messages',
       label: 'Messages',
@@ -89,6 +142,23 @@ export default function GeneralToolsScreen() {
       description: 'Church-wide groups and discussions.',
       onPress: () => router.push('/general/groups' as any),
     } : null,
+    mode === 'authenticated' ? {
+      key: 'connections',
+      label: 'Connections',
+      icon: 'person-add-outline',
+      description: 'Find and manage member connections.',
+      onPress: () => router.push('/general/member-connections' as any),
+    } : null,
+    mode === 'authenticated' && features.isEnabled('expressions') ? {
+      key: 'expressions',
+      label: 'Expressions',
+      icon: 'business-outline',
+      description: 'Open or join Expression spaces.',
+      onPress: () => router.push('/expressions'),
+    } : null,
+  ].filter(Boolean) as ToolItem[];
+
+  const mediaItems = [
     features.isEnabled('live_streaming') && features.isEnabled('general_live') ? {
       key: 'live',
       label: 'Live',
@@ -96,26 +166,43 @@ export default function GeneralToolsScreen() {
       description: 'Current and upcoming broadcasts.',
       onPress: () => router.push('/general/live' as any),
     } : null,
-    features.isEnabled('library_books') ? {
-      key: 'library',
-      label: 'Library',
-      icon: 'library-outline',
-      description: 'Browse books, authors and continue reading.',
-      onPress: () => router.push('/general/library' as any),
+    features.isEnabled('long_form_video') ? {
+      key: 'watch',
+      label: 'Watch',
+      icon: 'play-circle-outline',
+      description: 'Long-form COT video and media.',
+      onPress: () => router.push('/general/watch' as any),
     } : null,
-    features.isEnabled('devotionals') ? {
-      key: 'devotional',
-      label: 'Devotional',
-      icon: 'sunny-outline',
-      description: 'Open the daily devotional by year, month and day.',
-      onPress: () => router.push('/general/devotional' as any),
+    features.isEnabled('reels') ? {
+      key: 'reels',
+      label: 'Reels',
+      icon: 'flash-outline',
+      description: 'Watch short-form COT video.',
+      onPress: () => router.push('/general/reels' as any),
     } : null,
-    features.isEnabled('locations') ? {
-      key: 'location',
-      label: 'Location',
-      icon: 'location-outline',
-      description: 'Official church location.',
-      onPress: () => router.push('/general/location' as any),
+    {
+      key: 'explore',
+      label: 'Discover',
+      icon: 'compass-outline',
+      description: 'Explore people, media and church content.',
+      onPress: () => router.push('/general/explore' as any),
+    },
+    {
+      key: 'story',
+      label: 'Our Story',
+      icon: 'reader-outline',
+      description: 'Learn about COT and its story.',
+      onPress: () => router.push('/general/church-story' as any),
+    },
+  ].filter(Boolean) as ToolItem[];
+
+  const supportItems = [
+    features.isEnabled('giving') ? {
+      key: 'giving',
+      label: 'Giving',
+      icon: 'gift-outline',
+      description: 'Giving destinations and receipts.',
+      onPress: () => router.push('/general/giving'),
     } : null,
     mode === 'authenticated' && features.isEnabled('polls_giveaways') ? {
       key: 'participate',
@@ -131,26 +218,12 @@ export default function GeneralToolsScreen() {
       description: 'Saved posts and media.',
       onPress: () => router.push('/general/saved'),
     } : null,
-    features.isEnabled('prayer_request_ministry') ? {
-      key: 'prayer',
-      label: 'Prayer',
-      icon: 'heart-outline',
-      description: 'Prayer wall and private petitions.',
-      onPress: () => router.push('/general/prayer'),
-    } : null,
-    features.isEnabled('giving') ? {
-      key: 'giving',
-      label: 'Giving',
-      icon: 'gift-outline',
-      description: 'Giving destinations and receipts.',
-      onPress: () => router.push('/general/giving'),
-    } : null,
-    mode === 'authenticated' && features.isEnabled('expressions') ? {
-      key: 'expressions',
-      label: 'Expressions',
-      icon: 'business-outline',
-      description: 'Open or join Expression spaces.',
-      onPress: () => router.push('/expressions'),
+    features.isEnabled('locations') ? {
+      key: 'location',
+      label: 'Location',
+      icon: 'location-outline',
+      description: 'Official church location.',
+      onPress: () => router.push('/general/location' as any),
     } : null,
     mode === 'authenticated' && features.isEnabled('cot_assistant') ? {
       key: 'assistant',
@@ -159,6 +232,13 @@ export default function GeneralToolsScreen() {
       description: 'COT Assistant.',
       onPress: () => router.push('/general/assistant'),
     } : null,
+    {
+      key: 'tour',
+      label: 'App Tour',
+      icon: 'navigate-circle-outline',
+      description: 'Replay the COT app tour.',
+      onPress: () => router.push('/general/tour' as any),
+    },
     mode === 'authenticated' && hasLeadershipAccess ? {
       key: 'ministry',
       label: 'Ministry',
@@ -166,13 +246,15 @@ export default function GeneralToolsScreen() {
       description: 'Ministry tools available to your account.',
       onPress: () => router.push('/general/leadership'),
     } : null,
-  ].filter(Boolean) as Array<{
-    key: string;
-    label: string;
-    icon: string;
-    description: string;
-    onPress: () => void;
-  }>;
+  ].filter(Boolean) as ToolItem[];
+
+  const routeGridItems = (items: ToolItem[]) => items.map((item) => ({
+    key: item.key,
+    label: item.label,
+    icon: item.icon,
+    accessibilityLabel: `${item.label}. ${item.description}`,
+    onPress: item.onPress,
+  }));
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -215,18 +297,76 @@ export default function GeneralToolsScreen() {
         )}
 
         <View style={styles.section}>
-          <SectionHeader title="COT" compact />
-          <CompactRouteGrid
-            compact
-            items={cotItems.map((item) => ({
-              key: item.key,
-              label: item.label,
-              icon: item.icon,
-              accessibilityLabel: `${item.label}. ${item.description}`,
-              onPress: item.onPress,
-            }))}
-          />
+          <SectionHeader title="Essential" compact />
+          <View style={[styles.essentialCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+            <Pressable
+              onPress={() => router.push('/general/events' as any)}
+              disabled={!features.isEnabled('events_gatherings')}
+              style={({ pressed }) => [
+                styles.essentialAction,
+                { opacity: features.isEnabled('events_gatherings') ? 1 : 0.45 },
+                pressed && styles.pressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Events. Upcoming COT gatherings."
+            >
+              <View style={[styles.essentialIcon, { backgroundColor: colors.primarySoft }]}>
+                <Icon name="calendar-outline" size={29} color={colors.interactive} />
+              </View>
+              <View style={styles.essentialCopy}>
+                <Text style={[styles.essentialTitle, { color: colors.text }]}>Events</Text>
+                <Text style={[styles.essentialText, { color: colors.textMuted }]} numberOfLines={2}>Upcoming gatherings and church activities.</Text>
+              </View>
+              <Icon name="chevron-forward" size={18} color={colors.textMuted} />
+            </Pressable>
+
+            <View style={[styles.essentialDivider, { backgroundColor: colors.borderSubtle }]} />
+
+            <Pressable
+              onPress={() => router.push('/general/announcements' as any)}
+              style={({ pressed }) => [styles.essentialAction, pressed && styles.pressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Announcements. Important COT updates."
+            >
+              <View style={[styles.essentialIcon, { backgroundColor: colors.primarySoft }]}>
+                <Icon name="megaphone-outline" size={29} color={colors.interactive} />
+              </View>
+              <View style={styles.essentialCopy}>
+                <Text style={[styles.essentialTitle, { color: colors.text }]}>Announcements</Text>
+                <Text style={[styles.essentialText, { color: colors.textMuted }]} numberOfLines={2}>Important notices and updates from COT.</Text>
+              </View>
+              <Icon name="chevron-forward" size={18} color={colors.textMuted} />
+            </Pressable>
+          </View>
         </View>
+
+        {wordItems.length ? (
+          <View style={styles.section}>
+            <SectionHeader title="Word & worship" compact />
+            <CompactRouteGrid compact items={routeGridItems(wordItems)} />
+          </View>
+        ) : null}
+
+        {communityItems.length ? (
+          <View style={styles.section}>
+            <SectionHeader title="Community" compact />
+            <CompactRouteGrid compact items={routeGridItems(communityItems)} />
+          </View>
+        ) : null}
+
+        {mediaItems.length ? (
+          <View style={styles.section}>
+            <SectionHeader title="Media & discover" compact />
+            <CompactRouteGrid compact items={routeGridItems(mediaItems)} />
+          </View>
+        ) : null}
+
+        {supportItems.length ? (
+          <View style={styles.section}>
+            <SectionHeader title="More" compact />
+            <CompactRouteGrid compact items={routeGridItems(supportItems)} />
+          </View>
+        ) : null}
 
         <View style={styles.section}>
           <SectionHeader title="Account" compact />
@@ -279,6 +419,13 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: { flexGrow: 1, paddingHorizontal: spacing.md, gap: spacing.lg },
   section: { gap: spacing.sm },
+  essentialCard: { borderWidth: 1, borderRadius: radius.xl, overflow: 'hidden' },
+  essentialAction: { minHeight: 82, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  essentialIcon: { width: 54, height: 54, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  essentialCopy: { flex: 1, minWidth: 0 },
+  essentialTitle: { fontSize: 14.5, fontWeight: '900' },
+  essentialText: { fontSize: 10.5, lineHeight: 15, marginTop: 2 },
+  essentialDivider: { height: StyleSheet.hairlineWidth, marginLeft: 84 },
   signInCard: {
     minHeight: 58,
     borderWidth: 1,

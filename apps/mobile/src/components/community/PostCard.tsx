@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleProp, StyleSheet, Text, TextInput, useWindowDimensions, View, ViewStyle } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleProp, StyleSheet, Text, TextInput, useWindowDimensions, View, ViewStyle } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useTheme } from '@/state/theme';
 import { radius, shadows, spacing } from '@/design-system/tokens';
@@ -17,6 +17,7 @@ import { ContentReportSheet } from '../engagement/ContentReportSheet';
 import { InlineCommentsSheet } from '../engagement/InlineCommentsSheet';
 import { BottomSheet } from '../BottomSheet';
 import { QuotedContentCard } from './QuotedContentCard';
+import { ScripturePreviewCard } from '@/components/bible/ScriptureReferenceText';
 import type { MediaAsset, Post, SocialPost } from '@/types/content';
 import { CompactIdentityBadge, type PublicIdentityBadge } from '@/components/identity/PublicIdentityBadge';
 
@@ -69,6 +70,7 @@ export interface PostCardProps {
   onReact?: (reaction: string | null) => void | boolean | Promise<boolean>;
   onBookmark?: (currentlySaved: boolean) => void | boolean | Promise<boolean>;
   onShare?: () => void;
+  onDeleted?: () => void;
   allowExternalShare?: boolean;
   allowInternalShare?: boolean;
   onMore?: () => void;
@@ -124,6 +126,7 @@ export function PostCard({
   onReact,
   onBookmark,
   onShare,
+  onDeleted,
   allowExternalShare = true,
   allowInternalShare = true,
   onMore,
@@ -141,6 +144,8 @@ export function PostCard({
   const resolvedVariant = variant ?? 'card';
   const showContextRow = showContext ?? isExpressionPost;
   const postExpressionId = postAsAny.expression_id || postAsAny.branch_id || postAsAny.content_items?.expression_id || postAsAny.expression?.id || undefined;
+  const authorProfileId = author.id || postAsAny.author_profile_id || postAsAny.content_items?.author_profile_id || null;
+  const isOwner = mode === 'authenticated' && Boolean(context?.profile?.id) && authorProfileId === context?.profile?.id;
 
   const displayName = authorName || author.displayName || author.display_name || postAsAny.author_name || 'Church Member';
   const handle = authorHandle || author.username || author.handle || postAsAny.author_handle || undefined;
@@ -190,6 +195,11 @@ export function PostCard({
   const [quoteBody, setQuoteBody] = useState('');
   const [shareBusy, setShareBusy] = useState(false);
   const [shareError, setShareError] = useState('');
+  const [ownerActionsOpen, setOwnerActionsOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [deleted, setDeleted] = useState(false);
   const [bodyRevealStep, setBodyRevealStep] = useState(() => postRevealSteps.get(post.id) ?? 1);
 
   const likePending = useRef(false);
@@ -243,6 +253,33 @@ export function PostCard({
     await Clipboard.setStringAsync(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 1400);
+  };
+
+  const deleteOwnPost = async () => {
+    if (!isOwner || deleteBusy) return;
+    setDeleteBusy(true);
+    setDeleteError('');
+    try {
+      await api.request('social-feed', {
+        method: 'POST',
+        context: isExpressionPost ? 'current' : 'public',
+        feedback: false,
+        body: JSON.stringify({ action: 'delete_post', postId: post.id }),
+      });
+      invalidate('mobile:home-feed:');
+      invalidate('mobile:community:');
+      invalidate('community:post:');
+      invalidate('public-profile:');
+      invalidate('expression:');
+      setOwnerActionsOpen(false);
+      setDeleteConfirm(false);
+      setDeleted(true);
+      onDeleted?.();
+    } catch (value) {
+      setDeleteError(value instanceof Error ? value.message : 'Unable to delete this post.');
+    } finally {
+      setDeleteBusy(false);
+    }
   };
 
   const handleNativeShare = async () => {
@@ -312,6 +349,8 @@ export function PostCard({
   const progressiveBody = body.length > 700 || bodyLineCount > POST_REVEAL_LINES;
   const revealedBody = progressiveBody ? revealPostBody(body, bodyRevealStep) : { text: body, hasMore: false };
 
+  if (deleted) return null;
+
   const identityHeader = (
     <View style={styles.headerRow}>
       <Pressable onPress={openAuthor || onPress} hitSlop={4}>
@@ -330,11 +369,13 @@ export function PostCard({
       </View>
       {onMore || canEngage ? (
         <Pressable
-          onPress={onMore ?? (() => setReportOpen(true))}
+          onPress={onMore ?? (isOwner
+            ? (() => { setDeleteError(''); setDeleteConfirm(false); setOwnerActionsOpen(true); })
+            : (() => setReportOpen(true)))}
           hitSlop={8}
           style={({ pressed }) => [styles.moreButton, pressed ? { backgroundColor: colors.bgSecondary } : null]}
           accessibilityRole="button"
-          accessibilityLabel={onMore ? 'More post actions' : 'Report post'}
+          accessibilityLabel={onMore ? 'More post actions' : isOwner ? 'Manage your post' : 'Report post'}
         >
           <Icon name="ellipsis-horizontal" size={19} color={colors.textMuted} />
         </Pressable>
@@ -363,13 +404,15 @@ export function PostCard({
   return (
     <>
       <Pressable
-        onPress={onPress}
+        disabled={resolvedVariant === 'feed'}
+        onPress={resolvedVariant === 'feed' ? undefined : onPress}
         style={({ pressed }) => [
           styles.container,
           resolvedVariant === 'feed' ? styles.feedContainer : null,
           { backgroundColor: colors.card, borderColor: isExpressionPost ? colors.primarySoftStrong : colors.borderSubtle },
           isExpressionPost ? styles.expressionCard : resolvedVariant === 'card' ? styles.publicCard : null,
-          pressed && onPress ? { backgroundColor: colors.pressed } : null,
+          pressed && resolvedVariant !== 'feed' && onPress ? { backgroundColor: colors.pressed } : null,
+          resolvedVariant === 'feed' && Platform.OS === 'web' ? ({ touchAction: 'pan-y' } as ViewStyle) : null,
           style,
         ]}
       >
@@ -419,6 +462,8 @@ export function PostCard({
           </View>
         ) : null}
 
+        {body ? <ScripturePreviewCard text={body} compact /> : null}
+
         {quoteReferences.length ? (
           <View style={styles.quotedList}>
             {quoteReferences.map((reference: any, index) => {
@@ -444,6 +489,9 @@ export function PostCard({
             <ScrollView
               horizontal
               scrollEnabled={media.length > 1}
+              directionalLockEnabled
+              nestedScrollEnabled
+              disableScrollViewPanResponder
               style={styles.mediaScroller}
               showsHorizontalScrollIndicator={false}
               snapToInterval={media.length > 1 ? mediaCardWidth + 8 : undefined}
@@ -601,9 +649,13 @@ export function PostCard({
               <Pressable onPress={() => void handleLike()} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed ? { backgroundColor: colors.liveSoft } : null]} accessibilityRole="button" accessibilityLabel="Like post"><Icon name={hasLiked ? 'heart' : 'heart-outline'} size={18} color={hasLiked ? colors.live : colors.textSecondary} /><Text style={[styles.actionCount, { color: hasLiked ? colors.live : colors.textSecondary }]}>{likeCount > 0 ? likeCount : ''}</Text></Pressable>
               {onBookmark ? <Pressable onPress={() => void handleSave()} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed ? { backgroundColor: colors.primarySoft } : null]} accessibilityRole="button" accessibilityLabel="Bookmark post"><Icon name={hasSaved ? 'bookmark' : 'bookmark-outline'} size={18} color={hasSaved ? colors.interactive : colors.textSecondary} /></Pressable> : null}
               {post.body?.trim() ? <Pressable onPress={(event) => { event.stopPropagation?.(); void handleCopy(); }} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed ? { backgroundColor: colors.primarySoft } : null]} accessibilityRole="button" accessibilityLabel="Copy post text"><Icon name={copied ? 'checkmark-outline' : 'copy-outline'} size={18} color={copied ? colors.interactive : colors.textSecondary} /></Pressable> : null}
+              <Pressable onPress={(event) => { event.stopPropagation?.(); router.push('/general/bible' as any); }} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed ? { backgroundColor: colors.primarySoft } : null]} accessibilityRole="button" accessibilityLabel="Open COT Bible"><Icon name="book-outline" size={18} color={colors.textSecondary} /></Pressable>
             </View>
-          ) : <View style={styles.guestGroup}><Text style={[styles.guestMeta, { color: colors.textMuted }]}>Sign in to join the conversation</Text>{post.body?.trim() ? <Pressable onPress={(event) => { event.stopPropagation?.(); void handleCopy(); }} style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Copy post text"><Icon name={copied ? 'checkmark-outline' : 'copy-outline'} size={18} color={copied ? colors.interactive : colors.textSecondary} /></Pressable> : null}</View>}
-          {internalShareAvailable || allowExternalShare ? <Pressable onPress={(event) => { event.stopPropagation?.(); setShareError(''); setShareOpen(true); }} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed ? { backgroundColor: colors.bgSecondary } : null]} accessibilityRole="button" accessibilityLabel="Share post"><Icon name="share-social-outline" size={18} color={colors.textSecondary} /></Pressable> : <View style={styles.noShareMeta}><Icon name="lock-closed-outline" size={12} color={colors.textMuted} /><Text style={[styles.noShareText, { color: colors.textMuted }]}>Stays here</Text></View>}
+          ) : <View style={styles.guestGroup}><Text style={[styles.guestMeta, { color: colors.textMuted }]}>Sign in to join the conversation</Text>{post.body?.trim() ? <Pressable onPress={(event) => { event.stopPropagation?.(); void handleCopy(); }} style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Copy post text"><Icon name={copied ? 'checkmark-outline' : 'copy-outline'} size={18} color={copied ? colors.interactive : colors.textSecondary} /></Pressable> : null}<Pressable onPress={(event) => { event.stopPropagation?.(); router.push('/general/bible' as any); }} style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Open COT Bible"><Icon name="book-outline" size={18} color={colors.textSecondary} /></Pressable></View>}
+          <View style={styles.trailingActions}>
+            {resolvedVariant === 'feed' && onPress ? <Pressable onPress={(event) => { event.stopPropagation?.(); onPress(); }} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed ? { backgroundColor: colors.bgSecondary } : null]} accessibilityRole="button" accessibilityLabel="Open post"><Icon name="open-outline" size={18} color={colors.textSecondary} /></Pressable> : null}
+            {internalShareAvailable || allowExternalShare ? <Pressable onPress={(event) => { event.stopPropagation?.(); setShareError(''); setShareOpen(true); }} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed ? { backgroundColor: colors.bgSecondary } : null]} accessibilityRole="button" accessibilityLabel="Share post"><Icon name="share-social-outline" size={18} color={colors.textSecondary} /></Pressable> : <View style={styles.noShareMeta}><Icon name="lock-closed-outline" size={12} color={colors.textMuted} /><Text style={[styles.noShareText, { color: colors.textMuted }]}>Stays here</Text></View>}
+          </View>
         </View>
       </Pressable>
       <BottomSheet
@@ -672,6 +724,66 @@ export function PostCard({
           ) : null}
         </View>
       </BottomSheet>
+      <BottomSheet
+        visible={ownerActionsOpen}
+        onClose={() => {
+          if (!deleteBusy) {
+            setOwnerActionsOpen(false);
+            setDeleteConfirm(false);
+            setDeleteError('');
+          }
+        }}
+        title="Your post"
+        subtitle="Manage only the content you published."
+        compact
+      >
+        <View style={styles.ownerActions}>
+          {!deleteConfirm ? (
+            <Pressable
+              onPress={() => setDeleteConfirm(true)}
+              style={({ pressed }) => [
+                styles.ownerDeleteButton,
+                { borderColor: colors.live },
+                pressed && { opacity: 0.78 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Delete your post"
+            >
+              <View style={[styles.ownerDeleteIcon, { backgroundColor: colors.liveSoft }]}>
+                <Icon name="trash-outline" size={18} color={colors.live} />
+              </View>
+              <View style={styles.shareSheetCopy}>
+                <Text style={[styles.ownerDeleteTitle, { color: colors.live }]}>Delete post</Text>
+                <Text style={[styles.shareSheetMeta, { color: colors.textMuted }]}>Remove this post from COT.</Text>
+              </View>
+              <Icon name="chevron-forward" size={17} color={colors.live} />
+            </Pressable>
+          ) : (
+            <View style={[styles.deleteConfirmCard, { backgroundColor: colors.bgSecondary, borderColor: colors.live }]}>
+              <Text style={[styles.deleteConfirmTitle, { color: colors.text }]}>Delete this post?</Text>
+              <Text style={[styles.deleteConfirmText, { color: colors.textMuted }]}>This removes the post and its attached conversation from member-facing feeds.</Text>
+              {deleteError ? <Text style={[styles.shareError, { color: colors.live }]}>{deleteError}</Text> : null}
+              <View style={styles.deleteConfirmActions}>
+                <Pressable
+                  disabled={deleteBusy}
+                  onPress={() => { setDeleteConfirm(false); setDeleteError(''); }}
+                  style={[styles.deleteCancel, { borderColor: colors.borderSubtle }]}
+                >
+                  <Text style={[styles.deleteCancelText, { color: colors.text }]}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  disabled={deleteBusy}
+                  onPress={() => void deleteOwnPost()}
+                  style={[styles.deleteCommit, { backgroundColor: colors.live }]}
+                >
+                  <Icon name={deleteBusy ? 'hourglass-outline' : 'trash-outline'} size={16} color="#FFFFFF" />
+                  <Text style={styles.deleteCommitText}>{deleteBusy ? 'Deleting…' : 'Delete'}</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+        </View>
+      </BottomSheet>
       <MediaPreviewModal media={preview} visible={Boolean(preview)} onClose={() => setPreview(null)} />
       <InlineCommentsSheet visible={commentsOpen} onClose={() => setCommentsOpen(false)} contentId={post.id} context={isExpressionPost ? 'current' : 'public'} title="Comments" subtitle="Keep this post and its media in view while you read and reply." returnTo={isExpressionPost && postExpressionId ? `/expressions/${postExpressionId}/feed` : '/general'} onViewAll={onComment || onReply} />
       <ContentReportSheet target={reportOpen ? { contentId: post.id, context: isExpressionPost ? 'current' : 'public', label: isExpressionPost ? `Report post in ${expressionLabel || 'this Expression'}` : 'Report this General COT post' } : null} onClose={() => setReportOpen(false)} />
@@ -681,6 +793,18 @@ export function PostCard({
 
 const styles = StyleSheet.create({
   container: { marginHorizontal: spacing.sm, marginVertical: spacing.xs, padding: spacing.md, borderWidth: 1, borderRadius: radius.card },
+  ownerActions: { gap: spacing.sm },
+  ownerDeleteButton: { minHeight: 62, borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  ownerDeleteIcon: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  ownerDeleteTitle: { fontSize: 12.5, fontWeight: '900' },
+  deleteConfirmCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm },
+  deleteConfirmTitle: { fontSize: 15, fontWeight: '900' },
+  deleteConfirmText: { fontSize: 10.5, lineHeight: 15 },
+  deleteConfirmActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
+  deleteCancel: { minHeight: 40, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' },
+  deleteCancelText: { fontSize: 11, fontWeight: '800' },
+  deleteCommit: { minHeight: 40, borderRadius: radius.pill, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  deleteCommitText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
   feedContainer: { marginHorizontal: 0, marginTop: 0, paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: spacing.sm, borderRadius: 0, borderLeftWidth: 0, borderRightWidth: 0 },
   feedIdentityBlock: { paddingBottom: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, gap: 5 },
   feedBodyBlock: { marginTop: spacing.sm },
@@ -733,6 +857,7 @@ const styles = StyleSheet.create({
   reelReferenceTitle: { fontSize: 14, lineHeight: 19, fontWeight: '800', marginTop: 2 },
   actionRail: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, minHeight: 46 },
   actionGroup: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  trailingActions: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   guestGroup: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 },
   actionButton: { minWidth: 42, height: 36, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 8 },
   actionCount: { fontSize: 12, fontWeight: '700' },

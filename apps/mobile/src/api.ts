@@ -7,6 +7,7 @@ import {
   emitActionFeedback,
   mutationFeedbackKey,
   shouldShowMutationFeedback,
+  shouldShowMutationSuccessFeedback,
 } from './services/action-feedback';
 import * as SecureStore from 'expo-secure-store';
 
@@ -244,11 +245,13 @@ export class ApiClient {
     const cleanPath = path.replace(/^\/+/, '');
     const method = (fetchInit.method ?? 'GET').toUpperCase();
     const isMutation = ['POST', 'PATCH', 'PUT', 'DELETE'].includes(method);
-    const feedbackEnabled = isMutation && feedback !== false && shouldShowMutationFeedback(cleanPath);
-    const operationKey = feedbackEnabled ? mutationFeedbackKey(cleanPath, method, fetchInit.body) : '';
-    const operationSequence = feedbackEnabled ? (this.feedbackSequence.get(operationKey) ?? 0) + 1 : 0;
-    if (feedbackEnabled) this.feedbackSequence.set(operationKey, operationSequence);
-    const isLatestFeedbackOperation = () => !feedbackEnabled || this.feedbackSequence.get(operationKey) === operationSequence;
+    const failureFeedbackEnabled = isMutation && feedback !== false && shouldShowMutationFeedback(cleanPath);
+    const explicitFeedback = Boolean(feedback && typeof feedback === 'object');
+    const successFeedbackEnabled = failureFeedbackEnabled && (explicitFeedback || shouldShowMutationSuccessFeedback(cleanPath, fetchInit.body));
+    const operationKey = failureFeedbackEnabled ? mutationFeedbackKey(cleanPath, method, fetchInit.body) : '';
+    const operationSequence = failureFeedbackEnabled ? (this.feedbackSequence.get(operationKey) ?? 0) + 1 : 0;
+    if (failureFeedbackEnabled) this.feedbackSequence.set(operationKey, operationSequence);
+    const isLatestFeedbackOperation = () => !failureFeedbackEnabled || this.feedbackSequence.get(operationKey) === operationSequence;
     const controller = new AbortController();
     const requestTimeoutMs = Math.max(1_000, Math.min(timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS, MAX_REQUEST_TIMEOUT_MS));
     let timedOut = false;
@@ -302,7 +305,7 @@ export class ApiClient {
       const responseData = Object.prototype.hasOwnProperty.call(payload, 'data') ? payload.data : payload;
       if (isMutation) {
         invalidateAfterMutation(cleanPath, fetchInit.body);
-        if (feedbackEnabled && isLatestFeedbackOperation()) {
+        if (successFeedbackEnabled && isLatestFeedbackOperation()) {
           const config = feedback && typeof feedback === 'object' ? feedback : {};
           const derived = buildMutationSuccessFeedback(cleanPath, method, fetchInit.body, responseData);
           emitActionFeedback({
@@ -326,13 +329,13 @@ export class ApiClient {
         normalized = new ApiError('NETWORK_ERROR', userFacingApiMessage('NETWORK_ERROR', 0), 0);
       }
 
-      if (feedbackEnabled && normalized.code !== 'REQUEST_CANCELLED' && isLatestFeedbackOperation()) {
+      if (failureFeedbackEnabled && normalized.code !== 'REQUEST_CANCELLED' && isLatestFeedbackOperation()) {
         const config = feedback && typeof feedback === 'object' ? feedback : {};
         const description = describeMutation(cleanPath, method, fetchInit.body);
         const resourceLabel = `${description.resource[0]?.toUpperCase() ?? ''}${description.resource.slice(1)}`;
         emitActionFeedback({
           kind: 'error',
-          title: config.failureTitle ?? `${resourceLabel} update failed`,
+          title: config.failureTitle ?? (description.resource === 'change' ? 'Couldn’t complete that' : `Couldn’t update ${resourceLabel.toLowerCase()}`),
           message: config.failureMessage ?? normalized.message,
           details: buildMutationFailureDetails(cleanPath, method, fetchInit.body),
           retry: () => this.request<T>(path, init),

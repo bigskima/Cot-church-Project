@@ -16,6 +16,19 @@ function timestamp(value: unknown, field: string) {
   return result;
 }
 
+async function responseFormIdForOrganization(value: unknown, organizationId: string) {
+  if (value === null || value === undefined || value === "") return null;
+  const id = uuid(String(value), "responseFormId", true)!;
+  const { data, error } = await adminClient()
+    .from("cot_forms")
+    .select("id")
+    .eq("id", id)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  if (error || !data) throw new ApiError("FORM_NOT_FOUND", "Choose a response form from this church.", 422);
+  return id;
+}
+
 Deno.serve(createHandler(
   { methods: ["GET", "POST", "PATCH"], authentication: "required", organization: "required" },
   async ({ request, auth }) => {
@@ -26,7 +39,7 @@ Deno.serve(createHandler(
       const eventId = uuid(url.searchParams.get("id"), "id");
       let query = auth.client
         .from("events")
-        .select("id,organization_id,branch_id,title,description,status,visibility,location,timezone,starts_at,ends_at,registration_opens_at,registration_closes_at,capacity,recurrence_rule,banner_url,created_at,updated_at")
+        .select("id,organization_id,branch_id,title,description,status,visibility,location,timezone,starts_at,ends_at,registration_opens_at,registration_closes_at,capacity,recurrence_rule,banner_url,response_form_id,created_at,updated_at")
         .eq("organization_id", auth.organizationId)
         .order("starts_at");
       query = auth.branchId ? query.eq("branch_id", auth.branchId) : query.is("branch_id", null);
@@ -54,7 +67,7 @@ Deno.serve(createHandler(
 
     if (request.method === "POST") {
       await authorize(auth, "events.create");
-      assertNoUnknownFields(body, ["branchId", "title", "description", "visibility", "location", "timezone", "startsAt", "endsAt", "registrationOpensAt", "registrationClosesAt", "capacity", "recurrenceRule", "bannerUrl"]);
+      assertNoUnknownFields(body, ["branchId", "title", "description", "visibility", "location", "timezone", "startsAt", "endsAt", "registrationOpensAt", "registrationClosesAt", "capacity", "recurrenceRule", "bannerUrl", "responseFormId"]);
       const visibility = optionalString(body.visibility, "visibility", 20) ?? "members";
       if (!visibilities.has(visibility)) throw new ApiError("VALIDATION_FAILED", "Invalid visibility", 422);
       const capacity = body.capacity == null ? null : Number(body.capacity);
@@ -76,6 +89,7 @@ Deno.serve(createHandler(
         capacity,
         recurrence_rule: body.recurrenceRule ?? null,
         banner_url: optionalString(body.bannerUrl, "bannerUrl", 2000),
+        response_form_id: await responseFormIdForOrganization(body.responseFormId, auth.organizationId),
         created_by: auth.user.id,
       };
       const { data, error } = await auth.client.from("events").insert(record).select().single();
@@ -84,7 +98,7 @@ Deno.serve(createHandler(
     }
 
     await authorize(auth, "events.update");
-    assertNoUnknownFields(body, ["id", "title", "description", "status", "visibility", "location", "timezone", "startsAt", "endsAt", "capacity", "bannerUrl"]);
+    assertNoUnknownFields(body, ["id", "title", "description", "status", "visibility", "location", "timezone", "startsAt", "endsAt", "capacity", "bannerUrl", "responseFormId"]);
     const id = uuid(requiredString(body.id, "id", 36), "id", true)!;
     const updates: Record<string, unknown> = {};
     if (body.title !== undefined) updates.title = requiredString(body.title, "title", 180);
@@ -112,6 +126,7 @@ Deno.serve(createHandler(
       updates.capacity = capacity;
     }
     if (body.bannerUrl !== undefined) updates.banner_url = optionalString(body.bannerUrl, "bannerUrl", 2000);
+    if (body.responseFormId !== undefined) updates.response_form_id = await responseFormIdForOrganization(body.responseFormId, auth.organizationId);
     if (!Object.keys(updates).length) throw new ApiError("VALIDATION_FAILED", "At least one field is required", 422);
 
     let updateQuery = auth.client.from("events").update(updates).eq("id", id).eq("organization_id", auth.organizationId);

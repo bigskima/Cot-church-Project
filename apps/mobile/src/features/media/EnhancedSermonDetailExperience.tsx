@@ -20,6 +20,7 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import type { Sermon } from '@/types/content';
 import { ProgressiveSermonReader } from './ProgressiveSermonReader';
+import { ScripturePreviewCard } from '@/components/bible/ScriptureReferenceText';
 
 type SermonPlayback = {
   ready: boolean;
@@ -257,6 +258,7 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
                     </View>
                   ))}
                 </View>
+                <ScripturePreviewCard text={sermon.scripture_references.join(', ')} compact />
               </View>
             ) : null}
 

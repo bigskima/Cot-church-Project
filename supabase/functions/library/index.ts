@@ -86,6 +86,7 @@ async function requirePublish(auth: any, organizationId: string) {
 
 async function bookCoverUrl(admin: any, path?: string | null) {
   if (!path) return null;
+  if (/^https?:\/\//i.test(path)) return path;
   return admin.storage.from(COVER_BUCKET).getPublicUrl(path).data.publicUrl ?? null;
 }
 
@@ -195,6 +196,13 @@ export const libraryHandler = createHandler(
         await assertFeatureEnabled(admin, "devotionals", { organizationId }, "Devotionals are currently unavailable.");
         const date = isoDate(url.searchParams.get("date") ?? new Date().toISOString().slice(0, 10));
         const year = Number(date.slice(0, 4));
+        const { data: visual } = await admin.from("cot_daily_visuals")
+          .select("id,visual_date,content_kind,image_url,image_source,provider_code,status,generated_at")
+          .eq("organization_id", organizationId)
+          .eq("visual_date", date)
+          .eq("content_kind", "devotional")
+          .eq("status", "ready")
+          .maybeSingle();
         const { data: seriesRows, error: seriesError } = await admin.from("devotional_series")
           .select("id,title,author_name,devotional_year,description,book_id")
           .eq("organization_id", organizationId)
@@ -209,7 +217,7 @@ export const libraryHandler = createHandler(
         if (entryError) throw new ApiError("DEVOTIONAL_LOAD_FAILED", "Unable to load the devotional.", 500, undefined, false);
         const entry = entries?.[0] ?? null;
         const series = entry ? (seriesRows ?? []).find((row: any) => row.id === entry.series_id) ?? null : null;
-        if (entry && series) return { data: { series, entry } };
+        if (entry && series) return { data: { series, entry, visual: visual ?? null } };
 
         // Keep the original one-day devotional domain readable while churches
         // migrate into yearly/monthly devotional books.
@@ -225,6 +233,7 @@ export const libraryHandler = createHandler(
         if (!legacy) return { data: null };
         return {
           data: {
+            visual: visual ?? null,
             series: {
               id: `legacy-${legacy.id}`,
               organization_id: organizationId,
@@ -322,8 +331,12 @@ export const libraryHandler = createHandler(
         await requirePublish(auth, organizationId);
         if (!redistributionConfirmed) throw new ApiError("BOOK_RIGHTS_REQUIRED", "Confirm distribution rights before publishing.", 422);
       }
-      const coverPath = optionalText(body.coverPath, "coverPath", 600) || null;
-      if (coverPath && !coverPath.startsWith(`${organizationId}/${auth.user.id}/`)) throw new ApiError("BOOK_COVER_INVALID", "This cover upload does not belong to your account.", 403);
+      const coverPath = optionalText(body.coverPath, "coverPath", 2000) || null;
+      if (coverPath) {
+        const ownedUpload = coverPath.startsWith(`${organizationId}/${auth.user.id}/`);
+        const generatedArtwork = /^https:\/\/[^/]+\.supabase\.co\/storage\/v1\/object\/public\/ministry-generated-media\//i.test(coverPath);
+        if (!ownedUpload && !generatedArtwork) throw new ApiError("BOOK_COVER_INVALID", "This cover image is not an approved ministry asset.", 403);
+      }
 
       const { data: book, error } = await admin.from("library_books").insert({
         organization_id: organizationId,
@@ -419,7 +432,7 @@ export const libraryHandler = createHandler(
       const { error } = await admin.from("library_books").delete().eq("id", bookId).eq("organization_id", organizationId);
       if (error) throw new ApiError("BOOK_DELETE_FAILED", "Unable to delete this book.", 500, undefined, false);
       if (book.source_path) await admin.storage.from(BOOK_BUCKET).remove([book.source_path]).catch(() => {});
-      if (book.cover_path) await admin.storage.from(COVER_BUCKET).remove([book.cover_path]).catch(() => {});
+      if (book.cover_path && !/^https?:\/\//i.test(book.cover_path)) await admin.storage.from(COVER_BUCKET).remove([book.cover_path]).catch(() => {});
       return { data: { deleted: true, bookId } };
     }
 

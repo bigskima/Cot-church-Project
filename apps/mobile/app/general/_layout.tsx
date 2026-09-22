@@ -6,6 +6,7 @@ import { Icon } from '@/components/primitives/Icon';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
+import { TourAnchor } from '@/features/tour/AppTourProvider';
 
 const TAB_ICON_SIZE = 22;
 const hidden = { href: null } as const;
@@ -23,6 +24,7 @@ function PrimaryGeneralTabBar({ state, descriptors, navigation }: any) {
 
   return (
     <View style={[styles.tabBar, { backgroundColor: colors.glass, borderColor: colors.borderSubtle, minHeight: 64 + bottomInset, paddingBottom: bottomInset }, shadows.floating]}>
+      <TourAnchor targetKey="general.navigation" style={styles.tabItems}>
       {routes.map((route: any) => {
         const routeIndex = state.routes.findIndex((candidate: any) => candidate.key === route.key);
         const focused = state.index === routeIndex;
@@ -53,6 +55,7 @@ function PrimaryGeneralTabBar({ state, descriptors, navigation }: any) {
           </Pressable>
         );
       })}
+      </TourAnchor>
     </View>
   );
 }
@@ -123,6 +126,7 @@ export default function GeneralLayout() {
       <Tabs.Screen name="profile" options={{ title: 'You', tabBarAccessibilityLabel: 'Your General COT profile', tabBarIcon: renderIcon('person', 'person-outline') }} />
 
       <Tabs.Screen name="announcements" options={hidden as any} />
+      <Tabs.Screen name="announcement/[id]" options={hidden as any} />
       <Tabs.Screen name="participate" options={hidden as any} />
       <Tabs.Screen name="sermons" options={hidden as any} />
       <Tabs.Screen name="watch/index" options={hidden as any} />
@@ -146,6 +150,8 @@ export default function GeneralLayout() {
       <Tabs.Screen name="library/index" options={hidden as any} />
       <Tabs.Screen name="library/[bookId]" options={hidden as any} />
       <Tabs.Screen name="devotional" options={hidden as any} />
+      <Tabs.Screen name="daily-quote" options={hidden as any} />
+      <Tabs.Screen name="bible" options={hidden as any} />
       <Tabs.Screen name="groups/index" options={hidden as any} />
       <Tabs.Screen name="groups/[groupId]" options={hidden as any} />
       <Tabs.Screen name="groups/[groupId]/chat" options={hidden as any} />
@@ -166,6 +172,7 @@ export default function GeneralLayout() {
       <Tabs.Screen name="leadership/sermons-manage" options={hidden as any} />
       <Tabs.Screen name="leadership/library-manage" options={hidden as any} />
       <Tabs.Screen name="leadership/devotionals-manage" options={hidden as any} />
+      <Tabs.Screen name="leadership/bible-manage" options={hidden as any} />
       <Tabs.Screen name="leadership/events-manage" options={hidden as any} />
       <Tabs.Screen name="leadership/expressions-manage" options={hidden as any} />
       <Tabs.Screen name="leadership/roles-access" options={hidden as any} />
@@ -194,7 +201,8 @@ const styles = StyleSheet.create({
   iconStack: { height: 36, alignItems: 'center', justifyContent: 'center', gap: 2 },
   iconShell: { minWidth: 42, height: 31, borderRadius: 13, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 9 },
   activeDot: { width: 4, height: 4, borderRadius: 2 },
-  tabBar: { position: 'absolute', left: 14, right: 14, bottom: 10, maxWidth: 620, alignSelf: 'center', borderWidth: 1, borderRadius: 28, overflow: 'hidden', paddingHorizontal: 4, paddingTop: 5, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-around' },
+  tabBar: { position: 'absolute', left: 14, right: 14, bottom: 10, maxWidth: 620, alignSelf: 'center', borderWidth: 1, borderRadius: 28, overflow: 'hidden', paddingHorizontal: 4, paddingTop: 5 },
+  tabItems: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-around' },
   customTabItem: { flex: 1, minHeight: 58, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 2 },
   pressedTab: { opacity: 0.72, transform: [{ scale: 0.97 }] },
 });

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Image, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, EmptyState, Icon, ResourceError, ScreenHeader, Skeleton } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
@@ -14,9 +14,11 @@ type Announcement = {
   title: string;
   body: string;
   banner_url?: string | null;
+  response_form_id?: string | null;
   published_at?: string | null;
   created_at?: string | null;
 };
+type LinkedForm = { id: string; slug: string; title: string; status: string };
 
 function dateLabel(value?: string | null) {
   if (!value) return '';
@@ -31,6 +33,8 @@ function dateLabel(value?: string | null) {
 
 export default function GeneralAnnouncementsScreen() {
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ announcementId?: string }>();
+  const selectedAnnouncementId = typeof params.announcementId === 'string' ? params.announcementId : '';
   const { auth, context, mode, hasOrganizationCapability } = useSession();
   const { colors } = useTheme();
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
@@ -44,7 +48,7 @@ export default function GeneralAnnouncementsScreen() {
       const supabase = await getRuntimeSupabase(accessToken);
       const { data, error } = await supabase
         .from('announcements')
-        .select('id,title,body,banner_url,published_at,created_at')
+        .select('id,title,body,banner_url,response_form_id,published_at,created_at')
         .eq('organization_id', organizationId)
         .is('branch_id', null)
         .eq('status', 'published')
@@ -56,8 +60,9 @@ export default function GeneralAnnouncementsScreen() {
   );
 
   const announcements = resource.data ?? [];
-  const latest = announcements[0];
-  const remaining = announcements.slice(1);
+  const selected = selectedAnnouncementId ? announcements.find((item) => item.id === selectedAnnouncementId) : undefined;
+  const latest = selected ?? announcements[0];
+  const remaining = latest ? announcements.filter((item) => item.id !== latest.id) : [];
 
   return (
     <ScrollView
@@ -96,12 +101,13 @@ export default function GeneralAnnouncementsScreen() {
             </View>
           </View>
 
-          <Text style={[styles.eyebrow, { color: colors.interactive }]}>LATEST</Text>
+          <Text style={[styles.eyebrow, { color: colors.interactive }]}>{selected ? 'SELECTED ANNOUNCEMENT' : 'LATEST'}</Text>
           <View style={[styles.featured, { backgroundColor: colors.card, borderColor: colors.interactive }, shadows.sm]}>
             {latest.banner_url ? <Image source={{ uri: latest.banner_url }} style={styles.banner} resizeMode="cover" /> : null}
             <Text style={[styles.title, { color: colors.text }]}>{latest.title}</Text>
             <Text style={[styles.meta, { color: colors.textMuted }]}>{dateLabel(latest.published_at ?? latest.created_at)}</Text>
             <Text style={[styles.body, { color: colors.textSecondary }]}>{latest.body}</Text>
+            {latest.response_form_id ? <AnnouncementFormAction formId={latest.response_form_id} organizationId={organizationId} /> : null}
           </View>
 
           {remaining.length ? (
@@ -113,6 +119,7 @@ export default function GeneralAnnouncementsScreen() {
                   <Text style={[styles.cardTitle, { color: colors.text }]}>{item.title}</Text>
                   <Text style={[styles.meta, { color: colors.textMuted }]}>{dateLabel(item.published_at ?? item.created_at)}</Text>
                   <Text style={[styles.body, { color: colors.textSecondary }]}>{item.body}</Text>
+                  {item.response_form_id ? <AnnouncementFormAction formId={item.response_form_id} organizationId={organizationId} /> : null}
                 </View>
               ))}
             </View>
@@ -128,6 +135,29 @@ export default function GeneralAnnouncementsScreen() {
         />
       )}
     </ScrollView>
+  );
+}
+
+function AnnouncementFormAction({ formId, organizationId }: { formId: string; organizationId: string }) {
+  const { api } = useSession();
+  const { colors } = useTheme();
+  const form = useResource<LinkedForm | null>(
+    'announcement:form:' + formId,
+    (signal) => api.request<LinkedForm>(
+      'noop?service=engagement-hub&action=form&id=' + encodeURIComponent(formId) + '&organizationId=' + encodeURIComponent(organizationId),
+      { signal, context: 'public' },
+    ).catch(() => null),
+  );
+  if (!form.data) return null;
+  return (
+    <Button
+      label={form.data.title || 'Respond'}
+      variant="outline"
+      size="sm"
+      onPress={() => router.push(('/general/forms/' + form.data!.slug) as any)}
+      icon={<Icon name="document-text-outline" size={16} color={colors.interactive} />}
+      style={{ alignSelf: 'flex-start', marginTop: spacing.sm }}
+    />
   );
 }
 

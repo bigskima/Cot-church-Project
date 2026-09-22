@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Speech from 'expo-speech';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
 import { EmptyState, Icon, ScreenHeader, Skeleton } from '@/components';
 import { DateTimeField } from '@/components/DateTimeField';
 import { ReadAloudRateControl, useReadAloudRate } from '@/components/ReadAloudRateControl';
+import { ScripturePreviewCard } from '@/components/bible/ScriptureReferenceText';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 import { useSession } from '@/state/session';
@@ -46,10 +48,12 @@ function dateParts(value: string) {
 
 export function DevotionalExperience() {
   const insets = useSafeAreaInsets();
+  const route = useLocalSearchParams<{ date?: string }>();
   const { api, context } = useSession();
   const { colors } = useTheme();
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
-  const [date, setDate] = useState(today());
+  const routeDate = typeof route.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(route.date) ? route.date : today();
+  const [date, setDate] = useState(routeDate);
   const [speaking, setSpeaking] = useState(false);
   const [speechRate, setSpeechRate] = useReadAloudRate();
   const devotional = useResource<DailyDevotionalPayload | null>(
@@ -188,6 +192,18 @@ export function DevotionalExperience() {
           </View>
         ) : (
           <>
+            {devotional.data.visual?.image_url ? (
+              <View style={[styles.visualFrame, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+                <Image source={{ uri: devotional.data.visual.image_url }} style={styles.visualImage} resizeMode="cover" />
+                <View style={styles.visualOverlay}>
+                  <View style={[styles.visualBadge, { backgroundColor: 'rgba(4,12,24,.72)' }]}>
+                    <Icon name="sunny-outline" size={15} color="#FFFFFF" />
+                    <Text style={styles.visualBadgeText}>DAILY DEVOTIONAL</Text>
+                  </View>
+                </View>
+              </View>
+            ) : null}
+
             <View style={styles.seriesHead}>
               <View style={styles.flex}>
                 <Text style={[styles.seriesTitle, { color: colors.text }]}>{devotional.data.series.title}</Text>
@@ -225,6 +241,7 @@ export function DevotionalExperience() {
                   <Text style={[styles.scriptureText, { color: colors.text }]}>{devotional.data.entry.scripture}</Text>
                 </View>
               ) : null}
+              {devotional.data.entry.scripture ? <ScripturePreviewCard text={devotional.data.entry.scripture} compact /> : null}
               {devotional.data.entry.memory_verse ? (
                 <View style={styles.block}>
                   <Text style={[styles.kicker, { color: colors.textMuted }]}>MEMORY VERSE</Text>
@@ -232,6 +249,7 @@ export function DevotionalExperience() {
                 </View>
               ) : null}
               <Text style={[styles.body, { color: colors.text }]}>{devotional.data.entry.body}</Text>
+              <ScripturePreviewCard text={devotional.data.entry.body} compact />
               {devotional.data.entry.prayer ? (
                 <View style={[styles.prayer, { borderColor: colors.borderSubtle }]}>
                   <Icon name='heart-outline' size={18} color={colors.interactive} />
@@ -316,6 +334,11 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 18, fontWeight: '900' },
   emptyCopy: { fontSize: 12, lineHeight: 18, textAlign: 'center', maxWidth: 380 },
+  visualFrame: { width: '100%', aspectRatio: 16 / 7, borderWidth: 1, borderRadius: radius.xl, overflow: 'hidden' },
+  visualImage: { width: '100%', height: '100%' },
+  visualOverlay: { ...StyleSheet.absoluteFill as any, padding: spacing.md, justifyContent: 'flex-end' },
+  visualBadge: { alignSelf: 'flex-start', minHeight: 32, borderRadius: 16, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  visualBadgeText: { color: '#FFFFFF', fontSize: 8.5, fontWeight: '900', letterSpacing: 0.9 },
   seriesHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   seriesTitle: { fontSize: 17, fontWeight: '900' },
   seriesMeta: { fontSize: 11, marginTop: 2 },

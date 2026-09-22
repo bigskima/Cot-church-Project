@@ -183,6 +183,26 @@ export default function PublicMemberProfileScreen() {
               )}
             />
 
+            <Pressable
+              onPress={() => router.push('/general/bible' as any)}
+              accessibilityRole="button"
+              accessibilityLabel="Open COT Bible"
+              style={({ pressed }) => [
+                styles.bibleShortcut,
+                { backgroundColor: colors.card, borderColor: colors.borderSubtle },
+                pressed && styles.pressed,
+              ]}
+            >
+              <View style={[styles.bibleShortcutIcon, { backgroundColor: colors.primarySoft }]}>
+                <Icon name="book-outline" size={19} color={colors.interactive} />
+              </View>
+              <View style={styles.bibleShortcutCopy}>
+                <Text style={[styles.bibleShortcutTitle, { color: colors.text }]}>COT Bible</Text>
+                <Text style={[styles.bibleShortcutText, { color: colors.textMuted }]}>Read Scripture or continue a reading plan</Text>
+              </View>
+              <Icon name="chevron-forward" size={17} color={colors.textMuted} />
+            </Pressable>
+
             {actionError ? (
               <View style={[styles.error, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}>
                 <Icon name="alert-circle-outline" size={16} color={colors.live} />
@@ -260,6 +280,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  bibleShortcut: {
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    minHeight: 62,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  bibleShortcutIcon: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  bibleShortcutCopy: { flex: 1, minWidth: 0 },
+  bibleShortcutTitle: { fontSize: 12.5, fontWeight: '900' },
+  bibleShortcutText: { fontSize: 9.5, lineHeight: 14, marginTop: 1 },
   error: {
     marginHorizontal: spacing.md,
     marginTop: spacing.sm,

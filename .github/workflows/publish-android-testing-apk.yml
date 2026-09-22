@@ -1,0 +1,133 @@
+name: Publish Android Testing APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cot-android-testing-apk
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build and publish COT.apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+      CI: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck mobile
+        run: npm run mobile:typecheck
+
+      - name: Confirm Expo authentication
+        working-directory: apps/mobile
+        run: npx eas-cli@latest whoami --non-interactive
+
+      - name: Build current Android testing APK
+        working-directory: apps/mobile
+        run: |
+          npx eas-cli@latest build \
+            --platform android \
+            --profile production-apk \
+            --non-interactive \
+            --wait \
+            --json > ../../eas-android-build.json
+
+      - name: Read EAS artifact metadata
+        id: eas
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const raw = JSON.parse(fs.readFileSync('eas-android-build.json', 'utf8'));
+          const build = Array.isArray(raw) ? raw[0] : raw;
+          const url =
+            build?.artifacts?.applicationArchiveUrl ||
+            build?.artifacts?.buildUrl ||
+            build?.artifactUrl ||
+            '';
+          if (!url) {
+            console.error(JSON.stringify(build, null, 2));
+            throw new Error('EAS did not return an Android application archive URL.');
+          }
+          const output = process.env.GITHUB_OUTPUT;
+          fs.appendFileSync(output, `artifact_url=${url}\n`);
+          fs.appendFileSync(output, `build_id=${build.id || ''}\n`);
+          fs.appendFileSync(output, `app_version=${build.appVersion || ''}\n`);
+          fs.appendFileSync(output, `build_version=${build.appBuildVersion || ''}\n`);
+
+          const versionCode = Number(build.appBuildVersion);
+          if (!Number.isInteger(versionCode) || versionCode <= 0) {
+            throw new Error('EAS did not return a valid Android build version.');
+          }
+          const manifest = {
+            versionName: build.appVersion || null,
+            versionCode,
+            minimumSupportedVersionCode: null,
+            releaseNotes: 'Latest COT church testing build.',
+            publishedAt: new Date().toISOString(),
+            sourceCommit: process.env.GITHUB_SHA,
+            easBuildId: build.id || null,
+          };
+          fs.writeFileSync('release.json', JSON.stringify(manifest, null, 2) + '\n');
+          NODE
+
+      - name: Download APK
+        run: |
+          curl --fail --location --retry 3 --output COT.apk "${{ steps.eas.outputs.artifact_url }}"
+          test -s COT.apk
+          test "$(stat -c%s COT.apk)" -gt 1000000
+          test -s release.json
+
+      - name: Publish stable testing release assets
+        run: |
+          if gh release view cot-android-latest >/dev/null 2>&1; then
+            gh release upload cot-android-latest COT.apk release.json --clobber
+          else
+            gh release create cot-android-latest COT.apk release.json \
+              --target "$GITHUB_SHA" \
+              --title "COT Android Testing APK" \
+              --notes "Stable church-testing APK channel." \
+              --prerelease
+          fi
+
+          cat > release-notes.md <<EOF
+          # COT Android Testing APK
+
+          This release is the stable APK channel used by the COT direct-download route.
+
+          - Source commit: `$GITHUB_SHA`
+          - Branch: `$GITHUB_REF_NAME`
+          - App version: `${{ steps.eas.outputs.app_version }}`
+          - Android build version: `${{ steps.eas.outputs.build_version }}`
+          - EAS build: `${{ steps.eas.outputs.build_id }}`
+          - Published: `$(date -u +"%Y-%m-%dT%H:%M:%SZ")`
+
+          The asset names intentionally remain **COT.apk** and **release.json** so the church-facing download and update-check channels never change.
+          EOF
+          gh release edit cot-android-latest --title "COT Android Testing APK" --notes-file release-notes.md --prerelease
+
+      - name: Build summary
+        run: |
+          echo "### COT Android testing APK published" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Stable asset: https://github.com/${{ github.repository }}/releases/download/cot-android-latest/COT.apk" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Stable manifest: https://github.com/${{ github.repository }}/releases/download/cot-android-latest/release.json" >> "$GITHUB_STEP_SUMMARY"
+          echo "- EAS build ID: ${{ steps.eas.outputs.build_id }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- App version: ${{ steps.eas.outputs.app_version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Android build version: ${{ steps.eas.outputs.build_version }}" >> "$GITHUB_STEP_SUMMARY"

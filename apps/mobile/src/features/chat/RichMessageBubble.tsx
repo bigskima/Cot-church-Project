@@ -11,6 +11,7 @@ import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import { AdaptiveMediaImage, AudioPlayer, Avatar, Icon, MediaPreviewModal, VideoPlayer } from '@/components';
 import { CompactIdentityBadge } from '@/components/identity/PublicIdentityBadge';
+import { ScripturePreviewCard } from '@/components/bible/ScriptureReferenceText';
 import { radius, spacing } from '@/design-system/tokens';
 import { useTheme } from '@/state/theme';
 import { downloadFile } from '@/utils/download-file';
@@ -169,6 +170,7 @@ export function RichMessageBubble({
   onReply,
   onReact,
   onPin,
+  onDelete,
   onJumpToMessage,
 }: {
   message: RichChatMessage;
@@ -178,10 +180,13 @@ export function RichMessageBubble({
   onReply: (message: RichChatMessage) => void;
   onReact: (message: RichChatMessage, emoji: string) => void;
   onPin: (message: RichChatMessage, pinned: boolean) => void;
+  onDelete?: (message: RichChatMessage) => void | Promise<void>;
   onJumpToMessage: (messageId: string) => void;
 }) {
   const { colors } = useTheme();
   const [actionsOpen, setActionsOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const translateX = useRef(new Animated.Value(0)).current;
   const senderName = message.sender?.display_name || message.sender?.username || 'Member';
@@ -215,6 +220,18 @@ export function RichMessageBubble({
     if (!content) return;
     setActionsOpen(false);
     router.push({ pathname: '/general/chat', params: { forwardText: content } } as any);
+  };
+
+  const deleteMessage = async () => {
+    if (!mine || !onDelete || deleteBusy || message.optimistic) return;
+    setDeleteBusy(true);
+    try {
+      await onDelete(message);
+      setActionsOpen(false);
+      setDeleteConfirm(false);
+    } finally {
+      setDeleteBusy(false);
+    }
   };
 
   const copyMessage = async () => {
@@ -251,7 +268,7 @@ export function RichMessageBubble({
                 borderColor: message.pinned_at ? colors.interactive : colors.borderSubtle,
               },
             ]}
-            accessibilityHint="Long press for reply, copy, forward, reaction, and pin actions"
+            accessibilityHint={mine ? "Long press for reply, copy, forward, reaction, pin, and delete actions" : "Long press for reply, copy, forward, reaction, and pin actions"}
           >
             <View style={styles.bubbleMeta}>
               {!mine && showSender ? (
@@ -297,6 +314,7 @@ export function RichMessageBubble({
               {new Date(message.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </Text>
           </Pressable>
+          {message.body ? <ScripturePreviewCard text={message.body} compact /> : null}
 
           {(message.reactions ?? []).length ? (
             <View style={[styles.reactions, mine && styles.reactionsMine]}>
@@ -347,6 +365,24 @@ export function RichMessageBubble({
                   <Text style={[styles.actionLabel, { color: colors.textSecondary }]}>{message.pinned_at ? 'Unpin' : 'Pin'}</Text>
                 </Pressable>
               ) : null}
+              {mine && onDelete && !message.optimistic ? (
+                deleteConfirm ? (
+                  <View style={styles.deleteInlineConfirm}>
+                    <Pressable onPress={() => setDeleteConfirm(false)} disabled={deleteBusy} style={styles.actionButton}>
+                      <Text style={[styles.actionLabel, { color: colors.textSecondary }]}>Cancel</Text>
+                    </Pressable>
+                    <Pressable onPress={() => void deleteMessage()} disabled={deleteBusy} style={styles.actionButton}>
+                      <Icon name={deleteBusy ? 'hourglass-outline' : 'trash-outline'} size={17} color={colors.live} />
+                      <Text style={[styles.actionLabel, { color: colors.live }]}>{deleteBusy ? 'Deleting…' : 'Delete'}</Text>
+                    </Pressable>
+                  </View>
+                ) : (
+                  <Pressable onPress={() => setDeleteConfirm(true)} style={styles.actionButton}>
+                    <Icon name="trash-outline" size={17} color={colors.live} />
+                    <Text style={[styles.actionLabel, { color: colors.live }]}>Delete</Text>
+                  </Pressable>
+                )
+              ) : null}
             </View>
           ) : null}
         </View>
@@ -390,6 +426,7 @@ const styles = StyleSheet.create({
   reactionsMine: { justifyContent: 'flex-end', marginLeft: 0, marginRight: 8 },
   reactionChip: { minHeight: 25, borderRadius: 13, borderWidth: 1, paddingHorizontal: 7, alignItems: 'center', justifyContent: 'center' },
   reactionText: { fontSize: 12, color: '#FFFFFF' },
+  deleteInlineConfirm: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   actions: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 3, borderWidth: 1, borderRadius: radius.lg, padding: 5, alignSelf: 'flex-start' },
   actionsMine: { alignSelf: 'flex-end' },
   actionButton: { minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6 },

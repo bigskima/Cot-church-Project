@@ -83,14 +83,15 @@ const realtimeDomains: RealtimeDomain[] = [
   {
     name: 'ministry-content',
     tables: {
-      events: ['events:', 'event:', 'discover:events:', 'leadership:events:', 'general:ministry:events:', 'mobile:home-feed:', 'expression:'],
-      announcements: ['general:announcements:', 'expression:announcements:', 'leadership:announcements:', 'general:ministry:announcements:', 'mobile:home-feed:', 'expression:'],
+      events: ['events:', 'event:', 'discover:events:', 'leadership:events:', 'general:ministry:events:', 'home:spotlight:banners:', 'expression:'],
+      announcements: ['general:announcements:', 'general:announcement:', 'expression:announcements:', 'leadership:announcements:', 'general:ministry:announcements:', 'home:spotlight:banners:', 'expression:'],
       sermons: ['sermon:', 'general:sermons:', 'discover:sermons:', 'discover:series:', 'leadership:sermons:', 'general:ministry:sermons:', 'mobile:home-feed:', 'expression:', 'saved:'],
       library_books: ['library:'],
       library_reviews: ['library:'],
       library_reading_progress: ['library:'],
       devotional_series: ['devotional:'],
-      devotional_entries: ['devotional:'],
+      devotional_entries: ['devotional:', 'home:spotlight:banners:', 'devotional:visual-manage:'],
+      cot_daily_visuals: ['home:spotlight:banners:', 'bible:daily-visual:', 'daily-highlights:', 'devotional:', 'devotional:visual-manage:'],
       general_home_notice_signals: ['general-home-notice:'],
     },
   },

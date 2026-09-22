@@ -18,6 +18,7 @@ import {
   Skeleton,
 } from '@/components';
 import { DateTimeField, formatDateOnly } from '@/components/DateTimeField';
+import { ScripturePreviewCard } from '@/components/bible/ScriptureReferenceText';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
 import { getRuntimeSupabase } from '@/services/runtime-supabase';
@@ -237,6 +238,7 @@ export default function ExpressionTestimonyExperience({ managed = false }: { man
               <Pressable key={item.id} onPress={() => { setSelected(item); setServiceNotes(item.service_notes || ''); }} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
                 <View style={styles.cardTop}>{managed ? <Avatar url={author?.avatar_url ?? undefined} name={author?.display_name || 'Member'} size="sm" /> : <View style={[styles.docIcon, { backgroundColor: colors.primarySoft }]}><Icon name="document-text-outline" size={18} color={colors.interactive} /></View>}<View style={styles.flex}><Text style={[styles.cardTitle, { color: colors.text }]}>{item.title}</Text><Text style={[styles.meta, { color: colors.textMuted }]}>{managed ? `${author?.display_name || 'Expression member'} · ` : ''}{new Date(item.created_at).toLocaleDateString()} · {responseCount} response{responseCount === 1 ? '' : 's'}</Text></View><Badge label={item.status.toUpperCase()} variant={item.status === 'approved' ? 'success' : item.status === 'declined' ? 'neutral' : 'active'} /></View>
                 <Text style={[styles.cardBody, { color: colors.textSecondary }]} numberOfLines={4}>{item.testimony}</Text>
+                <ScripturePreviewCard text={item.testimony} compact />
                 <View style={styles.cardFlags}>{item.share_in_service_consent ? <Badge label="OPEN TO SHARE" variant="primary" /> : <Badge label="PRIVATE RECORD" variant="neutral" />}{item.invited_to_share ? <Badge label="INVITED TO SERVICE" variant="active" /> : null}</View>
               </Pressable>
             );
@@ -259,6 +261,7 @@ export default function ExpressionTestimonyExperience({ managed = false }: { man
       <BottomSheet visible={Boolean(selected)} onClose={() => { if (!saving) { setSelected(null); setResponseText(''); } }} title={selected?.title || 'Testimony'} subtitle={selected ? `Status: ${selected.status}` : undefined} maxHeightPercent={96}>
         {selected ? <ScrollView contentContainerStyle={styles.detail} showsVerticalScrollIndicator={false}>
           <Text style={[styles.detailText, { color: colors.text }]}>{selected.testimony}</Text>
+          <ScripturePreviewCard text={selected.testimony} compact />
           <View style={styles.cardFlags}><Badge label={selected.share_in_service_consent ? 'MEMBER OPEN TO SHARING' : 'DOCUMENTED ONLY'} variant={selected.share_in_service_consent ? 'primary' : 'neutral'} />{selected.invited_to_share ? <Badge label="INVITED TO SERVICE" variant="active" /> : null}</View>
           <Button label="Export PDF" onPress={() => void exportPdf(selected)} variant="outline" size="sm" />
 

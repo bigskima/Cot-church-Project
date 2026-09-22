@@ -212,6 +212,32 @@ export async function deleteChatUpload(
   return { uploadId, deleted: true };
 }
 
+export async function purgeAttachedChatUploads(
+  admin: SupabaseClient,
+  profileId: string,
+  attachmentIds: string[],
+) {
+  if (!attachmentIds.length) return;
+  const { data: uploads } = await admin
+    .from("chat_media_uploads")
+    .select("id,storage_path,status")
+    .in("id", attachmentIds)
+    .eq("uploader_profile_id", profileId);
+  const rows = uploads ?? [];
+  const storagePaths = rows
+    .filter((item: any) => item.status !== "deleted" && item.storage_path)
+    .map((item: any) => item.storage_path);
+  if (storagePaths.length) {
+    await admin.storage.from(CHAT_MEDIA_BUCKET).remove(storagePaths);
+  }
+  if (rows.length) {
+    await admin.from("chat_media_uploads")
+      .update({ status: "deleted", deleted_at: new Date().toISOString() })
+      .in("id", rows.map((item: any) => item.id))
+      .eq("uploader_profile_id", profileId);
+  }
+}
+
 export async function validateChatUploads(
   admin: SupabaseClient,
   profileId: string,

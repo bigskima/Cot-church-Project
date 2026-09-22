@@ -26,6 +26,7 @@ import type { ChatReaction, ChatReply, ChatSendPayload, RichChatMessage } from '
 import { ChatCallActions } from '@/features/calls/ChatCallActions';
 import { CallHistoryBubble } from '@/features/calls/CallHistoryBubble';
 import type { CallHistoryPayload } from '@/features/calls/call-types';
+import { TourAnchor } from '@/features/tour/AppTourProvider';
 
 type Person = {
   id: string;
@@ -75,6 +76,7 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
   const [replyTo, setReplyTo] = useState<ChatReply | null>(null);
   const [localMessages, setLocalMessages] = useState<RichChatMessage[]>([]);
   const [messageOverrides, setMessageOverrides] = useState<Map<string, Partial<RichChatMessage>>>(new Map());
+  const [deletedMessageIds, setDeletedMessageIds] = useState<Set<string>>(new Set());
   const messageListRef = useRef<FlatList<DirectTimelineItem>>(null);
 
   const [normalizedFilter, setNormalizedFilter] = useState('');
@@ -128,6 +130,7 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
     setReplyTo(null);
     setLocalMessages([]);
     setMessageOverrides(new Map());
+    setDeletedMessageIds(new Set());
   }, [selected?.id]);
 
   useEffect(() => {
@@ -266,6 +269,22 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
     }
   };
 
+  const deleteMessage = async (message: RichChatMessage) => {
+    if (!selected || message.sender_profile_id !== context?.profile?.id) return;
+    setActionError('');
+    await api.request('chat', {
+      method: 'POST',
+      context: 'public',
+      feedback: false,
+      body: JSON.stringify({ action: 'delete_message', conversationId: selected.id, messageId: message.id }),
+    });
+    setDeletedMessageIds((current) => new Set([...current, message.id]));
+    setLocalMessages((current) => current.filter((item) => item.id !== message.id));
+    if (replyTo?.id === message.id) setReplyTo(null);
+    invalidate(threadKey);
+    invalidate('chat:global:');
+  };
+
   const list = useMemo<InboxItem[]>(() => {
     if (normalizedFilter) {
       return (inbox.data?.people ?? []).map((person) => ({ kind: 'person' as const, id: `p:${person.id}`, person }));
@@ -302,8 +321,8 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
     return [...server, ...localMessages.filter((message) => !ids.has(message.id)).map((message) => ({
       ...message,
       ...(messageOverrides.get(message.id) ?? {}),
-    }))];
-  }, [localMessages, messageOverrides, thread.data?.messages]);
+    }))].filter((message) => !deletedMessageIds.has(message.id));
+  }, [deletedMessageIds, localMessages, messageOverrides, thread.data?.messages]);
 
   const timeline = useMemo<DirectTimelineItem[]>(() => {
     const messageItems = displayedMessages.map((message) => ({
@@ -417,6 +436,7 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
                   onReply={beginReply}
                   onReact={(target, emoji) => void react(target, emoji)}
                   onPin={(target, pinned) => void pin(target, pinned)}
+                  onDelete={(target) => deleteMessage(target)}
                   onJumpToMessage={jumpToMessage}
                 />
               );
@@ -463,18 +483,20 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
         </View>
       ) : null}
 
-      <View style={[styles.search, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
-        <Icon name="search" size={18} color={colors.textMuted} />
-        <TextInput
-          value={filter}
-          onChangeText={setFilter}
-          placeholder="Search anyone by @username or name"
-          placeholderTextColor={colors.textMuted}
-          autoCapitalize="none"
-          autoCorrect={false}
-          style={[styles.searchInput, { color: colors.text }]}
-        />
-      </View>
+      <TourAnchor targetKey="general.messages.search">
+        <View style={[styles.search, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+          <Icon name="search" size={18} color={colors.textMuted} />
+          <TextInput
+            value={filter}
+            onChangeText={setFilter}
+            placeholder="Search anyone by @username or name"
+            placeholderTextColor={colors.textMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={[styles.searchInput, { color: colors.text }]}
+          />
+        </View>
+      </TourAnchor>
 
       {actionError ? <Text style={{ color: colors.live, padding: 12 }}>{actionError}</Text> : null}
       {inbox.error ? (

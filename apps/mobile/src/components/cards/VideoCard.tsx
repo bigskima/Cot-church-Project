@@ -70,7 +70,15 @@ export function VideoCard({ video, expressionName, onPress, onBookmark, style, c
   return (
     <View style={[styles.container, variant === 'feed' && styles.feedContainer, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, variant === 'card' ? shadows.sm : null, style]}>
       <View style={[styles.thumbnailFrame, variant === 'feed' && styles.feedThumbnail, { backgroundColor: colors.cardElevated, aspectRatio: mediaRatio }]}>
-        {sourceUrl && player ? <VideoView player={player} style={styles.media} contentFit="contain" nativeControls /> : posterUrl ? <Image source={{ uri: posterUrl }} style={styles.media} resizeMode="cover" /> : <View style={styles.placeholder}><View style={[styles.playButton, { backgroundColor: colors.primarySoftStrong }]}><Icon name="play" size={24} color={colors.interactive} /></View></View>}
+        {sourceUrl && player ? (
+          variant === 'feed' ? (
+            <View pointerEvents="none" style={styles.media}>
+              <VideoView player={player} style={styles.media} contentFit="contain" nativeControls={false} />
+            </View>
+          ) : (
+            <VideoView player={player} style={styles.media} contentFit="contain" nativeControls />
+          )
+        ) : posterUrl ? <Image source={{ uri: posterUrl }} style={styles.media} resizeMode="cover" /> : <View style={styles.placeholder}><View style={[styles.playButton, { backgroundColor: colors.primarySoftStrong }]}><Icon name="play" size={24} color={colors.interactive} /></View></View>}
         {duration ? <View pointerEvents="none" style={styles.durationBadge}><Text style={styles.durationText}>{duration}</Text></View> : null}
         {variant === 'feed' ? <View pointerEvents="none" style={styles.typeBadge}><Icon name="videocam" size={11} color="#FFFFFF" /><Text style={styles.typeBadgeText}>VIDEO</Text></View> : null}
       </View>

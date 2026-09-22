@@ -19,6 +19,7 @@ export function useGeneralMinistryAccess() {
       hasOrganizationCapability('reels.publish') || hasOrganizationCapability('videos.publish')
     );
     const canManageSermons = hasOrganizationCapability('sermons.create') || hasOrganizationCapability('sermons.manage');
+    const canManageBible = hasOrganizationCapability('bible.manage');
     const canManageEvents = hasOrganizationCapability('events.create') || hasOrganizationCapability('events.update');
     const canManageAnnouncements = hasOrganizationCapability('announcements.manage');
     const canManagePolls = hasOrganizationCapability('polls.manage');
@@ -36,13 +37,13 @@ export function useGeneralMinistryAccess() {
     const canBroadcastLive = hasPublicCapability('public.live_stream.create');
     const canManageExpressions = isAuthorizedExpressionCreator;
     const canManageCare = canManagePrayer || canReceivePastoralFollowups || canReviewTestimonies;
-    const canCreateOfficialContent = canCreatePosts || canPublishMedia || canManageSermons || canManageEvents || canManageAnnouncements || canManagePolls;
+    const canCreateOfficialContent = canCreatePosts || canPublishMedia || canManageSermons || canManageBible || canManageEvents || canManageAnnouncements || canManagePolls;
     const canManageMedia = canBroadcastLive || canPublishMedia || canManageLeadership;
     const canManageSettings = canManageLeadership || canManageRoles;
 
     const focusAreas: GeneralMinistryArea[] = [];
     if (canCreateOfficialContent) focusAreas.push('Create');
-    if (canManageSermons || canManageEvents || canManageAnnouncements || canManagePolls) focusAreas.push('Content');
+    if (canManageSermons || canManageBible || canManageEvents || canManageAnnouncements || canManagePolls) focusAreas.push('Content');
     if (canManageCare) focusAreas.push('Care');
     if (canManageLeadership || canManageExpressions || canManageRoles) focusAreas.push('People');
     if (canManageGiving || canReadGivingFinance) focusAreas.push('Finance');
@@ -53,6 +54,7 @@ export function useGeneralMinistryAccess() {
       canCreatePosts,
       canPublishMedia,
       canManageSermons,
+      canManageBible,
       canManageEvents,
       canManageAnnouncements,
       canManagePolls,

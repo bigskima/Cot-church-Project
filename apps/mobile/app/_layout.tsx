@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Stack, type ErrorBoundaryProps } from 'expo-router';
+import { Stack, type ErrorBoundaryProps, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -11,6 +11,7 @@ import { OnboardingGate } from '@/components/OnboardingGate';
 import { RealtimeBridge } from '@/components/RealtimeBridge';
 import { PushNotificationsBridge } from '@/components/PushNotificationsBridge';
 import { IncomingCallBridge } from '@/components/IncomingCallBridge';
+import { AppUpdateBridge } from '@/components/AppUpdateBridge';
 import { ActionFeedbackProvider } from '@/components/ActionFeedbackProvider';
 import { AppTourProvider } from '@/features/tour/AppTourProvider';
 import { CotGlobalActions } from '@/features/ai/CotGlobalActions';
@@ -22,8 +23,13 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 function AppContent() {
   const { isDark, colors } = useTheme();
   const { mode, accessReady, contextStatus } = useSession();
-  // Getting COT ready remains an access-gate invariant; the visible copy is intentionally user-facing.
-  const resolvingAccess = mode === 'restoring' || (mode === 'authenticated' && !accessReady && contextStatus !== 'error');
+  const pathname = usePathname();
+  const directDownload = pathname.startsWith('/download/');
+  // Getting COT ready still waits for resolved account context. Direct-download
+  // routes intentionally bypass that gate so a shared install link never opens
+  // Home, onboarding, notifications or other app chrome.
+  const resolvingAccountAccess = mode === 'restoring' || (mode === 'authenticated' && !accessReady && contextStatus !== 'error');
+  const resolvingAccess = !directDownload && resolvingAccountAccess;
 
   useEffect(() => {
     void fetchPlatformBranding();
@@ -46,10 +52,11 @@ function AppContent() {
   return (
     <AppTourProvider>
       <StatusBar style={isDark ? 'light' : 'dark'} />
-      <RealtimeBridge />
-      <PushNotificationsBridge />
-      <OnboardingGate />
+      {!directDownload ? <RealtimeBridge /> : null}
+      {!directDownload ? <PushNotificationsBridge /> : null}
+      {!directDownload ? <OnboardingGate /> : null}
       <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }}>
+        <Stack.Screen name="download/android" options={{ headerShown: false, animation: 'none' }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="general" options={{ headerShown: false }} />
         <Stack.Screen name="expressions/[expressionId]" options={{ headerShown: false }} />
@@ -85,8 +92,9 @@ function AppContent() {
         <Stack.Screen name="leadership/directory" options={{ headerShown: false }} />
         <Stack.Screen name="leadership/invite-codes" options={{ headerShown: false }} />
       </Stack>
-      <CotGlobalActions />
-      <IncomingCallBridge />
+      {!directDownload ? <AppUpdateBridge /> : null}
+      {!directDownload ? <CotGlobalActions /> : null}
+      {!directDownload ? <IncomingCallBridge /> : null}
     </AppTourProvider>
   );
 }

@@ -52,7 +52,15 @@ export function ReelCard({ reel, onPress, width = 150, commentContext, onOpenCom
   return (
     <View style={[styles.card, variant === 'feed' && styles.feedCard, { width, backgroundColor: colors.card, borderColor: colors.borderSubtle }, variant === 'tile' ? shadows.md : shadows.sm]}>
       <View style={[styles.frame, { aspectRatio: sourceRatio ?? (variant === 'feed' ? 4 / 5 : 9 / 16) }]}>
-        {videoUrl && player ? <VideoView player={player} style={styles.media} contentFit="cover" nativeControls /> : posterUrl ? <Image source={{ uri: posterUrl }} style={styles.media} resizeMode="cover" /> : <View style={[styles.placeholder, { backgroundColor: colors.cardElevated }]}><View style={[styles.placeholderIcon, { backgroundColor: colors.primarySoft }]}><Icon name="play" size={22} color={colors.interactive} /></View></View>}
+        {videoUrl && player ? (
+          variant === 'feed' ? (
+            <View pointerEvents="none" style={styles.media}>
+              <VideoView player={player} style={styles.media} contentFit="cover" nativeControls={false} />
+            </View>
+          ) : (
+            <VideoView player={player} style={styles.media} contentFit="cover" nativeControls />
+          )
+        ) : posterUrl ? <Image source={{ uri: posterUrl }} style={styles.media} resizeMode="cover" /> : <View style={[styles.placeholder, { backgroundColor: colors.cardElevated }]}><View style={[styles.placeholderIcon, { backgroundColor: colors.primarySoft }]}><Icon name="play" size={22} color={colors.interactive} /></View></View>}
         <View pointerEvents="none" style={styles.reelLabel}><Icon name="flash" size={11} color="#FFFFFF" /><Text style={styles.reelLabelText}>REEL</Text></View>
         <View pointerEvents="none" style={styles.playChip}><Icon name="play" size={10} color="#FFFFFF" /><Text style={styles.viewsText}>{formatViews(reel.views_count)}</Text></View>
         {contentId ? <Pressable onPress={() => setCommentsOpen(true)} style={styles.commentChip} accessibilityRole="button" accessibilityLabel="Open Reel comments"><Icon name="chatbubble-ellipses-outline" size={14} color="#FFFFFF" /><Text style={styles.viewsText}>{reel.comments_count || 0}</Text></Pressable> : null}

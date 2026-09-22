@@ -148,6 +148,7 @@ export function CommunityPostScreen({ forcedScope }: { forcedScope?: FeedScope }
               onReply={() => setCommentFocus((value) => value + 1)}
               onReact={reactToPost}
               onBookmark={bookmarkPost}
+              onDeleted={() => router.back()}
               style={styles.postCard}
             />
 
@@ -163,6 +164,20 @@ export function CommunityPostScreen({ forcedScope }: { forcedScope?: FeedScope }
                   reportContext={requestContext}
                   focusRequest={commentFocus}
                   onRequireSignIn={openLogin}
+                  onDeleteComment={async (commentId) => {
+                    if (mode !== 'authenticated') {
+                      openLogin();
+                      return;
+                    }
+                    await api.request('engagement', {
+                      method: 'POST',
+                      context: requestContext,
+                      feedback: false,
+                      body: JSON.stringify({ action: 'delete_comment', commentId }),
+                    });
+                    comments.refresh();
+                    post.refresh();
+                  }}
                   onSubmitComment={async (body, parentCommentId) => {
                     if (mode !== 'authenticated') {
                       openLogin();

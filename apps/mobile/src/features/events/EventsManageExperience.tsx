@@ -23,6 +23,7 @@ import { useResource } from '@/hooks/use-resource';
 import { putSignedUpload, type UploadFile } from '@/services/uploads';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
+import { MinistryImageGenerator } from '@/features/ministry/MinistryImageGenerator';
 import type { Event } from '@/types/content';
 
 type EventWithBanner = Event & { banner_url?: string | null };
@@ -66,6 +67,7 @@ export default function EventsManageExperience() {
   const [visibility, setVisibility] = useState<EventVisibility>(expression?.id ? 'members' : 'public');
   const [status, setStatus] = useState<EventStatus>('draft');
   const [bannerFile, setBannerFile] = useState<UploadFile | null>(null);
+  const [generatedBannerUrl, setGeneratedBannerUrl] = useState('');
   const [creating, setCreating] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -89,6 +91,7 @@ export default function EventsManageExperience() {
     setVisibility(expression?.id ? 'members' : 'public');
     setStatus('draft');
     setBannerFile(null);
+    setGeneratedBannerUrl('');
     setErrorMsg('');
   };
 
@@ -115,6 +118,7 @@ export default function EventsManageExperience() {
     setVisibility(['members', 'public', 'private'].includes(event.visibility) ? event.visibility as EventVisibility : 'members');
     setStatus(['draft', 'published', 'cancelled', 'completed', 'archived'].includes(event.status ?? '') ? event.status as EventStatus : 'draft');
     setBannerFile(null);
+    setGeneratedBannerUrl('');
     setErrorMsg('');
     setSuccessMsg('');
     setComposerOpen(true);
@@ -128,6 +132,7 @@ export default function EventsManageExperience() {
     if (!asset) return;
     const mimeType = asset.mimeType?.toLowerCase() || 'image/jpeg';
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(mimeType)) return setErrorMsg('Choose a JPG, PNG, or WebP banner.');
+    setGeneratedBannerUrl('');
     setBannerFile({ uri: asset.uri, name: asset.fileName || `event-banner-${Date.now()}.jpg`, mimeType, size: asset.fileSize, file: (asset as any).file });
   };
 
@@ -145,7 +150,7 @@ export default function EventsManageExperience() {
     setErrorMsg('');
     setSuccessMsg('');
     try {
-      let bannerUrl = editingEvent?.banner_url ?? null;
+      let bannerUrl = generatedBannerUrl || editingEvent?.banner_url || null;
       if (bannerFile) {
         const intent = await api.request<BannerUploadIntent>('events', {
           method: 'POST',
@@ -211,9 +216,20 @@ export default function EventsManageExperience() {
           <InputField label="Event title" value={title} onChangeText={setTitle} placeholder="Sunday celebration, conference, prayer night…" />
           <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>EVENT FLYER / BANNER (OPTIONAL)</Text>
           <Pressable onPress={() => void chooseBanner()} style={[styles.uploadCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
-            {bannerFile?.uri || editingEvent?.banner_url ? <Image source={{ uri: bannerFile?.uri || editingEvent?.banner_url! }} style={styles.bannerPreview} resizeMode="cover" /> : <View style={[styles.imagePlaceholder, { backgroundColor: colors.primarySoft }]}><Icon name="image-outline" size={26} color={colors.interactive} /></View>}
+            {bannerFile?.uri || generatedBannerUrl || editingEvent?.banner_url ? <Image source={{ uri: bannerFile?.uri || generatedBannerUrl || editingEvent?.banner_url! }} style={styles.bannerPreview} resizeMode="cover" /> : <View style={[styles.imagePlaceholder, { backgroundColor: colors.primarySoft }]}><Icon name="image-outline" size={26} color={colors.interactive} /></View>}
             <View style={styles.flex}><Text style={[styles.uploadTitle, { color: colors.text }]}>Choose image</Text><Text style={[styles.uploadHint, { color: colors.textSecondary }]}>Use a flyer or 16:9 banner. The schedule still displays even when no image is added.</Text></View>
           </Pressable>
+          <MinistryImageGenerator
+            organizationId={organizationId}
+            branchId={expression?.id ?? null}
+            useCase="event_banner"
+            title={title}
+            description={description}
+            context={{ date: startsAt?.toISOString(), eventType: isOnline ? 'Online or hybrid' : 'In person', location: locationName }}
+            currentImageUrl={bannerFile?.uri || generatedBannerUrl || editingEvent?.banner_url}
+            onGenerated={(url) => { setBannerFile(null); setGeneratedBannerUrl(url); }}
+            onUploadInstead={() => void chooseBanner()}
+          />
           <InputField label="Venue" value={locationName} onChangeText={setLocationName} placeholder={isOnline ? 'Optional for online events' : 'Where is it happening?'} />
           <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>FORMAT</Text>
           <View style={styles.chips}><Chip label="In person" selected={!isOnline} onPress={() => setIsOnline(false)} /><Chip label="Online / hybrid" selected={isOnline} onPress={() => setIsOnline(true)} /></View>
