@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Icon, ScreenHeader } from '@/components';
 import { ReadAloudRateControl, useReadAloudRate } from '@/components/ReadAloudRateControl';
 import { radius, shadows, spacing, typography } from '@/design-system/tokens';
-import { COT_DOCUMENTARY, COT_DOCUMENTARY_SPEECH_TEXT, type CotDocumentaryChapter } from '@/content/cot-documentary';
+import { COT_DOCUMENTARY, COT_DOCUMENTARY_SPEECH_TEXT } from '@/content/cot-documentary';
 import { useTheme } from '@/state/theme';
 
 function speechText(value: string) {
@@ -31,7 +31,7 @@ function splitSpeech(text: string, maximum: number) {
     : Array.from({ length: Math.ceil(chunk.length / safeMaximum) }, (_, index) => chunk.slice(index * safeMaximum, (index + 1) * safeMaximum)));
 }
 
-function chapterSpeech(chapter: CotDocumentaryChapter) {
+function chapterSpeech(chapter: (typeof COT_DOCUMENTARY.chapters)[number]) {
   return [
     chapter.title,
     ...chapter.paragraphs,
