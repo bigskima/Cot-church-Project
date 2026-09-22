@@ -583,7 +583,7 @@ async function providerAudio(reference:string,organizationId:string) {
   const admin=adminClient();
   const platformState=await loadPlatformBibleState();
   const { data: settings }=await admin.from("bible_provider_settings").select("configuration,enabled").eq("organization_id",organizationId).eq("provider_key","bible_brain").maybeSingle();
-  if (!providerEnabled(platformState,"bible_brain") || !key || !settings?.enabled) return { available:false, provider:"tts", reason:"Recorded Bible audio is not enabled; use COT read aloud." };
+  if (!providerEnabled(platformState,"bible_brain") || !key || !settings?.enabled) return { available:false, provider:"tts", reason:"Recorded Bible audio is not enabled; use COT App Read aloud." };
   const config=settings.configuration ?? {};
   const fileset=String(config.audioFilesetId ?? "").trim();
   if (!fileset) return { available:false, provider:"tts", reason:"No Bible Brain audio fileset is configured." };
