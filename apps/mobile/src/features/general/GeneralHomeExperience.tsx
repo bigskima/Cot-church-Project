@@ -332,6 +332,9 @@ export default function GeneralHomeExperience() {
           data={feed}
           keyExtractor={(item) => item.key}
           showsVerticalScrollIndicator={false}
+          nestedScrollEnabled
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           ListHeaderComponent={header}
           ListEmptyComponent={<View style={[styles.emptyHome, { width: contentWidth }]}><EmptyState title="General COT is ready" message="Sermons, media and community activity will form the feed here. Events and announcements live in the Home spotlight above." iconName="home-outline" /></View>}
           contentContainerStyle={{ paddingBottom: insets.bottom + 132 }}
