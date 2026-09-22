@@ -91,7 +91,7 @@ export default function DailyHighlightsManageScreen() {
   const [quoteStatus, setQuoteStatus] = useState<'published' | 'hidden'>('published');
 
   const [bibleReference, setBibleReference] = useState('');
-  const [bibleVersion, setBibleVersion] = useState('web');
+  const [bibleVersion, setBibleVersion] = useState('kjv');
   const [bibleTheme, setBibleTheme] = useState('general');
   const [bibleMessage, setBibleMessage] = useState('');
 
