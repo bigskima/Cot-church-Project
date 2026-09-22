@@ -20,6 +20,13 @@ export type ImageGenerationOptions = {
   height?: number;
 };
 
+export type VisualSceneRequest = {
+  useCase: string;
+  source: string;
+  style?: string;
+  mood?: string;
+};
+
 type ProviderRow = {
   code: string;
   name: string;
@@ -56,7 +63,10 @@ async function configuredCloudflare(admin: any, row: ProviderRow) {
   const model = typeof configuration.model === "string" && configuration.model.trim()
     ? configuration.model.trim()
     : "@cf/bytedance/stable-diffusion-xl-lightning";
-  return { token, accountId, model, accountIdSecret };
+  const promptModel = typeof configuration.promptModel === "string" && configuration.promptModel.trim()
+    ? configuration.promptModel.trim()
+    : "@cf/meta/llama-3.2-3b-instruct";
+  return { token, accountId, model, promptModel, accountIdSecret };
 }
 
 async function activeProvider(admin: any): Promise<ProviderRow | null> {
@@ -98,6 +108,95 @@ export async function imageProviderReadiness(admin: any): Promise<ImageProviderR
   };
 }
 
+function compactScene(value: string) {
+  return value
+    .replace(/[\r\n]+/g, " ")
+    .replace(/[“”"'\`]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 1300);
+}
+
+function fallbackScene(useCase: string, style = "auto", mood = "auto") {
+  const base = useCase === "library_cover"
+    ? "A symbolic Christian editorial still life with warm directional light, layered depth, subtle paper and fabric textures, and generous uncluttered space."
+    : useCase === "sermon_artwork"
+      ? "A reverent symbolic worship scene with natural light, gentle depth, a quiet focal subject, and generous uncluttered space."
+      : useCase === "event_banner"
+        ? "A welcoming church gathering atmosphere with people connecting naturally, soft architectural depth, warm light, and a clear uncluttered focal area."
+        : useCase === "announcement_banner"
+          ? "A calm contemporary church community scene with meaningful human connection, elegant natural light, and a simple uncluttered composition."
+          : useCase === "form_banner"
+            ? "A welcoming ministry participation scene with people engaging naturally, soft depth, clean surfaces, and generous uncluttered space."
+            : useCase === "expression_banner"
+              ? "A warm church community scene rooted in local belonging, natural people-focused activity, atmospheric depth, and open uncluttered space."
+              : useCase === "home_banner"
+                ? "A premium contemporary church community scene with cinematic natural light, subtle movement, layered depth, and broad uncluttered space."
+                : "A reverent contemporary Christian visual scene with natural light, symbolic depth, and generous uncluttered space.";
+  const styleHint = style === "minimal" ? " Keep the scene especially restrained and minimal." : style === "illustrated" ? " Render it as sophisticated editorial illustration." : style === "cinematic" ? " Use cinematic framing and atmospheric depth." : style === "photographic" ? " Render it as realistic editorial photography." : "";
+  const moodHint = mood === "warm" ? " The emotional tone is warm and welcoming." : mood === "reflective" ? " The emotional tone is quiet and contemplative." : mood === "energetic" ? " The emotional tone is uplifting and active." : mood === "elegant" ? " The emotional tone is refined and graceful." : "";
+  return base + styleHint + moodHint;
+}
+
+export async function generateVisualScene(admin: any, request: VisualSceneRequest, signal: AbortSignal): Promise<string> {
+  const row = await activeProvider(admin);
+  if (!row || row.code !== "cloudflare") return fallbackScene(request.useCase, request.style, request.mood);
+
+  const config = await configuredCloudflare(admin, row);
+  if (!config.accountId || !config.token) return fallbackScene(request.useCase, request.style, request.mood);
+
+  const source = String(request.source || "").replace(/\s+/g, " ").trim().slice(0, 4500);
+  if (!source) return fallbackScene(request.useCase, request.style, request.mood);
+
+  const endpoint = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(config.accountId)}/ai/run/${config.promptModel}`;
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${config.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messages: [
+          {
+            role: "system",
+            content: [
+              "You are COT's visual art director.",
+              "Convert ministry copy into a purely visual scene description for an image generator.",
+              "Never quote, copy, spell, transliterate, or preserve any title, name, date, scripture reference, slogan, sentence, or phrase from the source.",
+              "Do not describe poster design, flyer design, banners with writing, typography, lettering, words, captions, logos, signs, screens, pages, book text, or any object that invites readable writing.",
+              "Describe only visible subjects, environment, lighting, composition, symbolism, activity, color atmosphere, camera/framing, and negative space.",
+              "If people appear, make them natural and non-identifiable rather than specific real pastors, authors, leaders or public figures.",
+              "Return only one concise scene paragraph. No headings, labels, quotation marks, lists, or explanations.",
+            ].join(" "),
+          },
+          {
+            role: "user",
+            content: [
+              "Content type: " + request.useCase + ".",
+              request.style && request.style !== "auto" ? "Preferred visual treatment: " + request.style + "." : "",
+              request.mood && request.mood !== "auto" ? "Preferred emotional tone: " + request.mood + "." : "",
+              "Source ministry content (meaning only; never repeat its wording): " + source,
+            ].filter(Boolean).join(" "),
+          },
+        ],
+        max_tokens: 180,
+        temperature: 0.2,
+        top_p: 0.8,
+      }),
+      signal,
+    });
+    if (!response.ok) return fallbackScene(request.useCase, request.style, request.mood);
+    const payload = await response.json().catch(() => null) as any;
+    const candidate = payload?.result?.response ?? payload?.response ?? payload?.result ?? "";
+    const scene = typeof candidate === "string" ? compactScene(candidate) : "";
+    if (!scene || scene.length < 40) return fallbackScene(request.useCase, request.style, request.mood);
+    return scene;
+  } catch {
+    return fallbackScene(request.useCase, request.style, request.mood);
+  }
+}
+
 async function generateCloudflare(admin: any, row: ProviderRow, prompt: string, signal: AbortSignal, options: ImageGenerationOptions = {}): Promise<GeneratedImage> {
   const config = await configuredCloudflare(admin, row);
   if (!config.accountId || !config.token) {
@@ -117,7 +216,7 @@ async function generateCloudflare(admin: any, row: ProviderRow, prompt: string, 
     },
     body: JSON.stringify({
       prompt,
-      negative_prompt: "text, typography, letters, words, alphabet characters, captions, subtitles, title text, poster text, flyer text, Bible verse text, signage, readable signs, logos, brand marks, watermarks, UI, interface elements, frames, borders, distorted hands, extra fingers, grotesque, horror, gore",
+      negative_prompt: "text, typography, letters, words, alphabet characters, captions, subtitles, title text, poster text, flyer text, Bible verse text, scripture text, signage, readable signs, stage signage, screens with writing, pages with writing, book pages with text, logos, brand marks, watermarks, UI, interface elements, graphic-design layout, poster layout, flyer layout, frames, borders, distorted hands, extra fingers, grotesque, horror, gore",
       num_steps: steps,
       width: Number.isFinite(width) ? Math.max(512, Math.min(2048, Math.round(width))) : 1280,
       height: Number.isFinite(height) ? Math.max(320, Math.min(2048, Math.round(height))) : 560,
