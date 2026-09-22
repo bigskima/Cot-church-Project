@@ -10,6 +10,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: publish-requested-eas-apk
+  cancel-in-progress: true
+
 jobs:
   publish:
     name: Wait for EAS build and publish COT.apk
@@ -35,19 +39,32 @@ jobs:
         run: |
           for attempt in $(seq 1 120); do
             set +e
-            npx eas-cli@latest build:view "$BUILD_ID" --json > ../../eas-build-view.json 2> ../../eas-build-view.err
-            VIEW_CODE=$?
+            npx eas-cli@latest build:list --platform android --limit 25 --json --non-interactive > ../../eas-build-list.json 2> ../../eas-build-list.err
+            LIST_CODE=$?
             set -e
 
-            if [ "$VIEW_CODE" -ne 0 ]; then
-              echo "EAS build lookup not ready yet (attempt $attempt)."
-              cat ../../eas-build-view.err || true
+            if [ "$LIST_CODE" -ne 0 ]; then
+              echo "EAS build list is temporarily unavailable (attempt $attempt)."
+              cat ../../eas-build-list.err || true
               sleep 30
               continue
             fi
 
-            STATUS=$(node -e "const fs=require('fs'); const b=JSON.parse(fs.readFileSync('../../eas-build-view.json','utf8')); console.log(String(b.status||'').toUpperCase())")
+            STATUS=$(node <<'NODE'
+          const fs = require('fs');
+          const builds = JSON.parse(fs.readFileSync('../../eas-build-list.json','utf8'));
+          const list = Array.isArray(builds) ? builds : (Array.isArray(builds.data) ? builds.data : []);
+          const build = list.find((item) => item && item.id === process.env.BUILD_ID);
+          if (!build) {
+            console.log('MISSING');
+            process.exit(0);
+          }
+          fs.writeFileSync('../../eas-build-view.json', JSON.stringify(build, null, 2) + '\n');
+          console.log(String(build.status || '').toUpperCase());
+          NODE
+            )
             echo "EAS status: $STATUS"
+
             if [ "$STATUS" = "FINISHED" ]; then
               exit 0
             fi
