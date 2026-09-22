@@ -298,7 +298,7 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
               href={PLATFORM_ADMIN_GUIDE_URL}
               target="_blank"
               rel="noreferrer"
-              aria-label="Open the COT Platform Administration Guide"
+              aria-label="Open the COT App Platform Administration Guide"
             >
               <span className="admin-guide-trigger-icon" aria-hidden="true">↗</span>
               <span className="admin-guide-trigger-label">Full guide</span>
