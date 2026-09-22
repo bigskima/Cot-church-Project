@@ -283,7 +283,7 @@ export function AppControlsPanel({
   const selectedExpression = directory?.expressions.find((item) => item.id === expressionId);
   const selectedGroup = directory?.groups.find((item) => item.id === groupId);
   const scopeTitle =
-    scopeType === 'global' ? 'Entire COT platform' :
+    scopeType === 'global' ? 'Entire COT App' :
     scopeType === 'organization' ? selectedOrganization?.name ?? 'Church / General COT' :
     scopeType === 'expression' ? selectedExpression?.name ?? 'Expression' :
     selectedGroup?.name ?? 'Group';
@@ -300,7 +300,7 @@ export function AppControlsPanel({
       <Card
         title="App Controls"
         subtitle="These controls change feature availability without deleting saved content or changing ministry roles."
-        headerAction={<Badge label={scopeType === 'global' ? 'ALL COT' : 'SELECTED AREA'} variant={scopeType === 'global' ? 'gold' : 'neutral'} />}
+        headerAction={<Badge label={scopeType === 'global' ? 'ENTIRE APP' : 'SELECTED AREA'} variant={scopeType === 'global' ? 'gold' : 'neutral'} />}
       >
         <div style={{ display: 'grid', gap: 14 }}>
           <div className="admin-form-grid-two">
@@ -316,7 +316,7 @@ export function AppControlsPanel({
                 setCategory('all');
               }}
               options={[
-                { label: 'Global · entire COT platform', value: 'global' },
+                { label: 'Global · entire COT App', value: 'global' },
                 { label: 'Church / General COT', value: 'organization' },
                 { label: 'Expression', value: 'expression' },
                 { label: 'Group', value: 'group' },
@@ -412,7 +412,7 @@ export function AppControlsPanel({
               accessor: (item) => <Badge label={categoryLabel(item.category).toUpperCase()} variant="neutral" />,
             },
             {
-              header: scopeType === 'global' ? 'ALL COT' : 'THIS AREA',
+              header: scopeType === 'global' ? 'ENTIRE APP' : 'THIS AREA',
               accessor: (item) => {
                 const state = controlState(item, scopeType);
                 return <Badge label={stateLabel(state)} variant={state === 'enabled' ? 'active' : state === 'disabled' ? 'suspended' : 'neutral'} />;
