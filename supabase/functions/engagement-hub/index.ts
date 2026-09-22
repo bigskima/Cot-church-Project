@@ -4,7 +4,7 @@ import { createHandler } from "../_shared/handler.ts";
 import { resolveActiveOrganizationId } from "../_shared/public-organization.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { adminClient } from "../_shared/supabase.ts";
-import { generateImage, imageProviderReadiness } from "../_shared/image-generation.ts";
+import { generateImage, generateVisualScene, imageProviderReadiness } from "../_shared/image-generation.ts";
 import { assertObject, requiredString, uuid } from "../_shared/validation.ts";
 
 const BANNER_BUCKET="home-banners";
@@ -276,27 +276,33 @@ function ministryImageContext(value:unknown){
     author:text(raw.author??"",180),
   };
 }
-function visualPrompt(kind:string,date:string,content:any,style="auto",mood="auto",direction=""){
+function dailyVisualSceneSource(kind:string,content:any,direction=""){
   const title=String(content.title??"").slice(0,180);
   const reference=String(content.reference??"").slice(0,160);
   const theme=String(content.theme??"general").slice(0,120);
-  const body=String(content.body??"").replace(/\s+/g," ").slice(0,700);
-  const subject=kind==="bible"?"a Daily Bible reading":kind==="quote"?"an original Bible-inspired daily reflection":"a Christian daily devotional";
+  const body=String(content.body??"").replace(/\s+/g," ").slice(0,900);
   return [
-    "Create premium background artwork for "+subject+". COT will render the real words separately in the interface.",
-    title?"Content title/theme: "+title+".":"",
-    reference?"Scripture context: "+reference+".":"",
-    theme?"Spiritual theme: "+theme+".":"",
-    body?"Meaning to communicate visually: "+body+".":"",
+    "Daily content kind: "+kind+".",
+    title?"Title/theme source: "+title+".":"",
+    reference?"Scripture reference source: "+reference+".":"",
+    theme?"Spiritual theme source: "+theme+".":"",
+    body?"Meaning/source copy: "+body+".":"",
+    direction?"Optional ministry direction: "+direction+".":"",
+  ].filter(Boolean).join(" ");
+}
+function visualPrompt(kind:string,scene:string,style="auto",mood="auto"){
+  const subject=kind==="bible"?"Daily Bible artwork":kind==="quote"?"Daily reflection artwork":"Daily devotional artwork";
+  return [
+    "Create "+subject+" as a natural visual scene, not a poster, flyer, title card or graphic-design layout.",
+    "Scene to render: "+scene,
     imageStyleInstruction(style),
     imageMoodInstruction(mood),
-    direction?"Optional ministry direction: "+direction+".":"",
     "Use reverent Christian visual storytelling and a modern premium church-app aesthetic. Symbolism should support the meaning without becoming kitschy or sensational.",
-    "BACKGROUND ARTWORK ONLY. Absolutely no text, typography, letters, words, numbers, Bible verses, captions, title cards, poster copy, logos, watermarks, UI, frames or readable signage anywhere in the image.",
-    "Do not design a flyer or poster with fake writing. Leave deliberate clean negative space for COT to overlay the real title, verse or devotional copy.",
+    "There must be no written communication anywhere: no text, typography, letters, words, numbers, scripture, captions, signage, labels, logos, watermarks, screens with writing, pages with writing or interface elements.",
+    "Avoid objects whose main purpose is displaying writing. If a book is present, keep it closed, distant, out of focus or turned so no writing is visible.",
+    "Leave deliberate clean negative space for COT to overlay the real title or devotional copy after generation.",
     "Avoid depicting identifiable real pastors, authors or public figures. If people help the scene, use natural non-identifiable subjects.",
-    "Compose for a 16:7 mobile Home carousel and dedicated detail screen; keep important subjects away from extreme edges.",
-    "Date context: "+date+".",
+    "Compose for a wide mobile Home carousel and dedicated detail screen; keep important subjects away from extreme edges.",
   ].filter(Boolean).join(" ");
 }
 function visualExtension(contentType:string){
@@ -324,7 +330,14 @@ async function autoGenerateVisual(admin:any,organizationId:string,date:string,ki
   try{content=await visualContent(admin,organizationId,date,kind);}
   catch{return;}
 
-  const prompt=visualPrompt(kind,date,content);
+  const signal=new AbortController().signal;
+  const scene=await generateVisualScene(admin,{
+    useCase:"daily_"+kind,
+    source:dailyVisualSceneSource(kind,content),
+    style:"auto",
+    mood:"auto",
+  },signal);
+  const prompt=visualPrompt(kind,scene);
   const {error:claimError}=await admin.from("cot_daily_visuals").insert({
     organization_id:organizationId,
     visual_date:date,
@@ -343,7 +356,7 @@ async function autoGenerateVisual(admin:any,organizationId:string,date:string,ki
   if(claimError) return;
 
   try{
-    const generated=await generateImage(admin,prompt,new AbortController().signal);
+    const generated=await generateImage(admin,prompt,signal);
     const ext=visualExtension(generated.contentType);
     const storagePath="orgs/"+organizationId+"/"+kind+"/"+date+"/auto-"+crypto.randomUUID()+"."+ext;
     const {error:uploadError}=await admin.storage.from(DAILY_VISUAL_BUCKET).upload(storagePath,generated.bytes,{contentType:generated.contentType,upsert:false});
@@ -450,74 +463,41 @@ async function requireMinistryImagePermission(auth:any,organizationId:string,use
   }
   throw new ApiError("PERMISSION_DENIED","Your ministry role cannot generate artwork for this content.",403);
 }
-function ministryImagePrompt(useCase:string,title:string,description:string,context:ReturnType<typeof ministryImageContext>,style:string,mood:string,direction:string){
-  const preset:string[]=[];
-  if(useCase==="event_banner"){
-    preset.push(
-      "Create premium background artwork for a church event or gathering banner.",
-      "Event title/theme: "+title+".",
-      description?"Event summary: "+description+".":"",
-      context.date?"Event date/time context: "+context.date+".":"",
-      context.eventType?"Event format/type: "+context.eventType+".":"",
-      context.location?"Location context: "+context.location+".":""
-    );
-  }else if(useCase==="announcement_banner"){
-    preset.push(
-      "Create premium background artwork for an official church announcement.",
-      "Announcement title/theme: "+title+".",
-      description?"Announcement meaning: "+description+".":""
-    );
-  }else if(useCase==="form_banner"){
-    preset.push(
-      "Create premium background artwork for a church registration, application, response or ministry form.",
-      "Form title: "+title+".",
-      context.purpose?"Form purpose: "+context.purpose+".":description?"Form purpose: "+description+".":""
-    );
-  }else if(useCase==="sermon_artwork"){
-    preset.push(
-      "Create premium background artwork for a sermon or Christian teaching.",
-      "Sermon title/theme: "+title+".",
-      context.scripture?"Scripture context: "+context.scripture+".":"",
-      context.excerpt?"Message meaning/excerpt: "+context.excerpt+".":description?"Message context: "+description+".":"",
-      context.speaker?"Speaker context only for tone; do not depict or imitate this real person: "+context.speaker+".":""
-    );
-  }else if(useCase==="home_banner"){
-    preset.push(
-      "Create premium background artwork for a church Home spotlight banner or ministry campaign.",
-      "Campaign title/theme: "+title+".",
-      context.subtitle?"Supporting message: "+context.subtitle+".":description?"Supporting message: "+description+".":"",
-      context.purpose?"Destination/purpose: "+context.purpose+".":""
-    );
-  }else if(useCase==="library_cover"){
-    preset.push(
-      "Create premium portrait background artwork for a Christian ministry library book cover.",
-      "Book title/theme: "+title+".",
-      context.author?"Author context only; do not depict or imitate the real author: "+context.author+".":"",
-      context.category?"Book category: "+context.category+".":"",
-      description?"Book summary/context: "+description+".":""
-    );
-  }else if(useCase==="expression_banner"){
-    preset.push(
-      "Create premium background artwork for a church Expression community banner.",
-      "Expression/community name: "+title+".",
-      context.location?"Geographic/community context: "+context.location+".":description?"Community context: "+description+".":""
-    );
-  }else{
-    preset.push("Create premium original background artwork for church ministry content.","Content title/theme: "+title+".",description?"Meaning and supporting context: "+description+".":"");
-  }
+function ministrySceneSource(useCase:string,title:string,description:string,context:ReturnType<typeof ministryImageContext>,direction:string){
   return [
-    ...preset,
+    "Use case: "+useCase+".",
+    title?"Primary ministry title/source: "+title+".":"",
+    description?"Supporting ministry copy/source: "+description+".":"",
+    context.subtitle?"Subtitle/source: "+context.subtitle+".":"",
+    context.date?"Date/time/source: "+context.date+".":"",
+    context.eventType?"Event format/source: "+context.eventType+".":"",
+    context.location?"Location/source: "+context.location+".":"",
+    context.scripture?"Scripture/source: "+context.scripture+".":"",
+    context.excerpt?"Message excerpt/source: "+context.excerpt+".":"",
+    context.theme?"Theme/source: "+context.theme+".":"",
+    context.purpose?"Purpose/source: "+context.purpose+".":"",
+    context.category?"Category/source: "+context.category+".":"",
+    context.speaker?"Speaker/source: "+context.speaker+".":"",
+    context.author?"Author/source: "+context.author+".":"",
+    direction?"Optional ministry direction/source: "+direction+".":"",
+  ].filter(Boolean).join(" ");
+}
+function ministryImagePrompt(useCase:string,scene:string,style:string,mood:string){
+  const framing=useCase==="library_cover"
+    ?"Use a strong 2:3 portrait editorial composition with deliberate clear space for COT to render the real book title and metadata later."
+    :useCase==="home_banner"||useCase==="form_banner"
+      ?"Use a responsive wide 16:7 composition with deliberate clear space for COT interface text later."
+      :"Use a responsive wide 16:9 composition with deliberate clear space for COT interface text later.";
+  return [
+    "Create premium original ministry artwork as a natural visual scene, never as a poster, flyer, title card, advertisement or graphic-design layout.",
+    "Scene to render: "+scene,
     imageStyleInstruction(style),
     imageMoodInstruction(mood),
-    direction?"Optional ministry direction: "+direction+".":"",
-    useCase==="library_cover"
-      ?"Use a strong 2:3 portrait editorial composition. Leave deliberate clear space where COT can render the real book title and metadata."
-      :useCase==="home_banner"||useCase==="form_banner"
-        ?"Compose for a responsive 16:7 ministry banner. Keep important subjects away from extreme edges and leave deliberate negative space for COT interface text."
-        :"Compose for a responsive 16:9 ministry banner/card. Keep important subjects away from extreme edges and leave deliberate negative space for COT interface text.",
+    framing,
     "Use a polished, reverent, contemporary Christian visual language. Avoid kitsch, sensationalism, horror, gore and misleading depictions of real identifiable people.",
-    "BACKGROUND ARTWORK ONLY. Absolutely no text, typography, letters, words, numbers, Bible verses, captions, title cards, poster copy, logos, watermarks, UI, frames or readable signage anywhere in the image.",
-    "Do not create a flyer/poster layout with fake writing. COT renders all real titles, dates, scripture and calls-to-action separately on top of the artwork.",
+    "There must be no written communication anywhere: no text, typography, letters, words, numbers, Bible verses, captions, title cards, poster copy, labels, logos, watermarks, UI, readable signage, screens with writing or pages with writing.",
+    "Avoid objects whose main purpose is displaying writing. If a book is present, keep it closed, distant, out of focus or positioned so no writing is visible.",
+    "COT will add every real title, date, scripture reference and call-to-action separately after generation.",
   ].filter(Boolean).join(" ");
 }
 function ministryImageDimensions(useCase:string){
@@ -942,7 +922,13 @@ export const engagementHubHandler=createHandler(
       const style=imageStyle(body.style);
       const mood=imageMood(body.mood);
       const direction=text(body.direction??"",1200);
-      const prompt=ministryImagePrompt(useCase,title,description,context,style,mood,direction);
+      const scene=await generateVisualScene(admin,{
+        useCase,
+        source:ministrySceneSource(useCase,title,description,context,direction),
+        style,
+        mood,
+      },request.signal);
+      const prompt=ministryImagePrompt(useCase,scene,style,mood);
       const dimensions=ministryImageDimensions(useCase);
       const generated=await generateImage(admin,prompt,request.signal,dimensions);
       const ext=visualExtension(generated.contentType);
@@ -1051,7 +1037,13 @@ export const engagementHubHandler=createHandler(
       const style=imageStyle(body.style);
       const mood=imageMood(body.mood);
       const direction=text(body.direction??"",1200);
-      const prompt=visualPrompt(kind,date,content,style,mood,direction);
+      const scene=await generateVisualScene(admin,{
+        useCase:"daily_"+kind,
+        source:dailyVisualSceneSource(kind,content,direction),
+        style,
+        mood,
+      },request.signal);
+      const prompt=visualPrompt(kind,scene,style,mood);
       const {data:existing}=await admin.from("cot_daily_visuals").select("storage_path,image_source").eq("organization_id",organizationId).eq("visual_date",date).eq("content_kind",kind).maybeSingle();
       await admin.from("cot_daily_visuals").upsert({
         organization_id:organizationId,
