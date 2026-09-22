@@ -238,6 +238,7 @@ export default function GeneralAnnouncementsManageExperience() {
           description={body}
           currentImageUrl={bannerFile?.uri || generatedBannerUrl || editing?.banner_url}
           onGenerated={(url) => { setBannerFile(null); setGeneratedBannerUrl(url); }}
+          onUploadInstead={() => void chooseBanner()}
         />
       </View>
     );
