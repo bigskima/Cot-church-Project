@@ -3696,3 +3696,8 @@ body {
 .admin-guide-composer textarea{flex:1;min-height:46px;max-height:120px;resize:vertical;border:1px solid var(--border-subtle);border-radius:14px;background:var(--bg-input);color:var(--text-primary);padding:11px 12px;font:600 12.5px/1.5 var(--font-sans);outline:none}.admin-guide-composer textarea:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(92,143,245,.12)}
 .admin-guide-composer button{width:42px;height:42px;border:0;border-radius:14px;background:linear-gradient(135deg,#5c8ff5,#2f6fed);color:#fff;font-size:17px;font-weight:900;cursor:pointer}.admin-guide-composer button:disabled{opacity:.38;cursor:not-allowed}
 @media(max-width:760px){.admin-guide-trigger-label{display:none}.admin-guide-trigger{padding:7px}.admin-guide-panel{top:8px;right:8px;bottom:8px;width:calc(100vw - 16px);border-radius:22px}}
+
+.admin-guide-voice-rate{margin-left:auto;display:flex;align-items:center;gap:6px;color:var(--text-muted);font:800 10px var(--font-sans)}
+.admin-guide-voice-rate select{border:1px solid var(--border-subtle);border-radius:9px;background:var(--bg-input);color:var(--text-secondary);padding:5px 7px;font:800 10px var(--font-sans);outline:none}
+.admin-guide-read-aloud{margin:6px 0 0 6px;border:1px solid var(--border-subtle);border-radius:10px;background:var(--bg-card);color:var(--text-secondary);padding:6px 9px;font:800 10.5px var(--font-sans);cursor:pointer}
+.admin-guide-read-aloud:hover{border-color:var(--gold);color:var(--text-primary)}
