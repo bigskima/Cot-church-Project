@@ -141,7 +141,7 @@ export function BibleInfrastructure({
           enabled,
           makeDefault,
           priority:item.priority||100,
-          reason:makeDefault?'Selected as the platform Bible default.':enabled?'Enabled for COT members.':'Disabled for COT members.',
+          reason:makeDefault?'Selected as the platform Bible default.':enabled?'Enabled for COT App members.':'Disabled for COT App members.',
         }),
       });
       setSuccess(makeDefault?`${item.abbreviation||item.title} is now the default Bible translation.`:`${item.abbreviation||item.title} ${enabled?'enabled':'disabled'}.`);
@@ -197,7 +197,7 @@ export function BibleInfrastructure({
         <StatWidget
           title="Active translations"
           value={activeTranslations.length}
-          subtitle="Visible and usable by members"
+          subtitle="Enabled here and usable by members"
           icon="TEXT"
         />
         <StatWidget
@@ -221,7 +221,7 @@ export function BibleInfrastructure({
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16,flexWrap:'wrap'}}>
           <div>
             <div className="admin-row-title">COT Bible experience</div>
-            <div className="admin-row-meta">Reading, search, plans, notes, highlights, Daily Scripture and Scripture previews.</div>
+            <div className="admin-row-meta">Reading, search, plans, notes, highlights, Daily Scripture and Scripture previews in the COT App.</div>
           </div>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
             <Badge label={bibleFeature?.global_enabled?'ENABLED':'DISABLED'} variant={bibleFeature?.global_enabled?'active':'suspended'} />
@@ -279,7 +279,7 @@ export function BibleInfrastructure({
 
     <Card
       title="Translations"
-      subtitle="Only translations that are enabled, available from an enabled provider, and licensed where required appear in the COT App Bible version picker."
+      subtitle="Platform Administration is the source of truth for member Bible versions. A translation appears in the COT App only when it is enabled here, its service is enabled, and any required licence is available."
       headerAction={<div className="admin-header-actions">
         <input
           className="admin-form-input"
@@ -352,11 +352,11 @@ export function BibleInfrastructure({
 
     <Card
       title="Runtime notes"
-      subtitle="What the current configuration means for members."
+      subtitle="What the current Platform Administration settings mean for COT App members."
     >
       <div className="admin-guide-task-list">
         <div className="admin-guide-task"><span>✓</span><p><strong>KJV</strong> is the public-domain production base and current default.</p></div>
-        <div className="admin-guide-task"><span>✓</span><p><strong>WEB (World English Bible)</strong> is kept only as a disabled governance entry and is not shown to members.</p></div>
+        <div className="admin-guide-task"><span>✓</span><p><strong>WEB (World English Bible)</strong> is disabled and is not shown to members.</p></div>
         <div className="admin-guide-task"><span>✓</span><p><strong>YouVersion</strong> translations appear only when the service is enabled, the publisher key is connected, the translation is licensed to that key, and the translation itself is active here.</p></div>
         <div className="admin-guide-task"><span>✓</span><p><strong>Bible Brain</strong> controls recorded audio only. COT App Read aloud remains the fallback.</p></div>
       </div>
