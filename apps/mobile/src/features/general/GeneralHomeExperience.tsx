@@ -24,6 +24,7 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import type { Event, LiveStream, Reel, Sermon, SocialPost, Video } from '@/types/content';
 import { useFeatureControls } from '@/features/availability/useFeatureControls';
+import { TourAnchor } from '@/features/tour/AppTourProvider';
 
 interface HomePayload {
   organization: { id: string; name: string; slug?: string };
@@ -98,6 +99,7 @@ export default function GeneralHomeExperience() {
   const wide = width >= 820;
   const contentWidth = Math.min(Math.max(width - spacing.sm * 2, 300), 1120);
   const reelWidth = Math.max(300, Math.min(wide ? 720 : contentWidth, 720));
+  const homeListRef = useRef<FlatList<HomeFeedUnit>>(null);
 
   const canManageAny = authenticated && (
     hasOrganizationCapability('sermons.create') || hasOrganizationCapability('sermons.manage') ||
@@ -302,12 +304,18 @@ export default function GeneralHomeExperience() {
   const header = (
     <View style={[styles.headerContent, { width: contentWidth }]}>
       <GeneralHomeActionDeck />
-      <GeneralHomeSpotlightCarousel />
+      <TourAnchor targetKey="general.home.spotlight" reveal={() => homeListRef.current?.scrollToOffset({ offset: 0, animated: true })}>
+        <GeneralHomeSpotlightCarousel />
+      </TourAnchor>
 
       {degradedSections.length ? <Pressable onPress={refreshHome} style={[styles.degradedBanner, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><View style={[styles.degradedIcon, { backgroundColor: colors.card }]}><Icon name="refresh-outline" size={16} color={colors.interactive} /></View><View style={styles.flex}><Text style={[styles.degradedTitle, { color: colors.text }]}>A few sections need another try</Text><Text style={[styles.degradedText, { color: colors.textMuted }]}>Your Home remains usable. Tap here to refresh only the missing pieces.</Text></View></Pressable> : null}
       {activeStream ? <View style={styles.liveSection}><FeedSectionHeading eyebrow={activeStream.status === 'live' ? 'LIVE NOW' : 'NEXT LIVE'} title={activeStream.status === 'live' ? 'Join what is happening now' : 'Coming up live'} subtitle="Open the broadcast without leaving Home discovery." actionLabel="Live" onAction={() => router.push('/general/live' as any)} /><HeroLiveCard stream={activeStream} onPress={() => router.push(`/general/live/${activeStream.id}` as any)} /></View> : null}
 
-      {feed.length ? <FeedSectionHeading eyebrow="COMMUNITY FEED" title={rankingMode === 'personalized' ? 'For you' : 'Latest from COT'} actionLabel="Discover" onAction={() => router.push('/general/explore')} /> : null}
+      {feed.length ? (
+        <TourAnchor targetKey="general.home.feed" reveal={() => homeListRef.current?.scrollToOffset({ offset: 220, animated: true })}>
+          <FeedSectionHeading eyebrow="COMMUNITY FEED" title={rankingMode === 'personalized' ? 'For you' : 'Latest from COT'} actionLabel="Discover" onAction={() => router.push('/general/explore')} />
+        </TourAnchor>
+      ) : null}
     </View>
   );
 
@@ -320,6 +328,7 @@ export default function GeneralHomeExperience() {
         <View style={[styles.errorWrap, { width: contentWidth }]}><ResourceError message={resource.error} retry={refreshHome} /></View>
       ) : (
         <FlatList
+          ref={homeListRef}
           data={feed}
           keyExtractor={(item) => item.key}
           showsVerticalScrollIndicator={false}
