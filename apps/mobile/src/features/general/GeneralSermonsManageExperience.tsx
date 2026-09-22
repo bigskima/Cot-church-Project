@@ -279,8 +279,10 @@ export default function GeneralSermonsManageExperience() {
           useCase="sermon_artwork"
           title={title}
           description={[scripture, sermonExcerpt(blocks)].filter(Boolean).join(' · ')}
+          context={{ scripture, excerpt: sermonExcerpt(blocks), speaker: preacher }}
           currentImageUrl={bannerFile?.uri || generatedBannerUrl || editing?.thumbnail_url}
           onGenerated={(url) => { setBannerFile(null); setGeneratedBannerUrl(url); }}
+          onUploadInstead={() => void chooseBanner()}
         />
         <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>OPTIONAL AUDIO</Text>
         <Pressable onPress={() => void chooseAudio()} style={[styles.uploadCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
