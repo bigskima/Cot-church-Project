@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { ApiError } from "../_shared/errors.ts";
+import { authorizePlatform } from "../_shared/context.ts";
 import { createHandler } from "../_shared/handler.ts";
 import { jsonBody } from "../_shared/request.ts";
 import { adminClient } from "../_shared/supabase.ts";
@@ -72,21 +73,103 @@ async function fetchJson(url: string, init: RequestInit = {}) {
   return response.json();
 }
 
-let webFullBiblePromise: Promise<any> | null = null;
-function webFullBible() {
-  if (!webFullBiblePromise) {
-    webFullBiblePromise = fetchJson(`${GETBIBLE_BASE}/web.json`).catch((error) => {
-      webFullBiblePromise = null;
+let kjvFullBiblePromise: Promise<any> | null = null;
+function kjvFullBible() {
+  if (!kjvFullBiblePromise) {
+    kjvFullBiblePromise = fetchJson(`${GETBIBLE_BASE}/kjv.json`).catch((error) => {
+      kjvFullBiblePromise = null;
       throw error;
     });
   }
-  return webFullBiblePromise;
+  return kjvFullBiblePromise;
 }
 
 const PUBLIC_GETBIBLE_TRANSLATIONS: Record<string,{ abbreviation:string; title:string; copyright:string }> = {
   web: { abbreviation:"WEB", title:"World English Bible", copyright:"Public Domain" },
   kjv: { abbreviation:"KJV", title:"King James Version", copyright:"Public Domain" },
 };
+
+type PlatformBibleProvider = {
+  provider_key:string;
+  display_name:string;
+  provider_kind:string;
+  enabled:boolean;
+  priority:number;
+  configuration:Record<string,unknown>;
+};
+type PlatformBibleTranslation = {
+  provider_key:string;
+  version_id:string;
+  abbreviation:string;
+  title:string;
+  language_tag:string;
+  copyright:string|null;
+  enabled:boolean;
+  is_default:boolean;
+  priority:number;
+  configuration:Record<string,unknown>;
+};
+
+async function loadPlatformBibleState() {
+  const admin=adminClient();
+  const [providersResult,translationsResult]=await Promise.all([
+    admin.from("platform_bible_providers").select("provider_key,display_name,provider_kind,enabled,priority,configuration").order("priority"),
+    admin.from("platform_bible_translation_settings").select("provider_key,version_id,abbreviation,title,language_tag,copyright,enabled,is_default,priority,configuration").order("priority"),
+  ]);
+  if(providersResult.error||translationsResult.error){
+    throw new ApiError("BIBLE_PLATFORM_CONFIG_FAILED","Bible platform configuration is unavailable.",500,undefined,false);
+  }
+  const providers=(providersResult.data??[]) as PlatformBibleProvider[];
+  const translations=(translationsResult.data??[]) as PlatformBibleTranslation[];
+  return {
+    providers,
+    translations,
+    providerMap:new Map(providers.map((item)=>[item.provider_key,item])),
+    translationMap:new Map(translations.map((item)=>[`${item.provider_key}:${item.version_id}`,item])),
+  };
+}
+
+function providerEnabled(state:Awaited<ReturnType<typeof loadPlatformBibleState>>,providerKey:string){
+  return state.providerMap.get(providerKey)?.enabled!==false;
+}
+
+function translationEnabled(
+  state:Awaited<ReturnType<typeof loadPlatformBibleState>>,
+  providerKey:string,
+  versionId:string,
+  implicitDefault=true,
+){
+  const configured=state.translationMap.get(`${providerKey}:${versionId}`);
+  return configured ? configured.enabled : implicitDefault;
+}
+
+function configuredDefaultVersion(state:Awaited<ReturnType<typeof loadPlatformBibleState>>){
+  const configured=state.translations
+    .filter((item)=>item.is_default&&item.enabled&&providerEnabled(state,item.provider_key))
+    .sort((a,b)=>a.priority-b.priority)[0];
+  if(configured?.provider_key==="youversion"&&!Deno.env.get("BIBLE_YOUVERSION_APP_KEY")) return null;
+  return configured?.version_id??null;
+}
+
+async function resolveEnabledVersionId(requestedVersionId:string){
+  const requested=String(requestedVersionId||"kjv").trim()||"kjv";
+  const state=await loadPlatformBibleState();
+  if(PUBLIC_GETBIBLE_TRANSLATIONS[requested]){
+    if(providerEnabled(state,"getbible")&&translationEnabled(state,"getbible",requested,requested==="kjv")) return requested;
+  }else if(
+    providerEnabled(state,"youversion") &&
+    Boolean(Deno.env.get("BIBLE_YOUVERSION_APP_KEY")) &&
+    translationEnabled(state,"youversion",requested,true)
+  ){
+    return requested;
+  }
+
+  const configured=configuredDefaultVersion(state);
+  if(configured) return configured;
+  if(providerEnabled(state,"getbible")&&translationEnabled(state,"getbible","kjv",true)) return "kjv";
+  throw new ApiError("BIBLE_VERSION_UNAVAILABLE","No active Bible translation is available.",503);
+}
+
 
 async function getPublicPassage(parsed: ParsedReference, versionId: string) {
   const translation = PUBLIC_GETBIBLE_TRANSLATIONS[versionId];
@@ -269,11 +352,12 @@ async function getYouVersionPassage(parsed: ParsedReference, versionId: string) 
   };
 }
 
-async function passage(reference: string, versionId = "web") {
+async function passage(reference: string, versionId = "kjv") {
   const parsed = parseReference(reference);
-  return PUBLIC_GETBIBLE_TRANSLATIONS[versionId]
-    ? getPublicPassage(parsed,versionId)
-    : getYouVersionPassage(parsed,versionId);
+  const resolvedVersionId=await resolveEnabledVersionId(versionId);
+  return PUBLIC_GETBIBLE_TRANSLATIONS[resolvedVersionId]
+    ? getPublicPassage(parsed,resolvedVersionId)
+    : getYouVersionPassage(parsed,resolvedVersionId);
 }
 
 async function fetchYouVersionBiblePages(key: string, language: string, allAvailable = false) {
@@ -306,54 +390,113 @@ function versionPriority(item: any) {
   return index >= 0 ? index : preferred.length + 100;
 }
 
-async function versions(language = "en") {
-  const free = [
-    {
-      id:"kjv", abbreviation:"KJV", localized_abbreviation:"KJV", title:"King James Version", localized_title:"King James Version",
-      language:{ name:"English", iso_639_1:"en" }, language_tag:"en",
-      copyright:"Public Domain", provider:"getbible", available:true, accessStatus:"public_domain",
-    },
-    {
-      id:"web", abbreviation:"WEB", localized_abbreviation:"WEB", title:"World English Bible", localized_title:"World English Bible",
-      language:{ name:"English", iso_639_1:"en" }, language_tag:"en",
-      copyright:"Public Domain", provider:"getbible", available:true, accessStatus:"public_domain",
-    },
-  ];
-  const key = Deno.env.get("BIBLE_YOUVERSION_APP_KEY");
-  if (!key) return free;
-  try {
-    const range = language.includes("*") ? language : `${language || "en"}*`;
-    const [licensed, catalogue] = await Promise.all([
-      fetchYouVersionBiblePages(key, range, false),
-      fetchYouVersionBiblePages(key, range, true).catch(() => []),
-    ]);
-    const licensedIds = new Set(licensed.map((item:any) => String(item.id)));
-    const byId = new Map<string,any>();
-    for (const item of [...catalogue, ...licensed]) {
-      const id = String(item.id);
-      byId.set(id, {
-        ...byId.get(id),
-        ...item,
-        id,
-        provider:"youversion",
-        available:licensedIds.has(id),
-        accessStatus:licensedIds.has(id) ? "licensed" : "requires_license",
-      });
-    }
-    const items = [...byId.values()].sort((a:any,b:any) => {
-      const preferred = versionPriority(a) - versionPriority(b);
-      if (preferred !== 0) return preferred;
-      const aName = String(a.localized_title ?? a.title ?? a.abbreviation ?? "");
-      const bName = String(b.localized_title ?? b.title ?? b.abbreviation ?? "");
-      return aName.localeCompare(bName);
+async function youVersionCatalogue(language="en"){
+  const key=Deno.env.get("BIBLE_YOUVERSION_APP_KEY");
+  if(!key) return [] as any[];
+  const range=language.includes("*")?language:`${language||"en"}*`;
+  const [licensed,catalogue]=await Promise.all([
+    fetchYouVersionBiblePages(key,range,false),
+    fetchYouVersionBiblePages(key,range,true).catch(()=>[]),
+  ]);
+  const licensedIds=new Set(licensed.map((item:any)=>String(item.id)));
+  const byId=new Map<string,any>();
+  for(const item of [...catalogue,...licensed]){
+    const id=String(item.id);
+    byId.set(id,{
+      ...byId.get(id),...item,id,provider:"youversion",
+      available:licensedIds.has(id),
+      accessStatus:licensedIds.has(id)?"licensed":"requires_license",
     });
-    return [...free, ...items];
-  } catch {
+  }
+  return [...byId.values()].sort((a:any,b:any)=>{
+    const preferred=versionPriority(a)-versionPriority(b);
+    if(preferred!==0)return preferred;
+    const aName=String(a.localized_title??a.title??a.abbreviation??"");
+    const bName=String(b.localized_title??b.title??b.abbreviation??"");
+    return aName.localeCompare(bName);
+  });
+}
+
+async function versions(language = "en") {
+  const state=await loadPlatformBibleState();
+  const free=[
+    {
+      id:"kjv",abbreviation:"KJV",localized_abbreviation:"KJV",title:"King James Version",localized_title:"King James Version",
+      language:{name:"English",iso_639_1:"en"},language_tag:"en",copyright:"Public Domain",provider:"getbible",
+      available:true,accessStatus:"public_domain",
+    },
+    {
+      id:"web",abbreviation:"WEB",localized_abbreviation:"WEB",title:"World English Bible",localized_title:"World English Bible",
+      language:{name:"English",iso_639_1:"en"},language_tag:"en",copyright:"Public Domain",provider:"getbible",
+      available:true,accessStatus:"public_domain",
+    },
+  ].filter((item)=>providerEnabled(state,"getbible")&&translationEnabled(state,"getbible",item.id,item.id==="kjv"));
+
+  if(!providerEnabled(state,"youversion")||!Deno.env.get("BIBLE_YOUVERSION_APP_KEY")) return free;
+  try{
+    const items=(await youVersionCatalogue(language)).filter((item:any)=>
+      item.available&&translationEnabled(state,"youversion",String(item.id),true)
+    );
+    return [...free,...items];
+  }catch{
     return free;
   }
 }
 
-function flattenWebBible(data:any) {
+async function platformBibleConfig(language="en"){
+  const state=await loadPlatformBibleState();
+  const publicRows=[
+    {id:"kjv",abbreviation:"KJV",localized_abbreviation:"KJV",title:"King James Version",localized_title:"King James Version",language_tag:"en",copyright:"Public Domain",provider:"getbible",available:true,accessStatus:"public_domain"},
+    {id:"web",abbreviation:"WEB",localized_abbreviation:"WEB",title:"World English Bible",localized_title:"World English Bible",language_tag:"en",copyright:"Public Domain",provider:"getbible",available:true,accessStatus:"public_domain"},
+  ];
+  const storedYouVersion=state.translations
+    .filter((item)=>item.provider_key==="youversion")
+    .map((item)=>({
+      id:item.version_id,abbreviation:item.abbreviation,localized_abbreviation:item.abbreviation,title:item.title,localized_title:item.title,
+      language_tag:item.language_tag,copyright:item.copyright,provider:"youversion",available:false,accessStatus:"provider_unavailable",
+    }));
+  let youversion:any[]=[];
+  if(Deno.env.get("BIBLE_YOUVERSION_APP_KEY")){
+    try{youversion=await youVersionCatalogue(language);}catch{youversion=storedYouVersion;}
+  }else{
+    youversion=storedYouVersion;
+  }
+  const merged=new Map<string,any>();
+  for(const item of [...publicRows,...youversion]){
+    const provider=String(item.provider);
+    const id=String(item.id);
+    const setting=state.translationMap.get(`${provider}:${id}`);
+    const providerOn=providerEnabled(state,provider);
+    const defaultEnabled=provider==="getbible"?id==="kjv":Boolean(item.available);
+    const enabled=setting?.enabled??defaultEnabled;
+    merged.set(`${provider}:${id}`,{
+      ...item,
+      enabled,
+      isDefault:Boolean(setting?.is_default),
+      priority:setting?.priority??(provider==="getbible"?(id==="kjv"?10:900):100),
+      providerEnabled:providerOn,
+      runtimeEnabled:Boolean(providerOn&&enabled&&(provider==="getbible"||item.available)),
+    });
+  }
+  const translations=[...merged.values()].sort((a:any,b:any)=>{
+    if(a.isDefault!==b.isDefault)return a.isDefault?-1:1;
+    if(a.runtimeEnabled!==b.runtimeEnabled)return a.runtimeEnabled?-1:1;
+    const preferred=versionPriority(a)-versionPriority(b);
+    return preferred!==0?preferred:String(a.title??"").localeCompare(String(b.title??""));
+  });
+  const defaultVersionId=configuredDefaultVersion(state)??"kjv";
+  return {
+    providers:state.providers.map((item)=>({
+      ...item,
+      ready:item.provider_key==="getbible"?true:item.provider_key==="youversion"?Boolean(Deno.env.get("BIBLE_YOUVERSION_APP_KEY")):Boolean(Deno.env.get("BIBLE_BRAIN_API_KEY")),
+      secretName:item.provider_key==="youversion"?"BIBLE_YOUVERSION_APP_KEY":item.provider_key==="bible_brain"?"BIBLE_BRAIN_API_KEY":null,
+    })),
+    translations,
+    defaultVersionId,
+  };
+}
+
+function flattenSearchBible(data:any) {
   const out:any[] = [];
   for (const book of data?.books ?? []) {
     for (const chapter of book?.chapters ?? []) {
@@ -384,14 +527,11 @@ async function searchBible(query:string, versionId:string) {
   const { data: topicRows }=await admin.from("bible_daily_pool").select("reference,theme").eq("active",true).ilike("theme",`%${trimmed}%`).limit(12);
   const topics=(topicRows ?? []).map((row:any)=>({ text:row.theme,reference:row.reference }));
 
-  // Keyword search uses the public-domain WEB corpus as COT's stable search
-  // index. Opening a result still uses the member's selected translation, so
-  // licensed providers never need their full corpus copied into COT.
-
-
-  const data=await webFullBible();
+  // Keyword search uses the public-domain KJV corpus as COT's stable search
+  // index. Opening a result still uses the member's selected active translation.
+  const data=await kjvFullBible();
   const needle=trimmed.toLowerCase();
-  const matches=flattenWebBible(data)
+  const matches=flattenSearchBible(data)
     .filter((row:any)=>row.text.toLowerCase().includes(needle))
     .slice(0,40);
   return { verses:matches,topics,query:trimmed,provider:"getbible" };
@@ -432,8 +572,9 @@ async function providerAudio(reference:string,organizationId:string) {
   const parsed=parseReference(reference);
   const key=Deno.env.get("BIBLE_BRAIN_API_KEY");
   const admin=adminClient();
+  const platformState=await loadPlatformBibleState();
   const { data: settings }=await admin.from("bible_provider_settings").select("configuration,enabled").eq("organization_id",organizationId).eq("provider_key","bible_brain").maybeSingle();
-  if (!key || !settings?.enabled) return { available:false, provider:"tts", reason:"Bible Brain is not connected; use COT read aloud." };
+  if (!providerEnabled(platformState,"bible_brain") || !key || !settings?.enabled) return { available:false, provider:"tts", reason:"Recorded Bible audio is not enabled; use COT read aloud." };
   const config=settings.configuration ?? {};
   const fileset=String(config.audioFilesetId ?? "").trim();
   if (!fileset) return { available:false, provider:"tts", reason:"No Bible Brain audio fileset is configured." };
@@ -453,23 +594,28 @@ export const bibleHandler = createHandler(
   async ({ request,auth }) => {
     const url=new URL(request.url);
     const action=url.searchParams.get("action") ?? "home";
-    const organizationId=await resolveOrganization(auth,url,request.method==="POST");
+    const organizationId=await resolveOrganization(auth,url,false);
 
     if (request.method==="GET") {
+      if(action==="platform-config"){
+        if(!auth?.user) throw new ApiError("AUTHENTICATION_REQUIRED","Authentication required.",401);
+        await authorizePlatform(auth,"platform.bible.read");
+        return {data:await platformBibleConfig(url.searchParams.get("language")??"en")};
+      }
       if (organizationId) await assertFeatureEnabled(adminClient(),"bible",{organizationId},"Bible is currently unavailable.");
 
       if (action==="books") return { data:BOOKS.map(([name,usfm,number,chapters])=>({name,usfm,number,chapters})) };
       if (action==="versions") return { data:await versions(url.searchParams.get("language") ?? "en") };
       if (action==="passage" || action==="preview") {
         const reference=requiredString(url.searchParams.get("reference"),"reference",80);
-        const versionId=url.searchParams.get("versionId") ?? "web";
+        const versionId=url.searchParams.get("versionId") ?? "kjv";
         const data=await passage(reference,versionId);
         if (organizationId && action==="passage") data.audio=await providerAudio(reference,organizationId);
         return { data };
       }
       if (action==="search") {
         const query=requiredString(url.searchParams.get("q"),"q",160);
-        const versionId=url.searchParams.get("versionId") ?? "web";
+        const versionId=url.searchParams.get("versionId") ?? "kjv";
         return { data:await searchBible(query,versionId) };
       }
       if (action==="today") {
@@ -478,15 +624,15 @@ export const bibleHandler = createHandler(
         const { data: rows,error }=await adminClient().rpc("resolve_daily_scripture",{target_organization_id:organizationId,target_date:date});
         if (error || !rows?.[0]) throw new ApiError("DAILY_SCRIPTURE_UNAVAILABLE","Daily Scripture is unavailable.",404);
         const selected=rows[0];
-        return { data:{...selected,date,passage:await passage(selected.reference,selected.version_id ?? "web")} };
+        return { data:{...selected,date,passage:await passage(selected.reference,selected.version_id ?? "kjv")} };
       }
       if (action==="provider-status") {
         const admin=adminClient();
         const configured=organizationId ? await admin.from("bible_provider_settings").select("provider_key,enabled,priority,configuration").eq("organization_id",organizationId) : {data:[]};
         return { data:{
-          freeProvider:{ key:"getbible",ready:true,label:"Public-domain Bible (GetBible/WEB)" },
-          youversion:{ ready:Boolean(Deno.env.get("BIBLE_YOUVERSION_APP_KEY")),secretName:"BIBLE_YOUVERSION_APP_KEY" },
-          bibleBrain:{ ready:Boolean(Deno.env.get("BIBLE_BRAIN_API_KEY")),secretName:"BIBLE_BRAIN_API_KEY" },
+          freeProvider:{ key:"getbible",ready:true,label:"Public-domain Bible (KJV)" },
+          youversion:{ ready:providerEnabled(await loadPlatformBibleState(),"youversion")&&Boolean(Deno.env.get("BIBLE_YOUVERSION_APP_KEY")),secretName:"BIBLE_YOUVERSION_APP_KEY" },
+          bibleBrain:{ ready:providerEnabled(await loadPlatformBibleState(),"bible_brain")&&Boolean(Deno.env.get("BIBLE_BRAIN_API_KEY")),secretName:"BIBLE_BRAIN_API_KEY" },
           configured:configured.data ?? [],
         }};
       }
@@ -562,16 +708,90 @@ export const bibleHandler = createHandler(
       throw new ApiError("NOT_FOUND","Bible action not recognized.",404);
     }
 
-    if (!auth?.user || !organizationId) throw new ApiError("AUTHENTICATION_REQUIRED","Sign in to continue.",401);
+    if (!auth?.user) throw new ApiError("AUTHENTICATION_REQUIRED","Sign in to continue.",401);
     const body=assertObject(await jsonBody(request));
     const actionName=requiredString(body.action,"action",50);
+
+    if(actionName==="platform_provider_save"||actionName==="platform_translation_save"){
+      await authorizePlatform(auth,"platform.bible.manage");
+      const admin=adminClient();
+
+      if(actionName==="platform_provider_save"){
+        assertNoUnknownFields(body,["action","providerKey","enabled","reason"]);
+        const providerKey=requiredString(body.providerKey,"providerKey",40);
+        if(!["getbible","youversion","bible_brain"].includes(providerKey)) throw new ApiError("VALIDATION_FAILED","Unknown Bible provider.",422);
+        if(typeof body.enabled!=="boolean") throw new ApiError("VALIDATION_FAILED","enabled must be a boolean.",422);
+        const state=await loadPlatformBibleState();
+        const currentDefault=state.translations.find((item)=>item.is_default&&item.enabled);
+        if(body.enabled===false&&currentDefault?.provider_key===providerKey){
+          throw new ApiError("BIBLE_DEFAULT_PROVIDER_REQUIRED","Choose a default translation from another provider before disabling this provider.",422);
+        }
+        const {data,error}=await admin.from("platform_bible_providers").update({
+          enabled:body.enabled,updated_by:auth.user.id,updated_at:new Date().toISOString(),
+        }).eq("provider_key",providerKey).select().single();
+        if(error) throw new ApiError("BIBLE_PROVIDER_SAVE_FAILED","Unable to update Bible provider.",500,undefined,false);
+        await admin.from("platform_audit_log").insert({
+          actor_profile_id:auth.user.id,action:"bible.provider_updated",target_type:"platform_bible_provider",target_id:providerKey,
+          metadata:{enabled:body.enabled,reason:String(body.reason??"").slice(0,500)},
+        });
+        return {data};
+      }
+
+      assertNoUnknownFields(body,["action","providerKey","versionId","enabled","makeDefault","priority","reason"]);
+      const providerKey=requiredString(body.providerKey,"providerKey",40);
+      const versionId=requiredString(body.versionId,"versionId",120);
+      if(!["getbible","youversion"].includes(providerKey)) throw new ApiError("VALIDATION_FAILED","Unknown Bible translation provider.",422);
+      if(typeof body.enabled!=="boolean") throw new ApiError("VALIDATION_FAILED","enabled must be a boolean.",422);
+      const config=await platformBibleConfig("en");
+      const candidate=config.translations.find((item:any)=>String(item.provider)===providerKey&&String(item.id)===versionId);
+      if(!candidate) throw new ApiError("BIBLE_VERSION_UNAVAILABLE","This Bible translation is not available from the configured provider.",404);
+      if(body.enabled&&providerKey==="youversion"&&!candidate.available){
+        throw new ApiError("BIBLE_LICENSE_REQUIRED","This YouVersion translation is not available to the connected publisher key.",422);
+      }
+      const existing=(await admin.from("platform_bible_translation_settings")
+        .select("is_default,enabled").eq("provider_key",providerKey).eq("version_id",versionId).maybeSingle()).data;
+      if(body.enabled===false&&existing?.is_default){
+        throw new ApiError("BIBLE_DEFAULT_TRANSLATION_REQUIRED","Choose another default translation before disabling this one.",422);
+      }
+      if(body.enabled===false){
+        const alternatives=config.translations.filter((item:any)=>item.runtimeEnabled&&!(String(item.provider)===providerKey&&String(item.id)===versionId));
+        if(!alternatives.length) throw new ApiError("BIBLE_TRANSLATION_REQUIRED","At least one Bible translation must remain active.",422);
+      }
+      const makeDefault=body.makeDefault===true;
+      if(makeDefault&&!body.enabled) throw new ApiError("VALIDATION_FAILED","The default Bible translation must be enabled.",422);
+      if(makeDefault){
+        await admin.from("platform_bible_translation_settings").update({is_default:false,updated_at:new Date().toISOString()}).eq("is_default",true);
+      }
+      const {data,error}=await admin.from("platform_bible_translation_settings").upsert({
+        provider_key:providerKey,
+        version_id:versionId,
+        abbreviation:String(candidate.localized_abbreviation??candidate.abbreviation??versionId).slice(0,40),
+        title:String(candidate.localized_title??candidate.title??candidate.abbreviation??versionId).slice(0,240),
+        language_tag:String(candidate.language_tag??"en").slice(0,30),
+        copyright:candidate.copyright?String(candidate.copyright).slice(0,1000):null,
+        enabled:body.enabled,
+        is_default:makeDefault?true:Boolean(existing?.is_default),
+        priority:Math.max(1,Math.min(10000,Number(body.priority??candidate.priority??100))),
+        configuration:{},
+        updated_by:auth.user.id,
+        updated_at:new Date().toISOString(),
+      },{onConflict:"provider_key,version_id"}).select().single();
+      if(error) throw new ApiError("BIBLE_TRANSLATION_SAVE_FAILED","Unable to update Bible translation.",500,undefined,false);
+      await admin.from("platform_audit_log").insert({
+        actor_profile_id:auth.user.id,action:"bible.translation_updated",target_type:"platform_bible_translation",
+        target_id:`${providerKey}:${versionId}`,metadata:{enabled:body.enabled,makeDefault,reason:String(body.reason??"").slice(0,500)},
+      });
+      return {data};
+    }
+
+    if (!organizationId) throw new ApiError("ORGANIZATION_REQUIRED","Choose a church to continue.",422);
     await assertFeatureEnabled(adminClient(),"bible",{organizationId},"Bible is currently unavailable.");
 
     if(actionName==="preferences"){
       assertNoUnknownFields(body,["action","defaultVersionId","languageTag","dailyScriptureNotification","notificationTime","timezone","audioRate"]);
       const row={
         profile_id:auth.user.id,organization_id:organizationId,
-        default_version_id:String(body.defaultVersionId ?? "web").slice(0,80),
+        default_version_id:String(body.defaultVersionId ?? "kjv").slice(0,80),
         language_tag:String(body.languageTag ?? "en").slice(0,20),
         daily_scripture_notification:Boolean(body.dailyScriptureNotification),
         notification_time:String(body.notificationTime ?? "07:00"),
@@ -584,7 +804,7 @@ export const bibleHandler = createHandler(
       return {data};
     }
     if(actionName==="toggle_bookmark"){
-      const reference=requiredString(body.reference,"reference",80); const versionId=String(body.versionId ?? "web");
+      const reference=requiredString(body.reference,"reference",80); const versionId=String(body.versionId ?? "kjv");
       const existing=await auth.client.from("bible_bookmarks").select("id").eq("profile_id",auth.user.id).eq("organization_id",organizationId).eq("reference",reference).eq("version_id",versionId).maybeSingle();
       if(existing.data){ await auth.client.from("bible_bookmarks").delete().eq("id",existing.data.id); return {data:{bookmarked:false}}; }
       const {data,error}=await auth.client.from("bible_bookmarks").insert({profile_id:auth.user.id,organization_id:organizationId,reference,version_id:versionId}).select().single();
@@ -592,21 +812,21 @@ export const bibleHandler = createHandler(
       return {data:{bookmarked:true,item:data}};
     }
     if(actionName==="highlight"){
-      const reference=requiredString(body.reference,"reference",80); const versionId=String(body.versionId ?? "web");
+      const reference=requiredString(body.reference,"reference",80); const versionId=String(body.versionId ?? "kjv");
       const color=String(body.colorKey ?? "gold");
       if(body.remove===true){await auth.client.from("bible_highlights").delete().eq("profile_id",auth.user.id).eq("organization_id",organizationId).eq("reference",reference).eq("version_id",versionId);return {data:{highlighted:false}};}
       const {data,error}=await auth.client.from("bible_highlights").upsert({profile_id:auth.user.id,organization_id:organizationId,reference,version_id:versionId,color_key:color,updated_at:new Date().toISOString()}).select().single();
       if(error) throw new ApiError("BIBLE_HIGHLIGHT_FAILED","Unable to save highlight.",500,undefined,false); return {data};
     }
     if(actionName==="note"){
-      const reference=requiredString(body.reference,"reference",80); const versionId=String(body.versionId ?? "web");
+      const reference=requiredString(body.reference,"reference",80); const versionId=String(body.versionId ?? "kjv");
       const note=String(body.body ?? "").trim();
       if(!note){await auth.client.from("bible_notes").delete().eq("profile_id",auth.user.id).eq("organization_id",organizationId).eq("reference",reference).eq("version_id",versionId);return {data:{deleted:true}};}
       const {data,error}=await auth.client.from("bible_notes").upsert({profile_id:auth.user.id,organization_id:organizationId,reference,version_id:versionId,body:note,updated_at:new Date().toISOString()}).select().single();
       if(error) throw new ApiError("BIBLE_NOTE_FAILED","Unable to save Bible note.",500,undefined,false); return {data};
     }
     if(actionName==="history"){
-      const reference=requiredString(body.reference,"reference",80); const versionId=String(body.versionId ?? "web");
+      const reference=requiredString(body.reference,"reference",80); const versionId=String(body.versionId ?? "kjv");
       const existing=await auth.client.from("bible_reading_history").select("read_count").eq("profile_id",auth.user.id).eq("organization_id",organizationId).eq("reference",reference).eq("version_id",versionId).maybeSingle();
       await auth.client.from("bible_reading_history").upsert({profile_id:auth.user.id,organization_id:organizationId,reference,version_id:versionId,last_read_at:new Date().toISOString(),read_count:Number(existing.data?.read_count ?? 0)+1});
       return {data:{recorded:true}};
@@ -688,7 +908,7 @@ export const bibleHandler = createHandler(
       const admin=adminClient();
       if(actionName==="manage_daily"){
         const date=requiredString(body.date,"date",10); const reference=requiredString(body.reference,"reference",80); parseReference(reference);
-        const {data,error}=await admin.from("bible_daily_schedule").upsert({organization_id:organizationId,scripture_date:date,reference,version_id:String(body.versionId??"web"),theme:String(body.theme??"general").slice(0,80),source:"ministry",message:body.message?String(body.message).slice(0,280):null,created_by:auth.user.id,updated_at:new Date().toISOString()},{onConflict:"organization_id,scripture_date"}).select().single();
+        const {data,error}=await admin.from("bible_daily_schedule").upsert({organization_id:organizationId,scripture_date:date,reference,version_id:String(body.versionId??"kjv"),theme:String(body.theme??"general").slice(0,80),source:"ministry",message:body.message?String(body.message).slice(0,280):null,created_by:auth.user.id,updated_at:new Date().toISOString()},{onConflict:"organization_id,scripture_date"}).select().single();
         if(error) throw new ApiError("DAILY_SCRIPTURE_SAVE_FAILED","Unable to schedule Daily Scripture.",500,undefined,false); return {data};
       }
       if(actionName==="manage_daily_reset"){
