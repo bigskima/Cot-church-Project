@@ -13,19 +13,19 @@ import { formatCotGuideContext } from "../_shared/cot-guides.ts";
 type Guide = { title: string; purpose: string; boundaries: string[] };
 const guides: Record<string, Guide> = {
   overview:{title:"Overview",purpose:"See platform health and move to areas that need attention.",boundaries:["Use this page for orientation, not detailed editing."]},
-  organizations:{title:"Church Organisations",purpose:"Manage church organisations that belong to COT.",boundaries:["Organisation status can affect many members."]},
+  organizations:{title:"Church Organisations",purpose:"Manage church organisations configured for the COT App.",boundaries:["Organisation status can affect many members."]},
   expressions:{title:"Expressions",purpose:"Manage Expression spaces without mixing them with general public COT.",boundaries:["Expression access and public COT are separate scopes."]},
   users:{title:"Accounts & Access",purpose:"Review accounts and the access granted to people.",boundaries:["Grant only the authority needed for the person’s responsibility."]},
   moderation:{title:"Moderation",purpose:"Review platform safety reports, supported public-content moderation and guarded restrictions.",boundaries:["Moderation is not pastoral care and does not expose confidential ministry records."]},
   "roles-access":{title:"Roles & Access",purpose:"Review the platform role catalogue and permission boundaries used by administrators.",boundaries:["Platform roles remain separate from church, Expression and Group ministry roles."]},
   "admin-invitations":{title:"Administrator Access",purpose:"Invite trusted people into Platform Administration.",boundaries:["Administration authority is separate from normal church membership."]},
   "expression-creators":{title:"Expression Creation Access",purpose:"Choose who may create new Expressions.",boundaries:["Creation access does not grant wider platform administration."]},
-  branding:{title:"Branding & Identity",purpose:"Control official COT names, logos and appearance.",boundaries:["Keep official identity consistent across COT."]},
+  branding:{title:"Branding & Identity",purpose:"Control official COT App names, logos and appearance.",boundaries:["Keep official app identity consistent across the COT App."]},
   features:{title:"Feature Availability",purpose:"Choose which product features are currently available.",boundaries:["Keep unfinished or unapproved features unavailable."]},
-  bible:{title:"Bible Experience",purpose:"Control Bible services, active translations and the default Bible version across COT.",boundaries:["Keep at least one usable translation active. Ministry still owns Daily Scripture content and reading plans."]},
+  bible:{title:"Bible Experience",purpose:"Control Bible services, active translations and the default Bible version across the COT App.",boundaries:["Keep at least one usable translation active. Ministry still owns Daily Scripture content and reading plans."]},
   credentials:{title:"Secure Credentials",purpose:"Store protected keys used by approved external services.",boundaries:["Never place credentials in descriptions, notes or screenshots."]},
   streaming:{title:"Streaming Services",purpose:"Prepare and monitor services used for live broadcasts.",boundaries:["Test service readiness before relying on it for a programme."]},
-  ai:{title:"AI Services",purpose:"Choose AI services and models for approved COT tasks.",boundaries:["A credential, active model and task assignment are all required."]},
+  ai:{title:"AI Services",purpose:"Choose AI services and models for approved COT App tasks.",boundaries:["A credential, active model and task assignment are all required."]},
   payments:{title:"Payment Services",purpose:"Prepare payment services without enabling unreleased payment methods.",boundaries:["Saving credentials does not automatically enable online giving."]},
   integrations:{title:"System Activity",purpose:"Review background work and connected-service activity.",boundaries:["Retry only work that is safe to repeat."]},
   audit:{title:"Audit & Security",purpose:"Review important administration actions and security events.",boundaries:["Treat audit history as protected evidence."]},
@@ -75,7 +75,7 @@ Deno.serve(createHandler({methods:["GET","POST"],authentication:"required",organ
     "Do not claim an action was completed. Explain what the administrator should check or do in the visible admin interface.",
     "Respect role boundaries and explain consequences before changes affecting access, public visibility, payments, streaming, security or sensitive information.",
     `Current page: ${guide.title}`,`Purpose: ${guide.purpose}`,`Important boundaries: ${guide.boundaries.join(" ")}`,
-    "Use the retrieved COT Platform Administration Guide as the operating authority for how this screen works. Give detailed visible-interface steps, expected results, boundaries and safe examples. If the guide does not support a claim, say so instead of inventing an action.",
+    "Use the retrieved COT App Platform Administration Guide as the operating authority for how this screen works. Give detailed visible-interface steps, expected results, boundaries and safe examples. If the guide does not support a claim, say so instead of inventing an action.",
     `Retrieved guide context:\n${guideContext || "No matching platform guide section was found."}`
   ].join("\n");
   const result=await runAi({organizationId:null,profileId:auth.user.id,capabilityCode:"admin.help",request:{model:"resolved-by-route",system,prompt:question,temperature:0.2,maxOutputTokens:1400},entityType:"platform_admin_page",entityId:page});
