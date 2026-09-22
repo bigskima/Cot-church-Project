@@ -164,7 +164,7 @@ async function resolveEnabledVersionId(requestedVersionId:string){
   }else if(
     providerEnabled(state,"youversion") &&
     Boolean(await optionalSecret("BIBLE_YOUVERSION_APP_KEY")) &&
-    translationEnabled(state,"youversion",requested,true)
+    translationEnabled(state,"youversion",requested,false)
   ){
     return requested;
   }
@@ -440,7 +440,7 @@ async function versions(language = "en") {
   if(!providerEnabled(state,"youversion")||!await optionalSecret("BIBLE_YOUVERSION_APP_KEY")) return free;
   try{
     const items=(await youVersionCatalogue(language)).filter((item:any)=>
-      item.available&&translationEnabled(state,"youversion",String(item.id),true)
+      item.available&&translationEnabled(state,"youversion",String(item.id),false)
     );
     return [...free,...items];
   }catch{
@@ -472,7 +472,7 @@ async function platformBibleConfig(language="en"){
     const id=String(item.id);
     const setting=state.translationMap.get(`${provider}:${id}`);
     const providerOn=providerEnabled(state,provider);
-    const defaultEnabled=provider==="getbible"?id==="kjv":Boolean(item.available);
+    const defaultEnabled=provider==="getbible"?id==="kjv":false;
     const enabled=setting?.enabled??defaultEnabled;
     merged.set(`${provider}:${id}`,{
       ...item,
@@ -490,10 +490,14 @@ async function platformBibleConfig(language="en"){
     return preferred!==0?preferred:String(a.title??"").localeCompare(String(b.title??""));
   });
   const defaultVersionId=(await configuredDefaultVersion(state))??"kjv";
+  const [youVersionReady,bibleBrainReady]=await Promise.all([
+    optionalSecret("BIBLE_YOUVERSION_APP_KEY").then(Boolean),
+    optionalSecret("BIBLE_BRAIN_API_KEY").then(Boolean),
+  ]);
   return {
     providers:state.providers.map((item)=>({
       ...item,
-      ready:item.provider_key==="getbible"?true:item.provider_key==="youversion"?Boolean(await optionalSecret("BIBLE_YOUVERSION_APP_KEY")):Boolean(await optionalSecret("BIBLE_BRAIN_API_KEY")),
+      ready:item.provider_key==="getbible"?true:item.provider_key==="youversion"?youVersionReady:bibleBrainReady,
       secretName:item.provider_key==="youversion"?"BIBLE_YOUVERSION_APP_KEY":item.provider_key==="bible_brain"?"BIBLE_BRAIN_API_KEY":null,
     })),
     translations,
@@ -579,7 +583,7 @@ async function providerAudio(reference:string,organizationId:string) {
   const admin=adminClient();
   const platformState=await loadPlatformBibleState();
   const { data: settings }=await admin.from("bible_provider_settings").select("configuration,enabled").eq("organization_id",organizationId).eq("provider_key","bible_brain").maybeSingle();
-  if (!providerEnabled(platformState,"bible_brain") || !key || !settings?.enabled) return { available:false, provider:"tts", reason:"Recorded Bible audio is not enabled; use COT read aloud." };
+  if (!providerEnabled(platformState,"bible_brain") || !key || !settings?.enabled) return { available:false, provider:"tts", reason:"Recorded Bible audio is not enabled; use COT App Read aloud." };
   const config=settings.configuration ?? {};
   const fileset=String(config.audioFilesetId ?? "").trim();
   if (!fileset) return { available:false, provider:"tts", reason:"No Bible Brain audio fileset is configured." };

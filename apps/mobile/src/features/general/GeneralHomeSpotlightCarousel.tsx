@@ -139,7 +139,7 @@ export function GeneralHomeSpotlightCarousel() {
         kind: 'devotional',
         eyebrow: 'DAILY DEVOTIONAL',
         title: dailyDevotional.title || 'Read · reflect · pray',
-        body: dailyDevotional.body || 'Open today’s devotional and continue your daily rhythm with COT.',
+        body: dailyDevotional.body || 'Open today’s devotional and continue your daily rhythm in the COT App.',
         meta: dailyDevotional.scripture || 'TODAY',
         imageUrl: devotionalImage,
         onPress: () => router.push({ pathname: '/general/devotional', params: { date: dailyDate } } as any),
@@ -155,8 +155,8 @@ export function GeneralHomeSpotlightCarousel() {
           : banner.destination_type === 'event'
             ? 'UPCOMING EVENT'
             : banner.destination_type === 'form'
-              ? 'COT FORM'
-              : 'COT OFFICIAL',
+              ? 'CHURCH FORM'
+              : 'OFFICIAL',
         title: banner.title,
         body: banner.subtitle || '',
         imageUrl: banner.image_url,

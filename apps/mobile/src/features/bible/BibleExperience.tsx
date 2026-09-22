@@ -1344,7 +1344,7 @@ export function BibleExperience() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + (tab === 'read' ? 190 : 120) }]}
       >
-        <ScreenHeader title="Bible" subtitle="Read, listen, search, save and study Scripture inside COT." showBack compact />
+        <ScreenHeader title="Bible" subtitle="Read, listen, search, save and study Scripture in the COT App." showBack compact />
         <View style={styles.tabs}>
           <Chip label="Read" selected={tab === 'read'} onPress={() => setTab('read')} />
           <Chip label="Search" selected={tab === 'search'} onPress={() => setTab('search')} />
@@ -1385,7 +1385,7 @@ export function BibleExperience() {
         </ScrollView>
       </BottomSheet>
 
-      <BottomSheet visible={versionSheet} onClose={() => setVersionSheet(false)} title="Bible version" subtitle="Only Bible translations enabled by Platform Administration appear here. Licensed YouVersion translations also depend on the connected publisher access." maxHeightPercent={82}>
+      <BottomSheet visible={versionSheet} onClose={() => setVersionSheet(false)} title="Bible version" subtitle="Only Bible translations currently made available in the COT App appear here." maxHeightPercent={82}>
         <View style={styles.versionFilters}>
           <Text style={[styles.versionSearchLabel, { color: colors.textMuted }]}>SEARCH TRANSLATIONS</Text>
           <Pressable onPress={() => versionSearchRef.current?.focus()} accessibilityRole="search" accessibilityLabel="Search Bible translations" style={({ pressed }) => [styles.versionSearch, { backgroundColor: colors.bgSecondary, borderColor: versionSearch ? colors.interactive : colors.borderSubtle }, pressed && { opacity: 0.92 }]}>
@@ -1436,7 +1436,7 @@ export function BibleExperience() {
                     {available
                       ? ((item.language?.name || item.language_tag || '') + (item.provider ? ' · ' + item.provider : ''))
                       : item.accessStatus === 'platform_unavailable'
-                        ? 'Available in the YouVersion Bible App, but not exposed through the YouVersion Platform API to COT'
+                        ? 'This translation is available in YouVersion but is not currently available in the COT App.'
                         : 'Listed by YouVersion · publisher license not enabled for this COT App Key'}
                   </Text>
                 </View>
@@ -1450,7 +1450,7 @@ export function BibleExperience() {
           })}
           {!visibleVersions.length ? (
             <Text style={[styles.emptyHelp, { color: colors.textMuted }]}>
-              No translation matches this search in the YouVersion Platform catalogue currently exposed to COT.
+              No Bible translation currently available in the COT App matches this search.
             </Text>
           ) : null}
         </ScrollView>
@@ -1495,7 +1495,7 @@ export function BibleExperience() {
             />
           ) : (
             <Text style={[styles.audioHint, { color: colors.textMuted }]}>
-              Recorded Bible audio appears when Bible Brain is connected. COT read aloud remains available.
+              Recorded Bible audio appears when it is available. COT App Read aloud remains available.
             </Text>
           )}
         </View>
@@ -1517,7 +1517,7 @@ export function BibleExperience() {
             <Button label="Share externally" variant="outline" onPress={() => void shareVerseExternal()} />
             <Button label="Share to COT" onPress={shareToCot} />
           </View>
-          <Text style={[styles.shareCardHint, { color: colors.textMuted }]}>The shared card includes the Scripture reference, selected Bible version and COT identity.</Text>
+          <Text style={[styles.shareCardHint, { color: colors.textMuted }]}>The shared card includes the Scripture reference, selected Bible version and approved church identity.</Text>
         </View>
       </BottomSheet>
 

@@ -44,7 +44,7 @@ export default function AboutCotDocumentaryScreen() {
   const { colors } = useTheme();
   const [speechRate, setSpeechRate] = useReadAloudRate();
   const [speakingKey, setSpeakingKey] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<Set<number>>(() => new Set([0, 13]));
+  const [expanded, setExpanded] = useState<Set<number>>(() => new Set([0, 12]));
   const speechRun = useRef(0);
 
   useEffect(() => () => {
@@ -110,9 +110,9 @@ export default function AboutCotDocumentaryScreen() {
         ]}
       >
         <ScreenHeader
-          title="About COT"
-          kicker="VISION & PRODUCT STORY"
-          subtitle="The purpose, structure, use cases and people behind the COT platform."
+          title="About the COT App"
+          kicker="VISION & STORY"
+          subtitle="The purpose, church use cases and people behind the COT App."
           showBack
         />
 
@@ -161,7 +161,7 @@ export default function AboutCotDocumentaryScreen() {
             <View style={styles.flex}>
               <Text style={[styles.listenTitle, { color: colors.text }]}>Listen to the documentary</Text>
               <Text style={[styles.listenCopy, { color: colors.textMuted }]}>
-                COT reads the full product story aloud. You can also listen to one chapter at a time.
+                The COT App reads the full story aloud. You can also listen to one chapter at a time.
               </Text>
             </View>
           </View>
@@ -260,7 +260,7 @@ export default function AboutCotDocumentaryScreen() {
           <Icon name="home-outline" size={24} color={colors.interactive} />
           <Text style={[styles.closingTitle, { color: colors.text }]}>One connected digital home for church life.</Text>
           <Text style={[styles.closingText, { color: colors.textSecondary }]}>
-            COT is built to help people belong, participate, grow, serve, communicate and lead within the right context.
+            The COT App helps people connect with City of Transformation, participate, grow, serve, communicate and lead within the right church context.
           </Text>
         </View>
       </ScrollView>

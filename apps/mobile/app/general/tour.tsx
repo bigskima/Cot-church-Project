@@ -49,12 +49,12 @@ export default function AppTourSettingsScreen() {
         <Pressable
           onPress={() => void Linking.openURL(COT_MEMBER_GUIDE_URL)}
           accessibilityRole="link"
-          accessibilityLabel="Open the COT Member User Guide"
+          accessibilityLabel="Open the COT App Member User Guide"
           style={({ pressed }) => [styles.guideCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm, pressed && styles.pressed]}
         >
           <View style={[styles.cardIcon, { backgroundColor: colors.primarySoft }]}><Icon name="book-outline" size={21} color={colors.interactive} /></View>
           <View style={styles.flex}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>Read the COT Member Guide</Text>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>Read the COT App Member Guide</Text>
             <Text style={[styles.cardCopy, { color: colors.textMuted }]}>Open the complete member guide for General COT, Expressions, Groups, messages, media, prayer, giving, events and everyday participation.</Text>
           </View>
           <Icon name="open-outline" size={18} color={colors.interactive} />
