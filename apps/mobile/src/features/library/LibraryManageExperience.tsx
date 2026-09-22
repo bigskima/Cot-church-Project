@@ -148,8 +148,10 @@ export function LibraryManageExperience() {
           useCase="library_cover"
           title={title}
           description={[subtitle,author,description].filter(Boolean).join(' · ')}
+          context={{ subtitle, author, category: 'Christian ministry library', purpose: description }}
           currentImageUrl={coverFile?.uri||generatedCoverUrl}
           onGenerated={(url)=>{setCoverFile(null);setGeneratedCoverUrl(url);}}
+          onUploadInstead={() => void chooseCover()}
           compact
         />
         <View style={styles.rightsBlock}><Text style={[styles.label,{color:colors.text}]}>Distribution rights</Text><View style={styles.chips}>{RIGHTS.map(([key,label])=><Chip key={key} label={label} selected={rightsBasis===key} onPress={()=>setRightsBasis(key)}/>)}</View><InputField label='Rights note (optional)' value={rightsNote} onChangeText={setRightsNote} placeholder='Licence, permission, copyright holder…' /></View>
