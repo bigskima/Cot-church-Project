@@ -286,8 +286,10 @@ export default function GeneralEventsManageExperience() {
           useCase="event_banner"
           title={title}
           description={description}
+          context={{ date: startsAt?.toISOString(), eventType: isOnline ? 'Online or hybrid' : 'In person', location: locationName }}
           currentImageUrl={bannerFile?.uri || generatedBannerUrl || editing?.banner_url}
           onGenerated={(url) => { setBannerFile(null); setGeneratedBannerUrl(url); }}
+          onUploadInstead={() => void chooseBanner()}
         />
       </View>
     );
