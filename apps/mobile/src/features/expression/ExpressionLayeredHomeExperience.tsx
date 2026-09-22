@@ -29,6 +29,7 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import type { Event, LiveStream, Reel, Sermon, SocialPost, Video } from '@/types/content';
 import { useFeatureControls } from '@/features/availability/useFeatureControls';
+import { TourAnchor } from '@/features/tour/AppTourProvider';
 
 type Announcement = { id: string; title: string; body: string; published_at?: string | null; created_at?: string | null };
 type FeedPlanRow = {
@@ -101,6 +102,7 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
   const controls = useFeatureControls({ organizationId, expressionId });
   const accessToken = auth?.session.accessToken ?? null;
   const reelWidth = Math.max(300, Math.min(width - spacing.sm * 2, 680));
+  const homeListRef = React.useRef<FlatList<HomeUnit>>(null);
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
@@ -265,16 +267,18 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
 
   const header = (
     <View style={styles.headerWrap}>
-      <View style={styles.quickSection}>
-        <View style={styles.quickHeading}>
-          <Text style={[styles.quickHeadingTitle, { color: colors.text }]}>Explore</Text>
+      <TourAnchor targetKey="expression.home.explore" reveal={() => homeListRef.current?.scrollToOffset({ offset: 0, animated: true })}>
+        <View style={styles.quickSection}>
+          <View style={styles.quickHeading}>
+            <Text style={[styles.quickHeadingTitle, { color: colors.text }]}>Explore</Text>
+          </View>
+          <View style={styles.quickGrid}>
+            {quickLinks.map((item) => (
+              <QuickLink key={item.key} label={item.label} hint={item.hint} icon={item.icon} onPress={() => router.push(item.route as any)} />
+            ))}
+          </View>
         </View>
-        <View style={styles.quickGrid}>
-          {quickLinks.map((item) => (
-            <QuickLink key={item.key} label={item.label} hint={item.hint} icon={item.icon} onPress={() => router.push(item.route as any)} />
-          ))}
-        </View>
-      </View>
+      </TourAnchor>
 
       {payload?.degradedSections?.length ? <Pressable onPress={resource.refresh} style={[styles.notice, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Icon name="alert-circle-outline" size={17} color={colors.textSecondary} /><Text style={[styles.noticeText, { color: colors.textSecondary }]}>Some Expression sections are still loading. Tap to retry.</Text><Icon name="refresh-outline" size={15} color={colors.textMuted} /></Pressable> : null}
       {activeStream ? <View style={styles.liveWrap}><HeroLiveCard stream={activeStream} onPress={() => router.push(`/expressions/${expressionId}/live/${activeStream.id}` as any)} /></View> : null}
@@ -289,6 +293,7 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <FlatList
+        ref={homeListRef}
         style={{ backgroundColor: colors.bg }}
         data={feed}
         keyExtractor={(item) => item.key}
