@@ -81,7 +81,7 @@ export function BibleInfrastructure({
     setLoading(true);setError('');
     try{
       const[bible,features]=await Promise.all([
-        api.request<BiblePayload>('bible?action=platform-config&language=en'),
+        api.request<BiblePayload>('noop?service=bible&action=platform-config&language=en'),
         api.request<FeaturePayload>('platform-features'),
       ]);
       setData(bible);
@@ -113,7 +113,7 @@ export function BibleInfrastructure({
     if(!canManage||busy)return;
     setBusy('provider:'+provider.provider_key);setError('');setSuccess('');
     try{
-      await api.request('bible',{
+      await api.request('noop?service=bible',{
         method:'POST',
         body:JSON.stringify({
           action:'platform_provider_save',
@@ -132,7 +132,7 @@ export function BibleInfrastructure({
     if(!canManage||busy)return;
     setBusy('translation:'+item.provider+':'+item.id);setError('');setSuccess('');
     try{
-      await api.request('bible',{
+      await api.request('noop?service=bible',{
         method:'POST',
         body:JSON.stringify({
           action:'platform_translation_save',
