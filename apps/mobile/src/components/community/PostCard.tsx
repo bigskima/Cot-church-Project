@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleProp, StyleSheet, Text, TextInput, useWindowDimensions, View, ViewStyle } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleProp, StyleSheet, Text, TextInput, useWindowDimensions, View, ViewStyle } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useTheme } from '@/state/theme';
 import { radius, shadows, spacing } from '@/design-system/tokens';
@@ -404,6 +404,7 @@ export function PostCard({
   return (
     <>
       <Pressable
+        disabled={resolvedVariant === 'feed'}
         onPress={resolvedVariant === 'feed' ? undefined : onPress}
         style={({ pressed }) => [
           styles.container,
@@ -411,7 +412,7 @@ export function PostCard({
           { backgroundColor: colors.card, borderColor: isExpressionPost ? colors.primarySoftStrong : colors.borderSubtle },
           isExpressionPost ? styles.expressionCard : resolvedVariant === 'card' ? styles.publicCard : null,
           pressed && resolvedVariant !== 'feed' && onPress ? { backgroundColor: colors.pressed } : null,
-          resolvedVariant === 'feed' ? ({ touchAction: 'manipulation' } as ViewStyle) : null,
+          resolvedVariant === 'feed' && Platform.OS === 'web' ? ({ touchAction: 'pan-y' } as ViewStyle) : null,
           style,
         ]}
       >
@@ -490,6 +491,7 @@ export function PostCard({
               scrollEnabled={media.length > 1}
               directionalLockEnabled
               nestedScrollEnabled
+              disableScrollViewPanResponder
               style={styles.mediaScroller}
               showsHorizontalScrollIndicator={false}
               snapToInterval={media.length > 1 ? mediaCardWidth + 8 : undefined}
