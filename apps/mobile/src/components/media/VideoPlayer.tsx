@@ -106,6 +106,7 @@ export function VideoPlayer({
             player={player}
             style={styles.videoView}
             contentFit="contain"
+            pointerEvents="none"
           />
         ) : posterUrl ? (
           <Image source={{ uri: posterUrl }} style={styles.posterImage} resizeMode="contain" />
