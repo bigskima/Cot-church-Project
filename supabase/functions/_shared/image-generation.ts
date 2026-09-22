@@ -117,7 +117,7 @@ async function generateCloudflare(admin: any, row: ProviderRow, prompt: string, 
     },
     body: JSON.stringify({
       prompt,
-      negative_prompt: "text, letters, words, captions, watermark, logo, UI, frame, border, distorted hands, extra fingers, grotesque, horror, gore",
+      negative_prompt: "text, typography, letters, words, alphabet characters, captions, subtitles, title text, poster text, flyer text, Bible verse text, signage, readable signs, logos, brand marks, watermarks, UI, interface elements, frames, borders, distorted hands, extra fingers, grotesque, horror, gore",
       num_steps: steps,
       width: Number.isFinite(width) ? Math.max(512, Math.min(2048, Math.round(width))) : 1280,
       height: Number.isFinite(height) ? Math.max(320, Math.min(2048, Math.round(height))) : 560,
