@@ -155,7 +155,7 @@ export default function DailyHighlightsManageScreen() {
     setQuoteTheme(day.quote.theme || day.bible.theme || 'general');
     setQuoteStatus(day.quote.status || 'published');
     setBibleReference(day.bible.reference || '');
-    setBibleVersion(day.bible.version_id || 'web');
+    setBibleVersion(day.bible.version_id || 'kjv');
     setBibleTheme(day.bible.theme || 'general');
     setBibleMessage(day.bible.message || '');
     setError('');
