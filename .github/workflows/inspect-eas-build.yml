@@ -22,7 +22,20 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - name: Inspect failed EAS build
+      - name: Inspect failed EAS build and Gradle log
         working-directory: apps/mobile
         run: |
-          npx eas-cli@latest build:view 46e6a311-7a81-4df1-81e1-75695bb06c49 --json | tee ../../eas-build-view.json
+          npx eas-cli@latest build:view 46e6a311-7a81-4df1-81e1-75695bb06c49 --json > ../../eas-build-view.json
+          node <<'NODE'
+          const fs = require('fs');
+          const build = JSON.parse(fs.readFileSync('../../eas-build-view.json', 'utf8'));
+          const url = build.logFiles?.[0];
+          if (!url) throw new Error('No EAS log file URL was returned.');
+          fs.writeFileSync('../../eas-log-url.txt', url);
+          console.log(JSON.stringify({ status: build.status, error: build.error, appVersion: build.appVersion, appBuildVersion: build.appBuildVersion }, null, 2));
+          NODE
+          curl --fail --location "$(cat ../../eas-log-url.txt)" --output ../../eas-native.log
+          echo "===== GRADLE FAILURE CONTEXT ====="
+          grep -n -E "FAILURE:|What went wrong|Execution failed|error:|ERROR|Could not|failed|Exception|Caused by" ../../eas-native.log | tail -n 160 || true
+          echo "===== END OF EAS NATIVE LOG ====="
+          tail -n 240 ../../eas-native.log
