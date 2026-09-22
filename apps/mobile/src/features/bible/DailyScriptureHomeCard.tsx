@@ -70,7 +70,7 @@ export function DailyScriptureHomeCard() {
       </View>
       <View style={styles.bottom}>
         <Text style={[styles.reference, { color: colors.text }]}>{item.reference}</Text>
-        <Text style={[styles.version, { color: colors.textMuted }]}>{item.passage.abbreviation || 'WEB'}</Text>
+        <Text style={[styles.version, { color: colors.textMuted }]}>{item.passage.abbreviation || 'KJV'}</Text>
       </View>
     </Pressable>
   );
