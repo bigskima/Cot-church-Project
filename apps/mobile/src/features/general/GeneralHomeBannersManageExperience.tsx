@@ -126,8 +126,10 @@ export default function GeneralHomeBannersManageExperience(){
          useCase="home_banner"
          title={title}
          description={subtitle}
+         context={{ subtitle, date: startsAt?.toISOString(), purpose: destinationType !== 'none' ? 'Home spotlight destination: ' + destinationType : 'Church Home spotlight' }}
          currentImageUrl={imageFile?.uri||generatedImageUrl||editing?.image_url}
          onGenerated={(url)=>{setImageFile(null);setGeneratedImageUrl(url);}}
+         onUploadInstead={() => void chooseImage()}
        />
        <Text style={[styles.label,{color:colors.textSecondary}]}>ACTION</Text>
        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>{(['none','route','external','event','announcement','form'] as const).map(type=><Chip key={type} label={type} selected={destinationType===type} onPress={()=>{setDestinationType(type);setDestinationValue('');}}/>)}</ScrollView>
