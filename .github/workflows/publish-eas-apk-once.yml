@@ -1,0 +1,108 @@
+name: Publish requested EAS APK once
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/publish-eas-apk-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Wait for EAS build and publish COT.apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+      BUILD_ID: 907372c0-fc2c-4a65-8ce3-50948eab6871
+      CI: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Wait for requested EAS build
+        working-directory: apps/mobile
+        run: |
+          for attempt in $(seq 1 120); do
+            npx eas-cli@latest build:view "$BUILD_ID" --json > ../../eas-build-view.json
+            STATUS=$(node -e "const b=require('../../eas-build-view.json'); console.log(String(b.status||'').toUpperCase())")
+            echo "EAS status: $STATUS"
+            if [ "$STATUS" = "FINISHED" ]; then
+              exit 0
+            fi
+            if [ "$STATUS" = "ERRORED" ] || [ "$STATUS" = "CANCELED" ]; then
+              cat ../../eas-build-view.json
+              exit 1
+            fi
+            sleep 30
+          done
+          echo "Timed out waiting for EAS build."
+          exit 1
+
+      - name: Read artifact metadata
+        id: eas
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const build = JSON.parse(fs.readFileSync('eas-build-view.json','utf8'));
+          const url =
+            build?.artifacts?.applicationArchiveUrl ||
+            build?.artifacts?.buildUrl ||
+            build?.artifactUrl ||
+            '';
+          if (!url) throw new Error('No Android application archive URL returned by EAS.');
+          const out = process.env.GITHUB_OUTPUT;
+          fs.appendFileSync(out, `artifact_url=${url}\n`);
+          fs.appendFileSync(out, `app_version=${build.appVersion || ''}\n`);
+          fs.appendFileSync(out, `build_version=${build.appBuildVersion || ''}\n`);
+          const versionCode = Number(build.appBuildVersion);
+          if (!Number.isInteger(versionCode) || versionCode <= 0) throw new Error('Invalid Android build version.');
+          fs.writeFileSync('release.json', JSON.stringify({
+            versionName: build.appVersion || null,
+            versionCode,
+            minimumSupportedVersionCode: null,
+            releaseNotes: 'Latest COT church testing build.',
+            publishedAt: new Date().toISOString(),
+            sourceCommit: '${{ github.sha }}',
+            easBuildId: build.id || process.env.BUILD_ID,
+          }, null, 2) + '\n');
+          NODE
+
+      - name: Download APK
+        run: |
+          curl --fail --location --retry 3 --output COT.apk "${{ steps.eas.outputs.artifact_url }}"
+          test -s COT.apk
+          test "$(stat -c%s COT.apk)" -gt 1000000
+
+      - name: Publish stable testing release assets
+        run: |
+          if gh release view cot-android-latest >/dev/null 2>&1; then
+            gh release upload cot-android-latest COT.apk release.json --clobber
+          else
+            gh release create cot-android-latest COT.apk release.json \
+              --target "$GITHUB_SHA" \
+              --title "COT Android Testing APK" \
+              --notes "Stable church-testing APK channel." \
+              --prerelease
+          fi
+          gh release edit cot-android-latest \
+            --title "COT Android Testing APK" \
+            --notes "Latest COT testing APK. EAS build: $BUILD_ID. Android version code: ${{ steps.eas.outputs.build_version }}." \
+            --prerelease
+
+      - name: Summary
+        run: |
+          echo "### COT.apk published" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Stable APK: https://github.com/${{ github.repository }}/releases/download/cot-android-latest/COT.apk" >> "$GITHUB_STEP_SUMMARY"
+          echo "- EAS build: $BUILD_ID" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Android version code: ${{ steps.eas.outputs.build_version }}" >> "$GITHUB_STEP_SUMMARY"
