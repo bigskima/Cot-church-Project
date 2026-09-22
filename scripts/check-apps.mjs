@@ -270,6 +270,7 @@ const checks = [
   [/Resolving Platform Administration access/, 'admin shell waits for resolved platform authority'],
   [/createPortal\([\s\S]*admin-guide-layer[\s\S]*document\.body/, 'COT App Admin Guide renders outside the sticky header containing block'],
   [/const onCloseRef = useRef\(onClose\)[\s\S]*\}, \[isOpen\]\);/, 'admin modal focus lifecycle stays stable while controlled fields rerender'],
+  [/createPortal\([\s\S]*admin-modal-overlay[\s\S]*document\.body/, 'shared admin modals render at the viewport root instead of inside page layout containers'],
   [/window\.setInterval\(\(\) => void refreshAuthority\(false\), 120_000\)/, 'Platform Administration authority refreshes without re-login'],
   [/refreshWhenVisible[\s\S]*refreshAuthority\(false\)[\s\S]*visibilitychange/, 'Platform Administration revalidates authority when returning to the app'],
   [/transient background refresh must not blank already-resolved/, 'Platform Administration preserves resolved access during transient refresh failures'],
