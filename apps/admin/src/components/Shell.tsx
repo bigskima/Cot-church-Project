@@ -13,6 +13,7 @@ import { ExpressionCreators } from '../pages/ExpressionCreators';
 import { BrandingAppearance } from '../pages/BrandingAppearance';
 import { StreamingInfrastructure } from '../pages/StreamingInfrastructure';
 import { AiInfrastructure } from '../pages/AiInfrastructure';
+import { BibleInfrastructure } from '../pages/BibleInfrastructure';
 import { PaymentInfrastructure } from '../pages/PaymentInfrastructure';
 import { ProviderCredentials } from '../pages/ProviderCredentials';
 import { FeatureFlags } from '../pages/FeatureFlags';
@@ -46,6 +47,7 @@ const allNavSections: NavSection[] = [
       { key: 'credentials', label: 'Secure Credentials', permission: 'platform.secrets.manage' },
       { key: 'streaming', label: 'Streaming Services', permission: 'platform.streaming.read' },
       { key: 'ai', label: 'AI Services', permission: 'platform.ai.read' },
+      { key: 'bible', label: 'Bible Experience', permission: 'platform.bible.read' },
       { key: 'payments', label: 'Payment Services', permission: 'platform.payments.read' },
       { key: 'integrations', label: 'System Activity', permission: 'platform.integrations.read' },
       { key: 'audit', label: 'Audit & Security', permission: 'platform.audit.read' },
@@ -181,6 +183,7 @@ export function Shell({ api, auth, updateAuth }: { api: ApiClient; auth: AuthSta
       case 'credentials': return <ProviderCredentials api={api} />;
       case 'streaming': return <StreamingInfrastructure api={api} canManage={can('platform.streaming.manage')} canManageSecrets={can('platform.secrets.manage')} />;
       case 'ai': return <AiInfrastructure api={api} canManage={can('platform.ai.manage')} canManageSecrets={can('platform.secrets.manage')} />;
+      case 'bible': return <BibleInfrastructure api={api} canManage={can('platform.bible.manage')} canManageFeatures={can('platform.features.manage')} canManageSecrets={can('platform.secrets.manage')} onNavigate={navigate} />;
       case 'payments': return <PaymentInfrastructure api={api} canManage={can('platform.payments.manage')} canManageSecrets={can('platform.secrets.manage')} />;
       case 'features': return <FeatureFlags api={api} canManage={can('platform.features.manage')} />;
       case 'integrations': return <IntegrationsJobs api={api} canManage={can('platform.integrations.manage')} />;
