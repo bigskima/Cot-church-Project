@@ -16,6 +16,8 @@ const guides: Record<string, Guide> = {
   organizations:{title:"Church Organisations",purpose:"Manage church organisations that belong to COT.",boundaries:["Organisation status can affect many members."]},
   expressions:{title:"Expressions",purpose:"Manage Expression spaces without mixing them with general public COT.",boundaries:["Expression access and public COT are separate scopes."]},
   users:{title:"Accounts & Access",purpose:"Review accounts and the access granted to people.",boundaries:["Grant only the authority needed for the person’s responsibility."]},
+  moderation:{title:"Moderation",purpose:"Review platform safety reports, supported public-content moderation and guarded restrictions.",boundaries:["Moderation is not pastoral care and does not expose confidential ministry records."]},
+  "roles-access":{title:"Roles & Access",purpose:"Review the platform role catalogue and permission boundaries used by administrators.",boundaries:["Platform roles remain separate from church, Expression and Group ministry roles."]},
   "admin-invitations":{title:"Administrator Access",purpose:"Invite trusted people into Platform Administration.",boundaries:["Administration authority is separate from normal church membership."]},
   "expression-creators":{title:"Expression Creation Access",purpose:"Choose who may create new Expressions.",boundaries:["Creation access does not grant wider platform administration."]},
   branding:{title:"Branding & Identity",purpose:"Control official COT names, logos and appearance.",boundaries:["Keep official identity consistent across COT."]},
