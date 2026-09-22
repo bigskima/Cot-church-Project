@@ -8,6 +8,7 @@ import { useResource } from '@/hooks/use-resource';
 import { shareContent } from '@/services/share';
 import { BottomSheet, Button, ContentReportSheet, Icon, ReelPlayer, ResourceError, Skeleton } from '@/components';
 import type { Reel } from '@/types/content';
+import { TourAnchor } from '@/features/tour/AppTourProvider';
 
 const { height: windowHeight } = Dimensions.get('window');
 type PlaybackInfo = { available: boolean; renditions?: { kind?: string; playbackUrl?: string; storagePath?: string }[] };
@@ -197,13 +198,15 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
           <Icon name="arrow-back" size={21} color="#FFFFFF" />
         </Pressable>
 
-        <View style={styles.scopePill}>
-          <Icon name={expressionId ? 'lock-closed-outline' : 'globe-outline'} size={14} color="#FFFFFF" />
-          <View style={styles.scopeCopy}>
-            <Text style={styles.scopeLabel}>{expressionId ? 'EXPRESSION REELS' : 'GENERAL REELS'}</Text>
-            <Text style={styles.scopeName} numberOfLines={1}>{expressionId ? expressionName ?? 'Members only' : 'Public COT discovery'}</Text>
+        <TourAnchor targetKey={expressionId ? 'expression.reels.scope' : 'general.reels.scope'} style={styles.scopeAnchor}>
+          <View style={styles.scopePill}>
+            <Icon name={expressionId ? 'lock-closed-outline' : 'globe-outline'} size={14} color="#FFFFFF" />
+            <View style={styles.scopeCopy}>
+              <Text style={styles.scopeLabel}>{expressionId ? 'EXPRESSION REELS' : 'GENERAL REELS'}</Text>
+              <Text style={styles.scopeName} numberOfLines={1}>{expressionId ? expressionName ?? 'Members only' : 'Public COT discovery'}</Text>
+            </View>
           </View>
-        </View>
+        </TourAnchor>
 
         {expressionId ? (
           <Pressable onPress={() => router.push(`/expressions/${expressionId}/videos` as any)} style={({ pressed }) => [styles.headerAction, pressed && styles.overlayPressed]} accessibilityRole="button" accessibilityLabel="Open Expression media library">
@@ -261,6 +264,7 @@ const styles = StyleSheet.create({
   reelsHeader: { position: 'absolute', left: 12, right: 12, zIndex: 30, flexDirection: 'row', alignItems: 'center', gap: 8 },
   loadingHeader: { position: 'absolute', left: 12, right: 12, zIndex: 30, flexDirection: 'row', alignItems: 'center', gap: 8 },
   backButton: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(4,12,24,0.72)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+  scopeAnchor: { flex: 1 },
   scopePill: { minHeight: 46, flex: 1, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 18, backgroundColor: 'rgba(4,12,24,0.72)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
   scopeCopy: { flex: 1, minWidth: 0 },
   scopeLabel: { color: '#FFFFFF', fontSize: 9, lineHeight: 11, fontWeight: '900', letterSpacing: 0.75 },
