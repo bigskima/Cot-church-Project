@@ -96,7 +96,7 @@ export default function GeneralMinistryWorkspace() {
             <Pressable
               onPress={() => void Linking.openURL(COT_MINISTRY_GUIDE_URL)}
               accessibilityRole="link"
-              accessibilityLabel="Open the COT Ministry Roles and Operations Guide"
+              accessibilityLabel="Open the COT App Ministry Roles and Operations Guide"
               style={[styles.roundButton, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}
             >
               <Icon name="book-outline" size={18} color={colors.interactive} />
