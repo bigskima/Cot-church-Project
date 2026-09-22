@@ -227,12 +227,12 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.sectionWrap}>
-          <SectionHeader title="About COT" subtitle="The vision, purpose and people behind the platform" />
+          <SectionHeader title="About the COT App" subtitle="The vision, purpose and people behind the app" />
           {compactLink(
             '/general/about-cot',
             'information-circle-outline',
-            'Vision & product story',
-            'Read the COT documentary, explore use cases, meet the builder and contributors, or listen with Read aloud.',
+            'Vision & app story',
+            'Read how the COT App supports City of Transformation, explore use cases, meet the builder and contributors, or listen with Read aloud.',
           )}
         </View>
 
