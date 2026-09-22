@@ -26,6 +26,7 @@ import type { ChatReaction, ChatReply, ChatSendPayload, RichChatMessage } from '
 import { ChatCallActions } from '@/features/calls/ChatCallActions';
 import { CallHistoryBubble } from '@/features/calls/CallHistoryBubble';
 import type { CallHistoryPayload } from '@/features/calls/call-types';
+import { TourAnchor } from '@/features/tour/AppTourProvider';
 
 type Person = {
   id: string;
@@ -482,18 +483,20 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
         </View>
       ) : null}
 
-      <View style={[styles.search, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
-        <Icon name="search" size={18} color={colors.textMuted} />
-        <TextInput
-          value={filter}
-          onChangeText={setFilter}
-          placeholder="Search anyone by @username or name"
-          placeholderTextColor={colors.textMuted}
-          autoCapitalize="none"
-          autoCorrect={false}
-          style={[styles.searchInput, { color: colors.text }]}
-        />
-      </View>
+      <TourAnchor targetKey="general.messages.search">
+        <View style={[styles.search, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+          <Icon name="search" size={18} color={colors.textMuted} />
+          <TextInput
+            value={filter}
+            onChangeText={setFilter}
+            placeholder="Search anyone by @username or name"
+            placeholderTextColor={colors.textMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={[styles.searchInput, { color: colors.text }]}
+          />
+        </View>
+      </TourAnchor>
 
       {actionError ? <Text style={{ color: colors.live, padding: 12 }}>{actionError}</Text> : null}
       {inbox.error ? (
