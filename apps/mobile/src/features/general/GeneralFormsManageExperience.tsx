@@ -232,8 +232,10 @@ export default function GeneralFormsManageExperience() {
             useCase="form_banner"
             title={title}
             description={description}
+            context={{ purpose: description }}
             currentImageUrl={bannerFile?.uri || generatedBannerUrl || editing?.banner_image_url}
             onGenerated={(url)=>{setBannerFile(null);setGeneratedBannerUrl(url);}}
+            onUploadInstead={() => void chooseBannerImage()}
           />
           <Text style={[styles.label,{color:colors.textSecondary}]}>STATUS</Text>
           <View style={styles.chips}>{(['draft','published','closed','hidden'] as const).map((item)=><Chip key={item} label={item} selected={status===item} onPress={()=>setStatus(item)}/>)}</View>
