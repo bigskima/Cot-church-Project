@@ -301,6 +301,9 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
         ListEmptyComponent={<EmptyState title="This Expression Home is ready" message="Posts, Reels, videos, sermons, events, announcements, polls and giveaways will form focused layers as they are published." iconName="home-outline" />}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        nestedScrollEnabled
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         refreshControl={<RefreshControl refreshing={resource.refreshing} onRefresh={resource.refresh} tintColor={colors.interactive} />}
         renderItem={({ item }) => {
           if (item.kind === 'section') return renderSection(item);
