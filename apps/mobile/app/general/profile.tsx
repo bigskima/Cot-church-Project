@@ -1,8 +1,6 @@
 import React, { Suspense } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Redirect } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { TourAnchor } from '@/features/tour/AppTourProvider';
 import { radius, spacing } from '@/design-system/tokens';
 import { Icon } from '@/components';
 import { useTheme } from '@/state/theme';
@@ -12,7 +10,6 @@ const GeneralProfileExperience = React.lazy(() => import('@/features/general/Gen
 
 export default function GeneralProfileRoute() {
   const { colors } = useTheme();
-  const insets = useSafeAreaInsets();
   const { mode } = useSession();
 
   // The profile tab is an account destination. Visitors should never have to
@@ -41,11 +38,6 @@ export default function GeneralProfileRoute() {
       )}>
         <GeneralProfileExperience />
       </Suspense>
-      <View pointerEvents="none" style={[styles.headerTarget, { top: insets.top + 6 }]}>
-        <TourAnchor targetKey="general.profile.header" style={styles.fill}>
-          <View style={styles.fill} />
-        </TourAnchor>
-      </View>
     </View>
   );
 }
@@ -60,6 +52,4 @@ const styles = StyleSheet.create({
   loadingLines: { width: '100%', marginTop: spacing.sm, gap: 7 },
   loadingLine: { width: '100%', height: 10, borderRadius: 5 },
   loadingLineShort: { width: '68%', height: 10, borderRadius: 5, alignSelf: 'center' },
-  headerTarget: { position: 'absolute', left: 12, right: 12, height: 74, zIndex: 30 },
-  fill: { flex: 1 },
 });
