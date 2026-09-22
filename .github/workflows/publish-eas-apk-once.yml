@@ -34,8 +34,19 @@ jobs:
         working-directory: apps/mobile
         run: |
           for attempt in $(seq 1 120); do
-            npx eas-cli@latest build:view "$BUILD_ID" --json > ../../eas-build-view.json
-            STATUS=$(node -e "const b=require('../../eas-build-view.json'); console.log(String(b.status||'').toUpperCase())")
+            set +e
+            npx eas-cli@latest build:view "$BUILD_ID" --json > ../../eas-build-view.json 2> ../../eas-build-view.err
+            VIEW_CODE=$?
+            set -e
+
+            if [ "$VIEW_CODE" -ne 0 ]; then
+              echo "EAS build lookup not ready yet (attempt $attempt)."
+              cat ../../eas-build-view.err || true
+              sleep 30
+              continue
+            fi
+
+            STATUS=$(node -e "const fs=require('fs'); const b=JSON.parse(fs.readFileSync('../../eas-build-view.json','utf8')); console.log(String(b.status||'').toUpperCase())")
             echo "EAS status: $STATUS"
             if [ "$STATUS" = "FINISHED" ]; then
               exit 0
