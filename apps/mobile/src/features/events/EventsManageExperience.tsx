@@ -225,8 +225,10 @@ export default function EventsManageExperience() {
             useCase="event_banner"
             title={title}
             description={description}
+            context={{ date: startsAt?.toISOString(), eventType: isOnline ? 'Online or hybrid' : 'In person', location: locationName }}
             currentImageUrl={bannerFile?.uri || generatedBannerUrl || editingEvent?.banner_url}
             onGenerated={(url) => { setBannerFile(null); setGeneratedBannerUrl(url); }}
+            onUploadInstead={() => void chooseBanner()}
           />
           <InputField label="Venue" value={locationName} onChangeText={setLocationName} placeholder={isOnline ? 'Optional for online events' : 'Where is it happening?'} />
           <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>FORMAT</Text>
