@@ -46,11 +46,11 @@ type AiReadiness = {
 };
 
 const suggestedPrompts = [
+  'Show me how to use COT step by step.',
+  'How do I use the Home spotlight and daily content?',
   'How do I send a prayer request?',
-  'Who are the current COT leaders?',
-  'Where is my Expression located?',
-  'What church events are coming up?',
-  'What was the latest sermon about?',
+  'How do I use the ministry tools available to my role?',
+  'How do calls and messages work?',
 ];
 
 function normalizeAssistantMarkdown(value: string) {
@@ -212,7 +212,7 @@ export function AssistantScreen() {
   const welcome = useMemo<Message>(() => ({
     id: 'welcome',
     role: 'assistant',
-    text: `Hi ${displayName}. I’m COT AI. I can chat with you, explain verified COT leaders, locations, sermons, events, groups and announcements, and take you directly to the right screen.`,
+    text: `Hi ${displayName}. I’m COT AI. I can chat with you, explain verified COT information, and now guide you step by step through the COT screens and workflows available to your account. You can also use Read aloud on my answers.`,
   }), [displayName]);
 
   const [readiness, setReadiness] = useState<AiReadiness | null>(null);
@@ -302,7 +302,7 @@ export function AssistantScreen() {
       `Current member space: ${expressionId ? `Expression ${expressionName || expressionId}` : 'General COT'}.`,
       recentConversation ? `Recent conversation:\n${recentConversation}` : '',
       `Current member message: ${promptToSend}`,
-      'Answer naturally. Use the verified COT context for church facts. If the member asks about a leader, location, event, sermon, group, story or announcement, use the saved database information and clearly say when that information has not yet been published. Use clean Markdown only when it improves readability. Never output decorative separator lines made from dashes, underscores, asterisks or dots.',
+      'Answer naturally. Use the verified COT context for church facts and the role-aware COT Guide for how-to instructions. If the member asks about a leader, location, event, sermon, group, story or announcement, use the saved database information and clearly say when that information has not yet been published. If they ask how to use COT, give detailed visible-screen steps and respect the tools available to their verified role. Use clean Markdown only when it improves readability. Never output decorative separator lines made from dashes, underscores, asterisks or dots.',
     ].filter(Boolean).join('\n\n');
 
     setMessages((previous) => [...previous, userMsg, pendingMsg]);
