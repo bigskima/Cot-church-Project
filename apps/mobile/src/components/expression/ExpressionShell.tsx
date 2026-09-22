@@ -18,6 +18,7 @@ import { useResource } from '@/hooks/use-resource';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useExpressionManagementAccess } from '@/features/expression-management/useExpressionManagementAccess';
+import { TourAnchor } from '@/features/tour/AppTourProvider';
 
 type Props = PropsWithChildren<{
   expressionId: string;
@@ -229,9 +230,9 @@ export function ExpressionShell({ expressionId, children }: Props) {
   if (wide) {
     return (
       <View style={[styles.desktopRoot, { backgroundColor: colors.bg }]}>
-        <View style={[styles.desktopSidebar, { paddingTop: Math.max(insets.top, spacing.md), backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+        <TourAnchor targetKey="expression.shell.navigation" style={[styles.desktopSidebar, { paddingTop: Math.max(insets.top, spacing.md), backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
           <ExpressionNavigation expressionId={expressionId} />
-        </View>
+        </TourAnchor>
         <View style={styles.desktopContent}>{children}</View>
       </View>
     );
@@ -239,20 +240,22 @@ export function ExpressionShell({ expressionId, children }: Props) {
 
   return (
     <View style={[styles.mobileRoot, { backgroundColor: colors.bg }]}>
-      <WorkspaceTopBar style={[styles.mobileHeader, { paddingTop: insets.top + spacing.xs }]}>
-        <Pressable onPress={() => setDrawerOpen(true)} accessibilityRole="button" accessibilityLabel="Open Expression navigation" style={({ pressed }) => [styles.headerButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed ? styles.pressed : null]}>
-          <Icon name="menu" size={21} color={colors.text} />
-        </Pressable>
-        <View style={[styles.headerAvatar, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}>
-          {expressionAvatar ? <Image source={{ uri: expressionAvatar }} style={styles.headerAvatarImage} resizeMode="cover" /> : <Icon name="people" size={16} color={colors.interactive} />}
-        </View>
-        <View style={styles.headerCopy}>
-          <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>{expressionName}</Text>
-        </View>
-        <Pressable onPress={() => router.push('/expressions')} accessibilityRole="button" accessibilityLabel="Switch Expression" style={({ pressed }) => [styles.headerButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed ? styles.pressed : null]}>
-          <Icon name="swap-horizontal-outline" size={20} color={colors.text} />
-        </Pressable>
-      </WorkspaceTopBar>
+      <TourAnchor targetKey="expression.shell.navigation">
+        <WorkspaceTopBar style={[styles.mobileHeader, { paddingTop: insets.top + spacing.xs }]}>
+          <Pressable onPress={() => setDrawerOpen(true)} accessibilityRole="button" accessibilityLabel="Open Expression navigation" style={({ pressed }) => [styles.headerButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed ? styles.pressed : null]}>
+            <Icon name="menu" size={21} color={colors.text} />
+          </Pressable>
+          <View style={[styles.headerAvatar, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}>
+            {expressionAvatar ? <Image source={{ uri: expressionAvatar }} style={styles.headerAvatarImage} resizeMode="cover" /> : <Icon name="people" size={16} color={colors.interactive} />}
+          </View>
+          <View style={styles.headerCopy}>
+            <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>{expressionName}</Text>
+          </View>
+          <Pressable onPress={() => router.push('/expressions')} accessibilityRole="button" accessibilityLabel="Switch Expression" style={({ pressed }) => [styles.headerButton, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed ? styles.pressed : null]}>
+            <Icon name="swap-horizontal-outline" size={20} color={colors.text} />
+          </Pressable>
+        </WorkspaceTopBar>
+      </TourAnchor>
 
       <View style={styles.mobileContent}>{children}</View>
 
