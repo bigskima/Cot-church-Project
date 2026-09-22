@@ -241,6 +241,7 @@ export default function AnnouncementsManageExperience() {
             description={body}
             currentImageUrl={bannerFile?.uri || generatedBannerUrl || editing?.banner_url}
             onGenerated={(url) => { setBannerFile(null); setGeneratedBannerUrl(url); }}
+            onUploadInstead={() => void chooseBanner()}
           />
           <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>DELIVERY</Text>
           <View style={styles.chips}><Chip label="Draft" selected={status === 'draft'} onPress={() => setStatus('draft')} /><Chip label="Schedule" selected={status === 'scheduled'} onPress={() => { setStatus('scheduled'); if (!scheduledFor) setScheduledFor(new Date(Date.now() + 60 * 60 * 1000)); }} /><Chip label="Publish now" selected={status === 'published'} onPress={() => setStatus('published')} /></View>
