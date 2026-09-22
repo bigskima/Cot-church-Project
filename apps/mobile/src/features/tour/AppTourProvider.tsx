@@ -123,6 +123,7 @@ export function AppTourProvider({ children }: React.PropsWithChildren) {
   const [tour, setTour] = React.useState<ActiveTour | null>(null);
   const [stepIndex, setStepIndex] = React.useState(0);
   const [targetRect, setTargetRect] = React.useState<LayoutRectangle | null>(null);
+  const [targetUnavailable, setTargetUnavailable] = React.useState(false);
   const [coachHeight, setCoachHeight] = React.useState(210);
   const [showOptions, setShowOptions] = React.useState(false);
   const [customDays, setCustomDays] = React.useState('');
@@ -176,6 +177,7 @@ export function AppTourProvider({ children }: React.PropsWithChildren) {
     setCustomDays('');
     setError('');
     setTargetRect(null);
+    setTargetUnavailable(false);
     try {
       const updated = await postTour(manual ? 'restart' : 'start', activeTour);
       if (updated?.experience && updated.steps.length) {
@@ -238,15 +240,18 @@ export function AppTourProvider({ children }: React.PropsWithChildren) {
   const measureCurrentTarget = React.useCallback(async () => {
     if (!currentStep) return;
     const screen = Dimensions.get('window');
+    const screenTarget = currentStep.targetKey.startsWith('screen.') || currentStep.targetKey.startsWith('screen:');
     const anchor = anchors.current.get(currentStep.targetKey);
+    setTargetUnavailable(false);
     if (!anchor?.ref.current) {
-      if (currentStep.targetKey.startsWith('screen.') || currentStep.targetKey.startsWith('screen:')) {
+      if (screenTarget) {
         setTargetRect(routeSpotlight(currentStep.targetKey, screen.width, screen.height));
       } else {
         setTargetRect(null);
         setTimeout(() => {
           const delayed = anchors.current.get(currentStep.targetKey)?.ref.current;
-          if (!delayed) setTargetRect(routeSpotlight(currentStep.targetKey, screen.width, screen.height));
+          if (!delayed) setTargetUnavailable(true);
+          else void measureCurrentTarget();
         }, 950);
       }
       return;
@@ -261,7 +266,10 @@ export function AppTourProvider({ children }: React.PropsWithChildren) {
       const node = anchors.current.get(currentStep.targetKey)?.ref.current;
       if (!node) {
         if (attempt++ < 7) setTimeout(measure, 120);
-        else setTargetRect(routeSpotlight(currentStep.targetKey, screen.width, screen.height));
+        else {
+          setTargetRect(screenTarget ? routeSpotlight(currentStep.targetKey, screen.width, screen.height) : null);
+          setTargetUnavailable(!screenTarget);
+        }
         return;
       }
       node.measureInWindow((x, y, width, height) => {
@@ -269,7 +277,13 @@ export function AppTourProvider({ children }: React.PropsWithChildren) {
           setTimeout(measure, 120);
           return;
         }
-        setTargetRect(width && height ? { x, y, width, height } : routeSpotlight(currentStep.targetKey, screen.width, screen.height));
+        if (width && height) {
+          setTargetUnavailable(false);
+          setTargetRect({ x, y, width, height });
+        } else {
+          setTargetRect(screenTarget ? routeSpotlight(currentStep.targetKey, screen.width, screen.height) : null);
+          setTargetUnavailable(!screenTarget);
+        }
       });
     };
     setTimeout(measure, 220);
@@ -278,6 +292,7 @@ export function AppTourProvider({ children }: React.PropsWithChildren) {
   React.useEffect(() => {
     if (!tour || !currentStep || !currentRoute) return;
     setTargetRect(null);
+    setTargetUnavailable(false);
     if (!sameRoute(pathname, currentRoute)) {
       if (navigatingTo.current !== currentRoute) {
         navigatingTo.current = currentRoute;
@@ -296,6 +311,7 @@ export function AppTourProvider({ children }: React.PropsWithChildren) {
     navigatingTo.current = null;
     setStepIndex(bounded);
     setTargetRect(null);
+    setTargetUnavailable(false);
     setError('');
     try {
       await postTour('advance', tour, { stepIndex: bounded });
@@ -312,6 +328,7 @@ export function AppTourProvider({ children }: React.PropsWithChildren) {
       await postTour('complete', tour);
       setTour(null);
       setTargetRect(null);
+      setTargetUnavailable(false);
       navigatingTo.current = null;
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to finish the tour right now.');
@@ -329,6 +346,7 @@ export function AppTourProvider({ children }: React.PropsWithChildren) {
       setTour(null);
       setShowOptions(false);
       setTargetRect(null);
+      setTargetUnavailable(false);
       navigatingTo.current = null;
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to save that reminder.');
@@ -346,6 +364,7 @@ export function AppTourProvider({ children }: React.PropsWithChildren) {
       setTour(null);
       setShowOptions(false);
       setTargetRect(null);
+      setTargetUnavailable(false);
       navigatingTo.current = null;
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to save that preference.');
@@ -358,6 +377,7 @@ export function AppTourProvider({ children }: React.PropsWithChildren) {
     setTour(null);
     setShowOptions(false);
     setTargetRect(null);
+    setTargetUnavailable(false);
     navigatingTo.current = null;
   }, []);
 
@@ -408,7 +428,13 @@ export function AppTourProvider({ children }: React.PropsWithChildren) {
               </View>
               <Text style={[styles.coachTitle, { color: colors.text }]}>{currentStep?.title}</Text>
               <Text style={[styles.coachBody, { color: colors.textSecondary }]}>{currentStep?.body}</Text>
-              {!spotlight ? <Text style={[styles.findingTarget, { color: colors.textMuted }]}>Opening the right screen and locating this control…</Text> : null}
+              {!spotlight ? (
+                <Text style={[styles.findingTarget, { color: colors.textMuted }]}>
+                  {targetUnavailable
+                    ? 'This control is not available in the current layout. Nothing is highlighted so the tour never points at the wrong place.'
+                    : 'Opening the right screen and locating this control…'}
+                </Text>
+              ) : null}
               {error ? <Text style={[styles.errorText, { color: colors.live }]}>{error}</Text> : null}
               <ScrollProgress steps={tour?.payload.steps.length ?? 0} active={stepIndex} activeColor={colors.interactive} idleColor={colors.borderSubtle} />
               <View style={styles.actions}>
