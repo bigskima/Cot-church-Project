@@ -16,10 +16,6 @@ type ManagePayload = {
   pool: Array<{ id:string; reference:string; theme:string; weight:number; active:boolean; organization_id?:string|null }>;
   plans: Array<{ id:string; title:string; description:string; duration_days:number; slug:string; organization_id?:string|null }>;
 };
-  youversion:{ready:boolean;secretName:string};
-  bibleBrain:{ready:boolean;secretName:string};
-  configured:Array<{provider_key:string;enabled:boolean;priority:number;configuration:Record<string,unknown>}>;
-};
 type Version={id:string;abbreviation?:string;title?:string;localized_title?:string};
 type Tab='daily'|'pool'|'plans';
 
