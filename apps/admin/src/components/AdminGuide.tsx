@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { ApiClient } from '../api';
 
 type GuideEntry = { summary: string; tasks: string[]; terms: Array<{ term: string; meaning: string }> };
@@ -36,16 +37,15 @@ export function AdminGuide({api,page,pageTitle,canOpenAi,onNavigate}:{api:ApiCli
   const guide=pageGuides[page]??pageGuides.overview;
   const loadReadiness=async()=>{setChecking(true);try{setReadiness(await api.request<Readiness>('platform-admin-guide'));}catch{setReadiness({ready:false,reason:'unavailable'});}finally{setChecking(false);}};
   useEffect(()=>{setMessages([]);setQuestion('');setError('');if(open)void loadReadiness();},[page]);
-  useEffect(()=>{if(!open){window.speechSynthesis?.cancel();setSpeakingIndex(null);return;}void loadReadiness();const timer=window.setTimeout(()=>inputRef.current?.focus(),120);const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape')setOpen(false);};window.addEventListener('keydown',onKey);return()=>{window.clearTimeout(timer);window.removeEventListener('keydown',onKey);};},[open]);
+  useEffect(()=>{if(!open){window.speechSynthesis?.cancel();setSpeakingIndex(null);return;}void loadReadiness();const previousOverflow=document.body.style.overflow;document.body.style.overflow='hidden';const timer=window.setTimeout(()=>inputRef.current?.focus(),120);const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape')setOpen(false);};window.addEventListener('keydown',onKey);return()=>{document.body.style.overflow=previousOverflow;window.clearTimeout(timer);window.removeEventListener('keydown',onKey);};},[open]);
   useEffect(()=>()=>{window.speechSynthesis?.cancel();},[]);
 
   const send=async(prompt?:string)=>{const next=(prompt??question).trim();if(!next||busy||!readiness?.ready)return;setBusy(true);setError('');setMessages(current=>[...current,{role:'user',text:next}]);setQuestion('');try{const result=await api.request<{answer:string}>('platform-admin-guide',{method:'POST',body:JSON.stringify({page,question:next})});setMessages(current=>[...current,{role:'assistant',text:result.answer}]);}catch(value){setError(value instanceof Error?value.message:'COT App Guide could not answer right now.');await loadReadiness();}finally{setBusy(false);}};
   const speak=(index:number,value:string)=>{if(!('speechSynthesis' in window)||typeof SpeechSynthesisUtterance==='undefined'){setError('Read aloud is not supported in this browser.');return;}if(speakingIndex===index){window.speechSynthesis.cancel();setSpeakingIndex(null);return;}window.speechSynthesis.cancel();const utterance=new SpeechSynthesisUtterance(guideSpeechText(value));utterance.rate=speechRate;utterance.onend=()=>setSpeakingIndex(current=>current===index?null:current);utterance.onerror=()=>setSpeakingIndex(current=>current===index?null:current);setSpeakingIndex(index);window.speechSynthesis.speak(utterance);};
   const statusText=useMemo(()=>checking?'Checking AI availability…':readiness?.ready?(readiness.modelName?`AI ready · ${readiness.modelName}`:'AI ready'):'Built-in guide available',[checking,readiness]);
 
-  return <>
-    <button type="button" className="admin-guide-trigger" onClick={()=>setOpen(true)} aria-haspopup="dialog"><span className="admin-guide-trigger-icon" aria-hidden="true">✦</span><span className="admin-guide-trigger-label">Ask COT App Guide</span></button>
-    {open?<div className="admin-guide-layer" role="presentation">
+  const guideLayer=open&&typeof document!=='undefined'?createPortal(
+    <div className="admin-guide-layer" role="presentation">
       <button type="button" className="admin-guide-backdrop" onClick={()=>setOpen(false)} aria-label="Close COT App Guide" />
       <aside className="admin-guide-panel" role="dialog" aria-modal="true" aria-label="COT App Admin Guide">
         <div className="admin-guide-header"><div className="admin-guide-identity"><div className="admin-guide-mark">✦</div><div><div className="admin-guide-eyebrow">COT APP ADMIN GUIDE</div><h3>Help with {pageTitle}</h3></div></div><button type="button" className="admin-guide-close" onClick={()=>setOpen(false)} aria-label="Close COT App Guide">×</button></div>
@@ -59,6 +59,12 @@ export function AdminGuide({api,page,pageTitle,canOpenAi,onNavigate}:{api:ApiCli
         </div>
         <div className="admin-guide-composer"><textarea ref={inputRef} value={question} onChange={event=>setQuestion(event.target.value)} placeholder={readiness?.ready?'Ask what this means or what to do next…':'AI answers will appear here after Admin guidance is enabled'} maxLength={3000} disabled={!readiness?.ready||busy} onKeyDown={event=>{if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();void send();}}}/><button type="button" onClick={()=>void send()} disabled={!readiness?.ready||!question.trim()||busy} aria-label="Ask COT App Guide">{busy?'…':'↑'}</button></div>
       </aside>
-    </div>:null}
+    </div>,
+    document.body,
+  ):null;
+
+  return <>
+    <button type="button" className="admin-guide-trigger" onClick={()=>setOpen(true)} aria-haspopup="dialog"><span className="admin-guide-trigger-icon" aria-hidden="true">✦</span><span className="admin-guide-trigger-label">Ask COT App Guide</span></button>
+    {guideLayer}
   </>;
 }

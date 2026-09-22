@@ -32,6 +32,13 @@ export function Modal({
   const subtitleId = useId();
   const dialogRef = useRef<HTMLElement | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+
+  // Modal parents frequently pass an inline onClose callback. Keep the latest
+  // callback without treating its changing function identity as a new modal
+  // session; otherwise every controlled-input keystroke tears down this effect,
+  // restores focus outside the dialog, and then focuses the first field again.
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -53,7 +60,7 @@ export function Modal({
 
       if (event.key === 'Escape') {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -90,7 +97,7 @@ export function Modal({
       previousFocusRef.current?.focus();
       previousFocusRef.current = null;
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
