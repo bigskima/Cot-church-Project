@@ -22,7 +22,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - name: Inspect failed EAS build and Gradle log
+      - name: Decode existing failed EAS Gradle log
         working-directory: apps/mobile
         run: |
           npx eas-cli@latest build:view 46e6a311-7a81-4df1-81e1-75695bb06c49 --json > ../../eas-build-view.json
@@ -34,8 +34,13 @@ jobs:
           fs.writeFileSync('../../eas-log-url.txt', url);
           console.log(JSON.stringify({ status: build.status, error: build.error, appVersion: build.appVersion, appBuildVersion: build.appBuildVersion }, null, 2));
           NODE
-          curl --fail --location "$(cat ../../eas-log-url.txt)" --output ../../eas-native.log
-          echo "===== GRADLE FAILURE CONTEXT ====="
-          grep -n -E "FAILURE:|What went wrong|Execution failed|error:|ERROR|Could not|failed|Exception|Caused by" ../../eas-native.log | tail -n 160 || true
-          echo "===== END OF EAS NATIVE LOG ====="
-          tail -n 240 ../../eas-native.log
+          curl --fail --location --compressed "$(cat ../../eas-log-url.txt)" --output ../../eas-native.raw
+          if gzip -t ../../eas-native.raw >/dev/null 2>&1; then
+            gzip -dc ../../eas-native.raw > ../../eas-native.log
+          else
+            cp ../../eas-native.raw ../../eas-native.log
+          fi
+          echo "===== FAILURE CONTEXT ====="
+          grep -n -E "FAILURE:|What went wrong|Execution failed|Could not|error:|ERROR|Caused by|Exception|FAILED|Task :" ../../eas-native.log | tail -n 220 || true
+          echo "===== LOG TAIL ====="
+          tail -n 260 ../../eas-native.log
