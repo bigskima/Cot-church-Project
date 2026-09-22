@@ -189,9 +189,9 @@ export default function GeneralToolsScreen() {
     },
     {
       key: 'story',
-      label: 'Our Story',
+      label: 'Church Story',
       icon: 'reader-outline',
-      description: 'Learn about COT and its story.',
+      description: 'The church story, heritage and public leadership.',
       onPress: () => router.push('/general/church-story' as any),
     },
   ].filter(Boolean) as ToolItem[];
@@ -232,6 +232,13 @@ export default function GeneralToolsScreen() {
       description: 'COT Assistant.',
       onPress: () => router.push('/general/assistant'),
     } : null,
+    {
+      key: 'about-cot',
+      label: 'About COT',
+      icon: 'information-circle-outline',
+      description: 'Vision, product story, builder and use cases.',
+      onPress: () => router.push('/general/about-cot' as any),
+    },
     {
       key: 'tour',
       label: 'App Tour',
