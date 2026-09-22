@@ -404,13 +404,14 @@ export function PostCard({
   return (
     <>
       <Pressable
-        onPress={onPress}
+        onPress={resolvedVariant === 'feed' ? undefined : onPress}
         style={({ pressed }) => [
           styles.container,
           resolvedVariant === 'feed' ? styles.feedContainer : null,
           { backgroundColor: colors.card, borderColor: isExpressionPost ? colors.primarySoftStrong : colors.borderSubtle },
           isExpressionPost ? styles.expressionCard : resolvedVariant === 'card' ? styles.publicCard : null,
-          pressed && onPress ? { backgroundColor: colors.pressed } : null,
+          pressed && resolvedVariant !== 'feed' && onPress ? { backgroundColor: colors.pressed } : null,
+          resolvedVariant === 'feed' ? ({ touchAction: 'manipulation' } as ViewStyle) : null,
           style,
         ]}
       >
@@ -487,6 +488,8 @@ export function PostCard({
             <ScrollView
               horizontal
               scrollEnabled={media.length > 1}
+              directionalLockEnabled
+              nestedScrollEnabled
               style={styles.mediaScroller}
               showsHorizontalScrollIndicator={false}
               snapToInterval={media.length > 1 ? mediaCardWidth + 8 : undefined}
@@ -647,7 +650,10 @@ export function PostCard({
               <Pressable onPress={(event) => { event.stopPropagation?.(); router.push('/general/bible' as any); }} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed ? { backgroundColor: colors.primarySoft } : null]} accessibilityRole="button" accessibilityLabel="Open COT Bible"><Icon name="book-outline" size={18} color={colors.textSecondary} /></Pressable>
             </View>
           ) : <View style={styles.guestGroup}><Text style={[styles.guestMeta, { color: colors.textMuted }]}>Sign in to join the conversation</Text>{post.body?.trim() ? <Pressable onPress={(event) => { event.stopPropagation?.(); void handleCopy(); }} style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Copy post text"><Icon name={copied ? 'checkmark-outline' : 'copy-outline'} size={18} color={copied ? colors.interactive : colors.textSecondary} /></Pressable> : null}<Pressable onPress={(event) => { event.stopPropagation?.(); router.push('/general/bible' as any); }} style={styles.actionButton} accessibilityRole="button" accessibilityLabel="Open COT Bible"><Icon name="book-outline" size={18} color={colors.textSecondary} /></Pressable></View>}
-          {internalShareAvailable || allowExternalShare ? <Pressable onPress={(event) => { event.stopPropagation?.(); setShareError(''); setShareOpen(true); }} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed ? { backgroundColor: colors.bgSecondary } : null]} accessibilityRole="button" accessibilityLabel="Share post"><Icon name="share-social-outline" size={18} color={colors.textSecondary} /></Pressable> : <View style={styles.noShareMeta}><Icon name="lock-closed-outline" size={12} color={colors.textMuted} /><Text style={[styles.noShareText, { color: colors.textMuted }]}>Stays here</Text></View>}
+          <View style={styles.trailingActions}>
+            {resolvedVariant === 'feed' && onPress ? <Pressable onPress={(event) => { event.stopPropagation?.(); onPress(); }} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed ? { backgroundColor: colors.bgSecondary } : null]} accessibilityRole="button" accessibilityLabel="Open post"><Icon name="open-outline" size={18} color={colors.textSecondary} /></Pressable> : null}
+            {internalShareAvailable || allowExternalShare ? <Pressable onPress={(event) => { event.stopPropagation?.(); setShareError(''); setShareOpen(true); }} hitSlop={6} style={({ pressed }) => [styles.actionButton, pressed ? { backgroundColor: colors.bgSecondary } : null]} accessibilityRole="button" accessibilityLabel="Share post"><Icon name="share-social-outline" size={18} color={colors.textSecondary} /></Pressable> : <View style={styles.noShareMeta}><Icon name="lock-closed-outline" size={12} color={colors.textMuted} /><Text style={[styles.noShareText, { color: colors.textMuted }]}>Stays here</Text></View>}
+          </View>
         </View>
       </Pressable>
       <BottomSheet
@@ -849,6 +855,7 @@ const styles = StyleSheet.create({
   reelReferenceTitle: { fontSize: 14, lineHeight: 19, fontWeight: '800', marginTop: 2 },
   actionRail: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, minHeight: 46 },
   actionGroup: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  trailingActions: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   guestGroup: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 },
   actionButton: { minWidth: 42, height: 36, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 8 },
   actionCount: { fontSize: 12, fontWeight: '700' },
