@@ -1,6 +1,7 @@
 import { ApiError } from '../errors.ts';
 import { AnthropicProvider } from './anthropic.ts';
+import { CloudflareProvider } from './cloudflare.ts';
 import { GeminiProvider } from './gemini.ts';
 import { OpenAiProvider } from './openai.ts';
-import type{AiProvider } from './types.ts';const adapters:Record<string,AiProvider>={openai:new OpenAiProvider(),gemini:new GeminiProvider(),anthropic:new AnthropicProvider()};
+import type{AiProvider } from './types.ts';const adapters:Record<string,AiProvider>={openai:new OpenAiProvider(),gemini:new GeminiProvider(),anthropic:new AnthropicProvider(),cloudflare:new CloudflareProvider()};
 export function aiProvider(code:string){const provider=adapters[code];if(!provider)throw new ApiError('AI_ADAPTER_UNAVAILABLE',`AI adapter ${code} is not installed`,501,undefined,false);return provider}
