@@ -161,6 +161,8 @@ const platformAi = await readFile('supabase/functions/platform-ai/index.ts', 'ut
 const platformAdminGuide = await readFile('supabase/functions/platform-admin-guide/index.ts', 'utf8');
 const bible = await readFile('supabase/functions/bible/index.ts', 'utf8');
 const aiRouter = await readFile('supabase/functions/_shared/ai/router.ts', 'utf8');
+const aiRegistry = await readFile('supabase/functions/_shared/ai/registry.ts', 'utf8');
+const cloudflareAi = await readFile('supabase/functions/_shared/ai/cloudflare.ts', 'utf8');
 const aiGateway = await readFile('supabase/functions/ai-gateway/index.ts', 'utf8');
 const cotLifeGuidance = await readFile('supabase/functions/_shared/cot-life-guidance.ts', 'utf8');
 const pastoralFollowups = await readFile('supabase/functions/pastoral-followups/index.ts', 'utf8');
@@ -209,6 +211,9 @@ const invariants = [
   [aiGateway, /You serve a Christian church and Christian discipleship:[\s\S]*Jesus Christ is the center[\s\S]*Scripture is the primary authority/, 'COT AI system identity is explicitly Christ-centered and Scripture-grounded'],
   [aiGateway, /christCenteredFaithRule[\s\S]*shared ethics[\s\S]*same doctrine, gospel, salvation, or faith/, 'COT AI does not confuse shared ethics with shared Christian faith'],
   [aiGateway, /When Islam is part of the comparison[\s\S]*without attacking Muslims[\s\S]*theologically interchangeable/, 'COT AI handles Islam comparison briefly, respectfully and from Christian doctrine'],
+  [aiRegistry, /cloudflare:new CloudflareProvider\(\)/, 'generic AI registry includes Cloudflare fallback adapter'],
+  [cloudflareAi, /CLOUDFLARE_ACCOUNT_ID[\s\S]*ai\/run\/[\s\S]*messages/, 'Cloudflare fallback uses existing account secret and chat-completions runtime'],
+  [cloudflareAi, /supports\(capability:[\s\S]*generateText[\s\S]*generateStructuredData/, 'Cloudflare fallback declares supported text capabilities'],
   [aiGateway, /request_pastoral_support[\s\S]*createPastoralAlert[\s\S]*member_requested/, 'COT AI supports explicit member-requested pastoral care'],
   [aiGateway, /self_harm_risk[\s\S]*autoEscalate:\s*true[\s\S]*createPastoralAlert[\s\S]*automatic_safety/, 'COT AI immediate safety signals can trigger transparent pastoral escalation'],
   [cotLifeGuidance, /emotional-distress[\s\S]*Psalm 34:18[\s\S]*anxiety-fear[\s\S]*grief-loss/, 'COT AI curated life guidance includes Scripture-grounded support'],
