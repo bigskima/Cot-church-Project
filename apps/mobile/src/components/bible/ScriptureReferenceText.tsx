@@ -91,14 +91,17 @@ export function ScriptureReferenceText({
 export function ScripturePreviewCard({
   text,
   compact = false,
+  tone = 'default',
 }: {
   text: string;
   compact?: boolean;
+  tone?: 'default' | 'accent';
 }) {
   const matches = useMemo(() => detectScriptureReferences(text, 1), [text]);
   const first = matches[0]?.reference ?? null;
   const [open, setOpen] = useState(false);
   const { colors } = useTheme();
+  const accent = tone === 'accent';
   if (!first) return null;
   return (
     <>
@@ -107,22 +110,25 @@ export function ScripturePreviewCard({
         style={({ pressed }) => [
           styles.previewButton,
           compact && styles.previewButtonCompact,
-          { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle },
+          {
+            backgroundColor: accent ? 'rgba(4, 16, 29, 0.24)' : colors.primarySoft,
+            borderColor: accent ? 'rgba(255,255,255,0.24)' : colors.borderSubtle,
+          },
           pressed && { opacity: 0.8 },
         ]}
       >
-        <View style={[styles.previewIcon, { backgroundColor: colors.card }]}>
-          <Icon name="book-outline" size={16} color={colors.interactive} />
+        <View style={[styles.previewIcon, { backgroundColor: accent ? 'rgba(4,16,29,0.48)' : colors.card }]}>
+          <Icon name="book-outline" size={16} color={accent ? '#FFFFFF' : colors.interactive} />
         </View>
         <View style={styles.previewCopy}>
-          <Text style={[styles.previewKicker, { color: colors.interactive }]}>SCRIPTURE REFERENCE</Text>
-          <Text style={[styles.previewReference, { color: colors.text }]} numberOfLines={1}>{first}</Text>
-          <Text style={[styles.previewHint, { color: colors.textMuted }]} numberOfLines={1}>
+          <Text style={[styles.previewKicker, { color: accent ? 'rgba(255,255,255,0.76)' : colors.interactive }]}>SCRIPTURE REFERENCE</Text>
+          <Text style={[styles.previewReference, { color: accent ? '#FFFFFF' : colors.text }]} numberOfLines={1}>{first}</Text>
+          <Text style={[styles.previewHint, { color: accent ? 'rgba(255,255,255,0.68)' : colors.textMuted }]} numberOfLines={1}>
             {/\:\d/.test(first) ? 'Preview this exact passage' : 'Preview this chapter'}
           </Text>
         </View>
-        <Text style={[styles.previewAction, { color: colors.interactive }]}>Open</Text>
-        <Icon name="chevron-forward" size={15} color={colors.interactive} />
+        <Text style={[styles.previewAction, { color: accent ? '#FFFFFF' : colors.interactive }]}>Open</Text>
+        <Icon name="chevron-forward" size={15} color={accent ? '#FFFFFF' : colors.interactive} />
       </Pressable>
       <ScripturePreviewSheet reference={open ? first : null} onClose={() => setOpen(false)} />
     </>
