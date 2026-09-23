@@ -319,6 +319,8 @@ const styles = StyleSheet.create({
   queueSection: { gap: spacing.sm },
   scopeTabs: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.xs },
   triageCard: { padding: spacing.md, borderRadius: radius.xl, borderWidth: 1, marginBottom: spacing.sm, gap: spacing.sm },
+  aiContextCard: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm, gap: 5 },
+  aiContextLabel: { fontSize: 9, lineHeight: 13, fontWeight: '900', letterSpacing: 0.6 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   dateText: { fontSize: 11 },
   title: { fontSize: 15, fontWeight: '800', letterSpacing: -0.15 },
