@@ -313,23 +313,128 @@ export function NotificationsExperience({ forcedExpressionId, onRespondInvitatio
 
           {activeView === 'updates' ? (
             <View style={styles.section}>
-              <SectionHeader title={forcedExpressionId ? 'Expression updates' : scope === 'expression' ? 'Expression updates' : 'General COT updates'} badge={scopedNotifications.length} subtitle={unread.length ? `${unread.length} unread` : 'You are all caught up'} />
-              {notifications.loading ? <Skeleton height={94} count={4} /> : notifications.error && !notifications.data ? <ResourceError message={notifications.error} retry={notifications.refresh} /> : scopedNotifications.length ? scopedNotifications.map((item) => {
-                const branchId = typeof item.data?.branchId === 'string' ? item.data.branchId : null;
-                const hasRoute = Boolean(inferredRoute(item));
-                return (
-                  <Pressable key={item.id} onPress={() => void openNotification(item)} disabled={busyNotificationId === item.id} style={({ pressed }) => [styles.notice, { backgroundColor: colors.card, borderColor: item.read_at ? colors.borderSubtle : colors.interactive }, shadows.sm, pressed && styles.pressed]} accessibilityRole="button">
-                    <View style={[styles.noticeIcon, { backgroundColor: item.read_at ? colors.bgSecondary : colors.primarySoft }]}><Icon name={item.type.includes('prayer') ? 'heart-outline' : item.type.includes('testimon') ? 'sparkles-outline' : item.type.includes('event') ? 'calendar-outline' : item.type.includes('announcement') ? 'megaphone-outline' : 'notifications-outline'} size={18} color={item.read_at ? colors.textMuted : colors.interactive} /></View>
-                    <View style={styles.flex}>
-                      <View style={styles.noticeTitleRow}><Text style={[styles.noticeTitle, { color: colors.text }]}>{item.title}</Text>{!item.read_at ? <View style={[styles.dot, { backgroundColor: colors.interactive }]} /> : null}</View>
-                      {branchId ? <Text style={[styles.scopeLabel, { color: colors.interactive }]}>{expressionName(branchId)}</Text> : <Text style={[styles.scopeLabel, { color: colors.textMuted }]}>General COT</Text>}
-                      <Text style={[styles.noticeBody, { color: colors.textSecondary }]}>{item.body}</Text>
-                      <Text style={[styles.noticeMeta, { color: colors.textMuted }]}>{new Date(item.created_at).toLocaleString()}{hasRoute ? ' · Tap to open' : !item.read_at ? ' · Tap to mark read' : ''}</Text>
-                    </View>
-                    {hasRoute ? <Icon name="chevron-forward" size={17} color={colors.textMuted} /> : null}
-                  </Pressable>
-                );
-              }) : <EmptyState title={scope === 'expression' ? 'No Expression notifications' : 'No General notifications'} message={scope === 'expression' ? 'Expression announcements, events, prayer and testimony activity will appear here.' : 'General COT announcements, events and account activity will appear here.'} iconName="notifications-off-outline" />}
+              <SectionHeader
+                title={forcedExpressionId ? 'Expression updates' : scope === 'expression' ? 'Expression updates' : 'General COT updates'}
+                badge={notificationTotal}
+                subtitle={unreadCount ? `${unreadCount} unread` : 'You are all caught up'}
+              />
+
+              {notificationTotal > 0 ? (
+                <View style={styles.inboxControls}>
+                  <Text style={[styles.loadedCount, { color: colors.textMuted }]}>
+                    Showing {scopedNotifications.length} of {notificationTotal}
+                  </Text>
+                  {unreadCount > 0 ? (
+                    <Button
+                      label="Mark all as read"
+                      variant="outline"
+                      size="sm"
+                      loading={markingAllRead}
+                      onPress={() => void markAllRead()}
+                    />
+                  ) : null}
+                </View>
+              ) : null}
+
+              {notifications.loading ? (
+                <Skeleton height={94} count={4} />
+              ) : notifications.error && !notifications.data ? (
+                <ResourceError message={notifications.error} retry={notifications.refresh} />
+              ) : scopedNotifications.length ? (
+                <>
+                  {scopedNotifications.map((item) => {
+                    const branchId = typeof item.data?.branchId === 'string' ? item.data.branchId : null;
+                    const hasRoute = Boolean(inferredRoute(item));
+                    const expanded = expandedIds.has(item.id);
+                    const longBody = item.body.trim().length > 140;
+                    return (
+                      <View
+                        key={item.id}
+                        style={[
+                          styles.notice,
+                          { backgroundColor: colors.card, borderColor: item.read_at ? colors.borderSubtle : colors.interactive },
+                          shadows.sm,
+                        ]}
+                      >
+                        <Pressable
+                          onPress={() => void openNotification(item)}
+                          disabled={busyNotificationId === item.id}
+                          style={({ pressed }) => [styles.noticeMain, pressed && styles.pressed]}
+                          accessibilityRole="button"
+                          accessibilityLabel={hasRoute ? `Open notification: ${item.title}` : `Notification: ${item.title}`}
+                        >
+                          <View style={[styles.noticeIcon, { backgroundColor: item.read_at ? colors.bgSecondary : colors.primarySoft }]}>
+                            <Icon
+                              name={item.type.includes('prayer') ? 'heart-outline' : item.type.includes('testimon') ? 'sparkles-outline' : item.type.includes('event') ? 'calendar-outline' : item.type.includes('announcement') ? 'megaphone-outline' : 'notifications-outline'}
+                              size={18}
+                              color={item.read_at ? colors.textMuted : colors.interactive}
+                            />
+                          </View>
+                          <View style={styles.flex}>
+                            <View style={styles.noticeTitleRow}>
+                              <Text style={[styles.noticeTitle, { color: colors.text }]}>{item.title}</Text>
+                              {!item.read_at ? <View style={[styles.dot, { backgroundColor: colors.interactive }]} /> : null}
+                            </View>
+                            {branchId ? (
+                              <Text style={[styles.scopeLabel, { color: colors.interactive }]}>{expressionName(branchId)}</Text>
+                            ) : (
+                              <Text style={[styles.scopeLabel, { color: colors.textMuted }]}>General COT</Text>
+                            )}
+                            <Text
+                              style={[styles.noticeBody, { color: colors.textSecondary }]}
+                              numberOfLines={expanded ? undefined : 2}
+                            >
+                              {item.body}
+                            </Text>
+                            <Text style={[styles.noticeMeta, { color: colors.textMuted }]}>
+                              {new Date(item.created_at).toLocaleString()}{hasRoute ? ' · Open' : ''}
+                            </Text>
+                          </View>
+                          {hasRoute ? <Icon name="chevron-forward" size={17} color={colors.textMuted} /> : null}
+                        </Pressable>
+
+                        {(!item.read_at || longBody) ? (
+                          <View style={[styles.noticeActions, { borderTopColor: colors.borderSubtle }]}>
+                            {!item.read_at ? (
+                              <Pressable
+                                onPress={() => void markRead(item)}
+                                disabled={busyNotificationId === item.id}
+                                hitSlop={6}
+                              >
+                                <Text style={[styles.noticeActionText, { color: colors.interactive }]}>Mark as read</Text>
+                              </Pressable>
+                            ) : null}
+                            {longBody ? (
+                              <Pressable onPress={() => toggleExpanded(item.id)} hitSlop={6}>
+                                <Text style={[styles.noticeActionText, { color: colors.textSecondary }]}>
+                                  {expanded ? 'Show less' : 'Show more'}
+                                </Text>
+                              </Pressable>
+                            ) : null}
+                          </View>
+                        ) : null}
+                      </View>
+                    );
+                  })}
+
+                  {hasMoreNotifications ? (
+                    <Button
+                      label="Show more notifications"
+                      variant="outline"
+                      loading={loadingMore}
+                      onPress={() => void loadMoreNotifications()}
+                    />
+                  ) : notificationItems.length > 20 ? (
+                    <Text style={[styles.endOfList, { color: colors.textMuted }]}>You’ve reached the end of this inbox.</Text>
+                  ) : null}
+                </>
+              ) : (
+                <EmptyState
+                  title={scope === 'expression' ? 'No Expression notifications' : 'No General notifications'}
+                  message={scope === 'expression' ? 'Expression announcements, events, prayer and testimony activity will appear here.' : 'General COT announcements, events and account activity will appear here.'}
+                  iconName="notifications-off-outline"
+                />
+              )}
             </View>
           ) : null}
 
@@ -357,6 +462,7 @@ const styles = StyleSheet.create({
   scopeCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm }, scopeTitle: { fontSize: 16, fontWeight: '900' }, scopeText: { fontSize: 11.5, lineHeight: 17 }, scopeTabs: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   segmented: { borderWidth: 1, borderRadius: radius.xl, padding: 4, flexDirection: 'row', gap: 4 }, segment: { flex: 1, minHeight: 42, borderWidth: 1, borderColor: 'transparent', borderRadius: radius.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 }, segmentText: { fontSize: 10.5, fontWeight: '800' }, count: { minWidth: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 }, countText: { fontSize: 9, fontWeight: '900' },
   message: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, messageText: { flex: 1, fontSize: 11.5, lineHeight: 17 }, section: { gap: spacing.sm },
-  notice: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, noticeIcon: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, noticeTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 }, noticeTitle: { flexShrink: 1, fontSize: 13, lineHeight: 18, fontWeight: '900' }, dot: { width: 7, height: 7, borderRadius: 4 }, scopeLabel: { fontSize: 9.5, fontWeight: '800', marginTop: 1 }, noticeBody: { fontSize: 11.5, lineHeight: 17, marginTop: 4 }, noticeMeta: { fontSize: 9.5, lineHeight: 14, marginTop: 6 }, pressed: { opacity: 0.8 },
+  inboxControls: { minHeight: 40, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm }, loadedCount: { fontSize: 10.5, fontWeight: '700' },
+  notice: { borderWidth: 1, borderRadius: radius.xl, overflow: 'hidden' }, noticeMain: { padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, noticeIcon: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, noticeTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 }, noticeTitle: { flexShrink: 1, fontSize: 13, lineHeight: 18, fontWeight: '900' }, dot: { width: 7, height: 7, borderRadius: 4 }, scopeLabel: { fontSize: 9.5, fontWeight: '800', marginTop: 1 }, noticeBody: { fontSize: 11.5, lineHeight: 17, marginTop: 4 }, noticeMeta: { fontSize: 9.5, lineHeight: 14, marginTop: 6 }, noticeActions: { minHeight: 38, borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: spacing.lg }, noticeActionText: { fontSize: 10.5, fontWeight: '800' }, endOfList: { fontSize: 10.5, textAlign: 'center', paddingVertical: spacing.sm }, pressed: { opacity: 0.8 },
   inviteCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm }, inviteTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, inviteIcon: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, inviteTitle: { fontSize: 12.5, fontWeight: '900' }, inviteMeta: { fontSize: 9.5, lineHeight: 14, marginTop: 2 }, inviteBody: { fontSize: 11.5, lineHeight: 17 }, actions: { flexDirection: 'row', justifyContent: 'flex-end', flexWrap: 'wrap', gap: spacing.sm }, historyRow: { minHeight: 60, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
 });
