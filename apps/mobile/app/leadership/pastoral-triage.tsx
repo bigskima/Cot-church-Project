@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Redirect, usePathname } from 'expo-router';
 import { useSession } from '@/state/session';
@@ -79,6 +79,7 @@ export default function PastoralTriageScreen() {
   );
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
+  const [expandedAiId, setExpandedAiId] = useState<string | null>(null);
 
   useEffect(() => {
     if (ministryScope === 'expression' && !canUseExpressionScope && canUseGeneralScope) {
@@ -280,10 +281,27 @@ export default function PastoralTriageScreen() {
                         <Badge label={f.source === 'ai' ? `COT AI · ${(f.severity || 'support').toUpperCase()}` : f.type.replaceAll('_', ' ').toUpperCase()} variant={f.requires_immediate_attention ? 'warning' : 'primary'} />
                         <Text style={[styles.dateText, { color: colors.textMuted }]}>{new Date(f.created_at).toLocaleDateString()}</Text>
                       </View>
-                      <Text style={[styles.title, { color: colors.text }]}>{f.user_name || 'Church Participant'}</Text>
-                      {f.user_username ? <Text style={[styles.bodyText, { color: colors.textMuted }]}>@{f.user_username}</Text> : null}
+                      <View style={styles.identityRow}>
+                        <View style={styles.identityCopy}>
+                          <Text style={[styles.aiContextLabel, { color: colors.textMuted }]}>FULL NAME</Text>
+                          <Text style={[styles.title, { color: colors.text }]}>{f.user_name || 'Church Participant'}</Text>
+                          {f.user_username ? <Text style={[styles.bodyText, { color: colors.textMuted }]}>@{f.user_username}</Text> : null}
+                        </View>
+                        {f.source === 'ai' ? <Badge label={f.source_mode === 'automatic_safety' ? 'AUTOMATIC SAFETY' : 'MEMBER REQUEST'} variant={f.requires_immediate_attention ? 'warning' : 'neutral'} /> : null}
+                      </View>
                       {f.source === 'ai' && f.summary ? <Text style={[styles.bodyText, { color: colors.textSecondary }]}>{f.summary}</Text> : null}
-                      {f.source === 'ai' && f.last_member_message ? <View style={[styles.aiContextCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Text style={[styles.aiContextLabel, { color: colors.textMuted }]}>LATEST MEMBER MESSAGE</Text><Text style={[styles.bodyText, { color: colors.text }]}>{f.last_member_message}</Text></View> : null}
+                      {f.source === 'ai' && f.last_member_message ? <View style={[styles.aiContextCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+                        <Text style={[styles.aiContextLabel, { color: colors.textMuted }]}>LATEST MEMBER MESSAGE</Text>
+                        <Text style={[styles.bodyText, { color: colors.text }]}>{f.last_member_message}</Text>
+                        {f.conversation_excerpt && f.conversation_excerpt !== f.last_member_message ? (
+                          <>
+                            <Pressable onPress={() => setExpandedAiId((current) => current === f.id ? null : f.id)} style={styles.contextToggle}>
+                              <Text style={[styles.contextToggleText, { color: colors.interactive }]}>{expandedAiId === f.id ? 'Hide conversation context' : 'View conversation context'}</Text>
+                            </Pressable>
+                            {expandedAiId === f.id ? <Text style={[styles.conversationText, { color: colors.textSecondary }]}>{f.conversation_excerpt}</Text> : null}
+                          </>
+                        ) : null}
+                      </View> : null}
                       {f.stream_title ? <Text style={[styles.bodyText, { color: colors.textSecondary }]}>From: {f.stream_title}</Text> : null}
                       {f.user_phone ? <Text style={[styles.bodyText, { color: colors.interactive }]}>{f.user_phone}</Text> : null}
                       {f.private_note ? <Text style={[styles.bodyText, { color: colors.textSecondary }]}>{f.private_note}</Text> : null}
@@ -321,6 +339,11 @@ const styles = StyleSheet.create({
   triageCard: { padding: spacing.md, borderRadius: radius.xl, borderWidth: 1, marginBottom: spacing.sm, gap: spacing.sm },
   aiContextCard: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm, gap: 5 },
   aiContextLabel: { fontSize: 9, lineHeight: 13, fontWeight: '900', letterSpacing: 0.6 },
+  identityRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
+  identityCopy: { flex: 1, minWidth: 0, gap: 2 },
+  contextToggle: { alignSelf: 'flex-start', paddingVertical: 4 },
+  contextToggleText: { fontSize: 11, fontWeight: '800' },
+  conversationText: { fontSize: 12, lineHeight: 18, paddingTop: 3 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   dateText: { fontSize: 11 },
   title: { fontSize: 15, fontWeight: '800', letterSpacing: -0.15 },
