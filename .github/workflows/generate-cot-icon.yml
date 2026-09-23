@@ -34,6 +34,7 @@ jobs:
           target = "apps/mobile/assets/cot-family-logo.png"
           image = Image.open(source).convert("RGB")
           image = image.resize((1024, 1024), Image.Resampling.LANCZOS)
+          image = image.quantize(colors=256, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.FLOYDSTEINBERG)
           image.save(target, format="PNG", optimize=True)
           with open(target, "rb") as handle:
               signature = handle.read(8)
