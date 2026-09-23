@@ -156,6 +156,9 @@ const retiredSearch = await readFile('supabase/functions/search/index.ts', 'utf8
 const platformPayments = await readFile('supabase/functions/platform-payments/index.ts', 'utf8');
 const platformStreaming = await readFile('supabase/functions/platform-streaming/index.ts', 'utf8');
 const platformAi = await readFile('supabase/functions/platform-ai/index.ts', 'utf8');
+const aiGateway = await readFile('supabase/functions/ai-gateway/index.ts', 'utf8');
+const pastoralFollowups = await readFile('supabase/functions/pastoral-followups/index.ts', 'utf8');
+const aiPastoralMigration = await readFile('supabase/migrations/20260923012500_ai_pastoral_safety_alerts.sql', 'utf8');
 const platformAdminGuide = await readFile('supabase/functions/platform-admin-guide/index.ts', 'utf8');
 const bible = await readFile('supabase/functions/bible/index.ts', 'utf8');
 const aiRouter = await readFile('supabase/functions/_shared/ai/router.ts', 'utf8');
@@ -204,6 +207,12 @@ const invariants = [
   [adminShell, /key: 'bible'[\s\S]*label: 'Bible Experience'[\s\S]*platform\.bible\.read/, 'Platform Administration exposes dedicated Bible navigation'],
   [adminBiblePage, /WEB \(World English Bible\)[\s\S]*disabled[\s\S]*not shown to members/, 'Bible administration explains WEB retirement'],
   [adminBiblePage, /Set default/, 'Bible administration supports selecting the platform default translation'],
+  [aiGateway, /classifyMemberConcern[\s\S]*request_pastoral_care[\s\S]*urgent_safety/, 'COT AI separates consented pastoral care from urgent safety escalation'],
+  [aiGateway, /Never reveal, reconstruct, guess, request, or claim access to passwords[\s\S]*administrator secrets/, 'COT AI explicitly protects credentials and secrets'],
+  [aiGateway, /pastoralSafetyInstruction[\s\S]*Scripture references/, 'COT AI has compassionate life-support and Scripture guidance'],
+  [aiPastoralMigration, /ai_pastoral_alerts[\s\S]*can_receive_pastoral_followups[\s\S]*route_ai_pastoral_alert/, 'AI pastoral alerts use exact pastoral scope and routing'],
+  [pastoralFollowups, /ai_pastoral_alerts[\s\S]*source: "ai"/, 'Pastoral follow-up API exposes AI alerts only through pastoral access'],
+
   [socialChatContracts, /organization:\s*"none"/, 'direct chat is independent of Expression membership context'],
   [socialChatContracts, /group_memberships[\s\S]*group_messages/, 'Group chat remains a separate membership-scoped conversation'],
   [socialChatContracts, /targetProfileId|target_profile_id/, 'individual member follow target contract'],
