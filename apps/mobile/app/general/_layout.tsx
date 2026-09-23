@@ -22,7 +22,9 @@ function PrimaryGeneralTabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const bottomInset = Math.max(insets.bottom, Platform.OS === 'web' ? 9 : 7);
-  const tabWidth = Math.min(Math.max(width - 16, 280), 620);
+  const tabWidth = Platform.OS === 'web'
+    ? width
+    : Math.min(Math.max(width - 16, 280), 620);
   const routes = state.routes.filter((route: any) => PRIMARY_TAB_NAMES.includes(route.name));
 
   return (
@@ -205,7 +207,15 @@ const styles = StyleSheet.create({
   iconShell: { minWidth: 42, height: 31, borderRadius: 13, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 9 },
   activeDot: { width: 4, height: 4, borderRadius: 2 },
   tabBar: { marginBottom: 10, maxWidth: 620, alignSelf: 'center', borderWidth: 1, borderRadius: 28, overflow: 'hidden', paddingHorizontal: 4, paddingTop: 5 },
-  tabBarWeb: { marginBottom: 0 },
+  tabBarWeb: {
+    marginBottom: 0,
+    maxWidth: '100%',
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    borderLeftWidth: 0,
+    borderRightWidth: 0,
+    borderBottomWidth: 0,
+  },
   tabItems: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-around' },
   customTabItem: { flex: 1, minHeight: 58, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 2 },
   pressedTab: { opacity: 0.72, transform: [{ scale: 0.97 }] },
