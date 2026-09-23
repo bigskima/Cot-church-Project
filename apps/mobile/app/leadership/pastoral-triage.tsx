@@ -183,7 +183,7 @@ export default function PastoralTriageScreen() {
           <ScreenHeader
             title="Pastoral Care"
             kicker="LEADERSHIP"
-            subtitle="Prayer and live-service follow-up stay within the church or Expression you are responsible for."
+            subtitle="Prayer, live-service follow-up and confidential COT AI care alerts stay within the church or Expression you are responsible for."
             showBack
           />
         </View>
@@ -194,7 +194,7 @@ export default function PastoralTriageScreen() {
               <Chip label="Prayer Requests" selected={activeQueue === 'prayer'} onPress={() => setActiveQueue('prayer')} count={prayerList.length} />
             ) : null}
             {canReceiveFollowups ? (
-              <Chip label="Altar & Care Responses" selected={activeQueue === 'care'} onPress={() => setActiveQueue('care')} count={careList.length} />
+              <Chip label="Care & AI Alerts" selected={activeQueue === 'care'} onPress={() => setActiveQueue('care')} count={careList.length} />
             ) : null}
           </View>
         ) : null}
@@ -298,7 +298,7 @@ export default function PastoralTriageScreen() {
                   );
                 })
               ) : (
-                <EmptyState title="No Follow-Up Requests" message="Altar responses, counselling requests and other live-service follow-ups routed to this exact scope will appear here." iconName="heart-outline" />
+                <EmptyState title="No Follow-Up Requests" message="Altar responses, counselling requests, live-service follow-ups and confidential COT AI care alerts routed to this exact scope will appear here." iconName="heart-outline" />
               )}
             </View>
           ) : null}
