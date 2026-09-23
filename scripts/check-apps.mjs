@@ -554,6 +554,7 @@ const boundaryChecks = [
   [guideLinksUi, /1tzW_4eU9yDzKHGjey4dxcUbMRPnRyThP-TtY0B2dD2M[\s\S]*Read the COT App Member Guide/, 'member help opens only the COT Member Guide'],
   [guideLinksUi, /13AM5RK4CuJffYe9zIF2iew1VWBneg7YrskL4dNh23hU[\s\S]*Open the COT App Ministry Roles and Operations Guide/, 'ministry workspaces open the role-specific Ministry Guide'],
   [guideLinksUi, /17SeNvbifGeuAL7pV-2TkbnZ_ZGr1S-GI0U5ZdPH4XLw[\s\S]*Open the COT App Platform Administration Guide/, 'platform shell opens the role-specific Platform Administration Guide'],
+  [guideLinksUi, /1XgrisdEnrkVJkYZ4bTfH04OGaQyavnDmRNTIv1AmrmA[\s\S]*Costs & services/, 'platform shell opens the COT integrations and production cost overview'],
 ];
 
 const forbiddenGivingPatterns = [
