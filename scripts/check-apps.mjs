@@ -31,6 +31,9 @@ const files = [
   'apps/mobile/app/general/comments/[contentId].tsx',
   'apps/mobile/app/general/giving.tsx',
   'apps/mobile/app/general/prayer.tsx',
+  'apps/mobile/app/assistant.tsx',
+  'apps/mobile/app/leadership/pastoral-triage.tsx',
+  'apps/mobile/src/features/general/GeneralPastoralCareExperience.tsx',
   'apps/mobile/app/general/leadership/index.tsx',
   'apps/mobile/app/general/leadership/roles-access.tsx',
   'apps/mobile/app/general/leadership/titles-badges.tsx',
@@ -498,6 +501,10 @@ const checks = [
   [/General conversation[\s\S]*Public COT post, reactions and replies in one thread/, 'General post detail uses a dedicated conversation identity'],
   [/title=\{expressionMode \? 'Expression conversation' : 'Conversation'\}[\s\S]*Join the public COT discussion/, 'full-screen comments distinguish General and private Expression conversations'],
   [/public-content\?type=series-detail&id=/, 'exact sermon series detail request'],
+  [/ScripturePreviewCard[\s\S]*Request pastoral care/, 'COT AI renders Scripture previews and a consented pastoral care action'],
+  [/urgentAlertSent[\s\S]*restricted alert was sent/, 'COT AI visibly discloses urgent pastoral safety escalation'],
+  [/COT AI safety alert[\s\S]*@\{f\.username\}/, 'pastoral triage shows AI alert identity and safety context'],
+
   [/No published messages/, 'empty sermon series state'],
   [/EXPRESSION_MEMBERSHIP_REQUIRED/, 'not-a-member state mapping'],
 ];
