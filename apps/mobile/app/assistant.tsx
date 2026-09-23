@@ -17,6 +17,7 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { Badge, Button, Chip, Icon, ScreenHeader, Skeleton } from '@/components';
 import { ReadAloudRateControl, useReadAloudRate } from '@/components/ReadAloudRateControl';
+import { ScripturePreviewCard } from '@/components/bible/ScriptureReferenceText';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { PLATFORM_KEYBOARD_BEHAVIOR, PLATFORM_KEYBOARD_DISMISS_MODE, PLATFORM_KEYBOARD_VERTICAL_OFFSET } from '@/utils/keyboard';
 
@@ -27,12 +28,23 @@ type AssistantAction = {
   description?: string;
 };
 
+type PastoralCareMeta = {
+  supportSuggested?: boolean;
+  requestAvailable?: boolean;
+  urgentAlertSent?: boolean;
+  alertRouted?: boolean;
+  riskLevel?: 'high' | 'support' | 'none';
+  requested?: boolean;
+};
+
 type Message = {
   id: string;
   role: 'user' | 'assistant';
   text: string;
   pending?: boolean;
   actions?: AssistantAction[];
+  pastoralCare?: PastoralCareMeta;
+  pastoralSourceMessage?: string;
 };
 
 type AiReadiness = {
@@ -282,6 +294,29 @@ export function AssistantScreen() {
     speakChunk(0);
   };
 
+  async function requestPastoralCare(message: Message) {
+    const source = message.pastoralSourceMessage?.trim();
+    if (!source || message.pastoralCare?.requested) return;
+    setError('');
+    setMessages((previous) => previous.map((item) => item.id === message.id
+      ? { ...item, pastoralCare: { ...item.pastoralCare, requestAvailable: false } }
+      : item));
+    try {
+      const result = await api.request<{ pastoralCare?: { requested?: boolean; routed?: boolean } }>('ai-gateway', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'request_pastoral_care', userMessage: source }),
+      });
+      setMessages((previous) => previous.map((item) => item.id === message.id
+        ? { ...item, pastoralCare: { ...item.pastoralCare, requested: true, requestAvailable: false, alertRouted: result.pastoralCare?.routed ?? false } }
+        : item));
+    } catch (value) {
+      setMessages((previous) => previous.map((item) => item.id === message.id
+        ? { ...item, pastoralCare: { ...item.pastoralCare, requestAvailable: true } }
+        : item));
+      setError(value instanceof Error ? value.message : 'We couldn’t send your pastoral care request right now.');
+    }
+  }
+
   async function handleSend(customPrompt?: string) {
     const promptToSend = (customPrompt || text).trim();
     if (!promptToSend || loading || !readiness?.ready) return;
@@ -311,9 +346,9 @@ export function AssistantScreen() {
     setLoading(true);
 
     try {
-      const result = await api.request<{ content?: unknown; text?: string; response?: string }>('ai-gateway', {
+      const result = await api.request<{ content?: unknown; text?: string; response?: string; pastoralCare?: PastoralCareMeta }>('ai-gateway', {
         method: 'POST',
-        body: JSON.stringify({ capability: 'assistant.answer', prompt: contextualPrompt }),
+        body: JSON.stringify({ capability: 'assistant.answer', prompt: contextualPrompt, userMessage: promptToSend }),
       });
       const responseText =
         typeof result.content === 'string'
@@ -321,7 +356,9 @@ export function AssistantScreen() {
           : result.content !== undefined
             ? JSON.stringify(result.content)
             : result.text || result.response || 'I am currently unable to retrieve an answer.';
-      setMessages((previous) => previous.map((item) => item.id === pendingMsg.id ? { ...item, text: responseText, pending: false, actions } : item));
+      setMessages((previous) => previous.map((item) => item.id === pendingMsg.id
+        ? { ...item, text: responseText, pending: false, actions, pastoralCare: result.pastoralCare, pastoralSourceMessage: promptToSend }
+        : item));
     } catch (value) {
       setMessages((previous) => previous.filter((item) => item.id !== pendingMsg.id));
       setError(value instanceof Error ? value.message : 'The assistant is temporarily unreachable.');
@@ -413,6 +450,29 @@ export function AssistantScreen() {
                 </View>
               </View>
 
+              {!isUser && !item.pending ? <View style={styles.scripturePreviewWrap}><ScripturePreviewCard text={item.text} compact /></View> : null}
+
+              {!isUser && !item.pending && item.pastoralCare?.supportSuggested ? (
+                <View style={[styles.pastoralCard, { backgroundColor: colors.bgSecondary, borderColor: item.pastoralCare.urgentAlertSent ? colors.live : colors.borderSubtle }]}>
+                  <View style={[styles.pastoralIcon, { backgroundColor: item.pastoralCare.urgentAlertSent ? colors.liveSoft : colors.primarySoft }]}>
+                    <Icon name={item.pastoralCare.urgentAlertSent ? 'alert-circle-outline' : 'heart-outline'} size={18} color={item.pastoralCare.urgentAlertSent ? colors.live : colors.interactive} />
+                  </View>
+                  <View style={styles.pastoralCopy}>
+                    <Text style={[styles.pastoralTitle, { color: colors.text }]}>
+                      {item.pastoralCare.urgentAlertSent ? 'Pastoral safety alert sent' : item.pastoralCare.requested ? 'Pastoral care requested' : 'Would you like pastoral care?'}
+                    </Text>
+                    <Text style={[styles.pastoralText, { color: colors.textSecondary }]}>
+                      {item.pastoralCare.urgentAlertSent
+                        ? 'Because your message suggested immediate safety risk, a restricted alert was sent to the pastoral team assigned to this exact church space.'
+                        : item.pastoralCare.requested
+                          ? 'Your request was sent privately to the pastoral team assigned to this exact church space.'
+                          : 'Nothing has been reported. If you choose this, your name, username and this message will be shared privately with the pastoral team assigned to this exact church space.'}
+                    </Text>
+                    {item.pastoralCare.requestAvailable ? <Button label="Request pastoral care" onPress={() => void requestPastoralCare(item)} variant="outline" size="sm" /> : null}
+                  </View>
+                </View>
+              ) : null}
+
               {!isUser && !item.pending ? (
                 <View style={styles.responseTools}>
                   <Pressable onPress={() => void copyResponse(item)} style={({ pressed }) => [styles.responseTool, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Copy AI response">
@@ -487,6 +547,10 @@ const styles = StyleSheet.create({
   markdownBold: { fontWeight: '900' }, markdownItalic: { fontStyle: 'italic' }, markdownCode: { fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }), fontSize: 13 },
   markdownHeading: { fontSize: 15, lineHeight: 21, fontWeight: '900', marginTop: 4 }, markdownHeadingLarge: { fontSize: 18, lineHeight: 24 },
   markdownBulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 }, markdownBullet: { width: 12, fontSize: 17, lineHeight: 21, fontWeight: '900' }, markdownNumber: { minWidth: 20, fontSize: 13, lineHeight: 21, fontWeight: '900' }, markdownBulletBody: { flex: 1 },
+  scripturePreviewWrap: { marginLeft: 40, maxWidth: 520 },
+  pastoralCard: { marginLeft: 40, maxWidth: 520, borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  pastoralIcon: { width: 36, height: 36, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  pastoralCopy: { flex: 1, gap: 6 }, pastoralTitle: { fontSize: 12.5, fontWeight: '900' }, pastoralText: { fontSize: 10.5, lineHeight: 16 },
   responseTools: { marginLeft: 40, flexDirection: 'row', gap: 6, flexWrap: 'wrap' }, responseTool: { minHeight: 32, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 5 }, responseToolText: { fontSize: 10.5, fontWeight: '800' },
   actionList: { marginLeft: 40, gap: 7, maxWidth: 520 },
   routeAction: { minHeight: 54, borderWidth: 1, borderRadius: radius.lg, padding: 9, flexDirection: 'row', alignItems: 'center', gap: 9 },
