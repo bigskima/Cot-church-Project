@@ -45,6 +45,11 @@ for each row execute function public.set_updated_at();
 
 alter table public.ai_pastoral_alerts enable row level security;
 
+-- Keep the confidential alert table out of anonymous access and restrict authenticated
+-- users to the two operations protected by exact-scope RLS below.
+revoke all on table public.ai_pastoral_alerts from anon, authenticated;
+grant select, update on table public.ai_pastoral_alerts to authenticated;
+
 drop policy if exists ai_pastoral_alerts_pastoral_read on public.ai_pastoral_alerts;
 create policy ai_pastoral_alerts_pastoral_read
 on public.ai_pastoral_alerts for select to authenticated
@@ -68,7 +73,7 @@ language sql
 stable
 security definer
 set search_path=''
-as $
+as $$
   select count(distinct m.profile_id)::integer
   from public.memberships m
   join public.role_assignments ra
@@ -85,7 +90,7 @@ as $
       or
       (target_branch_id is not null and ra.branch_id=target_branch_id)
     );
-$;
+$$;
 
 revoke all on function public.ai_pastoral_recipient_count(uuid,uuid) from public, anon, authenticated;
 grant execute on function public.ai_pastoral_recipient_count(uuid,uuid) to service_role;
@@ -153,6 +158,9 @@ begin
   return new;
 end;
 $$;
+
+-- Trigger helper is internal-only; do not expose this SECURITY DEFINER function as an RPC.
+revoke all on function public.notify_ai_pastoral_alert() from public, anon, authenticated;
 
 drop trigger if exists ai_pastoral_alert_notify on public.ai_pastoral_alerts;
 create trigger ai_pastoral_alert_notify
