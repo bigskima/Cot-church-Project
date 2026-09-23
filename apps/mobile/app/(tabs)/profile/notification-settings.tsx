@@ -29,6 +29,18 @@ type NotificationPreferences = {
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
+function clockDate(value: string) {
+  if (!TIME_PATTERN.test(value)) return null;
+  const [hours, minutes] = value.split(':').map(Number);
+  const date = new Date();
+  date.setHours(hours, minutes, 0, 0);
+  return date;
+}
+
+function formatClock(date: Date) {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
 export default function NotificationSettingsScreen() {
   const insets = useSafeAreaInsets();
   const { api, mode, context } = useSession();
