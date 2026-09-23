@@ -309,7 +309,7 @@ export function AssistantScreen() {
 
   const cycleSpeechRate = () => {
     const currentIndex = READ_ALOUD_RATES.indexOf(speechRate);
-    const nextRate = READ_ALOUD_RATES[(currentIndex + 1) % READ_ALOUD_RATES.length];
+    const nextRate = READ_ALOUD_RATES[(currentIndex + 1) % READ_ALOUD_RATES.length] ?? 1;
     setSpeechRate(nextRate);
   };
 
