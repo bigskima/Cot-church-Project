@@ -44,6 +44,7 @@ const files = [
   'apps/mobile/app/general/tour.tsx',
   'apps/mobile/src/features/general/GeneralRolesAccessExperience.tsx',
   'apps/mobile/src/features/notifications/NotificationsExperience.tsx',
+  'apps/mobile/src/features/bible/bible-share-card-runtime.ts',
   'apps/mobile/src/features/expression-management/ExpressionIdentityBadgesExperience.tsx',
   'apps/mobile/src/services/action-feedback.ts',
   'apps/mobile/app/general/studio/index.tsx',
@@ -195,6 +196,14 @@ for (const legacyAsset of ['apps/mobile/assets/icon.png']) {
 }
 
 const joined = [...sources.values()].join('\n');
+const bibleShareCardRuntime = sources.get('apps/mobile/src/features/bible/bible-share-card-runtime.ts') ?? '';
+if (/Image\.resolveAssetSource\s*\(/.test(bibleShareCardRuntime)) {
+  throw new Error('Application check failed: Scripture card web path must not depend on React Native Image.resolveAssetSource');
+}
+if (!/Asset\.fromModule/.test(bibleShareCardRuntime) || !/bundledCotLogoUri/.test(bibleShareCardRuntime)) {
+  throw new Error('Application check failed: Scripture card must resolve the bundled COT logo through Expo Asset');
+}
+
 const givingUi = [
   sources.get('apps/mobile/src/features/giving/GivingScreen.tsx') ?? '',
   sources.get('apps/mobile/app/(tabs)/profile/leadership/giving-manage.tsx') ?? '',
