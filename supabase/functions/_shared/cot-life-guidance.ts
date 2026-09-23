@@ -9,6 +9,19 @@ export type CotLifeGuidanceTopic = {
 
 export const COT_LIFE_GUIDANCE: CotLifeGuidanceTopic[] = [
   {
+    id: "self-harm-crisis",
+    title: "Suicidal thoughts, self-harm and immediate safety",
+    keywords: ["suicidal","kill myself","end my life","take my life","take my own life","want to die","self-harm","self harm","hurt myself","no reason to live"],
+    guidance: [
+      "Treat this as an immediate safety issue before ordinary encouragement.",
+      "COT is based in Nigeria. Unless the member explicitly says they are in another country, use Nigeria as the emergency context and direct immediate emergencies to 112. Do not default to U.S., U.K. or other foreign crisis hotlines or service numbers.",
+      "Encourage the person not to stay alone, to stay with a trusted person who can physically reach them, and to move away from anything they could use to hurt themselves.",
+      "Offer brief Bible-grounded hope without implying that Scripture, prayer or pastoral care replaces emergency or professional help."
+    ],
+    scriptureReferences: ["Psalm 34:18","Psalm 46:1","Matthew 11:28","Romans 8:38-39"],
+    humanSupport: "For immediate danger in Nigeria, call 112 and involve a trusted person who can physically reach the member. Pastoral care is additional support."
+  },
+  {
     id: "emotional-distress",
     title: "Depression, sadness, hopelessness and emotional overwhelm",
     keywords: ["depressed","depression","sad","hopeless","overwhelmed","breaking down","cannot cope","can't cope","empty","exhausted emotionally"],
