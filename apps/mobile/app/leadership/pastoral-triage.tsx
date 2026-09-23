@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Redirect, usePathname } from 'expo-router';
 import { useSession } from '@/state/session';
@@ -29,10 +29,20 @@ type RoutedPrayer = PrayerRequest & {
   is_publicly_visible?: boolean;
 };
 type CareFollowUp = LiveFollowUp & {
+  source?: 'live' | 'ai';
   branch_id?: string | null;
   stream_title?: string | null;
   user_phone?: string | null;
+  user_username?: string | null;
   user_avatar?: string | null;
+  care_category?: string | null;
+  severity?: 'support' | 'elevated' | 'urgent' | null;
+  source_mode?: 'member_requested' | 'automatic_safety' | null;
+  summary?: string | null;
+  conversation_excerpt?: string | null;
+  last_member_message?: string | null;
+  requires_immediate_attention?: boolean;
+  member_notified?: boolean;
 };
 
 export default function PastoralTriageScreen() {
@@ -69,6 +79,7 @@ export default function PastoralTriageScreen() {
   );
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
+  const [expandedAiId, setExpandedAiId] = useState<string | null>(null);
 
   useEffect(() => {
     if (ministryScope === 'expression' && !canUseExpressionScope && canUseGeneralScope) {
@@ -131,13 +142,13 @@ export default function PastoralTriageScreen() {
     }
   };
 
-  const updateFollowup = async (id: string, status: 'contacted' | 'resolved' | 'closed') => {
+  const updateFollowup = async (id: string, status: 'contacted' | 'resolved' | 'closed', source: 'live' | 'ai' = 'live') => {
     setWorkingId(id);
     setActionError('');
     try {
       await api.request('pastoral-followups', {
         method: 'PATCH',
-        body: JSON.stringify({ id, status }),
+        body: JSON.stringify({ id, status, source }),
       });
       followups.refresh();
     } catch (error) {
@@ -173,7 +184,7 @@ export default function PastoralTriageScreen() {
           <ScreenHeader
             title="Pastoral Care"
             kicker="LEADERSHIP"
-            subtitle="Prayer and live-service follow-up stay within the church or Expression you are responsible for."
+            subtitle="Prayer, live-service follow-up and confidential COT AI care alerts stay within the church or Expression you are responsible for."
             showBack
           />
         </View>
@@ -184,7 +195,7 @@ export default function PastoralTriageScreen() {
               <Chip label="Prayer Requests" selected={activeQueue === 'prayer'} onPress={() => setActiveQueue('prayer')} count={prayerList.length} />
             ) : null}
             {canReceiveFollowups ? (
-              <Chip label="Altar & Care Responses" selected={activeQueue === 'care'} onPress={() => setActiveQueue('care')} count={careList.length} />
+              <Chip label="Care & AI Alerts" selected={activeQueue === 'care'} onPress={() => setActiveQueue('care')} count={careList.length} />
             ) : null}
           </View>
         ) : null}
@@ -267,25 +278,45 @@ export default function PastoralTriageScreen() {
                   return (
                     <View key={f.id} style={[styles.triageCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
                       <View style={styles.cardHeader}>
-                        <Badge label={f.type.replaceAll('_', ' ').toUpperCase()} variant="primary" />
+                        <Badge label={f.source === 'ai' ? `COT AI · ${(f.severity || 'support').toUpperCase()}` : f.type.replaceAll('_', ' ').toUpperCase()} variant={f.requires_immediate_attention ? 'warning' : 'primary'} />
                         <Text style={[styles.dateText, { color: colors.textMuted }]}>{new Date(f.created_at).toLocaleDateString()}</Text>
                       </View>
-                      <Text style={[styles.title, { color: colors.text }]}>{f.user_name || 'Church Participant'}</Text>
+                      <View style={styles.identityRow}>
+                        <View style={styles.identityCopy}>
+                          <Text style={[styles.aiContextLabel, { color: colors.textMuted }]}>FULL NAME</Text>
+                          <Text style={[styles.title, { color: colors.text }]}>{f.user_name || 'Church Participant'}</Text>
+                          {f.user_username ? <Text style={[styles.bodyText, { color: colors.textMuted }]}>@{f.user_username}</Text> : null}
+                        </View>
+                        {f.source === 'ai' ? <Badge label={f.source_mode === 'automatic_safety' ? 'AUTOMATIC SAFETY' : 'MEMBER REQUEST'} variant={f.requires_immediate_attention ? 'warning' : 'neutral'} /> : null}
+                      </View>
+                      {f.source === 'ai' && f.summary ? <Text style={[styles.bodyText, { color: colors.textSecondary }]}>{f.summary}</Text> : null}
+                      {f.source === 'ai' && f.last_member_message ? <View style={[styles.aiContextCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+                        <Text style={[styles.aiContextLabel, { color: colors.textMuted }]}>LATEST MEMBER MESSAGE</Text>
+                        <Text style={[styles.bodyText, { color: colors.text }]}>{f.last_member_message}</Text>
+                        {f.conversation_excerpt && f.conversation_excerpt !== f.last_member_message ? (
+                          <>
+                            <Pressable onPress={() => setExpandedAiId((current) => current === f.id ? null : f.id)} style={styles.contextToggle}>
+                              <Text style={[styles.contextToggleText, { color: colors.interactive }]}>{expandedAiId === f.id ? 'Hide conversation context' : 'View conversation context'}</Text>
+                            </Pressable>
+                            {expandedAiId === f.id ? <Text style={[styles.conversationText, { color: colors.textSecondary }]}>{f.conversation_excerpt}</Text> : null}
+                          </>
+                        ) : null}
+                      </View> : null}
                       {f.stream_title ? <Text style={[styles.bodyText, { color: colors.textSecondary }]}>From: {f.stream_title}</Text> : null}
                       {f.user_phone ? <Text style={[styles.bodyText, { color: colors.interactive }]}>{f.user_phone}</Text> : null}
                       {f.private_note ? <Text style={[styles.bodyText, { color: colors.textSecondary }]}>{f.private_note}</Text> : null}
                       <View style={[styles.actionBar, { borderTopColor: colors.borderSubtle }]}>
                         <Text style={[styles.statusLabel, { color: colors.textMuted }]}>Status: <Text style={{ color: colors.interactive, fontWeight: '700' }}>{f.status}</Text></Text>
                         <View style={styles.btnRow}>
-                          <Button label="Contacted" onPress={() => updateFollowup(f.id, 'contacted')} variant="outline" size="sm" loading={busy} />
-                          <Button label="Resolved" onPress={() => updateFollowup(f.id, 'resolved')} variant="primary" size="sm" loading={busy} />
+                          <Button label="Contacted" onPress={() => updateFollowup(f.id, 'contacted', f.source || 'live')} variant="outline" size="sm" loading={busy} />
+                          <Button label="Resolved" onPress={() => updateFollowup(f.id, 'resolved', f.source || 'live')} variant="primary" size="sm" loading={busy} />
                         </View>
                       </View>
                     </View>
                   );
                 })
               ) : (
-                <EmptyState title="No Follow-Up Requests" message="Altar responses, counselling requests and other live-service follow-ups routed to this exact scope will appear here." iconName="heart-outline" />
+                <EmptyState title="No Follow-Up Requests" message="Altar responses, counselling requests, live-service follow-ups and confidential COT AI care alerts routed to this exact scope will appear here." iconName="heart-outline" />
               )}
             </View>
           ) : null}
@@ -306,6 +337,13 @@ const styles = StyleSheet.create({
   queueSection: { gap: spacing.sm },
   scopeTabs: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.xs },
   triageCard: { padding: spacing.md, borderRadius: radius.xl, borderWidth: 1, marginBottom: spacing.sm, gap: spacing.sm },
+  aiContextCard: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm, gap: 5 },
+  aiContextLabel: { fontSize: 9, lineHeight: 13, fontWeight: '900', letterSpacing: 0.6 },
+  identityRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
+  identityCopy: { flex: 1, minWidth: 0, gap: 2 },
+  contextToggle: { alignSelf: 'flex-start', paddingVertical: 4 },
+  contextToggleText: { fontSize: 11, fontWeight: '800' },
+  conversationText: { fontSize: 12, lineHeight: 18, paddingTop: 3 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   dateText: { fontSize: 11 },
   title: { fontSize: 15, fontWeight: '800', letterSpacing: -0.15 },

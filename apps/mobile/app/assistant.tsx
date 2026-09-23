@@ -17,6 +17,7 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { Badge, Button, Chip, Icon, ScreenHeader, Skeleton } from '@/components';
 import { ReadAloudRateControl, useReadAloudRate } from '@/components/ReadAloudRateControl';
+import { ScripturePreviewCard, detectScriptureReferences } from '@/components/bible/ScriptureReferenceText';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { PLATFORM_KEYBOARD_BEHAVIOR, PLATFORM_KEYBOARD_DISMISS_MODE, PLATFORM_KEYBOARD_VERTICAL_OFFSET } from '@/utils/keyboard';
 
@@ -27,12 +28,23 @@ type AssistantAction = {
   description?: string;
 };
 
+type AssistantCare = {
+  category?: string;
+  severity?: 'support' | 'elevated' | 'urgent';
+  offerPastoralSupport?: boolean;
+  alertCreated?: boolean;
+  alertId?: string | null;
+  notice?: string;
+};
+
 type Message = {
   id: string;
   role: 'user' | 'assistant';
   text: string;
   pending?: boolean;
   actions?: AssistantAction[];
+  care?: AssistantCare | null;
+  careContext?: string;
 };
 
 type AiReadiness = {
@@ -51,6 +63,8 @@ const suggestedPrompts = [
   'How do I send a prayer request?',
   'How do I use the ministry tools available to my role?',
   'How do calls and messages work?',
+  'What can COT AI access, and what information stays private?',
+  'I am going through a difficult time. Can you encourage me from Scripture?',
 ];
 
 function normalizeAssistantMarkdown(value: string) {
@@ -212,7 +226,7 @@ export function AssistantScreen() {
   const welcome = useMemo<Message>(() => ({
     id: 'welcome',
     role: 'assistant',
-    text: `Hi ${displayName}. I’m COT AI. I can chat with you, explain verified COT information, and now guide you step by step through the COT screens and workflows available to your account. You can also use Read aloud on my answers.`,
+    text: `Hi ${displayName}. I’m COT AI. I can chat with you, explain verified COT information, guide you through the COT App, and offer Bible-grounded encouragement for difficult life moments. I can also help you reach authorised pastoral care when you choose. You can use Read aloud on my answers.`,
   }), [displayName]);
 
   const [readiness, setReadiness] = useState<AiReadiness | null>(null);
@@ -225,6 +239,7 @@ export function AssistantScreen() {
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const [speechRate, setSpeechRate] = useReadAloudRate();
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [careBusyId, setCareBusyId] = useState<string | null>(null);
 
   useEffect(() => {
     setMessages((previous) => previous.length === 1 && previous[0]?.id === 'welcome' ? [welcome] : previous);
@@ -282,6 +297,37 @@ export function AssistantScreen() {
     speakChunk(0);
   };
 
+  const requestPastoralSupport = async (message: Message) => {
+    if (careBusyId) return;
+    setCareBusyId(message.id);
+    setError('');
+    try {
+      const result = await api.request<{ care?: AssistantCare }>('ai-gateway', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'request_pastoral_support',
+          careContext: message.careContext || message.text,
+        }),
+      });
+      setMessages((previous) => previous.map((item) => item.id === message.id
+        ? {
+            ...item,
+            care: {
+              ...item.care,
+              ...result.care,
+              offerPastoralSupport: true,
+              alertCreated: true,
+              notice: result.care?.notice || 'Your confidential pastoral support request has been sent to the authorised care team in this church space.',
+            },
+          }
+        : item));
+    } catch (value) {
+      setError(value instanceof Error ? value.message : 'We couldn’t send the pastoral support request right now.');
+    } finally {
+      setCareBusyId(null);
+    }
+  };
+
   async function handleSend(customPrompt?: string) {
     const promptToSend = (customPrompt || text).trim();
     if (!promptToSend || loading || !readiness?.ready) return;
@@ -311,7 +357,7 @@ export function AssistantScreen() {
     setLoading(true);
 
     try {
-      const result = await api.request<{ content?: unknown; text?: string; response?: string }>('ai-gateway', {
+      const result = await api.request<{ content?: unknown; text?: string; response?: string; care?: AssistantCare | null }>('ai-gateway', {
         method: 'POST',
         body: JSON.stringify({ capability: 'assistant.answer', prompt: contextualPrompt }),
       });
@@ -321,7 +367,7 @@ export function AssistantScreen() {
           : result.content !== undefined
             ? JSON.stringify(result.content)
             : result.text || result.response || 'I am currently unable to retrieve an answer.';
-      setMessages((previous) => previous.map((item) => item.id === pendingMsg.id ? { ...item, text: responseText, pending: false, actions } : item));
+      setMessages((previous) => previous.map((item) => item.id === pendingMsg.id ? { ...item, text: responseText, pending: false, actions, care: result.care ?? null, careContext: contextualPrompt } : item));
     } catch (value) {
       setMessages((previous) => previous.filter((item) => item.id !== pendingMsg.id));
       setError(value instanceof Error ? value.message : 'The assistant is temporarily unreachable.');
@@ -382,6 +428,12 @@ export function AssistantScreen() {
           <Badge label="AVAILABLE" variant="active" />
           <View style={[styles.scopeChip, { backgroundColor: colors.primarySoft }]}><Icon name={expressionId ? 'people-outline' : 'globe-outline'} size={12} color={colors.interactive} /><Text style={[styles.scopeText, { color: colors.interactive }]} numberOfLines={1}>{scopeLabel}</Text></View>
         </View>
+        <View style={[styles.safetyNotice, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+          <Icon name="shield-checkmark-outline" size={15} color={colors.interactive} />
+          <Text style={[styles.safetyNoticeText, { color: colors.textSecondary }]}>
+            COT AI does not reveal passwords, private credentials, private messages or confidential records. If a message clearly indicates immediate danger, it may confidentially alert authorised pastoral care in your current church space.
+          </Text>
+        </View>
         <View style={styles.voiceSettings}>
           <ReadAloudRateControl value={speechRate} onChange={setSpeechRate} compact />
         </View>
@@ -402,6 +454,7 @@ export function AssistantScreen() {
         ) : null}
         renderItem={({ item }) => {
           const isUser = item.role === 'user';
+          const scriptureReferences = !isUser && !item.pending ? detectScriptureReferences(item.text, 3) : [];
           return (
             <View style={[styles.messageBlock, isUser ? styles.userBlock : styles.assistantBlock]}>
               <View style={[styles.bubbleRow, isUser ? styles.userRow : styles.assistantRow]}>
@@ -412,6 +465,35 @@ export function AssistantScreen() {
                     : <AssistantMarkdown value={item.text} />}
                 </View>
               </View>
+
+              {scriptureReferences.length ? (
+                <View style={styles.scripturePreviews}>
+                  {scriptureReferences.map((match) => <ScripturePreviewCard key={`${item.id}:${match.reference}`} text={match.reference} compact />)}
+                </View>
+              ) : null}
+
+              {!isUser && !item.pending && item.care?.offerPastoralSupport ? (
+                <View style={[styles.careCard, { backgroundColor: item.care.severity === 'urgent' ? colors.liveSoft : colors.primarySoft, borderColor: item.care.severity === 'urgent' ? colors.live : colors.borderSubtle }]}>
+                  <View style={styles.careHeading}>
+                    <Icon name={item.care.alertCreated ? 'heart-circle' : 'heart-outline'} size={18} color={item.care.severity === 'urgent' ? colors.live : colors.interactive} />
+                    <Text style={[styles.careTitle, { color: colors.text }]}>
+                      {item.care.alertCreated ? 'Pastoral care notified' : 'Pastoral support is available'}
+                    </Text>
+                  </View>
+                  <Text style={[styles.careText, { color: colors.textSecondary }]}>
+                    {item.care.notice || 'You can send a confidential support request to the authorised pastoral care team in this church space.'}
+                  </Text>
+                  {!item.care.alertCreated ? (
+                    <Button
+                      label="Request pastoral support"
+                      onPress={() => void requestPastoralSupport(item)}
+                      loading={careBusyId === item.id}
+                      variant="outline"
+                      size="sm"
+                    />
+                  ) : null}
+                </View>
+              ) : null}
 
               {!isUser && !item.pending ? (
                 <View style={styles.responseTools}>
@@ -474,6 +556,8 @@ const styles = StyleSheet.create({
   assistantHeader: { marginHorizontal: spacing.md, marginTop: spacing.xs, borderWidth: 1, borderRadius: radius.xxl, overflow: 'hidden' },
   providerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, paddingBottom: spacing.xs },
   voiceSettings: { paddingHorizontal: spacing.md, paddingBottom: spacing.md },
+  safetyNotice: { marginHorizontal: spacing.md, marginBottom: spacing.sm, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: spacing.sm, paddingVertical: 8, flexDirection: 'row', alignItems: 'flex-start', gap: 7 },
+  safetyNoticeText: { flex: 1, fontSize: 9.5, lineHeight: 14.5, fontWeight: '600' },
   scopeChip: { minHeight: 25, maxWidth: 260, borderRadius: radius.pill, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', gap: 5 },
   scopeText: { fontSize: 10, fontWeight: '800', flexShrink: 1 },
   chatList: { paddingHorizontal: spacing.md, paddingVertical: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
@@ -487,6 +571,11 @@ const styles = StyleSheet.create({
   markdownBold: { fontWeight: '900' }, markdownItalic: { fontStyle: 'italic' }, markdownCode: { fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }), fontSize: 13 },
   markdownHeading: { fontSize: 15, lineHeight: 21, fontWeight: '900', marginTop: 4 }, markdownHeadingLarge: { fontSize: 18, lineHeight: 24 },
   markdownBulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 }, markdownBullet: { width: 12, fontSize: 17, lineHeight: 21, fontWeight: '900' }, markdownNumber: { minWidth: 20, fontSize: 13, lineHeight: 21, fontWeight: '900' }, markdownBulletBody: { flex: 1 },
+  scripturePreviews: { marginLeft: 40, gap: 6, maxWidth: 520 },
+  careCard: { marginLeft: 40, maxWidth: 520, borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm, gap: 7 },
+  careHeading: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  careTitle: { fontSize: 12.5, lineHeight: 17, fontWeight: '900' },
+  careText: { fontSize: 10.5, lineHeight: 16 },
   responseTools: { marginLeft: 40, flexDirection: 'row', gap: 6, flexWrap: 'wrap' }, responseTool: { minHeight: 32, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 5 }, responseToolText: { fontSize: 10.5, fontWeight: '800' },
   actionList: { marginLeft: 40, gap: 7, maxWidth: 520 },
   routeAction: { minHeight: 54, borderWidth: 1, borderRadius: radius.lg, padding: 9, flexDirection: 'row', alignItems: 'center', gap: 9 },
