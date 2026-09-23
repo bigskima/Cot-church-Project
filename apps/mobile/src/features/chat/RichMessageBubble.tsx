@@ -191,7 +191,11 @@ export function RichMessageBubble({
   const translateX = useRef(new Animated.Value(0)).current;
   const senderName = message.sender?.display_name || message.sender?.username || 'Member';
   const senderBadge = message.sender?.badges?.[0];
-  const hasScripturePreview = Boolean(message.body && detectScriptureReferences(message.body, 1).length);
+  const scriptureMatch = message.body ? detectScriptureReferences(message.body, 1)[0] ?? null : null;
+  const hasScripturePreview = Boolean(scriptureMatch);
+  const normalizedBody = message.body?.trim().replace(/\s+/g, ' ').toLowerCase() ?? '';
+  const normalizedReference = scriptureMatch?.reference.trim().replace(/\s+/g, ' ').toLowerCase() ?? '';
+  const scriptureOnly = Boolean(scriptureMatch && normalizedBody === normalizedReference);
   const openSender = () => {
     if (!message.sender?.username) return;
     router.push(`/general/member/${encodeURIComponent(message.sender.username)}` as any);
@@ -323,8 +327,8 @@ export function RichMessageBubble({
               </View>
             ) : null}
 
-            {message.body ? <MentionAwareMessage body={message.body} mine={mine} /> : null}
-            {message.body && hasScripturePreview ? <ScripturePreviewCard text={message.body} compact /> : null}
+            {message.body && !scriptureOnly ? <MentionAwareMessage body={message.body} mine={mine} /> : null}
+            {message.body && hasScripturePreview ? <ScripturePreviewCard text={message.body} compact tone={mine ? 'accent' : 'default'} /> : null}
             <Text style={[styles.time, { color: mine ? '#DDEEFF' : colors.textMuted }]}>
               {new Date(message.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </Text>
