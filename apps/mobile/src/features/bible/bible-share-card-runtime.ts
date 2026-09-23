@@ -25,7 +25,7 @@ function dataUriBytes(uri: string) {
 async function nativeCotLogoDataUri() {
   if (nativeLogoDataUri !== undefined) return nativeLogoDataUri;
   try {
-    const asset = Asset.fromModule(require('../../../assets/cot-family-logo.jpg'));
+    const asset = Asset.fromModule(require('../../../assets/cot-family-logo.png'));
     await asset.downloadAsync();
     const uri = asset.localUri || asset.uri;
     if (!uri) throw new Error('COT logo asset is unavailable.');
@@ -46,7 +46,7 @@ async function persistNativePng(dataUri: string, reference: string) {
 
 export async function buildBibleShareCardPng(input: ShareCardInput, nativeRenderer?: NativeRenderer) {
   if (Platform.OS === 'web') {
-    const logoUrl = Image.resolveAssetSource(require('../../../assets/cot-family-logo.jpg')).uri;
+    const logoUrl = Image.resolveAssetSource(require('../../../assets/cot-family-logo.png')).uri;
     const result = await bibleVerseCardPngDataUri({ ...input, logoUrl });
     if (!result.startsWith('data:image/png')) throw new Error('The Scripture card could not be converted to PNG.');
     return result;
