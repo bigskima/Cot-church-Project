@@ -106,6 +106,7 @@ export function VideoPlayer({
             player={player}
             style={styles.videoView}
             contentFit="contain"
+            nativeControls={false}
             pointerEvents="none"
           />
         ) : posterUrl ? (
