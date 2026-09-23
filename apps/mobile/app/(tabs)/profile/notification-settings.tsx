@@ -1,10 +1,11 @@
 import React from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Chip, EmptyState, Icon, ResourceError, ScreenHeader, Skeleton } from '@/components';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { radius, shadows, spacing, typography } from '@/design-system/tokens';
+import { TimeField as SharedTimeField } from '@/components/DateTimeField';
 import { deactivateStoredPushDevice, pushDeviceStatus, registerPushDevice, type PushDeviceStatus } from '@/services/push-notifications';
 
 type NotificationPreferences = {
@@ -363,11 +364,25 @@ export default function NotificationSettingsScreen() {
               </View>
 
               <View style={[styles.timePanel, { backgroundColor: colors.bgSecondary, opacity: quietEnabled ? 1 : 0.55 }]}>
-                <TimeField label="FROM" value={quietStart} onChangeText={setQuietStart} disabled={!quietEnabled} colors={colors} />
+                <View style={styles.timeField}>
+                  <SharedTimeField
+                    label="From"
+                    value={clockDate(quietStart)}
+                    onChange={(date) => setQuietStart(formatClock(date))}
+                    placeholder="Choose start time"
+                  />
+                </View>
                 <View style={styles.timeArrow}><Icon name="arrow-forward" size={17} color={colors.textMuted} /></View>
-                <TimeField label="UNTIL" value={quietEnd} onChangeText={setQuietEnd} disabled={!quietEnabled} colors={colors} />
+                <View style={styles.timeField}>
+                  <SharedTimeField
+                    label="Until"
+                    value={clockDate(quietEnd)}
+                    onChange={(date) => setQuietEnd(formatClock(date))}
+                    placeholder="Choose end time"
+                  />
+                </View>
               </View>
-              <Text style={[styles.helper, { color: colors.textMuted }]}>Use 24-hour time. The window can cross midnight, for example 22:00 → 07:00.</Text>
+              <Text style={[styles.helper, { color: colors.textMuted }]}>Choose the quiet-hours window with the same time picker used elsewhere in COT. It can cross midnight, for example 22:00 → 07:00.</Text>
             </View>
 
             <View style={[styles.infoCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
@@ -426,37 +441,6 @@ function PreferenceRow({
   );
 }
 
-function TimeField({
-  label,
-  value,
-  onChangeText,
-  disabled,
-  colors,
-}: {
-  label: string;
-  value: string;
-  onChangeText: (value: string) => void;
-  disabled: boolean;
-  colors: any;
-}) {
-  return (
-    <View style={styles.timeField}>
-      <Text style={[styles.timeLabel, { color: colors.textMuted }]}>{label}</Text>
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        editable={!disabled}
-        maxLength={5}
-        placeholder="22:00"
-        placeholderTextColor={colors.textMuted}
-        keyboardType="numbers-and-punctuation"
-        style={[styles.timeInput, { backgroundColor: colors.card, borderColor: colors.borderSubtle, color: colors.text }]}
-        accessibilityLabel={label === 'FROM' ? 'Quiet hours start time' : 'Quiet hours end time'}
-      />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   stateScreen: { flex: 1, padding: spacing.xl, justifyContent: 'center' },
@@ -479,8 +463,6 @@ const styles = StyleSheet.create({
   sectionIcon: { width: 42, height: 42, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
   timePanel: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, borderRadius: radius.xl, padding: spacing.md, marginTop: spacing.lg },
   timeField: { flex: 1, gap: 5 },
-  timeLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
-  timeInput: { minHeight: 48, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: spacing.md, fontSize: 15, fontWeight: '800' },
   timeArrow: { paddingBottom: 15 },
   helper: { fontSize: 11, lineHeight: 16, marginTop: spacing.sm },
   infoCard: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md },
