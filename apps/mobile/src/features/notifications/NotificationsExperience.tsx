@@ -47,6 +47,21 @@ type NotificationItem = {
 type InboxView = 'actions' | 'updates' | 'history';
 type ScopeView = 'expression' | 'general';
 
+type NotificationPage = {
+  items: NotificationItem[];
+  page: {
+    offset: number;
+    limit: number;
+    total: number;
+    hasMore: boolean;
+  };
+  unreadCount: number;
+  scopeUnread: {
+    general: number;
+    expression: number;
+  };
+};
+
 const platformAdminUrl = process.env.EXPO_PUBLIC_PLATFORM_ADMIN_URL?.trim() || 'https://cot-admin.vercel.app';
 
 type NotificationsExperienceProps = {
@@ -85,25 +100,65 @@ export function NotificationsExperience({ forcedExpressionId, onRespondInvitatio
   const [message, setMessage] = useState('');
   const [activeView, setActiveView] = useState<InboxView>(params.view === 'actions' || params.view === 'history' ? params.view : 'updates');
   const [scope, setScope] = useState<ScopeView>(forcedExpressionId ? 'expression' : 'general');
+  const [notificationItems, setNotificationItems] = useState<NotificationItem[]>([]);
+  const [notificationTotal, setNotificationTotal] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [scopeUnread, setScopeUnread] = useState({ general: 0, expression: 0 });
+  const [hasMoreNotifications, setHasMoreNotifications] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [markingAllRead, setMarkingAllRead] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const organizationId = context?.organization?.id ?? auth?.organizationId ?? '';
 
   const invitations = useResource<GovernanceInvitation[]>(`governance:inbox:${mode}`, (signal) => {
     if (mode !== 'authenticated') return Promise.resolve([]);
     return api.request<GovernanceInvitation[]>('governance-invitations', { signal });
   });
-  const notifications = useResource<NotificationItem[]>(`notifications:inbox:${mode}:${organizationId || 'none'}`, (signal) => {
-    if (mode !== 'authenticated' || !organizationId) return Promise.resolve([]);
-    return api.request<NotificationItem[]>('notifications', { signal });
-  });
+  const notificationPath = (offset = 0) => {
+    const activeScope: ScopeView = forcedExpressionId ? 'expression' : scope;
+    const query = [
+      'paged=true',
+      'limit=20',
+      `offset=${offset}`,
+      `scope=${encodeURIComponent(activeScope)}`,
+      ...(forcedExpressionId ? [`branchId=${encodeURIComponent(forcedExpressionId)}`] : []),
+    ];
+    return `notifications?${query.join('&')}`;
+  };
+
+  const notifications = useResource<NotificationPage>(
+    `notifications:inbox:${mode}:${organizationId || 'none'}:${forcedExpressionId || scope}`,
+    (signal) => {
+      if (mode !== 'authenticated' || !organizationId) {
+        return Promise.resolve({
+          items: [],
+          page: { offset: 0, limit: 20, total: 0, hasMore: false },
+          unreadCount: 0,
+          scopeUnread: { general: 0, expression: 0 },
+        });
+      }
+      return api.request<NotificationPage>(notificationPath(0), { signal });
+    },
+  );
 
   const pending = useMemo(() => (invitations.data ?? []).filter((item) => item.status === 'pending'), [invitations.data]);
   const history = useMemo(() => (invitations.data ?? []).filter((item) => item.status !== 'pending'), [invitations.data]);
-  const scopedNotifications = useMemo(() => (notifications.data ?? []).filter((item) => {
+  const scopedNotifications = useMemo(() => notificationItems.filter((item) => {
     const dataBranch = typeof item.data?.branchId === 'string' ? item.data.branchId : null;
     if (forcedExpressionId) return itemScope(item) === 'expression' && dataBranch === forcedExpressionId;
     return itemScope(item) === scope;
-  }), [forcedExpressionId, notifications.data, scope]);
-  const unread = scopedNotifications.filter((item) => !item.read_at);
+  }), [forcedExpressionId, notificationItems, scope]);
+
+  useEffect(() => {
+    const page = notifications.data;
+    if (!page) return;
+    setNotificationItems(page.items);
+    setNotificationTotal(page.page.total);
+    setUnreadCount(page.unreadCount);
+    setScopeUnread(page.scopeUnread);
+    setHasMoreNotifications(page.page.hasMore);
+    setExpandedIds(new Set());
+  }, [notifications.data]);
 
   useEffect(() => {
     if (params.view === 'actions' || params.view === 'history' || params.view === 'updates') setActiveView(params.view);
@@ -145,6 +200,70 @@ export function NotificationsExperience({ forcedExpressionId, onRespondInvitatio
     if (item.read_at) return;
     if (onMarkNotificationRead) await onMarkNotificationRead(item);
     else await api.request('notifications', { method: 'PATCH', body: JSON.stringify({ id: item.id, read: true }) });
+
+    const readAt = new Date().toISOString();
+    setNotificationItems((current) => current.map((candidate) => candidate.id === item.id ? { ...candidate, read_at: readAt } : candidate));
+    setUnreadCount((current) => Math.max(0, current - 1));
+    if (!forcedExpressionId) {
+      setScopeUnread((current) => ({ ...current, [scope]: Math.max(0, current[scope] - 1) }));
+    }
+  };
+
+  const loadMoreNotifications = async () => {
+    if (loadingMore || !hasMoreNotifications) return;
+    setLoadingMore(true);
+    setMessage('');
+    try {
+      const page = await api.request<NotificationPage>(notificationPath(notificationItems.length), { feedback: false });
+      setNotificationItems((current) => {
+        const known = new Set(current.map((item) => item.id));
+        return [...current, ...page.items.filter((item) => !known.has(item.id))];
+      });
+      setNotificationTotal(page.page.total);
+      setUnreadCount(page.unreadCount);
+      setScopeUnread(page.scopeUnread);
+      setHasMoreNotifications(page.page.hasMore);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Unable to load more notifications.');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const markAllRead = async () => {
+    if (markingAllRead || unreadCount === 0) return;
+    setMarkingAllRead(true);
+    setMessage('');
+    try {
+      await api.request('notifications', {
+        method: 'PATCH',
+        feedback: false,
+        body: JSON.stringify({
+          markAll: true,
+          read: true,
+          scope: forcedExpressionId ? 'expression' : scope,
+          ...(forcedExpressionId ? { branchId: forcedExpressionId } : {}),
+        }),
+      });
+      const readAt = new Date().toISOString();
+      setNotificationItems((current) => current.map((item) => ({ ...item, read_at: item.read_at || readAt })));
+      setUnreadCount(0);
+      if (!forcedExpressionId) setScopeUnread((current) => ({ ...current, [scope]: 0 }));
+      setMessage('All notifications in this inbox are marked as read.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Unable to mark notifications as read.');
+    } finally {
+      setMarkingAllRead(false);
+    }
+  };
+
+  const toggleExpanded = (id: string) => {
+    setExpandedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   const openNotification = async (item: NotificationItem) => {
@@ -155,14 +274,13 @@ export function NotificationsExperience({ forcedExpressionId, onRespondInvitatio
       const branchId = typeof item.data?.branchId === 'string' ? item.data.branchId : '';
       if (branchId && organizationId && context?.expression?.id !== branchId) await selectContext(organizationId, branchId);
       const route = inferredRoute(item);
-      await notifications.refresh();
       if (route) router.push(route as any);
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to open this notification.'); }
     finally { setBusyNotificationId(null); }
   };
 
   const views: Array<{ key: InboxView; label: string; icon: string; count: number }> = [
-    { key: 'updates', label: 'Updates', icon: 'notifications-outline', count: unread.length },
+    { key: 'updates', label: 'Updates', icon: 'notifications-outline', count: unreadCount },
     { key: 'actions', label: 'Invites', icon: 'flash-outline', count: pending.length },
     { key: 'history', label: 'History', icon: 'time-outline', count: history.length },
   ];
@@ -178,8 +296,8 @@ export function NotificationsExperience({ forcedExpressionId, onRespondInvitatio
               <Text style={[styles.scopeTitle, { color: colors.text }]}>Notification scope</Text>
               <Text style={[styles.scopeText, { color: colors.textSecondary }]}>Expression activity never mixes into the General list.</Text>
               <View style={styles.scopeTabs}>
-                <Chip label="Expression" icon="people-outline" selected={scope === 'expression'} count={(notifications.data ?? []).filter((item) => itemScope(item) === 'expression' && !item.read_at).length} onPress={() => { setScope('expression'); setActiveView('updates'); }} />
-                <Chip label="General" icon="globe-outline" selected={scope === 'general'} count={(notifications.data ?? []).filter((item) => itemScope(item) === 'general' && !item.read_at).length} onPress={() => { setScope('general'); setActiveView('updates'); }} />
+                <Chip label="Expression" icon="people-outline" selected={scope === 'expression'} count={scopeUnread.expression} onPress={() => { setScope('expression'); setActiveView('updates'); }} />
+                <Chip label="General" icon="globe-outline" selected={scope === 'general'} count={scopeUnread.general} onPress={() => { setScope('general'); setActiveView('updates'); }} />
               </View>
             </View>
           ) : null}
