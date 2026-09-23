@@ -102,6 +102,7 @@ export default function GeneralPastoralCareExperience() {
   const [selectedTestimony, setSelectedTestimony] = useState<Testimony | null>(null);
   const [responseText, setResponseText] = useState('');
   const [serviceNotes, setServiceNotes] = useState('');
+  const [expandedAiId, setExpandedAiId] = useState<string | null>(null);
 
   const prayerQuery = (() => {
     const query = new URLSearchParams({ view: 'moderation', scope: 'general' });
@@ -274,10 +275,27 @@ export default function GeneralPastoralCareExperience() {
                 const busy = workingId === item.id;
                 return <View key={item.id} style={[styles.caseCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
                   <View style={styles.caseTop}><Badge label={item.source === 'ai' ? `COT AI · ${(item.severity || 'support').toUpperCase()}` : item.type.replaceAll('_', ' ').toUpperCase()} variant={item.requires_immediate_attention ? 'warning' : 'primary'} /><Text style={[styles.date, { color: colors.textMuted }]}>{new Date(item.created_at).toLocaleDateString()}</Text></View>
-                  <Text style={[styles.caseTitle, { color: colors.text }]}>{item.user_name || 'Church participant'}</Text>
-                  {item.user_username ? <Text style={[styles.metaText, { color: colors.textMuted }]}>@{item.user_username}</Text> : null}
+                  <View style={styles.identityRow}>
+                    <View style={styles.flex}>
+                      <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>FULL NAME</Text>
+                      <Text style={[styles.caseTitle, { color: colors.text }]}>{item.user_name || 'Church participant'}</Text>
+                      {item.user_username ? <Text style={[styles.metaText, { color: colors.textMuted }]}>@{item.user_username}</Text> : null}
+                    </View>
+                    {item.source === 'ai' ? <Badge label={item.source_mode === 'automatic_safety' ? 'AUTOMATIC SAFETY' : 'MEMBER REQUEST'} variant={item.requires_immediate_attention ? 'warning' : 'neutral'} /> : null}
+                  </View>
                   {item.source === 'ai' && item.summary ? <Text style={[styles.caseBody, { color: colors.textSecondary }]}>{item.summary}</Text> : null}
-                  {item.source === 'ai' && item.last_member_message ? <View style={[styles.inlinePanel, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Text style={[styles.fieldLabel, { color: colors.textMuted }]}>LATEST MEMBER MESSAGE</Text><Text style={[styles.caseBody, { color: colors.text }]}>{item.last_member_message}</Text></View> : null}
+                  {item.source === 'ai' && item.last_member_message ? <View style={[styles.inlinePanel, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+                    <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>LATEST MEMBER MESSAGE</Text>
+                    <Text style={[styles.caseBody, { color: colors.text }]}>{item.last_member_message}</Text>
+                    {item.conversation_excerpt && item.conversation_excerpt !== item.last_member_message ? (
+                      <>
+                        <Pressable onPress={() => setExpandedAiId((current) => current === item.id ? null : item.id)} style={styles.contextToggle}>
+                          <Text style={[styles.contextToggleText, { color: colors.interactive }]}>{expandedAiId === item.id ? 'Hide conversation context' : 'View conversation context'}</Text>
+                        </Pressable>
+                        {expandedAiId === item.id ? <Text style={[styles.conversationText, { color: colors.textSecondary }]}>{item.conversation_excerpt}</Text> : null}
+                      </>
+                    ) : null}
+                  </View> : null}
                   {item.stream_title ? <Text style={[styles.caseBody, { color: colors.textSecondary }]}>From {item.stream_title}</Text> : null}
                   {item.user_phone ? <Text style={[styles.contactText, { color: colors.interactive }]}>{item.user_phone}</Text> : null}
                   {item.private_note ? <Text style={[styles.caseBody, { color: colors.textSecondary }]}>{item.private_note}</Text> : null}
@@ -326,7 +344,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 }, content: { flexGrow: 1 }, body: { paddingHorizontal: spacing.md, gap: spacing.lg }, flex: { flex: 1, minWidth: 0 },
   notice: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, noticeText: { flex: 1, fontSize: 11.5, lineHeight: 17, fontWeight: '700' },
   queueTabs: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.xs, flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }, section: { gap: spacing.sm },
-  caseCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm }, caseTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm }, date: { fontSize: 9.5, lineHeight: 14 }, caseTitle: { fontSize: 15, lineHeight: 20, fontWeight: '900' }, caseBody: { fontSize: 11.5, lineHeight: 18 }, contactText: { fontSize: 12.5, fontWeight: '800' },
+  caseCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm }, caseTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm }, identityRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm }, contextToggle: { alignSelf: 'flex-start', paddingVertical: 4 }, contextToggleText: { fontSize: 11, fontWeight: '800' }, conversationText: { fontSize: 12, lineHeight: 18, paddingTop: 3 }, date: { fontSize: 9.5, lineHeight: 14 }, caseTitle: { fontSize: 15, lineHeight: 20, fontWeight: '900' }, caseBody: { fontSize: 11.5, lineHeight: 18 }, contactText: { fontSize: 12.5, fontWeight: '800' },
   inlinePanel: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm, gap: spacing.sm }, inlineText: { flex: 1, fontSize: 10.5, lineHeight: 16 }, caseFooter: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: spacing.sm, gap: spacing.sm }, statusText: { fontSize: 10.5 }, actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'flex-end' },
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, authorName: { fontSize: 12.5, fontWeight: '900' }, testimonyMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, metaText: { fontSize: 9.5, lineHeight: 14, fontWeight: '700' }, pressed: { opacity: 0.84 },
   testimonySheet: { gap: spacing.md }, privacyPanel: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, sheetStory: { fontSize: 14, lineHeight: 22 }, responseStack: { gap: spacing.sm }, responseCard: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm, gap: spacing.xs }, responseTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm }, responseName: { fontSize: 11.5, fontWeight: '900' }, fieldLabel: { fontSize: 9.5, fontWeight: '900', letterSpacing: 0.7 }, statusChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
