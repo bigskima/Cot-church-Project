@@ -17,7 +17,7 @@ import * as Speech from 'expo-speech';
 import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { Badge, Button, Chip, Icon, ScreenHeader, Skeleton } from '@/components';
-import { ReadAloudRateControl, useReadAloudRate } from '@/components/ReadAloudRateControl';
+import { READ_ALOUD_RATES, useReadAloudRate } from '@/components/ReadAloudRateControl';
 import { ScripturePreviewCard, detectScriptureReferences } from '@/components/bible/ScriptureReferenceText';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { PLATFORM_KEYBOARD_BEHAVIOR, PLATFORM_KEYBOARD_DISMISS_MODE, PLATFORM_KEYBOARD_VERTICAL_OFFSET } from '@/utils/keyboard';
@@ -307,6 +307,12 @@ export function AssistantScreen() {
     speakChunk(0);
   };
 
+  const cycleSpeechRate = () => {
+    const currentIndex = READ_ALOUD_RATES.indexOf(speechRate);
+    const nextRate = READ_ALOUD_RATES[(currentIndex + 1) % READ_ALOUD_RATES.length];
+    setSpeechRate(nextRate);
+  };
+
   const requestPastoralSupport = async (message: Message) => {
     if (careBusyId) return;
     setCareBusyId(message.id);
@@ -432,20 +438,40 @@ export function AssistantScreen() {
       behavior={PLATFORM_KEYBOARD_BEHAVIOR}
       keyboardVerticalOffset={PLATFORM_KEYBOARD_VERTICAL_OFFSET}
     >
-      <View style={[styles.assistantHeader, { paddingTop: insets.top + spacing.sm, backgroundColor: colors.glass, borderColor: colors.borderSubtle }, shadows.sm]}>
-        <ScreenHeader title="COT AI" kicker={expressionId ? 'EXPRESSION-AWARE AI' : 'GENERAL COT AI'} subtitle={`Talking with you in ${scopeLabel}.`} showBack />
+      <View style={[styles.assistantHeader, { paddingTop: insets.top, backgroundColor: colors.bg, borderColor: colors.borderSubtle }]}>
+        <ScreenHeader
+          title="COT AI"
+          showBack
+          compact
+          style={styles.compactHeaderBar}
+          rightAction={(
+            <Pressable
+              onPress={cycleSpeechRate}
+              style={({ pressed }) => [
+                styles.voicePill,
+                { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle },
+                pressed && styles.pressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={`Voice speed ${speechRate} times. Tap to change.`}
+            >
+              <Icon name="speedometer-outline" size={13} color={colors.interactive} />
+              <Text style={[styles.voicePillText, { color: colors.textSecondary }]}>Voice {speechRate}×</Text>
+            </Pressable>
+          )}
+        />
         <View style={styles.providerRow}>
           <Badge label="AVAILABLE" variant="active" />
-          <View style={[styles.scopeChip, { backgroundColor: colors.primarySoft }]}><Icon name={expressionId ? 'people-outline' : 'globe-outline'} size={12} color={colors.interactive} /><Text style={[styles.scopeText, { color: colors.interactive }]} numberOfLines={1}>{scopeLabel}</Text></View>
+          <View style={[styles.scopeChip, { backgroundColor: colors.primarySoft }]}>
+            <Icon name={expressionId ? 'people-outline' : 'globe-outline'} size={12} color={colors.interactive} />
+            <Text style={[styles.scopeText, { color: colors.interactive }]} numberOfLines={1}>{scopeLabel}</Text>
+          </View>
         </View>
-        <View style={[styles.safetyNotice, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
-          <Icon name="shield-checkmark-outline" size={15} color={colors.interactive} />
-          <Text style={[styles.safetyNoticeText, { color: colors.textSecondary }]}>
-            COT AI does not reveal passwords, private credentials, private messages or confidential records. If a message clearly indicates immediate danger, it may confidentially alert authorised pastoral care in your current church space.
+        <View style={[styles.sessionNotice, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+          <Icon name="shield-checkmark-outline" size={14} color={colors.interactive} />
+          <Text style={[styles.sessionNoticeText, { color: colors.textSecondary }]}>
+            Temporary chat · This conversation clears from view when you refresh this screen or close COT. Private credentials stay protected; urgent safety messages may alert authorised pastoral care.
           </Text>
-        </View>
-        <View style={styles.voiceSettings}>
-          <ReadAloudRateControl value={speechRate} onChange={setSpeechRate} compact />
         </View>
       </View>
 
@@ -572,12 +598,14 @@ const styles = StyleSheet.create({
   stateTitle: { fontSize: 20, fontWeight: '800', textAlign: 'center' },
   stateBody: { fontSize: 13, lineHeight: 20, textAlign: 'center', maxWidth: 460 },
   readinessError: { fontSize: 12, textAlign: 'center' },
-  assistantHeader: { marginHorizontal: spacing.md, marginTop: spacing.xs, borderWidth: 1, borderRadius: radius.xxl, overflow: 'hidden' },
-  providerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, paddingBottom: spacing.xs },
-  voiceSettings: { paddingHorizontal: spacing.md, paddingBottom: spacing.md },
-  safetyNotice: { marginHorizontal: spacing.md, marginBottom: spacing.sm, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: spacing.sm, paddingVertical: 8, flexDirection: 'row', alignItems: 'flex-start', gap: 7 },
-  safetyNoticeText: { flex: 1, fontSize: 9.5, lineHeight: 14.5, fontWeight: '600' },
-  scopeChip: { minHeight: 25, maxWidth: 260, borderRadius: radius.pill, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  assistantHeader: { marginHorizontal: spacing.md, marginTop: spacing.xs, borderWidth: 1, borderRadius: radius.xl, overflow: 'hidden' },
+  compactHeaderBar: { backgroundColor: 'transparent', borderBottomWidth: 0 },
+  providerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm, paddingBottom: 6 },
+  voicePill: { minHeight: 30, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  voicePillText: { fontSize: 10, fontWeight: '800' },
+  sessionNotice: { marginHorizontal: spacing.sm, marginBottom: spacing.sm, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: 9, paddingVertical: 7, flexDirection: 'row', alignItems: 'flex-start', gap: 7 },
+  sessionNoticeText: { flex: 1, fontSize: 9.5, lineHeight: 14, fontWeight: '600' },
+  scopeChip: { minHeight: 24, maxWidth: 240, borderRadius: radius.pill, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 5 },
   scopeText: { fontSize: 10, fontWeight: '800', flexShrink: 1 },
   chatList: { paddingHorizontal: spacing.md, paddingVertical: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
   messageBlock: { gap: spacing.xs }, userBlock: { alignItems: 'flex-end' }, assistantBlock: { alignItems: 'stretch' },
