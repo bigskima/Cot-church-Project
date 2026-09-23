@@ -59,6 +59,37 @@ with check(public.can_receive_pastoral_followups(organization_id,branch_id));
 -- Do not grant direct member INSERT. COT AI creates alerts through the trusted
 -- server path after scope, membership, and escalation rules are resolved.
 
+create or replace function public.ai_pastoral_recipient_count(
+  target_organization_id uuid,
+  target_branch_id uuid default null
+)
+returns integer
+language sql
+stable
+security definer
+set search_path=''
+as $
+  select count(distinct m.profile_id)::integer
+  from public.memberships m
+  join public.role_assignments ra
+    on ra.membership_id=m.id
+   and ra.organization_id=m.organization_id
+  join public.role_permissions rp on rp.role_id=ra.role_id
+  join public.permissions p on p.code=rp.permission_code and p.is_active=true
+  where m.organization_id=target_organization_id
+    and m.status='active'
+    and p.code='pastoral.followups.receive'
+    and (ra.expires_at is null or ra.expires_at>now())
+    and (
+      (target_branch_id is null and ra.branch_id is null)
+      or
+      (target_branch_id is not null and ra.branch_id=target_branch_id)
+    );
+$;
+
+revoke all on function public.ai_pastoral_recipient_count(uuid,uuid) from public, anon, authenticated;
+grant execute on function public.ai_pastoral_recipient_count(uuid,uuid) to service_role;
+
 create or replace function public.notify_ai_pastoral_alert()
 returns trigger
 language plpgsql
