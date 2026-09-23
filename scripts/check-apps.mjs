@@ -330,6 +330,7 @@ const checks = [
   [/posts:\s*CommunityPost\[\][\s\S]*kind:\s*'post'[\s\S]*PostCard/, 'Home includes canonical social posts in the mixed feed'],
   [/\/general\/comments\/\[contentId\]|\/expressions\/\$\{expressionId\}\/comments\/\[contentId\]/, 'media comments open canonical full-screen routes'],
   [/CommentsThread/, 'shared full-screen comment thread surface'],
+  [/threadRows[\s\S]*threadReplyRow[\s\S]*Replying to/, 'comment replies use a flat bounded-indent thread layout'],
   [/Spam or misleading[\s\S]*Harassment or abuse[\s\S]*Privacy or personal information[\s\S]*Report content[\s\S]*Submit report/, 'member reporting uses one compact reusable safety sheet'],
   [/Reports are private[\s\S]*will not see who submitted the report/, 'member report sheet explains reporter privacy'],
   [/action: 'report'[\s\S]*contentId[\s\S]*commentId[\s\S]*reason[\s\S]*details/, 'member report sheet submits only target and moderation details'],
@@ -554,6 +555,7 @@ const boundaryChecks = [
   [guideLinksUi, /1tzW_4eU9yDzKHGjey4dxcUbMRPnRyThP-TtY0B2dD2M[\s\S]*Read the COT App Member Guide/, 'member help opens only the COT Member Guide'],
   [guideLinksUi, /13AM5RK4CuJffYe9zIF2iew1VWBneg7YrskL4dNh23hU[\s\S]*Open the COT App Ministry Roles and Operations Guide/, 'ministry workspaces open the role-specific Ministry Guide'],
   [guideLinksUi, /17SeNvbifGeuAL7pV-2TkbnZ_ZGr1S-GI0U5ZdPH4XLw[\s\S]*Open the COT App Platform Administration Guide/, 'platform shell opens the role-specific Platform Administration Guide'],
+  [guideLinksUi, /1XgrisdEnrkVJkYZ4bTfH04OGaQyavnDmRNTIv1AmrmA[\s\S]*Integrations & costs/, 'platform shell opens the COT integrations and production costs overview'],
   [guideLinksUi, /1XgrisdEnrkVJkYZ4bTfH04OGaQyavnDmRNTIv1AmrmA[\s\S]*Costs & services/, 'platform shell opens the COT integrations and production cost overview'],
 ];
 

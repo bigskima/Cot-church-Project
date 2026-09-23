@@ -86,6 +86,26 @@ export function CommentsThread({
     return map;
   }, [comments, commentById]);
 
+  const threadRows = useMemo(() => {
+    const rows: Array<{ item: ContentComment; depth: number }> = [];
+    const visited = new Set<string>();
+
+    const visit = (item: ContentComment, depth: number) => {
+      if (visited.has(item.id)) return;
+      visited.add(item.id);
+      rows.push({ item, depth });
+      for (const child of repliesByParent.get(item.id) ?? []) visit(child, depth + 1);
+    };
+
+    for (const root of roots) visit(root, 0);
+    // Defensive fallback for malformed/cyclic legacy rows: keep every comment
+    // visible rather than allowing recursive nesting to disappear off-screen.
+    for (const item of comments) {
+      if (!visited.has(item.id)) rows.push({ item, depth: 0 });
+    }
+    return rows;
+  }, [comments, repliesByParent, roots]);
+
   useEffect(() => {
     if (!focusRequest || !canComment) return;
     requestAnimationFrame(() => inputRef.current?.focus());
@@ -240,19 +260,18 @@ export function CommentsThread({
     );
   };
 
-  const renderThreadNode = (item: ContentComment, depth = 0): React.ReactNode => {
+  const renderThreadRow = (item: ContentComment, depth = 0): React.ReactNode => {
     const parent = item.parent_comment_id ? commentById.get(item.parent_comment_id) ?? null : null;
-    const children = repliesByParent.get(item.id) ?? [];
-    const visualDepth = Math.min(depth, 3);
+    const isReply = depth > 0;
     return (
       <View
         key={item.id}
         style={[
-          styles.threadNode,
-          depth > 0 && { marginLeft: visualDepth * 24 },
+          styles.threadRow,
+          isReply && styles.threadReplyRow,
         ]}
       >
-        {depth > 0 ? (
+        {isReply ? (
           <View
             pointerEvents="none"
             style={[
@@ -261,12 +280,7 @@ export function CommentsThread({
             ]}
           />
         ) : null}
-        {renderComment(item, depth > 0, parent)}
-        {children.length ? (
-          <View style={styles.childThread}>
-            {children.map((child) => renderThreadNode(child, depth + 1))}
-          </View>
-        ) : null}
+        {renderComment(item, isReply, parent)}
       </View>
     );
   };
@@ -298,7 +312,7 @@ export function CommentsThread({
         </View>
       ) : (
         <View style={styles.thread}>
-          {roots.map((root) => renderThreadNode(root))}
+          {threadRows.map(({ item, depth }) => renderThreadRow(item, depth))}
         </View>
       )}
 
@@ -411,10 +425,12 @@ const styles = StyleSheet.create({
   stateCard: { minHeight: 118, borderWidth: 1, borderRadius: radius.xl, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, gap: spacing.xs },
   stateTitle: { fontSize: 14, fontWeight: '800' },
   stateCopy: { fontSize: 11, lineHeight: 16, textAlign: 'center' },
-  thread: { gap: spacing.md },
-  threadNode: { position: 'relative', gap: spacing.sm },
-  childThread: { gap: spacing.sm },
-  threadConnector: { position: 'absolute', left: -14, top: -9, width: 14, height: 30, borderLeftWidth: 1, borderBottomWidth: 1, borderBottomLeftRadius: 10 },
+  thread: { gap: spacing.sm, width: '100%' },
+  threadRow: { position: 'relative', width: '100%', minWidth: 0 },
+  // Replies keep only one compact visual offset regardless of reply depth.
+  // Parent identity is carried by the "Replying to" context inside each card.
+  threadReplyRow: { paddingLeft: 14 },
+  threadConnector: { position: 'absolute', left: 1, top: 0, width: 10, height: 28, borderLeftWidth: 1, borderBottomWidth: 1, borderBottomLeftRadius: 8 },
   commentActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   threadGroup: { gap: spacing.sm },
   comment: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md },
