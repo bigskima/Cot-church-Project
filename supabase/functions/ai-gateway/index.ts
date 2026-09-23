@@ -141,6 +141,31 @@ function memberConversationExcerpt(prompt: string) {
   return userLines.join("\n").slice(-6000);
 }
 
+function assistantBoundaryReply(prompt: string) {
+  const current = extractCurrentMemberMessage(prompt).toLowerCase();
+  const asksAboutLimits = [
+    /\bwhat (?:are|is) your limits?\b/,
+    /\bwhat can you access\b/,
+    /\bwhat can(?:'t|not) you access\b/,
+    /\bwhat information (?:can|do) you (?:see|know|access)\b/,
+    /\bwhat do you know about me\b/,
+    /\bcan you see my (?:private )?(?:messages|password|credentials|data)\b/,
+    /\bhow private is (?:this|cot ai)\b/,
+  ].some((pattern) => pattern.test(current));
+  if (!asksAboutLimits) return null;
+
+  return [
+    "Here are my main limits inside COT:",
+    "",
+    "- I can use this COT AI conversation, verified church information, the COT App Guide, and approved church content available to your current General or Expression context.",
+    "- I do not have access to passwords, Platform Administration credentials, API keys, tokens, private invitation codes, private direct messages, confidential prayer or counselling records, giving details, attendance records, or other protected member data.",
+    "- I cannot reveal or guess secrets, bypass permissions, or grant you access that your account does not have.",
+    "- I can offer Bible-grounded encouragement and practical support, but I am not a pastor, doctor, therapist, lawyer, financial adviser, or emergency service.",
+    "- For ordinary emotional distress, I can offer an optional confidential pastoral-support request. If a message clearly indicates immediate danger, self-harm, suicide risk, serious harm to another person, or abuse/immediate danger, COT AI may create a confidential safety alert for authorised pastoral-care roles in that exact church space, and I will tell you when that happens.",
+    "- If a church-specific fact is not in verified COT information, I should say I do not know rather than invent it.",
+  ].join("\n");
+}
+
 function protectedCredentialReply(prompt: string) {
   const current = extractCurrentMemberMessage(prompt);
   const text = current.toLowerCase();
@@ -545,6 +570,17 @@ Deno.serve(createHandler(
             status: "succeeded",
             content: protectedReply,
             guardrail: "protected_information",
+          },
+          status: 200,
+        };
+      }
+      const boundaryReply = assistantBoundaryReply(prompt);
+      if (boundaryReply) {
+        return {
+          data: {
+            status: "succeeded",
+            content: boundaryReply,
+            guardrail: "assistant_boundaries",
           },
           status: 200,
         };
