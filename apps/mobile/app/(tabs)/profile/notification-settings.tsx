@@ -108,6 +108,7 @@ export default function NotificationSettingsScreen() {
     try {
       const data = await api.request<NotificationPreferences>('notification-settings', {
         method: 'PUT',
+        feedback: false,
         body: JSON.stringify({
           emailEnabled,
           smsEnabled,
