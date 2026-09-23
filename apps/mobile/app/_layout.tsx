@@ -11,7 +11,6 @@ import { OnboardingGate } from '@/components/OnboardingGate';
 import { RealtimeBridge } from '@/components/RealtimeBridge';
 import { PushNotificationsBridge } from '@/components/PushNotificationsBridge';
 import { IncomingCallBridge } from '@/components/IncomingCallBridge';
-import { AppUpdateBridge } from '@/components/AppUpdateBridge';
 import { ActionFeedbackProvider } from '@/components/ActionFeedbackProvider';
 import { AppTourProvider } from '@/features/tour/AppTourProvider';
 import { CotGlobalActions } from '@/features/ai/CotGlobalActions';
@@ -92,7 +91,6 @@ function AppContent() {
         <Stack.Screen name="leadership/directory" options={{ headerShown: false }} />
         <Stack.Screen name="leadership/invite-codes" options={{ headerShown: false }} />
       </Stack>
-      {!directDownload ? <AppUpdateBridge /> : null}
       {!directDownload ? <CotGlobalActions /> : null}
       {!directDownload ? <IncomingCallBridge /> : null}
     </AppTourProvider>
