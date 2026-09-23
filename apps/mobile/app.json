@@ -79,7 +79,8 @@
         "RECORD_AUDIO",
         "POST_NOTIFICATIONS"
       ],
-      "icon": "./assets/cot-family-logo.png"
+      "icon": "./assets/cot-family-logo.png",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",
