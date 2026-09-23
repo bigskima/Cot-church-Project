@@ -12,11 +12,9 @@ const ANDROID_SIZE_PROPERTIES = {
   // Compress the JavaScript bundle in release builds.
   'android.enableBundleCompression': 'true',
 
-  // R8 removes unreachable Java/Kotlin bytecode and shrinkResources removes
-  // Android resources that are provably unused. These do not change the COT
-  // feature surface or business rules.
-  'android.enableMinifyInReleaseBuilds': 'true',
-  'android.enableShrinkResourcesInReleaseBuilds': 'true',
+  // Deliberately do not turn on R8/resource shrinking here. COT uses several
+  // reflection/native-heavy modules (including calling/media), so the first
+  // size pass stays conservative and avoids risking runtime behavior.
 };
 
 function upsertProperty(properties, key, value) {
