@@ -459,13 +459,17 @@ export function AssistantScreen() {
                   </View>
                   <View style={styles.pastoralCopy}>
                     <Text style={[styles.pastoralTitle, { color: colors.text }]}>
-                      {item.pastoralCare.urgentAlertSent ? 'Pastoral safety alert sent' : item.pastoralCare.requested ? 'Pastoral care requested' : 'Would you like pastoral care?'}
+                      {item.pastoralCare.urgentAlertSent ? (item.pastoralCare.alertRouted ? 'Pastoral safety alert sent' : 'Pastoral safety alert recorded') : item.pastoralCare.requested ? 'Pastoral care requested' : 'Would you like pastoral care?'}
                     </Text>
                     <Text style={[styles.pastoralText, { color: colors.textSecondary }]}>
                       {item.pastoralCare.urgentAlertSent
-                        ? 'Because your message suggested immediate safety risk, a restricted alert was sent to the pastoral team assigned to this exact church space.'
+                        ? (item.pastoralCare.alertRouted
+                          ? 'Because your message suggested immediate safety risk, a restricted alert was sent to the pastoral team assigned to this exact church space.'
+                          : 'Because your message suggested immediate safety risk, a restricted alert was recorded. No pastoral recipient is currently assigned here, so please also contact a trusted person and local emergency support if danger is immediate.')
                         : item.pastoralCare.requested
-                          ? 'Your request was sent privately to the pastoral team assigned to this exact church space.'
+                          ? (item.pastoralCare.alertRouted
+                            ? 'Your request was sent privately to the pastoral team assigned to this exact church space.'
+                            : 'Your request was saved privately, but no pastoral recipient is currently assigned in this exact church space.')
                           : 'Nothing has been reported. If you choose this, your name, username and this message will be shared privately with the pastoral team assigned to this exact church space.'}
                     </Text>
                     {item.pastoralCare.requestAvailable ? <Button label="Request pastoral care" onPress={() => void requestPastoralCare(item)} variant="outline" size="sm" /> : null}
