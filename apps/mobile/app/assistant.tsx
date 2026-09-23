@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -81,6 +82,7 @@ function normalizeAssistantMarkdown(value: string) {
 function markdownToPlainText(value: string) {
   return normalizeAssistantMarkdown(value)
     .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^>\s?/gm, '')
     .replace(/^[-*•]\s+/gm, '• ')
     .replace(/^\d+[.)]\s+/gm, '')
     .replace(/\*\*([^*]+)\*\*/g, '$1')
@@ -147,6 +149,14 @@ function AssistantMarkdown({ value }: { value: string }) {
         const heading = line.match(/^(#{1,4})\s+(.+)$/);
         if (heading) {
           return <Text key={`heading-${index}`} style={[styles.markdownHeading, heading[1].length === 1 && styles.markdownHeadingLarge, { color: colors.text }]}>{markdownToPlainText(heading[2])}</Text>;
+        }
+        const quote = line.match(/^>\s?(.*)$/);
+        if (quote) {
+          return (
+            <View key={`quote-${index}`} style={[styles.markdownQuote, { backgroundColor: colors.bgSecondary, borderLeftColor: colors.interactive }]}>
+              <InlineMarkdown text={quote[1]} color={colors.textSecondary} />
+            </View>
+          );
         }
         const bullet = line.match(/^[-*•]\s+(.+)$/);
         if (bullet) {
@@ -458,7 +468,16 @@ export function AssistantScreen() {
           return (
             <View style={[styles.messageBlock, isUser ? styles.userBlock : styles.assistantBlock]}>
               <View style={[styles.bubbleRow, isUser ? styles.userRow : styles.assistantRow]}>
-                {!isUser ? <View style={[styles.assistantIcon, { backgroundColor: colors.primarySoft }]}><Icon name="sparkles" size={16} color={colors.interactive} /></View> : null}
+                {!isUser ? (
+                  <View style={[styles.assistantIcon, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}>
+                    <Image
+                      source={require('../assets/cot-family-logo.png')}
+                      style={styles.assistantLogo}
+                      resizeMode="cover"
+                      accessibilityLabel="COT AI"
+                    />
+                  </View>
+                ) : null}
                 <View style={[styles.bubble, isUser ? { backgroundColor: colors.interactive } : { backgroundColor: colors.card, borderColor: colors.borderSubtle, borderWidth: 1 }, isUser ? shadows.none : shadows.sm]}>
                   {isUser || item.pending
                     ? <Text style={[styles.bubbleText, { color: isUser ? '#FFFFFF' : colors.textMuted }, item.pending && { fontStyle: 'italic' }]}>{item.text}</Text>
@@ -564,12 +583,14 @@ const styles = StyleSheet.create({
   messageBlock: { gap: spacing.xs }, userBlock: { alignItems: 'flex-end' }, assistantBlock: { alignItems: 'stretch' },
   bubbleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs },
   userRow: { justifyContent: 'flex-end' }, assistantRow: { justifyContent: 'flex-start' },
-  assistantIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+  assistantIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginTop: 2, overflow: 'hidden', borderWidth: 1 },
+  assistantLogo: { width: '100%', height: '100%' },
   bubble: { maxWidth: '88%', paddingHorizontal: 14, paddingVertical: 11, borderRadius: radius.xl },
   bubbleText: { fontSize: 14, lineHeight: 20 },
   markdownWrap: { gap: 3 }, markdownSpace: { height: 5 }, markdownText: { fontSize: 14, lineHeight: 21 },
   markdownBold: { fontWeight: '900' }, markdownItalic: { fontStyle: 'italic' }, markdownCode: { fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }), fontSize: 13 },
   markdownHeading: { fontSize: 15, lineHeight: 21, fontWeight: '900', marginTop: 4 }, markdownHeadingLarge: { fontSize: 18, lineHeight: 24 },
+  markdownQuote: { borderLeftWidth: 3, borderRadius: radius.md, paddingHorizontal: 11, paddingVertical: 8, marginVertical: 2 },
   markdownBulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 }, markdownBullet: { width: 12, fontSize: 17, lineHeight: 21, fontWeight: '900' }, markdownNumber: { minWidth: 20, fontSize: 13, lineHeight: 21, fontWeight: '900' }, markdownBulletBody: { flex: 1 },
   scripturePreviews: { marginLeft: 40, gap: 6, maxWidth: 520 },
   careCard: { marginLeft: 40, maxWidth: 520, borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm, gap: 7 },
