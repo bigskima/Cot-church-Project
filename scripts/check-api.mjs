@@ -205,7 +205,7 @@ const socialChatContracts = [
 const invariants = [
   [aiGateway, /protectedCredentialReply[\s\S]*Platform Administration credentials[\s\S]*protected_information/, 'COT AI refuses protected credentials deterministically'],
   [aiGateway, /request_pastoral_support[\s\S]*createPastoralAlert[\s\S]*member_requested/, 'COT AI supports explicit member-requested pastoral care'],
-  [aiGateway, /self_harm_risk[\s\S]*automatic_safety[\s\S]*requiresImmediateAttention/, 'COT AI immediate safety signals can trigger transparent pastoral escalation'],
+  [aiGateway, /self_harm_risk[\s\S]*autoEscalate:\s*true[\s\S]*createPastoralAlert[\s\S]*automatic_safety/, 'COT AI immediate safety signals can trigger transparent pastoral escalation'],
   [cotLifeGuidance, /emotional-distress[\s\S]*Psalm 34:18[\s\S]*anxiety-fear[\s\S]*grief-loss/, 'COT AI curated life guidance includes Scripture-grounded support'],
   [pastoralFollowups, /ai_pastoral_alerts[\s\S]*pastoral\.followups\.receive[\s\S]*mappedAi/, 'pastoral follow-up API includes exact-scope COT AI alerts'],
   [aiPastoralCareMigration, /alter table public\.ai_pastoral_alerts enable row level security[\s\S]*can_receive_pastoral_followups/, 'COT AI pastoral alerts are exact-scope RLS protected'],
