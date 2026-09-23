@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, BottomSheet, Button, Chip, Icon, InputField, ResourceError } from '@/components';
 import { ExpressionPeopleHeader } from '@/components/expression/ExpressionPeopleHeader';
@@ -80,6 +80,14 @@ export function ExpressionChatExperience({ expressionId }: { expressionId: strin
   useEffect(() => {
     if (resource.data?.messages) setMessages(resource.data.messages);
   }, [resource.data?.messages]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const subscription = Keyboard.addListener('keyboardDidShow', () => {
+      requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+    });
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     setSelectedMember(null);
@@ -220,7 +228,7 @@ export function ExpressionChatExperience({ expressionId }: { expressionId: strin
   return (
     <KeyboardAvoidingView
       style={[styles.screen, { backgroundColor: colors.bg }]}
-      behavior={PLATFORM_KEYBOARD_BEHAVIOR}
+      behavior={Platform.OS === 'android' ? 'height' : PLATFORM_KEYBOARD_BEHAVIOR}
       keyboardVerticalOffset={Platform.select({ ios: insets.top, android: 0, web: 0, default: 0 })}
     >
       <TourAnchor targetKey="expression.discussion.header">
@@ -253,6 +261,7 @@ export function ExpressionChatExperience({ expressionId }: { expressionId: strin
       {pinned.length && !pinnedOnly && !normalizedSearch ? <Pressable onPress={() => jumpToMessage(pinned[0].id)} style={[styles.pinned, { backgroundColor: colors.primarySoft }]}><Icon name="pin" size={14} color={colors.interactive} /><Text style={[styles.pinnedText, { color: colors.textSecondary }]} numberOfLines={1}>{pinned[0].body || 'Pinned media message'}</Text></Pressable> : null}
       <FlatList
         ref={listRef}
+        style={styles.messageList}
         data={visibleTimeline}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.messages}
@@ -308,6 +317,7 @@ const styles = StyleSheet.create({
   quickTool: { minHeight: 32, flex: 1, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
   quickToolText: { fontSize: 9, lineHeight: 12, fontWeight: '900' }, searchWrap: { marginHorizontal: spacing.md, marginBottom: spacing.xs },
   pinned: { marginHorizontal: spacing.md, borderRadius: radius.md, padding: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }, pinnedText: { flex: 1, fontSize: 11, fontWeight: '700' },
+  messageList: { flex: 1, minHeight: 0 },
   messages: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, gap: spacing.xs, flexGrow: 1, justifyContent: 'flex-end' }, empty: { paddingVertical: 54, paddingHorizontal: spacing.lg, alignItems: 'center', gap: 7 }, emptyTitle: { fontSize: 17, fontWeight: '900', textAlign: 'center' }, emptyCopy: { fontSize: 11, lineHeight: 16, textAlign: 'center', maxWidth: 320 }, error: { paddingHorizontal: spacing.md, paddingVertical: 5, fontSize: 11 },
   memberList: { gap: spacing.sm }, sheetHint: { fontSize: 11, lineHeight: 16, marginBottom: spacing.xs }, memberRow: { minHeight: 64, borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, memberName: { fontSize: 12.5, fontWeight: '900' }, memberMeta: { fontSize: 10, lineHeight: 14, marginTop: 2 }, moderationForm: { gap: spacing.md }, backRow: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' }, backText: { fontSize: 11, fontWeight: '900' }, selectedCard: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, selectedName: { fontSize: 14, fontWeight: '900' }, actionTitle: { fontSize: 9, fontWeight: '900', letterSpacing: 0.8 }, chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 }, moderationButtons: { gap: spacing.sm },
 });
