@@ -1,4 +1,4 @@
-import { Image, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import { Asset } from 'expo-asset';
 import { File, Paths } from 'expo-file-system';
 import { bibleVerseCardDataUri, bibleVerseCardPngDataUri } from './bible-share-card';
@@ -20,6 +20,16 @@ function dataUriBytes(uri: string) {
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
   return bytes;
+}
+
+function bundledCotLogoUri() {
+  try {
+    const moduleId = require('../../../assets/cot-family-logo.png');
+    const asset = Asset.fromModule(moduleId);
+    return asset.localUri || asset.uri || (typeof moduleId === 'string' ? moduleId : null);
+  } catch {
+    return null;
+  }
 }
 
 async function nativeCotLogoDataUri() {
@@ -46,7 +56,10 @@ async function persistNativePng(dataUri: string, reference: string) {
 
 export async function buildBibleShareCardPng(input: ShareCardInput, nativeRenderer?: NativeRenderer) {
   if (Platform.OS === 'web') {
-    const logoUrl = Image.resolveAssetSource(require('../../../assets/cot-family-logo.png')).uri;
+    // React Native Web does not guarantee Image.resolveAssetSource. Expo Asset
+    // provides a stable bundled URI on web, and the card renderer already has
+    // an in-card COT fallback when an image URL is unavailable.
+    const logoUrl = bundledCotLogoUri();
     const result = await bibleVerseCardPngDataUri({ ...input, logoUrl });
     if (!result.startsWith('data:image/png')) throw new Error('The Scripture card could not be converted to PNG.');
     return result;
