@@ -29,10 +29,15 @@ type RoutedPrayer = PrayerRequest & {
   is_publicly_visible?: boolean;
 };
 type CareFollowUp = LiveFollowUp & {
+  source?: 'live' | 'ai';
   branch_id?: string | null;
   stream_title?: string | null;
   user_phone?: string | null;
   user_avatar?: string | null;
+  username?: string | null;
+  risk_level?: 'routine' | 'high';
+  member_message?: string | null;
+  consent_given?: boolean;
 };
 
 export default function PastoralTriageScreen() {
@@ -131,13 +136,13 @@ export default function PastoralTriageScreen() {
     }
   };
 
-  const updateFollowup = async (id: string, status: 'contacted' | 'resolved' | 'closed') => {
+  const updateFollowup = async (id: string, status: 'contacted' | 'resolved' | 'closed', source: 'live' | 'ai' = 'live') => {
     setWorkingId(id);
     setActionError('');
     try {
       await api.request('pastoral-followups', {
         method: 'PATCH',
-        body: JSON.stringify({ id, status }),
+        body: JSON.stringify({ id, status, source }),
       });
       followups.refresh();
     } catch (error) {
@@ -256,7 +261,7 @@ export default function PastoralTriageScreen() {
           ) : canReceiveFollowups ? (
             <View style={styles.queueSection}>
               {scopeTabs}
-              <SectionHeader title={ministryScope === 'expression' && expression?.name ? `${expression.name} Altar & Care Queue` : 'General Altar & Care Queue'} badge={careList.length} />
+              <SectionHeader title={ministryScope === 'expression' && expression?.name ? `${expression.name} Pastoral Care Queue` : 'General Pastoral Care Queue'} badge={careList.length} subtitle="Live follow-ups and private COT AI care alerts stay within this exact pastoral scope." />
               {followups.loading && !followups.data ? (
                 <Skeleton height={130} count={2} />
               ) : followups.error && !followups.data ? (
@@ -267,18 +272,20 @@ export default function PastoralTriageScreen() {
                   return (
                     <View key={f.id} style={[styles.triageCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
                       <View style={styles.cardHeader}>
-                        <Badge label={f.type.replaceAll('_', ' ').toUpperCase()} variant="primary" />
+                        <Badge label={f.type.replaceAll('_', ' ').toUpperCase()} variant={f.risk_level === 'high' ? 'warning' : 'primary'} />
                         <Text style={[styles.dateText, { color: colors.textMuted }]}>{new Date(f.created_at).toLocaleDateString()}</Text>
                       </View>
                       <Text style={[styles.title, { color: colors.text }]}>{f.user_name || 'Church Participant'}</Text>
+                      {f.username ? <Text style={[styles.bodyText, { color: colors.textMuted }]}>@{f.username}</Text> : null}
+                      {f.source === 'ai' ? <View style={[styles.aiNotice, { backgroundColor: f.risk_level === 'high' ? colors.liveSoft : colors.primarySoft, borderColor: colors.borderSubtle }]}><Text style={[styles.aiNoticeText, { color: colors.textSecondary }]}>{f.risk_level === 'high' ? 'COT AI safety alert · explicit safety-risk language detected and disclosed to the member.' : 'COT AI pastoral care request · shared with the member’s consent.'}</Text></View> : null}
                       {f.stream_title ? <Text style={[styles.bodyText, { color: colors.textSecondary }]}>From: {f.stream_title}</Text> : null}
                       {f.user_phone ? <Text style={[styles.bodyText, { color: colors.interactive }]}>{f.user_phone}</Text> : null}
                       {f.private_note ? <Text style={[styles.bodyText, { color: colors.textSecondary }]}>{f.private_note}</Text> : null}
                       <View style={[styles.actionBar, { borderTopColor: colors.borderSubtle }]}>
                         <Text style={[styles.statusLabel, { color: colors.textMuted }]}>Status: <Text style={{ color: colors.interactive, fontWeight: '700' }}>{f.status}</Text></Text>
                         <View style={styles.btnRow}>
-                          <Button label="Contacted" onPress={() => updateFollowup(f.id, 'contacted')} variant="outline" size="sm" loading={busy} />
-                          <Button label="Resolved" onPress={() => updateFollowup(f.id, 'resolved')} variant="primary" size="sm" loading={busy} />
+                          <Button label="Contacted" onPress={() => updateFollowup(f.id, 'contacted', f.source || 'live')} variant="outline" size="sm" loading={busy} />
+                          <Button label="Resolved" onPress={() => updateFollowup(f.id, 'resolved', f.source || 'live')} variant="primary" size="sm" loading={busy} />
                         </View>
                       </View>
                     </View>
@@ -312,6 +319,8 @@ const styles = StyleSheet.create({
   bodyText: { fontSize: 13, lineHeight: 18 },
   wallNotice: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm, marginTop: spacing.xs },
   wallNoticeText: { fontSize: 11, lineHeight: 16 },
+  aiNotice: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm },
+  aiNoticeText: { fontSize: 11, lineHeight: 16, fontWeight: '700' },
   actionBar: { gap: spacing.sm, paddingTop: spacing.xs + 4, borderTopWidth: 1, marginTop: spacing.xs },
   statusLabel: { fontSize: 12 },
   btnRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
