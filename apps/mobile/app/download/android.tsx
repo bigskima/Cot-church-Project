@@ -1,5 +1,6 @@
 import React from 'react';
 import { Linking, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
 import { Button, Icon } from '@/components';
 import { radius, spacing } from '@/design-system/tokens';
 import { useSession } from '@/state/session';
@@ -74,7 +75,7 @@ export default function AndroidDownloadRoute() {
         </View>
 
         <Text style={[styles.title, { color: colors.text }]}>
-          {error ? 'Download unavailable' : 'COT App for Android'}
+          {error ? 'Download unavailable' : 'Optional Android download'}
         </Text>
 
         <Text style={[styles.copy, { color: colors.textSecondary }]}>
@@ -82,7 +83,7 @@ export default function AndroidDownloadRoute() {
             ? error
             : loading
               ? 'Checking the current COT Android release…'
-              : `Version ${release?.versionName || release?.versionCode || ''} is ready. The APK will only open when you choose Download APK below.`}
+              : `Version ${release?.versionName || release?.versionCode || ''} is available for testing. Downloading it is optional and COT will continue normally if you skip it.`}
         </Text>
 
         {release?.releaseNotes && !error ? (
@@ -101,9 +102,10 @@ export default function AndroidDownloadRoute() {
             disabled={loading || !release?.downloadUrl}
           />
         )}
+        <Button label="Continue to COT" variant="outline" onPress={() => router.replace('/general' as any)} />
 
         <Text style={[styles.helper, { color: colors.textMuted }]}>
-          COT will not start or redirect to an APK download automatically.
+          COT never requires this APK download to continue using the web app.
         </Text>
       </View>
     </View>
