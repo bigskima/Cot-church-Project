@@ -269,7 +269,7 @@ export default function GeneralPastoralCareExperience() {
 
           {activeQueue === 'care' ? (
             <View style={styles.section}>
-              <SectionHeader title="Care follow-ups" badge={careList.length} subtitle="Altar responses, counselling requests and live-service follow-ups" />
+              <SectionHeader title="Care follow-ups" badge={careList.length} subtitle="Altar responses, counselling requests, live-service follow-ups and confidential COT AI care alerts" />
               {followups.loading && !followups.data ? <Skeleton height={140} count={2} /> : followups.error && !followups.data ? <ResourceError message={followups.error} retry={followups.refresh} /> : careList.length ? careList.map((item) => {
                 const busy = workingId === item.id;
                 return <View key={item.id} style={[styles.caseCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
@@ -283,7 +283,7 @@ export default function GeneralPastoralCareExperience() {
                   {item.private_note ? <Text style={[styles.caseBody, { color: colors.textSecondary }]}>{item.private_note}</Text> : null}
                   <View style={[styles.caseFooter, { borderTopColor: colors.borderSubtle }]}><Text style={[styles.statusText, { color: colors.textMuted }]}>Status · <Text style={{ color: colors.interactive, fontWeight: '800' }}>{item.status}</Text></Text><View style={styles.actions}><Button label="Contacted" onPress={() => void updateFollowup(item.id, 'contacted', item.source || 'live')} variant="outline" size="sm" loading={busy} /><Button label="Resolved" onPress={() => void updateFollowup(item.id, 'resolved', item.source || 'live')} size="sm" loading={busy} /></View></View>
                 </View>;
-              }) : <EmptyState title="No care follow-ups" message="General COT follow-up requests routed to your ministry role will appear here." iconName="people-outline" />}
+              }) : <EmptyState title="No care follow-ups" message="General COT follow-up requests and confidential COT AI care alerts routed to your ministry role will appear here." iconName="people-outline" />}
             </View>
           ) : null}
 
