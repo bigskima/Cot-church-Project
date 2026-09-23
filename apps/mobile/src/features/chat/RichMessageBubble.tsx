@@ -11,7 +11,7 @@ import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import { AdaptiveMediaImage, AudioPlayer, Avatar, Icon, MediaPreviewModal, VideoPlayer } from '@/components';
 import { CompactIdentityBadge } from '@/components/identity/PublicIdentityBadge';
-import { ScripturePreviewCard } from '@/components/bible/ScriptureReferenceText';
+import { ScripturePreviewCard, detectScriptureReferences } from '@/components/bible/ScriptureReferenceText';
 import { radius, spacing } from '@/design-system/tokens';
 import { useTheme } from '@/state/theme';
 import { downloadFile } from '@/utils/download-file';
@@ -191,6 +191,7 @@ export function RichMessageBubble({
   const translateX = useRef(new Animated.Value(0)).current;
   const senderName = message.sender?.display_name || message.sender?.username || 'Member';
   const senderBadge = message.sender?.badges?.[0];
+  const hasScripturePreview = Boolean(message.body && detectScriptureReferences(message.body, 1).length);
   const openSender = () => {
     if (!message.sender?.username) return;
     router.push(`/general/member/${encodeURIComponent(message.sender.username)}` as any);
@@ -323,11 +324,11 @@ export function RichMessageBubble({
             ) : null}
 
             {message.body ? <MentionAwareMessage body={message.body} mine={mine} /> : null}
+            {message.body && hasScripturePreview ? <ScripturePreviewCard text={message.body} compact /> : null}
             <Text style={[styles.time, { color: mine ? '#DDEEFF' : colors.textMuted }]}>
               {new Date(message.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </Text>
           </Pressable>
-          {message.body ? <ScripturePreviewCard text={message.body} compact /> : null}
 
           {(message.reactions ?? []).length ? (
             <View style={[styles.reactions, mine && styles.reactionsMine]}>
@@ -414,6 +415,7 @@ const styles = StyleSheet.create({
   rowMine: { justifyContent: 'flex-end' },
   messageColumn: { flexShrink: 1, gap: 4 },
   bubble: { minWidth: 76, maxWidth: '100%', borderWidth: 1, borderRadius: 18, paddingHorizontal: 11, paddingVertical: 8, overflow: 'hidden' },
+  bubbleWithScripture: { minWidth: 250 },
   mine: { alignSelf: 'flex-end', borderBottomRightRadius: 5 },
   theirs: { alignSelf: 'flex-start', borderBottomLeftRadius: 5 },
   flex: { flex: 1 },
