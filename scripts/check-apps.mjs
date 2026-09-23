@@ -295,6 +295,8 @@ const checks = [
   [/Care & AI Alerts/, 'pastoral triage exposes the confidential AI care queue'],
   [/user_username/, 'pastoral triage includes member username context'],
   [/last_member_message/, 'pastoral triage includes the latest member message context'],
+  [/View conversation context/, 'authorised pastoral roles can expand confidential COT AI conversation context'],
+  [/FULL NAME/, 'COT AI pastoral reports surface the member display name as full name'],
   [/social-feed/, 'scoped social experience'],
   [/pathname:\s*['\"]\/general\/post\/\[id\]['\"]/, 'General community cards open canonical post detail'],
   [/posts:\s*CommunityPost\[\][\s\S]*kind:\s*'post'[\s\S]*PostCard/, 'Home includes canonical social posts in the mixed feed'],
