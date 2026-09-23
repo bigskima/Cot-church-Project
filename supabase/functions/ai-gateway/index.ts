@@ -183,6 +183,28 @@ function christCenteredFaithRule(prompt: string) {
   ].join(" ");
 }
 
+const COT_DEFAULT_EMERGENCY_COUNTRY = "Nigeria";
+const COT_NIGERIA_EMERGENCY_NUMBER = "112";
+
+function nigeriaUrgentSafetyLead() {
+  return [
+    "**Immediate safety — Nigeria**",
+    `If you may act on these thoughts or someone is in immediate danger, call **${COT_NIGERIA_EMERGENCY_NUMBER}**, Nigeria's national toll-free emergency number, or go to the nearest emergency department.`,
+    "Please stay with a trusted person who can physically reach you, and move away from anything you could use to hurt yourself or someone else.",
+    "If you are currently outside Nigeria, use your local emergency service instead. COT AI should not guess or substitute a foreign hotline."
+  ].join("\n");
+}
+
+function stripForeignCrisisContacts(value: string) {
+  const foreignContact = /\b(?:988|911|999|741741)\b|Suicide\s*&\s*Crisis Lifeline|National Suicide Prevention|Crisis Text Line|Samaritans|text\s+home\s+to\s+741741/i;
+  return value
+    .split("\n")
+    .filter((line) => !foreignContact.test(line))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function protectedCredentialReply(prompt: string) {
   const current = extractCurrentMemberMessage(prompt);
   const text = current.toLowerCase();
@@ -208,7 +230,7 @@ function assessPastoralNeed(prompt: string): CareAssessment | null {
   const selfHarm = [
     /\bkill myself\b/, /\bend my life\b/, /\btake my own life\b/, /\bhurt myself\b/,
     /\bself[- ]harm\b/, /\bi(?:'m| am) suicidal\b/, /\bi want to die\b/,
-    /\bi (?:do not|don't) want to live\b/, /\bno reason to live\b/,
+    /\btake my life\b/, /\bi (?:do not|don't) want to live\b/, /\bno reason to live\b/,
   ].some((pattern) => pattern.test(text));
   if (selfHarm) {
     return {
@@ -218,7 +240,7 @@ function assessPastoralNeed(prompt: string): CareAssessment | null {
       autoEscalate: true,
       requiresImmediateAttention: true,
       summary: "COT AI detected language indicating possible immediate self-harm or suicide risk. Please review this confidential alert and contact the member promptly.",
-      memberNotice: "Because your message may indicate an immediate safety risk, COT AI has confidentially alerted the authorised pastoral care team for your current church space. Pastoral support is additional to emergency or professional help.",
+      memberNotice: "Because your message may indicate an immediate safety risk, COT AI has confidentially alerted the authorised pastoral care team for your current church space. If you may act on these thoughts now, call 112 in Nigeria or go to the nearest emergency department, and stay with a trusted person who can physically reach you.",
     };
   }
 
@@ -235,7 +257,7 @@ function assessPastoralNeed(prompt: string): CareAssessment | null {
       autoEscalate: true,
       requiresImmediateAttention: true,
       summary: "COT AI detected language indicating a possible immediate risk of harm to another person. Please review this confidential alert promptly.",
-      memberNotice: "Because your message may indicate an immediate safety risk, COT AI has confidentially alerted the authorised pastoral care team for your current church space. Please also seek immediate local emergency help if anyone may be in danger.",
+      memberNotice: "Because your message may indicate an immediate safety risk, COT AI has confidentially alerted the authorised pastoral care team for your current church space. If anyone may be in immediate danger in Nigeria, call 112 and involve a trusted person who can physically reach them.",
     };
   }
 
@@ -252,7 +274,7 @@ function assessPastoralNeed(prompt: string): CareAssessment | null {
       autoEscalate: true,
       requiresImmediateAttention: true,
       summary: "COT AI detected language indicating possible abuse or immediate personal danger. Please review this confidential alert and contact the member promptly.",
-      memberNotice: "Because your message may indicate immediate danger, COT AI has confidentially alerted the authorised pastoral care team for your current church space. If you are in immediate danger, contact local emergency services or a trusted person who can reach you now.",
+      memberNotice: "Because your message may indicate immediate danger, COT AI has confidentially alerted the authorised pastoral care team for your current church space. If you are in immediate danger in Nigeria, call 112 or go to the nearest emergency department, and contact a trusted person who can reach you now.",
     };
   }
 
@@ -524,7 +546,7 @@ async function assistantContext(auth: any, entityType?: string, entityId?: strin
       formatting: "You may use Markdown for useful headings, bold emphasis, italic emphasis and lists. The COT app renders this formatting. Do not expose implementation syntax as an explanation.",
       lifeSupport: "COT AI may offer compassionate Bible-grounded encouragement for grief, loneliness, anxiety, depression, conflict, spiritual struggle, relationships and difficult decisions. It must not diagnose a mental or physical condition, replace a qualified clinician, lawyer, financial professional, emergency service, or human pastoral care, or present itself as a pastor.",
       secrets: "Passwords, administrator credentials, API keys, tokens, secret references, private invitation codes, private messages, confidential pastoral records and other protected information are outside the assistant's public knowledge. Never reveal, infer, fabricate or help bypass them. Explain the boundary politely and direct the person to the legitimate account or ministry process.",
-      safety: "If someone may be in immediate danger, suicidal, self-harming, or threatening serious harm, prioritize immediate safety, encourage contacting local emergency services and a trusted person who can physically reach them, and make clear that pastoral care is additional support rather than a replacement for emergency or professional help.",
+      safety: "COT is based in Nigeria. If someone may be in immediate danger, suicidal, self-harming, or threatening serious harm and they have not stated that they are in another country, use Nigeria as the default emergency context and direct them to the national emergency number 112 plus a trusted person who can physically reach them. Do not default to U.S., U.K. or other foreign crisis services or numbers. If the member explicitly says they are outside Nigeria, advise them to use their local emergency service and do not invent a country-specific number. Pastoral care is additional support rather than a replacement for emergency or professional help.",
     },
   });
 }
@@ -615,7 +637,7 @@ Deno.serve(createHandler(
     const sermonRule = entityType === "sermon" ? " The verified context contains the exact saved sermon. Base the answer on that sermon, including its content_blocks/description/transcript, and never claim that only a fragment was supplied when the verified sermon contains more content." : "";
     const careAssessment = capability === "assistant.answer" ? assessPastoralNeed(prompt) : null;
     const lifeCareRule = careAssessment
-      ? ` The member's words may reflect ${careAssessment.category.replaceAll("_", " ")} at ${careAssessment.severity} level. Respond with warmth and dignity; do not diagnose. Start with the person's immediate concern rather than a generic disclaimer. Offer simple practical next steps and 1-3 relevant Scripture references so the app can render Bible previews. Prefer naming references (for example Psalm 34:18, Psalm 46:1, Matthew 11:28, Philippians 4:6-7) rather than reproducing long verse text. Encourage human connection and pastoral care. ${careAssessment.requiresImmediateAttention ? "Treat this as a safety-first response: encourage the person to contact local emergency services and a trusted person who can physically reach them now; if possible, encourage them not to stay alone and to move away from anything they could use to hurt themselves or someone else. Never rely on Scripture or pastoral care alone for an immediate safety emergency." : "Pastoral care is optional support; do not imply that ordinary distress has already been reported."}`
+      ? ` The member's words may reflect ${careAssessment.category.replaceAll("_", " ")} at ${careAssessment.severity} level. Respond with warmth and dignity; do not diagnose. Start with the person's immediate concern rather than a generic disclaimer. Offer simple practical next steps and 1-3 relevant Scripture references so the app can render Bible previews. Prefer naming references (for example Psalm 34:18, Psalm 46:1, Matthew 11:28, Philippians 4:6-7) rather than reproducing long verse text. Encourage human connection and pastoral care. ${careAssessment.requiresImmediateAttention ? "Treat this as a safety-first response. COT is Nigeria-based. Do not provide any phone number, hotline, crisis line, or named overseas crisis service in the generated answer; the server will prepend verified Nigeria-specific emergency guidance. Keep the generated portion focused on calm encouragement, practical safety steps, staying with a trusted person who can physically reach them, moving away from means of harm, qualified professional help, and brief Scripture support. Never rely on Scripture or pastoral care alone for an immediate safety emergency." : "Pastoral care is optional support; do not imply that ordinary distress has already been reported."}`
       : "";
     const system = `You are COT AI, the conversational assistant inside City of Transformation. You serve a Christian church and Christian discipleship: Jesus Christ is the center of spiritual formation and Scripture is the primary authority for Christian teaching. Do not flatten Christianity into generic spirituality or present distinct religions as interchangeable. Speak about people of other faiths with dignity and accuracy. Be natural, compassionate and useful for ordinary life conversation as well as church guidance. You may help with grief, loneliness, anxiety, depression, relationships, conflict, spiritual questions, difficult decisions and everyday struggles using practical wisdom and Bible-grounded encouragement, while staying within your limits. Never diagnose mental or physical illness, prescribe treatment, or present yourself as a therapist, doctor, lawyer, financial professional or pastor. For high-stakes health, legal, financial or safety matters, encourage appropriate qualified human help. For church-specific facts, Quick Facts, schedules, leaders, locations, story, sermons, announcements, groups, posts, permissions and navigation, rely on the verified tenant-scoped context and never invent facts or routes. When a verified route exists, tell the member the exact destination in plain language; the app will render matching action buttons. When the person asks how the COT App works, how to use a screen, what a control does, or how to perform a member or ministry workflow, use the retrieved COT App Guide context below as the operating authority. Give practical step-by-step instructions with the visible screen names and expected result. The guide audiences were resolved from the signed-in account. Never expose internal permission codes. Never reveal, infer, fabricate or help obtain passwords, Platform Administration credentials, API keys, tokens, secret references, private invitation codes, confidential pastoral records, identity/KYC data, private messages or other protected information. If asked for a password or secret, politely explain that it is private and unavailable to COT AI and point to the legitimate sign-in, reset, invitation or authorised administrator process. Keep the active General/Expression scope clear. Do not pretend to be a pastor or replace human pastoral care. If a church-specific fact is absent from verified context, say that it has not been published or configured yet rather than guessing.${lifeCareRule}${faithFormationRule ? ` ${faithFormationRule}` : ""}${sermonRule} Verified context: ${verifiedContext}\n\nRetrieved COT App Guide context:\n${guideContext || "No matching guide section was available for this account and question."}\n\nCurated life-and-Scripture guidance:\n${lifeGuidance || "No special life-guidance topic matched this question. Use ordinary compassionate reasoning within the stated boundaries."}`;
 
@@ -638,6 +660,15 @@ Deno.serve(createHandler(
       entityId,
     });
 
+    const safeResult = capability === "assistant.answer"
+      && careAssessment?.requiresImmediateAttention
+      && typeof result.content === "string"
+      ? {
+          ...result,
+          content: [nigeriaUrgentSafetyLead(), stripForeignCrisisContacts(result.content)].filter(Boolean).join("\n\n"),
+        }
+      : result;
+
     let care: Record<string, unknown> | null = null;
     if (capability === "assistant.answer" && careAssessment) {
       let alertId: string | null = null;
@@ -649,7 +680,7 @@ Deno.serve(createHandler(
           alertCreated = true;
           const recipientNotice = alert.recipientCount > 0
             ? careAssessment.memberNotice
-            : "Your message may indicate immediate danger. COT AI recorded a confidential safety alert, but no pastoral care recipient is currently assigned to this exact church space. Please contact local emergency services and a trusted person who can reach you now.";
+            : "Your message may indicate immediate danger. COT AI recorded a confidential safety alert, but no pastoral care recipient is currently assigned to this exact church space. If you are in Nigeria, call 112 now and contact a trusted person who can physically reach you.";
           care = {
             category: careAssessment.category,
             severity: careAssessment.severity,
@@ -666,7 +697,7 @@ Deno.serve(createHandler(
             offerPastoralSupport: true,
             alertCreated: false,
             alertId: null,
-            notice: "COT AI could not confirm that a pastoral alert was delivered. Please contact local emergency services and a trusted person who can physically reach you now, and contact a church leader directly when you can.",
+            notice: "COT AI could not confirm that a pastoral alert was delivered. If you are in Nigeria, call 112 now and contact a trusted person who can physically reach you; if you are outside Nigeria, use your local emergency service. Contact a church leader directly when you can.",
           };
         }
       }
@@ -682,6 +713,6 @@ Deno.serve(createHandler(
       }
     }
 
-    return { data: { ...result, ...(care ? { care } : {}) }, status: result.status === "requires_review" ? 202 : 200 };
+    return { data: { ...safeResult, ...(care ? { care } : {}) }, status: safeResult.status === "requires_review" ? 202 : 200 };
   },
 ));
