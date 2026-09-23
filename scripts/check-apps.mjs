@@ -289,7 +289,7 @@ const checks = [
   [/Replays & recordings/, 'recording processing and replay discovery'],
   [/follow_up/, 'private live follow-up'],
   [/ScripturePreviewCard/, 'COT AI renders existing Bible Scripture previews'],
-  [/cot-family-logo\.png[\s\S]*assistantLogo/, 'COT AI uses the COT logo as its chat avatar'],
+  [/cot-family-logo\.jpg[\s\S]*assistantLogo/, 'COT AI uses the COT logo as its chat avatar'],
   [/markdownQuote[\s\S]*borderLeftWidth/, 'COT AI renders Markdown blockquotes without showing the quote marker'],
   [/replace\(\/\^>\\s\?\/gm, ''\)/, 'COT AI strips Markdown quote markers before copy and read aloud'],
   [/Request pastoral support/, 'COT AI offers member-controlled pastoral support'],
