@@ -65,6 +65,8 @@ const requiredFiles = [
   'supabase/functions/streaming-recordings/index.ts',
   'supabase/functions/stream-access/index.ts',
   'supabase/functions/ai-gateway/index.ts',
+  'supabase/functions/_shared/cot-life-guidance.ts',
+  'supabase/functions/pastoral-followups/index.ts',
   'supabase/functions/bible/index.ts',
   'supabase/functions/ai-review/index.ts',
   'supabase/functions/sermons/index.ts',
@@ -159,6 +161,10 @@ const platformAi = await readFile('supabase/functions/platform-ai/index.ts', 'ut
 const platformAdminGuide = await readFile('supabase/functions/platform-admin-guide/index.ts', 'utf8');
 const bible = await readFile('supabase/functions/bible/index.ts', 'utf8');
 const aiRouter = await readFile('supabase/functions/_shared/ai/router.ts', 'utf8');
+const aiGateway = await readFile('supabase/functions/ai-gateway/index.ts', 'utf8');
+const cotLifeGuidance = await readFile('supabase/functions/_shared/cot-life-guidance.ts', 'utf8');
+const pastoralFollowups = await readFile('supabase/functions/pastoral-followups/index.ts', 'utf8');
+const aiPastoralCareMigration = await readFile('supabase/migrations/20260923010500_ai_pastoral_care_alerts.sql', 'utf8');
 const adminGuidePage = await readFile('apps/admin/src/components/AdminGuide.tsx', 'utf8');
 const adminShell = await readFile('apps/admin/src/components/Shell.tsx', 'utf8');
 const platformSecrets = await readFile('supabase/functions/platform-secrets/index.ts', 'utf8');
@@ -197,6 +203,13 @@ const socialChatContracts = [
 ].join('\n');
 
 const invariants = [
+  [aiGateway, /protectedCredentialReply[\s\S]*Platform Administration credentials[\s\S]*protected_information/, 'COT AI refuses protected credentials deterministically'],
+  [aiGateway, /request_pastoral_support[\s\S]*createPastoralAlert[\s\S]*member_requested/, 'COT AI supports explicit member-requested pastoral care'],
+  [aiGateway, /self_harm_risk[\s\S]*automatic_safety[\s\S]*requiresImmediateAttention/, 'COT AI immediate safety signals can trigger transparent pastoral escalation'],
+  [cotLifeGuidance, /emotional-distress[\s\S]*Psalm 34:18[\s\S]*anxiety-fear[\s\S]*grief-loss/, 'COT AI curated life guidance includes Scripture-grounded support'],
+  [pastoralFollowups, /ai_pastoral_alerts[\s\S]*pastoral\.followups\.receive[\s\S]*mappedAi/, 'pastoral follow-up API includes exact-scope COT AI alerts'],
+  [aiPastoralCareMigration, /alter table public\.ai_pastoral_alerts enable row level security[\s\S]*can_receive_pastoral_followups/, 'COT AI pastoral alerts are exact-scope RLS protected'],
+  [aiPastoralCareMigration, /notify_ai_pastoral_alert[\s\S]*pastoral\.followups\.receive[\s\S]*recipient_profile_id/, 'COT AI pastoral notifications route only to authorised care roles'],
   [socialChatContracts, /direct_conversations[\s\S]*direct_messages/, 'global profile-to-profile direct messaging contract'],
   [bible, /platform-config[\s\S]*platform\.bible\.read/, 'Bible platform configuration uses platform read authority'],
   [bible, /platform_translation_save[\s\S]*platform\.bible\.manage/, 'Bible translation governance uses platform manage authority'],
