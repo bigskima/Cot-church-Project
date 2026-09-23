@@ -497,7 +497,7 @@ export function AssistantScreen() {
                 {!isUser ? (
                   <View style={[styles.assistantIcon, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}>
                     <Image
-                      source={require('../assets/cot-family-logo.jpg')}
+                      source={require('../assets/cot-family-logo.png')}
                       style={styles.assistantLogo}
                       resizeMode="cover"
                       accessibilityLabel="COT AI"
