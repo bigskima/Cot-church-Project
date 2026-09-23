@@ -118,6 +118,72 @@ export const COT_LIFE_GUIDANCE: CotLifeGuidanceTopic[] = [
       "For serious debt, legal or investment questions, encourage qualified local advice."
     ],
     scriptureReferences: ["Proverbs 21:5","Matthew 6:31-34","1 Timothy 6:6-10"]
+  },
+  {
+    id: "burnout-rest",
+    title: "Burnout, exhaustion and rest",
+    keywords: ["burnout","burned out","burnt out","exhausted","tired all the time","overworked","no energy","need rest"],
+    guidance: [
+      "Encourage realistic rest, sleep, nourishment, reduced load where possible, and asking others for help.",
+      "Do not spiritualise persistent exhaustion; physical or mental symptoms may deserve professional assessment.",
+      "Help the person identify one responsibility that can be paused, delegated or discussed."
+    ],
+    scriptureReferences: ["Mark 6:31","Matthew 11:28-30","Psalm 23:1-3"]
+  },
+  {
+    id: "anger",
+    title: "Anger, resentment and emotional control",
+    keywords: ["angry","anger","rage","furious","resentment","resentful","revenge","hate them"],
+    guidance: [
+      "Validate the emotion without endorsing harmful action. Encourage space, slower responses, naming the underlying hurt, and safe conversation.",
+      "If the person feels they may hurt someone, shift immediately to safety and human intervention.",
+      "Forgiveness can be a process and does not remove appropriate boundaries or accountability."
+    ],
+    scriptureReferences: ["James 1:19-20","Ephesians 4:26-27","Proverbs 15:1"]
+  },
+  {
+    id: "purpose-identity",
+    title: "Purpose, identity, calling and self-worth",
+    keywords: ["purpose","calling","worthless","worth","identity","who am i","my future","no purpose","meaningless"],
+    guidance: [
+      "Avoid claiming certainty about a specific divine calling that has not been revealed in verified church teaching or the person's life.",
+      "Help the person identify values, gifts, responsibilities, relationships and next faithful steps rather than demanding one perfect life plan.",
+      "When worthlessness is linked to hopelessness or self-harm language, prioritize the safety guidance instead."
+    ],
+    scriptureReferences: ["Psalm 139:13-14","Ephesians 2:10","Romans 12:4-8"]
+  },
+  {
+    id: "illness-health",
+    title: "Illness, health worries and medical uncertainty",
+    keywords: ["sick","illness","diagnosis","diagnosed","hospital","pain","symptoms","health","doctor","medical"],
+    guidance: [
+      "Offer compassion, practical support and prayer without diagnosing or contradicting qualified medical care.",
+      "Encourage appropriate medical evaluation for concerning, severe, persistent or worsening symptoms.",
+      "Never tell someone to stop prescribed treatment because of faith or prayer."
+    ],
+    scriptureReferences: ["Psalm 46:1","James 5:14-16","2 Corinthians 1:3-4"]
+  },
+  {
+    id: "family-parenting",
+    title: "Family pressure, parenting and home relationships",
+    keywords: ["family","parent","parenting","mother","father","child","children","sibling","home conflict"],
+    guidance: [
+      "Encourage respectful communication, realistic expectations, boundaries, listening and seeking trusted counsel where needed.",
+      "Do not automatically side with one family member when context is incomplete.",
+      "If there is abuse, violence or danger, safety takes priority over preserving appearances or forcing reconciliation."
+    ],
+    scriptureReferences: ["Colossians 3:12-14","James 1:19","Ephesians 6:1-4"]
+  },
+  {
+    id: "abuse-safety",
+    title: "Abuse, coercion, violence and personal safety",
+    keywords: ["abuse","abused","violent","violence","beating me","threatening me","controlling me","sexual assault","domestic violence","not safe"],
+    guidance: [
+      "Believe the seriousness of the safety concern without interrogating the person or blaming them.",
+      "Do not pressure the person to reconcile, confront an abuser alone, or remain in danger for spiritual reasons.",
+      "Encourage moving toward immediate safety, contacting trusted people who can physically help, and appropriate local emergency or specialist services."
+    ],
+    scriptureReferences: ["Psalm 9:9","Psalm 82:3-4","Proverbs 22:3"]
   }
 ];
 
