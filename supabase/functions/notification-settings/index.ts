@@ -6,9 +6,9 @@ import { adminClient } from "../_shared/supabase.ts";
 import { assertNoUnknownFields, assertObject, optionalString, requiredString } from "../_shared/validation.ts";
 
 const preferenceSelect = "email_enabled,sms_enabled,push_enabled,quiet_hours,timezone,push_preview,push_sound_enabled,live_alerts_enabled,followed_posts_enabled,priority_leadership_posts_enabled,urgent_platform_alerts_enabled,updated_at";
-const TIME_PATTERN = /^([01]\\d|2[0-3]):[0-5]\\d$/;
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const PUSH_PREVIEWS = new Set(["full", "sender_only", "private"]);
-const EXPO_PUSH_TOKEN_PATTERN = /^(?:Exponent|Expo)PushToken\\[[A-Za-z0-9_-]+\\]$/;
+const EXPO_PUSH_TOKEN_PATTERN = /^(?:Exponent|Expo)PushToken\[[A-Za-z0-9_-]+\]$/;
 
 function normalizeQuietHours(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
