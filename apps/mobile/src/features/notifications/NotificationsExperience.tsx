@@ -47,6 +47,21 @@ type NotificationItem = {
 type InboxView = 'actions' | 'updates' | 'history';
 type ScopeView = 'expression' | 'general';
 
+type NotificationPage = {
+  items: NotificationItem[];
+  page: {
+    offset: number;
+    limit: number;
+    total: number;
+    hasMore: boolean;
+  };
+  unreadCount: number;
+  scopeUnread: {
+    general: number;
+    expression: number;
+  };
+};
+
 const platformAdminUrl = process.env.EXPO_PUBLIC_PLATFORM_ADMIN_URL?.trim() || 'https://cot-admin.vercel.app';
 
 type NotificationsExperienceProps = {
@@ -85,25 +100,65 @@ export function NotificationsExperience({ forcedExpressionId, onRespondInvitatio
   const [message, setMessage] = useState('');
   const [activeView, setActiveView] = useState<InboxView>(params.view === 'actions' || params.view === 'history' ? params.view : 'updates');
   const [scope, setScope] = useState<ScopeView>(forcedExpressionId ? 'expression' : 'general');
+  const [notificationItems, setNotificationItems] = useState<NotificationItem[]>([]);
+  const [notificationTotal, setNotificationTotal] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [scopeUnread, setScopeUnread] = useState({ general: 0, expression: 0 });
+  const [hasMoreNotifications, setHasMoreNotifications] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [markingAllRead, setMarkingAllRead] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const organizationId = context?.organization?.id ?? auth?.organizationId ?? '';
 
   const invitations = useResource<GovernanceInvitation[]>(`governance:inbox:${mode}`, (signal) => {
     if (mode !== 'authenticated') return Promise.resolve([]);
     return api.request<GovernanceInvitation[]>('governance-invitations', { signal });
   });
-  const notifications = useResource<NotificationItem[]>(`notifications:inbox:${mode}:${organizationId || 'none'}`, (signal) => {
-    if (mode !== 'authenticated' || !organizationId) return Promise.resolve([]);
-    return api.request<NotificationItem[]>('notifications', { signal });
-  });
+  const notificationPath = (offset = 0) => {
+    const activeScope: ScopeView = forcedExpressionId ? 'expression' : scope;
+    const query = [
+      'paged=true',
+      'limit=20',
+      `offset=${offset}`,
+      `scope=${encodeURIComponent(activeScope)}`,
+      ...(forcedExpressionId ? [`branchId=${encodeURIComponent(forcedExpressionId)}`] : []),
+    ];
+    return `notifications?${query.join('&')}`;
+  };
+
+  const notifications = useResource<NotificationPage>(
+    `notifications:inbox:${mode}:${organizationId || 'none'}:${forcedExpressionId || scope}`,
+    (signal) => {
+      if (mode !== 'authenticated' || !organizationId) {
+        return Promise.resolve({
+          items: [],
+          page: { offset: 0, limit: 20, total: 0, hasMore: false },
+          unreadCount: 0,
+          scopeUnread: { general: 0, expression: 0 },
+        });
+      }
+      return api.request<NotificationPage>(notificationPath(0), { signal });
+    },
+  );
 
   const pending = useMemo(() => (invitations.data ?? []).filter((item) => item.status === 'pending'), [invitations.data]);
   const history = useMemo(() => (invitations.data ?? []).filter((item) => item.status !== 'pending'), [invitations.data]);
-  const scopedNotifications = useMemo(() => (notifications.data ?? []).filter((item) => {
+  const scopedNotifications = useMemo(() => notificationItems.filter((item) => {
     const dataBranch = typeof item.data?.branchId === 'string' ? item.data.branchId : null;
     if (forcedExpressionId) return itemScope(item) === 'expression' && dataBranch === forcedExpressionId;
     return itemScope(item) === scope;
-  }), [forcedExpressionId, notifications.data, scope]);
-  const unread = scopedNotifications.filter((item) => !item.read_at);
+  }), [forcedExpressionId, notificationItems, scope]);
+
+  useEffect(() => {
+    const page = notifications.data;
+    if (!page) return;
+    setNotificationItems(page.items);
+    setNotificationTotal(page.page.total);
+    setUnreadCount(page.unreadCount);
+    setScopeUnread(page.scopeUnread);
+    setHasMoreNotifications(page.page.hasMore);
+    setExpandedIds(new Set());
+  }, [notifications.data]);
 
   useEffect(() => {
     if (params.view === 'actions' || params.view === 'history' || params.view === 'updates') setActiveView(params.view);
@@ -145,6 +200,70 @@ export function NotificationsExperience({ forcedExpressionId, onRespondInvitatio
     if (item.read_at) return;
     if (onMarkNotificationRead) await onMarkNotificationRead(item);
     else await api.request('notifications', { method: 'PATCH', body: JSON.stringify({ id: item.id, read: true }) });
+
+    const readAt = new Date().toISOString();
+    setNotificationItems((current) => current.map((candidate) => candidate.id === item.id ? { ...candidate, read_at: readAt } : candidate));
+    setUnreadCount((current) => Math.max(0, current - 1));
+    if (!forcedExpressionId) {
+      setScopeUnread((current) => ({ ...current, [scope]: Math.max(0, current[scope] - 1) }));
+    }
+  };
+
+  const loadMoreNotifications = async () => {
+    if (loadingMore || !hasMoreNotifications) return;
+    setLoadingMore(true);
+    setMessage('');
+    try {
+      const page = await api.request<NotificationPage>(notificationPath(notificationItems.length), { feedback: false });
+      setNotificationItems((current) => {
+        const known = new Set(current.map((item) => item.id));
+        return [...current, ...page.items.filter((item) => !known.has(item.id))];
+      });
+      setNotificationTotal(page.page.total);
+      setUnreadCount(page.unreadCount);
+      setScopeUnread(page.scopeUnread);
+      setHasMoreNotifications(page.page.hasMore);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Unable to load more notifications.');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const markAllRead = async () => {
+    if (markingAllRead || unreadCount === 0) return;
+    setMarkingAllRead(true);
+    setMessage('');
+    try {
+      await api.request('notifications', {
+        method: 'PATCH',
+        feedback: false,
+        body: JSON.stringify({
+          markAll: true,
+          read: true,
+          scope: forcedExpressionId ? 'expression' : scope,
+          ...(forcedExpressionId ? { branchId: forcedExpressionId } : {}),
+        }),
+      });
+      const readAt = new Date().toISOString();
+      setNotificationItems((current) => current.map((item) => ({ ...item, read_at: item.read_at || readAt })));
+      setUnreadCount(0);
+      if (!forcedExpressionId) setScopeUnread((current) => ({ ...current, [scope]: 0 }));
+      setMessage('All notifications in this inbox are marked as read.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Unable to mark notifications as read.');
+    } finally {
+      setMarkingAllRead(false);
+    }
+  };
+
+  const toggleExpanded = (id: string) => {
+    setExpandedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   const openNotification = async (item: NotificationItem) => {
@@ -155,14 +274,13 @@ export function NotificationsExperience({ forcedExpressionId, onRespondInvitatio
       const branchId = typeof item.data?.branchId === 'string' ? item.data.branchId : '';
       if (branchId && organizationId && context?.expression?.id !== branchId) await selectContext(organizationId, branchId);
       const route = inferredRoute(item);
-      await notifications.refresh();
       if (route) router.push(route as any);
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to open this notification.'); }
     finally { setBusyNotificationId(null); }
   };
 
   const views: Array<{ key: InboxView; label: string; icon: string; count: number }> = [
-    { key: 'updates', label: 'Updates', icon: 'notifications-outline', count: unread.length },
+    { key: 'updates', label: 'Updates', icon: 'notifications-outline', count: unreadCount },
     { key: 'actions', label: 'Invites', icon: 'flash-outline', count: pending.length },
     { key: 'history', label: 'History', icon: 'time-outline', count: history.length },
   ];
@@ -178,8 +296,8 @@ export function NotificationsExperience({ forcedExpressionId, onRespondInvitatio
               <Text style={[styles.scopeTitle, { color: colors.text }]}>Notification scope</Text>
               <Text style={[styles.scopeText, { color: colors.textSecondary }]}>Expression activity never mixes into the General list.</Text>
               <View style={styles.scopeTabs}>
-                <Chip label="Expression" icon="people-outline" selected={scope === 'expression'} count={(notifications.data ?? []).filter((item) => itemScope(item) === 'expression' && !item.read_at).length} onPress={() => { setScope('expression'); setActiveView('updates'); }} />
-                <Chip label="General" icon="globe-outline" selected={scope === 'general'} count={(notifications.data ?? []).filter((item) => itemScope(item) === 'general' && !item.read_at).length} onPress={() => { setScope('general'); setActiveView('updates'); }} />
+                <Chip label="Expression" icon="people-outline" selected={scope === 'expression'} count={scopeUnread.expression} onPress={() => { setScope('expression'); setActiveView('updates'); }} />
+                <Chip label="General" icon="globe-outline" selected={scope === 'general'} count={scopeUnread.general} onPress={() => { setScope('general'); setActiveView('updates'); }} />
               </View>
             </View>
           ) : null}
@@ -195,23 +313,128 @@ export function NotificationsExperience({ forcedExpressionId, onRespondInvitatio
 
           {activeView === 'updates' ? (
             <View style={styles.section}>
-              <SectionHeader title={forcedExpressionId ? 'Expression updates' : scope === 'expression' ? 'Expression updates' : 'General COT updates'} badge={scopedNotifications.length} subtitle={unread.length ? `${unread.length} unread` : 'You are all caught up'} />
-              {notifications.loading ? <Skeleton height={94} count={4} /> : notifications.error && !notifications.data ? <ResourceError message={notifications.error} retry={notifications.refresh} /> : scopedNotifications.length ? scopedNotifications.map((item) => {
-                const branchId = typeof item.data?.branchId === 'string' ? item.data.branchId : null;
-                const hasRoute = Boolean(inferredRoute(item));
-                return (
-                  <Pressable key={item.id} onPress={() => void openNotification(item)} disabled={busyNotificationId === item.id} style={({ pressed }) => [styles.notice, { backgroundColor: colors.card, borderColor: item.read_at ? colors.borderSubtle : colors.interactive }, shadows.sm, pressed && styles.pressed]} accessibilityRole="button">
-                    <View style={[styles.noticeIcon, { backgroundColor: item.read_at ? colors.bgSecondary : colors.primarySoft }]}><Icon name={item.type.includes('prayer') ? 'heart-outline' : item.type.includes('testimon') ? 'sparkles-outline' : item.type.includes('event') ? 'calendar-outline' : item.type.includes('announcement') ? 'megaphone-outline' : 'notifications-outline'} size={18} color={item.read_at ? colors.textMuted : colors.interactive} /></View>
-                    <View style={styles.flex}>
-                      <View style={styles.noticeTitleRow}><Text style={[styles.noticeTitle, { color: colors.text }]}>{item.title}</Text>{!item.read_at ? <View style={[styles.dot, { backgroundColor: colors.interactive }]} /> : null}</View>
-                      {branchId ? <Text style={[styles.scopeLabel, { color: colors.interactive }]}>{expressionName(branchId)}</Text> : <Text style={[styles.scopeLabel, { color: colors.textMuted }]}>General COT</Text>}
-                      <Text style={[styles.noticeBody, { color: colors.textSecondary }]}>{item.body}</Text>
-                      <Text style={[styles.noticeMeta, { color: colors.textMuted }]}>{new Date(item.created_at).toLocaleString()}{hasRoute ? ' · Tap to open' : !item.read_at ? ' · Tap to mark read' : ''}</Text>
-                    </View>
-                    {hasRoute ? <Icon name="chevron-forward" size={17} color={colors.textMuted} /> : null}
-                  </Pressable>
-                );
-              }) : <EmptyState title={scope === 'expression' ? 'No Expression notifications' : 'No General notifications'} message={scope === 'expression' ? 'Expression announcements, events, prayer and testimony activity will appear here.' : 'General COT announcements, events and account activity will appear here.'} iconName="notifications-off-outline" />}
+              <SectionHeader
+                title={forcedExpressionId ? 'Expression updates' : scope === 'expression' ? 'Expression updates' : 'General COT updates'}
+                badge={notificationTotal}
+                subtitle={unreadCount ? `${unreadCount} unread` : 'You are all caught up'}
+              />
+
+              {notificationTotal > 0 ? (
+                <View style={styles.inboxControls}>
+                  <Text style={[styles.loadedCount, { color: colors.textMuted }]}>
+                    Showing {scopedNotifications.length} of {notificationTotal}
+                  </Text>
+                  {unreadCount > 0 ? (
+                    <Button
+                      label="Mark all as read"
+                      variant="outline"
+                      size="sm"
+                      loading={markingAllRead}
+                      onPress={() => void markAllRead()}
+                    />
+                  ) : null}
+                </View>
+              ) : null}
+
+              {notifications.loading ? (
+                <Skeleton height={94} count={4} />
+              ) : notifications.error && !notifications.data ? (
+                <ResourceError message={notifications.error} retry={notifications.refresh} />
+              ) : scopedNotifications.length ? (
+                <>
+                  {scopedNotifications.map((item) => {
+                    const branchId = typeof item.data?.branchId === 'string' ? item.data.branchId : null;
+                    const hasRoute = Boolean(inferredRoute(item));
+                    const expanded = expandedIds.has(item.id);
+                    const longBody = item.body.trim().length > 140;
+                    return (
+                      <View
+                        key={item.id}
+                        style={[
+                          styles.notice,
+                          { backgroundColor: colors.card, borderColor: item.read_at ? colors.borderSubtle : colors.interactive },
+                          shadows.sm,
+                        ]}
+                      >
+                        <Pressable
+                          onPress={() => void openNotification(item)}
+                          disabled={busyNotificationId === item.id}
+                          style={({ pressed }) => [styles.noticeMain, pressed && styles.pressed]}
+                          accessibilityRole="button"
+                          accessibilityLabel={hasRoute ? `Open notification: ${item.title}` : `Notification: ${item.title}`}
+                        >
+                          <View style={[styles.noticeIcon, { backgroundColor: item.read_at ? colors.bgSecondary : colors.primarySoft }]}>
+                            <Icon
+                              name={item.type.includes('prayer') ? 'heart-outline' : item.type.includes('testimon') ? 'sparkles-outline' : item.type.includes('event') ? 'calendar-outline' : item.type.includes('announcement') ? 'megaphone-outline' : 'notifications-outline'}
+                              size={18}
+                              color={item.read_at ? colors.textMuted : colors.interactive}
+                            />
+                          </View>
+                          <View style={styles.flex}>
+                            <View style={styles.noticeTitleRow}>
+                              <Text style={[styles.noticeTitle, { color: colors.text }]}>{item.title}</Text>
+                              {!item.read_at ? <View style={[styles.dot, { backgroundColor: colors.interactive }]} /> : null}
+                            </View>
+                            {branchId ? (
+                              <Text style={[styles.scopeLabel, { color: colors.interactive }]}>{expressionName(branchId)}</Text>
+                            ) : (
+                              <Text style={[styles.scopeLabel, { color: colors.textMuted }]}>General COT</Text>
+                            )}
+                            <Text
+                              style={[styles.noticeBody, { color: colors.textSecondary }]}
+                              numberOfLines={expanded ? undefined : 2}
+                            >
+                              {item.body}
+                            </Text>
+                            <Text style={[styles.noticeMeta, { color: colors.textMuted }]}>
+                              {new Date(item.created_at).toLocaleString()}{hasRoute ? ' · Open' : ''}
+                            </Text>
+                          </View>
+                          {hasRoute ? <Icon name="chevron-forward" size={17} color={colors.textMuted} /> : null}
+                        </Pressable>
+
+                        {(!item.read_at || longBody) ? (
+                          <View style={[styles.noticeActions, { borderTopColor: colors.borderSubtle }]}>
+                            {!item.read_at ? (
+                              <Pressable
+                                onPress={() => void markRead(item)}
+                                disabled={busyNotificationId === item.id}
+                                hitSlop={6}
+                              >
+                                <Text style={[styles.noticeActionText, { color: colors.interactive }]}>Mark as read</Text>
+                              </Pressable>
+                            ) : null}
+                            {longBody ? (
+                              <Pressable onPress={() => toggleExpanded(item.id)} hitSlop={6}>
+                                <Text style={[styles.noticeActionText, { color: colors.textSecondary }]}>
+                                  {expanded ? 'Show less' : 'Show more'}
+                                </Text>
+                              </Pressable>
+                            ) : null}
+                          </View>
+                        ) : null}
+                      </View>
+                    );
+                  })}
+
+                  {hasMoreNotifications ? (
+                    <Button
+                      label="Show more notifications"
+                      variant="outline"
+                      loading={loadingMore}
+                      onPress={() => void loadMoreNotifications()}
+                    />
+                  ) : notificationItems.length > 20 ? (
+                    <Text style={[styles.endOfList, { color: colors.textMuted }]}>You’ve reached the end of this inbox.</Text>
+                  ) : null}
+                </>
+              ) : (
+                <EmptyState
+                  title={scope === 'expression' ? 'No Expression notifications' : 'No General notifications'}
+                  message={scope === 'expression' ? 'Expression announcements, events, prayer and testimony activity will appear here.' : 'General COT announcements, events and account activity will appear here.'}
+                  iconName="notifications-off-outline"
+                />
+              )}
             </View>
           ) : null}
 
@@ -239,6 +462,7 @@ const styles = StyleSheet.create({
   scopeCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm }, scopeTitle: { fontSize: 16, fontWeight: '900' }, scopeText: { fontSize: 11.5, lineHeight: 17 }, scopeTabs: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   segmented: { borderWidth: 1, borderRadius: radius.xl, padding: 4, flexDirection: 'row', gap: 4 }, segment: { flex: 1, minHeight: 42, borderWidth: 1, borderColor: 'transparent', borderRadius: radius.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 }, segmentText: { fontSize: 10.5, fontWeight: '800' }, count: { minWidth: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 }, countText: { fontSize: 9, fontWeight: '900' },
   message: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, messageText: { flex: 1, fontSize: 11.5, lineHeight: 17 }, section: { gap: spacing.sm },
-  notice: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, noticeIcon: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, noticeTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 }, noticeTitle: { flexShrink: 1, fontSize: 13, lineHeight: 18, fontWeight: '900' }, dot: { width: 7, height: 7, borderRadius: 4 }, scopeLabel: { fontSize: 9.5, fontWeight: '800', marginTop: 1 }, noticeBody: { fontSize: 11.5, lineHeight: 17, marginTop: 4 }, noticeMeta: { fontSize: 9.5, lineHeight: 14, marginTop: 6 }, pressed: { opacity: 0.8 },
+  inboxControls: { minHeight: 40, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm }, loadedCount: { fontSize: 10.5, fontWeight: '700' },
+  notice: { borderWidth: 1, borderRadius: radius.xl, overflow: 'hidden' }, noticeMain: { padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, noticeIcon: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, noticeTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 }, noticeTitle: { flexShrink: 1, fontSize: 13, lineHeight: 18, fontWeight: '900' }, dot: { width: 7, height: 7, borderRadius: 4 }, scopeLabel: { fontSize: 9.5, fontWeight: '800', marginTop: 1 }, noticeBody: { fontSize: 11.5, lineHeight: 17, marginTop: 4 }, noticeMeta: { fontSize: 9.5, lineHeight: 14, marginTop: 6 }, noticeActions: { minHeight: 38, borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: spacing.lg }, noticeActionText: { fontSize: 10.5, fontWeight: '800' }, endOfList: { fontSize: 10.5, textAlign: 'center', paddingVertical: spacing.sm }, pressed: { opacity: 0.8 },
   inviteCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm }, inviteTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, inviteIcon: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, inviteTitle: { fontSize: 12.5, fontWeight: '900' }, inviteMeta: { fontSize: 9.5, lineHeight: 14, marginTop: 2 }, inviteBody: { fontSize: 11.5, lineHeight: 17 }, actions: { flexDirection: 'row', justifyContent: 'flex-end', flexWrap: 'wrap', gap: spacing.sm }, historyRow: { minHeight: 60, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
 });
