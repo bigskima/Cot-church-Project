@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, PermissionsAndroid, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Avatar, Icon } from '@/components';
@@ -9,6 +9,16 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { AgoraCallSession } from './AgoraCallSession';
 import type { ActiveCallPayload, JoinedCallPayload } from './call-types';
+
+async function requestNativeCallPermissions(video: boolean) {
+  if (Platform.OS !== 'android') return true;
+  const permissions = [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO];
+  if (video) permissions.push(PermissionsAndroid.PERMISSIONS.CAMERA);
+  const result = await PermissionsAndroid.requestMultiple(permissions);
+  const microphoneGranted = result[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] === PermissionsAndroid.RESULTS.GRANTED;
+  const cameraGranted = !video || result[PermissionsAndroid.PERMISSIONS.CAMERA] === PermissionsAndroid.RESULTS.GRANTED;
+  return microphoneGranted && cameraGranted;
+}
 
 export function CallExperience({ callId, autoAnswer = false }: { callId: string; autoAnswer?: boolean }) {
   const { api, context, mode } = useSession();
@@ -45,6 +55,13 @@ export function CallExperience({ callId, autoAnswer = false }: { callId: string;
     setJoining(true);
     setError('');
     try {
+      const permissionGranted = await requestNativeCallPermissions(call?.call_kind === 'video');
+      if (!permissionGranted) {
+        setError(call?.call_kind === 'video'
+          ? 'Microphone and camera access are required for this video call.'
+          : 'Microphone access is required for this audio call.');
+        return;
+      }
       const data = await api.request<JoinedCallPayload>('noop?service=calls', {
         method: 'POST',
         context: 'public',

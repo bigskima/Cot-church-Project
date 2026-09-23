@@ -244,9 +244,22 @@ export function RichMessageBubble({
 
   return (
     <View style={[styles.outer, mine && styles.outerMine]}>
-      <View style={[styles.swipeReply, mine ? styles.swipeReplyMine : styles.swipeReplyTheirs]}>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.swipeReply,
+          mine ? styles.swipeReplyMine : styles.swipeReplyTheirs,
+          {
+            opacity: translateX.interpolate({
+              inputRange: [0, 18, 54],
+              outputRange: [0, 0.35, 1],
+              extrapolate: 'clamp',
+            }),
+          },
+        ]}
+      >
         <Icon name="arrow-undo" size={17} color={colors.interactive} />
-      </View>
+      </Animated.View>
       <Animated.View
         {...panResponder.panHandlers}
         style={[styles.row, mine && styles.rowMine, { transform: [{ translateX }] }]}

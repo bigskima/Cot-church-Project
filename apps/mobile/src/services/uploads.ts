@@ -58,10 +58,13 @@ export async function readUploadFile(file: UploadFile): Promise<Blob> {
  * upload so Android/iOS picker aliases match the Storage bucket allow-list.
  */
 export async function putSignedUpload(signedUploadUrl: string, file: UploadFile): Promise<number> {
-  const body = await readUploadFile(file);
+  const source = await readUploadFile(file);
+  const mimeType = normalizeUploadMime(file.name, file.mimeType);
+  const body = source.type === mimeType
+    ? source
+    : new Blob([await source.arrayBuffer()], { type: mimeType });
   const size = Number(body.size || file.size || 0);
   if (!size) throw new Error('The selected file is empty. Choose another file.');
-  const mimeType = normalizeUploadMime(file.name, file.mimeType);
 
   let lastError: Error | null = null;
   for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt += 1) {
@@ -74,8 +77,9 @@ export async function putSignedUpload(signedUploadUrl: string, file: UploadFile)
 
       if (response.ok) return size;
 
-      const detail = await response.text().catch(() => '');
-      const error = new Error(`File upload failed (${response.status})${detail ? `: ${detail.slice(0, 160)}` : ''}.`);
+      const error = new Error(response.status === 415
+        ? 'This file format could not be uploaded. Choose the file again and retry.'
+        : `File upload failed (${response.status}). Please try again.`);
       if (!TRANSIENT_UPLOAD_STATUSES.has(response.status) || attempt >= RETRY_DELAYS_MS.length) throw error;
       lastError = error;
     } catch (value) {

@@ -116,12 +116,12 @@ export async function registerPushDevice(api: ApiClient, requestPermission = tru
     });
     await persistToken(token);
     return { state: 'registered', permission: 'granted', token };
-  } catch (error) {
+  } catch {
     return {
       state: 'error',
       permission: (await currentPushPermission().catch(() => ({ status: 'unknown' }))).status,
       token: null,
-      message: error instanceof Error ? error.message : 'Unable to enable push notifications on this device.',
+      message: 'COT could not finish push registration on this device. Your in-app notifications still work.',
     };
   }
 }

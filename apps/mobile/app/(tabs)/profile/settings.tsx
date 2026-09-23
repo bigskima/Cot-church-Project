@@ -105,6 +105,7 @@ export default function AccountSettingsScreen() {
       const updated = await api.request<ProfilePayload>('profile', {
         method: 'PATCH',
         context: 'public',
+        feedback: false,
         body: JSON.stringify({
           displayName: displayName.trim(),
           username: username.trim(),
@@ -171,7 +172,13 @@ export default function AccountSettingsScreen() {
         } as any);
       }
 
-      const response = await api.request<{ avatarUrl: string }>('profile-avatar', { method: 'POST', context: 'public', body: form });
+      const response = await api.request<{ avatarUrl: string }>('profile-avatar', {
+        method: 'POST',
+        context: 'public',
+        feedback: false,
+        timeoutMs: 120_000,
+        body: form,
+      });
       setProfile((current) => current ? { ...current, avatar_url: response.avatarUrl } : current);
       updateContextProfile({ avatar_url: response.avatarUrl });
       setSuccess('Profile photo updated.');
@@ -187,7 +194,7 @@ export default function AccountSettingsScreen() {
     setError('');
     setSuccess('');
     try {
-      await api.request<{ avatarUrl: null }>('profile-avatar', { method: 'DELETE', context: 'public' });
+      await api.request<{ avatarUrl: null }>('profile-avatar', { method: 'DELETE', context: 'public', feedback: false });
       setProfile((current) => current ? { ...current, avatar_url: null } : current);
       updateContextProfile({ avatar_url: undefined });
       setSuccess('Profile photo removed.');
@@ -241,6 +248,8 @@ export default function AccountSettingsScreen() {
       const response = await api.request<{ bannerUrl: string }>('profile-banner', {
         method: 'POST',
         context: 'public',
+        feedback: false,
+        timeoutMs: 120_000,
         body: form,
       });
       setProfile((current) => current ? { ...current, banner_url: response.bannerUrl } : current);
@@ -258,7 +267,7 @@ export default function AccountSettingsScreen() {
     setError('');
     setSuccess('');
     try {
-      await api.request<{ bannerUrl: null }>('profile-banner', { method: 'DELETE', context: 'public' });
+      await api.request<{ bannerUrl: null }>('profile-banner', { method: 'DELETE', context: 'public', feedback: false });
       setProfile((current) => current ? { ...current, banner_url: null } : current);
       updateContextProfile({ banner_url: undefined });
       setSuccess('Profile banner removed.');
