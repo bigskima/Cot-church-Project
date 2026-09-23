@@ -27,7 +27,7 @@ function fallbackRoute(pathname: string) {
 export function ScreenHeader({
   title,
   subtitle,
-  showBack = false,
+  showBack,
   onBack,
   rightAction,
   style,
@@ -36,6 +36,11 @@ export function ScreenHeader({
 }: ScreenHeaderProps) {
   const { colors } = useTheme();
   const pathname = usePathname();
+  const normalizedPath = pathname.replace(/\/+$/, '') || '/general';
+  const autoGeneralBack = normalizedPath.startsWith('/general/')
+    && normalizedPath !== '/general/explore'
+    && normalizedPath !== '/general/reels';
+  const shouldShowBack = showBack ?? autoGeneralBack;
 
   const handleBack = () => {
     if (onBack) {
@@ -62,7 +67,7 @@ export function ScreenHeader({
         style,
       ]}
     >
-      {showBack ? (
+      {shouldShowBack ? (
         <Pressable
           onPress={handleBack}
           hitSlop={8}
