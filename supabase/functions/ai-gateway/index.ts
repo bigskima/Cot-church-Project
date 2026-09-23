@@ -563,9 +563,14 @@ Deno.serve(createHandler(
             notice: recipientNotice,
           };
         } catch {
-          // The assistant response must still reach the member even if care routing
-          // is temporarily unavailable. The response itself tells them to seek
-          // immediate local human help when safety is at risk.
+          care = {
+            category: careAssessment.category,
+            severity: careAssessment.severity,
+            offerPastoralSupport: true,
+            alertCreated: false,
+            alertId: null,
+            notice: "COT AI could not confirm that a pastoral alert was delivered. Please contact local emergency services and a trusted person who can physically reach you now, and contact a church leader directly when you can.",
+          };
         }
       }
       if (!care) {
