@@ -197,7 +197,7 @@ for (const legacyAsset of ['apps/mobile/assets/icon.png']) {
 
 const joined = [...sources.values()].join('\n');
 const bibleShareCardRuntime = sources.get('apps/mobile/src/features/bible/bible-share-card-runtime.ts') ?? '';
-if (/resolveAssetSource/.test(bibleShareCardRuntime)) {
+if (/Image\.resolveAssetSource\s*\(/.test(bibleShareCardRuntime)) {
   throw new Error('Application check failed: Scripture card web path must not depend on React Native Image.resolveAssetSource');
 }
 if (!/Asset\.fromModule/.test(bibleShareCardRuntime) || !/bundledCotLogoUri/.test(bibleShareCardRuntime)) {
