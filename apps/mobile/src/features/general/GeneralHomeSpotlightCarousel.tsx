@@ -71,7 +71,9 @@ export function GeneralHomeSpotlightCarousel() {
   const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
   const scrollRef = useRef<ScrollView>(null);
   const [index, setIndex] = useState(0);
-  const cardWidth = Math.min(Math.max(width - spacing.md * 2, 300), 900);
+  const [viewportWidth, setViewportWidth] = useState(0);
+  const fallbackWidth = Math.min(Math.max(width - spacing.sm * 2, 300), 1120);
+  const cardWidth = viewportWidth || fallbackWidth;
 
   const bible = useResource<BibleToday | null>(
     'home:spotlight:bible:' + organizationId,
@@ -185,7 +187,13 @@ export function GeneralHomeSpotlightCarousel() {
   if (!items.length) return null;
 
   return (
-    <View style={styles.wrap}>
+    <View
+      style={styles.wrap}
+      onLayout={(event) => {
+        const nextWidth = Math.round(event.nativeEvent.layout.width);
+        if (nextWidth > 0 && nextWidth !== viewportWidth) setViewportWidth(nextWidth);
+      }}
+    >
       <ScrollView
         ref={scrollRef}
         horizontal
@@ -255,7 +263,7 @@ export function GeneralHomeSpotlightCarousel() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: 7 },
+  wrap: { gap: 7, width: '100%', overflow: 'hidden' },
   track: { alignItems: 'stretch' },
   card: { marginHorizontal: 0, minHeight: 190, aspectRatio: 2.15, borderWidth: 1, borderRadius: radius.xl, overflow: 'hidden' },
   image: { ...StyleSheet.absoluteFill as any, width: '100%', height: '100%' },

@@ -127,7 +127,8 @@ export function CotGlobalActions() {
   }, [bounds.maxX, bounds.maxY, bounds.minX, bounds.minY, hidden, pan, persist, ready]);
 
   if (mode !== 'authenticated' || !accessReady || !ready || hidden || actionCount === 0) return null;
-  if (HIDDEN_EXACT.has(pathname) || HIDDEN_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return null;
+  const isChatSurface = pathname === '/general/chat' || /\/chat(?:\/|$)/.test(pathname);
+  if (HIDDEN_EXACT.has(pathname) || HIDDEN_PREFIXES.some((prefix) => pathname.startsWith(prefix)) || isChatSurface) return null;
 
   const openAssistant = () => {
     router.push({

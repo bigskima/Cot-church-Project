@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { router, Tabs, usePathname } from 'expo-router';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View, type ColorValue } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/primitives/Icon';
 import { radius, shadows, spacing } from '@/design-system/tokens';
@@ -10,20 +10,23 @@ import { TourAnchor } from '@/features/tour/AppTourProvider';
 
 const TAB_ICON_SIZE = 22;
 const hidden = { href: null } as const;
-// Reels is intentionally excluded: immersive playback owns the full screen and
-// supplies its own Back/Create controls instead of the primary bottom bar.
-const PRIMARY_GENERAL_PATHS = new Set(['/general', '/general/explore', '/general/chat', '/general/profile']);
+// Reels, Messages and You intentionally hide the primary bottom bar once opened.
+// Home/Discover still expose all primary destinations, but focused conversation,
+// profile and immersive playback screens get the full viewport.
+const PRIMARY_GENERAL_PATHS = new Set(['/general', '/general/explore']);
 const PRIMARY_TAB_NAMES = ['index', 'explore', 'reels', 'chat', 'profile'] as const;
 
 function PrimaryGeneralTabBar({ state, descriptors, navigation }: any) {
   const { colors } = useTheme();
   const { mode } = useSession();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const bottomInset = Math.max(insets.bottom, Platform.OS === 'web' ? 9 : 7);
+  const tabWidth = Math.min(Math.max(width - 16, 280), 620);
   const routes = state.routes.filter((route: any) => PRIMARY_TAB_NAMES.includes(route.name));
 
   return (
-    <View style={[styles.tabBar, { backgroundColor: colors.glass, borderColor: colors.borderSubtle, minHeight: 64 + bottomInset, paddingBottom: bottomInset }, shadows.floating]}>
+    <View style={[styles.tabBar, Platform.OS === 'web' && styles.tabBarWeb, { width: tabWidth, backgroundColor: colors.glass, borderColor: colors.borderSubtle, minHeight: 64 + bottomInset, paddingBottom: bottomInset }, shadows.floating]}>
       <TourAnchor targetKey="general.navigation" style={styles.tabItems}>
       {routes.map((route: any) => {
         const routeIndex = state.routes.findIndex((candidate: any) => candidate.key === route.key);
@@ -201,7 +204,8 @@ const styles = StyleSheet.create({
   iconStack: { height: 36, alignItems: 'center', justifyContent: 'center', gap: 2 },
   iconShell: { minWidth: 42, height: 31, borderRadius: 13, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 9 },
   activeDot: { width: 4, height: 4, borderRadius: 2 },
-  tabBar: { marginHorizontal: 14, marginBottom: 10, maxWidth: 620, alignSelf: 'center', width: '100%', borderWidth: 1, borderRadius: 28, overflow: 'hidden', paddingHorizontal: 4, paddingTop: 5 },
+  tabBar: { marginBottom: 10, maxWidth: 620, alignSelf: 'center', borderWidth: 1, borderRadius: 28, overflow: 'hidden', paddingHorizontal: 4, paddingTop: 5 },
+  tabBarWeb: { marginBottom: 0 },
   tabItems: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-around' },
   customTabItem: { flex: 1, minHeight: 58, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 2 },
   pressedTab: { opacity: 0.72, transform: [{ scale: 0.97 }] },

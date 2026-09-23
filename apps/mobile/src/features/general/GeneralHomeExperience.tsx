@@ -337,7 +337,7 @@ export default function GeneralHomeExperience() {
           keyboardDismissMode="on-drag"
           ListHeaderComponent={header}
           ListEmptyComponent={<View style={[styles.emptyHome, { width: contentWidth }]}><EmptyState title="General COT is ready" message="Sermons, media and community activity will form the feed here. Events and announcements live in the Home spotlight above." iconName="home-outline" /></View>}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 132 }}
+          contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, spacing.md) + spacing.lg }}
           refreshControl={<RefreshControl refreshing={resource.refreshing} onRefresh={refreshHome} tintColor={colors.interactive} colors={[colors.interactive]} progressBackgroundColor={colors.card} />}
           renderItem={({ item }) => {
             if (item.kind === 'section') return <View style={[styles.fullWidthItem, { width: contentWidth }]}>{renderSection(item)}</View>;
@@ -355,7 +355,7 @@ export default function GeneralHomeExperience() {
           accessibilityLabel="Create"
           style={({ pressed }) => [
             styles.createFab,
-            { bottom: insets.bottom + 88, backgroundColor: colors.interactive },
+            { bottom: Math.max(insets.bottom, 8) + 14, backgroundColor: colors.interactive },
             pressed && styles.createFabPressed,
           ]}
         >

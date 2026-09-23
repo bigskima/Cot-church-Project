@@ -90,9 +90,6 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
       setPendingForwardText(routeParams.forwardText);
     }
   }, [routeParams.forwardText]);
-  const generalThreadBottomInset = embeddedExpression
-    ? 0
-    : 75 + Math.max(insets.bottom, Platform.OS === 'web' ? 10 : 8);
   useEffect(() => {
     const timer = setTimeout(() => setNormalizedFilter(filter.trim().replace(/^@/, '').toLowerCase()), 250);
     return () => clearTimeout(timer);
@@ -370,7 +367,7 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
     const threadBadge = threadPerson?.badges?.[0];
     return (
       <KeyboardAvoidingView
-        style={[styles.screen, { backgroundColor: colors.bg, paddingBottom: generalThreadBottomInset }]}
+        style={[styles.screen, { backgroundColor: colors.bg }]}
         behavior={PLATFORM_KEYBOARD_BEHAVIOR}
         keyboardVerticalOffset={PLATFORM_KEYBOARD_VERTICAL_OFFSET}
       >
@@ -417,6 +414,7 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
         ) : (
           <FlatList
             ref={messageListRef}
+            style={styles.messageList}
             data={timeline}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.messages}
@@ -594,6 +592,7 @@ const styles = StyleSheet.create({
   username: { fontSize: 11, marginTop: 1 },
   pinnedBanner: { minHeight: 38, borderBottomWidth: StyleSheet.hairlineWidth, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', gap: 7 },
   pinnedText: { flex: 1, fontSize: 11, fontWeight: '700' },
+  messageList: { flex: 1, minHeight: 0 },
   messages: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, gap: spacing.xs, flexGrow: 1, justifyContent: 'flex-end' },
   bubble: { maxWidth: '84%', borderWidth: 1, borderRadius: 18, paddingHorizontal: 13, paddingVertical: 9 },
   mine: { alignSelf: 'flex-end', borderBottomRightRadius: 5 },
