@@ -141,6 +141,23 @@ function memberConversationExcerpt(prompt: string) {
   return userLines.join("\n").slice(-6000);
 }
 
+function protectedCredentialReply(prompt: string) {
+  const current = extractCurrentMemberMessage(prompt);
+  const text = current.toLowerCase();
+  const asksForSecret =
+    /\b(?:what(?:'s| is)|tell me|give me|show me|send me|reveal|find|retrieve|get)\b[\s\S]{0,80}\b(?:password|passcode|api key|secret key|access token|refresh token|admin credential|administrator credential|private key|service role key)\b/.test(text) ||
+    /\b(?:platform admin|platform administrator|supabase|vercel|netlify|api)\b[\s\S]{0,60}\b(?:password|credential|key|token|secret)\b/.test(text);
+  const legitimateHelp = /\b(?:reset|forgot|change|recover|create|set|sign in|login|log in|invitation|invite|access request)\b/.test(text);
+  if (!asksForSecret || legitimateHelp) return null;
+  return [
+    "I can’t provide or retrieve passwords, Platform Administration credentials, API keys, tokens, private keys, or other protected secrets.",
+    "",
+    "Those credentials are private and are not part of COT AI’s accessible knowledge. If you need legitimate access, use the official sign-in or password-reset process, or ask an authorised Platform Super Admin to invite or assist you.",
+    "",
+    "I can still explain how the authorised access process works without exposing any secret."
+  ].join("\n");
+}
+
 function assessPastoralNeed(prompt: string): CareAssessment | null {
   const current = extractCurrentMemberMessage(prompt);
   const history = memberConversationExcerpt(prompt);
@@ -507,6 +524,19 @@ Deno.serve(createHandler(
     }
 
     const prompt = requiredString(body.prompt, "prompt", 12000);
+    if (capability === "assistant.answer") {
+      const protectedReply = protectedCredentialReply(prompt);
+      if (protectedReply) {
+        return {
+          data: {
+            status: "succeeded",
+            content: protectedReply,
+            guardrail: "protected_information",
+          },
+          status: 200,
+        };
+      }
+    }
     const entityType = optionalString(body.entityType, "entityType", 50);
     const entityId = body.entityId ? uuid(String(body.entityId), "entityId", true) : undefined;
     const verifiedContext = capability === "assistant.answer" ? await assistantContext(auth, entityType, entityId) : "";
