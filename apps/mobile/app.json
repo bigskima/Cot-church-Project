@@ -14,7 +14,7 @@
     },
     "orientation": "default",
     "userInterfaceStyle": "automatic",
-    "icon": "./assets/cot-family-logo.jpg",
+    "icon": "./assets/cot-family-logo.png",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -48,7 +48,8 @@
           "image": "./assets/splash.png",
           "imageWidth": 240
         }
-      ]
+      ],
+      "./plugins/with-android-size-optimizations"
     ],
     "experiments": {
       "typedRoutes": true
@@ -65,7 +66,7 @@
       "package": "com.cot.app",
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/cot-family-logo.jpg",
+        "foregroundImage": "./assets/cot-family-logo.png",
         "backgroundColor": "#091733"
       },
       "splash": {
@@ -77,12 +78,13 @@
         "CAMERA",
         "RECORD_AUDIO",
         "POST_NOTIFICATIONS"
-      ]
+      ],
+      "icon": "./assets/cot-family-logo.png"
     },
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/cot-family-logo.jpg"
+      "favicon": "./assets/cot-family-logo.png"
     },
     "extra": {
       "eas": {
