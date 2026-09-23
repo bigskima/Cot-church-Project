@@ -3,9 +3,8 @@ import { Image, StyleSheet, View, StyleProp, ViewStyle, ImageStyle } from 'react
 import { useBranding } from '@/state/branding';
 import { useTheme } from '@/state/theme';
 
-// Use a verified PNG for the bundled fallback. The previous
-// cot-family-logo.png contains JPEG bytes despite its .png extension,
-// which Android AAPT rejects during release resource compilation.
+// Use the verified splash PNG for the shared bundled fallback. The dedicated
+// COT family logo is stored as .jpg because its source bytes are JPEG.
 const defaultCotLogo = require('../../../assets/splash.png');
 
 export interface BrandMarkProps {
