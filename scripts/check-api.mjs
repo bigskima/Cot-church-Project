@@ -204,7 +204,8 @@ const socialChatContracts = [
 
 const invariants = [
   [aiGateway, /protectedCredentialReply[\s\S]*Platform Administration credentials[\s\S]*protected_information/, 'COT AI refuses protected credentials deterministically'],
-  [aiGateway, /assistantBoundaryReply[\s\S]*assistant_boundaries[\s\S]*authorised pastoral-care roles/, 'COT AI explains privacy, access and pastoral-safety limits explicitly'],
+  [aiGateway, /assistantBoundaryReply[\s\S]*authorised pastoral-care roles/, 'COT AI explains privacy, access and pastoral-safety limits explicitly'],
+  [aiGateway, /guardrail:\s*"assistant_boundaries"/, 'COT AI boundary questions use the deterministic assistant-boundaries guardrail'],
   [aiGateway, /request_pastoral_support[\s\S]*createPastoralAlert[\s\S]*member_requested/, 'COT AI supports explicit member-requested pastoral care'],
   [aiGateway, /self_harm_risk[\s\S]*autoEscalate:\s*true[\s\S]*createPastoralAlert[\s\S]*automatic_safety/, 'COT AI immediate safety signals can trigger transparent pastoral escalation'],
   [cotLifeGuidance, /emotional-distress[\s\S]*Psalm 34:18[\s\S]*anxiety-fear[\s\S]*grief-loss/, 'COT AI curated life guidance includes Scripture-grounded support'],
