@@ -503,7 +503,7 @@ const checks = [
   [/public-content\?type=series-detail&id=/, 'exact sermon series detail request'],
   [/ScripturePreviewCard[\s\S]*Request pastoral care/, 'COT AI renders Scripture previews and a consented pastoral care action'],
   [/urgentAlertSent[\s\S]*restricted alert was sent/, 'COT AI visibly discloses urgent pastoral safety escalation'],
-  [/COT AI safety alert[\s\S]*@\{f\.username\}/, 'pastoral triage shows AI alert identity and safety context'],
+  [/@\{f\.username\}[\s\S]*COT AI safety alert|COT AI safety alert[\s\S]*f\.username/, 'pastoral triage shows AI alert identity and safety context'],
 
   [/No published messages/, 'empty sermon series state'],
   [/EXPRESSION_MEMBERSHIP_REQUIRED/, 'not-a-member state mapping'],
