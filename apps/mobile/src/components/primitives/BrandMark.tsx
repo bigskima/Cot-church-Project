@@ -3,9 +3,9 @@ import { Image, StyleSheet, View, StyleProp, ViewStyle, ImageStyle } from 'react
 import { useBranding } from '@/state/branding';
 import { useTheme } from '@/state/theme';
 
-// Use the verified splash PNG for the shared bundled fallback. The dedicated
-// COT family logo is stored as .jpg because its source bytes are JPEG.
-const defaultCotLogo = require('../../../assets/splash.png');
+// Use the dedicated COT Family artwork for every bundled COT brand fallback.
+// Splash artwork is a launch-screen asset and should not leak into in-app branding.
+const defaultCotLogo = require('../../../assets/cot-family-logo.png');
 
 export interface BrandMarkProps {
   variant?: 'auth' | 'header' | 'compact' | 'icon';
