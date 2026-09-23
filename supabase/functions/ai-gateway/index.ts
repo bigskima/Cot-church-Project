@@ -108,11 +108,202 @@ function appRoutes(branchId: string | null) {
     groups: expressionBase ? `${expressionBase}/groups` : "/expressions",
     story: "/general/church-story",
     expressionHome: expressionBase,
+    pastoralCare: branchId ? `${expressionBase}/manage/prayer` : "/general/leadership/pastoral-triage",
   };
 }
 
 function compactText(value: unknown, maximum = 4000) {
   return typeof value === "string" ? value.trim().slice(0, maximum) : value;
+}
+
+type CareCategory = "emotional_distress" | "self_harm_risk" | "harm_to_others_risk" | "abuse_or_immediate_safety" | "grief_or_loss" | "other";
+type CareSeverity = "support" | "elevated" | "urgent";
+type CareAssessment = {
+  category: CareCategory;
+  severity: CareSeverity;
+  offerPastoralSupport: boolean;
+  autoEscalate: boolean;
+  requiresImmediateAttention: boolean;
+  summary: string;
+  memberNotice: string;
+};
+
+function extractCurrentMemberMessage(prompt: string) {
+  const match = prompt.match(/Current member message:\s*([\s\S]*?)(?:\n\n|$)/i);
+  return (match?.[1] ?? prompt).trim().slice(0, 2000);
+}
+
+function memberConversationExcerpt(prompt: string) {
+  const userLines = [...prompt.matchAll(/^Member:\s*(.+)$/gmi)].map((match) => match[1].trim()).filter(Boolean);
+  const current = extractCurrentMemberMessage(prompt);
+  if (current && !userLines.some((item) => item === current)) userLines.push(current);
+  return userLines.join("\n").slice(-6000);
+}
+
+function assessPastoralNeed(prompt: string): CareAssessment | null {
+  const current = extractCurrentMemberMessage(prompt);
+  const history = memberConversationExcerpt(prompt);
+  const text = (history || current).toLowerCase();
+
+  const selfHarm = [
+    /\bkill myself\b/, /\bend my life\b/, /\btake my own life\b/, /\bhurt myself\b/,
+    /\bself[- ]harm\b/, /\bi(?:'m| am) suicidal\b/, /\bi want to die\b/,
+    /\bi (?:do not|don't) want to live\b/, /\bno reason to live\b/,
+  ].some((pattern) => pattern.test(text));
+  if (selfHarm) {
+    return {
+      category: "self_harm_risk",
+      severity: "urgent",
+      offerPastoralSupport: true,
+      autoEscalate: true,
+      requiresImmediateAttention: true,
+      summary: "COT AI detected language indicating possible immediate self-harm or suicide risk. Please review this confidential alert and contact the member promptly.",
+      memberNotice: "Because your message may indicate an immediate safety risk, COT AI has confidentially alerted the authorised pastoral care team for your current church space. Pastoral support is additional to emergency or professional help.",
+    };
+  }
+
+  const harmToOthers = [
+    /\bi(?:'m| am)? going to (?:kill|hurt|harm) (?:someone|him|her|them|people)\b/,
+    /\bi want to (?:kill|hurt|harm) (?:someone|him|her|them|people)\b/,
+    /\bi might (?:kill|hurt|harm) (?:someone|him|her|them|people)\b/,
+  ].some((pattern) => pattern.test(text));
+  if (harmToOthers) {
+    return {
+      category: "harm_to_others_risk",
+      severity: "urgent",
+      offerPastoralSupport: true,
+      autoEscalate: true,
+      requiresImmediateAttention: true,
+      summary: "COT AI detected language indicating a possible immediate risk of harm to another person. Please review this confidential alert promptly.",
+      memberNotice: "Because your message may indicate an immediate safety risk, COT AI has confidentially alerted the authorised pastoral care team for your current church space. Please also seek immediate local emergency help if anyone may be in danger.",
+    };
+  }
+
+  const immediateSafety = [
+    /\bi(?:'m| am) not safe\b/, /\bsomeone (?:is )?(?:hurting|beating|threatening) me\b/,
+    /\bi(?:'m| am) being abused\b/, /\bdomestic violence\b/, /\bsexual assault\b/,
+    /\bsomeone (?:is )?going to kill me\b/,
+  ].some((pattern) => pattern.test(text));
+  if (immediateSafety) {
+    return {
+      category: "abuse_or_immediate_safety",
+      severity: "urgent",
+      offerPastoralSupport: true,
+      autoEscalate: true,
+      requiresImmediateAttention: true,
+      summary: "COT AI detected language indicating possible abuse or immediate personal danger. Please review this confidential alert and contact the member promptly.",
+      memberNotice: "Because your message may indicate immediate danger, COT AI has confidentially alerted the authorised pastoral care team for your current church space. If you are in immediate danger, contact local emergency services or a trusted person who can reach you now.",
+    };
+  }
+
+  const severeDistress = [
+    /\bi (?:can't|cannot) go on\b/, /\bi(?:'m| am) hopeless\b/, /\bnothing matters anymore\b/,
+    /\bi(?:'m| am) breaking down\b/, /\bi(?:'m| am) in crisis\b/,
+  ].some((pattern) => pattern.test(text));
+  if (severeDistress) {
+    return {
+      category: "emotional_distress",
+      severity: "elevated",
+      offerPastoralSupport: true,
+      autoEscalate: false,
+      requiresImmediateAttention: false,
+      summary: "The member described significant emotional distress and requested or may benefit from confidential pastoral support.",
+      memberNotice: "If you want, you can ask COT AI to send a confidential pastoral support request to the authorised care team in this church space.",
+    };
+  }
+
+  const grief = /\b(grieving|grief|bereaved|bereavement|lost (?:my|someone)|death of my|died)\b/.test(text);
+  if (grief) {
+    return {
+      category: "grief_or_loss",
+      severity: "support",
+      offerPastoralSupport: true,
+      autoEscalate: false,
+      requiresImmediateAttention: false,
+      summary: "The member is dealing with grief or loss and may appreciate confidential pastoral support.",
+      memberNotice: "If you want, you can ask COT AI to send a confidential pastoral support request to the authorised care team in this church space.",
+    };
+  }
+
+  const emotionalDistress = /\b(i(?:'m| am) depressed|depression|i feel depressed|i(?:'m| am) overwhelmed|i feel hopeless|i(?:'m| am) anxious|panic attacks?|i feel lonely|i(?:'m| am) very sad|i can(?:'t|not) cope)\b/.test(text);
+  if (emotionalDistress) {
+    return {
+      category: "emotional_distress",
+      severity: "support",
+      offerPastoralSupport: true,
+      autoEscalate: false,
+      requiresImmediateAttention: false,
+      summary: "The member described emotional distress and may appreciate confidential pastoral support.",
+      memberNotice: "If you want, you can ask COT AI to send a confidential pastoral support request to the authorised care team in this church space.",
+    };
+  }
+
+  return null;
+}
+
+async function createPastoralAlert(
+  auth: any,
+  assessment: CareAssessment,
+  prompt: string,
+  sourceMode: "member_requested" | "automatic_safety",
+) {
+  const admin = adminClient();
+  const excerpt = memberConversationExcerpt(prompt);
+  const lastMemberMessage = extractCurrentMemberMessage(prompt);
+  const since = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+
+  let existingQuery = admin
+    .from("ai_pastoral_alerts")
+    .select("id,status,severity")
+    .eq("organization_id", auth.organizationId)
+    .eq("profile_id", auth.user.id)
+    .eq("category", assessment.category)
+    .in("status", ["new", "contacted"])
+    .gte("created_at", since)
+    .order("created_at", { ascending: false })
+    .limit(1);
+  existingQuery = auth.branchId
+    ? existingQuery.eq("branch_id", auth.branchId)
+    : existingQuery.is("branch_id", null);
+
+  const { data: existing, error: existingError } = await existingQuery.maybeSingle();
+  if (existingError) throw new ApiError("AI_PASTORAL_ALERT_FAILED", "Unable to prepare pastoral support", 500, undefined, false);
+
+  if (existing?.id) {
+    const { error } = await admin
+      .from("ai_pastoral_alerts")
+      .update({
+        severity: assessment.severity,
+        summary: assessment.summary,
+        conversation_excerpt: excerpt,
+        last_member_message: lastMemberMessage,
+        requires_immediate_attention: assessment.requiresImmediateAttention,
+        member_notified: true,
+      })
+      .eq("id", existing.id);
+    if (error) throw new ApiError("AI_PASTORAL_ALERT_FAILED", "Unable to update pastoral support", 500, undefined, false);
+    return { id: existing.id, created: false };
+  }
+
+  const { data, error } = await admin
+    .from("ai_pastoral_alerts")
+    .insert({
+      organization_id: auth.organizationId,
+      branch_id: auth.branchId ?? null,
+      profile_id: auth.user.id,
+      category: assessment.category,
+      severity: assessment.severity,
+      source_mode: sourceMode,
+      summary: assessment.summary,
+      conversation_excerpt: excerpt,
+      last_member_message: lastMemberMessage,
+      requires_immediate_attention: assessment.requiresImmediateAttention,
+      member_notified: true,
+    })
+    .select("id")
+    .single();
+  if (error || !data) throw new ApiError("AI_PASTORAL_ALERT_FAILED", "Unable to send pastoral support", 500, undefined, false);
+  return { id: data.id, created: true };
 }
 
 function publicLocation(settings: unknown) {
@@ -250,6 +441,9 @@ async function assistantContext(auth: any, entityType?: string, entityId?: strin
         : "When a member asks how to send prayer, direct them to routes.generalPrayer. If they specifically want an Expression prayer request, direct them to routes.expressions first.",
       navigation: "When the member asks where or how to do something in COT, name the exact verified destination from routes. Never invent a route.",
       formatting: "You may use Markdown for useful headings, bold emphasis, italic emphasis and lists. The COT app renders this formatting. Do not expose implementation syntax as an explanation.",
+      lifeSupport: "COT AI may offer compassionate Bible-grounded encouragement for grief, loneliness, anxiety, depression, conflict, spiritual struggle, relationships and difficult decisions. It must not diagnose a mental or physical condition, replace a qualified clinician, lawyer, financial professional, emergency service, or human pastoral care, or present itself as a pastor.",
+      secrets: "Passwords, administrator credentials, API keys, tokens, secret references, private invitation codes, private messages, confidential pastoral records and other protected information are outside the assistant's public knowledge. Never reveal, infer, fabricate or help bypass them. Explain the boundary politely and direct the person to the legitimate account or ministry process.",
+      safety: "If someone may be in immediate danger, suicidal, self-harming, or threatening serious harm, prioritize immediate safety, encourage contacting local emergency services and a trusted person who can physically reach them, and make clear that pastoral care is additional support rather than a replacement for emergency or professional help.",
     },
   });
 }
@@ -270,7 +464,26 @@ Deno.serve(createHandler(
     }
 
     const body = assertObject(await jsonBody(request));
-    assertNoUnknownFields(body, ["capability", "prompt", "language", "entityType", "entityId"]);
+    assertNoUnknownFields(body, ["action", "capability", "prompt", "language", "entityType", "entityId", "careContext"]);
+    const action = optionalString(body.action, "action", 50);
+    if (action === "request_pastoral_support") {
+      await assertFeatureEnabled(adminClient(), "pastoral_care", { organizationId: auth.organizationId, expressionId: auth.branchId ?? null }, "Pastoral care is currently unavailable in this area.");
+      const careContext = optionalString(body.careContext, "careContext", 6000) ?? optionalString(body.prompt, "prompt", 12000) ?? "Member requested pastoral support through COT AI.";
+      const detected = assessPastoralNeed(careContext);
+      const assessment: CareAssessment = detected ?? {
+        category: "other",
+        severity: "support",
+        offerPastoralSupport: true,
+        autoEscalate: false,
+        requiresImmediateAttention: false,
+        summary: "The member requested confidential pastoral support through COT AI.",
+        memberNotice: "Your confidential pastoral support request has been sent to the authorised care team in this church space.",
+      };
+      const alert = await createPastoralAlert(auth, assessment, careContext, "member_requested");
+      return { data: { care: { alertId: alert.id, alertCreated: true, severity: assessment.severity, notice: "Your confidential pastoral support request has been sent to the authorised care team in this church space." } } };
+    }
+    if (action) throw new ApiError("VALIDATION_FAILED", "Unsupported COT AI action", 422);
+
     const capability = requiredString(body.capability, "capability", 60);
     if (!allowed.has(capability)) throw new ApiError("AI_CAPABILITY_DENIED", "Capability is not available through this endpoint", 422);
 
@@ -290,7 +503,11 @@ Deno.serve(createHandler(
       ? formatCotGuideContext({ audiences: guideAccess.audiences, query: prompt, permissionCodes: guideAccess.permissionCodes, limit: 8 })
       : "";
     const sermonRule = entityType === "sermon" ? " The verified context contains the exact saved sermon. Base the answer on that sermon, including its content_blocks/description/transcript, and never claim that only a fragment was supplied when the verified sermon contains more content." : "";
-    const system = `You are COT AI, the conversational assistant inside City of Transformation. Be natural and useful for ordinary everyday conversation. For church-specific facts, Quick Facts, schedules, leaders, locations, story, sermons, announcements, groups, posts, permissions and navigation, rely on the verified tenant-scoped context and never invent facts or routes. When a verified route exists, tell the member the exact destination in plain language; the app will render matching action buttons. When the person asks how COT works, how to use a screen, what a control does, or how to perform a member or ministry workflow, use the retrieved COT Guide context below as the operating authority. Give practical step-by-step instructions with the visible screen names and expected result. The guide audiences were resolved from the signed-in account. Never expose internal permission codes, and never imply that a ministry tool is available when the verified guide audience does not include ministry or the relevant guide section was filtered out. Keep the active General/Expression scope clear. Never reveal private prayer, counselling, giving, attendance, identity/KYC or private messaging records. Do not pretend to be a pastor or replace human pastoral care. If a church-specific fact is absent from verified context, say that it has not been published or configured yet rather than guessing.${sermonRule} Verified context: ${verifiedContext}\n\nRetrieved COT Guide context:\n${guideContext || "No matching guide section was available for this account and question."}`;
+    const careAssessment = capability === "assistant.answer" ? assessPastoralNeed(prompt) : null;
+    const lifeCareRule = careAssessment
+      ? ` The member's words may reflect ${careAssessment.category.replaceAll("_", " ")} at ${careAssessment.severity} level. Respond with warmth and dignity; do not diagnose. Start with the person's immediate concern rather than a generic disclaimer. Offer simple practical next steps and 1-3 relevant Scripture references so the app can render Bible previews. Prefer naming references (for example Psalm 34:18, Psalm 46:1, Matthew 11:28, Philippians 4:6-7) rather than reproducing long verse text. Encourage human connection and pastoral care. ${careAssessment.requiresImmediateAttention ? "Treat this as a safety-first response: encourage the person to contact local emergency services and a trusted person who can physically reach them now; if possible, encourage them not to stay alone and to move away from anything they could use to hurt themselves or someone else. Never rely on Scripture or pastoral care alone for an immediate safety emergency." : "Pastoral care is optional support; do not imply that ordinary distress has already been reported."}`
+      : "";
+    const system = `You are COT AI, the conversational assistant inside City of Transformation. Be natural, compassionate and useful for ordinary life conversation as well as church guidance. You may help with grief, loneliness, anxiety, depression, relationships, conflict, spiritual questions, difficult decisions and everyday struggles using practical wisdom and Bible-grounded encouragement, while staying within your limits. Never diagnose mental or physical illness, prescribe treatment, or present yourself as a therapist, doctor, lawyer, financial professional or pastor. For high-stakes health, legal, financial or safety matters, encourage appropriate qualified human help. For church-specific facts, Quick Facts, schedules, leaders, locations, story, sermons, announcements, groups, posts, permissions and navigation, rely on the verified tenant-scoped context and never invent facts or routes. When a verified route exists, tell the member the exact destination in plain language; the app will render matching action buttons. When the person asks how the COT App works, how to use a screen, what a control does, or how to perform a member or ministry workflow, use the retrieved COT App Guide context below as the operating authority. Give practical step-by-step instructions with the visible screen names and expected result. The guide audiences were resolved from the signed-in account. Never expose internal permission codes. Never reveal, infer, fabricate or help obtain passwords, Platform Administration credentials, API keys, tokens, secret references, private invitation codes, confidential pastoral records, identity/KYC data, private messages or other protected information. If asked for a password or secret, politely explain that it is private and unavailable to COT AI and point to the legitimate sign-in, reset, invitation or authorised administrator process. Keep the active General/Expression scope clear. Do not pretend to be a pastor or replace human pastoral care. If a church-specific fact is absent from verified context, say that it has not been published or configured yet rather than guessing.${lifeCareRule}${sermonRule} Verified context: ${verifiedContext}\n\nRetrieved COT App Guide context:\n${guideContext || "No matching guide section was available for this account and question."}`;
 
     const result = await runAi({
       organizationId: auth.organizationId,
@@ -310,6 +527,32 @@ Deno.serve(createHandler(
       entityType,
       entityId,
     });
-    return { data: result, status: result.status === "requires_review" ? 202 : 200 };
+
+    let care: Record<string, unknown> | null = null;
+    if (capability === "assistant.answer" && careAssessment) {
+      let alertId: string | null = null;
+      let alertCreated = false;
+      if (careAssessment.autoEscalate) {
+        try {
+          const alert = await createPastoralAlert(auth, careAssessment, prompt, "automatic_safety");
+          alertId = alert.id;
+          alertCreated = true;
+        } catch {
+          // The assistant response must still reach the member even if care routing
+          // is temporarily unavailable. The response itself tells them to seek
+          // immediate local human help when safety is at risk.
+        }
+      }
+      care = {
+        category: careAssessment.category,
+        severity: careAssessment.severity,
+        offerPastoralSupport: careAssessment.offerPastoralSupport,
+        alertCreated,
+        alertId,
+        notice: careAssessment.memberNotice,
+      };
+    }
+
+    return { data: { ...result, ...(care ? { care } : {}) }, status: result.status === "requires_review" ? 202 : 200 };
   },
 ));
