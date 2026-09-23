@@ -167,6 +167,7 @@ const aiGateway = await readFile('supabase/functions/ai-gateway/index.ts', 'utf8
 const cotLifeGuidance = await readFile('supabase/functions/_shared/cot-life-guidance.ts', 'utf8');
 const pastoralFollowups = await readFile('supabase/functions/pastoral-followups/index.ts', 'utf8');
 const aiPastoralCareMigration = await readFile('supabase/migrations/20260923021234_ai_pastoral_care_alerts.sql', 'utf8');
+const cloudflareAiFallbackMigration = await readFile('supabase/migrations/20260923030953_cloudflare_ai_assistant_fallback.sql', 'utf8');
 const adminGuidePage = await readFile('apps/admin/src/components/AdminGuide.tsx', 'utf8');
 const adminShell = await readFile('apps/admin/src/components/Shell.tsx', 'utf8');
 const platformSecrets = await readFile('supabase/functions/platform-secrets/index.ts', 'utf8');
@@ -214,6 +215,7 @@ const invariants = [
   [aiRegistry, /cloudflare:new CloudflareProvider\(\)/, 'generic AI registry includes Cloudflare fallback adapter'],
   [cloudflareAi, /CLOUDFLARE_ACCOUNT_ID[\s\S]*ai\/run\/[\s\S]*messages/, 'Cloudflare fallback uses existing account secret and chat-completions runtime'],
   [cloudflareAi, /supports\(capability:[\s\S]*generateText[\s\S]*generateStructuredData/, 'Cloudflare fallback declares supported text capabilities'],
+  [cloudflareAiFallbackMigration, /cloudflare[\s\S]*@cf\/meta\/llama-3\.2-3b-instruct[\s\S]*fallback_model_ids[\s\S]*max_retries=0/, 'COT AI route falls back to Cloudflare before the secondary Gemini model'],
   [aiGateway, /request_pastoral_support[\s\S]*createPastoralAlert[\s\S]*member_requested/, 'COT AI supports explicit member-requested pastoral care'],
   [aiGateway, /self_harm_risk[\s\S]*autoEscalate:\s*true[\s\S]*createPastoralAlert[\s\S]*automatic_safety/, 'COT AI immediate safety signals can trigger transparent pastoral escalation'],
   [cotLifeGuidance, /emotional-distress[\s\S]*Psalm 34:18[\s\S]*anxiety-fear[\s\S]*grief-loss/, 'COT AI curated life guidance includes Scripture-grounded support'],
