@@ -29,10 +29,20 @@ type RoutedPrayer = PrayerRequest & {
   is_publicly_visible?: boolean;
 };
 type CareFollowUp = LiveFollowUp & {
+  source?: 'live' | 'ai';
   branch_id?: string | null;
   stream_title?: string | null;
   user_phone?: string | null;
+  user_username?: string | null;
   user_avatar?: string | null;
+  care_category?: string | null;
+  severity?: 'support' | 'elevated' | 'urgent' | null;
+  source_mode?: 'member_requested' | 'automatic_safety' | null;
+  summary?: string | null;
+  conversation_excerpt?: string | null;
+  last_member_message?: string | null;
+  requires_immediate_attention?: boolean;
+  member_notified?: boolean;
 };
 
 export default function PastoralTriageScreen() {
@@ -131,13 +141,13 @@ export default function PastoralTriageScreen() {
     }
   };
 
-  const updateFollowup = async (id: string, status: 'contacted' | 'resolved' | 'closed') => {
+  const updateFollowup = async (id: string, status: 'contacted' | 'resolved' | 'closed', source: 'live' | 'ai' = 'live') => {
     setWorkingId(id);
     setActionError('');
     try {
       await api.request('pastoral-followups', {
         method: 'PATCH',
-        body: JSON.stringify({ id, status }),
+        body: JSON.stringify({ id, status, source }),
       });
       followups.refresh();
     } catch (error) {
@@ -267,18 +277,21 @@ export default function PastoralTriageScreen() {
                   return (
                     <View key={f.id} style={[styles.triageCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
                       <View style={styles.cardHeader}>
-                        <Badge label={f.type.replaceAll('_', ' ').toUpperCase()} variant="primary" />
+                        <Badge label={f.source === 'ai' ? `COT AI · ${(f.severity || 'support').toUpperCase()}` : f.type.replaceAll('_', ' ').toUpperCase()} variant={f.requires_immediate_attention ? 'warning' : 'primary'} />
                         <Text style={[styles.dateText, { color: colors.textMuted }]}>{new Date(f.created_at).toLocaleDateString()}</Text>
                       </View>
                       <Text style={[styles.title, { color: colors.text }]}>{f.user_name || 'Church Participant'}</Text>
+                      {f.user_username ? <Text style={[styles.bodyText, { color: colors.textMuted }]}>@{f.user_username}</Text> : null}
+                      {f.source === 'ai' && f.summary ? <Text style={[styles.bodyText, { color: colors.textSecondary }]}>{f.summary}</Text> : null}
+                      {f.source === 'ai' && f.last_member_message ? <View style={[styles.aiContextCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Text style={[styles.aiContextLabel, { color: colors.textMuted }]}>LATEST MEMBER MESSAGE</Text><Text style={[styles.bodyText, { color: colors.text }]}>{f.last_member_message}</Text></View> : null}
                       {f.stream_title ? <Text style={[styles.bodyText, { color: colors.textSecondary }]}>From: {f.stream_title}</Text> : null}
                       {f.user_phone ? <Text style={[styles.bodyText, { color: colors.interactive }]}>{f.user_phone}</Text> : null}
                       {f.private_note ? <Text style={[styles.bodyText, { color: colors.textSecondary }]}>{f.private_note}</Text> : null}
                       <View style={[styles.actionBar, { borderTopColor: colors.borderSubtle }]}>
                         <Text style={[styles.statusLabel, { color: colors.textMuted }]}>Status: <Text style={{ color: colors.interactive, fontWeight: '700' }}>{f.status}</Text></Text>
                         <View style={styles.btnRow}>
-                          <Button label="Contacted" onPress={() => updateFollowup(f.id, 'contacted')} variant="outline" size="sm" loading={busy} />
-                          <Button label="Resolved" onPress={() => updateFollowup(f.id, 'resolved')} variant="primary" size="sm" loading={busy} />
+                          <Button label="Contacted" onPress={() => updateFollowup(f.id, 'contacted', f.source || 'live')} variant="outline" size="sm" loading={busy} />
+                          <Button label="Resolved" onPress={() => updateFollowup(f.id, 'resolved', f.source || 'live')} variant="primary" size="sm" loading={busy} />
                         </View>
                       </View>
                     </View>
