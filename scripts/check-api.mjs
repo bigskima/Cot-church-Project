@@ -211,7 +211,8 @@ const invariants = [
   [aiGateway, /Never reveal, reconstruct, guess, request, or claim access to passwords[\s\S]*administrator secrets/, 'COT AI explicitly protects credentials and secrets'],
   [aiGateway, /pastoralSafetyInstruction[\s\S]*Scripture references/, 'COT AI has compassionate life-support and Scripture guidance'],
   [aiPastoralMigration, /ai_pastoral_alerts[\s\S]*can_receive_pastoral_followups[\s\S]*route_ai_pastoral_alert/, 'AI pastoral alerts use exact pastoral scope and routing'],
-  [pastoralFollowups, /ai_pastoral_alerts[\s\S]*source: "ai"/, 'Pastoral follow-up API exposes AI alerts only through pastoral access'],
+  [pastoralFollowups, /function mappedAiAlert[\s\S]*source: "ai"/, 'Pastoral follow-up API maps AI alerts into the pastoral queue'],
+  [pastoralFollowups, /requireScopeAccess[\s\S]*ai_pastoral_alerts/, 'Pastoral follow-up API keeps AI alerts behind exact-scope pastoral access'],
 
   [socialChatContracts, /organization:\s*"none"/, 'direct chat is independent of Expression membership context'],
   [socialChatContracts, /group_memberships[\s\S]*group_messages/, 'Group chat remains a separate membership-scoped conversation'],
