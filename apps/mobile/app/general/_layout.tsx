@@ -23,7 +23,7 @@ function PrimaryGeneralTabBar({ state, descriptors, navigation }: any) {
   const routes = state.routes.filter((route: any) => PRIMARY_TAB_NAMES.includes(route.name));
 
   return (
-    <View style={[styles.tabBar, { backgroundColor: colors.glass, borderColor: colors.borderSubtle, minHeight: 64 + bottomInset, paddingBottom: bottomInset }, shadows.floating]}>
+    <View style={[styles.tabBar, Platform.OS === 'web' && styles.tabBarWeb, { backgroundColor: colors.glass, borderColor: colors.borderSubtle, minHeight: 64 + bottomInset, paddingBottom: bottomInset }, shadows.floating]}>
       <TourAnchor targetKey="general.navigation" style={styles.tabItems}>
       {routes.map((route: any) => {
         const routeIndex = state.routes.findIndex((candidate: any) => candidate.key === route.key);
@@ -202,6 +202,7 @@ const styles = StyleSheet.create({
   iconShell: { minWidth: 42, height: 31, borderRadius: 13, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 9 },
   activeDot: { width: 4, height: 4, borderRadius: 2 },
   tabBar: { marginHorizontal: 14, marginBottom: 10, maxWidth: 620, alignSelf: 'center', width: '100%', borderWidth: 1, borderRadius: 28, overflow: 'hidden', paddingHorizontal: 4, paddingTop: 5 },
+  tabBarWeb: { marginBottom: 0 },
   tabItems: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-around' },
   customTabItem: { flex: 1, minHeight: 58, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 2 },
   pressedTab: { opacity: 0.72, transform: [{ scale: 0.97 }] },
