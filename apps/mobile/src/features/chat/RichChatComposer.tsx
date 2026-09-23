@@ -352,7 +352,7 @@ export function RichChatComposer({
             multiline
             maxLength={4000}
             blurOnSubmit={false}
-            style={[styles.input, { color: colors.text }]}
+            style={[styles.input, Platform.OS === 'web' && styles.inputWeb, { color: colors.text }]}
           />
           <Pressable onPress={() => { setEmojisOpen((value) => !value); setToolsOpen(false); }} disabled={Boolean(disabledReason)} hitSlop={6}><Icon name="happy-outline" size={21} color={colors.textMuted} /></Pressable>
         </View>
@@ -364,7 +364,7 @@ export function RichChatComposer({
 
 const styles = StyleSheet.create({
   shell: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: spacing.sm, paddingTop: 7, gap: 6 }, flex: { flex: 1, minWidth: 0 }, composerRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 7 }, roundButton: { width: 43, height: 43, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  inputShell: { flex: 1, minHeight: 43, maxHeight: 126, borderWidth: 1, borderRadius: 22, flexDirection: 'row', alignItems: 'flex-end', paddingRight: 11 }, input: { flex: 1, minHeight: 41, maxHeight: 122, paddingHorizontal: 13, paddingVertical: 9, fontSize: 15 },
+  inputShell: { flex: 1, minHeight: 43, maxHeight: 126, borderWidth: 1, borderRadius: 22, flexDirection: 'row', alignItems: 'flex-end', paddingRight: 11 }, input: { flex: 1, minHeight: 41, maxHeight: 122, paddingHorizontal: 13, paddingVertical: 9, fontSize: 15 }, inputWeb: { outlineStyle: 'none', outlineWidth: 0, outlineColor: 'transparent' } as any,
   tools: { flexDirection: 'row', justifyContent: 'space-around', gap: 4, paddingVertical: 3 }, toolButton: { minWidth: 68, alignItems: 'center', gap: 3, paddingVertical: 4 }, toolLabel: { fontSize: 9, fontWeight: '700' }, emojiTray: { gap: 6, paddingVertical: 3 }, composerEmoji: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' }, composerEmojiText: { fontSize: 20 },
   previews: { gap: 7, paddingVertical: 2 }, preview: { width: 98, height: 66, borderRadius: radius.md, borderWidth: 1, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', padding: 5 }, previewImage: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%' }, previewLabel: { fontSize: 9, fontWeight: '700', maxWidth: 78, marginTop: 3 }, remove: { position: 'absolute', right: 3, top: 3, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   reply: { flexDirection: 'row', alignItems: 'center', borderLeftWidth: 3, borderRadius: radius.sm, paddingHorizontal: 9, paddingVertical: 6 }, replyTitle: { fontSize: 10, fontWeight: '800' }, replyCopy: { fontSize: 11, marginTop: 1 }, recording: { minHeight: 39, borderRadius: radius.md, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 10 }, recordingDot: { width: 8, height: 8, borderRadius: 4 }, recordingText: { flex: 1, fontSize: 12, fontWeight: '800' }, recordingAction: { fontSize: 11, fontWeight: '800', paddingVertical: 7 }, disabled: { borderRadius: radius.md, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, paddingVertical: 7 }, disabledText: { flex: 1, fontSize: 11, lineHeight: 15, fontWeight: '700' }, error: { fontSize: 11, lineHeight: 15, paddingHorizontal: 4 },
