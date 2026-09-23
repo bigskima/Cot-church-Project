@@ -212,7 +212,7 @@ export function ScripturePreviewSheet({ reference, onClose }: { reference: strin
 
 const styles = StyleSheet.create({
   previewButton: { marginTop: spacing.sm, minHeight: 58, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: 9 },
-  previewButtonCompact: { minHeight: 50 },
+  previewButtonCompact: { minHeight: 50, minWidth: 230, maxWidth: '100%' },
   previewIcon: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   previewCopy: { flex: 1, minWidth: 0 },
   previewKicker: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.9 },
