@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "COT",
+    "name": "COT App",
     "slug": "church-platform",
     "owner": "0xskima",
     "scheme": "churchos",
@@ -14,7 +14,7 @@
     },
     "orientation": "default",
     "userInterfaceStyle": "automatic",
-    "icon": "./assets/splash.png",
+    "icon": "./assets/cot-family-logo.jpg",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -27,7 +27,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow COT to access your photos so you can choose a profile picture.",
+          "photosPermission": "Allow COT App to access photos and videos you choose to share.",
           "cameraPermission": false,
           "microphonePermission": false
         }
@@ -35,7 +35,7 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "Allow COT to record audio that you choose to share.",
+          "microphonePermission": "Allow COT App to use your microphone for calls, voice recordings, and live broadcasts.",
           "recordAudioAndroid": true,
           "enableBackgroundRecording": false,
           "enableBackgroundPlayback": false
@@ -57,15 +57,15 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.cot.app",
       "infoPlist": {
-        "NSCameraUsageDescription": "Allow COT to use your camera when you are authorized to broadcast an Expression live service.",
-        "NSMicrophoneUsageDescription": "Allow COT to use your microphone when you are authorized to broadcast an Expression live service."
+        "NSCameraUsageDescription": "Allow COT App to use your camera for video calls, live broadcasts, and media you choose to share.",
+        "NSMicrophoneUsageDescription": "Allow COT App to use your microphone for calls, voice recordings, and live broadcasts."
       }
     },
     "android": {
       "package": "com.cot.app",
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/splash.png",
+        "foregroundImage": "./assets/cot-family-logo.jpg",
         "backgroundColor": "#091733"
       },
       "splash": {
@@ -75,13 +75,14 @@
       },
       "permissions": [
         "CAMERA",
-        "RECORD_AUDIO"
+        "RECORD_AUDIO",
+        "POST_NOTIFICATIONS"
       ]
     },
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/splash.png"
+      "favicon": "./assets/cot-family-logo.jpg"
     },
     "extra": {
       "eas": {
