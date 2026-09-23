@@ -283,7 +283,11 @@ async function createPastoralAlert(
       })
       .eq("id", existing.id);
     if (error) throw new ApiError("AI_PASTORAL_ALERT_FAILED", "Unable to update pastoral support", 500, undefined, false);
-    return { id: existing.id, created: false };
+    const { data: recipientCountData } = await admin.rpc("ai_pastoral_recipient_count", {
+      target_organization_id: auth.organizationId,
+      target_branch_id: auth.branchId ?? null,
+    });
+    return { id: existing.id, created: false, recipientCount: Number(recipientCountData ?? 0) };
   }
 
   const { data, error } = await admin
@@ -304,7 +308,11 @@ async function createPastoralAlert(
     .select("id")
     .single();
   if (error || !data) throw new ApiError("AI_PASTORAL_ALERT_FAILED", "Unable to send pastoral support", 500, undefined, false);
-  return { id: data.id, created: true };
+  const { data: recipientCountData } = await admin.rpc("ai_pastoral_recipient_count", {
+    target_organization_id: auth.organizationId,
+    target_branch_id: auth.branchId ?? null,
+  });
+  return { id: data.id, created: true, recipientCount: Number(recipientCountData ?? 0) };
 }
 
 function publicLocation(settings: unknown) {
@@ -481,7 +489,10 @@ Deno.serve(createHandler(
         memberNotice: "Your confidential pastoral support request has been sent to the authorised care team in this church space.",
       };
       const alert = await createPastoralAlert(auth, assessment, careContext, "member_requested");
-      return { data: { care: { alertId: alert.id, alertCreated: true, severity: assessment.severity, notice: "Your confidential pastoral support request has been sent to the authorised care team in this church space." } } };
+      const notice = alert.recipientCount > 0
+        ? "Your confidential pastoral support request has been recorded and the authorised care team in this church space has been notified."
+        : "Your confidential pastoral support request has been recorded, but no pastoral care recipient is currently assigned to this exact church space. Please also contact a trusted church leader directly if you need support.";
+      return { data: { care: { alertId: alert.id, alertCreated: true, severity: assessment.severity, recipientCount: alert.recipientCount, notice } } };
     }
     if (action) throw new ApiError("VALIDATION_FAILED", "Unsupported COT AI action", 422);
 
@@ -539,20 +550,34 @@ Deno.serve(createHandler(
           const alert = await createPastoralAlert(auth, careAssessment, prompt, "automatic_safety");
           alertId = alert.id;
           alertCreated = true;
+          const recipientNotice = alert.recipientCount > 0
+            ? careAssessment.memberNotice
+            : "Your message may indicate immediate danger. COT AI recorded a confidential safety alert, but no pastoral care recipient is currently assigned to this exact church space. Please contact local emergency services and a trusted person who can reach you now.";
+          care = {
+            category: careAssessment.category,
+            severity: careAssessment.severity,
+            offerPastoralSupport: true,
+            alertCreated: true,
+            alertId,
+            recipientCount: alert.recipientCount,
+            notice: recipientNotice,
+          };
         } catch {
           // The assistant response must still reach the member even if care routing
           // is temporarily unavailable. The response itself tells them to seek
           // immediate local human help when safety is at risk.
         }
       }
-      care = {
-        category: careAssessment.category,
-        severity: careAssessment.severity,
-        offerPastoralSupport: careAssessment.offerPastoralSupport,
-        alertCreated,
-        alertId,
-        notice: careAssessment.memberNotice,
-      };
+      if (!care) {
+        care = {
+          category: careAssessment.category,
+          severity: careAssessment.severity,
+          offerPastoralSupport: careAssessment.offerPastoralSupport,
+          alertCreated,
+          alertId,
+          notice: careAssessment.memberNotice,
+        };
+      }
     }
 
     return { data: { ...result, ...(care ? { care } : {}) }, status: result.status === "requires_review" ? 202 : 200 };
