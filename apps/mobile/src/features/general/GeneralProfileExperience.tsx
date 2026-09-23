@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BottomSheet, Button, EmptyState, Icon, ResourceError, Skeleton, SocialProfileHero } from '@/components';
+import { BottomSheet, Button, EmptyState, Icon, ResourceError, ScreenHeader, Skeleton, SocialProfileHero } from '@/components';
 import { PostCard } from '@/components/community/PostCard';
 import type { PublicIdentityBadge } from '@/components/identity/PublicIdentityBadge';
 import { radius, shadows, spacing } from '@/design-system/tokens';
@@ -288,6 +288,11 @@ export default function GeneralProfileExperience() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+      {!wide ? (
+        <View style={{ paddingTop: insets.top }}>
+          <ScreenHeader title="You" compact showBack />
+        </View>
+      ) : null}
       {wide ? (
         <View style={styles.wideShell}>
           <ScrollView

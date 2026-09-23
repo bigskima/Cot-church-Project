@@ -470,7 +470,7 @@ export function GlobalChatExperience({ embeddedExpression = false }: { embeddedE
         />
       ) : (
         <View style={{ paddingTop: insets.top }}>
-          <ScreenHeader title="Messages" compact />
+          <ScreenHeader title="Messages" compact showBack />
         </View>
       )}
 
