@@ -10,9 +10,10 @@ import { TourAnchor } from '@/features/tour/AppTourProvider';
 
 const TAB_ICON_SIZE = 22;
 const hidden = { href: null } as const;
-// Reels is intentionally excluded: immersive playback owns the full screen and
-// supplies its own Back/Create controls instead of the primary bottom bar.
-const PRIMARY_GENERAL_PATHS = new Set(['/general', '/general/explore', '/general/chat', '/general/profile']);
+// Reels, Messages and You intentionally hide the primary bottom bar once opened.
+// Home/Discover still expose all primary destinations, but focused conversation,
+// profile and immersive playback screens get the full viewport.
+const PRIMARY_GENERAL_PATHS = new Set(['/general', '/general/explore']);
 const PRIMARY_TAB_NAMES = ['index', 'explore', 'reels', 'chat', 'profile'] as const;
 
 function PrimaryGeneralTabBar({ state, descriptors, navigation }: any) {
