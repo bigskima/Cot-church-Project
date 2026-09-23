@@ -243,6 +243,19 @@ function assessPastoralNeed(prompt: string): CareAssessment | null {
     };
   }
 
+  const explicitCareNeed = /\b(i need someone to talk to|i need to talk to someone|can i talk to (?:a )?pastor|i need (?:a )?pastor|pastoral care|i need counselling|i need counseling|i need help emotionally|please get me help)\b/.test(text);
+  if (explicitCareNeed) {
+    return {
+      category: "other",
+      severity: "support",
+      offerPastoralSupport: true,
+      autoEscalate: false,
+      requiresImmediateAttention: false,
+      summary: "The member directly expressed a need for someone to talk to or for confidential pastoral support.",
+      memberNotice: "You can send a confidential pastoral support request to the authorised care team in this church space.",
+    };
+  }
+
   const emotionalDistress = /\b(i(?:'m| am) depressed|depression|i feel depressed|i(?:'m| am) overwhelmed|i feel hopeless|i(?:'m| am) anxious|panic attacks?|i feel lonely|i(?:'m| am) very sad|i can(?:'t|not) cope)\b/.test(text);
   if (emotionalDistress) {
     return {
