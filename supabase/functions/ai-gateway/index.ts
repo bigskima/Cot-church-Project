@@ -115,6 +115,71 @@ function compactText(value: unknown, maximum = 4000) {
   return typeof value === "string" ? value.trim().slice(0, maximum) : value;
 }
 
+type MemberConcern = {
+  supportSuggested: boolean;
+  urgentSafety: boolean;
+  category: "emotional_support" | "self_harm" | "harm_to_others" | "other";
+};
+
+function classifyMemberConcern(message: string): MemberConcern {
+  const text = message.toLowerCase().replace(/\s+/g, " ").trim();
+  const emotional = /\b(depress(?:ed|ion)?|hopeless|overwhelmed|lonely|grief|grieving|bereav(?:ed|ement)|anxious|anxiety|panic|heartbroken|worthless|empty|can'?t cope|cannot cope)\b/i.test(text);
+  const selfHarm =
+    /\b(?:i|i'm|im|myself|me)\b.{0,80}\b(?:kill myself|hurt myself|harm myself|end my life|take my life|want to die|suicid(?:e|al))\b/i.test(text) ||
+    /\b(?:kill myself|hurt myself|harm myself|end my life|take my life|want to die|suicid(?:e|al))\b.{0,80}\b(?:i|i'm|im|myself|me)\b/i.test(text);
+  const harmOther =
+    /\b(?:i|i'm|im|me)\b.{0,80}\b(?:kill|hurt|harm|attack)\b.{0,40}\b(?:him|her|them|someone|somebody|people|person)\b/i.test(text);
+  return {
+    supportSuggested: emotional || selfHarm || harmOther,
+    urgentSafety: selfHarm || harmOther,
+    category: selfHarm ? "self_harm" : harmOther ? "harm_to_others" : emotional ? "emotional_support" : "other",
+  };
+}
+
+async function createPastoralAlert(auth: any, input: {
+  memberMessage: string;
+  triggerType: "member_requested" | "urgent_safety";
+  riskLevel: "routine" | "high";
+  category: MemberConcern["category"];
+  consentGiven: boolean;
+}) {
+  const admin = adminClient();
+  const message = input.memberMessage.trim().slice(0, 3000);
+  if (!message) throw new ApiError("VALIDATION_FAILED", "A message is required for pastoral care", 422);
+
+  // Avoid duplicate alerts when a member retries the same urgent message.
+  const recentCutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  let duplicateQuery = admin
+    .from("ai_pastoral_alerts")
+    .select("id,created_at")
+    .eq("organization_id", auth.organizationId)
+    .eq("profile_id", auth.user.id)
+    .eq("trigger_type", input.triggerType)
+    .eq("member_message", message)
+    .gte("created_at", recentCutoff)
+    .order("created_at", { ascending: false })
+    .limit(1);
+  duplicateQuery = auth.branchId ? duplicateQuery.eq("branch_id", auth.branchId) : duplicateQuery.is("branch_id", null);
+  const { data: duplicate } = await duplicateQuery.maybeSingle();
+  if (duplicate?.id) return { id: duplicate.id, routed: true, duplicate: true };
+
+  const { data: created, error } = await admin.from("ai_pastoral_alerts").insert({
+    organization_id: auth.organizationId,
+    branch_id: auth.branchId ?? null,
+    profile_id: auth.user.id,
+    trigger_type: input.triggerType,
+    risk_level: input.riskLevel,
+    category: input.category,
+    member_message: message,
+    consent_given: input.consentGiven,
+  }).select("id").single();
+  if (error || !created?.id) throw new ApiError("PASTORAL_ALERT_CREATE_FAILED", "Unable to send the pastoral care request", 500, undefined, false);
+
+  const { data: recipientCount, error: routeError } = await admin.rpc("route_ai_pastoral_alert", { target_alert_id: created.id });
+  if (routeError) throw new ApiError("PASTORAL_ALERT_ROUTE_FAILED", "The pastoral care request was saved but could not be routed yet", 500, undefined, false);
+  return { id: created.id, routed: Number(recipientCount ?? 0) > 0, recipientCount: Number(recipientCount ?? 0), duplicate: false };
+}
+
 function publicLocation(settings: unknown) {
   if (!settings || typeof settings !== "object" || Array.isArray(settings)) return null;
   const value = (settings as Record<string, unknown>).public_location;
@@ -270,7 +335,23 @@ Deno.serve(createHandler(
     }
 
     const body = assertObject(await jsonBody(request));
-    assertNoUnknownFields(body, ["capability", "prompt", "language", "entityType", "entityId"]);
+    assertNoUnknownFields(body, ["action", "capability", "prompt", "userMessage", "language", "entityType", "entityId"]);
+
+    const action = optionalString(body.action, "action", 60);
+    if (action === "request_pastoral_care") {
+      await assertFeatureEnabled(adminClient(), "cot_assistant", { organizationId: auth.organizationId, expressionId: auth.branchId ?? null }, "COT Assistant is currently unavailable in this area.");
+      const memberMessage = requiredString(body.userMessage, "userMessage", 3000);
+      const concern = classifyMemberConcern(memberMessage);
+      const alert = await createPastoralAlert(auth, {
+        memberMessage,
+        triggerType: "member_requested",
+        riskLevel: "routine",
+        category: concern.category === "other" ? "emotional_support" : concern.category,
+        consentGiven: true,
+      });
+      return { data: { pastoralCare: { requested: true, alertId: alert.id, routed: alert.routed } } };
+    }
+
     const capability = requiredString(body.capability, "capability", 60);
     if (!allowed.has(capability)) throw new ApiError("AI_CAPABILITY_DENIED", "Capability is not available through this endpoint", 422);
 
@@ -282,6 +363,19 @@ Deno.serve(createHandler(
     }
 
     const prompt = requiredString(body.prompt, "prompt", 12000);
+    const memberMessage = capability === "assistant.answer"
+      ? (optionalString(body.userMessage, "userMessage", 3000) ?? prompt.slice(0, 3000))
+      : "";
+    const memberConcern = capability === "assistant.answer" ? classifyMemberConcern(memberMessage) : { supportSuggested: false, urgentSafety: false, category: "other" as const };
+    const urgentAlert = capability === "assistant.answer" && memberConcern.urgentSafety
+      ? await createPastoralAlert(auth, {
+          memberMessage,
+          triggerType: "urgent_safety",
+          riskLevel: "high",
+          category: memberConcern.category,
+          consentGiven: false,
+        })
+      : null;
     const entityType = optionalString(body.entityType, "entityType", 50);
     const entityId = body.entityId ? uuid(String(body.entityId), "entityId", true) : undefined;
     const verifiedContext = capability === "assistant.answer" ? await assistantContext(auth, entityType, entityId) : "";
@@ -290,7 +384,13 @@ Deno.serve(createHandler(
       ? formatCotGuideContext({ audiences: guideAccess.audiences, query: prompt, permissionCodes: guideAccess.permissionCodes, limit: 8 })
       : "";
     const sermonRule = entityType === "sermon" ? " The verified context contains the exact saved sermon. Base the answer on that sermon, including its content_blocks/description/transcript, and never claim that only a fragment was supplied when the verified sermon contains more content." : "";
-    const system = `You are COT AI, the conversational assistant inside City of Transformation. Be natural and useful for ordinary everyday conversation. For church-specific facts, Quick Facts, schedules, leaders, locations, story, sermons, announcements, groups, posts, permissions and navigation, rely on the verified tenant-scoped context and never invent facts or routes. When a verified route exists, tell the member the exact destination in plain language; the app will render matching action buttons. When the person asks how COT works, how to use a screen, what a control does, or how to perform a member or ministry workflow, use the retrieved COT Guide context below as the operating authority. Give practical step-by-step instructions with the visible screen names and expected result. The guide audiences were resolved from the signed-in account. Never expose internal permission codes, and never imply that a ministry tool is available when the verified guide audience does not include ministry or the relevant guide section was filtered out. Keep the active General/Expression scope clear. Never reveal private prayer, counselling, giving, attendance, identity/KYC or private messaging records. Do not pretend to be a pastor or replace human pastoral care. If a church-specific fact is absent from verified context, say that it has not been published or configured yet rather than guessing.${sermonRule} Verified context: ${verifiedContext}\n\nRetrieved COT Guide context:\n${guideContext || "No matching guide section was available for this account and question."}`;
+    const pastoralSafetyInstruction = memberConcern.urgentSafety
+      ? "The member's latest message contains explicit first-person safety-risk language. A restricted pastoral safety alert has already been created for the exact current church/Expression scope. Respond with calm, compassionate language; encourage the member to stay with a trusted person and contact local emergency or crisis services if danger is immediate; include 1-3 relevant Scripture references without inventing verse wording; and clearly tell the member that COT AI sent a restricted alert to the assigned pastoral care team because the message suggested immediate safety risk."
+      : memberConcern.supportSuggested
+        ? "The member's latest message suggests emotional distress. Respond warmly and without judgment. Do not diagnose them or pretend to replace a counsellor, clinician, or pastor. Offer practical next steps, 1-3 relevant Scripture references without inventing verse wording, and encourage them to use the visible Request pastoral care action if they want the assigned pastoral team to contact them. Do not say that a report was sent because routine emotional-support conversations are not silently reported."
+        : "";
+
+    const system = `You are COT AI, the conversational assistant inside City of Transformation. Be natural and useful for ordinary everyday conversation. For church-specific facts, Quick Facts, schedules, leaders, locations, story, sermons, announcements, groups, posts, permissions and navigation, rely on the verified tenant-scoped context and never invent facts or routes. When a verified route exists, tell the member the exact destination in plain language; the app will render matching action buttons. When the person asks how COT works, how to use a screen, what a control does, or how to perform a member or ministry workflow, use the retrieved COT Guide context below as the operating authority. Give practical step-by-step instructions with the visible screen names and expected result. The guide audiences were resolved from the signed-in account. Never expose internal permission codes, and never imply that a ministry tool is available when the verified guide audience does not include ministry or the relevant guide section was filtered out. Keep the active General/Expression scope clear. Never reveal private prayer, counselling, giving, attendance, identity/KYC or private messaging records. Never reveal, reconstruct, guess, request, or claim access to passwords, API keys, private credentials, recovery codes, service-role keys, certificates, tokens, or administrator secrets. If asked for one, politely explain that protected credentials are private and not available through COT AI, and direct the person to the legitimate sign-in, password-reset, or authorised administrator process when known. Do not pretend to be a pastor or replace human pastoral care. If a church-specific fact is absent from verified context, say that it has not been published or configured yet rather than guessing. When providing emotional or spiritual support, use Scripture references that the app can preview rather than fabricating quotations. ${pastoralSafetyInstruction}${sermonRule} Verified context: ${verifiedContext}\n\nRetrieved COT Guide context:\n${guideContext || "No matching guide section was available for this account and question."}`;
 
     const result = await runAi({
       organizationId: auth.organizationId,
@@ -310,6 +410,18 @@ Deno.serve(createHandler(
       entityType,
       entityId,
     });
-    return { data: result, status: result.status === "requires_review" ? 202 : 200 };
+    return {
+      data: {
+        ...result,
+        pastoralCare: capability === "assistant.answer" ? {
+          supportSuggested: memberConcern.supportSuggested,
+          requestAvailable: memberConcern.supportSuggested && !memberConcern.urgentSafety,
+          urgentAlertSent: Boolean(urgentAlert),
+          alertRouted: urgentAlert?.routed ?? false,
+          riskLevel: memberConcern.urgentSafety ? "high" : memberConcern.supportSuggested ? "support" : "none",
+        } : undefined,
+      },
+      status: result.status === "requires_review" ? 202 : 200,
+    };
   },
 ));
