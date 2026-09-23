@@ -179,6 +179,21 @@ await Promise.all(files.map((file) => access(file)));
 const sources = new Map(
   await Promise.all(files.map(async (file) => [file, await readFile(file, 'utf8')]))
 );
+
+const cotLogoAsset = await readFile('apps/mobile/assets/cot-family-logo.jpg');
+if (!(cotLogoAsset[0] === 0xff && cotLogoAsset[1] === 0xd8 && cotLogoAsset[2] === 0xff)) {
+  throw new Error('Application check failed: COT family logo .jpg must contain JPEG bytes');
+}
+for (const legacyAsset of ['apps/mobile/assets/cot-family-logo.png', 'apps/mobile/assets/icon.png']) {
+  try {
+    await access(legacyAsset);
+    throw new Error(`Application check failed: legacy mislabelled Android asset still exists: ${legacyAsset}`);
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('Application check failed:')) throw error;
+    if ((error)?.code !== 'ENOENT') throw error;
+  }
+}
+
 const joined = [...sources.values()].join('\n');
 const givingUi = [
   sources.get('apps/mobile/src/features/giving/GivingScreen.tsx') ?? '',
@@ -289,7 +304,7 @@ const checks = [
   [/Replays & recordings/, 'recording processing and replay discovery'],
   [/follow_up/, 'private live follow-up'],
   [/ScripturePreviewCard/, 'COT AI renders existing Bible Scripture previews'],
-  [/cot-family-logo\.png[\s\S]*assistantLogo/, 'COT AI uses the COT logo as its chat avatar'],
+  [/cot-family-logo\.jpg[\s\S]*assistantLogo/, 'COT AI uses the COT logo as its chat avatar'],
   [/markdownQuote[\s\S]*borderLeftWidth/, 'COT AI renders Markdown blockquotes without showing the quote marker'],
   [/replace\(\/\^>\\s\?\/gm, ''\)/, 'COT AI strips Markdown quote markers before copy and read aloud'],
   [/Request pastoral support/, 'COT AI offers member-controlled pastoral support'],
