@@ -32,9 +32,20 @@ type RoutedPrayer = PrayerRequest & {
   is_publicly_visible?: boolean;
 };
 type CareFollowUp = LiveFollowUp & {
+  source?: 'live' | 'ai';
   branch_id?: string | null;
   stream_title?: string | null;
   user_phone?: string | null;
+  user_username?: string | null;
+  user_avatar?: string | null;
+  care_category?: string | null;
+  severity?: 'support' | 'elevated' | 'urgent' | null;
+  source_mode?: 'member_requested' | 'automatic_safety' | null;
+  summary?: string | null;
+  conversation_excerpt?: string | null;
+  last_member_message?: string | null;
+  requires_immediate_attention?: boolean;
+  member_notified?: boolean;
 };
 type ProfileSummary = { id: string; display_name?: string | null; username?: string | null; avatar_url?: string | null };
 type Testimony = {
@@ -151,10 +162,10 @@ export default function GeneralPastoralCareExperience() {
     } finally { setWorkingId(null); }
   };
 
-  const updateFollowup = async (id: string, status: 'contacted' | 'resolved' | 'closed') => {
+  const updateFollowup = async (id: string, status: 'contacted' | 'resolved' | 'closed', source: 'live' | 'ai' = 'live') => {
     setWorkingId(id); setError(''); setSuccess('');
     try {
-      await api.request('pastoral-followups', { method: 'PATCH', body: JSON.stringify({ id, status }) });
+      await api.request('pastoral-followups', { method: 'PATCH', body: JSON.stringify({ id, status, source }) });
       setSuccess(status === 'resolved' ? 'Care follow-up resolved.' : 'Care follow-up updated.');
       followups.refresh();
     } catch (value) {
@@ -262,12 +273,15 @@ export default function GeneralPastoralCareExperience() {
               {followups.loading && !followups.data ? <Skeleton height={140} count={2} /> : followups.error && !followups.data ? <ResourceError message={followups.error} retry={followups.refresh} /> : careList.length ? careList.map((item) => {
                 const busy = workingId === item.id;
                 return <View key={item.id} style={[styles.caseCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
-                  <View style={styles.caseTop}><Badge label={item.type.replaceAll('_', ' ').toUpperCase()} variant="primary" /><Text style={[styles.date, { color: colors.textMuted }]}>{new Date(item.created_at).toLocaleDateString()}</Text></View>
+                  <View style={styles.caseTop}><Badge label={item.source === 'ai' ? `COT AI · ${(item.severity || 'support').toUpperCase()}` : item.type.replaceAll('_', ' ').toUpperCase()} variant={item.requires_immediate_attention ? 'warning' : 'primary'} /><Text style={[styles.date, { color: colors.textMuted }]}>{new Date(item.created_at).toLocaleDateString()}</Text></View>
                   <Text style={[styles.caseTitle, { color: colors.text }]}>{item.user_name || 'Church participant'}</Text>
+                  {item.user_username ? <Text style={[styles.metaText, { color: colors.textMuted }]}>@{item.user_username}</Text> : null}
+                  {item.source === 'ai' && item.summary ? <Text style={[styles.caseBody, { color: colors.textSecondary }]}>{item.summary}</Text> : null}
+                  {item.source === 'ai' && item.last_member_message ? <View style={[styles.inlinePanel, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Text style={[styles.fieldLabel, { color: colors.textMuted }]}>LATEST MEMBER MESSAGE</Text><Text style={[styles.caseBody, { color: colors.text }]}>{item.last_member_message}</Text></View> : null}
                   {item.stream_title ? <Text style={[styles.caseBody, { color: colors.textSecondary }]}>From {item.stream_title}</Text> : null}
                   {item.user_phone ? <Text style={[styles.contactText, { color: colors.interactive }]}>{item.user_phone}</Text> : null}
                   {item.private_note ? <Text style={[styles.caseBody, { color: colors.textSecondary }]}>{item.private_note}</Text> : null}
-                  <View style={[styles.caseFooter, { borderTopColor: colors.borderSubtle }]}><Text style={[styles.statusText, { color: colors.textMuted }]}>Status · <Text style={{ color: colors.interactive, fontWeight: '800' }}>{item.status}</Text></Text><View style={styles.actions}><Button label="Contacted" onPress={() => void updateFollowup(item.id, 'contacted')} variant="outline" size="sm" loading={busy} /><Button label="Resolved" onPress={() => void updateFollowup(item.id, 'resolved')} size="sm" loading={busy} /></View></View>
+                  <View style={[styles.caseFooter, { borderTopColor: colors.borderSubtle }]}><Text style={[styles.statusText, { color: colors.textMuted }]}>Status · <Text style={{ color: colors.interactive, fontWeight: '800' }}>{item.status}</Text></Text><View style={styles.actions}><Button label="Contacted" onPress={() => void updateFollowup(item.id, 'contacted', item.source || 'live')} variant="outline" size="sm" loading={busy} /><Button label="Resolved" onPress={() => void updateFollowup(item.id, 'resolved', item.source || 'live')} size="sm" loading={busy} /></View></View>
                 </View>;
               }) : <EmptyState title="No care follow-ups" message="General COT follow-up requests routed to your ministry role will appear here." iconName="people-outline" />}
             </View>
