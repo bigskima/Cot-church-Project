@@ -117,18 +117,19 @@ export function VideoPlayer({
       {/* Source-aware video canvas frame */}
       <View style={[styles.videoFrame, { backgroundColor: '#000000', aspectRatio: Number.isFinite(aspectRatio) && aspectRatio > 0 ? aspectRatio : 16 / 9 }]}>
         {sourceUrl && player ? (
-          <VideoView
-            ref={videoViewRef}
-            player={player}
-            style={styles.videoView}
-            contentFit="contain"
-            nativeControls={false}
-            fullscreenOptions={{ enable: true }}
-            onFullscreenEnter={() => setIsFullscreen(true)}
-            onFullscreenExit={() => setIsFullscreen(false)}
-            pointerEvents="none"
-          />
-          <Pressable
+          <>
+            <VideoView
+              ref={videoViewRef}
+              player={player}
+              style={styles.videoView}
+              contentFit="contain"
+              nativeControls={false}
+              fullscreenOptions={{ enable: true }}
+              onFullscreenEnter={() => setIsFullscreen(true)}
+              onFullscreenExit={() => setIsFullscreen(false)}
+              pointerEvents="none"
+            />
+            <Pressable
             onPress={toggleFullscreen}
             accessibilityRole="button"
             accessibilityLabel={isFullscreen ? 'Exit full screen' : 'View full screen'}
@@ -140,7 +141,8 @@ export function VideoPlayer({
               size={21}
               color="#FFFFFF"
             />
-          </Pressable>
+            </Pressable>
+          </>
         ) : posterUrl ? (
           <Image source={{ uri: posterUrl }} style={styles.posterImage} resizeMode="contain" />
         ) : (
