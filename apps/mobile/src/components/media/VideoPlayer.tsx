@@ -35,7 +35,9 @@ export function VideoPlayer({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(durationSeconds || 0);
   const [isBuffering, setIsBuffering] = useState(false);
-  const [restoredPosition, setRestoredPosition] = useState(false);\n  const [isFullscreen, setIsFullscreen] = useState(false);\n  const videoViewRef = useRef<VideoView>(null);
+  const [restoredPosition, setRestoredPosition] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const videoViewRef = useRef<VideoView>(null);
 
   const player = useVideoPlayer(sourceUrl || '', (p) => {
     p.loop = false;
