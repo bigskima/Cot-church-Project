@@ -222,6 +222,7 @@ export default function SermonsManageExperience() {
           method: 'POST',
           body: JSON.stringify({
             action: 'create_upload_intent',
+            purpose: 'pastor_message',
             mediaType: 'audio',
             mimeType: audioFile.mimeType,
             expressionId: expression?.id ?? null,
@@ -253,6 +254,7 @@ export default function SermonsManageExperience() {
           method: 'POST',
           body: JSON.stringify({
             action: 'create_upload_intent',
+            purpose: 'pastor_message',
             mediaType: 'video',
             mimeType: videoFile.mimeType,
             expressionId: expression?.id ?? null,
