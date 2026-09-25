@@ -11,9 +11,10 @@ const visibilities = new Set(["public", "organization", "branch", "private"]);
 const BANNER_BUCKET = "sermon-banners";
 
 async function hasScopedPermission(auth: any, permission: string, branchId: string | null) {
-  const { data, error } = await auth.client.rpc("has_permission", {
+  const effectivePermission = branchId ? `expression.sermons.${permission.split('.').pop()}` : permission;
+  const { data, error } = await auth.client.rpc("has_exact_scope_permission", {
     target_organization_id: auth.organizationId,
-    requested_permission: permission,
+    requested_permission: effectivePermission,
     target_branch_id: branchId,
   });
   return !error && data === true;
