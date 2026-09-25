@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { router, usePathname } from 'expo-router';
@@ -141,13 +141,13 @@ export default function PastorMessagesManageExperience() {
 
   const chooseVideo = async () => {
     const result = await DocumentPicker.getDocumentAsync({
-      type: ['video/mp4', 'video/webm', 'video/quicktime'],
+      type: Platform.OS === 'web' ? ['video/webm', 'video/mp4'] : ['video/mp4'],
       copyToCacheDirectory: true,
     });
     const asset = result.canceled ? null : result.assets?.[0];
     if (!asset) return;
     const mimeType = asset.mimeType?.toLowerCase()
-      || (asset.name.toLowerCase().endsWith('.mov') ? 'video/quicktime' : asset.name.toLowerCase().endsWith('.webm') ? 'video/webm' : 'video/mp4');
+      || (asset.name.toLowerCase().endsWith('.webm') && Platform.OS === 'web' ? 'video/webm' : 'video/mp4');
     if ((asset.size ?? 0) > 100 * 1024 * 1024) {
       setErrorMsg('Choose a video recording that is 100 MB or smaller.');
       return;
@@ -204,7 +204,7 @@ export default function PastorMessagesManageExperience() {
       setErrorMsg('Choose either a video message or an audio message. You do not need to upload both.');
       return;
     }
-    if ((status === 'published' || status === 'scheduled') && !canPublish) {
+    if (status === 'published' && !canPublish) {
       setErrorMsg('Publishing isn’t available for this account.');
       return;
     }
