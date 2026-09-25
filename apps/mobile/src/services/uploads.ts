@@ -121,6 +121,20 @@ function resumableEndpointFromSignedUrl(signedUploadUrl: string) {
   return `https://${hostname}/storage/v1/upload/resumable`;
 }
 
+async function putSignedDirectUpload(signedUploadUrl: string, mimeType: string, source: Blob) {
+  const response = await fetch(signedUploadUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': mimeType },
+    body: source,
+  });
+  if (!response.ok) throw new Error(`File upload failed (${response.status}). Please try again.`);
+  return source.size;
+}
+
+function isNetworkFetchError(value: unknown) {
+  return value instanceof TypeError || (value instanceof Error && /failed to fetch|network request failed|network error/i.test(value.message));
+}
+
 async function readTusOffset(uploadUrl: string) {
   const response = await fetch(uploadUrl, {
     method: 'HEAD',
@@ -178,22 +192,33 @@ export async function putSignedResumableUpload(
         // the TUS session bootstrap with 400; fall back to the same signed URL
         // rather than making the creator restart the message.
         if (response.status === 400) {
-          const direct = await fetch(session.signedUploadUrl, {
-            method: 'PUT',
-            headers: { 'Content-Type': mimeType },
-            body: source,
-          });
-          if (direct.ok) {
-            onProgress?.(size, size);
-            return size;
-          }
+          const directSize = await putSignedDirectUpload(session.signedUploadUrl, mimeType, source);
+          onProgress?.(directSize, directSize);
+          return directSize;
         }
         throw new Error(`Unable to start media upload (${response.status}).`);
       }
       uploadUrl = response.headers.get('Location') || response.headers.get('location') || '';
       if (!uploadUrl) throw new Error('The media upload session did not return a resumable upload URL.');
     } catch (error) {
-      if (attempt === TUS_RETRY_DELAYS_MS.length - 1) throw error instanceof Error ? error : new Error('Unable to start media upload.');
+      // Some browser/native WebViews can fail the TUS bootstrap at the network
+      // layer even though the signed PUT URL is valid. Do not strand the
+      // selected video/audio: use the same one-time signed URL as a safe
+      // fallback before asking the creator to retry.
+      if (isNetworkFetchError(error)) {
+        try {
+          const directSize = await putSignedDirectUpload(session.signedUploadUrl, mimeType, source);
+          onProgress?.(directSize, directSize);
+          return directSize;
+        } catch {
+          // Keep the TUS retry path below so transient connectivity can recover.
+        }
+      }
+      if (attempt === TUS_RETRY_DELAYS_MS.length - 1) {
+        throw error instanceof Error
+          ? error
+          : new Error('Unable to start media upload. Please try again.');
+      }
       await delay(TUS_RETRY_DELAYS_MS[attempt]);
     }
   }
