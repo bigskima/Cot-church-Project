@@ -187,7 +187,7 @@ export default function PastorMessageDetailExperience({
                       title={message.title}
                       preacherOrArtist={message.preacher}
                       sourceUrl={media?.audioUrl}
-                      durationSeconds={media?.durationSeconds ?? message.duration_seconds}
+                      durationSeconds={media?.audioDurationSeconds ?? message.duration_seconds}
                     />
                   )
                 ) : (
