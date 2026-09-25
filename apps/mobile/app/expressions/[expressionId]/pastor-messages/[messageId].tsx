@@ -1,8 +1,8 @@
 import React from 'react';
 import { useLocalSearchParams } from 'expo-router';
-import { EnhancedSermonDetailExperience } from '@/features/media/EnhancedSermonDetailExperience';
+import PastorMessageDetailExperience from '@/features/media/PastorMessageDetailExperience';
 
 export default function ExpressionPastorMessageDetailScreen() {
   const { messageId } = useLocalSearchParams<{ messageId?: string }>();
-  return <EnhancedSermonDetailExperience sermonId={typeof messageId === 'string' ? messageId : ''} scope="expression" pastorMessage />;
+  return <PastorMessageDetailExperience sermonId={typeof messageId === 'string' ? messageId : ''} scope="expression" />;
 }
