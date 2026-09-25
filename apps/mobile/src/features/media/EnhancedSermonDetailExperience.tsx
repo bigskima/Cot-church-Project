@@ -81,8 +81,8 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
             { signal, context: expressionMode ? 'current' : 'public' },
           );
           const renditions = media?.renditions ?? [];
-          const videoRendition = renditions.find((item: any) => item.renditionKind === 'video_stream' || item.rendition_kind === 'video_stream');
-          const audioRendition = renditions.find((item: any) => item.renditionKind === 'audio_stream' || item.rendition_kind === 'audio_stream');
+          const videoRendition = renditions.find((item: any) => item.kind === 'video_stream' || item.renditionKind === 'video_stream' || item.rendition_kind === 'video_stream');
+          const audioRendition = renditions.find((item: any) => item.kind === 'audio_stream' || item.renditionKind === 'audio_stream' || item.rendition_kind === 'audio_stream');
           if (media?.available || videoRendition || audioRendition) {
             return {
               ready: true,
