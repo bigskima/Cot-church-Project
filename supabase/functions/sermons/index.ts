@@ -92,6 +92,7 @@ Deno.serve(createHandler(
         managementQuery = scopeId
           ? managementQuery.eq("expression_id", scopeId)
           : managementQuery.is("expression_id", null);
+        if (sermonId) managementQuery = managementQuery.eq("id", sermonId);
         if (pastorMessagesView) managementQuery = managementQuery.eq("is_pastor_message", true);
         if (queryTerm) managementQuery = managementQuery.ilike("title", `%${queryTerm.replace(/[%_]/g, "\\$&")}%`);
 
