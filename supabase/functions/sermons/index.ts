@@ -265,7 +265,7 @@ Deno.serve(createHandler(
       return { data, status: 201 };
     }
 
-    assertNoUnknownFields(body, ["id", "title", "preacher", "sermonDate", "description", "transcript", "audioUrl", "videoUrl", "thumbnailUrl", "audioAssetId", "videoAssetId", "durationSeconds", "scriptures", "topics", "status", "visibility", "isFeatured"]);
+    assertNoUnknownFields(body, ["id", "title", "preacher", "sermonDate", "description", "transcript", "audioUrl", "videoUrl", "thumbnailUrl", "audioAssetId", "videoAssetId", "durationSeconds", "scriptures", "topics", "status", "visibility", "isFeatured", "isPastorMessage"]);
     const id = uuid(requiredString(body.id, "id", 36), "id", true)!;
     const { data: existing, error: existingError } = await auth.client
       .from("sermons")
