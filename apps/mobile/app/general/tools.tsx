@@ -83,20 +83,6 @@ export default function GeneralToolsScreen() {
   };
 
   const wordItems = [
-    features.isEnabled('sermons') ? {
-      key: 'sermons',
-      label: 'Sermons',
-      icon: 'book-outline',
-      description: 'Messages, teaching series and sermon notes.',
-      onPress: () => router.push('/general/sermons' as any),
-    } : null,
-    features.isEnabled('bible') ? {
-      key: 'bible',
-      label: 'Bible',
-      icon: 'book-outline',
-      description: 'Read, listen, search, save Scripture and follow reading plans.',
-      onPress: () => router.push('/general/bible' as any),
-    } : null,
     features.isEnabled('devotionals') ? {
       key: 'devotional',
       label: 'Devotional',
@@ -306,44 +292,72 @@ export default function GeneralToolsScreen() {
         <View style={styles.section}>
           <SectionHeader title="Essential" compact />
           <View style={[styles.essentialCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
-            <Pressable
-              onPress={() => router.push('/general/events' as any)}
-              disabled={!features.isEnabled('events_gatherings')}
-              style={({ pressed }) => [
-                styles.essentialAction,
-                { opacity: features.isEnabled('events_gatherings') ? 1 : 0.45 },
-                pressed && styles.pressed,
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel="Events. Upcoming COT gatherings."
-            >
-              <View style={[styles.essentialIcon, { backgroundColor: colors.primarySoft }]}>
-                <Icon name="calendar-outline" size={29} color={colors.interactive} />
-              </View>
-              <View style={styles.essentialCopy}>
-                <Text style={[styles.essentialTitle, { color: colors.text }]}>Events</Text>
-                <Text style={[styles.essentialText, { color: colors.textMuted }]} numberOfLines={2}>Upcoming gatherings and church activities.</Text>
-              </View>
-              <Icon name="chevron-forward" size={18} color={colors.textMuted} />
-            </Pressable>
-
-            <View style={[styles.essentialDivider, { backgroundColor: colors.borderSubtle }]} />
-
-            <Pressable
-              onPress={() => router.push('/general/announcements' as any)}
-              style={({ pressed }) => [styles.essentialAction, pressed && styles.pressed]}
-              accessibilityRole="button"
-              accessibilityLabel="Announcements. Important COT updates."
-            >
-              <View style={[styles.essentialIcon, { backgroundColor: colors.primarySoft }]}>
-                <Icon name="megaphone-outline" size={29} color={colors.interactive} />
-              </View>
-              <View style={styles.essentialCopy}>
-                <Text style={[styles.essentialTitle, { color: colors.text }]}>Announcements</Text>
-                <Text style={[styles.essentialText, { color: colors.textMuted }]} numberOfLines={2}>Important notices and updates from COT.</Text>
-              </View>
-              <Icon name="chevron-forward" size={18} color={colors.textMuted} />
-            </Pressable>
+            {[
+              features.isEnabled('events_gatherings') ? {
+                key: 'events',
+                label: 'Events',
+                icon: 'calendar-outline',
+                description: 'Upcoming gatherings and church activities.',
+                route: '/general/events',
+              } : null,
+              {
+                key: 'announcements',
+                label: 'Announcements',
+                icon: 'megaphone-outline',
+                description: 'Important notices and updates from COT.',
+                route: '/general/announcements',
+              },
+              features.isEnabled('sermons') ? {
+                key: 'pastor-messages',
+                label: 'Pastor’s Messages',
+                icon: 'headset-outline',
+                description: 'Pastoral audio and video messages.',
+                route: '/general/pastor-messages',
+              } : null,
+              features.isEnabled('expressions') ? {
+                key: 'expressions',
+                label: 'Expressions',
+                icon: 'business-outline',
+                description: 'Open or join Expression spaces.',
+                route: '/expressions',
+              } : null,
+              features.isEnabled('bible') ? {
+                key: 'bible',
+                label: 'Bible',
+                icon: 'book-outline',
+                description: 'Read, listen, search and save Scripture.',
+                route: '/general/bible',
+              } : null,
+              features.isEnabled('sermons') ? {
+                key: 'sermons',
+                label: 'Sermons',
+                icon: 'book-outline',
+                description: 'Teaching series, sermon notes and details.',
+                route: '/general/sermons',
+              } : null,
+            ].filter(Boolean).map((item, index) => {
+              const entry = item as { key: string; label: string; icon: string; description: string; route: string };
+              return (
+                <React.Fragment key={entry.key}>
+                  {index > 0 ? <View style={[styles.essentialDivider, { backgroundColor: colors.borderSubtle }]} /> : null}
+                  <Pressable
+                    onPress={() => router.push(entry.route as any)}
+                    style={({ pressed }) => [styles.essentialAction, pressed && styles.pressed]}
+                    accessibilityRole="button"
+                    accessibilityLabel={entry.label + '. ' + entry.description}
+                  >
+                    <View style={[styles.essentialIcon, { backgroundColor: colors.primarySoft }]}>
+                      <Icon name={entry.icon} size={29} color={colors.interactive} />
+                    </View>
+                    <View style={styles.essentialCopy}>
+                      <Text style={[styles.essentialTitle, { color: colors.text }]}>{entry.label}</Text>
+                      <Text style={[styles.essentialText, { color: colors.textMuted }]} numberOfLines={2}>{entry.description}</Text>
+                    </View>
+                    <Icon name="chevron-forward" size={18} color={colors.textMuted} />
+                  </Pressable>
+                </React.Fragment>
+              );
+            })}
           </View>
         </View>
 
