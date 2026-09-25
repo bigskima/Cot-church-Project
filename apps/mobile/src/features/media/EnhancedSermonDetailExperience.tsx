@@ -111,6 +111,10 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
           // Fall through to the legacy sermon playback path for livestream recordings.
         }
       }
+      // Pastor's Messages use only their dedicated uploaded media asset. Never fall back to sermon/livestream playback for this content type.
+      if (pastorMessage) {
+        return { ready: false, source: 'direct' as const, status: 'pastor-message-media-unavailable', videoUrl: null, audioUrl: null, posterUrl: null, durationSeconds: null, expiresAt: null };
+      }
       if (!expressionMode) {
         if (!playbackOrganizationId) {
           return Promise.resolve({
@@ -211,6 +215,7 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
               </Pressable>
             ) : null}
 
+            {!pastorMessage ? (
             <View style={[styles.readingIntro, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
               <View style={[styles.readingIcon, { backgroundColor: colors.primarySoft }]}>
                 <Icon name="book-outline" size={22} color={colors.interactive} />
@@ -220,6 +225,8 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
                 <Text style={[styles.readingCopy, { color: colors.textSecondary }]}>COT reveals long sermons progressively so you can read, reflect and continue at your pace.</Text>
               </View>
             </View>
+
+            ) : null}
 
             {hasVideo || hasAudio || playback.loading || mediaPending || playback.error ? (
               <View style={styles.mediaSection}>
@@ -232,13 +239,13 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
 
                 {playback.loading && !hasVideo && !hasAudio ? (
                   <View style={[styles.mediaState, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
-                    <Text style={[styles.mediaStateTitle, { color: colors.text }]}>Preparing sermon media…</Text>
+                    <Text style={[styles.mediaStateTitle, { color: colors.text }]}>{pastorMessage ? 'Preparing teaching media…' : 'Preparing sermon media…'}</Text>
                   </View>
                 ) : mediaPending ? (
                   <View style={[styles.mediaState, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
                     <Icon name="time-outline" size={20} color={colors.interactive} />
-                    <Text style={[styles.mediaStateTitle, { color: colors.text }]}>Recording is still processing</Text>
-                    <Text style={[styles.mediaStateText, { color: colors.textSecondary }]}>The written sermon is available now. Playback will appear automatically when the recording is ready.</Text>
+                    <Text style={[styles.mediaStateTitle, { color: colors.text }]}>{pastorMessage ? 'Teaching recording is still processing' : 'Recording is still processing'}</Text>
+                    <Text style={[styles.mediaStateText, { color: colors.textSecondary }]}>{pastorMessage ? 'The original teaching is still being prepared for playback.' : 'The written sermon is available now. Playback will appear automatically when the recording is ready.'}</Text>
                   </View>
                 ) : playback.error && !hasVideo && !hasAudio ? (
                   <ResourceError message={playback.error} retry={playback.refresh} />
@@ -254,7 +261,7 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
                   />
                 ) : mediaFormat === 'audio' && hasAudio ? (
                   <AudioPlayer
-                    title={sermon.title}
+                    title={pastorMessage ? `${sermon.title} — Teaching` : sermon.title}
                     speaker={sermon.preacher}
                     sourceUrl={audioUrl}
                     durationSeconds={durationSeconds}
@@ -299,7 +306,12 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
               </View>
             ) : null}
 
-            <ProgressiveSermonReader sermon={sermon} />
+            {!pastorMessage ? <ProgressiveSermonReader sermon={sermon} /> : (
+              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+                <Text style={[styles.cardKicker, { color: colors.interactive }]}>TEACHING NOTES</Text>
+                <Text style={[styles.readingCopy, { color: colors.textSecondary }]}>{sermon.description || 'This Pastor’s Message is presented from the original uploaded teaching.'}</Text>
+              </View>
+            )}
 
             {contentId ? (
               <View style={[styles.safetyRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
