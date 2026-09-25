@@ -95,3 +95,139 @@ export async function putSignedUpload(signedUploadUrl: string, file: UploadFile)
 
   throw new Error(`${lastError?.message || 'The upload connection was interrupted.'} Your selected file is still available; retry publishing.`);
 }
+
+
+type ResumableUploadSession = {
+  signedUploadUrl: string;
+  uploadToken?: string | null;
+  storagePath: string;
+  bucketName?: string;
+};
+
+const TUS_CHUNK_SIZE = 6 * 1024 * 1024;
+const TUS_RETRY_DELAYS_MS = [0, 1500, 3500, 7000];
+
+function toBase64(value: string) {
+  if (typeof globalThis.btoa === 'function') return globalThis.btoa(unescape(encodeURIComponent(value)));
+  // React Native's global btoa is available in supported Expo runtimes.
+  throw new Error('This device cannot prepare the media upload metadata.');
+}
+
+function resumableEndpointFromSignedUrl(signedUploadUrl: string) {
+  const parsed = new URL(signedUploadUrl);
+  const hostname = parsed.hostname.endsWith('.storage.supabase.co')
+    ? parsed.hostname
+    : parsed.hostname.replace(/\.supabase\.co$/, '.storage.supabase.co');
+  return `https://${hostname}/storage/v1/upload/resumable`;
+}
+
+async function readTusOffset(uploadUrl: string) {
+  const response = await fetch(uploadUrl, {
+    method: 'HEAD',
+    headers: { 'Tus-Resumable': '1.0.0' },
+  });
+  if (!response.ok) throw new Error(`Unable to resume media upload (${response.status}).`);
+  const offset = Number(response.headers.get('Upload-Offset') ?? 0);
+  if (!Number.isSafeInteger(offset) || offset < 0) throw new Error('The media upload position could not be verified.');
+  return offset;
+}
+
+/**
+ * Uses Supabase Storage's TUS resumable protocol for large pastoral media.
+ * Supabase recommends resumable uploads above 6 MB and documents 6 MB chunks,
+ * progress events and direct storage hostnames for better large-file performance.
+ */
+export async function putSignedResumableUpload(
+  session: ResumableUploadSession,
+  file: UploadFile,
+  onProgress?: (uploadedBytes: number, totalBytes: number) => void,
+): Promise<number> {
+  const source = await readUploadFile(file);
+  const mimeType = normalizeUploadMime(file.name, file.mimeType);
+  const size = Number(source.size || file.size || 0);
+  if (!size) throw new Error('The selected file is empty. Choose another file.');
+
+  const endpoint = resumableEndpointFromSignedUrl(session.signedUploadUrl);
+  const signature = session.uploadToken || new URL(session.signedUploadUrl).searchParams.get('token');
+  if (!signature) throw new Error('The secure media upload session is incomplete. Please choose the file again.');
+
+  const metadata = [
+    ['bucketName', session.bucketName || 'content-media'],
+    ['objectName', session.storagePath],
+    ['contentType', mimeType],
+    ['cacheControl', '3600'],
+  ].map(([key, value]) => `${key} ${toBase64(value)}`).join(',');
+
+  let uploadUrl = '';
+  let offset = 0;
+
+  for (let attempt = 0; attempt < TUS_RETRY_DELAYS_MS.length && !uploadUrl; attempt += 1) {
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Tus-Resumable': '1.0.0',
+          'Upload-Length': String(size),
+          'Upload-Metadata': metadata,
+          'x-signature': signature,
+        },
+      });
+      if (!response.ok) throw new Error(`Unable to start media upload (${response.status}).`);
+      uploadUrl = response.headers.get('Location') || response.headers.get('location') || '';
+      if (!uploadUrl) throw new Error('The media upload session did not return a resumable upload URL.');
+    } catch (error) {
+      if (attempt === TUS_RETRY_DELAYS_MS.length - 1) throw error instanceof Error ? error : new Error('Unable to start media upload.');
+      await delay(TUS_RETRY_DELAYS_MS[attempt]);
+    }
+  }
+
+  onProgress?.(0, size);
+
+  while (offset < size) {
+    const end = Math.min(offset + TUS_CHUNK_SIZE, size);
+    const chunk = source.slice(offset, end);
+    let uploaded = false;
+
+    for (let attempt = 0; attempt < TUS_RETRY_DELAYS_MS.length; attempt += 1) {
+      try {
+        const response = await fetch(uploadUrl, {
+          method: 'PATCH',
+          headers: {
+            'Tus-Resumable': '1.0.0',
+            'Upload-Offset': String(offset),
+            'Content-Type': 'application/offset+octet-stream',
+          },
+          body: chunk,
+        });
+        if (!response.ok) throw new Error(`Media upload failed (${response.status}).`);
+        const nextOffset = Number(response.headers.get('Upload-Offset') ?? end);
+        if (!Number.isSafeInteger(nextOffset) || nextOffset <= offset || nextOffset > size) {
+          throw new Error('The media upload returned an invalid position.');
+        }
+        offset = nextOffset;
+        onProgress?.(offset, size);
+        uploaded = true;
+        break;
+      } catch (error) {
+        if (attempt === TUS_RETRY_DELAYS_MS.length - 1) {
+          // If the connection dropped after Storage accepted the chunk, resume
+          // from Storage's authoritative offset instead of sending it again.
+          offset = await readTusOffset(uploadUrl);
+          onProgress?.(offset, size);
+          if (offset >= size) {
+            uploaded = true;
+            break;
+          }
+        } else {
+          await delay(TUS_RETRY_DELAYS_MS[attempt]);
+        }
+      }
+    }
+
+    if (!uploaded) {
+      throw new Error('The media upload was interrupted. Your file is still selected; please retry.');
+    }
+  }
+
+  return size;
+}
