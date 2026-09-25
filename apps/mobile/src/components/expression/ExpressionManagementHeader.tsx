@@ -42,7 +42,7 @@ const tabs: Array<{ key: ExpressionManagementSection; label: string; description
   { key: 'tools', label: 'Tools', description: 'Expression operations and shortcuts', icon: 'grid-outline' },
   { key: 'studio', label: 'Studio', description: 'Create and publish Expression content', icon: 'color-wand-outline' },
   { key: 'live', label: 'Live', description: 'Prepare and manage broadcasts', icon: 'radio-outline' },
-  { key: 'sermons', label: 'Sermons', description: 'Create and manage teaching', icon: 'book-outline' },
+  { key: 'sermons', label: 'Pastor’s Messages', description: 'Create and manage pastoral audio and video messages', icon: 'book-outline' },
   { key: 'events', label: 'Events', description: 'Plan Expression events', icon: 'calendar-outline' },
   { key: 'announcements', label: 'Updates', description: 'Publish announcements and notices', icon: 'megaphone-outline' },
   { key: 'testimonies', label: 'Testimony', description: 'Review testimony submissions', icon: 'document-text-outline' },
