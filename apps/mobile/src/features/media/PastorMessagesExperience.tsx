@@ -34,10 +34,7 @@ export function PastorMessagesScreen({ scope, expressionId }: { scope: Scope; ex
     `pastor-messages:${scope}:${organizationId || 'auto'}:${expressionId || 'general'}:${mode}`,
     (signal) => {
       if (scope === 'expression') {
-        const params = new URLSearchParams();
-        if (organizationId) params.set('organizationId', organizationId);
-        if (expressionId) params.set('expressionId', expressionId);
-        return api.request<Sermon[]>(`public-content?type=pastor-messages&${params.toString()}`, { signal, context: 'public' });
+        return api.request<Sermon[]>('sermons?pastorMessages=true', { signal });
       }
       const suffix = organizationId ? `&organizationId=${encodeURIComponent(organizationId)}` : '';
       return api.request<Sermon[]>(`public-content?type=pastor-messages${suffix}`, { signal, context: 'public' });
