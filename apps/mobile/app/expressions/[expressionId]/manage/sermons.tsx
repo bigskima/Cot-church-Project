@@ -7,7 +7,7 @@ import { useExpressionManagementAccess } from '@/features/expression-management/
 export default function ExpressionSermonManagementScreen() {
   const access = useExpressionManagementAccess();
   return (
-    <ExpressionManagementGate ready={access.ready} allowed={access.canManageSermons} expressionId={access.expressionId} title="Sermon management unavailable">
+    <ExpressionManagementGate ready={access.ready} allowed={access.canManagePastorMessages} expressionId={access.expressionId} title="Pastor’s Messages management unavailable">
       <ExpressionManagementWorkspace
         expressionId={access.expressionId}
         active="sermons"
