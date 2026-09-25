@@ -207,7 +207,7 @@ with check (
 
 create policy sermons_read_published
 on public.sermons
-for select to authenticated
+for select
 using (
   (
     status='published'
