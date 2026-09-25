@@ -11,9 +11,9 @@ export default function ExpressionSermonManagementScreen() {
       <ExpressionManagementWorkspace
         expressionId={access.expressionId}
         active="sermons"
-        title="Sermon Studio"
-        subtitle="Draft, prepare and publish teaching for members of this Expression."
-        icon="book-outline"
+        title="Pastor’s Messages Studio"
+        subtitle="Create and publish pastoral audio and video messages for members of this Expression."
+        icon="headset-outline"
       >
         <SermonsManageScreen />
       </ExpressionManagementWorkspace>
