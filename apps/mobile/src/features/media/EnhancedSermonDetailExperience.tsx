@@ -85,7 +85,7 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
 
   const playback = useResource<SermonPlayback>(
     `sermon:playback:${expressionMode ? `expression:${activeExpressionId ?? 'none'}` : `public:${playbackOrganizationId || 'pending'}`}:${id}:${sermon?.content_item_id ?? 'pending'}`,
-    (signal) => {
+    async (signal) => {
       if (sermon?.content_item_id) {
         try {
           const media = await api.request<any>(
