@@ -53,8 +53,8 @@ export function ExpressionManagementHub() {
       },
       {
         key: 'sermons',
-        title: 'Sermons',
-        description: 'Draft, publish and update messages.',
+        title: 'Pastor’s Messages',
+        description: 'Create, publish and update pastoral audio and video messages.',
         iconName: 'book-outline',
         route: `${base}/sermons`,
         enabled: access.canManageSermons,
