@@ -52,11 +52,11 @@ export function ExpressionManagementHub() {
         enabled: access.canManageLive,
       },
       {
-        key: 'sermons',
+        key: 'pastor-messages',
         title: 'Pastor’s Messages',
         description: 'Create, publish and update pastoral audio and video messages.',
-        iconName: 'book-outline',
-        route: `${base}/sermons`,
+        iconName: 'headset-outline',
+        route: `${base}/pastor-messages`,
         enabled: access.canManagePastorMessages,
       },
       {
