@@ -19,20 +19,29 @@ Deno.serve(createHandler(
     const viewer = auth?.client ?? publicClient();
     const { data: sermon, error: sermonError } = await viewer
       .from("sermons")
-      .select("id,organization_id,expression_id,recording_id,title,video_url,audio_url,thumbnail_url,duration_seconds,status,visibility")
+      .select("id,organization_id,expression_id,recording_id,title,video_url,audio_url,video_asset_id,audio_asset_id,thumbnail_url,duration_seconds,status,visibility,media_assets:video_asset_id(id,media_type,processing_state,duration_seconds,media_renditions(rendition_kind,storage_path,provider_playback_id)),audio_media_assets:audio_asset_id(id,media_type,processing_state,duration_seconds,media_renditions(rendition_kind,storage_path,provider_playback_id))")
       .eq("id", sermonId)
       .eq("organization_id", organizationId)
       .maybeSingle();
     if (sermonError || !sermon) throw new ApiError("SERMON_NOT_FOUND", "Sermon is unavailable", 404);
 
     if (!sermon.recording_id) {
+      const signAsset = async (asset: any, renditionKind: string) => {
+        if (!asset || asset.media_type !== (renditionKind === "video_stream" ? "video" : "audio") || asset.processing_state !== "ready") return null;
+        const rendition = (asset.media_renditions ?? []).find((item: any) => item.rendition_kind === renditionKind) ?? asset.media_renditions?.[0];
+        if (!rendition?.storage_path) return null;
+        const { data: signed, error } = await adminClient().storage.from("content-media").createSignedUrl(rendition.storage_path, PLAYBACK_TTL_SECONDS);
+        return error || !signed?.signedUrl ? null : signed.signedUrl;
+      };
+      const videoAssetUrl = await signAsset((sermon as any).media_assets, "video_stream");
+      const audioAssetUrl = await signAsset((sermon as any).audio_media_assets, "audio_stream");
       return {
         data: {
-          ready: Boolean(sermon.video_url || sermon.audio_url),
+          ready: Boolean(sermon.video_url || sermon.audio_url || videoAssetUrl || audioAssetUrl),
           sermonId: sermon.id,
           source: "direct",
-          videoUrl: sermon.video_url ?? null,
-          audioUrl: sermon.audio_url ?? null,
+          videoUrl: sermon.video_url ?? videoAssetUrl,
+          audioUrl: sermon.audio_url ?? audioAssetUrl,
           posterUrl: sermon.thumbnail_url ?? null,
           durationSeconds: sermon.duration_seconds ?? null,
           expiresAt: null,
