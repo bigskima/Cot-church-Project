@@ -294,7 +294,21 @@ export default function GeneralHomeExperience() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalContent}>
           {unit.ids.map((id) => {
             const sermon = sermonMap.get(id);
-            return sermon ? <View key={id} style={styles.discoveryCardWidth}><SermonCard sermon={sermon} variant="discovery" onPress={() => router.push(`/general/sermon/${sermon.id}` as any)} /></View> : null;
+            if (!sermon) return null;
+            const isPastorMessage = sermon.is_pastor_message === true;
+            return (
+              <View key={id} style={styles.discoveryCardWidth}>
+                <SermonCard
+                  sermon={sermon}
+                  variant="discovery"
+                  onPress={() => router.push(
+                    (isPastorMessage
+                      ? `/general/pastor-messages/${sermon.id}`
+                      : `/general/sermon/${sermon.id}`) as any,
+                  )}
+                />
+              </View>
+            );
           })}
         </ScrollView>
       </View>

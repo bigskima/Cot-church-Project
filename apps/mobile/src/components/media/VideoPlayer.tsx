@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View, StyleProp, ViewStyle, ActivityIndicator } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useTheme } from '@/state/theme';
@@ -36,6 +36,8 @@ export function VideoPlayer({
   const [duration, setDuration] = useState(durationSeconds || 0);
   const [isBuffering, setIsBuffering] = useState(false);
   const [restoredPosition, setRestoredPosition] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const videoViewRef = useRef<VideoView>(null);
 
   const player = useVideoPlayer(sourceUrl || '', (p) => {
     p.loop = false;
@@ -97,18 +99,50 @@ export function VideoPlayer({
 
   const progressPercent = duration > 0 ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0;
 
+  const toggleFullscreen = async () => {
+    if (!videoViewRef.current) return;
+    try {
+      if (isFullscreen) {
+        await videoViewRef.current.exitFullscreen();
+      } else {
+        await videoViewRef.current.enterFullscreen();
+      }
+    } catch {
+      // Fullscreen is optional on platforms where the native player cannot provide it.
+    }
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md, style]}>
       {/* Source-aware video canvas frame */}
       <View style={[styles.videoFrame, { backgroundColor: '#000000', aspectRatio: Number.isFinite(aspectRatio) && aspectRatio > 0 ? aspectRatio : 16 / 9 }]}>
         {sourceUrl && player ? (
-          <VideoView
-            player={player}
-            style={styles.videoView}
-            contentFit="contain"
-            nativeControls={false}
-            pointerEvents="none"
-          />
+          <>
+            <VideoView
+              ref={videoViewRef}
+              player={player}
+              style={styles.videoView}
+              contentFit="contain"
+              nativeControls={false}
+              fullscreenOptions={{ enable: true }}
+              onFullscreenEnter={() => setIsFullscreen(true)}
+              onFullscreenExit={() => setIsFullscreen(false)}
+              pointerEvents="none"
+            />
+            <Pressable
+            onPress={toggleFullscreen}
+            accessibilityRole="button"
+            accessibilityLabel={isFullscreen ? 'Exit full screen' : 'View full screen'}
+            hitSlop={10}
+            style={[styles.fullscreenButton, { backgroundColor: 'rgba(0, 0, 0, 0.62)' }]}
+          >
+            <Icon
+              name={isFullscreen ? 'contract-outline' : 'expand-outline'}
+              size={21}
+              color="#FFFFFF"
+            />
+            </Pressable>
+          </>
         ) : posterUrl ? (
           <Image source={{ uri: posterUrl }} style={styles.posterImage} resizeMode="contain" />
         ) : (
@@ -217,6 +251,17 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  fullscreenButton: {
+    position: 'absolute',
+    top: spacing.sm,
+    right: spacing.sm,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
   },
   bufferingOverlay: {
     ...StyleSheet.absoluteFill as any,

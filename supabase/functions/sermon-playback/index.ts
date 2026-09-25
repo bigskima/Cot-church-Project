@@ -19,20 +19,38 @@ Deno.serve(createHandler(
     const viewer = auth?.client ?? publicClient();
     const { data: sermon, error: sermonError } = await viewer
       .from("sermons")
-      .select("id,organization_id,expression_id,recording_id,title,video_url,audio_url,thumbnail_url,duration_seconds,status,visibility")
+      .select("id,organization_id,expression_id,recording_id,title,video_url,audio_url,video_asset_id,audio_asset_id,thumbnail_url,duration_seconds,status,visibility")
       .eq("id", sermonId)
       .eq("organization_id", organizationId)
       .maybeSingle();
     if (sermonError || !sermon) throw new ApiError("SERMON_NOT_FOUND", "Sermon is unavailable", 404);
 
     if (!sermon.recording_id) {
+      const assetIds = [sermon.video_asset_id, sermon.audio_asset_id].filter(Boolean);
+      const { data: assets } = assetIds.length
+        ? await admin.from("media_assets").select("id,media_type,processing_state").in("id", assetIds).eq("organization_id", sermon.organization_id)
+        : { data: [] as any[] };
+      const signAsset = async (assetId: string | null, mediaType: "video" | "audio", renditionKind: string) => {
+        if (!assetId) return null;
+        const asset = (assets ?? []).find((item: any) => item.id === assetId);
+        if (!asset || asset.media_type !== mediaType || asset.processing_state !== "ready") return null;
+        const { data: renditions } = await admin.from("media_renditions").select("rendition_kind,storage_path").eq("media_asset_id", assetId).eq("rendition_kind", renditionKind).limit(1);
+        const rendition = renditions?.[0];
+        if (!rendition?.storage_path) return null;
+        const { data: signed, error } = await admin.storage.from("content-media").createSignedUrl(rendition.storage_path, PLAYBACK_TTL_SECONDS);
+        return error || !signed?.signedUrl ? null : signed.signedUrl;
+      };
+      const [videoAssetUrl, audioAssetUrl] = await Promise.all([
+        signAsset(sermon.video_asset_id, "video", "video_stream"),
+        signAsset(sermon.audio_asset_id, "audio", "audio_stream"),
+      ]);
       return {
         data: {
-          ready: Boolean(sermon.video_url || sermon.audio_url),
+          ready: Boolean(sermon.video_url || sermon.audio_url || videoAssetUrl || audioAssetUrl),
           sermonId: sermon.id,
           source: "direct",
-          videoUrl: sermon.video_url ?? null,
-          audioUrl: sermon.audio_url ?? null,
+          videoUrl: sermon.video_url ?? videoAssetUrl,
+          audioUrl: sermon.audio_url ?? audioAssetUrl,
           posterUrl: sermon.thumbnail_url ?? null,
           durationSeconds: sermon.duration_seconds ?? null,
           expiresAt: null,

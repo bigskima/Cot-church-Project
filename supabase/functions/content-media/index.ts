@@ -13,9 +13,14 @@ const BUCKET = "content-media";
 const MAX_BYTES = 200 * 1024 * 1024;
 const MIME_TYPES: Record<string, { mediaType: "video" | "audio" | "image"; ext: string; rendition: "video_stream" | "audio_stream" | null }> = {
   "video/mp4": { mediaType: "video", ext: "mp4", rendition: "video_stream" },
+  "video/x-m4v": { mediaType: "video", ext: "mp4", rendition: "video_stream" },
+  "video/m4v": { mediaType: "video", ext: "mp4", rendition: "video_stream" },
   "video/webm": { mediaType: "video", ext: "webm", rendition: "video_stream" },
   "video/quicktime": { mediaType: "video", ext: "mov", rendition: "video_stream" },
   "audio/mpeg": { mediaType: "audio", ext: "mp3", rendition: "audio_stream" },
+  "audio/x-m4a": { mediaType: "audio", ext: "m4a", rendition: "audio_stream" },
+  "audio/m4a": { mediaType: "audio", ext: "m4a", rendition: "audio_stream" },
+  "audio/x-wav": { mediaType: "audio", ext: "wav", rendition: "audio_stream" },
   "audio/mp4": { mediaType: "audio", ext: "m4a", rendition: "audio_stream" },
   "audio/aac": { mediaType: "audio", ext: "aac", rendition: "audio_stream" },
   "audio/ogg": { mediaType: "audio", ext: "ogg", rendition: "audio_stream" },
@@ -25,10 +30,10 @@ const MIME_TYPES: Record<string, { mediaType: "video" | "audio" | "image"; ext: 
   "image/webp": { mediaType: "image", ext: "webp", rendition: null },
 };
 
-function validateSize(value: unknown) {
+function validateSize(value: unknown, maxBytes = MAX_BYTES) {
   const size = Number(value);
-  if (!Number.isSafeInteger(size) || size <= 0 || size > MAX_BYTES) {
-    throw new ApiError("PAYLOAD_TOO_LARGE", "Content media must be 200 MB or smaller", 413);
+  if (!Number.isSafeInteger(size) || size <= 0 || size > maxBytes) {
+    throw new ApiError("PAYLOAD_TOO_LARGE", maxBytes === MAX_BYTES ? "Content media must be 200 MB or smaller" : "Pastor’s Message media must be 100 MB or smaller", 413);
   }
   return size;
 }
@@ -40,7 +45,7 @@ function safeFileName(value: unknown) {
 async function findOwnedAsset(profileId: string, assetId: string) {
   const { data, error } = await adminClient()
     .from("media_assets")
-    .select("id,organization_id,expression_id,media_type,processing_state,source_storage_path,mime_type,file_size_bytes,duration_seconds,aspect_ratio,created_by")
+    .select("id,organization_id,expression_id,media_type,processing_state,source_storage_path,mime_type,file_size_bytes,duration_seconds,aspect_ratio,created_by,metadata")
     .eq("id", assetId)
     .eq("created_by", profileId)
     .maybeSingle();
@@ -132,6 +137,62 @@ Deno.serve(createHandler(
       return { data: await resolvePlayback(client, admin, contentId) };
     }
 
+    if (request.method === "GET" && url.searchParams.get("action") === "pastor_message_playback") {
+      const sermonId = uuid(url.searchParams.get("sermonId"), "sermonId", true)!;
+      const client = auth?.client ?? publicClient();
+      const { data: sermon, error: sermonError } = await client
+        .from("sermons")
+        .select("id,organization_id,expression_id,is_pastor_message,status,visibility,audio_asset_id,video_asset_id,thumbnail_url,duration_seconds")
+        .eq("id", sermonId)
+        .eq("is_pastor_message", true)
+        .eq("status", "published")
+        .eq("visibility", "public")
+        .maybeSingle();
+      if (sermonError || !sermon) throw new ApiError("PASTOR_MESSAGE_NOT_FOUND", "This Pastor’s Message is not available", 404);
+
+      const assetIds = [sermon.audio_asset_id, sermon.video_asset_id].filter(Boolean) as string[];
+      if (!assetIds.length) return { data: { available: false, audioUrl: null, videoUrl: null, posterUrl: sermon.thumbnail_url ?? null, audioDurationSeconds: null, videoDurationSeconds: null } };
+
+      const [{ data: assets, error: assetError }, { data: renditions, error: renditionError }] = await Promise.all([
+        admin
+          .from("media_assets")
+          .select("id,media_type,processing_state,duration_seconds")
+          .in("id", assetIds),
+        admin
+          .from("media_renditions")
+          .select("media_asset_id,rendition_kind,storage_path")
+          .in("media_asset_id", assetIds)
+          .in("rendition_kind", ["audio_stream", "video_stream"]),
+      ]);
+      if (assetError) throw new ApiError("PLAYBACK_INFO_FAILED", "Unable to resolve Pastor’s Message media assets", 500, undefined, false);
+      if (renditionError) throw new ApiError("PLAYBACK_INFO_FAILED", "Unable to resolve Pastor’s Message media", 500, undefined, false);
+
+      const sign = async (path: string | null) => {
+        if (!path) return null;
+        const { data, error } = await admin.storage.from(BUCKET).createSignedUrl(path, 3600);
+        if (error || !data?.signedUrl) throw new ApiError("PLAYBACK_SIGNING_FAILED", "Unable to authorize media playback", 500, undefined, false);
+        return data.signedUrl;
+      };
+      const audioAsset = assets?.find((item) => item.id === sermon.audio_asset_id && item.media_type === "audio" && item.processing_state === "ready");
+      const videoAsset = assets?.find((item) => item.id === sermon.video_asset_id && item.media_type === "video" && item.processing_state === "ready");
+      const audioRendition = audioAsset
+        ? renditions?.find((item) => item.media_asset_id === audioAsset.id && item.rendition_kind === "audio_stream")
+        : null;
+      const videoRendition = videoAsset
+        ? renditions?.find((item) => item.media_asset_id === videoAsset.id && item.rendition_kind === "video_stream")
+        : null;
+      return {
+        data: {
+          available: Boolean(audioRendition || videoRendition),
+          audioUrl: await sign(audioRendition?.storage_path ?? null),
+          videoUrl: await sign(videoRendition?.storage_path ?? null),
+          posterUrl: sermon.thumbnail_url ?? null,
+          audioDurationSeconds: audioAsset?.duration_seconds ?? null,
+          videoDurationSeconds: videoAsset?.duration_seconds ?? null,
+        },
+      };
+    }
+
     if (!auth?.user) {
       throw new ApiError("AUTHENTICATION_REQUIRED", "Please sign in to continue", 401);
     }
@@ -140,31 +201,56 @@ Deno.serve(createHandler(
     const action = requiredString(body.action, "action", 40);
 
     if (action === "create_upload_intent") {
-      assertNoUnknownFields(body, ["action", "organizationId", "mediaType", "mimeType", "expressionId", "durationSeconds", "aspectRatio", "fileSizeBytes", "fileName"]);
+      assertNoUnknownFields(body, ["action", "organizationId", "mediaType", "mimeType", "expressionId", "durationSeconds", "aspectRatio", "fileSizeBytes", "fileName", "purpose"]);
       const expressionId = body.expressionId ? uuid(String(body.expressionId), "expressionId", true) : null;
+      const purpose = optionalString(body.purpose, "purpose", 40) ?? "community_media";
+      if (!["community_media", "pastor_message"].includes(purpose)) {
+        throw new ApiError("VALIDATION_FAILED", "Unsupported media upload purpose", 422);
+      }
       const requestedOrganizationId = body.organizationId
         ? uuid(String(body.organizationId), "organizationId", true)!
         : auth.organizationId;
       const organizationId = await resolveActiveOrganizationId(admin, requestedOrganizationId);
 
-      const { data: postingAllowed, error: postingError } = await auth.client.rpc("can_profile_post", {
-        target_profile_id: auth.user.id,
-      });
-      if (postingError || postingAllowed !== true) {
-        throw new ApiError("POSTING_RESTRICTED", "Your posting access is currently restricted", 403);
-      }
-
-      if (expressionId) {
-        if (!auth.organizationId || !auth.branchId || organizationId !== auth.organizationId || expressionId !== auth.branchId) {
-          throw new ApiError("EXPRESSION_SCOPE_DENIED", "Media can only be uploaded for your selected Expression", 403);
+      if (purpose === "pastor_message") {
+        if (expressionId) {
+          if (!auth.organizationId || !auth.branchId || organizationId !== auth.organizationId || expressionId !== auth.branchId) {
+            throw new ApiError("EXPRESSION_SCOPE_DENIED", "Media can only be uploaded for your selected Expression", 403);
+          }
+          const { data, error } = await auth.client.rpc("has_exact_scope_permission", {
+            target_organization_id: organizationId,
+            requested_permission: "expression.pastor_messages.create",
+            target_branch_id: expressionId,
+          });
+          if (error || data !== true) throw new ApiError("PERMISSION_DENIED", "This action isn’t available for your account.", 403);
+        } else {
+          const { data, error } = await auth.client.rpc("has_exact_scope_permission", {
+            target_organization_id: organizationId,
+            requested_permission: "pastor_messages.create",
+            target_branch_id: null,
+          });
+          if (error || data !== true) throw new ApiError("PERMISSION_DENIED", "This action isn’t available for your account.", 403);
         }
-        await authorize(auth, "media.upload");
       } else {
-        const { data: publicPostingAllowed, error: publicPostingError } = await admin.rpc("can_profile_post_publicly", {
+        const { data: postingAllowed, error: postingError } = await auth.client.rpc("can_profile_post", {
           target_profile_id: auth.user.id,
         });
-        if (publicPostingError || publicPostingAllowed !== true) {
-          throw new ApiError("PUBLIC_POSTING_UNAVAILABLE", "Public posting is currently unavailable for this account", 403);
+        if (postingError || postingAllowed !== true) {
+          throw new ApiError("POSTING_RESTRICTED", "Your posting access is currently restricted", 403);
+        }
+
+        if (expressionId) {
+          if (!auth.organizationId || !auth.branchId || organizationId !== auth.organizationId || expressionId !== auth.branchId) {
+            throw new ApiError("EXPRESSION_SCOPE_DENIED", "Media can only be uploaded for your selected Expression", 403);
+          }
+          await authorize(auth, "media.upload");
+        } else {
+          const { data: publicPostingAllowed, error: publicPostingError } = await admin.rpc("can_profile_post_publicly", {
+            target_profile_id: auth.user.id,
+          });
+          if (publicPostingError || publicPostingAllowed !== true) {
+            throw new ApiError("PUBLIC_POSTING_UNAVAILABLE", "Public posting is currently unavailable for this account", 403);
+          }
         }
       }
 
@@ -172,7 +258,7 @@ Deno.serve(createHandler(
       const mimeType = requiredString(body.mimeType, "mimeType", 120).toLowerCase();
       const mime = MIME_TYPES[mimeType];
       if (!mime || mime.mediaType !== mediaType) throw new ApiError("UNSUPPORTED_MEDIA_TYPE", "This media format is not supported", 415);
-      const fileSizeBytes = validateSize(body.fileSizeBytes);
+      const fileSizeBytes = validateSize(body.fileSizeBytes, purpose === "pastor_message" ? 100 * 1024 * 1024 : MAX_BYTES);
       const durationSeconds = typeof body.durationSeconds === "number" && Number.isFinite(body.durationSeconds) && body.durationSeconds >= 0
         ? Math.round(body.durationSeconds)
         : null;
@@ -192,7 +278,7 @@ Deno.serve(createHandler(
         mime_type: mimeType,
         file_size_bytes: fileSizeBytes,
         created_by: auth.user.id,
-        metadata: { originalFileName: safeFileName(body.fileName) },
+        metadata: { originalFileName: safeFileName(body.fileName), purpose },
       }).select("id,organization_id,expression_id,media_type,processing_state,source_storage_path,mime_type,file_size_bytes,duration_seconds,aspect_ratio").single();
       if (createError || !asset) throw new ApiError("ASSET_CREATE_FAILED", "Unable to initialize media upload", 500, undefined, false);
 
@@ -239,10 +325,11 @@ Deno.serve(createHandler(
       const object = (objects ?? []).find((item) => item.name === objectName);
       if (!object) throw new ApiError("MEDIA_UPLOAD_INCOMPLETE", "The media file has not finished uploading", 409);
       const actualSize = Number((object as any).metadata?.size ?? asset.file_size_bytes ?? 0);
-      if (!Number.isFinite(actualSize) || actualSize <= 0 || actualSize > MAX_BYTES) {
+      const maxBytes = asset.metadata?.purpose === "pastor_message" ? 100 * 1024 * 1024 : MAX_BYTES;
+      if (!Number.isFinite(actualSize) || actualSize <= 0 || actualSize > maxBytes) {
         await admin.storage.from(BUCKET).remove([asset.source_storage_path]);
         await admin.from("media_assets").update({ processing_state: "failed", processing_error: "Invalid uploaded file size" }).eq("id", assetId);
-        throw new ApiError("PAYLOAD_TOO_LARGE", "Uploaded media exceeds the 200 MB limit", 413);
+        throw new ApiError("PAYLOAD_TOO_LARGE", asset.metadata?.purpose === "pastor_message" ? "Pastor’s Message media must be 100 MB or smaller" : "Uploaded media exceeds the 200 MB limit", 413);
       }
 
       const mime = MIME_TYPES[asset.mime_type];

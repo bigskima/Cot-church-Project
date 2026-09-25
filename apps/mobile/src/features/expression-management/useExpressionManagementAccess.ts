@@ -20,7 +20,8 @@ export function useExpressionManagementAccess() {
   const ready = accessReady && ownershipReady;
 
   const canManageLive = Boolean(expressionId) && hasCapability('streams.broadcast');
-  const canManageSermons = Boolean(expressionId) && (hasCapability('sermons.create') || hasCapability('sermons.manage') || hasCapability('sermons.publish'));
+  const canManageSermons = Boolean(expressionId) && (hasCapability('expression.sermons.create') || hasCapability('expression.sermons.manage') || hasCapability('expression.sermons.publish'));
+  const canManagePastorMessages = Boolean(expressionId) && (hasCapability('expression.pastor_messages.create') || hasCapability('expression.pastor_messages.manage') || hasCapability('expression.pastor_messages.publish'));
   const canManageEvents = Boolean(expressionId) && (hasCapability('events.create') || hasCapability('events.update'));
   const canManageAnnouncements = Boolean(expressionId) && hasCapability('announcements.manage');
   const canReviewTestimonies = Boolean(expressionId) && (hasCapability('testimonies.review') || hasCapability('testimonies.manage'));
@@ -39,7 +40,7 @@ export function useExpressionManagementAccess() {
   const canPublishExpressionPosts = Boolean(expressionId) && (hasCapability('posts.create') || hasCapability('posts.publish'));
   const canPublishExpressionReels = Boolean(expressionId) && hasCapability('media.upload') && hasCapability('reels.publish');
   const canPublishExpressionVideos = Boolean(expressionId) && hasCapability('media.upload') && hasCapability('videos.publish');
-  const canUseContentStudio = canPublishExpressionPosts || canPublishExpressionReels || canPublishExpressionVideos || canManageSermons;
+  const canUseContentStudio = canPublishExpressionPosts || canPublishExpressionReels || canPublishExpressionVideos || canManageSermons || canManagePastorMessages;
 
   const canManageAny = useMemo(
     () =>
@@ -83,6 +84,7 @@ export function useExpressionManagementAccess() {
     canManageAny,
     canManageLive,
     canManageSermons,
+    canManagePastorMessages,
     canManageEvents,
     canManageAnnouncements,
     canReviewTestimonies,

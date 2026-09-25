@@ -35,7 +35,7 @@ type SermonPlayback = {
 
 const publicOrganizationId = process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
 
-export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general' }: { sermonId: string; scope?: 'general' | 'expression' }) {
+export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general', pastorMessage = false }: { sermonId: string; scope?: 'general' | 'expression'; pastorMessage?: boolean }) {
   const insets = useSafeAreaInsets();
   const { api, context, mode } = useSession();
   const { colors } = useTheme();
@@ -52,18 +52,30 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
     `sermon:detail:${expressionMode ? `expression:${activeExpressionId ?? 'none'}` : 'public'}:${id}`,
     async (signal) => {
       if (!id) throw new Error('This sermon is unavailable.');
+      if (pastorMessage && mode === 'authenticated') {
+        try {
+          const managed = await api.request<Sermon[]>(
+            `sermons?view=manage&pastorMessages=true&id=${encodeURIComponent(id)}`,
+            { signal },
+          );
+          const managedMessage = managed?.find((item) => item.id === id && item.is_pastor_message === true);
+          if (managedMessage) return managedMessage;
+        } catch {
+          // Not a manager: fall through to the public published-message path.
+        }
+      }
       if (!expressionMode) {
         const organizationSuffix = activeOrganizationId
           ? `&organizationId=${encodeURIComponent(activeOrganizationId)}`
           : '';
         return api.request<Sermon>(
-          `public-content?type=sermon&id=${encodeURIComponent(id)}${organizationSuffix}`,
+          `public-content?type=${pastorMessage ? 'pastor-message' : 'sermon'}&id=${encodeURIComponent(id)}${organizationSuffix}`,
           { signal, context: 'public' },
         );
       }
       if (!activeExpressionId) throw new Error('Enter this Expression to view its internal sermon.');
-      const sermon = await api.request<Sermon>(`sermons?id=${encodeURIComponent(id)}`, { signal });
-      if (!sermon || sermon.expression_id !== activeExpressionId) throw new Error('This sermon is not part of this Expression.');
+      const sermon = await api.request<Sermon>(`sermons?id=${encodeURIComponent(id)}${pastorMessage ? '&pastorMessages=true' : ''}`, { signal });
+      if (!sermon || sermon.expression_id !== activeExpressionId || (pastorMessage && sermon.is_pastor_message !== true)) throw new Error(pastorMessage ? 'This Pastor’s Message is not part of this Expression.' : 'This sermon is not part of this Expression.');
       return sermon;
     },
   );
@@ -72,8 +84,39 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
   const playbackOrganizationId = activeOrganizationId || sermon?.organization_id || '';
 
   const playback = useResource<SermonPlayback>(
-    `sermon:playback:${expressionMode ? `expression:${activeExpressionId ?? 'none'}` : `public:${playbackOrganizationId || 'pending'}`}:${id}`,
-    (signal) => {
+    `sermon:playback:${expressionMode ? `expression:${activeExpressionId ?? 'none'}` : `public:${playbackOrganizationId || 'pending'}`}:${id}:${sermon?.content_item_id ?? 'pending'}`,
+    async (signal) => {
+      if (sermon?.content_item_id) {
+        try {
+          const media = await api.request<any>(
+            pastorMessage
+              ? `content-media?action=pastor_message_playback&sermonId=${encodeURIComponent(sermon.id)}`
+              : `content-media?action=playback&contentId=${encodeURIComponent(sermon.content_item_id)}`,
+            { signal, context: expressionMode ? 'current' : 'public' },
+          );
+          const renditions = media?.renditions ?? [];
+          const videoRendition = renditions.find((item: any) => item.kind === 'video_stream' || item.renditionKind === 'video_stream' || item.rendition_kind === 'video_stream');
+          const audioRendition = renditions.find((item: any) => item.kind === 'audio_stream' || item.renditionKind === 'audio_stream' || item.rendition_kind === 'audio_stream');
+          if (media?.available || videoRendition || audioRendition) {
+            return {
+              ready: true,
+              source: 'direct' as const,
+              status: 'ready',
+              videoUrl: videoRendition?.playbackUrl ?? null,
+              audioUrl: audioRendition?.playbackUrl ?? null,
+              posterUrl: null,
+              durationSeconds: media?.durationSeconds ?? sermon.duration_seconds ?? null,
+              expiresAt: media?.expiresAt ?? null,
+            };
+          }
+        } catch {
+          // Fall through to the legacy sermon playback path for livestream recordings.
+        }
+      }
+      // Pastor's Messages use only their dedicated uploaded media asset. Never fall back to sermon/livestream playback for this content type.
+      if (pastorMessage) {
+        return { ready: false, source: 'direct' as const, status: 'pastor-message-media-unavailable', videoUrl: null, audioUrl: null, posterUrl: null, durationSeconds: null, expiresAt: null };
+      }
       if (!expressionMode) {
         if (!playbackOrganizationId) {
           return Promise.resolve({
@@ -143,7 +186,7 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
     if (mode === 'visitor') {
       router.push({
         pathname: '/(auth)/login',
-        params: { returnTo: expressionMode && activeExpressionId ? `/expressions/${activeExpressionId}/sermons/${id}` : `/general/sermon/${id}` },
+        params: { returnTo: expressionMode && activeExpressionId ? `${pastorMessage ? `/expressions/${activeExpressionId}/pastor-messages` : `/expressions/${activeExpressionId}/sermons`}/${id}` : `${pastorMessage ? '/general/pastor-messages' : '/general/sermon'}/${id}` },
       } as any);
       return;
     }
@@ -156,8 +199,8 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 120 }]}>
         <ScreenHeader
-          title={sermon?.title ?? 'Sermon'}
-          kicker="SERMON"
+          title={sermon?.title ?? (pastorMessage ? 'Pastor’s Message' : 'Sermon')}
+          kicker={pastorMessage ? 'PASTOR’S MESSAGE' : 'SERMON'}
           subtitle={sermon?.preacher ? `By ${sermon.preacher}` : sermon?.sermon_date ? new Date(sermon.sermon_date).toLocaleDateString() : undefined}
           showBack
         />
@@ -174,6 +217,7 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
               </Pressable>
             ) : null}
 
+            {!pastorMessage ? (
             <View style={[styles.readingIntro, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
               <View style={[styles.readingIcon, { backgroundColor: colors.primarySoft }]}>
                 <Icon name="book-outline" size={22} color={colors.interactive} />
@@ -183,6 +227,8 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
                 <Text style={[styles.readingCopy, { color: colors.textSecondary }]}>COT reveals long sermons progressively so you can read, reflect and continue at your pace.</Text>
               </View>
             </View>
+
+            ) : null}
 
             {hasVideo || hasAudio || playback.loading || mediaPending || playback.error ? (
               <View style={styles.mediaSection}>
@@ -195,13 +241,13 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
 
                 {playback.loading && !hasVideo && !hasAudio ? (
                   <View style={[styles.mediaState, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
-                    <Text style={[styles.mediaStateTitle, { color: colors.text }]}>Preparing sermon media…</Text>
+                    <Text style={[styles.mediaStateTitle, { color: colors.text }]}>{pastorMessage ? 'Preparing teaching media…' : 'Preparing sermon media…'}</Text>
                   </View>
                 ) : mediaPending ? (
                   <View style={[styles.mediaState, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
                     <Icon name="time-outline" size={20} color={colors.interactive} />
-                    <Text style={[styles.mediaStateTitle, { color: colors.text }]}>Recording is still processing</Text>
-                    <Text style={[styles.mediaStateText, { color: colors.textSecondary }]}>The written sermon is available now. Playback will appear automatically when the recording is ready.</Text>
+                    <Text style={[styles.mediaStateTitle, { color: colors.text }]}>{pastorMessage ? 'Teaching recording is still processing' : 'Recording is still processing'}</Text>
+                    <Text style={[styles.mediaStateText, { color: colors.textSecondary }]}>{pastorMessage ? 'The original teaching is still being prepared for playback.' : 'The written sermon is available now. Playback will appear automatically when the recording is ready.'}</Text>
                   </View>
                 ) : playback.error && !hasVideo && !hasAudio ? (
                   <ResourceError message={playback.error} retry={playback.refresh} />
@@ -217,7 +263,7 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
                   />
                 ) : mediaFormat === 'audio' && hasAudio ? (
                   <AudioPlayer
-                    title={sermon.title}
+                    title={pastorMessage ? `${sermon.title} — Teaching` : sermon.title}
                     speaker={sermon.preacher}
                     sourceUrl={audioUrl}
                     durationSeconds={durationSeconds}
@@ -262,7 +308,12 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
               </View>
             ) : null}
 
-            <ProgressiveSermonReader sermon={sermon} />
+            {!pastorMessage ? <ProgressiveSermonReader sermon={sermon} /> : (
+              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+                <Text style={[styles.cardKicker, { color: colors.interactive }]}>TEACHING NOTES</Text>
+                <Text style={[styles.readingCopy, { color: colors.textSecondary }]}>{sermon.description || 'This Pastor’s Message is presented from the original uploaded teaching.'}</Text>
+              </View>
+            )}
 
             {contentId ? (
               <View style={[styles.safetyRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>

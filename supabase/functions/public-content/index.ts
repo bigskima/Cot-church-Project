@@ -129,16 +129,17 @@ Deno.serve(createHandler(
       return { data: enriched };
     }
 
-    if (type === "sermon") {
+    if (type === "pastor-message" || type === "sermon") {
+      const pastorMessage = type === "pastor-message";
       const sermonId = uuid(url.searchParams.get("id"), "id", true);
       if (!sermonId) throw new ApiError("VALIDATION_FAILED", "id is required", 422);
-      let query = client.from("sermons").select("id,organization_id,expression_id,content_item_id,series_id,recording_id,title,slug,preacher,sermon_date,scripture_references,topics,description,transcript,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,chapters,duration_seconds,status,visibility,is_featured,play_count,published_at,series:sermon_series(id,title,slug)")
-        .eq("id", sermonId).eq("visibility", "public").eq("status", "published");
+      const sermonReader = pastorMessage ? admin : client;
+      let query = sermonReader.from("sermons").select("id,organization_id,expression_id,content_item_id,series_id,recording_id,title,slug,preacher,sermon_date,scripture_references,topics,description,transcript,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,chapters,duration_seconds,status,visibility,is_featured,play_count,published_at,series:sermon_series(id,title,slug)").eq("id", sermonId).eq("visibility", "public").eq("status", "published").eq("is_pastor_message", pastorMessage);
       if (organizationId) query = query.eq("organization_id", organizationId);
       const { data, error } = await query.maybeSingle();
-      if (error) throw new ApiError("PUBLIC_SERMON_FAILED", "Unable to retrieve this sermon", 500, undefined, false);
-      if (!data) throw new ApiError("SERMON_NOT_FOUND", "This sermon is not available", 404);
-      await assertFeatureEnabled(admin, "sermons", { organizationId: data.organization_id, expressionId: data.expression_id }, "Sermons are currently unavailable in this area.");
+      if (error) throw new ApiError(pastorMessage ? "PUBLIC_PASTOR_MESSAGE_FAILED" : "PUBLIC_SERMON_FAILED", pastorMessage ? "Unable to retrieve this Pastor’s Message" : "Unable to retrieve this sermon", 500, undefined, false);
+      if (!data) throw new ApiError(pastorMessage ? "PASTOR_MESSAGE_NOT_FOUND" : "SERMON_NOT_FOUND", pastorMessage ? "This Pastor’s Message is not available" : "This sermon is not available", 404);
+      await assertFeatureEnabled(admin, "sermons", { organizationId: data.organization_id, expressionId: data.expression_id }, pastorMessage ? "Pastor’s Messages are currently unavailable in this area." : "Sermons are currently unavailable in this area.");
       if (auth?.user && data.content_item_id) {
         const { data: item, error: itemError } = await admin
           .from("content_items")
@@ -188,7 +189,7 @@ Deno.serve(createHandler(
       ]);
 
       const [sermons, videos, reels, events, leaders] = await Promise.all([
-        client.from("sermons").select("id,organization_id,expression_id,content_item_id,series_id,title,slug,preacher,sermon_date,scripture_references,topics,description,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,duration_seconds,status,visibility,is_featured,play_count,published_at").eq("expression_id", expressionId).eq("visibility", "public").eq("status", "published").order("published_at", { ascending: false }).limit(30),
+        client.from("sermons").select("id,organization_id,expression_id,content_item_id,series_id,title,slug,preacher,sermon_date,scripture_references,topics,description,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,duration_seconds,status,visibility,is_featured,play_count,published_at").eq("expression_id", expressionId).eq("is_pastor_message", false).eq("visibility", "public").eq("status", "published").order("published_at", { ascending: false }).limit(30),
         client.from("videos").select("id,organization_id,media_asset_id,series_id,title,slug,description,category,chapters,views_count,likes_count,comments_count,shares_count,created_at,content_items!inner(id,organization_id,expression_id,author_profile_id,visibility,status,published_at),media_assets(id,media_type,duration_seconds,aspect_ratio,media_renditions(id,rendition_kind,container,codec,width,height,storage_path,provider_playback_id),media_thumbnails(storage_path,is_primary))").eq("content_items.expression_id", expressionId).eq("content_items.visibility", "public").eq("content_items.status", "published").order("created_at", { ascending: false }).limit(30),
         client.from("reels").select("id,organization_id,media_asset_id,caption,audio_title,audio_artist,views_count,likes_count,comments_count,shares_count,created_at,content_items!inner(id,organization_id,expression_id,author_profile_id,visibility,status,published_at),media_assets(id,media_type,duration_seconds,aspect_ratio,media_renditions(id,rendition_kind,container,codec,width,height,storage_path,provider_playback_id),media_thumbnails(storage_path,is_primary))").eq("content_items.expression_id", expressionId).eq("content_items.visibility", "public").eq("content_items.status", "published").order("created_at", { ascending: false }).limit(30),
         client.from("events").select("id,organization_id,branch_id,title,description,starts_at,ends_at,location,capacity,visibility").eq("branch_id", expressionId).eq("visibility", "public").gte("ends_at", new Date().toISOString()).order("starts_at").limit(30),
@@ -276,11 +277,29 @@ Deno.serve(createHandler(
       return { data: await enrichContentCreators(visible, client) };
     }
 
+    if (type === "pastor-messages") {
+      if (organizationId) await assertFeatureEnabled(admin, "sermons", { organizationId, expressionId }, "Pastor’s Messages are currently unavailable in this area.");
+      let query = client
+        .from("sermons")
+        .select("id,organization_id,expression_id,content_item_id,series_id,title,slug,preacher,sermon_date,scripture_references,topics,description,transcript,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,chapters,duration_seconds,status,visibility,is_pastor_message,is_featured,play_count,published_at")
+        .eq("is_pastor_message", true)
+        .eq("visibility", "public")
+        .eq("status", "published")
+        .order("sermon_date", { ascending: false })
+        .limit(50);
+      if (organizationId) query = query.eq("organization_id", organizationId);
+      if (expressionId) query = query.eq("expression_id", expressionId);
+      const { data, error } = await query;
+      if (error) throw new ApiError("PUBLIC_PASTOR_MESSAGES_FAILED", "Unable to retrieve Pastor’s Messages", 500, undefined, false);
+      return { data: await filterSermonsBySafety(admin, data ?? [], safety.hiddenFromFeed) };
+    }
+
     if (type === "sermons") {
       if (organizationId) await assertFeatureEnabled(admin, "sermons", { organizationId, expressionId }, "Sermons are currently unavailable in this area.");
       let query = client
         .from("sermons")
         .select("id,organization_id,expression_id,content_item_id,series_id,title,slug,preacher,sermon_date,scripture_references,topics,description,transcript,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,chapters,duration_seconds,status,visibility,is_featured,play_count,published_at")
+        .eq("is_pastor_message", false)
         .eq("visibility", "public")
         .eq("status", "published")
         .order("sermon_date", { ascending: false })

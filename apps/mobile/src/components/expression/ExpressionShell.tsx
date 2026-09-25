@@ -107,6 +107,7 @@ function ExpressionNavigation({ expressionId, onNavigate }: { expressionId: stri
     () => [
       { key: 'live', label: 'Live', icon: 'radio-outline', active: pathname === `${basePath}/live` || pathname.startsWith(`${basePath}/live/`), onPress: () => router.push(`${basePath}/live` as any) },
       { key: 'sermons', label: 'Sermons', icon: 'mic-outline', active: pathname === `${basePath}/sermons` || pathname.startsWith(`${basePath}/sermons/`), onPress: () => router.push(`${basePath}/sermons` as any) },
+      { key: 'pastor-messages', label: 'Pastor’s Messages', icon: 'headset-outline', active: pathname === `${basePath}/pastor-messages` || pathname.startsWith(`${basePath}/pastor-messages/`), onPress: () => router.push(`${basePath}/pastor-messages` as any) },
       { key: 'videos', label: 'Videos', icon: 'videocam-outline', active: pathname === `${basePath}/videos` || pathname.startsWith(`${basePath}/videos/`), onPress: () => router.push(`${basePath}/videos` as any) },
       { key: 'reels', label: 'Reels', icon: 'flash-outline', active: pathname === `${basePath}/reels`, onPress: () => router.push(`${basePath}/reels` as any) },
     ],
@@ -131,6 +132,7 @@ function ExpressionNavigation({ expressionId, onNavigate }: { expressionId: stri
         { key: 'manage-announcements', label: 'Manage Announcements', icon: 'megaphone-outline', active: pathname === `${manageBase}/announcements`, onPress: () => router.push(`${manageBase}/announcements` as any), enabled: management.canManageAnnouncements },
         { key: 'manage-live', label: 'Live Studio', icon: 'radio-outline', active: pathname === `${manageBase}/live`, onPress: () => router.push(`${manageBase}/live` as any), enabled: management.canManageLive },
         { key: 'manage-sermons', label: 'Manage Sermons', icon: 'book-outline', active: pathname === `${manageBase}/sermons`, onPress: () => router.push(`${manageBase}/sermons` as any), enabled: management.canManageSermons },
+        { key: 'manage-pastor-messages', label: 'Pastor’s Messages', icon: 'headset-outline', active: pathname === `${manageBase}/pastor-messages`, onPress: () => router.push(`${manageBase}/pastor-messages` as any), enabled: management.canManagePastorMessages },
         { key: 'manage-events', label: 'Manage Events', icon: 'calendar-outline', active: pathname === `${manageBase}/events`, onPress: () => router.push(`${manageBase}/events` as any), enabled: management.canManageEvents },
         { key: 'manage-testimonies', label: 'Testimony Inbox', icon: 'document-text-outline', active: pathname === `${manageBase}/testimonies`, onPress: () => router.push(`${manageBase}/testimonies` as any), enabled: management.canReviewTestimonies },
         { key: 'manage-prayer', label: 'Prayer Inbox', icon: 'heart-outline', active: pathname === `${manageBase}/prayer`, onPress: () => router.push(`${manageBase}/prayer` as any), enabled: management.canManagePrayer },
@@ -158,6 +160,7 @@ function ExpressionNavigation({ expressionId, onNavigate }: { expressionId: stri
       management.canManageSettings,
       management.canManageLive,
       management.canManageSermons,
+      management.canManagePastorMessages,
       management.canReadExpressionFinance,
       management.canReadGivingFinance,
       management.canReviewTestimonies,

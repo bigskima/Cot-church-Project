@@ -14,6 +14,7 @@ export type ExpressionManagementSection =
   | 'studio'
   | 'live'
   | 'sermons'
+  | 'pastor-messages'
   | 'events'
   | 'announcements'
   | 'testimonies'
@@ -42,7 +43,8 @@ const tabs: Array<{ key: ExpressionManagementSection; label: string; description
   { key: 'tools', label: 'Tools', description: 'Expression operations and shortcuts', icon: 'grid-outline' },
   { key: 'studio', label: 'Studio', description: 'Create and publish Expression content', icon: 'color-wand-outline' },
   { key: 'live', label: 'Live', description: 'Prepare and manage broadcasts', icon: 'radio-outline' },
-  { key: 'sermons', label: 'Sermons', description: 'Create and manage teaching', icon: 'book-outline' },
+  { key: 'sermons', label: 'Sermons', description: 'Create and manage Expression sermons', icon: 'book-outline' },
+  { key: 'pastor-messages', label: 'Pastor’s Messages', description: 'Create and manage pastoral audio and video messages', icon: 'headset-outline' },
   { key: 'events', label: 'Events', description: 'Plan Expression events', icon: 'calendar-outline' },
   { key: 'announcements', label: 'Updates', description: 'Publish announcements and notices', icon: 'megaphone-outline' },
   { key: 'testimonies', label: 'Testimony', description: 'Review testimony submissions', icon: 'document-text-outline' },
@@ -61,6 +63,7 @@ function sectionPath(expressionId: string, key: ExpressionManagementSection) {
   if (key === 'studio') return `/expressions/${expressionId}/manage/studio`;
   if (key === 'live') return `/expressions/${expressionId}/manage/live`;
   if (key === 'sermons') return `/expressions/${expressionId}/manage/sermons`;
+  if (key === 'pastor-messages') return `/expressions/${expressionId}/manage/pastor-messages`;
   if (key === 'events') return `/expressions/${expressionId}/manage/events`;
   if (key === 'announcements') return `/expressions/${expressionId}/manage/announcements`;
   if (key === 'testimonies') return `/expressions/${expressionId}/manage/testimonies`;
@@ -94,6 +97,7 @@ export function ExpressionManagementHeader({
     if (item.key === 'studio') return access.canUseContentStudio;
     if (item.key === 'live') return access.canManageLive;
     if (item.key === 'sermons') return access.canManageSermons;
+    if (item.key === 'pastor-messages') return access.canManagePastorMessages;
     if (item.key === 'events') return access.canManageEvents;
     if (item.key === 'announcements') return access.canManageAnnouncements;
     if (item.key === 'testimonies') return access.canReviewTestimonies;
