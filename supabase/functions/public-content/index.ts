@@ -133,8 +133,8 @@ Deno.serve(createHandler(
       const pastorMessage = type === "pastor-message";
       const sermonId = uuid(url.searchParams.get("id"), "id", true);
       if (!sermonId) throw new ApiError("VALIDATION_FAILED", "id is required", 422);
-      let query = client.from("sermons").select("id,organization_id,expression_id,content_item_id,series_id,recording_id,title,slug,preacher,sermon_date,scripture_references,topics,description,transcript,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,chapters,duration_seconds,status,visibility,is_featured,play_count,published_at,series:sermon_series(id,title,slug)")
-        .eq("id", sermonId).eq("visibility", "public").eq("status", "published").eq("is_pastor_message", pastorMessage);
+      const sermonReader = pastorMessage ? admin : client;
+      let query = sermonReader.from("sermons").select("id,organization_id,expression_id,content_item_id,series_id,recording_id,title,slug,preacher,sermon_date,scripture_references,topics,description,transcript,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,chapters,duration_seconds,status,visibility,is_featured,play_count,published_at,series:sermon_series(id,title,slug)").eq("id", sermonId).eq("visibility", "public").eq("status", "published").eq("is_pastor_message", pastorMessage);
       if (organizationId) query = query.eq("organization_id", organizationId);
       const { data, error } = await query.maybeSingle();
       if (error) throw new ApiError(pastorMessage ? "PUBLIC_PASTOR_MESSAGE_FAILED" : "PUBLIC_SERMON_FAILED", pastorMessage ? "Unable to retrieve this Pastor’s Message" : "Unable to retrieve this sermon", 500, undefined, false);
