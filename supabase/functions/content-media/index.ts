@@ -137,6 +137,48 @@ Deno.serve(createHandler(
       return { data: await resolvePlayback(client, admin, contentId) };
     }
 
+    if (request.method === "GET" && url.searchParams.get("action") === "pastor_message_playback") {
+      const sermonId = uuid(url.searchParams.get("sermonId"), "sermonId", true)!;
+      const client = auth?.client ?? publicClient();
+      const { data: sermon, error: sermonError } = await client
+        .from("sermons")
+        .select("id,organization_id,expression_id,is_pastor_message,status,visibility,audio_asset_id,video_asset_id,thumbnail_url,duration_seconds")
+        .eq("id", sermonId)
+        .eq("is_pastor_message", true)
+        .eq("status", "published")
+        .eq("visibility", "public")
+        .maybeSingle();
+      if (sermonError || !sermon) throw new ApiError("PASTOR_MESSAGE_NOT_FOUND", "This Pastor’s Message is not available", 404);
+
+      const assetIds = [sermon.audio_asset_id, sermon.video_asset_id].filter(Boolean) as string[];
+      if (!assetIds.length) return { data: { available: false, audioUrl: null, videoUrl: null, posterUrl: sermon.thumbnail_url ?? null, durationSeconds: sermon.duration_seconds ?? null } };
+
+      const { data: renditions, error: renditionError } = await admin
+        .from("media_renditions")
+        .select("media_asset_id,rendition_kind,storage_path")
+        .in("media_asset_id", assetIds)
+        .in("rendition_kind", ["audio_stream", "video_stream"]);
+      if (renditionError) throw new ApiError("PLAYBACK_INFO_FAILED", "Unable to resolve Pastor’s Message media", 500, undefined, false);
+
+      const sign = async (path: string | null) => {
+        if (!path) return null;
+        const { data, error } = await admin.storage.from(BUCKET).createSignedUrl(path, 3600);
+        if (error || !data?.signedUrl) throw new ApiError("PLAYBACK_SIGNING_FAILED", "Unable to authorize media playback", 500, undefined, false);
+        return data.signedUrl;
+      };
+      const audioRendition = renditions?.find((item) => item.media_asset_id === sermon.audio_asset_id && item.rendition_kind === "audio_stream");
+      const videoRendition = renditions?.find((item) => item.media_asset_id === sermon.video_asset_id && item.rendition_kind === "video_stream");
+      return {
+        data: {
+          available: Boolean(audioRendition || videoRendition),
+          audioUrl: await sign(audioRendition?.storage_path ?? null),
+          videoUrl: await sign(videoRendition?.storage_path ?? null),
+          posterUrl: sermon.thumbnail_url ?? null,
+          durationSeconds: sermon.duration_seconds ?? null,
+        },
+      };
+    }
+
     if (!auth?.user) {
       throw new ApiError("AUTHENTICATION_REQUIRED", "Please sign in to continue", 401);
     }
