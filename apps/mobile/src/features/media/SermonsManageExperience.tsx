@@ -62,9 +62,10 @@ export default function SermonsManageExperience() {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  const canCreate = hasCapability('sermons.create');
-  const canManage = hasCapability('sermons.manage');
-  const canPublish = hasCapability('sermons.publish');
+  const expressionScope = Boolean(expression?.id);
+  const canCreate = expressionScope ? hasCapability('expression.sermons.create') : hasCapability('sermons.create');
+  const canManage = expressionScope ? hasCapability('expression.sermons.manage') : hasCapability('sermons.manage');
+  const canPublish = expressionScope ? hasCapability('expression.sermons.publish') : hasCapability('sermons.publish');
 
   const sermons = useResource<Sermon[]>(
     `leadership:sermons:${organizationId || 'none'}:${expression?.id ?? 'general'}`,
