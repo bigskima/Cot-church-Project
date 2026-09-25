@@ -107,6 +107,7 @@ function ExpressionNavigation({ expressionId, onNavigate }: { expressionId: stri
     () => [
       { key: 'live', label: 'Live', icon: 'radio-outline', active: pathname === `${basePath}/live` || pathname.startsWith(`${basePath}/live/`), onPress: () => router.push(`${basePath}/live` as any) },
       { key: 'sermons', label: 'Sermons', icon: 'mic-outline', active: pathname === `${basePath}/sermons` || pathname.startsWith(`${basePath}/sermons/`), onPress: () => router.push(`${basePath}/sermons` as any) },
+      { key: 'pastor-messages', label: 'Pastor’s Messages', icon: 'headset-outline', active: pathname === `${basePath}/pastor-messages` || pathname.startsWith(`${basePath}/pastor-messages/`), onPress: () => router.push(`${basePath}/pastor-messages` as any) },
       { key: 'videos', label: 'Videos', icon: 'videocam-outline', active: pathname === `${basePath}/videos` || pathname.startsWith(`${basePath}/videos/`), onPress: () => router.push(`${basePath}/videos` as any) },
       { key: 'reels', label: 'Reels', icon: 'flash-outline', active: pathname === `${basePath}/reels`, onPress: () => router.push(`${basePath}/reels` as any) },
     ],
