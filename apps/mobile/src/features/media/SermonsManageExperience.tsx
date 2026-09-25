@@ -56,6 +56,7 @@ export default function SermonsManageExperience() {
   const [bannerFile, setBannerFile] = useState<UploadFile | null>(null);
   const [generatedBannerUrl, setGeneratedBannerUrl] = useState('');
   const [audioFile, setAudioFile] = useState<UploadFile | null>(null);
+  const [videoFile, setVideoFile] = useState<UploadFile | null>(null);
   const [status, setStatus] = useState<Sermon['status']>('draft');
   const [creating, setCreating] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -82,6 +83,7 @@ export default function SermonsManageExperience() {
     setBannerFile(null);
     setGeneratedBannerUrl('');
     setAudioFile(null);
+    setVideoFile(null);
     setStatus('draft');
     setErrorMsg('');
   };
@@ -130,6 +132,22 @@ export default function SermonsManageExperience() {
     setAudioFile({ uri: asset.uri, name: asset.name, mimeType, size: asset.size, file: (asset as any).file });
   };
 
+  const chooseVideo = async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['video/mp4', 'video/webm', 'video/quicktime'],
+      copyToCacheDirectory: true,
+    });
+    const asset = result.canceled ? null : result.assets?.[0];
+    if (!asset) return;
+    const mimeType = asset.mimeType?.toLowerCase()
+      || (asset.name.toLowerCase().endsWith('.mov') ? 'video/quicktime' : asset.name.toLowerCase().endsWith('.webm') ? 'video/webm' : 'video/mp4');
+    if ((asset.size ?? 0) > 200 * 1024 * 1024) {
+      setErrorMsg('Choose a video recording that is 200 MB or smaller.');
+      return;
+    }
+    setVideoFile({ uri: asset.uri, name: asset.name, mimeType, size: asset.size, file: (asset as any).file });
+  };
+
   const openCreate = () => {
     if (!canCreate) return;
     resetComposer();
@@ -147,6 +165,7 @@ export default function SermonsManageExperience() {
     setStatus(sermon.status ?? 'draft');
     setBannerFile(null);
     setAudioFile(null);
+    setVideoFile(null);
     setErrorMsg('');
     setSuccessMsg('');
     setComposerOpen(true);
@@ -167,8 +186,8 @@ export default function SermonsManageExperience() {
       .map((block) => ({ ...block, text: block.text.trim() }))
       .filter((block) => block.text.length > 0);
     const hasText = sermonBlocksToPlainText(cleanBlocks).length > 0;
-    if (!hasText && !audioFile && !editingSermon?.audio_asset_id) {
-      setErrorMsg('Add sermon text or attach an audio recording.');
+    if (!hasText && !audioFile && !editingSermon?.audio_asset_id && !videoFile && !editingSermon?.video_asset_id) {
+      setErrorMsg('Add sermon text or attach an audio or video recording.');
       return;
     }
     if ((status === 'published' || status === 'scheduled') && !canPublish) {
@@ -183,6 +202,7 @@ export default function SermonsManageExperience() {
       const scriptures = scripture.split(',').map((item) => item.trim()).filter(Boolean);
       let thumbnailUrl = generatedBannerUrl || editingSermon?.thumbnail_url || null;
       let audioAssetId = editingSermon?.audio_asset_id ?? null;
+      let videoAssetId = editingSermon?.video_asset_id ?? null;
 
       if (bannerFile) {
         const intent = await api.request<BannerUploadIntent>('sermons', {
@@ -214,6 +234,27 @@ export default function SermonsManageExperience() {
         audioAssetId = intent.uploadSession.assetId;
       }
 
+      if (videoFile) {
+        const videoBody = await readUploadFile(videoFile);
+        const intent = await api.request<ContentUploadIntent>('content-media', {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'create_upload_intent',
+            mediaType: 'video',
+            mimeType: videoFile.mimeType,
+            expressionId: expression?.id ?? null,
+            fileSizeBytes: videoBody.size,
+            fileName: videoFile.name,
+          }),
+        });
+        await putSignedUpload(intent.uploadSession.signedUploadUrl, { ...videoFile, file: videoBody });
+        await api.request('content-media', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'complete_upload', assetId: intent.uploadSession.assetId }),
+        });
+        videoAssetId = intent.uploadSession.assetId;
+      }
+
       const basePayload = {
         title: title.trim(),
         preacher: preacher.trim(),
@@ -222,6 +263,7 @@ export default function SermonsManageExperience() {
         transcript: sermonBlocksToMarkdown(cleanBlocks),
         thumbnailUrl,
         audioAssetId,
+        videoAssetId,
       };
       const isEditing = Boolean(editingSermon);
       await api.request<Sermon>('sermons', {
@@ -266,9 +308,9 @@ export default function SermonsManageExperience() {
       >
         {!expressionWorkspace ? (
           <ScreenHeader
-            title="Sermons"
+            title="Pastor’s Messages"
             kicker="LEADERSHIP"
-            subtitle="Compose structured teaching, emphasize key truths and publish progressively readable sermons."
+            subtitle="Create and publish pastoral audio and video messages for the dedicated message library."
             showBack
             rightAction={canCreate ? <Button label="New sermon" onPress={openCreate} size="sm" /> : undefined}
           />
@@ -379,7 +421,7 @@ export default function SermonsManageExperience() {
             onUploadInstead={() => void chooseBanner()}
           />
 
-          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>OPTIONAL AUDIO</Text>
+          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>PASTORAL AUDIO</Text>
           <View style={[styles.uploadCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
             <Icon name={audioFile || editingSermon?.audio_asset_id ? 'checkmark-circle' : 'headset-outline'} size={24} color={colors.interactive} />
             <View style={styles.flex}>
@@ -387,6 +429,14 @@ export default function SermonsManageExperience() {
               <Text style={[styles.uploadHint, { color: colors.textSecondary }]}>People can listen to the original recording or use Read Aloud for the written sermon.</Text>
             </View>
             <Button label={audioFile || editingSermon?.audio_asset_id ? 'Replace' : 'Add audio'} onPress={() => void chooseAudio()} variant="outline" size="sm" />
+          </View>          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>PASTORAL VIDEO</Text>
+          <View style={[styles.uploadCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+            <Icon name={videoFile || editingSermon?.video_asset_id ? 'checkmark-circle' : 'videocam-outline'} size={24} color={colors.interactive} />
+            <View style={styles.flex}>
+              <Text style={[styles.uploadTitle, { color: colors.text }]}>{videoFile?.name || (editingSermon?.video_asset_id ? 'Video recording attached' : 'Attach sermon video')}</Text>
+              <Text style={[styles.uploadHint, { color: colors.textSecondary }]}>Upload the pastoral video for the dedicated Pastor’s Messages video library.</Text>
+            </View>
+            <Button label={videoFile || editingSermon?.video_asset_id ? 'Replace' : 'Add video'} onPress={() => void chooseVideo()} variant="outline" size="sm" />
           </View>
 
           <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>STATUS</Text>
