@@ -379,8 +379,8 @@ export default function SermonsManageExperience() {
             resetComposer();
           }
         }}
-        title={editingSermon ? 'Edit sermon' : 'Create sermon'}
-        subtitle={editingSermon ? editingSermon.title : expression?.name ? `Inside ${expression.name}` : 'Church-wide sermon'}
+        title={editingSermon ? 'Edit pastoral message' : 'Create pastoral message'}
+        subtitle={editingSermon ? editingSermon.title : expression?.name ? `Inside ${expression.name}` : 'Church-wide pastoral message'}
         maxHeightPercent={96}
       >
         <View style={styles.form}>
@@ -429,7 +429,9 @@ export default function SermonsManageExperience() {
               <Text style={[styles.uploadHint, { color: colors.textSecondary }]}>People can listen to the original recording or use Read Aloud for the written sermon.</Text>
             </View>
             <Button label={audioFile || editingSermon?.audio_asset_id ? 'Replace' : 'Add audio'} onPress={() => void chooseAudio()} variant="outline" size="sm" />
-          </View>          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>PASTORAL VIDEO</Text>
+          </View>
+
+          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>PASTORAL VIDEO</Text>
           <View style={[styles.uploadCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
             <Icon name={videoFile || editingSermon?.video_asset_id ? 'checkmark-circle' : 'videocam-outline'} size={24} color={colors.interactive} />
             <View style={styles.flex}>
