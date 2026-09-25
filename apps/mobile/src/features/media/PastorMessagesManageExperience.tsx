@@ -57,6 +57,7 @@ export default function PastorMessagesManageExperience() {
   const [generatedBannerUrl, setGeneratedBannerUrl] = useState('');
   const [audioFile, setAudioFile] = useState<UploadFile | null>(null);
   const [videoFile, setVideoFile] = useState<UploadFile | null>(null);
+  const [mediaType, setMediaType] = useState<'audio' | 'video' | null>(null);
   const [status, setStatus] = useState<Sermon['status']>('draft');
   const [creating, setCreating] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -86,6 +87,7 @@ export default function PastorMessagesManageExperience() {
     setGeneratedBannerUrl('');
     setAudioFile(null);
     setVideoFile(null);
+    setMediaType(null);
     setStatus('draft');
     setErrorMsg('');
     setUploadProgress(null);
@@ -133,6 +135,8 @@ export default function PastorMessagesManageExperience() {
       return;
     }
     setAudioFile({ uri: asset.uri, name: asset.name, mimeType, size: asset.size, file: (asset as any).file });
+    setVideoFile(null);
+    setMediaType('audio');
   };
 
   const chooseVideo = async () => {
@@ -149,6 +153,8 @@ export default function PastorMessagesManageExperience() {
       return;
     }
     setVideoFile({ uri: asset.uri, name: asset.name, mimeType, size: asset.size, file: (asset as any).file });
+    setAudioFile(null);
+    setMediaType('video');
   };
 
   const openCreate = () => {
@@ -169,6 +175,7 @@ export default function PastorMessagesManageExperience() {
     setBannerFile(null);
     setAudioFile(null);
     setVideoFile(null);
+    setMediaType(sermon.video_asset_id ? 'video' : sermon.audio_asset_id ? 'audio' : null);
     setErrorMsg('');
     setSuccessMsg('');
     setComposerOpen(true);
@@ -188,8 +195,13 @@ export default function PastorMessagesManageExperience() {
     const cleanBlocks = blocks
       .map((block) => ({ ...block, text: block.text.trim() }))
       .filter((block) => block.text.length > 0);
-     if (!audioFile && !editingSermon?.audio_asset_id && !videoFile && !editingSermon?.video_asset_id) {
-      setErrorMsg('Attach at least one audio or video recording.');
+     const hasSelectedMedia = mediaType === 'video'
+      ? Boolean(videoFile || editingSermon?.video_asset_id)
+      : mediaType === 'audio'
+        ? Boolean(audioFile || editingSermon?.audio_asset_id)
+        : false;
+    if (!hasSelectedMedia) {
+      setErrorMsg('Choose either a video message or an audio message. You do not need to upload both.');
       return;
     }
     if ((status === 'published' || status === 'scheduled') && !canPublish) {
@@ -203,8 +215,8 @@ export default function PastorMessagesManageExperience() {
     try {
       const scriptures = scripture.split(',').map((item) => item.trim()).filter(Boolean);
       let thumbnailUrl = generatedBannerUrl || editingSermon?.thumbnail_url || null;
-      let audioAssetId = editingSermon?.audio_asset_id ?? null;
-      let videoAssetId = editingSermon?.video_asset_id ?? null;
+      let audioAssetId = mediaType === 'audio' ? editingSermon?.audio_asset_id ?? null : null;
+      let videoAssetId = mediaType === 'video' ? editingSermon?.video_asset_id ?? null : null;
 
       if (bannerFile) {
         const intent = await api.request<BannerUploadIntent>('sermons', {
@@ -215,7 +227,7 @@ export default function PastorMessagesManageExperience() {
         thumbnailUrl = intent.publicUrl;
       }
 
-      if (audioFile) {
+      if (mediaType === 'audio' && audioFile) {
         setUploadProgress({ label: 'Uploading audio', percent: 0 });
         const audioBody = await readUploadFile(audioFile);
         const intent = await api.request<ContentUploadIntent>('content-media', {
@@ -247,7 +259,7 @@ export default function PastorMessagesManageExperience() {
         audioAssetId = intent.uploadSession.assetId;
       }
 
-      if (videoFile) {
+      if (mediaType === 'video' && videoFile) {
         setUploadProgress({ label: 'Uploading video', percent: 0 });
         const videoBody = await readUploadFile(videoFile);
         const intent = await api.request<ContentUploadIntent>('content-media', {
@@ -386,10 +398,10 @@ export default function PastorMessagesManageExperience() {
               ))
             ) : (
               <EmptyState
-                title="No sermons yet"
-                message={canCreate ? 'Create a sermon draft with structured text, a banner and optional audio.' : 'Sermons created here will appear in this library.'}
+                title="No Pastor’s Messages yet"
+                message={canCreate ? 'Create a Pastor’s Message with a banner and either video or audio.' : 'Pastor’s Messages created here will appear in this library.'}
                 iconName="book-outline"
-                actionLabel={canCreate ? 'Create sermon' : undefined}
+                actionLabel={canCreate ? 'Create message' : undefined}
                 onAction={canCreate ? openCreate : undefined}
               />
             )}
@@ -458,6 +470,15 @@ export default function PastorMessagesManageExperience() {
             onUploadInstead={() => void chooseBanner()}
           />
 
+          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>MESSAGE MEDIA</Text>
+          <View style={styles.chips}>
+            <Chip label="Video message" selected={mediaType === 'video'} onPress={() => { setMediaType('video'); setAudioFile(null); }} />
+            <Chip label="Audio message" selected={mediaType === 'audio'} onPress={() => { setMediaType('audio'); setVideoFile(null); }} />
+          </View>
+          <Text style={[styles.uploadHint, { color: colors.textSecondary }]}>A video is already a complete video message and includes its own audio. Upload either video or audio; do not pair them.</Text>
+
+          {mediaType === 'audio' ? (
+          <>
           <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>PASTORAL AUDIO</Text>
           <View style={[styles.uploadCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
             <Icon name={audioFile || editingSermon?.audio_asset_id ? 'checkmark-circle' : 'headset-outline'} size={24} color={colors.interactive} />
@@ -468,6 +489,11 @@ export default function PastorMessagesManageExperience() {
             <Button label={audioFile || editingSermon?.audio_asset_id ? 'Replace' : 'Add audio'} onPress={() => void chooseAudio()} variant="outline" size="sm" />
           </View>
 
+          </>
+          ) : null}
+
+          {mediaType === 'video' ? (
+          <>
           <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>PASTORAL VIDEO</Text>
           <View style={[styles.uploadCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
             <Icon name={videoFile || editingSermon?.video_asset_id ? 'checkmark-circle' : 'videocam-outline'} size={24} color={colors.interactive} />
@@ -478,15 +504,17 @@ export default function PastorMessagesManageExperience() {
             <Button label={videoFile || editingSermon?.video_asset_id ? 'Replace' : 'Add video'} onPress={() => void chooseVideo()} variant="outline" size="sm" />
           </View>
 
+          </>
+          ) : null}
+
           <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>STATUS</Text>
           <View style={styles.chips}>
             <Chip label="Draft" selected={status === 'draft'} onPress={() => setStatus('draft')} />
             <Chip label="Review" selected={status === 'review'} onPress={() => setStatus('review')} />
-            {editingSermon ? <Chip label="Archived" selected={status === 'archived'} onPress={() => setStatus('archived')} /> : null}
-            {canPublish ? <Chip label="Published" selected={status === 'published'} onPress={() => setStatus('published')} /> : null}
+            {canPublish ? <Chip label="Publish" selected={status === 'published'} onPress={() => setStatus('published')} /> : null}
           </View>
 
-          <Button label={editingSermon ? 'Save changes' : 'Save message'} onPress={() => void handleSaveSermon()} loading={creating} size="lg" fullWidth />
+          <Button label={status === 'published' ? 'Publish message' : status === 'review' ? 'Save for review' : 'Save draft'} onPress={() => void handleSaveSermon()} loading={creating} size="lg" fullWidth />
         </View>
       </BottomSheet>
     </View>
