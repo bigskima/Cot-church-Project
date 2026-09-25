@@ -72,8 +72,33 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
   const playbackOrganizationId = activeOrganizationId || sermon?.organization_id || '';
 
   const playback = useResource<SermonPlayback>(
-    `sermon:playback:${expressionMode ? `expression:${activeExpressionId ?? 'none'}` : `public:${playbackOrganizationId || 'pending'}`}:${id}`,
+    `sermon:playback:${expressionMode ? `expression:${activeExpressionId ?? 'none'}` : `public:${playbackOrganizationId || 'pending'}`}:${id}:${sermon?.content_item_id ?? 'pending'}`,
     (signal) => {
+      if (sermon?.content_item_id) {
+        try {
+          const media = await api.request<any>(
+            `content-media?action=playback&contentId=${encodeURIComponent(sermon.content_item_id)}`,
+            { signal, context: expressionMode ? 'current' : 'public' },
+          );
+          const renditions = media?.renditions ?? [];
+          const videoRendition = renditions.find((item: any) => item.renditionKind === 'video_stream' || item.rendition_kind === 'video_stream');
+          const audioRendition = renditions.find((item: any) => item.renditionKind === 'audio_stream' || item.rendition_kind === 'audio_stream');
+          if (media?.available || videoRendition || audioRendition) {
+            return {
+              ready: true,
+              source: 'direct' as const,
+              status: 'ready',
+              videoUrl: videoRendition?.playbackUrl ?? null,
+              audioUrl: audioRendition?.playbackUrl ?? null,
+              posterUrl: null,
+              durationSeconds: media?.durationSeconds ?? sermon.duration_seconds ?? null,
+              expiresAt: media?.expiresAt ?? null,
+            };
+          }
+        } catch {
+          // Fall through to the legacy sermon playback path for livestream recordings.
+        }
+      }
       if (!expressionMode) {
         if (!playbackOrganizationId) {
           return Promise.resolve({
