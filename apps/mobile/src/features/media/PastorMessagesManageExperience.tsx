@@ -301,7 +301,6 @@ export default function PastorMessagesManageExperience() {
         thumbnailUrl,
         audioAssetId,
         videoAssetId,
-        isPastorMessage: true,
       };
       const isEditing = Boolean(editingSermon);
       await api.request<Sermon>('sermons', {
@@ -309,7 +308,7 @@ export default function PastorMessagesManageExperience() {
         body: JSON.stringify(
           isEditing
             ? { id: editingSermon!.id, ...basePayload, ...(status !== editingSermon!.status ? { status } : {}) }
-            : { ...basePayload, status },
+            : { ...basePayload, isPastorMessage: true, status },
         ),
       });
 
