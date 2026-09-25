@@ -108,7 +108,7 @@ const TUS_CHUNK_SIZE = 6 * 1024 * 1024;
 const TUS_RETRY_DELAYS_MS = [0, 1500, 3500, 7000];
 
 function toBase64(value: string) {
-  if (typeof globalThis.btoa === 'function') return globalThis.btoa(unescape(encodeURIComponent(value)));
+  if (typeof globalThis.btoa === 'function') return globalThis.btoa(value);
   // React Native's global btoa is available in supported Expo runtimes.
   throw new Error('This device cannot prepare the media upload metadata.');
 }
