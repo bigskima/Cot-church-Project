@@ -212,10 +212,8 @@ begin
     from public.sermon_series
     where id=target_series_id and organization_id=rec.organization_id;
     if not found then raise exception using errcode='P0002', message='Sermon series not found'; end if;
-    if selected_series.expression_id is not distinct from null and str.branch_id is not null then
-      null;
-    elsif selected_series.expression_id is distinct from str.branch_id then
-      raise exception using errcode='42501', message='Sermon series belongs to another scope';
+    if selected_series.expression_id is not null and selected_series.expression_id is distinct from str.branch_id then
+      raise exception using errcode='42501', message='Sermon series belongs to another Expression';
     end if;
   end if;
 
