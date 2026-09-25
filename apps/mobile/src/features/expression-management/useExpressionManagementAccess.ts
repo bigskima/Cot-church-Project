@@ -20,7 +20,7 @@ export function useExpressionManagementAccess() {
   const ready = accessReady && ownershipReady;
 
   const canManageLive = Boolean(expressionId) && hasCapability('streams.broadcast');
-  const canManageSermons = Boolean(expressionId) && (hasCapability('sermons.create') || hasCapability('sermons.manage') || hasCapability('sermons.publish'));
+  const canManageSermons = Boolean(expressionId) && (hasCapability('expression.sermons.create') || hasCapability('expression.sermons.manage') || hasCapability('expression.sermons.publish'));
   const canManageEvents = Boolean(expressionId) && (hasCapability('events.create') || hasCapability('events.update'));
   const canManageAnnouncements = Boolean(expressionId) && hasCapability('announcements.manage');
   const canReviewTestimonies = Boolean(expressionId) && (hasCapability('testimonies.review') || hasCapability('testimonies.manage'));
