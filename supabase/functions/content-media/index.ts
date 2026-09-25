@@ -151,13 +151,20 @@ Deno.serve(createHandler(
       if (sermonError || !sermon) throw new ApiError("PASTOR_MESSAGE_NOT_FOUND", "This Pastor’s Message is not available", 404);
 
       const assetIds = [sermon.audio_asset_id, sermon.video_asset_id].filter(Boolean) as string[];
-      if (!assetIds.length) return { data: { available: false, audioUrl: null, videoUrl: null, posterUrl: sermon.thumbnail_url ?? null, durationSeconds: sermon.duration_seconds ?? null } };
+      if (!assetIds.length) return { data: { available: false, audioUrl: null, videoUrl: null, posterUrl: sermon.thumbnail_url ?? null, audioDurationSeconds: null, videoDurationSeconds: null } };
 
-      const { data: renditions, error: renditionError } = await admin
-        .from("media_renditions")
-        .select("media_asset_id,rendition_kind,storage_path")
-        .in("media_asset_id", assetIds)
-        .in("rendition_kind", ["audio_stream", "video_stream"]);
+      const [{ data: assets, error: assetError }, { data: renditions, error: renditionError }] = await Promise.all([
+        admin
+          .from("media_assets")
+          .select("id,media_type,processing_state,duration_seconds")
+          .in("id", assetIds),
+        admin
+          .from("media_renditions")
+          .select("media_asset_id,rendition_kind,storage_path")
+          .in("media_asset_id", assetIds)
+          .in("rendition_kind", ["audio_stream", "video_stream"]),
+      ]);
+      if (assetError) throw new ApiError("PLAYBACK_INFO_FAILED", "Unable to resolve Pastor’s Message media assets", 500, undefined, false);
       if (renditionError) throw new ApiError("PLAYBACK_INFO_FAILED", "Unable to resolve Pastor’s Message media", 500, undefined, false);
 
       const sign = async (path: string | null) => {
@@ -166,15 +173,22 @@ Deno.serve(createHandler(
         if (error || !data?.signedUrl) throw new ApiError("PLAYBACK_SIGNING_FAILED", "Unable to authorize media playback", 500, undefined, false);
         return data.signedUrl;
       };
-      const audioRendition = renditions?.find((item) => item.media_asset_id === sermon.audio_asset_id && item.rendition_kind === "audio_stream");
-      const videoRendition = renditions?.find((item) => item.media_asset_id === sermon.video_asset_id && item.rendition_kind === "video_stream");
+      const audioAsset = assets?.find((item) => item.id === sermon.audio_asset_id && item.media_type === "audio" && item.processing_state === "ready");
+      const videoAsset = assets?.find((item) => item.id === sermon.video_asset_id && item.media_type === "video" && item.processing_state === "ready");
+      const audioRendition = audioAsset
+        ? renditions?.find((item) => item.media_asset_id === audioAsset.id && item.rendition_kind === "audio_stream")
+        : null;
+      const videoRendition = videoAsset
+        ? renditions?.find((item) => item.media_asset_id === videoAsset.id && item.rendition_kind === "video_stream")
+        : null;
       return {
         data: {
           available: Boolean(audioRendition || videoRendition),
           audioUrl: await sign(audioRendition?.storage_path ?? null),
           videoUrl: await sign(videoRendition?.storage_path ?? null),
           posterUrl: sermon.thumbnail_url ?? null,
-          durationSeconds: sermon.duration_seconds ?? null,
+          audioDurationSeconds: audioAsset?.duration_seconds ?? null,
+          videoDurationSeconds: videoAsset?.duration_seconds ?? null,
         },
       };
     }
