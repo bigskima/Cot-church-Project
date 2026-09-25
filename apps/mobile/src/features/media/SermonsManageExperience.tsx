@@ -188,8 +188,7 @@ export default function SermonsManageExperience() {
     const cleanBlocks = blocks
       .map((block) => ({ ...block, text: block.text.trim() }))
       .filter((block) => block.text.length > 0);
-    const hasText = sermonBlocksToPlainText(cleanBlocks).length > 0;
-    if (!audioFile && !editingSermon?.audio_asset_id && !videoFile && !editingSermon?.video_asset_id) {
+     if (!audioFile && !editingSermon?.audio_asset_id && !videoFile && !editingSermon?.video_asset_id) {
       setErrorMsg('Attach at least one audio or video recording.');
       return;
     }
@@ -372,7 +371,7 @@ export default function SermonsManageExperience() {
                   <SermonCard
                     sermon={sermon}
                     variant="row"
-                    onPress={() => router.push((expression?.id ? `/expressions/${expression.id}/sermons/${sermon.id}` : `/general/sermon/${sermon.id}`) as any)}
+                    onPress={() => router.push((expression?.id ? `/expressions/${expression.id}/pastor-messages/${sermon.id}` : `/general/pastor-messages/${sermon.id}`) as any)}
                   />
                   <View style={styles.statusRow}>
                     <View style={styles.statusMeta}>
@@ -442,7 +441,7 @@ export default function SermonsManageExperience() {
             )}
             <View style={styles.flex}>
               <Text style={[styles.uploadTitle, { color: colors.text }]}>Choose 16:9 banner</Text>
-              <Text style={[styles.uploadHint, { color: colors.textSecondary }]}>Shown on sermon cards and the reading screen.</Text>
+              <Text style={[styles.uploadHint, { color: colors.textSecondary }]}>Shown on Pastor’s Messages cards and the message screen.</Text>
             </View>
           </Pressable>
           <MinistryImageGenerator
@@ -461,8 +460,8 @@ export default function SermonsManageExperience() {
           <View style={[styles.uploadCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
             <Icon name={audioFile || editingSermon?.audio_asset_id ? 'checkmark-circle' : 'headset-outline'} size={24} color={colors.interactive} />
             <View style={styles.flex}>
-              <Text style={[styles.uploadTitle, { color: colors.text }]}>{audioFile?.name || (editingSermon?.audio_asset_id ? 'Audio recording attached' : 'Attach sermon audio')}</Text>
-              <Text style={[styles.uploadHint, { color: colors.textSecondary }]}>People can listen to the original recording or use Read Aloud for the written sermon.</Text>
+              <Text style={[styles.uploadTitle, { color: colors.text }]}>{audioFile?.name || (editingSermon?.audio_asset_id ? 'Audio recording attached' : 'Attach pastor’s audio')}</Text>
+              <Text style={[styles.uploadHint, { color: colors.textSecondary }]}>Upload the original pastor’s audio recording. Large files use resumable upload.</Text>
             </View>
             <Button label={audioFile || editingSermon?.audio_asset_id ? 'Replace' : 'Add audio'} onPress={() => void chooseAudio()} variant="outline" size="sm" />
           </View>
@@ -471,8 +470,8 @@ export default function SermonsManageExperience() {
           <View style={[styles.uploadCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
             <Icon name={videoFile || editingSermon?.video_asset_id ? 'checkmark-circle' : 'videocam-outline'} size={24} color={colors.interactive} />
             <View style={styles.flex}>
-              <Text style={[styles.uploadTitle, { color: colors.text }]}>{videoFile?.name || (editingSermon?.video_asset_id ? 'Video recording attached' : 'Attach sermon video')}</Text>
-              <Text style={[styles.uploadHint, { color: colors.textSecondary }]}>Upload the pastoral video for the dedicated Pastor’s Messages video library.</Text>
+              <Text style={[styles.uploadTitle, { color: colors.text }]}>{videoFile?.name || (editingSermon?.video_asset_id ? 'Video recording attached' : 'Attach pastor’s video')}</Text>
+              <Text style={[styles.uploadHint, { color: colors.textSecondary }]}>Upload the original pastor’s video for the dedicated video library.</Text>
             </View>
             <Button label={videoFile || editingSermon?.video_asset_id ? 'Replace' : 'Add video'} onPress={() => void chooseVideo()} variant="outline" size="sm" />
           </View>
@@ -485,7 +484,7 @@ export default function SermonsManageExperience() {
             {canPublish ? <Chip label="Published" selected={status === 'published'} onPress={() => setStatus('published')} /> : null}
           </View>
 
-          <Button label={editingSermon ? 'Save changes' : 'Save sermon'} onPress={() => void handleSaveSermon()} loading={creating} size="lg" fullWidth />
+          <Button label={editingSermon ? 'Save changes' : 'Save message'} onPress={() => void handleSaveSermon()} loading={creating} size="lg" fullWidth />
         </View>
       </BottomSheet>
     </View>
