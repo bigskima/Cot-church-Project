@@ -342,6 +342,7 @@ export type Sermon = {
   chapters?: { title: string; timestamp_seconds: number }[];
   status: PublicationStatus;
   visibility: ContentVisibility;
+  is_pastor_message?: boolean;
   is_featured?: boolean;
   play_count?: number;
   published_at?: string;
