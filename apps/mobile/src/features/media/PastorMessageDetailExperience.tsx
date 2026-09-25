@@ -15,7 +15,8 @@ type Playback = {
   audioUrl?: string | null;
   videoUrl?: string | null;
   posterUrl?: string | null;
-  durationSeconds?: number | null;
+  audioDurationSeconds?: number | null;
+  videoDurationSeconds?: number | null;
 };
 
 export default function PastorMessageDetailExperience({
@@ -179,7 +180,7 @@ export default function PastorMessageDetailExperience({
                       title={message.title}
                       sourceUrl={media?.videoUrl}
                       posterUrl={media?.posterUrl ?? message.thumbnail_url}
-                      durationSeconds={media?.durationSeconds ?? message.duration_seconds}
+                      durationSeconds={media?.videoDurationSeconds ?? message.duration_seconds}
                     />
                   ) : (
                     <AudioPlayer
