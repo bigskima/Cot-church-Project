@@ -209,7 +209,7 @@ export default function SermonsManageExperience() {
       if (bannerFile) {
         const intent = await api.request<BannerUploadIntent>('sermons', {
           method: 'POST',
-          body: JSON.stringify({ action: 'create_banner_upload', mimeType: bannerFile.mimeType }),
+          body: JSON.stringify({ action: 'create_banner_upload', purpose: 'pastor_message', mimeType: bannerFile.mimeType }),
         });
         await putSignedUpload(intent.signedUploadUrl, bannerFile);
         thumbnailUrl = intent.publicUrl;
