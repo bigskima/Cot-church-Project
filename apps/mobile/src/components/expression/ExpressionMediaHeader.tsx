@@ -23,7 +23,8 @@ type Props = {
 
 const destinations: Array<{ key: ExpressionMediaSection; label: string; description: string; icon: string }> = [
   { key: 'live', label: 'Live', description: 'Current, upcoming and recent Expression broadcasts', icon: 'radio-outline' },
-  { key: 'sermons', label: 'Sermons', description: 'Messages shared with this Expression', icon: 'mic-outline' },
+  { key: 'sermons', label: 'Sermons', description: 'Teaching series and sermon notes', icon: 'mic-outline' },
+  { key: 'pastor-messages', label: 'Pastor’s Messages', description: 'Pastoral audio and video messages for this Expression', icon: 'headset-outline' },
   { key: 'videos', label: 'Videos', description: 'Long-form Expression media and teaching', icon: 'videocam-outline' },
   { key: 'reels', label: 'Reels', description: 'Short videos from this Expression', icon: 'flash-outline' },
 ];
