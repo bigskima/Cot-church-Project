@@ -385,7 +385,13 @@ export default function PastorMessagesManageExperience() {
                   <SermonCard
                     sermon={sermon}
                     variant="row"
-                    onPress={() => router.push((expression?.id ? `/expressions/${expression.id}/pastor-messages/${sermon.id}` : `/general/pastor-messages/${sermon.id}`) as any)}
+                    onPress={() => {
+                      if (sermon.status === 'draft' || sermon.status === 'review') {
+                        openEdit(sermon);
+                        return;
+                      }
+                      router.push((expression?.id ? `/expressions/${expression.id}/pastor-messages/${sermon.id}` : `/general/pastor-messages/${sermon.id}`) as any);
+                    }}
                   />
                   <View style={styles.statusRow}>
                     <View style={styles.statusMeta}>
