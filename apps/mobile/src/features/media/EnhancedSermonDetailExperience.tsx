@@ -52,6 +52,18 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
     `sermon:detail:${expressionMode ? `expression:${activeExpressionId ?? 'none'}` : 'public'}:${id}`,
     async (signal) => {
       if (!id) throw new Error('This sermon is unavailable.');
+      if (pastorMessage && mode === 'authenticated') {
+        try {
+          const managed = await api.request<Sermon[]>(
+            `sermons?view=manage&pastorMessages=true&id=${encodeURIComponent(id)}`,
+            { signal },
+          );
+          const managedMessage = managed?.find((item) => item.id === id && item.is_pastor_message === true);
+          if (managedMessage) return managedMessage;
+        } catch {
+          // Not a manager: fall through to the public published-message path.
+        }
+      }
       if (!expressionMode) {
         const organizationSuffix = activeOrganizationId
           ? `&organizationId=${encodeURIComponent(activeOrganizationId)}`
