@@ -35,7 +35,7 @@ type SermonPlayback = {
 
 const publicOrganizationId = process.env.EXPO_PUBLIC_ORGANIZATION_ID ?? '';
 
-export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general' }: { sermonId: string; scope?: 'general' | 'expression' }) {
+export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general', pastorMessage = false }: { sermonId: string; scope?: 'general' | 'expression'; pastorMessage?: boolean }) {
   const insets = useSafeAreaInsets();
   const { api, context, mode } = useSession();
   const { colors } = useTheme();
@@ -57,13 +57,13 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
           ? `&organizationId=${encodeURIComponent(activeOrganizationId)}`
           : '';
         return api.request<Sermon>(
-          `public-content?type=sermon&id=${encodeURIComponent(id)}${organizationSuffix}`,
+          `public-content?type=${pastorMessage ? 'pastor-message' : 'sermon'}&id=${encodeURIComponent(id)}${organizationSuffix}`,
           { signal, context: 'public' },
         );
       }
       if (!activeExpressionId) throw new Error('Enter this Expression to view its internal sermon.');
-      const sermon = await api.request<Sermon>(`sermons?id=${encodeURIComponent(id)}`, { signal });
-      if (!sermon || sermon.expression_id !== activeExpressionId) throw new Error('This sermon is not part of this Expression.');
+      const sermon = await api.request<Sermon>(`sermons?id=${encodeURIComponent(id)}${pastorMessage ? '&pastorMessages=true' : ''}`, { signal });
+      if (!sermon || sermon.expression_id !== activeExpressionId || (pastorMessage && sermon.is_pastor_message !== true)) throw new Error(pastorMessage ? 'This Pastor’s Message is not part of this Expression.' : 'This sermon is not part of this Expression.');
       return sermon;
     },
   );
@@ -143,7 +143,7 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
     if (mode === 'visitor') {
       router.push({
         pathname: '/(auth)/login',
-        params: { returnTo: expressionMode && activeExpressionId ? `/expressions/${activeExpressionId}/sermons/${id}` : `/general/sermon/${id}` },
+        params: { returnTo: expressionMode && activeExpressionId ? `${pastorMessage ? `/expressions/${activeExpressionId}/pastor-messages` : `/expressions/${activeExpressionId}/sermons`}/${id}` : `${pastorMessage ? '/general/pastor-messages' : '/general/sermon'}/${id}` },
       } as any);
       return;
     }
@@ -156,8 +156,8 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 120 }]}>
         <ScreenHeader
-          title={sermon?.title ?? 'Sermon'}
-          kicker="SERMON"
+          title={sermon?.title ?? (pastorMessage ? 'Pastor’s Message' : 'Sermon')}
+          kicker={pastorMessage ? 'PASTOR’S MESSAGE' : 'SERMON'}
           subtitle={sermon?.preacher ? `By ${sermon.preacher}` : sermon?.sermon_date ? new Date(sermon.sermon_date).toLocaleDateString() : undefined}
           showBack
         />
