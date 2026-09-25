@@ -7,7 +7,7 @@ import { Icon } from '@/components/primitives/Icon';
 import { radius, spacing } from '@/design-system/tokens';
 import { useTheme } from '@/state/theme';
 
-export type ExpressionMediaSection = 'live' | 'sermons' | 'videos' | 'reels';
+export type ExpressionMediaSection = 'live' | 'sermons' | 'pastor-messages' | 'videos' | 'reels';
 
 type Props = {
   expressionId: string;
