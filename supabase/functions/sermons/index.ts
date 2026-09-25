@@ -122,6 +122,7 @@ Deno.serve(createHandler(
         .select("id,organization_id,expression_id,content_item_id,series_id,recording_id,title,slug,preacher,sermon_date,scripture_references,topics,description,transcript,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,duration_seconds,status,visibility,is_featured,play_count,published_at")
         .eq("organization_id", organizationId);
 
+      const pastorMessagesView = url.searchParams.get("pastorMessages") === "true";
       if (sermonId) {
         query = query.eq("id", sermonId);
       } else {
@@ -129,7 +130,7 @@ Deno.serve(createHandler(
         if (queryTerm) query = query.ilike("title", `%${queryTerm.replace(/[%_]/g, "\\$&")}%`);
         query = query.order("sermon_date", { ascending: false }).limit(100);
       }
-      query = query.eq("status", "published");
+      query = query.eq("status", "published").eq("is_pastor_message", pastorMessagesView);
       if (auth?.branchId) query = query.eq("expression_id", auth.branchId);
       else query = query.eq("visibility", "public");
 
