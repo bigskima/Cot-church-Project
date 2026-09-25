@@ -89,7 +89,9 @@ export function EnhancedSermonDetailExperience({ sermonId: id, scope = 'general'
       if (sermon?.content_item_id) {
         try {
           const media = await api.request<any>(
-            `content-media?action=playback&contentId=${encodeURIComponent(sermon.content_item_id)}`,
+            pastorMessage
+              ? `content-media?action=pastor_message_playback&sermonId=${encodeURIComponent(sermon.id)}`
+              : `content-media?action=playback&contentId=${encodeURIComponent(sermon.content_item_id)}`,
             { signal, context: expressionMode ? 'current' : 'public' },
           );
           const renditions = media?.renditions ?? [];
