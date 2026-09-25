@@ -139,6 +139,8 @@ export default function GeneralLayout() {
       <Tabs.Screen name="live/index" options={hidden as any} />
       <Tabs.Screen name="live/[id]" options={hidden as any} />
       <Tabs.Screen name="sermon/[id]" options={hidden as any} />
+      <Tabs.Screen name="pastor-messages" options={hidden as any} />
+      <Tabs.Screen name="pastor-messages/[id]" options={hidden as any} />
       <Tabs.Screen name="series/[id]" options={hidden as any} />
       <Tabs.Screen name="events" options={hidden as any} />
       <Tabs.Screen name="event/[id]" options={hidden as any} />
