@@ -140,31 +140,56 @@ Deno.serve(createHandler(
     const action = requiredString(body.action, "action", 40);
 
     if (action === "create_upload_intent") {
-      assertNoUnknownFields(body, ["action", "organizationId", "mediaType", "mimeType", "expressionId", "durationSeconds", "aspectRatio", "fileSizeBytes", "fileName"]);
+      assertNoUnknownFields(body, ["action", "organizationId", "mediaType", "mimeType", "expressionId", "durationSeconds", "aspectRatio", "fileSizeBytes", "fileName", "purpose"]);
       const expressionId = body.expressionId ? uuid(String(body.expressionId), "expressionId", true) : null;
+      const purpose = optionalString(body.purpose, "purpose", 40) ?? "community_media";
+      if (!["community_media", "pastor_message"].includes(purpose)) {
+        throw new ApiError("VALIDATION_FAILED", "Unsupported media upload purpose", 422);
+      }
       const requestedOrganizationId = body.organizationId
         ? uuid(String(body.organizationId), "organizationId", true)!
         : auth.organizationId;
       const organizationId = await resolveActiveOrganizationId(admin, requestedOrganizationId);
 
-      const { data: postingAllowed, error: postingError } = await auth.client.rpc("can_profile_post", {
-        target_profile_id: auth.user.id,
-      });
-      if (postingError || postingAllowed !== true) {
-        throw new ApiError("POSTING_RESTRICTED", "Your posting access is currently restricted", 403);
-      }
-
-      if (expressionId) {
-        if (!auth.organizationId || !auth.branchId || organizationId !== auth.organizationId || expressionId !== auth.branchId) {
-          throw new ApiError("EXPRESSION_SCOPE_DENIED", "Media can only be uploaded for your selected Expression", 403);
+      if (purpose === "pastor_message") {
+        if (expressionId) {
+          if (!auth.organizationId || !auth.branchId || organizationId !== auth.organizationId || expressionId !== auth.branchId) {
+            throw new ApiError("EXPRESSION_SCOPE_DENIED", "Media can only be uploaded for your selected Expression", 403);
+          }
+          const { data, error } = await auth.client.rpc("has_exact_scope_permission", {
+            target_organization_id: organizationId,
+            requested_permission: "expression.pastor_messages.create",
+            target_branch_id: expressionId,
+          });
+          if (error || data !== true) throw new ApiError("PERMISSION_DENIED", "This action isn’t available for your account.", 403);
+        } else {
+          const { data, error } = await auth.client.rpc("has_exact_scope_permission", {
+            target_organization_id: organizationId,
+            requested_permission: "pastor_messages.create",
+            target_branch_id: null,
+          });
+          if (error || data !== true) throw new ApiError("PERMISSION_DENIED", "This action isn’t available for your account.", 403);
         }
-        await authorize(auth, "media.upload");
       } else {
-        const { data: publicPostingAllowed, error: publicPostingError } = await admin.rpc("can_profile_post_publicly", {
+        const { data: postingAllowed, error: postingError } = await auth.client.rpc("can_profile_post", {
           target_profile_id: auth.user.id,
         });
-        if (publicPostingError || publicPostingAllowed !== true) {
-          throw new ApiError("PUBLIC_POSTING_UNAVAILABLE", "Public posting is currently unavailable for this account", 403);
+        if (postingError || postingAllowed !== true) {
+          throw new ApiError("POSTING_RESTRICTED", "Your posting access is currently restricted", 403);
+        }
+
+        if (expressionId) {
+          if (!auth.organizationId || !auth.branchId || organizationId !== auth.organizationId || expressionId !== auth.branchId) {
+            throw new ApiError("EXPRESSION_SCOPE_DENIED", "Media can only be uploaded for your selected Expression", 403);
+          }
+          await authorize(auth, "media.upload");
+        } else {
+          const { data: publicPostingAllowed, error: publicPostingError } = await admin.rpc("can_profile_post_publicly", {
+            target_profile_id: auth.user.id,
+          });
+          if (publicPostingError || publicPostingAllowed !== true) {
+            throw new ApiError("PUBLIC_POSTING_UNAVAILABLE", "Public posting is currently unavailable for this account", 403);
+          }
         }
       }
 
