@@ -25,10 +25,10 @@ const MIME_TYPES: Record<string, { mediaType: "video" | "audio" | "image"; ext: 
   "image/webp": { mediaType: "image", ext: "webp", rendition: null },
 };
 
-function validateSize(value: unknown) {
+function validateSize(value: unknown, maxBytes = MAX_BYTES) {
   const size = Number(value);
-  if (!Number.isSafeInteger(size) || size <= 0 || size > MAX_BYTES) {
-    throw new ApiError("PAYLOAD_TOO_LARGE", "Content media must be 200 MB or smaller", 413);
+  if (!Number.isSafeInteger(size) || size <= 0 || size > maxBytes) {
+    throw new ApiError("PAYLOAD_TOO_LARGE", maxBytes === MAX_BYTES ? "Content media must be 200 MB or smaller" : "Pastor’s Message media must be 100 MB or smaller", 413);
   }
   return size;
 }
@@ -40,7 +40,7 @@ function safeFileName(value: unknown) {
 async function findOwnedAsset(profileId: string, assetId: string) {
   const { data, error } = await adminClient()
     .from("media_assets")
-    .select("id,organization_id,expression_id,media_type,processing_state,source_storage_path,mime_type,file_size_bytes,duration_seconds,aspect_ratio,created_by")
+    .select("id,organization_id,expression_id,media_type,processing_state,source_storage_path,mime_type,file_size_bytes,duration_seconds,aspect_ratio,created_by,metadata")
     .eq("id", assetId)
     .eq("created_by", profileId)
     .maybeSingle();
@@ -197,7 +197,7 @@ Deno.serve(createHandler(
       const mimeType = requiredString(body.mimeType, "mimeType", 120).toLowerCase();
       const mime = MIME_TYPES[mimeType];
       if (!mime || mime.mediaType !== mediaType) throw new ApiError("UNSUPPORTED_MEDIA_TYPE", "This media format is not supported", 415);
-      const fileSizeBytes = validateSize(body.fileSizeBytes);
+      const fileSizeBytes = validateSize(body.fileSizeBytes, purpose === "pastor_message" ? 100 * 1024 * 1024 : MAX_BYTES);
       const durationSeconds = typeof body.durationSeconds === "number" && Number.isFinite(body.durationSeconds) && body.durationSeconds >= 0
         ? Math.round(body.durationSeconds)
         : null;
@@ -217,7 +217,7 @@ Deno.serve(createHandler(
         mime_type: mimeType,
         file_size_bytes: fileSizeBytes,
         created_by: auth.user.id,
-        metadata: { originalFileName: safeFileName(body.fileName) },
+        metadata: { originalFileName: safeFileName(body.fileName), purpose },
       }).select("id,organization_id,expression_id,media_type,processing_state,source_storage_path,mime_type,file_size_bytes,duration_seconds,aspect_ratio").single();
       if (createError || !asset) throw new ApiError("ASSET_CREATE_FAILED", "Unable to initialize media upload", 500, undefined, false);
 
@@ -264,10 +264,11 @@ Deno.serve(createHandler(
       const object = (objects ?? []).find((item) => item.name === objectName);
       if (!object) throw new ApiError("MEDIA_UPLOAD_INCOMPLETE", "The media file has not finished uploading", 409);
       const actualSize = Number((object as any).metadata?.size ?? asset.file_size_bytes ?? 0);
-      if (!Number.isFinite(actualSize) || actualSize <= 0 || actualSize > MAX_BYTES) {
+      const maxBytes = asset.metadata?.purpose === "pastor_message" ? 100 * 1024 * 1024 : MAX_BYTES;
+      if (!Number.isFinite(actualSize) || actualSize <= 0 || actualSize > maxBytes) {
         await admin.storage.from(BUCKET).remove([asset.source_storage_path]);
         await admin.from("media_assets").update({ processing_state: "failed", processing_error: "Invalid uploaded file size" }).eq("id", assetId);
-        throw new ApiError("PAYLOAD_TOO_LARGE", "Uploaded media exceeds the 200 MB limit", 413);
+        throw new ApiError("PAYLOAD_TOO_LARGE", asset.metadata?.purpose === "pastor_message" ? "Pastor’s Message media must be 100 MB or smaller" : "Uploaded media exceeds the 200 MB limit", 413);
       }
 
       const mime = MIME_TYPES[asset.mime_type];
