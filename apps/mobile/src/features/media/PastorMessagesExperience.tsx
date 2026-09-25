@@ -37,11 +37,10 @@ export function PastorMessagesScreen({ scope, expressionId }: { scope: Scope; ex
         const params = new URLSearchParams();
         if (organizationId) params.set('organizationId', organizationId);
         if (expressionId) params.set('expressionId', expressionId);
-        return api.request<{ sermons?: Sermon[] }>(`home-feed?${params.toString()}`, { signal })
-          .then((payload) => payload.sermons ?? []);
+        return api.request<Sermon[]>(`public-content?type=pastor-messages&${params.toString()}`, { signal, context: 'public' });
       }
       const suffix = organizationId ? `&organizationId=${encodeURIComponent(organizationId)}` : '';
-      return api.request<Sermon[]>(`public-content?type=sermons${suffix}`, { signal, context: 'public' });
+      return api.request<Sermon[]>(`public-content?type=pastor-messages${suffix}`, { signal, context: 'public' });
     },
   );
 
@@ -60,7 +59,7 @@ export function PastorMessagesScreen({ scope, expressionId }: { scope: Scope; ex
 
   const audioCount = (resource.data ?? []).filter(hasAudio).length;
   const videoCount = (resource.data ?? []).filter(hasVideo).length;
-  const baseRoute = scope === 'expression' ? `/expressions/${expressionId}/sermons` : '/general/sermon';
+  const baseRoute = scope === 'expression' ? `/expressions/${expressionId}/pastor-messages` : '/general/pastor-messages';
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -110,8 +109,8 @@ export function PastorMessagesScreen({ scope, expressionId }: { scope: Scope; ex
             <EmptyState
               title={query.trim() ? 'No messages match that search' : `No ${tab === 'audio' ? 'audio' : 'video'} messages yet`}
               message={scope === 'expression'
-                ? 'Messages published specifically for this Expression will appear here.'
-                : 'Published pastoral recordings from COT will appear here.'}
+                ? 'Pastoral audio and video published specifically for this Expression will appear here.'
+                : 'Published pastoral audio and video from COT will appear here.'}
               iconName={tab === 'audio' ? 'headset-outline' : 'videocam-outline'}
             />
           ) : null
