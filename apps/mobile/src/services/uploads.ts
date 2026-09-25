@@ -161,6 +161,15 @@ export async function putSignedResumableUpload(
   const size = Number(source.size || file.size || 0);
   if (!size) throw new Error('The selected file is empty. Choose another file.');
 
+  // TUS is intended for large files. Small pastoral videos (for example a
+  // 4–5 MB MP4) are more reliable through the signed PUT URL and do not need
+  // a resumable session at all.
+  if (size <= TUS_CHUNK_SIZE) {
+    const directSize = await putSignedDirectUpload(session.signedUploadUrl, mimeType, source);
+    onProgress?.(directSize, directSize);
+    return directSize;
+  }
+
   const endpoint = resumableEndpointFromSignedUrl(session.signedUploadUrl);
   const signature = session.uploadToken || new URL(session.signedUploadUrl).searchParams.get('token');
   if (!signature) throw new Error('The secure media upload session is incomplete. Please choose the file again.');
