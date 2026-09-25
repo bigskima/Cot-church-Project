@@ -10,8 +10,11 @@ const statuses = new Set(["draft", "review", "scheduled", "published", "archived
 const visibilities = new Set(["public", "organization", "branch", "private"]);
 const BANNER_BUCKET = "sermon-banners";
 
-async function hasScopedPermission(auth: any, permission: string, branchId: string | null) {
-  const effectivePermission = branchId ? `expression.sermons.${permission.split('.').pop()}` : permission;
+async function hasScopedPermission(auth: any, permission: string, branchId: string | null, domain: "sermons" | "pastor_messages" = "sermons") {
+  const action = permission.split('.').pop();
+  const effectivePermission = branchId
+    ? `expression.${domain}.${action}`
+    : `${domain}.${action}`;
   const { data, error } = await auth.client.rpc("has_exact_scope_permission", {
     target_organization_id: auth.organizationId,
     requested_permission: effectivePermission,
@@ -20,8 +23,8 @@ async function hasScopedPermission(auth: any, permission: string, branchId: stri
   return !error && data === true;
 }
 
-async function assertScopedPermission(auth: any, permission: string, branchId: string | null, message: string) {
-  if (!(await hasScopedPermission(auth, permission, branchId))) {
+async function assertScopedPermission(auth: any, permission: string, branchId: string | null, message: string, domain: "sermons" | "pastor_messages" = "sermons") {
+  if (!(await hasScopedPermission(auth, permission, branchId, domain))) {
     throw new ApiError("PERMISSION_DENIED", message, 403);
   }
 }
@@ -72,21 +75,24 @@ Deno.serve(createHandler(
           throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication and organization context required", 401);
         }
         const scopeId = auth.branchId ?? null;
+        const pastorMessagesView = url.searchParams.get("pastorMessages") === "true";
+        const domain = pastorMessagesView ? "pastor_messages" : "sermons";
         const canManage =
-          await hasScopedPermission(auth, "sermons.create", scopeId) ||
-          await hasScopedPermission(auth, "sermons.manage", scopeId) ||
-          await hasScopedPermission(auth, "sermons.publish", scopeId);
+          await hasScopedPermission(auth, `${domain}.create`, scopeId, domain) ||
+          await hasScopedPermission(auth, `${domain}.manage`, scopeId, domain) ||
+          await hasScopedPermission(auth, `${domain}.publish`, scopeId, domain);
         if (!canManage) throw new ApiError("PERMISSION_DENIED", "You cannot manage sermons in this scope", 403);
 
         let managementQuery = auth.client
           .from("sermons")
-          .select("id,organization_id,expression_id,content_item_id,series_id,recording_id,title,slug,preacher,sermon_date,scripture_references,topics,description,transcript,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,duration_seconds,status,visibility,is_featured,play_count,published_at")
+          .select("id,organization_id,expression_id,content_item_id,series_id,recording_id,title,slug,preacher,sermon_date,scripture_references,topics,description,transcript,audio_url,video_url,thumbnail_url,audio_asset_id,video_asset_id,duration_seconds,status,visibility,is_pastor_message,is_featured,play_count,published_at")
           .eq("organization_id", auth.organizationId)
           .order("sermon_date", { ascending: false })
           .limit(200);
         managementQuery = scopeId
           ? managementQuery.eq("expression_id", scopeId)
           : managementQuery.is("expression_id", null);
+        if (pastorMessagesView) managementQuery = managementQuery.eq("is_pastor_message", true);
         if (queryTerm) managementQuery = managementQuery.ilike("title", `%${queryTerm.replace(/[%_]/g, "\\$&")}%`);
 
         const { data, error } = await managementQuery;
@@ -140,7 +146,8 @@ Deno.serve(createHandler(
 
     if (request.method === "POST" && body.action === "create_banner_upload") {
       assertNoUnknownFields(body, ["action", "mimeType"]);
-      await assertScopedPermission(auth, "sermons.create", auth.branchId ?? null, "You cannot upload sermon banners in this scope");
+      const bannerDomain = "sermons";
+      await assertScopedPermission(auth, "sermons.create", auth.branchId ?? null, "You cannot upload sermon banners in this scope", bannerDomain);
       const mimeType = requiredString(body.mimeType, "mimeType", 80).toLowerCase();
       const extension = mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : mimeType === "image/jpeg" ? "jpg" : null;
       if (!extension) throw new ApiError("UNSUPPORTED_MEDIA_TYPE", "Choose a JPG, PNG, or WebP banner", 415);
@@ -171,14 +178,22 @@ Deno.serve(createHandler(
     }
 
     if (request.method === "POST") {
-      assertNoUnknownFields(body, ["title", "preacher", "sermonDate", "expressionId", "seriesId", "description", "transcript", "audioUrl", "videoUrl", "thumbnailUrl", "audioAssetId", "videoAssetId", "durationSeconds", "scriptures", "topics", "status", "visibility"]);
+      assertNoUnknownFields(body, ["title", "preacher", "sermonDate", "expressionId", "seriesId", "description", "transcript", "audioUrl", "videoUrl", "thumbnailUrl", "audioAssetId", "videoAssetId", "durationSeconds", "scriptures", "topics", "status", "visibility", "isPastorMessage"]);
 
       const suppliedExpressionId = body.expressionId ? uuid(String(body.expressionId), "expressionId", true)! : null;
       if (auth.branchId && suppliedExpressionId && suppliedExpressionId !== auth.branchId) {
         throw new ApiError("EXPRESSION_SCOPE_DENIED", "A sermon can only be created inside the selected Expression", 403);
       }
       const targetExpressionId = auth.branchId ?? suppliedExpressionId;
-      await assertScopedPermission(auth, "sermons.create", targetExpressionId, "You cannot create sermons in this scope");
+      const isPastorMessage = body.isPastorMessage === true;
+      const domain = isPastorMessage ? "pastor_messages" : "sermons";
+      await assertScopedPermission(
+        auth,
+        `${domain}.create`,
+        targetExpressionId,
+        isPastorMessage ? "You cannot create Pastor’s Messages in this scope" : "You cannot create sermons in this scope",
+        domain,
+      );
 
       const title = requiredString(body.title, "title", 200).trim();
       const preacher = requiredString(body.preacher, "preacher", 120).trim();
@@ -187,7 +202,13 @@ Deno.serve(createHandler(
       if (!statuses.has(status) || !visibilities.has(visibility)) throw new ApiError("VALIDATION_FAILED", "Invalid status or visibility", 422);
       if (visibility === "branch" && !targetExpressionId) throw new ApiError("VALIDATION_FAILED", "Expression visibility requires an Expression", 422);
       if (["scheduled", "published"].includes(status)) {
-        await assertScopedPermission(auth, "sermons.publish", targetExpressionId, "Publishing sermons requires publish permission in this scope");
+        await assertScopedPermission(
+          auth,
+          `${domain}.publish`,
+          targetExpressionId,
+          isPastorMessage ? "Publishing Pastor’s Messages requires publish permission in this scope" : "Publishing sermons requires publish permission in this scope",
+          domain,
+        );
       }
 
       const seriesId = body.seriesId ? uuid(String(body.seriesId), "seriesId", true)! : null;
@@ -199,6 +220,9 @@ Deno.serve(createHandler(
       const audioAssetId = await validateMediaAsset(auth, body.audioAssetId ? uuid(String(body.audioAssetId), "audioAssetId", true) : null, "audio", targetExpressionId);
       const videoAssetId = await validateMediaAsset(auth, body.videoAssetId ? uuid(String(body.videoAssetId), "videoAssetId", true) : null, "video", targetExpressionId);
       const description = optionalString(body.description, "description", 10000)?.trim() ?? "";
+      if (isPastorMessage && !audioAssetId && !videoAssetId) {
+        throw new ApiError("PASTOR_MESSAGE_MEDIA_REQUIRED", "Add an audio or video recording to publish a Pastor’s Message", 422);
+      }
       if (!description && !audioAssetId && !videoAssetId) throw new ApiError("SERMON_CONTENT_REQUIRED", "Add sermon text, audio, or video", 422);
       const thumbnailUrl = optionalString(body.thumbnailUrl, "thumbnailUrl", 2000);
       if (!thumbnailUrl) throw new ApiError("SERMON_BANNER_REQUIRED", "Add a sermon banner", 422);
@@ -222,6 +246,7 @@ Deno.serve(createHandler(
         topics: Array.isArray(body.topics) ? body.topics.map(String).slice(0, 100) : [],
         status,
         visibility,
+        is_pastor_message: isPastorMessage,
         created_by: auth.user.id,
         published_at: status === "published" ? new Date().toISOString() : null,
       };
@@ -235,13 +260,20 @@ Deno.serve(createHandler(
     const id = uuid(requiredString(body.id, "id", 36), "id", true)!;
     const { data: existing, error: existingError } = await auth.client
       .from("sermons")
-      .select("id,expression_id,status")
+      .select("id,expression_id,status,is_pastor_message")
       .eq("id", id)
       .eq("organization_id", auth.organizationId)
       .maybeSingle();
     if (existingError || !existing) throw new ApiError("SERMON_NOT_FOUND", "Sermon is unavailable", 404);
     if (auth.branchId && existing.expression_id !== auth.branchId) throw new ApiError("EXPRESSION_SCOPE_DENIED", "This sermon belongs to another Expression", 403);
-    await assertScopedPermission(auth, "sermons.manage", existing.expression_id, "You cannot manage this sermon");
+    const existingDomain = existing.is_pastor_message ? "pastor_messages" : "sermons";
+    await assertScopedPermission(
+      auth,
+      `${existingDomain}.manage`,
+      existing.expression_id,
+      existing.is_pastor_message ? "You cannot manage this Pastor’s Message" : "You cannot manage this sermon",
+      existingDomain,
+    );
 
     const updates: Record<string, unknown> = {};
     if (body.title !== undefined) updates.title = requiredString(body.title, "title", 200).trim();
@@ -273,7 +305,13 @@ Deno.serve(createHandler(
       const status = requiredString(body.status, "status", 20);
       if (!statuses.has(status)) throw new ApiError("VALIDATION_FAILED", "Invalid status", 422);
       if (["scheduled", "published"].includes(status)) {
-        await assertScopedPermission(auth, "sermons.publish", existing.expression_id, "Publishing sermons requires publish permission in this scope");
+        await assertScopedPermission(
+          auth,
+          `${existingDomain}.publish`,
+          existing.expression_id,
+          existing.is_pastor_message ? "Publishing Pastor’s Messages requires publish permission in this scope" : "Publishing sermons requires publish permission in this scope",
+          existingDomain,
+        );
       }
       updates.status = status;
       if (status === "published") updates.published_at = new Date().toISOString();
