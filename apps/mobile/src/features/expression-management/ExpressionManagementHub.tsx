@@ -57,7 +57,7 @@ export function ExpressionManagementHub() {
         description: 'Create, publish and update pastoral audio and video messages.',
         iconName: 'book-outline',
         route: `${base}/sermons`,
-        enabled: access.canManageSermons,
+        enabled: access.canManagePastorMessages,
       },
       {
         key: 'events',
@@ -197,6 +197,7 @@ export function ExpressionManagementHub() {
     access.canManageSettings,
     access.canManageLive,
     access.canManageSermons,
+    access.canManagePastorMessages,
     access.canReadExpressionFinance,
     access.canReadGivingFinance,
     access.canReviewTestimonies,
