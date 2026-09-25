@@ -259,7 +259,7 @@ Deno.serve(createHandler(
         published_at: status === "published" ? new Date().toISOString() : null,
       };
 
-      const { data, error } = await auth.client.from("sermons").insert(record).select().single();
+      const { data, error } = await adminClient().from("sermons").insert(record).select().single();
       if (error) throw new ApiError("SERMON_CREATE_FAILED", "Unable to create sermon", 500, undefined, false);
       return { data, status: 201 };
     }
@@ -333,7 +333,7 @@ Deno.serve(createHandler(
     }
     if (!Object.keys(updates).length) throw new ApiError("VALIDATION_FAILED", "At least one sermon field is required", 422);
 
-    const { data, error } = await auth.client
+    const { data, error } = await adminClient()
       .from("sermons")
       .update(updates)
       .eq("id", id)
