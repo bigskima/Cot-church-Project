@@ -146,9 +146,16 @@ Deno.serve(createHandler(
     const body = assertObject(await jsonBody(request));
 
     if (request.method === "POST" && body.action === "create_banner_upload") {
-      assertNoUnknownFields(body, ["action", "mimeType"]);
-      const bannerDomain = "sermons";
-      await assertScopedPermission(auth, "sermons.create", auth.branchId ?? null, "You cannot upload sermon banners in this scope", bannerDomain);
+      assertNoUnknownFields(body, ["action", "mimeType", "purpose"]);
+      const bannerPastorMessage = body.purpose === "pastor_message";
+      const bannerDomain = bannerPastorMessage ? "pastor_messages" : "sermons";
+      await assertScopedPermission(
+        auth,
+        `${bannerDomain}.create`,
+        auth.branchId ?? null,
+        bannerPastorMessage ? "You cannot upload Pastor’s Message banners in this scope" : "You cannot upload sermon banners in this scope",
+        bannerDomain,
+      );
       const mimeType = requiredString(body.mimeType, "mimeType", 80).toLowerCase();
       const extension = mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : mimeType === "image/jpeg" ? "jpg" : null;
       if (!extension) throw new ApiError("UNSUPPORTED_MEDIA_TYPE", "Choose a JPG, PNG, or WebP banner", 415);
