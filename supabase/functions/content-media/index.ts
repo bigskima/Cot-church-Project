@@ -13,9 +13,14 @@ const BUCKET = "content-media";
 const MAX_BYTES = 200 * 1024 * 1024;
 const MIME_TYPES: Record<string, { mediaType: "video" | "audio" | "image"; ext: string; rendition: "video_stream" | "audio_stream" | null }> = {
   "video/mp4": { mediaType: "video", ext: "mp4", rendition: "video_stream" },
+  "video/x-m4v": { mediaType: "video", ext: "mp4", rendition: "video_stream" },
+  "video/m4v": { mediaType: "video", ext: "mp4", rendition: "video_stream" },
   "video/webm": { mediaType: "video", ext: "webm", rendition: "video_stream" },
   "video/quicktime": { mediaType: "video", ext: "mov", rendition: "video_stream" },
   "audio/mpeg": { mediaType: "audio", ext: "mp3", rendition: "audio_stream" },
+  "audio/x-m4a": { mediaType: "audio", ext: "m4a", rendition: "audio_stream" },
+  "audio/m4a": { mediaType: "audio", ext: "m4a", rendition: "audio_stream" },
+  "audio/x-wav": { mediaType: "audio", ext: "wav", rendition: "audio_stream" },
   "audio/mp4": { mediaType: "audio", ext: "m4a", rendition: "audio_stream" },
   "audio/aac": { mediaType: "audio", ext: "aac", rendition: "audio_stream" },
   "audio/ogg": { mediaType: "audio", ext: "ogg", rendition: "audio_stream" },
