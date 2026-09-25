@@ -172,7 +172,24 @@ export async function putSignedResumableUpload(
           'x-signature': signature,
         },
       });
-      if (!response.ok) throw new Error(`Unable to start media upload (${response.status}).`);
+      if (!response.ok) {
+        // Supabase recommends TUS for large files, but signed-upload URLs also
+        // support a direct PUT. Some native/storage combinations can reject
+        // the TUS session bootstrap with 400; fall back to the same signed URL
+        // rather than making the creator restart the message.
+        if (response.status === 400) {
+          const direct = await fetch(session.signedUploadUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': mimeType },
+            body: source,
+          });
+          if (direct.ok) {
+            onProgress?.(size, size);
+            return size;
+          }
+        }
+        throw new Error(`Unable to start media upload (${response.status}).`);
+      }
       uploadUrl = response.headers.get('Location') || response.headers.get('location') || '';
       if (!uploadUrl) throw new Error('The media upload session did not return a resumable upload URL.');
     } catch (error) {
