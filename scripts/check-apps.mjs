@@ -524,7 +524,7 @@ const checks = [
   [/viewer_has_prayed/, 'prayer support viewer state'],
   [/prayingIds/, 'prayer support pending state'],
 
-  [/public-content\?type=sermon&id=/, 'exact public sermon detail request'],
+  [/public-content\?type=\$\{pastorMessage \? 'pastor-message' : 'sermon'\}&id=/, 'exact public sermon detail request'],
   [/Enter this Expression to play its internal sermon/, 'Expression sermon playback guard'],
   [/onProgress=\{syncProgress\}/, 'sermon audio and video continuity'],
   [/useDeferredValue/, 'non-blocking public discovery search'],
