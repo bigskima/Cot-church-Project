@@ -1,10 +1,8 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import { getPublicSupabaseConfig, getServiceRoleKey } from "./config.ts";
 
-// Supabase has been returning intermittent PGRST303 responses when the API
-// gateway's short-lived JWT is rejected by PostgREST. Retry only this specific
-// authentication-validation error; all other 401 responses retain their normal
-// behavior and are never retried.
+// PostgREST 14.x can intermittently reject gateway-minted JWTs with PGRST303.
+// Retry only that error; do not retry ordinary authentication or permission failures.
 const POSTGREST_AUTH_RETRY_DELAYS_MS = [150, 450, 1000];
 
 async function fetchWithPostgrestAuthRetry(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
@@ -24,6 +22,20 @@ async function fetchWithPostgrestAuthRetry(input: RequestInfo | URL, init?: Requ
   }
 
   return response;
+}
+
+// Opaque Supabase secret keys are API keys, not JWTs. supabase-js normally
+// mirrors its constructor key into Authorization: Bearer. Supabase's hosted
+// gateway expects the secret key only in apikey and mints the service-role
+// credential for the upstream Data API itself.
+function createSecretKeyFetch(secretKey: string) {
+  return (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const request = new Request(input, init);
+    const headers = new Headers(request.headers);
+    headers.set("apikey", secretKey);
+    headers.delete("Authorization");
+    return fetchWithPostgrestAuthRetry(new Request(request, { headers }));
+  };
 }
 
 export function userClient(token: string) {
@@ -47,8 +59,9 @@ export function publicClient() {
 
 export function adminClient() {
   const config = getPublicSupabaseConfig();
-  return createClient(config.url, getServiceRoleKey(), {
-    global: { fetch: fetchWithPostgrestAuthRetry },
+  const secretKey = getServiceRoleKey();
+  return createClient(config.url, secretKey, {
+    global: { fetch: createSecretKeyFetch(secretKey) },
     auth: { autoRefreshToken: false, persistSession: false },
   });
 }
