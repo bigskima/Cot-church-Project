@@ -549,4 +549,10 @@ const styles = StyleSheet.create({
   uploadTitle: { fontSize: 12, fontWeight: '800' },
   uploadHint: { fontSize: 10.5, lineHeight: 15, marginTop: 2 },
   bannerPreview: { width: 92, aspectRatio: 16 / 9, borderRadius: radius.md },
+  uploadProgress: { marginHorizontal: spacing.md, marginBottom: spacing.sm, padding: spacing.md, gap: spacing.sm, borderWidth: 1, borderRadius: radius.lg },
+  uploadProgressRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  uploadProgressLabel: { fontSize: 12, fontWeight: '600' },
+  uploadProgressPercent: { fontSize: 12, fontWeight: '700' },
+  uploadTrack: { height: 6, borderRadius: radius.full, overflow: 'hidden' },
+  uploadFill: { height: '100%', borderRadius: radius.full },
 });
