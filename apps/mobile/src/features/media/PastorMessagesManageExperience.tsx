@@ -553,6 +553,6 @@ const styles = StyleSheet.create({
   uploadProgressRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   uploadProgressLabel: { fontSize: 12, fontWeight: '600' },
   uploadProgressPercent: { fontSize: 12, fontWeight: '700' },
-  uploadTrack: { height: 6, borderRadius: radius.full, overflow: 'hidden' },
-  uploadFill: { height: '100%', borderRadius: radius.full },
+  uploadTrack: { height: 6, borderRadius: radius.pill, overflow: 'hidden' },
+  uploadFill: { height: '100%', borderRadius: radius.pill },
 });
