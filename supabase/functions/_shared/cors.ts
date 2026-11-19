@@ -5,6 +5,12 @@ import { adminClient } from "./supabase.ts";
 const allowedHeaders = "authorization, content-type, idempotency-key, x-branch-id, x-organization-id, x-request-id";
 const DATABASE_ORIGIN_CACHE_MS = 60_000;
 
+// Exact, temporary production fallback for the restored COT web app. The
+// database allowlist remains the source of truth for other origins. This
+// prevents a transient PostgREST PGRST303 response from taking the whole app
+// offline while the Supabase project is moved to a fixed PostgREST release.
+const RECOVERY_PRODUCTION_ORIGINS = ["https://cot-digital-app.vercel.app"];
+
 let databaseOriginCache: { expiresAt: number; patterns: string[] } | null = null;
 
 function normalizePattern(value: string) {
@@ -81,6 +87,7 @@ export async function corsHeaders(request: Request) {
   const configured = [
     ...getAllowedOrigins().map(normalizePattern),
     ...await databaseAllowedOrigins(),
+    ...RECOVERY_PRODUCTION_ORIGINS,
   ].filter(Boolean);
 
   // Preserve the historical development fallback when no origin policy exists
