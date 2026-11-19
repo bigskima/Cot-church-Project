@@ -391,7 +391,7 @@ const invariants = [
   [rateLimitRpcHardening, /grant execute on function public\.consume_rate_limit\(text,text,integer,integer\) to service_role/i, 'rate-limit RPC granted only to service role'],
   [paymentEvents, /HMAC/, 'payment event signature validation'],
   [publicContent, /visibility.*public/, 'public content visibility enforcement'],
-  [sermons, /sermons\.create/, 'sermon authorization'],
+  [sermons, /bannerDomain[\s\S]*\$\{bannerDomain\}\.create/, 'sermon authorization'],
   [branding, /platform\.branding\.manage/, 'branding authorization'],
   [churchStory, /leadership_profiles/, 'leadership profile management'],
   [prayerRequests, /action === "pray"/, 'prayer-wall support action'],
