@@ -544,6 +544,7 @@ const checks = [
 ];
 
 // Keep this assertion aligned with the member-facing ministry/platform explanation.
+// It verifies the access boundary without requiring implementation terminology.
 const boundaryChecks = [
   [mobilePlatformBoundaryUi, /Manage General COT access here[\s\S]*separate Platform Administration website/, 'General Roles & Access states the ministry/platform boundary'],
   [mobilePlatformBoundaryUi, /route: '\/general\/leadership\/titles-badges'[\s\S]*enabled: access\.canManageLeadership/, 'General ministry leadership owns church-wide title management'],
