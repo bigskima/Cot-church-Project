@@ -285,7 +285,7 @@ export default function GeneralHomeExperience() {
           <View style={styles.flex}>
             <Text style={[styles.discoveryEyebrow, { color: colors.interactive }]}>WATCH · LISTEN · STUDY</Text>
             <Text style={[styles.discoveryTitle, { color: colors.text }]}>Messages for the week</Text>
-            <Text style={[styles.discoverySubtitle, { color: colors.textMuted }]}>Sermons presented as focused discovery, not another feed.</Text>
+            <Text style={[styles.discoverySubtitle, { color: colors.textMuted }]}>Watch, listen to and study recent messages from COT.</Text>
           </View>
           <Pressable onPress={() => router.push('/general/sermons' as any)} style={({ pressed }) => [styles.viewAllButton, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, pressed && styles.pressed]}>
             <Text style={[styles.viewAllText, { color: colors.text }]}>View all</Text><Icon name="arrow-forward" size={14} color={colors.interactive} />
@@ -322,12 +322,12 @@ export default function GeneralHomeExperience() {
         <GeneralHomeSpotlightCarousel />
       </TourAnchor>
 
-      {degradedSections.length ? <Pressable onPress={refreshHome} style={[styles.degradedBanner, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><View style={[styles.degradedIcon, { backgroundColor: colors.card }]}><Icon name="refresh-outline" size={16} color={colors.interactive} /></View><View style={styles.flex}><Text style={[styles.degradedTitle, { color: colors.text }]}>A few sections need another try</Text><Text style={[styles.degradedText, { color: colors.textMuted }]}>Your Home remains usable. Tap here to refresh only the missing pieces.</Text></View></Pressable> : null}
-      {activeStream ? <View style={styles.liveSection}><FeedSectionHeading eyebrow={activeStream.status === 'live' ? 'LIVE NOW' : 'NEXT LIVE'} title={activeStream.status === 'live' ? 'Join what is happening now' : 'Coming up live'} subtitle="Open the broadcast without leaving Home discovery." actionLabel="Live" onAction={() => router.push('/general/live' as any)} /><HeroLiveCard stream={activeStream} onPress={() => router.push(`/general/live/${activeStream.id}` as any)} /></View> : null}
+      {degradedSections.length ? <Pressable onPress={refreshHome} style={[styles.degradedBanner, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><View style={[styles.degradedIcon, { backgroundColor: colors.card }]}><Icon name="refresh-outline" size={16} color={colors.interactive} /></View><View style={styles.flex}><Text style={[styles.degradedTitle, { color: colors.text }]}>Some updates have not loaded yet</Text><Text style={[styles.degradedText, { color: colors.textMuted }]}>You can keep using Home. Tap here to try loading the missing content again.</Text></View></Pressable> : null}
+      {activeStream ? <View style={styles.liveSection}><FeedSectionHeading eyebrow={activeStream.status === 'live' ? 'LIVE NOW' : 'NEXT LIVE'} title={activeStream.status === 'live' ? 'Join what is happening now' : 'Coming up live'} subtitle="Watch the live broadcast right here on Home." actionLabel="Live" onAction={() => router.push('/general/live' as any)} /><HeroLiveCard stream={activeStream} onPress={() => router.push(`/general/live/${activeStream.id}` as any)} /></View> : null}
 
       {feed.length ? (
         <TourAnchor targetKey="general.home.feed" reveal={() => homeListRef.current?.scrollToOffset({ offset: 220, animated: true })}>
-          <FeedSectionHeading eyebrow="COMMUNITY FEED" title={rankingMode === 'personalized' ? 'For you' : 'Latest from COT'} actionLabel="Discover" onAction={() => router.push('/general/explore')} />
+          <FeedSectionHeading eyebrow="COMMUNITY" title={rankingMode === 'personalized' ? 'For you' : 'Latest from COT'} actionLabel="Discover" onAction={() => router.push('/general/explore')} />
         </TourAnchor>
       ) : null}
     </View>
@@ -350,7 +350,7 @@ export default function GeneralHomeExperience() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           ListHeaderComponent={header}
-          ListEmptyComponent={<View style={[styles.emptyHome, { width: contentWidth }]}><EmptyState title="General COT is ready" message="Sermons, media and community activity will form the feed here. Events and announcements live in the Home spotlight above." iconName="home-outline" /></View>}
+          ListEmptyComponent={<View style={[styles.emptyHome, { width: contentWidth }]}><EmptyState title="Nothing to show just yet" message="New sermons, videos and community posts will appear here. Events and announcements are highlighted above." iconName="home-outline" /></View>}
           contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, spacing.md) + spacing.lg }}
           refreshControl={<RefreshControl refreshing={resource.refreshing} onRefresh={refreshHome} tintColor={colors.interactive} colors={[colors.interactive]} progressBackgroundColor={colors.card} />}
           renderItem={({ item }) => {

@@ -280,10 +280,10 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
         </View>
       </TourAnchor>
 
-      {payload?.degradedSections?.length ? <Pressable onPress={resource.refresh} style={[styles.notice, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Icon name="alert-circle-outline" size={17} color={colors.textSecondary} /><Text style={[styles.noticeText, { color: colors.textSecondary }]}>Some Expression sections are still loading. Tap to retry.</Text><Icon name="refresh-outline" size={15} color={colors.textMuted} /></Pressable> : null}
+      {payload?.degradedSections?.length ? <Pressable onPress={resource.refresh} style={[styles.notice, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Icon name="alert-circle-outline" size={17} color={colors.textSecondary} /><Text style={[styles.noticeText, { color: colors.textSecondary }]}>Some content has not loaded yet. Tap to try again.</Text><Icon name="refresh-outline" size={15} color={colors.textMuted} /></Pressable> : null}
       {activeStream ? <View style={styles.liveWrap}><HeroLiveCard stream={activeStream} onPress={() => router.push(`/expressions/${expressionId}/live/${activeStream.id}` as any)} /></View> : null}
 
-      {feed.length ? <View style={styles.feedHeading}><Text style={[styles.feedTitle, { color: colors.text }]}>Latest</Text><Pressable onPress={() => router.push(`/expressions/${expressionId}/feed` as any)}><Text style={[styles.seeAll, { color: colors.interactive }]}>Full feed</Text></Pressable></View> : null}
+      {feed.length ? <View style={styles.feedHeading}><Text style={[styles.feedTitle, { color: colors.text }]}>Latest</Text><Pressable onPress={() => router.push(`/expressions/${expressionId}/feed` as any)}><Text style={[styles.seeAll, { color: colors.interactive }]}>View all posts</Text></Pressable></View> : null}
     </View>
   );
 
@@ -298,7 +298,7 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
         data={feed}
         keyExtractor={(item) => item.key}
         ListHeaderComponent={header}
-        ListEmptyComponent={<EmptyState title="This Expression Home is ready" message="Posts, Reels, videos, sermons, events, announcements, polls and giveaways will form focused layers as they are published." iconName="home-outline" />}
+        ListEmptyComponent={<EmptyState title="Nothing to show just yet" message="Posts, Reels, videos, sermons, events, announcements, polls and giveaways will appear here as they are shared." iconName="home-outline" />}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         nestedScrollEnabled

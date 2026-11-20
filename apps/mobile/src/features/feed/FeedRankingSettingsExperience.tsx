@@ -60,14 +60,14 @@ const defaults: Record<NumericField, number> = {
 };
 
 const fields: Array<{ key: NumericField; title: string; help: string; min: number; max: number }> = [
-  { key: 'recency_weight', title: 'Freshness', help: 'How much newer content should rise before engagement and relationship signals are considered.', min: 0, max: 100 },
-  { key: 'reaction_weight', title: 'Reactions', help: 'Boost from likes, prayer, celebration and other reactions. Popularity uses a logarithmic curve to prevent runaway dominance.', min: 0, max: 100 },
-  { key: 'comment_weight', title: 'Comments', help: 'Boost from visible discussion. This is also logarithmic so one viral thread cannot own the feed forever.', min: 0, max: 100 },
-  { key: 'followed_author_boost', title: 'Followed people', help: 'Extra relevance when the signed-in viewer follows the content author.', min: 0, max: 100 },
-  { key: 'continuation_boost', title: 'Continue watching', help: 'Extra relevance for unfinished Reel/video playback so people can continue what they started.', min: 0, max: 100 },
-  { key: 'completed_penalty', title: 'Completed content penalty', help: 'Reduces media already completed by the viewer so Home does not repeatedly resurface it.', min: 0, max: 100 },
-  { key: 'repeat_author_penalty', title: 'Repeat-author diversity', help: 'Reduces consecutive dominance by the same creator while keeping strong content eligible.', min: 0, max: 100 },
-  { key: 'freshness_half_life_hours', title: 'Freshness half-life (hours)', help: 'How quickly the freshness advantage decays. 24 means a one-day-old item retains roughly half its freshness signal.', min: 1, max: 8760 },
+  { key: 'recency_weight', title: 'Freshness', help: 'Give newer posts a stronger place near the top.', min: 0, max: 100 },
+  { key: 'reaction_weight', title: 'Reactions', help: 'Give more visibility to posts that receive likes, prayers and other responses, without letting one popular post take over.', min: 0, max: 100 },
+  { key: 'comment_weight', title: 'Comments', help: 'Give more visibility to posts that spark thoughtful conversation without letting one long thread dominate.', min: 0, max: 100 },
+  { key: 'followed_author_boost', title: 'Followed people', help: 'Bring posts from people you follow a little closer to the top.', min: 0, max: 100 },
+  { key: 'continuation_boost', title: 'Continue watching', help: 'Help members return to a Reel or video they have not finished.', min: 0, max: 100 },
+  { key: 'completed_penalty', title: 'Completed content penalty', help: 'Move videos and Reels a member has finished lower, making room for something new.', min: 0, max: 100 },
+  { key: 'repeat_author_penalty', title: 'Repeat-author diversity', help: 'Avoid showing too many posts from the same person in a row.', min: 0, max: 100 },
+  { key: 'freshness_half_life_hours', title: 'Freshness half-life (hours)', help: 'Choose how long a new post keeps its freshness advantage. 24 hours gives it a stronger position for about a day.', min: 1, max: 8760 },
 ];
 
 function numberValue(value: number | string | undefined, fallback: number) {
@@ -101,8 +101,8 @@ export function FeedRankingSettingsExperience({ scope, expressionId }: { scope: 
           ? supabase.from('feed_ranking_settings').select('*').eq('organization_id', organizationId).is('branch_id', null).maybeSingle()
           : Promise.resolve({ data: null, error: null }),
       ]);
-      if (scopedResult.error) throw new Error(scopedResult.error.message || 'Unable to load feed ranking settings.');
-      if (organizationResult.error) throw new Error(organizationResult.error.message || 'Unable to load General COT ranking defaults.');
+      if (scopedResult.error) throw new Error(scopedResult.error.message || 'Unable to load content order settings.');
+      if (organizationResult.error) throw new Error(organizationResult.error.message || 'Unable to load the General COT settings.');
       return {
         scoped: scopedResult.data as RankingSettings | null,
         organization: organizationResult.data as RankingSettings | null,
@@ -135,7 +135,7 @@ export function FeedRankingSettingsExperience({ scope, expressionId }: { scope: 
   }, [values]);
 
   const save = async () => {
-    if (!organizationId || !canManage || validation) return setError(validation || 'Ranking management is unavailable.');
+    if (!organizationId || !canManage || validation) return setError(validation || 'These settings are not available right now.');
     setSaving(true); setError(''); setFeedback('');
     try {
       const supabase = await getRuntimeSupabase(accessToken);
@@ -151,8 +151,8 @@ export function FeedRankingSettingsExperience({ scope, expressionId }: { scope: 
         .upsert(record, { onConflict: 'organization_id,branch_id' })
         .select('*')
         .single();
-      if (result.error) throw new Error(result.error.message || 'Unable to save ranking settings.');
-      setFeedback(scope === 'expression' ? 'Expression feed ranking override saved.' : 'General COT feed ranking settings saved.');
+      if (result.error) throw new Error(result.error.message || 'Unable to save content order settings. Please try again.');
+      setFeedback(scope === 'expression' ? 'This Expression’s content order settings have been saved.' : 'General COT content order settings have been saved.');
       resource.refresh();
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to save feed ranking settings.');
@@ -165,16 +165,16 @@ export function FeedRankingSettingsExperience({ scope, expressionId }: { scope: 
     try {
       const supabase = await getRuntimeSupabase(accessToken);
       const result = await supabase.from('feed_ranking_settings').delete().eq('organization_id', organizationId).eq('branch_id', branchId);
-      if (result.error) throw new Error(result.error.message || 'Unable to restore General COT defaults.');
-      setFeedback('This Expression now inherits the General COT ranking weights.');
+      if (result.error) throw new Error(result.error.message || 'Unable to use the General COT settings. Please try again.');
+      setFeedback('This Expression now uses the General COT content order settings.');
       resource.refresh();
     } catch (value) {
-      setError(value instanceof Error ? value.message : 'Unable to restore inherited ranking settings.');
+      setError(value instanceof Error ? value.message : 'Unable to update these settings. Please try again.');
     } finally { setSaving(false); }
   };
 
   if (!canManage) {
-    return <EmptyState title="Feed ranking controls unavailable" message="Only authorized COT or Expression administrators can tune feed ranking." iconName="lock-closed-outline" />;
+    return <EmptyState title="Content order settings unavailable" message="Only COT or Expression leaders with permission can change what appears first." iconName="lock-closed-outline" />;
   }
 
   return (
@@ -185,24 +185,24 @@ export function FeedRankingSettingsExperience({ scope, expressionId }: { scope: 
       <View style={[styles.infoCard, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}>
         <Icon name="analytics-outline" size={21} color={colors.interactive} />
         <View style={styles.flex}>
-          <View style={styles.infoTop}><Text style={[styles.infoTitle, { color: colors.text }]}>Explainable ranking</Text>{inherited ? <Badge label="INHERITING GENERAL" variant="neutral" /> : <Badge label="CUSTOM" variant="primary" />}</View>
-          <Text style={[styles.infoText, { color: colors.textSecondary }]}>COT does not use a hidden AI model here. Home combines freshness, real reactions/comments, relationship signals, continuation and creator diversity. Specialty sections such as sermons, events and announcements remain layered separately.</Text>
+          <View style={styles.infoTop}><Text style={[styles.infoTitle, { color: colors.text }]}>How content is ordered</Text>{inherited ? <Badge label="USING GENERAL COT SETTINGS" variant="neutral" /> : <Badge label="CUSTOM SETTINGS" variant="primary" />}</View>
+          <Text style={[styles.infoText, { color: colors.textSecondary }]}>Content is ordered using a mix of how recent a post is, how people respond, the people a member follows, and whether they have finished watching a video. Sermons, events and announcements appear in their own sections.</Text>
         </View>
       </View>
 
       {resource.loading && !resource.data ? <Skeleton height={92} count={5} /> : resource.error && !resource.data ? <ResourceError message={resource.error} retry={resource.refresh} /> : (
         <>
           <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
-            <SectionHeader title="Ranking mode" subtitle={scope === 'expression' ? 'Expression-specific override or inherited General COT weights' : 'Church-wide default weights'} />
+            <SectionHeader title="Content order" subtitle={scope === 'expression' ? 'Use General COT settings or choose a different order for this Expression.' : 'Default settings for General COT.'} />
             <View style={styles.chips}>
-              <Chip label="Ranked" selected={enabled} onPress={() => setEnabled(true)} />
-              <Chip label="Recent only" selected={!enabled} onPress={() => setEnabled(false)} />
+              <Chip label="Recommended" selected={enabled} onPress={() => setEnabled(true)} />
+              <Chip label="Newest first" selected={!enabled} onPress={() => setEnabled(false)} />
             </View>
-            <Text style={[styles.helper, { color: colors.textMuted }]}>Turning ranking off keeps the layered Home layout but orders the ordinary post/Reel/video stream by recency.</Text>
+            <Text style={[styles.helper, { color: colors.textMuted }]}>Recommended order balances newer posts, reactions and discussion, while also considering people members follow and videos they have not finished. Newest first shows posts, Reels and videos by date.</Text>
           </View>
 
           <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
-            <SectionHeader title="Signals & weights" subtitle="Higher values make a signal matter more. Changes affect Home ordering without an app deployment." />
+            <SectionHeader title="What affects the order" subtitle="Adjust how strongly each factor influences what appears first." />
             {fields.map((field) => (
               <View key={field.key} style={styles.fieldBlock}>
                 <InputField
@@ -219,12 +219,12 @@ export function FeedRankingSettingsExperience({ scope, expressionId }: { scope: 
 
           <View style={[styles.boundary, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
             <Icon name="shield-checkmark-outline" size={18} color={colors.interactive} />
-            <Text style={[styles.boundaryText, { color: colors.textSecondary }]}>Ranking never bypasses visibility, membership or moderation rules. It only orders content the viewer is already allowed to see.</Text>
+            <Text style={[styles.boundaryText, { color: colors.textSecondary }]}>These settings only change the order of posts and videos a member is allowed to see. They never change who can see content or the moderation rules.</Text>
           </View>
 
           <View style={styles.actions}>
-            {scope === 'expression' && resource.data?.scoped ? <Button label="Use General defaults" onPress={() => void restoreInheritance()} variant="outline" disabled={saving} /> : null}
-            <Button label={scope === 'expression' && inherited ? 'Create Expression override' : 'Save ranking'} onPress={() => void save()} loading={saving} disabled={Boolean(validation)} />
+            {scope === 'expression' && resource.data?.scoped ? <Button label="Use General COT settings" onPress={() => void restoreInheritance()} variant="outline" disabled={saving} /> : null}
+            <Button label={scope === 'expression' && inherited ? 'Set separate Expression settings' : 'Save changes'} onPress={() => void save()} loading={saving} disabled={Boolean(validation)} />
           </View>
           {validation ? <Text style={[styles.validation, { color: colors.live }]}>{validation}</Text> : null}
         </>

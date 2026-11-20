@@ -127,8 +127,8 @@ export default function CreatorStudioScreen({ forcedScope }: { forcedScope?: 'ge
       enabled: generalWorkspace ? hasOrganizationCapability('polls.manage') : hasCapability('polls.manage'),
     },
     {
-      title: 'Feed Ranking',
-      description: 'Adjust how General COT Home prioritizes and presents content.',
+      title: 'Home content order',
+      description: 'Choose what appears first on General COT Home.',
       iconName: 'analytics-outline',
       badge: 'HOME',
       route: routeFor('/general/leadership/feed-ranking', '/general/leadership/feed-ranking'),

@@ -430,7 +430,7 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
   const handleCreatePost = async () => {
     if ((!postText.trim() && !attachments.length) || !canPostDestination || mediaUploading) return;
     if (postDestination === 'expression' && !expression?.id) {
-      setPostError('Select or join an Expression before posting to an Expression feed.');
+      setPostError('Join this Expression before sharing a post here.');
       return;
     }
 
@@ -567,8 +567,8 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
         />
       ) : (
         <EmptyState
-          title={activeTab === 'expression' ? 'No Expression Posts Yet' : 'No General Community Posts Yet'}
-          message={canPostCurrent ? 'Share the first encouraging word or media post in this feed.' : 'Published community posts will appear here.'}
+          title={activeTab === 'expression' ? 'Nothing shared here yet' : 'No community posts yet'}
+          message={canPostCurrent ? 'Be the first to share a message, photo or video with your community.' : 'New community posts will appear here.'}
           iconName="chatbubbles-outline"
         />
       )}
@@ -599,7 +599,7 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
       >
         <KeyboardAvoidingView behavior={PLATFORM_KEYBOARD_BEHAVIOR} keyboardVerticalOffset={PLATFORM_KEYBOARD_VERTICAL_OFFSET} style={styles.composerBody}>
           <View style={styles.destinationBlock}>
-            <Text style={[styles.destinationLabel, { color: colors.textSecondary }]}>POST TO</Text>
+            <Text style={[styles.destinationLabel, { color: colors.textSecondary }]}>SHARE WITH</Text>
             <View style={styles.destinationRow}>
               {scope === 'general' && canPostGeneral ? (
               <Pressable
@@ -607,7 +607,7 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
                 style={[styles.destinationPill, { borderColor: postDestination === 'general' ? colors.interactive : colors.border, backgroundColor: postDestination === 'general' ? colors.primarySoft : colors.bgSecondary }]}
               >
                 <Icon name="globe-outline" size={15} color={postDestination === 'general' ? colors.interactive : colors.textSecondary} />
-                <Text style={[styles.destinationText, { color: postDestination === 'general' ? colors.interactive : colors.textSecondary }]}>General Community</Text>
+                <Text style={[styles.destinationText, { color: postDestination === 'general' ? colors.interactive : colors.textSecondary }]}>General COT</Text>
               </Pressable>
               ) : null}
               {scope === 'expression' && expression?.id && canPostExpression ? (
@@ -622,8 +622,8 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
             </View>
             <Text style={[styles.destinationHelp, { color: colors.textMuted }]}>
               {postDestination === 'general'
-                ? 'General Community posts are public. Signed-in members can share text, photos, videos and audio, or open the dedicated Reel and Video creators.'
-                : 'Expression posts remain inside your selected Expression and follow that Expression’s publishing access.'}
+                ? 'Posts shared in General COT are public. Share text, photos, videos and audio here, or create a Reel or longer video using the options below.'
+                : 'Posts shared here are visible only to members of this Expression.'}
             </Text>
           </View>
 
@@ -731,14 +731,14 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
 
           <Text style={[styles.mediaHelp, { color: colors.textMuted }]}>
             {ordinaryGeneralMemberLane
-              ? 'General post · up to 2,200 characters · 4 attachments · 50 MB each.'
+              ? 'General COT post · up to 2,200 characters · 4 attachments · 50 MB each.'
               : `Up to ${attachmentLimit} attachments · 50 MB each.`}
           </Text>
 
           {mediaUploading ? (
             <View style={[styles.uploadingRow, { backgroundColor: colors.primarySoft }]}>
               <Icon name="cloud-upload-outline" size={17} color={colors.interactive} />
-              <Text style={[styles.uploadingText, { color: colors.textSecondary }]}>Uploading selected media…</Text>
+              <Text style={[styles.uploadingText, { color: colors.textSecondary }]}>Uploading attachments…</Text>
             </View>
           ) : null}
 
@@ -766,7 +766,7 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
           ) : null}
 
           <View style={[styles.composerFooter, { borderTopColor: colors.borderSubtle }]}>
-            <Text style={[styles.characterCount, { color: colors.textMuted }]}>{postText.length.toLocaleString()} / {postTextLimit.toLocaleString()} · {attachments.length}/{attachmentLimit} media</Text>
+            <Text style={[styles.characterCount, { color: colors.textMuted }]}>{postText.length.toLocaleString()} / {postTextLimit.toLocaleString()} · {attachments.length}/{attachmentLimit} attachments</Text>
             <Pressable
               onPress={handleCreatePost}
               disabled={!canPublishCurrent}

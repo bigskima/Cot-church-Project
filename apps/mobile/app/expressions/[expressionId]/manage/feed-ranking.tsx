@@ -11,12 +11,12 @@ export default function ExpressionFeedRankingScreen() {
   const access = useExpressionManagementAccess();
   const id = access.expressionId || routeId;
   return (
-    <ExpressionManagementGate ready={access.ready} allowed={Boolean(id) && access.canManageFeedRanking} expressionId={id} title="Feed ranking controls unavailable">
+    <ExpressionManagementGate ready={access.ready} allowed={Boolean(id) && access.canManageFeedRanking} expressionId={id} title="Content order settings unavailable">
       <ExpressionManagementWorkspace
         expressionId={id}
         active="settings"
-        title="Feed Ranking"
-        subtitle="Tune an explainable ranking model for this Expression without changing content visibility or moderation."
+        title="Content order"
+        subtitle="Choose what appears first in this Expression. These settings do not change who can view posts or how content is moderated."
         icon="analytics-outline"
       >
         <FeedRankingSettingsExperience scope="expression" expressionId={id} />
