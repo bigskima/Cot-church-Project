@@ -348,7 +348,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId, sco
         <View style={styles.form}>
           <View style={[styles.formIntro, { backgroundColor: colors.primarySoft }]}>
             <Icon name="lock-closed-outline" size={17} color={colors.interactive} />
-            <Text style={[styles.helper, { color: colors.textSecondary }]}>{churchWide ? 'This Group belongs to the church-wide General COT space and is separate from Expression Groups.' : 'This group will always belong to this Expression. Only its members can see it.'}</Text>
+            <Text style={[styles.helper, { color: colors.textSecondary }]}>{churchWide ? 'This Group belongs to the church-wide General COT space and is separate from Expression Groups.' : 'This group will always belong to this Expression. Choose whether all Expression members or invited members can join.'}</Text>
           </View>
           <InputField label="Group Name" value={name} onChangeText={setName} placeholder="e.g. Young Adults Fellowship" />
           <InputField label="Description" value={description} onChangeText={setDescription} placeholder="What is this group for?" multiline numberOfLines={3} />
