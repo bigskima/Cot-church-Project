@@ -137,16 +137,13 @@ export default function GeneralHomeExperience() {
       settled.forEach((result) => { if (result.status === 'fulfilled') result.value.forEach((item) => playback.set(item.contentId, item)); });
       const hydrate = <T extends Reel | Video>(item: T): T => {
         const prepared = item.content_items?.id ? playback.get(item.content_items.id) : undefined;
-        const stream = prepared?.renditions?.find((rendition) => rendition.kind === 'video_stream');
         const thumbnail = prepared?.thumbnails?.find((candidate) => candidate.isPrimary) ?? prepared?.thumbnails?.[0];
-        if (!stream?.playbackUrl && !thumbnail?.playbackUrl) return item;
+        if (!thumbnail?.playbackUrl) return item;
         return {
           ...item,
           media_assets: {
             ...(item.media_assets ?? {}),
-            ...(stream?.playbackUrl ? { url: stream.playbackUrl } : {}),
-            ...(thumbnail?.playbackUrl ? { thumbnailUrl: thumbnail.playbackUrl } : {}),
-            renditions: (item.media_assets?.renditions ?? []).map((rendition) => rendition.rendition_kind === 'video_stream' && stream?.playbackUrl ? { ...rendition, playbackUrl: stream.playbackUrl } : rendition),
+            thumbnailUrl: thumbnail.playbackUrl,
           },
         };
       };
