@@ -11,8 +11,8 @@ where is_active = true
   and scope in ('general', 'expression');
 
 update public.app_tour_steps as step
-set title = copy.title,
-    body = copy.body
+set title = wording.title,
+    body = wording.body
 from public.app_tour_experiences as experience,
      (values
        ('general', 'general.topbar', 'Find your way around', 'Search, notifications and your profile are always available at the top.'),
@@ -30,11 +30,11 @@ from public.app_tour_experiences as experience,
        ('expression', 'expression.feed.header', 'Community posts', 'Posts and conversations shared in this Expression appear here for its members.'),
        ('expression', 'expression.discussion.header', 'Expression chat', 'Chat with other members, search messages, find pinned conversations and use calling tools where available.'),
        ('expression', 'expression.reels.scope', 'Reels from this Expression', 'Watch short videos shared with this Expression. General COT Reels are available separately.')
-     ) as copy(scope, target_key, title, body)
+     ) as wording(scope, target_key, title, body)
 where step.experience_id = experience.id
   and experience.is_active = true
-  and experience.scope = copy.scope
-  and step.target_key = copy.target_key;
+  and experience.scope = wording.scope
+  and step.target_key = wording.target_key;
 
 update public.onboarding_experiences
 set subtitle = 'Review the community guidelines once. COT will then guide you through General COT and any Expression you join.',

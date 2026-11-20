@@ -28,16 +28,16 @@ type NumericField = 'recency_weight' | 'reaction_weight' | 'comment_weight' | 'f
 
 const defaults: Record<NumericField, number> = { recency_weight: 6, reaction_weight: 1.25, comment_weight: 1.75, followed_author_boost: 3, continuation_boost: 2.5, completed_penalty: 1, repeat_author_penalty: 1.2, freshness_half_life_hours: 24 };
 const engagementFields: Array<{ key: NumericField; title: string; help: string; min: number; max: number }> = [
-  { key: 'recency_weight', title: 'Freshness', help: 'Give newer posts a stronger place near the top.', min: 0, max: 100 },
-  { key: 'reaction_weight', title: 'Reactions', help: 'Give more visibility to posts that receive likes, prayers and other responses.', min: 0, max: 100 },
-  { key: 'comment_weight', title: 'Comments', help: 'Give more visibility to posts that start meaningful conversations.', min: 0, max: 100 },
-  { key: 'followed_author_boost', title: 'Followed people', help: 'Bring posts from people you follow a little closer to the top.', min: 0, max: 100 },
+  { key: 'recency_weight', title: 'Newer posts', help: 'Give newer posts a stronger place near the top.', min: 0, max: 100 },
+  { key: 'reaction_weight', title: 'Likes & responses', help: 'Give more visibility to posts that receive likes, prayers and other responses.', min: 0, max: 100 },
+  { key: 'comment_weight', title: 'Discussion', help: 'Give more visibility to posts that start meaningful conversations.', min: 0, max: 100 },
+  { key: 'followed_author_boost', title: 'People you follow', help: 'Bring posts from people you follow a little closer to the top.', min: 0, max: 100 },
 ];
 const continuityFields: Array<{ key: NumericField; title: string; help: string; min: number; max: number }> = [
-  { key: 'continuation_boost', title: 'Continue watching', help: 'Help members return to a Reel or video they have not finished.', min: 0, max: 100 },
-  { key: 'completed_penalty', title: 'Completed media penalty', help: 'Move videos and Reels a member has finished lower to make room for something new.', min: 0, max: 100 },
-  { key: 'repeat_author_penalty', title: 'Creator diversity', help: 'Avoid showing too many posts from the same person in a row.', min: 0, max: 100 },
-  { key: 'freshness_half_life_hours', title: 'Freshness half-life (hours)', help: 'Choose how long a new post keeps its freshness advantage. 24 hours gives it a stronger position for about a day.', min: 1, max: 8760 },
+  { key: 'continuation_boost', title: 'Unfinished videos', help: 'Help members return to a Reel or video they have not finished.', min: 0, max: 100 },
+  { key: 'completed_penalty', title: 'Already watched', help: 'Move videos and Reels a member has finished lower to make room for something new.', min: 0, max: 100 },
+  { key: 'repeat_author_penalty', title: 'Mix of creators', help: 'Avoid showing too many posts from the same person in a row.', min: 0, max: 100 },
+  { key: 'freshness_half_life_hours', title: 'How long a post stays new (hours)', help: 'Choose how long a new post keeps its freshness advantage. 24 hours gives it a stronger position for about a day.', min: 1, max: 8760 },
 ];
 const allFields = [...engagementFields, ...continuityFields];
 const STEPS: ProgressiveFlowStep[] = [
