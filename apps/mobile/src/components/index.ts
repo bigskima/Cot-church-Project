@@ -30,6 +30,7 @@ export * from './media/AdaptiveMediaImage';
 export * from './media/ReelPlayer';
 export * from './cards/VideoCard';
 export * from './cards/ReelCard';
+export * from './cards/MediaShelfCard';
 export * from './engagement/CommentsThread';
 export * from './engagement/InlineCommentsSheet';
 export * from './engagement/ContentReportSheet';
