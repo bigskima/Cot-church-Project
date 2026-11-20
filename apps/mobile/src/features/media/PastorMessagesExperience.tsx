@@ -71,7 +71,7 @@ export function PastorMessagesScreen({ scope, expressionId }: { scope: Scope; ex
             <ScreenHeader
               title="Pastor’s Messages"
               kicker={scope === 'expression' ? expression?.name?.toUpperCase() || 'EXPRESSION' : 'GENERAL COT'}
-              subtitle="Pastoral teaching recordings, separate from the community feed, Watch and Reels."
+              subtitle="Audio and video messages from COT leaders. These are separate from community posts, longer videos and Reels."
               showBack
             />
             <View style={styles.tabs}>
@@ -106,8 +106,8 @@ export function PastorMessagesScreen({ scope, expressionId }: { scope: Scope; ex
             <EmptyState
               title={query.trim() ? 'No messages match that search' : `No ${tab === 'audio' ? 'audio' : 'video'} messages yet`}
               message={scope === 'expression'
-                ? 'Pastoral audio and video published specifically for this Expression will appear here.'
-                : 'Published pastoral audio and video from COT will appear here.'}
+                ? 'Messages shared with this Expression will appear here.'
+                : 'Messages shared by COT leaders will appear here.'}
               iconName={tab === 'audio' ? 'headset-outline' : 'videocam-outline'}
             />
           ) : null

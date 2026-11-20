@@ -26,7 +26,7 @@ export function ExpressionLeadershipExperience({ embedded = false, expressionId 
     return (
       <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top + spacing.sm }]}>
         <ScreenHeader title="Expression Leadership" kicker="COMMUNITY" showBack />
-        <View style={styles.body}><EmptyState title="Enter an Expression first" message="Internal leadership directories are available only inside an active Expression context." iconName="lock-closed-outline" /></View>
+        <View style={styles.body}><EmptyState title="Open an Expression first" message="This leadership list is available after you open an Expression." iconName="lock-closed-outline" /></View>
       </View>
     );
   }
@@ -97,8 +97,8 @@ export function ExpressionLeadershipExperience({ embedded = false, expressionId 
             </View>
           ) : (
             <EmptyState
-              title="No Expression leaders listed"
-              message="Expression leadership will appear here once assigned by church administration."
+              title="No leaders listed yet"
+              message="The leaders of this Expression will appear here once COT has added them."
               iconName="people-outline"
             />
           )}

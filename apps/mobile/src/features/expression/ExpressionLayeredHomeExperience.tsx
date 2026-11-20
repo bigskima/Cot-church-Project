@@ -6,7 +6,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import { router } from 'expo-router';
@@ -16,11 +15,10 @@ import {
   HeroLiveCard,
   Icon,
   PostCard,
-  ReelCard,
+  MediaShelfCard,
   ResourceError,
   SermonCard,
   Skeleton,
-  VideoCard,
 } from '@/components';
 import { radius, shadows, spacing } from '@/design-system/tokens';
 import { useResource } from '@/hooks/use-resource';
@@ -62,18 +60,33 @@ type ExpressionHomePayload = {
   events: Event[];
   degradedSections?: string[];
 };
-type StreamUnit =
-  | { key: string; kind: 'post'; post: CommunityPost }
-  | { key: string; kind: 'reel'; reel: Reel }
-  | { key: string; kind: 'video'; video: Video };
-type SectionUnit = { key: string; kind: 'section'; contentKind: 'sermon' | 'event' | 'announcement'; ids: string[] };
-type HomeUnit = StreamUnit | SectionUnit;
 type HomeResource = { payload: ExpressionHomePayload; plan: FeedPlanRow[]; announcements: Announcement[] };
 
 function chunks<T>(items: T[], size: number) {
   const result: T[][] = [];
   for (let index = 0; index < items.length; index += size) result.push(items.slice(index, index + size));
   return result;
+}
+
+function idsForPlan(plan: FeedPlanRow[], unitKind: FeedPlanRow['unit_kind'], contentKind: FeedPlanRow['content_kind']) {
+  return plan.filter((row) => row.unit_kind === unitKind && row.content_kind === contentKind).flatMap((row) => row.content_ids ?? []);
+}
+
+function timeValue(value?: string | null) {
+  if (!value) return 0;
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function orderByPlan<T extends { id: string }>(items: T[], plannedIds: string[], fallback: (a: T, b: T) => number) {
+  const byId = new Map(items.map((item) => [item.id, item]));
+  const ordered: T[] = [];
+  const seen = new Set<string>();
+  plannedIds.forEach((id) => {
+    const item = byId.get(id);
+    if (item && !seen.has(id)) { ordered.push(item); seen.add(id); }
+  });
+  return [...ordered, ...items.filter((item) => !seen.has(item.id)).sort(fallback)];
 }
 
 function QuickLink({ label, hint, icon, onPress }: { label: string; hint: string; icon: string; onPress: () => void }) {
@@ -94,15 +107,13 @@ function QuickLink({ label, hint, icon, onPress }: { label: string; hint: string
 }
 
 export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId: string }) {
-  const { width } = useWindowDimensions();
   const { api, auth, context, mode } = useSession();
   const { colors } = useTheme();
   const membership = context?.expressions?.find((item) => item.id === expressionId && item.status === 'active');
   const organizationId = membership?.organizationId ?? context?.organization?.id ?? '';
   const controls = useFeatureControls({ organizationId, expressionId });
   const accessToken = auth?.session.accessToken ?? null;
-  const reelWidth = Math.max(300, Math.min(width - spacing.sm * 2, 680));
-  const homeListRef = React.useRef<FlatList<HomeUnit>>(null);
+  const homeListRef = React.useRef<FlatList<CommunityPost>>(null);
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
@@ -130,13 +141,12 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
           const prepared = contentId ? playback.get(contentId) : undefined;
           const stream = prepared?.renditions?.find((rendition) => rendition.kind === 'video_stream');
           const thumbnail = prepared?.thumbnails?.find((candidate) => candidate.isPrimary) ?? prepared?.thumbnails?.[0];
-          if (!stream?.playbackUrl && !thumbnail?.playbackUrl) return item;
+          if (!thumbnail?.playbackUrl) return item;
           return {
             ...item,
             media_assets: {
               ...(item.media_assets ?? {}),
-              ...(stream?.playbackUrl ? { url: stream.playbackUrl } : {}),
-              ...(thumbnail?.playbackUrl ? { thumbnailUrl: thumbnail.playbackUrl } : {}),
+              thumbnailUrl: thumbnail.playbackUrl,
             },
           };
         };
@@ -180,82 +190,48 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
   const announcements = controls.isEnabled('announcements') ? (resource.data?.announcements ?? []) : [];
   const activeStream = streams.find((item) => item.status === 'live') ?? streams.find((item) => item.status === 'scheduled');
 
-  const feed = useMemo<HomeUnit[]>(() => {
-    const postMap = new Map(posts.map((item) => [item.id, item]));
-    const reelMap = new Map(reels.map((item) => [item.id, item]));
-    const videoMap = new Map(videos.map((item) => [item.id, item]));
-    const plan = resource.data?.plan ?? [];
-    if (plan.length) {
-      return plan.flatMap<HomeUnit>((row, index) => {
-        const id = row.content_ids?.[0];
-        if (row.unit_kind === 'stream' && row.content_kind === 'post' && postMap.has(id)) return [{ key: `post:${id}`, kind: 'post', post: postMap.get(id)! }];
-        if (row.unit_kind === 'stream' && row.content_kind === 'reel' && reelMap.has(id)) return [{ key: `reel:${id}`, kind: 'reel', reel: reelMap.get(id)! }];
-        if (row.unit_kind === 'stream' && row.content_kind === 'video' && videoMap.has(id)) return [{ key: `video:${id}`, kind: 'video', video: videoMap.get(id)! }];
-        if (row.unit_kind === 'section' && ['sermon', 'event', 'announcement'].includes(row.content_kind)) return [{ key: `section:${row.content_kind}:${index}:${row.content_ids.join(':')}`, kind: 'section', contentKind: row.content_kind as SectionUnit['contentKind'], ids: row.content_ids }];
-        return [];
-      });
-    }
+  const plan = resource.data?.plan ?? [];
+  const orderedPosts = useMemo(() => orderByPlan(posts, idsForPlan(plan, 'stream', 'post'), (a, b) => timeValue(b.published_at || (b as any).created_at) - timeValue(a.published_at || (a as any).created_at)), [plan, posts]);
+  const orderedReels = useMemo(() => orderByPlan(reels, idsForPlan(plan, 'stream', 'reel'), (a, b) => timeValue(b.created_at) - timeValue(a.created_at)), [plan, reels]);
+  const orderedVideos = useMemo(() => orderByPlan(videos, idsForPlan(plan, 'stream', 'video'), (a, b) => timeValue(b.created_at) - timeValue(a.created_at)), [plan, videos]);
+  const orderedSermons = useMemo(() => orderByPlan(sermons, idsForPlan(plan, 'section', 'sermon'), (a, b) => timeValue(b.published_at || b.sermon_date) - timeValue(a.published_at || a.sermon_date)), [plan, sermons]);
+  const orderedEvents = useMemo(() => orderByPlan(events, idsForPlan(plan, 'section', 'event'), (a, b) => timeValue(a.starts_at) - timeValue(b.starts_at)), [events, plan]);
+  const orderedAnnouncements = useMemo(() => orderByPlan(announcements, idsForPlan(plan, 'section', 'announcement'), (a, b) => timeValue(b.published_at || b.created_at) - timeValue(a.published_at || a.created_at)), [announcements, plan]);
 
-    const stream: StreamUnit[] = [
-      ...posts.map((post) => ({ key: `post:${post.id}`, kind: 'post' as const, post })),
-      ...reels.map((reel) => ({ key: `reel:${reel.id}`, kind: 'reel' as const, reel })),
-      ...videos.map((video) => ({ key: `video:${video.id}`, kind: 'video' as const, video })),
-    ];
-    const sectionBatches: SectionUnit[] = [];
-    const grouped = {
-      announcement: chunks(announcements.map((item) => item.id), 6),
-      event: chunks(events.map((item) => item.id), 6),
-      sermon: chunks(sermons.map((item) => item.id), 6),
-    };
-    const depth = Math.max(grouped.announcement.length, grouped.event.length, grouped.sermon.length);
-    for (let batch = 0; batch < depth; batch += 1) {
-      (['announcement', 'event', 'sermon'] as const).forEach((contentKind) => {
-        const ids = grouped[contentKind][batch];
-        if (ids?.length) sectionBatches.push({ key: `fallback:${contentKind}:${batch}`, kind: 'section', contentKind, ids });
-      });
-    }
-    const result: HomeUnit[] = [];
-    let sectionIndex = 0;
-    stream.forEach((item, index) => {
-      result.push(item);
-      if ((index + 1) % 4 === 0 && sectionBatches[sectionIndex]) result.push(sectionBatches[sectionIndex++]);
-    });
-    while (sectionBatches[sectionIndex]) result.push(sectionBatches[sectionIndex++]);
-    return result;
-  }, [announcements, events, posts, reels, resource.data?.plan, sermons, videos]);
+  const renderMessagesShelf = () => orderedSermons.length ? (
+    <View style={[styles.shelf, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+      <View style={styles.shelfHeader}><View style={styles.shelfTitleRow}><View style={[styles.shelfIcon, { backgroundColor: colors.primarySoft }]}><Icon name="book-outline" size={17} color={colors.interactive} /></View><View><Text style={[styles.shelfEyebrow, { color: colors.interactive }]}>WATCH · LISTEN · STUDY</Text><Text style={[styles.shelfTitle, { color: colors.text }]}>Messages for the week</Text></View></View><Pressable onPress={() => router.push(`/expressions/${expressionId}/sermons` as any)}><Text style={[styles.seeAll, { color: colors.interactive }]}>See all</Text></Pressable></View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalContent}>{orderedSermons.slice(0, 6).map((sermon) => <View key={sermon.id} style={styles.horizontalCard}><SermonCard sermon={sermon} variant="discovery" onPress={() => router.push(`/expressions/${expressionId}/sermons/${sermon.id}` as any)} /></View>)}</ScrollView>
+    </View>
+  ) : null;
 
-  const renderSection = (unit: SectionUnit) => {
-    const sermonMap = new Map(sermons.map((item) => [item.id, item]));
-    const eventMap = new Map(events.map((item) => [item.id, item]));
-    const announcementMap = new Map(announcements.map((item) => [item.id, item]));
-    const title = unit.contentKind === 'sermon' ? 'Sermons' : unit.contentKind === 'event' ? 'Events' : 'Announcements';
-    const icon = unit.contentKind === 'sermon' ? 'book-outline' : unit.contentKind === 'event' ? 'calendar-outline' : 'megaphone-outline';
-    const destination = unit.contentKind === 'sermon' ? `/expressions/${expressionId}/sermons` : unit.contentKind === 'event' ? `/expressions/${expressionId}/events` : `/expressions/${expressionId}/announcements`;
+  const renderReelsShelf = () => orderedReels.length ? (
+    <View style={[styles.shelf, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+      <View style={styles.shelfHeader}><View style={styles.shelfTitleRow}><View style={[styles.shelfIcon, { backgroundColor: colors.primarySoft }]}><Icon name="flash-outline" size={17} color={colors.interactive} /></View><View><Text style={[styles.shelfEyebrow, { color: colors.interactive }]}>SHORT VIDEOS</Text><Text style={[styles.shelfTitle, { color: colors.text }]}>Reels from this Expression</Text></View></View><Pressable onPress={() => router.push(`/expressions/${expressionId}/reels` as any)}><Text style={[styles.seeAll, { color: colors.interactive }]}>Watch all</Text></Pressable></View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalContent}>{orderedReels.slice(0, 8).map((reel) => <MediaShelfCard key={reel.id} label="REEL" title={reel.caption?.trim() || 'Watch this Reel'} subtitle={reel.content_items?.author?.display_name || expression?.name || 'Expression member'} meta={reel.views_count ? `${reel.views_count.toLocaleString()} views` : undefined} thumbnailUrl={reel.media_assets?.thumbnailUrl || reel.media_assets?.thumbnails?.find((item) => item.is_primary)?.playbackUrl} width={146} aspectRatio={0.78} onPress={() => router.push({ pathname: `/expressions/${expressionId}/reels`, params: { reelId: reel.id } } as any)} />)}</ScrollView>
+    </View>
+  ) : null;
 
-    return (
-      <View style={[styles.shelf, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
-        <View style={styles.shelfHeader}>
-          <View style={styles.shelfTitleRow}><View style={[styles.shelfIcon, { backgroundColor: colors.primarySoft }]}><Icon name={icon as any} size={17} color={colors.interactive} /></View><View><Text style={[styles.shelfEyebrow, { color: colors.interactive }]}>IN THIS EXPRESSION</Text><Text style={[styles.shelfTitle, { color: colors.text }]}>{title}</Text></View></View>
-          <Pressable onPress={() => router.push(destination as any)}><Text style={[styles.seeAll, { color: colors.interactive }]}>See all</Text></Pressable>
-        </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalContent}>
-          {unit.ids.map((id) => {
-            if (unit.contentKind === 'sermon') {
-              const sermon = sermonMap.get(id); if (!sermon) return null;
-              return <View key={id} style={styles.horizontalCard}><SermonCard sermon={sermon} onPress={() => router.push(`/expressions/${expressionId}/sermons/${id}` as any)} /></View>;
-            }
-            if (unit.contentKind === 'event') {
-              const event = eventMap.get(id); if (!event) return null;
-              return <View key={id} style={styles.horizontalCard}><EventCard event={event} onPress={() => router.push(`/expressions/${expressionId}/event/${id}` as any)} /></View>;
-            }
-            const announcement = announcementMap.get(id); if (!announcement) return null;
-            return <Pressable key={id} onPress={() => router.push(`/expressions/${expressionId}/announcements` as any)} style={[styles.announcementCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}><View style={[styles.announcementIcon, { backgroundColor: colors.primarySoft }]}><Icon name="megaphone-outline" size={18} color={colors.interactive} /></View><Text style={[styles.announcementTitle, { color: colors.text }]} numberOfLines={2}>{announcement.title}</Text><Text style={[styles.announcementBody, { color: colors.textSecondary }]} numberOfLines={4}>{announcement.body}</Text></Pressable>;
-          })}
-        </ScrollView>
-      </View>
-    );
-  };
+  const renderVideosShelf = () => orderedVideos.length ? (
+    <View style={[styles.shelf, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+      <View style={styles.shelfHeader}><View style={styles.shelfTitleRow}><View style={[styles.shelfIcon, { backgroundColor: colors.primarySoft }]}><Icon name="videocam-outline" size={17} color={colors.interactive} /></View><View><Text style={[styles.shelfEyebrow, { color: colors.interactive }]}>WATCH</Text><Text style={[styles.shelfTitle, { color: colors.text }]}>More to watch</Text></View></View><Pressable onPress={() => router.push(`/expressions/${expressionId}/videos` as any)}><Text style={[styles.seeAll, { color: colors.interactive }]}>See all</Text></Pressable></View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalContent}>{orderedVideos.slice(0, 6).map((video) => <MediaShelfCard key={video.id} label="WATCH" title={video.title} subtitle={video.content_items?.author?.display_name || expression?.name || 'Expression member'} meta={video.category?.replace(/_/g, ' ')} thumbnailUrl={video.media_assets?.thumbnailUrl || video.media_assets?.thumbnails?.find((item) => item.is_primary)?.playbackUrl} width={238} aspectRatio={16 / 9} onPress={() => router.push(`/expressions/${expressionId}/videos/${video.id}` as any)} />)}</ScrollView>
+    </View>
+  ) : null;
 
+  const renderEventsShelf = () => orderedEvents.length ? (
+    <View style={[styles.shelf, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+      <View style={styles.shelfHeader}><View style={styles.shelfTitleRow}><View style={[styles.shelfIcon, { backgroundColor: colors.primarySoft }]}><Icon name="calendar-outline" size={17} color={colors.interactive} /></View><View><Text style={[styles.shelfEyebrow, { color: colors.interactive }]}>GATHER TOGETHER</Text><Text style={[styles.shelfTitle, { color: colors.text }]}>Upcoming events</Text></View></View><Pressable onPress={() => router.push(`/expressions/${expressionId}/events` as any)}><Text style={[styles.seeAll, { color: colors.interactive }]}>See all</Text></Pressable></View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalContent}>{orderedEvents.slice(0, 6).map((event) => <View key={event.id} style={styles.horizontalCard}><EventCard event={event} variant="discovery" onPress={() => router.push(`/expressions/${expressionId}/event/${event.id}` as any)} /></View>)}</ScrollView>
+    </View>
+  ) : null;
+
+  const renderAnnouncementsShelf = () => orderedAnnouncements.length ? (
+    <View style={[styles.shelf, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+      <View style={styles.shelfHeader}><View style={styles.shelfTitleRow}><View style={[styles.shelfIcon, { backgroundColor: colors.primarySoft }]}><Icon name="megaphone-outline" size={17} color={colors.interactive} /></View><View><Text style={[styles.shelfEyebrow, { color: colors.interactive }]}>IMPORTANT UPDATES</Text><Text style={[styles.shelfTitle, { color: colors.text }]}>Announcements</Text></View></View><Pressable onPress={() => router.push(`/expressions/${expressionId}/announcements` as any)}><Text style={[styles.seeAll, { color: colors.interactive }]}>See all</Text></Pressable></View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalContent}>{orderedAnnouncements.slice(0, 5).map((announcement) => <Pressable key={announcement.id} onPress={() => router.push(`/expressions/${expressionId}/announcements` as any)} style={[styles.announcementCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}><View style={[styles.announcementIcon, { backgroundColor: colors.primarySoft }]}><Icon name="megaphone-outline" size={18} color={colors.interactive} /></View><Text style={[styles.announcementTitle, { color: colors.text }]} numberOfLines={2}>{announcement.title}</Text><Text style={[styles.announcementBody, { color: colors.textSecondary }]} numberOfLines={4}>{announcement.body}</Text></Pressable>)}</ScrollView>
+    </View>
+  ) : null;
   const quickLinks = [
     controls.isEnabled('announcements') ? { key: 'updates', label: 'Updates', hint: 'Important updates', icon: 'megaphone-outline', route: `/expressions/${expressionId}/announcements` } : null,
     controls.isEnabled('prayer_request_ministry') ? { key: 'prayer', label: 'Prayer', hint: 'Pray together', icon: 'heart-outline', route: `/expressions/${expressionId}/prayer` } : null,
@@ -267,25 +243,16 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
 
   const header = (
     <View style={styles.headerWrap}>
-      <TourAnchor targetKey="expression.home.explore" reveal={() => homeListRef.current?.scrollToOffset({ offset: 0, animated: true })}>
-        <View style={styles.quickSection}>
-          <View style={styles.quickHeading}>
-            <Text style={[styles.quickHeadingTitle, { color: colors.text }]}>Explore</Text>
-          </View>
-          <View style={styles.quickGrid}>
-            {quickLinks.map((item) => (
-              <QuickLink key={item.key} label={item.label} hint={item.hint} icon={item.icon} onPress={() => router.push(item.route as any)} />
-            ))}
-          </View>
-        </View>
-      </TourAnchor>
-
-      {payload?.degradedSections?.length ? <Pressable onPress={resource.refresh} style={[styles.notice, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Icon name="alert-circle-outline" size={17} color={colors.textSecondary} /><Text style={[styles.noticeText, { color: colors.textSecondary }]}>Some Expression sections are still loading. Tap to retry.</Text><Icon name="refresh-outline" size={15} color={colors.textMuted} /></Pressable> : null}
+      <TourAnchor targetKey="expression.home.explore" reveal={() => homeListRef.current?.scrollToOffset({ offset: 0, animated: true })}><View style={styles.quickSection}><View style={styles.quickHeading}><Text style={[styles.quickHeadingTitle, { color: colors.text }]}>Explore</Text></View><View style={styles.quickGrid}>{quickLinks.map((item) => <QuickLink key={item.key} label={item.label} hint={item.hint} icon={item.icon} onPress={() => router.push(item.route as any)} />)}</View></View></TourAnchor>
+      {payload?.degradedSections?.length ? <Pressable onPress={resource.refresh} style={[styles.notice, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><Icon name="alert-circle-outline" size={17} color={colors.textSecondary} /><Text style={[styles.noticeText, { color: colors.textSecondary }]}>Some content has not loaded yet. Tap to try again.</Text><Icon name="refresh-outline" size={15} color={colors.textMuted} /></Pressable> : null}
       {activeStream ? <View style={styles.liveWrap}><HeroLiveCard stream={activeStream} onPress={() => router.push(`/expressions/${expressionId}/live/${activeStream.id}` as any)} /></View> : null}
-
-      {feed.length ? <View style={styles.feedHeading}><Text style={[styles.feedTitle, { color: colors.text }]}>Latest</Text><Pressable onPress={() => router.push(`/expressions/${expressionId}/feed` as any)}><Text style={[styles.seeAll, { color: colors.interactive }]}>Full feed</Text></Pressable></View> : null}
+      {renderMessagesShelf()}
+      {renderReelsShelf()}
+      {renderVideosShelf()}
+      <TourAnchor targetKey="expression.feed.header" reveal={() => homeListRef.current?.scrollToOffset({ offset: 0, animated: true })}><View style={styles.feedHeading}><Text style={[styles.feedTitle, { color: colors.text }]}>Community posts</Text><Pressable onPress={() => router.push(`/expressions/${expressionId}/feed` as any)}><Text style={[styles.seeAll, { color: colors.interactive }]}>View all</Text></Pressable></View></TourAnchor>
     </View>
   );
+  const footer = <View style={styles.footerWrap}>{renderEventsShelf()}{renderAnnouncementsShelf()}</View>;
 
   if (resource.loading && !resource.data) return <View style={[styles.stateWrap, { backgroundColor: colors.bg }]}><Skeleton height={180} borderRadius={radius.xl} /><Skeleton height={100} count={4} /></View>;
   if (resource.error && !resource.data) return <View style={[styles.stateWrap, { backgroundColor: colors.bg }]}><ResourceError message={resource.error} retry={resource.refresh} /></View>;
@@ -295,42 +262,30 @@ export function ExpressionLayeredHomeExperience({ expressionId }: { expressionId
       <FlatList
         ref={homeListRef}
         style={{ backgroundColor: colors.bg }}
-        data={feed}
-        keyExtractor={(item) => item.key}
+        data={orderedPosts}
+        keyExtractor={(item) => `post:${item.id}`}
         ListHeaderComponent={header}
-        ListEmptyComponent={<EmptyState title="This Expression Home is ready" message="Posts, Reels, videos, sermons, events, announcements, polls and giveaways will form focused layers as they are published." iconName="home-outline" />}
+        ListEmptyComponent={<View style={styles.emptyPosts}><EmptyState title="No posts yet" message="New posts shared with this Expression will appear here. Reels, longer videos, sermons, events and announcements have their own sections." iconName="chatbubbles-outline" /></View>}
+        ListFooterComponent={footer}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         nestedScrollEnabled
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         refreshControl={<RefreshControl refreshing={resource.refreshing} onRefresh={resource.refresh} tintColor={colors.interactive} />}
-        renderItem={({ item }) => {
-          if (item.kind === 'section') return renderSection(item);
-          if (item.kind === 'post') return <View style={styles.feedCard}><PostCard post={item.post} expressionName={expression?.name} canEngage={mode === 'authenticated'} allowExternalShare={false} onPress={() => router.push({ pathname: `/expressions/${expressionId}/post/[id]`, params: { id: item.post.id } } as any)} onReply={() => router.push({ pathname: `/expressions/${expressionId}/post/[id]`, params: { id: item.post.id, focus: 'comments' } } as any)} variant="feed" showContext={false} style={styles.homePostCard} /></View>;
-          if (item.kind === 'reel') return <View style={styles.feedCard}><ReelCard reel={item.reel} width={reelWidth} variant="feed" commentContext="current" onPressCreator={item.reel.content_items?.author?.username ? () => router.push({ pathname: '/general/member/[username]', params: { username: item.reel.content_items!.author!.username! } } as any) : undefined} onPress={() => router.push({ pathname: `/expressions/${expressionId}/reels`, params: { reelId: item.reel.id } } as any)} onOpenComments={item.reel.content_items?.id ? () => router.push({ pathname: `/expressions/${expressionId}/comments/[contentId]`, params: { contentId: item.reel.content_items!.id } } as any) : undefined} /></View>;
-          return <View style={styles.feedCard}><VideoCard video={item.video} variant="feed" commentContext="current" onPressCreator={item.video.content_items?.author?.username ? () => router.push({ pathname: '/general/member/[username]', params: { username: item.video.content_items!.author!.username! } } as any) : undefined} onPress={() => router.push(`/expressions/${expressionId}/videos/${item.video.id}` as any)} onOpenComments={item.video.content_items?.id ? () => router.push({ pathname: `/expressions/${expressionId}/comments/[contentId]`, params: { contentId: item.video.content_items!.id } } as any) : undefined} /></View>;
-        }}
-        />
-      {mode === 'authenticated' && communityAvailable && controls.isEnabled('expression_posting') ? (
-        <Pressable
-          onPress={() => router.push({ pathname: `/expressions/${expressionId}/feed`, params: { compose: 'post', intentId: String(Date.now()) } } as any)}
-          accessibilityRole="button"
-          accessibilityLabel="Create"
-          style={({ pressed }) => [styles.createFab, { backgroundColor: colors.interactive }, pressed && styles.createFabPressed]}
-        >
-          <Icon name="add" size={28} color="#FFFFFF" />
-        </Pressable>
-      ) : null}
+        renderItem={({ item }) => <View style={styles.feedCard}><PostCard post={item} expressionName={expression?.name} canEngage={mode === 'authenticated'} allowExternalShare={false} onPress={() => router.push({ pathname: `/expressions/${expressionId}/post/[id]`, params: { id: item.id } } as any)} onReply={() => router.push({ pathname: `/expressions/${expressionId}/post/[id]`, params: { id: item.id, focus: 'comments' } } as any)} variant="feed" showContext={false} style={styles.homePostCard} /></View>}
+      />
+      {mode === 'authenticated' && communityAvailable && controls.isEnabled('expression_posting') ? <Pressable onPress={() => router.push({ pathname: `/expressions/${expressionId}/feed`, params: { compose: 'post', intentId: String(Date.now()) } } as any)} accessibilityRole="button" accessibilityLabel="Create" style={({ pressed }) => [styles.createFab, { backgroundColor: colors.interactive }, pressed && styles.createFabPressed]}><Icon name="add" size={28} color="#FFFFFF" /></Pressable> : null}
     </View>
   );
 }
-
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: { width: '100%', maxWidth: 1060, alignSelf: 'center', paddingHorizontal: spacing.sm, paddingTop: spacing.sm, paddingBottom: 120, gap: spacing.sm },
   stateWrap: { flex: 1, padding: spacing.lg, gap: spacing.md },
   headerWrap: { gap: spacing.sm },
+  footerWrap: { gap: spacing.md, paddingTop: spacing.lg },
+  emptyPosts: { paddingTop: spacing.lg },
   flex: { flex: 1, minWidth: 0 },
   quickSection: { gap: 6 },
   quickHeading: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingHorizontal: 2 },

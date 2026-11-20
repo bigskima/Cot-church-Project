@@ -181,7 +181,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId, sco
       <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top + spacing.sm }]}>
         <ScreenHeader title="Groups" subtitle={churchWide ? 'Church-wide communities in General COT.' : 'Expression community groups.'} showBack />
         <View style={styles.body}>
-          <EmptyState title={churchWide ? 'Sign in with your church membership' : 'Join an Expression first'} message={churchWide ? 'General COT Groups are available to active church members.' : 'Expression groups are available only to members of that specific Expression.'} iconName="people-outline" />
+          <EmptyState title={churchWide ? 'Sign in with your church membership' : 'Join an Expression first'} message={churchWide ? 'General COT Groups are available to active church members.' : 'Join this Expression to see and take part in its groups.'} iconName="people-outline" />
         </View>
       </View>
     );
@@ -337,7 +337,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId, sco
           }) : (
             <EmptyState
               title={focusGroupId ? 'Group unavailable' : 'No groups yet'}
-              message={focusGroupId ? (churchWide ? 'This Group is unavailable or is not church-wide.' : 'This group does not belong to the active Expression or is no longer available.') : churchWide ? 'Create or join a General COT Group for prayer, fellowship, service or discussion.' : canManageGroups ? 'Create the first group for this Expression.' : 'Expression leaders have not published any member groups yet.'}
+              message={focusGroupId ? (churchWide ? 'This Group is unavailable or is not church-wide.' : 'This group is not part of the Expression you opened or is no longer available.') : churchWide ? 'Create or join a General COT Group for prayer, fellowship, service or discussion.' : canManageGroups ? 'Create the first group for this Expression.' : 'Expression leaders have not published any member groups yet.'}
               iconName="people-outline"
             />
           )}
@@ -348,7 +348,7 @@ export function ExpressionGroupsExperience({ embedded = false, focusGroupId, sco
         <View style={styles.form}>
           <View style={[styles.formIntro, { backgroundColor: colors.primarySoft }]}>
             <Icon name="lock-closed-outline" size={17} color={colors.interactive} />
-            <Text style={[styles.helper, { color: colors.textSecondary }]}>{churchWide ? 'This Group belongs to the church-wide General COT space and is separate from Expression Groups.' : 'This group will be permanently scoped to the currently selected Expression.'}</Text>
+            <Text style={[styles.helper, { color: colors.textSecondary }]}>{churchWide ? 'This Group belongs to the church-wide General COT space and is separate from Expression Groups.' : 'This group will always belong to this Expression. Choose whether all Expression members or invited members can join.'}</Text>
           </View>
           <InputField label="Group Name" value={name} onChangeText={setName} placeholder="e.g. Young Adults Fellowship" />
           <InputField label="Description" value={description} onChangeText={setDescription} placeholder="What is this group for?" multiline numberOfLines={3} />

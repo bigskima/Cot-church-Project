@@ -81,8 +81,8 @@ export function PollComposerExperience({ scope, expressionId }: { scope: Scope; 
       <View style={[styles.screen, { backgroundColor: colors.bg }]}>
         <View style={styles.pad}>
           <EmptyState
-            title="Poll publishing is restricted"
-            message="Official polls can be created only by an authorized ministry role in this space."
+            title="Only approved leaders can publish polls"
+            message="Only leaders approved to publish polls can create an official poll here."
             iconName="lock-closed-outline"
             actionLabel="Back to participation"
             onAction={() => router.replace(backDestination as any)}
@@ -129,7 +129,7 @@ export function PollComposerExperience({ scope, expressionId }: { scope: Scope; 
         {step === 1 ? (
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
             <InputField label="Question" value={question} onChangeText={setQuestion} placeholder="What should the community decide or respond to?" />
-            <InputField label="Context (optional)" value={description} onChangeText={setDescription} multiline numberOfLines={3} placeholder="Add helpful context…" />
+            <InputField label="Details (optional)" value={description} onChangeText={setDescription} multiline numberOfLines={3} placeholder="Add helpful context…" />
             <View style={styles.sectionLabelRow}><Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>OPTIONS</Text><Text style={[styles.sectionMeta, { color: colors.textMuted }]}>{readyOptions.length} ready</Text></View>
             {options.map((option, index) => <InputField key={index} label={`Option ${index + 1}`} value={option} onChangeText={(value) => setOptions((current) => current.map((item, itemIndex) => itemIndex === index ? value : item))} placeholder={`Choice ${index + 1}`} />)}
             <View style={styles.inlineActions}>

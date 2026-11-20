@@ -40,7 +40,7 @@ export default function GeneralMinistryWorkspace() {
     { key: 'library', title: 'Library', description: 'Upload EPUB/PDF books, covers, rights details and publish the COT Library.', icon: 'library-outline', route: '/general/leadership/library-manage', area: 'Content', badge: 'BOOKS', enabled: access.canManageSermons, priority: true },
     { key: 'devotionals', title: 'Devotionals', description: 'Create yearly devotionals, map dated book chapters and manage daily readings.', icon: 'sunny-outline', route: '/general/leadership/devotionals-manage', area: 'Content', badge: 'DAILY', enabled: access.canManageSermons, priority: true },
     { key: 'bible', title: 'Bible & Daily Scripture', description: 'Schedule Daily Scripture, curate verse themes, connect Bible providers and create reading plans.', icon: 'book-outline', route: '/general/leadership/bible-manage', area: 'Content', badge: 'SCRIPTURE', enabled: access.canManageBible, priority: true },
-    { key: 'daily-highlights', title: 'Daily Quote & Bible', description: 'Prepare Bible-inspired COT quotes, schedule up to 30 days and override Daily Bible when needed.', icon: 'sparkles-outline', route: '/general/leadership/daily-highlights', area: 'Content', badge: 'DAILY HOME', enabled: access.canManageBible, priority: true },
+    { key: 'daily-highlights', title: 'Daily Quote & Bible', description: 'Prepare Bible-inspired COT quotes and schedule up to 30 days of daily content.', icon: 'sparkles-outline', route: '/general/leadership/daily-highlights', area: 'Content', badge: 'DAILY HOME', enabled: access.canManageBible, priority: true },
     { key: 'important-updates', title: 'Important updates', description: 'Edit the published updates that power the Important Updates strip on General COT Home.', icon: 'flash-outline', route: '/general/leadership/urgent-updates', area: 'Content', badge: 'HOME STRIP', enabled: access.canManageAnnouncements, priority: true },
     { key: 'announcements', title: 'Announcements', description: 'Draft, schedule and publish official General COT announcements.', icon: 'megaphone-outline', route: '/general/leadership/announcements-manage', area: 'Content', badge: 'UPDATES', enabled: access.canManageAnnouncements },
     { key: 'home-banners', title: 'Home banners', description: 'Publish official rotating banners for events, registrations, forms and updates.', icon: 'images-outline', route: '/general/leadership/home-banners', area: 'Content', badge: 'SPOTLIGHT', enabled: access.canManageAnnouncements || access.canManageEvents },
@@ -49,13 +49,13 @@ export default function GeneralMinistryWorkspace() {
     { key: 'care', title: 'Pastoral care', description: 'Review prayer, testimony follow-ups and pastoral care actions.', icon: 'heart-circle-outline', route: '/general/leadership/pastoral-triage', area: 'Care', badge: 'CARE', enabled: access.canManageCare, priority: true },
     { key: 'roles', title: 'Roles & access', description: 'Assign church-wide ministry roles without granting platform administration access.', icon: 'shield-checkmark-outline', route: '/general/leadership/roles-access', area: 'People', badge: 'ACCESS', enabled: access.canManageRoles, priority: true },
     { key: 'leaders', title: 'Church profile', description: 'Manage Our Story, Quick Facts, church location and Our Leaders.', icon: 'people-outline', route: '/general/church-story?manage=1', area: 'People', badge: 'PROFILE', enabled: access.canManageLeadership },
-    { key: 'titles', title: 'Titles & badges', description: 'Create and assign church-wide presentation titles. Titles never grant permissions.', icon: 'ribbon-outline', route: '/general/leadership/titles-badges', area: 'People', badge: 'IDENTITY', enabled: access.canManageLeadership },
+    { key: 'titles', title: 'Titles & badges', description: 'Create and assign church-wide presentation titles. Titles recognise ministry service but do not give extra access.', icon: 'ribbon-outline', route: '/general/leadership/titles-badges', area: 'People', badge: 'IDENTITY', enabled: access.canManageLeadership },
     { key: 'expressions', title: 'Expressions', description: 'Manage Expressions available to your creator authority.', icon: 'business-outline', route: '/general/leadership/expressions-manage', area: 'People', badge: 'EXPRESSIONS', enabled: access.canManageExpressions },
     { key: 'giving', title: 'Giving setup', description: 'Manage giving purposes and church-wide giving options.', icon: 'gift-outline', route: '/general/leadership/giving-manage', area: 'Finance', badge: 'GIVING', enabled: access.canManageGiving },
     { key: 'finance', title: 'Giving reports', description: 'Review giving totals, refunds and finance reports.', icon: 'analytics-outline', route: '/general/leadership/giving-finance', area: 'Finance', badge: 'REPORTS', enabled: access.canReadGivingFinance },
     { key: 'live', title: 'Live Studio', description: 'Prepare broadcasts, go live and monitor stream operations.', icon: 'radio-outline', route: '/general/leadership/media-studio', area: 'Media', badge: 'LIVE', enabled: access.canBroadcastLive, priority: true },
     { key: 'watch', title: 'Watch categories', description: 'Organize the video categories people see in Watch.', icon: 'pricetags-outline', route: '/general/leadership/watch-categories', area: 'Media', badge: 'DISCOVERY', enabled: access.canManageLeadership },
-    { key: 'ranking', title: 'Home content', description: 'Choose how church-wide Home content is prioritized.', icon: 'options-outline', route: '/general/leadership/feed-ranking', area: 'Settings', badge: 'HOME', enabled: access.canManageSettings },
+    { key: 'ranking', title: 'Home content order', description: 'Choose what appears first on General COT Home.', icon: 'options-outline', route: '/general/leadership/feed-ranking', area: 'Settings', badge: 'HOME', enabled: access.canManageSettings },
   ], [access]);
 
   const available = tools.filter((tool) => tool.enabled);
@@ -67,7 +67,7 @@ export default function GeneralMinistryWorkspace() {
   if (mode !== 'authenticated') {
     return (
       <View style={[styles.screen, styles.centered, { backgroundColor: colors.bg }]}>
-        <EmptyState title="Sign in for ministry tools" message="Ministry access is tied to your COT roles." iconName="shield-checkmark-outline" />
+        <EmptyState title="Sign in for ministry tools" message="Sign in with the account that has your COT ministry access." iconName="shield-checkmark-outline" />
         <Button label="Sign in" onPress={() => router.push({ pathname: '/(auth)/login', params: { returnTo: '/general/leadership' } } as any)} />
       </View>
     );
@@ -114,7 +114,7 @@ export default function GeneralMinistryWorkspace() {
           </View>
         ) : !hasWorkspaceAccess ? (
           <View style={styles.noAccess}>
-            <EmptyState title="No ministry tools assigned" message="Tools appear when your ministry role grants access." iconName="shield-outline" />
+            <EmptyState title="No ministry tools available" message="Your COT responsibilities determine which tools you can use." iconName="shield-outline" />
             <Button label="Back to You" variant="outline" onPress={() => router.replace('/general/profile')} />
           </View>
         ) : (

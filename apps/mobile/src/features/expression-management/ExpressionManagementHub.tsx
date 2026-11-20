@@ -77,8 +77,8 @@ export function ExpressionManagementHub() {
       },
       {
         key: 'ranking',
-        title: 'Feed Ranking',
-        description: 'Tune freshness, engagement and diversity weights for Home.',
+        title: 'Content order',
+        description: 'Choose what appears first in this Expression’s Home.',
         iconName: 'analytics-outline',
         route: `${base}/feed-ranking`,
         enabled: access.canManageFeedRanking,

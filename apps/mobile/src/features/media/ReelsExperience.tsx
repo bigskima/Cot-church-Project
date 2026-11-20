@@ -6,7 +6,7 @@ import { useSession } from '@/state/session';
 import { useTheme } from '@/state/theme';
 import { useResource } from '@/hooks/use-resource';
 import { shareContent } from '@/services/share';
-import { BottomSheet, Button, ContentReportSheet, Icon, ReelPlayer, ResourceError, Skeleton } from '@/components';
+import { BottomSheet, Button, ContentReportSheet, EmptyState, Icon, ReelPlayer, ResourceError, Skeleton } from '@/components';
 import type { Reel } from '@/types/content';
 import { TourAnchor } from '@/features/tour/AppTourProvider';
 
@@ -202,8 +202,8 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
           <View style={styles.scopePill}>
             <Icon name={expressionId ? 'lock-closed-outline' : 'globe-outline'} size={14} color="#FFFFFF" />
             <View style={styles.scopeCopy}>
-              <Text style={styles.scopeLabel}>{expressionId ? 'EXPRESSION REELS' : 'GENERAL REELS'}</Text>
-              <Text style={styles.scopeName} numberOfLines={1}>{expressionId ? expressionName ?? 'Members only' : 'Public COT discovery'}</Text>
+              <Text style={styles.scopeLabel}>{expressionId ? 'EXPRESSION REELS' : 'GENERAL COT REELS'}</Text>
+              <Text style={styles.scopeName} numberOfLines={1}>{expressionId ? expressionName ?? 'Members only' : 'Public short videos from COT'}</Text>
             </View>
           </View>
         </TourAnchor>
@@ -223,7 +223,7 @@ export function ReelsExperience({ scope = 'general', reelId: forcedReelId }: { s
 
       {actionError ? <Pressable onPress={() => setActionError('')} style={[styles.errorToast, { top: insets.top + 64 }]} accessibilityRole="button" accessibilityLabel="Dismiss Reel error"><Icon name="alert-circle-outline" size={15} color="#FFFFFF" /><Text style={styles.errorToastText} numberOfLines={2}>{actionError}</Text><Icon name="close" size={14} color="rgba(255,255,255,0.86)" /></Pressable> : null}
 
-      {reelsResource.error && !reels.length ? <View style={styles.centerWrapper}><ResourceError message={reelsResource.error} retry={reelsResource.refresh} /></View> : reels.length === 0 ? <View style={styles.centerWrapper}><ResourceError message="No Reels Yet" retry={reelsResource.refresh} /></View> : (
+      {reelsResource.error && !reels.length ? <View style={styles.centerWrapper}><ResourceError message={reelsResource.error} retry={reelsResource.refresh} /></View> : reels.length === 0 ? <View style={styles.centerWrapper}><EmptyState title="No Reels yet" message={expressionId ? 'Short videos shared with this Expression will appear here.' : 'Public short videos shared with General COT will appear here.'} iconName="play-circle-outline" /></View> : (
         <FlatList
           ref={listRef}
           data={reels}

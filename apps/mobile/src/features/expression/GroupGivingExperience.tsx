@@ -102,7 +102,7 @@ export function GroupGivingExperience({ groupId, scope = 'expression' }: { group
   const expressionGiving = useResource<PublicGivingDetails>(
     `group-giving:scope:${organizationId || 'none'}:${expressionId ?? 'general'}`,
     (signal) => {
-      if (!organizationId) return Promise.reject(new Error('Church giving scope is unavailable.'));
+      if (!organizationId) return Promise.reject(new Error('Church giving is not available right now.'));
       const params = new URLSearchParams({ organizationId });
       if (expressionId) params.set('expressionId', expressionId);
       return api.request<PublicGivingDetails>(`public-giving?${params.toString()}`, { signal });
@@ -213,14 +213,14 @@ export function GroupGivingExperience({ groupId, scope = 'expression' }: { group
               {expressionGiving.data.methods.manualBankTransfer && accounts.length ? (
                 accounts.map((account) => <AccountCard key={account.id} account={account} reference={referenceLabel} />)
               ) : (
-                <EmptyState title='No active transfer destination' message={generalGroup ? 'General COT has not published an active bank-transfer destination for Group Giving.' : 'This Expression has not published an active bank-transfer destination for Group Giving.'} iconName='business-outline' />
+                <EmptyState title='Bank details are not available yet' message={generalGroup ? 'General COT has not added bank details for Group Giving yet.' : 'This Expression has not added bank details for Group Giving yet.'} iconName='business-outline' />
               )}
             </>
           ) : null}
 
           {group.data.permissions.manageGiving ? (
             <View style={[styles.manager, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
-              <SectionHeader title='Manage Group Giving' subtitle='This is a Group-scoped destination. Changes here affect only this Group and never redirect you into General or Expression-wide Giving Setup.' />
+              <SectionHeader title='Manage Group Giving' subtitle='This destination is only for this Group. Changes here will not affect General COT or Expression-wide giving settings.' />
               {options.map((item) => (
                 <View key={item.id} style={styles.manageRow}>
                   <View style={styles.flex}><Text style={[styles.cardTitle, { color: colors.text }]}>{item.label}</Text><Text style={[styles.meta, { color: colors.textMuted }]}>Enabled in this Group</Text></View>
@@ -230,15 +230,15 @@ export function GroupGivingExperience({ groupId, scope = 'expression' }: { group
               {!group.data.availableGivingPurposes.length ? (
                 <View style={[styles.setupCard, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}>
                   <View style={styles.flex}>
-                    <Text style={[styles.cardTitle, { color: colors.text }]}>No approved giving purpose exists in this scope yet</Text>
+                    <Text style={[styles.cardTitle, { color: colors.text }]}>No approved giving purpose is available for this Group yet</Text>
                     <Text style={[styles.meta, { color: colors.textSecondary }]}>
-                      Your Group Giving role is active. A purpose must first be published in {generalGroup ? 'General COT' : 'this Expression'} before it can be linked here.
+                      You can manage giving for this Group. A purpose must first be published in {generalGroup ? 'General COT' : 'this Expression'} before it can be linked here.
                     </Text>
                   </View>
                   <View style={styles.scopeLock}>
                     <Icon name='lock-closed-outline' size={15} color={colors.interactive} />
                     <Text style={[styles.scopeLockText, { color: colors.textSecondary }]}>
-                      Stay in this Group. A church or Expression finance manager can publish an approved destination separately; once available, it will appear here for you to enable for this Group.
+                      Stay in this Group. A COT or Expression finance leader can publish an approved destination. Once it is available, it will appear here for you to enable for this Group.
                     </Text>
                   </View>
                 </View>
