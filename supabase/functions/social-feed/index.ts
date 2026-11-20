@@ -1,0 +1,354 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { ApiError } from "../_shared/errors.ts";
+import { createHandler } from "../_shared/handler.ts";
+import { jsonBody } from "../_shared/request.ts";
+import { enrichContentEngagement, enrichSocialPosts } from "../_shared/public-identity.ts";
+import { resolveActiveOrganizationId } from "../_shared/public-organization.ts";
+import { adminClient } from "../_shared/supabase.ts";
+import { filterByAuthor, loadSafetyProfileSets } from "../_shared/safety.ts";
+import { assertFeatureEnabled } from "../_shared/feature-controls.ts";
+import { assertNoUnknownFields, assertObject, requiredString, uuid } from "../_shared/validation.ts";
+
+const visibilities = new Set(["public", "organization", "branch", "group", "private"]);
+const scopes = new Set(["all", "church", "expression"]);
+
+function mediaUploadIds(body: Record<string, unknown>) {
+  const source = body.mediaUploadIds ?? body.media ?? [];
+  if (!Array.isArray(source)) throw new ApiError("VALIDATION_FAILED", "media must be an array", 422);
+  if (source.length > 10) throw new ApiError("VALIDATION_FAILED", "A feed post can contain at most 10 media items", 422);
+  return source.map((item, index) => {
+    const value = typeof item === "string"
+      ? item
+      : item && typeof item === "object" && !Array.isArray(item)
+        ? (item as Record<string, unknown>).uploadId
+        : null;
+    if (typeof value !== "string") throw new ApiError("VALIDATION_FAILED", `Media item ${index + 1} is missing its upload id`, 422);
+    return uuid(value, `mediaUploadIds[${index}]`, true)!;
+  });
+}
+
+function postBody(value: unknown, hasMedia: boolean) {
+  if (value === undefined || value === null) {
+    if (hasMedia) return "";
+    throw new ApiError("VALIDATION_FAILED", "Write something or attach media before publishing", 422);
+  }
+  if (typeof value !== "string") throw new ApiError("VALIDATION_FAILED", "Post text must be text", 422);
+  const normalized = value.trim();
+  if (!normalized && !hasMedia) throw new ApiError("VALIDATION_FAILED", "Write something or attach media before publishing", 422);
+  if (normalized.length > 10000) throw new ApiError("VALIDATION_FAILED", "Post text must be 10,000 characters or fewer", 422);
+  return normalized;
+}
+
+Deno.serve(createHandler(
+  { methods: ["GET", "POST"], authentication: "required", organization: "optional" },
+  async ({ request, auth }) => {
+    if (!auth) throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication required", 401);
+
+    if (request.method === "GET") {
+      if (!auth.organizationId) throw new ApiError("ORGANIZATION_REQUIRED", "Choose a church community first", 400);
+      const url = new URL(request.url);
+      const postId = uuid(url.searchParams.get("postId"), "postId");
+      const view = url.searchParams.get("view");
+      if (view === "post") {
+        if (!postId) throw new ApiError("VALIDATION_FAILED", "postId is required", 422);
+        const scope = url.searchParams.get("scope") ?? "all";
+        if (!scopes.has(scope)) throw new ApiError("VALIDATION_FAILED", "Invalid community feed scope", 422);
+        let postQuery = auth.client.from("social_posts")
+          .select("id,organization_id,author_membership_id,branch_id,group_id,visibility,status,body,media,published_at,edited_at,created_at")
+          .eq("organization_id", auth.organizationId)
+          .eq("id", postId)
+          .eq("status", "published");
+        if (scope === "church") postQuery = postQuery.is("branch_id", null).eq("visibility", "public");
+        if (scope === "expression") {
+          if (!auth.branchId) throw new ApiError("EXPRESSION_REQUIRED", "Enter an Expression to view this post", 403);
+          postQuery = postQuery.eq("branch_id", auth.branchId);
+        }
+        const { data: rows, error: postError } = await postQuery.limit(1);
+        if (postError) throw new ApiError("POST_READ_FAILED", "Unable to retrieve this post", 500, undefined, false);
+        if (!(rows ?? []).length) throw new ApiError("POST_NOT_FOUND", "This post is no longer available", 404);
+        const identified = await enrichSocialPosts(rows ?? []);
+        const safety = await loadSafetyProfileSets(adminClient(), auth.user.id);
+        const visible = filterByAuthor(identified, safety.blockedProfiles, (post: any) => post.author?.id);
+        if (!visible.length) throw new ApiError("POST_NOT_FOUND", "This post is no longer available", 404);
+        const engaged = await enrichContentEngagement(visible, auth.client, auth.user.id);
+        return { data: engaged[0] };
+      }
+      if (postId) {
+        const { data, error } = await auth.client
+          .from("content_comments")
+          .select("id,content_item_id,author_profile_id,parent_comment_id,body,created_at,profiles(id,display_name,avatar_url)")
+          .eq("content_item_id", postId)
+          .eq("is_hidden", false)
+          .order("created_at")
+          .limit(200);
+        if (error) throw new ApiError("COMMENT_LIST_FAILED", "Unable to retrieve comments", 500, undefined, false);
+        const safety = await loadSafetyProfileSets(adminClient(), auth.user.id);
+        return {
+          data: filterByAuthor(data ?? [], safety.hiddenFromFeed, (comment: any) => comment.author_profile_id),
+        };
+      }
+
+      const scope = url.searchParams.get("scope") ?? "all";
+      if (!scopes.has(scope)) throw new ApiError("VALIDATION_FAILED", "Invalid community feed scope", 422);
+      let query = auth.client.from("social_posts")
+        .select("id,organization_id,author_membership_id,branch_id,group_id,visibility,status,body,media,published_at,edited_at,created_at")
+        .eq("organization_id", auth.organizationId)
+        .eq("status", "published")
+        .order("published_at", { ascending: false })
+        .limit(100);
+      if (scope === "church") query = query.is("branch_id", null).eq("visibility", "public");
+      if (scope === "expression") {
+        if (!auth.branchId) throw new ApiError("EXPRESSION_REQUIRED", "Join or select an Expression to view its feed", 403);
+        query = query.eq("branch_id", auth.branchId);
+      }
+      const { data, error } = await query;
+      if (error) throw new ApiError("FEED_READ_FAILED", "Unable to retrieve community feed", 500, undefined, false);
+      const identified = await enrichSocialPosts(data ?? []);
+      const safety = await loadSafetyProfileSets(adminClient(), auth.user.id);
+      const visible = filterByAuthor(identified, safety.hiddenFromFeed, (post: any) => post.author?.id);
+      return {
+        data: await enrichContentEngagement(visible, auth.client, auth.user.id),
+      };
+    }
+
+    const body = assertObject(await jsonBody(request));
+    if (body.action === "delete_post") {
+      assertNoUnknownFields(body, ["action", "postId"]);
+      const postId = uuid(requiredString(body.postId, "postId", 36), "postId", true)!;
+      const admin = adminClient();
+      const { data: content, error: contentError } = await admin
+        .from("content_items")
+        .select("id,author_profile_id,content_type")
+        .eq("id", postId)
+        .maybeSingle();
+      if (contentError || !content || content.content_type !== "post") {
+        throw new ApiError("POST_NOT_FOUND", "This post is no longer available", 404);
+      }
+      if (content.author_profile_id !== auth.user.id) {
+        throw new ApiError("POST_DELETE_DENIED", "You can delete only posts you created.", 403);
+      }
+
+      const { data: uploads } = await admin
+        .from("social_media_uploads")
+        .select("id,storage_path,status")
+        .eq("post_id", postId)
+        .eq("uploader_profile_id", auth.user.id);
+
+      const { error: deleteError } = await admin
+        .from("content_items")
+        .delete()
+        .eq("id", postId)
+        .eq("author_profile_id", auth.user.id);
+      if (deleteError) throw new ApiError("POST_DELETE_FAILED", "Unable to delete this post.", 500, undefined, false);
+
+      const storagePaths = (uploads ?? [])
+        .filter((item: any) => item.status !== "deleted" && item.storage_path)
+        .map((item: any) => item.storage_path);
+      if (storagePaths.length) await admin.storage.from("community-public-media").remove(storagePaths);
+      if ((uploads ?? []).length) {
+        await admin.from("social_media_uploads")
+          .update({ status: "deleted", deleted_at: new Date().toISOString(), post_id: null })
+          .in("id", (uploads ?? []).map((item: any) => item.id))
+          .eq("uploader_profile_id", auth.user.id);
+      }
+      return { data: { postId, deleted: true } };
+    }
+
+    const requestedOrganizationId = body.organizationId
+      ? uuid(String(body.organizationId), "organizationId", true)!
+      : auth.organizationId;
+    const targetOrganizationId = await resolveActiveOrganizationId(adminClient(), requestedOrganizationId);
+    if (auth.organizationId && body.organizationId && targetOrganizationId !== auth.organizationId) {
+      throw new ApiError("ORGANIZATION_ACCESS_DENIED", "The selected church does not match this request", 403);
+    }
+
+    if (body.action === "comment") {
+      assertNoUnknownFields(body, ["action", "organizationId", "postId", "body", "parentCommentId"]);
+      const contentId = uuid(requiredString(body.postId, "postId", 36), "postId", true)!;
+      const { data: targetContent } = await adminClient()
+        .from("content_items")
+        .select("id,organization_id,expression_id,group_id")
+        .eq("id", contentId)
+        .maybeSingle();
+      if (!targetContent) throw new ApiError("POST_NOT_FOUND", "This post is no longer available", 404);
+      await assertFeatureEnabled(
+        adminClient(),
+        "comments",
+        { organizationId: targetContent.organization_id, expressionId: targetContent.expression_id, groupId: targetContent.group_id },
+        "Comments are currently unavailable for this post.",
+      );
+      const parentCommentId = body.parentCommentId
+        ? uuid(String(body.parentCommentId), "parentCommentId", true)
+        : null;
+      if (parentCommentId) {
+        const { data: parentComment, error: parentError } = await auth.client
+          .from("content_comments")
+          .select("id")
+          .eq("id", parentCommentId)
+          .eq("content_item_id", contentId)
+          .maybeSingle();
+        if (parentError) throw new ApiError("COMMENT_PARENT_CHECK_FAILED", "Unable to validate the reply target", 500, undefined, false);
+        if (!parentComment) throw new ApiError("INVALID_PARENT_COMMENT", "Reply target does not belong to this post", 422);
+      }
+      const { data, error } = await auth.client
+        .from("content_comments")
+        .insert({
+          content_item_id: contentId,
+          author_profile_id: auth.user.id,
+          parent_comment_id: parentCommentId,
+          body: requiredString(body.body, "body", 3000).trim(),
+        })
+        .select("id,content_item_id,author_profile_id,parent_comment_id,body,created_at,profiles(id,display_name,avatar_url)")
+        .single();
+      if (error?.code === "42501") throw new ApiError("PERMISSION_DENIED", "You do not have access to comment on this post", 403);
+      if (error) throw new ApiError("COMMENT_CREATE_FAILED", "Unable to comment", 500, undefined, false);
+      return { data, status: 201 };
+    }
+    if (body.action === "share_reel") {
+      assertNoUnknownFields(body, ["action", "organizationId", "reelId", "body"]);
+      const reelId = uuid(requiredString(body.reelId, "reelId", 36), "reelId", true)!;
+      await assertFeatureEnabled(adminClient(), "social_community_feed", { organizationId: targetOrganizationId }, "Community posting is currently unavailable.");
+      await assertFeatureEnabled(adminClient(), "general_posting", { organizationId: targetOrganizationId }, "General COT posting is currently unavailable.");
+      await assertFeatureEnabled(adminClient(), "content_sharing", { organizationId: targetOrganizationId }, "Sharing content is currently unavailable.");
+      await assertFeatureEnabled(adminClient(), "reels", { organizationId: targetOrganizationId }, "Reels are currently unavailable.");
+      const shareBody = body.body === undefined || body.body === null ? "" : requiredString(body.body, "body", 10000).trim();
+      const { data, error } = await auth.client.rpc("publish_social_reel_share", {
+        target_organization_id: targetOrganizationId,
+        target_reel_id: reelId,
+        post_body: shareBody,
+      }).single();
+      if (error?.code === "P0002") throw new ApiError("REEL_NOT_FOUND", "This Reel is no longer available", 404);
+      if (error?.code === "42501") {
+        const message = String(error.message ?? "");
+        if (message.includes("Posting is currently restricted")) throw new ApiError("POSTING_RESTRICTED", "Your posting access is currently restricted", 403);
+
+        if (message.includes("Only published public Reels")) throw new ApiError("REEL_SHARE_UNAVAILABLE", "Only public Reels can be shared to General Community", 403);
+        throw new ApiError("PERMISSION_DENIED", "You do not have permission to share this Reel to General Community", 403);
+      }
+      if (error) throw new ApiError("REEL_SHARE_FAILED", "Unable to share this Reel to General Community", 500, undefined, false);
+      return { data, status: 201 };
+    }
+
+    if (body.action === "share_post") {
+      assertNoUnknownFields(body, ["action", "organizationId", "postId", "body", "branchId"]);
+      const postId = uuid(requiredString(body.postId, "postId", 36), "postId", true)!;
+      const targetBranchId = body.branchId ? uuid(String(body.branchId), "branchId", true) : null;
+      const featureScope = { organizationId: targetOrganizationId, expressionId: targetBranchId };
+      await assertFeatureEnabled(adminClient(), "social_community_feed", featureScope, "Community posting is currently unavailable.");
+      await assertFeatureEnabled(
+        adminClient(),
+        targetBranchId ? "expression_posting" : "general_posting",
+        featureScope,
+        targetBranchId ? "Expression posting is currently unavailable." : "General COT posting is currently unavailable.",
+      );
+      await assertFeatureEnabled(adminClient(), "content_sharing", featureScope, "Sharing content is currently unavailable.");
+      const shareBody = body.body === undefined || body.body === null ? "" : requiredString(body.body, "body", 10000).trim();
+
+      const { data, error } = await auth.client.rpc("publish_social_post_share", {
+        target_organization_id: targetOrganizationId,
+        target_post_id: postId,
+        post_body: shareBody,
+        target_branch_id: targetBranchId,
+      }).single();
+
+      if (error?.code === "P0002") throw new ApiError("POST_NOT_FOUND", "The original post is no longer available", 404);
+      if (error?.code === "42501") {
+        const message = String(error.message ?? "");
+        if (message.includes("Posting is currently restricted")) throw new ApiError("POSTING_RESTRICTED", "Your posting access is currently restricted", 403);
+        if (message.includes("Public posting is currently unavailable")) throw new ApiError("PUBLIC_POSTING_UNAVAILABLE", "Public posting is currently unavailable for this account", 403);
+        if (message.includes("Expression membership required")) throw new ApiError("EXPRESSION_MEMBERSHIP_REQUIRED", "Join this Expression before sharing inside it", 403);
+        if (message.includes("same Expression")) throw new ApiError("POST_SHARE_SCOPE_DENIED", "Expression posts can only be shared inside the same Expression", 403);
+        if (message.includes("Only public posts")) throw new ApiError("POST_SHARE_SCOPE_DENIED", "Only public posts can be shared into General COT", 403);
+        if (message.includes("cannot be shared")) throw new ApiError("POST_SHARE_UNAVAILABLE", "This post cannot be shared inside COT", 403);
+        throw new ApiError("PERMISSION_DENIED", "You do not have permission to share this post here", 403);
+      }
+      if (error?.code === "22023" || error?.code === "23514") throw new ApiError("VALIDATION_FAILED", error.message, 422);
+      if (error) throw new ApiError("POST_SHARE_FAILED", "Unable to share this post inside COT", 500, undefined, false);
+      return { data, status: 201 };
+    }
+
+    if (body.action === "react") {
+      assertNoUnknownFields(body, ["action", "postId", "reaction"]);
+      const contentId = uuid(requiredString(body.postId, "postId", 36), "postId", true)!;
+      const reaction = requiredString(body.reaction, "reaction", 20);
+      const { data: targetContent } = await adminClient()
+        .from("content_items")
+        .select("id,organization_id,expression_id,group_id")
+        .eq("id", contentId)
+        .maybeSingle();
+      if (!targetContent) throw new ApiError("POST_NOT_FOUND", "This post is no longer available", 404);
+      await assertFeatureEnabled(
+        adminClient(),
+        "reactions",
+        { organizationId: targetContent.organization_id, expressionId: targetContent.expression_id, groupId: targetContent.group_id },
+        "Reactions are currently unavailable for this post.",
+      );
+      if (!new Set(["like", "love", "pray", "celebrate", "amen", "support"]).has(reaction)) {
+        throw new ApiError("VALIDATION_FAILED", "Invalid reaction type", 422);
+      }
+      const { data, error } = await auth.client
+        .from("content_reactions")
+        .upsert({
+          content_item_id: contentId,
+          profile_id: auth.user.id,
+          reaction,
+          created_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+      if (error?.code === "42501") throw new ApiError("PERMISSION_DENIED", "You do not have access to react to this post", 403);
+      if (error) throw new ApiError("REACTION_FAILED", "Unable to react", 500, undefined, false);
+      return { data };
+    }
+
+    assertNoUnknownFields(body, ["organizationId", "body", "visibility", "branchId", "groupId", "media", "mediaUploadIds"]);
+    const visibility = requiredString(body.visibility, "visibility", 20);
+    if (!visibilities.has(visibility)) throw new ApiError("VALIDATION_FAILED", "Invalid visibility", 422);
+    const uploadIds = mediaUploadIds(body);
+    const normalizedBody = postBody(body.body, uploadIds.length > 0);
+    const targetBranchId = body.branchId ? uuid(String(body.branchId), "branchId", true) : null;
+    const targetGroupId = body.groupId ? uuid(String(body.groupId), "groupId", true) : null;
+    const featureScope = {
+      organizationId: targetOrganizationId,
+      expressionId: targetBranchId,
+      groupId: targetGroupId,
+    };
+    await assertFeatureEnabled(adminClient(), "social_community_feed", featureScope, "Community posting is currently unavailable.");
+    await assertFeatureEnabled(
+      adminClient(),
+      targetBranchId ? "expression_posting" : "general_posting",
+      featureScope,
+      targetBranchId ? "Expression posting is currently unavailable." : "General COT posting is currently unavailable.",
+    );
+    if (uploadIds.length) {
+      await assertFeatureEnabled(adminClient(), "photo_posts", featureScope, "Media posts are currently unavailable in this area.");
+    }
+
+    const { data, error } = await auth.client.rpc("publish_social_post_with_uploads", {
+      target_organization_id: targetOrganizationId,
+      target_visibility: visibility,
+      post_body: normalizedBody,
+      target_branch_id: targetBranchId,
+      target_group_id: targetGroupId,
+      target_upload_ids: uploadIds,
+    }).single();
+
+    if (error?.code === "42501") {
+      const message = String(error.message ?? "");
+      if (message.includes("Posting is restricted")) throw new ApiError("POSTING_RESTRICTED", "Your posting access is currently restricted", 403);
+      if (message.includes("Public posting is currently unavailable")) {
+        throw new ApiError("PUBLIC_POSTING_UNAVAILABLE", "Public posting is currently unavailable for this account", 403);
+      }
+
+      if (message.includes("Expression membership required")) throw new ApiError("EXPRESSION_MEMBERSHIP_REQUIRED", "Join an Expression before publishing", 403);
+      if (message.includes("your own Expression")) throw new ApiError("EXPRESSION_SCOPE_DENIED", "You may publish only to your own Expression", 403);
+      if (message.includes("media uploads")) throw new ApiError("MEDIA_SCOPE_DENIED", "One or more media uploads cannot be used in this feed", 403);
+      throw new ApiError("PERMISSION_DENIED", "You do not have permission to publish this post", 403);
+    }
+    if (error?.code === "22023" || error?.code === "23514") {
+      throw new ApiError("VALIDATION_FAILED", error.message, 422);
+    }
+    if (error) throw new ApiError("POST_CREATE_FAILED", "Unable to publish post", 500, undefined, false);
+    return { data, status: 201 };
+  },
+));

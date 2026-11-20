@@ -1,0 +1,125 @@
+import React from 'react';
+import { KeyboardAvoidingView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CommentsThread, ResourceError, ScreenHeader } from '@/components';
+import { useResource } from '@/hooks/use-resource';
+import { useSession } from '@/state/session';
+import { useTheme } from '@/state/theme';
+import { spacing } from '@/design-system/tokens';
+import { PLATFORM_KEYBOARD_BEHAVIOR, PLATFORM_KEYBOARD_DISMISS_MODE, PLATFORM_KEYBOARD_VERTICAL_OFFSET } from '@/utils/keyboard';
+import type { ContentComment } from '@/types/content';
+
+export function CommentsScreen({ forcedScope }: { forcedScope?: 'general' | 'expression' } = {}) {
+  const { contentId, context: requestedContext } = useLocalSearchParams<{ contentId: string; context?: string }>();
+  const insets = useSafeAreaInsets();
+  const { api, mode, context } = useSession();
+  const { colors } = useTheme();
+  const expressionMode = forcedScope ? forcedScope === 'expression' : requestedContext === 'expression';
+  const requestContext = expressionMode ? 'current' : 'public';
+
+  const comments = useResource<ContentComment[]>(
+    `comments:screen:${expressionMode ? context?.expression?.id ?? 'none' : 'public'}:${contentId}`,
+    async (signal) => {
+      if (!contentId) throw new Error('This conversation is unavailable.');
+      if (expressionMode && (mode !== 'authenticated' || !context?.expression?.id)) {
+        throw new Error('Enter this Expression to view its conversation.');
+      }
+      return api.request<ContentComment[]>(
+        `engagement?contentId=${encodeURIComponent(contentId)}`,
+        { signal, context: requestContext },
+      );
+    },
+  );
+
+  const returnTo = forcedScope === 'general' ? `/general/comments/${encodeURIComponent(contentId)}` : `/comments/${encodeURIComponent(contentId)}${expressionMode ? '?context=expression' : '?context=public'}`;
+
+  return (
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+      <View style={{ paddingTop: insets.top }}>
+        <ScreenHeader
+          title={expressionMode ? 'Expression conversation' : 'Conversation'}
+          subtitle={expressionMode ? 'Replies stay inside this private Expression.' : 'Join the public COT discussion around this post.'}
+          kicker={expressionMode ? 'EXPRESSION' : 'GENERAL COT'}
+          showBack
+          rightAction={
+            comments.data ? (
+              <View style={[styles.countPill, { backgroundColor: colors.primarySoft }]}>
+                <Text style={[styles.countText, { color: colors.interactive }]}>{comments.data.length}</Text>
+              </View>
+            ) : null
+          }
+        />
+      </View>
+
+      {comments.error && !comments.data ? (
+        <ResourceError message={comments.error} retry={comments.refresh} />
+      ) : (
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={PLATFORM_KEYBOARD_BEHAVIOR}
+          keyboardVerticalOffset={PLATFORM_KEYBOARD_VERTICAL_OFFSET}
+        >
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={PLATFORM_KEYBOARD_DISMISS_MODE}
+            contentContainerStyle={[
+              styles.content,
+              { paddingBottom: Math.max(insets.bottom, spacing.md) + spacing.xl },
+            ]}
+          >
+            <CommentsThread
+              comments={comments.data ?? []}
+              loading={comments.loading}
+              canComment={mode === 'authenticated'}
+              canReport={mode === 'authenticated'}
+              reportContext={requestContext}
+              onRequireSignIn={() => router.push({
+                pathname: '/(auth)/login',
+                params: { returnTo },
+              } as any)}
+              onDeleteComment={async (commentId) => {
+                await api.request('engagement', {
+                  method: 'POST',
+                  context: requestContext,
+                  feedback: false,
+                  body: JSON.stringify({ action: 'delete_comment', commentId }),
+                });
+                comments.refresh();
+              }}
+              onSubmitComment={async (body, parentCommentId) => {
+                if (!contentId) throw new Error('This conversation is unavailable.');
+                await api.request('engagement', {
+                  method: 'POST',
+                  context: requestContext,
+                  body: JSON.stringify({
+                    action: 'comment',
+                    contentId,
+                    body,
+                    parentCommentId: parentCommentId ?? undefined,
+                  }),
+                });
+                comments.refresh();
+              }}
+            />
+          </ScrollView>
+        </KeyboardAvoidingView>
+      )}
+    </View>
+  );
+}
+
+export default function LegacyCommentsRoute() {
+  const { contentId, context: requestedContext } = useLocalSearchParams<{ contentId?: string; context?: string }>();
+  if (requestedContext === 'expression') return <Redirect href="/expressions" />;
+  return <Redirect href={`/general/comments/${typeof contentId === 'string' ? contentId : ''}` as any} />;
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1 },
+  flex: { flex: 1 },
+  content: { width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.sm },
+  countPill: { minWidth: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm },
+  countText: { fontSize: 12, fontWeight: '900' },
+});

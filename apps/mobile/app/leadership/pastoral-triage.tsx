@@ -1,0 +1,356 @@
+import React, { useEffect, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Redirect, usePathname } from 'expo-router';
+import { useSession } from '@/state/session';
+import { useTheme } from '@/state/theme';
+import { useResource } from '@/hooks/use-resource';
+import {
+  Badge,
+  Button,
+  Chip,
+  EmptyState,
+  ResourceError,
+  ScreenHeader,
+  SectionHeader,
+  Skeleton,
+} from '@/components';
+import { radius, shadows, spacing } from '@/design-system/tokens';
+import type { LiveFollowUp, PrayerRequest } from '@/types/content';
+import { toUserFacingErrorMessage } from '@/api';
+
+type PrayerScope = 'general' | 'expression';
+type RoutedPrayer = PrayerRequest & {
+  organization_id?: string;
+  branch_id?: string | null;
+  scope?: PrayerScope;
+  routing_status?: 'queued' | 'routed' | 'unassigned';
+  public_approved_at?: string | null;
+  is_publicly_visible?: boolean;
+};
+type CareFollowUp = LiveFollowUp & {
+  source?: 'live' | 'ai';
+  branch_id?: string | null;
+  stream_title?: string | null;
+  user_phone?: string | null;
+  user_username?: string | null;
+  user_avatar?: string | null;
+  care_category?: string | null;
+  severity?: 'support' | 'elevated' | 'urgent' | null;
+  source_mode?: 'member_requested' | 'automatic_safety' | null;
+  summary?: string | null;
+  conversation_excerpt?: string | null;
+  last_member_message?: string | null;
+  requires_immediate_attention?: boolean;
+  member_notified?: boolean;
+};
+
+export default function PastoralTriageScreen() {
+  const insets = useSafeAreaInsets();
+  const pathname = usePathname();
+  const { api, context, hasCapability, hasOrganizationCapability } = useSession();
+  const { colors } = useTheme();
+  const expression = context?.expression;
+  const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
+
+  const canModerateGeneralPrayer =
+    hasOrganizationCapability('prayer.moderate') &&
+    (hasOrganizationCapability('prayer.pastoral.receive') || hasOrganizationCapability('prayer.team.receive'));
+  const canModerateExpressionPrayer =
+    Boolean(expression?.id) &&
+    hasCapability('prayer.moderate') &&
+    (hasCapability('prayer.pastoral.receive') || hasCapability('prayer.team.receive'));
+  const canReceiveGeneralFollowups = hasOrganizationCapability('pastoral.followups.receive');
+  const canReceiveExpressionFollowups =
+    Boolean(expression?.id) && hasCapability('pastoral.followups.receive');
+
+  const canUseGeneralScope = canModerateGeneralPrayer || canReceiveGeneralFollowups;
+  const canUseExpressionScope =
+    Boolean(expression?.id) && (canModerateExpressionPrayer || canReceiveExpressionFollowups);
+  const initialScope: PrayerScope = canUseExpressionScope ? 'expression' : 'general';
+
+  const [ministryScope, setMinistryScope] = useState<PrayerScope>(initialScope);
+  const canModeratePrayer =
+    ministryScope === 'expression' ? canModerateExpressionPrayer : canModerateGeneralPrayer;
+  const canReceiveFollowups =
+    ministryScope === 'expression' ? canReceiveExpressionFollowups : canReceiveGeneralFollowups;
+  const [activeQueue, setActiveQueue] = useState<'prayer' | 'care'>(
+    (initialScope === 'expression' ? canModerateExpressionPrayer : canModerateGeneralPrayer) ? 'prayer' : 'care',
+  );
+  const [workingId, setWorkingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState('');
+  const [expandedAiId, setExpandedAiId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (ministryScope === 'expression' && !canUseExpressionScope && canUseGeneralScope) {
+      setMinistryScope('general');
+    } else if (ministryScope === 'general' && !canUseGeneralScope && canUseExpressionScope) {
+      setMinistryScope('expression');
+    } else if (!expression?.id && ministryScope === 'expression') {
+      setMinistryScope('general');
+    }
+  }, [expression?.id, ministryScope, canUseExpressionScope, canUseGeneralScope]);
+
+  useEffect(() => {
+    if (activeQueue === 'prayer' && !canModeratePrayer && canReceiveFollowups) setActiveQueue('care');
+    if (activeQueue === 'care' && !canReceiveFollowups && canModeratePrayer) setActiveQueue('prayer');
+  }, [activeQueue, canModeratePrayer, canReceiveFollowups]);
+
+  const prayerPath = (() => {
+    const query = new URLSearchParams({ view: 'moderation', scope: ministryScope });
+    if (organizationId) query.set('organizationId', organizationId);
+    if (ministryScope === 'expression' && expression?.id) query.set('branchId', expression.id);
+    return `prayer-requests?${query.toString()}`;
+  })();
+
+  const followupPath = (() => {
+    const query = new URLSearchParams({ scope: ministryScope });
+    if (ministryScope === 'expression' && expression?.id) query.set('branchId', expression.id);
+    return `pastoral-followups?${query.toString()}`;
+  })();
+
+  const prayers = useResource<RoutedPrayer[]>(
+    `pastoral:prayers:${ministryScope}:${organizationId || 'auto'}:${expression?.id || 'none'}`,
+    (signal) => canModeratePrayer ? api.request<RoutedPrayer[]>(prayerPath, { signal }) : Promise.resolve([])
+  );
+
+  const followups = useResource<CareFollowUp[]>(
+    `pastoral:followups:${ministryScope}:${organizationId || 'none'}:${expression?.id || 'none'}`,
+    (signal) => canReceiveFollowups ? api.request<CareFollowUp[]>(followupPath, { signal }) : Promise.resolve([])
+  );
+
+  if (pathname === '/leadership/pastoral-triage') {
+    return <Redirect href="/general/leadership/pastoral-triage" />;
+  }
+
+  const updatePrayer = async (
+    id: string,
+    patch: { status?: 'praying' | 'answered' | 'archived'; approvePublic?: boolean }
+  ) => {
+    setWorkingId(id);
+    setActionError('');
+    try {
+      await api.request('prayer-requests', {
+        method: 'PATCH',
+        body: JSON.stringify({ id, ...patch }),
+      });
+      prayers.refresh();
+    } catch (error) {
+      setActionError(toUserFacingErrorMessage(error, 'We couldn’t update this prayer request. Please try again.'));
+    } finally {
+      setWorkingId(null);
+    }
+  };
+
+  const updateFollowup = async (id: string, status: 'contacted' | 'resolved' | 'closed', source: 'live' | 'ai' = 'live') => {
+    setWorkingId(id);
+    setActionError('');
+    try {
+      await api.request('pastoral-followups', {
+        method: 'PATCH',
+        body: JSON.stringify({ id, status, source }),
+      });
+      followups.refresh();
+    } catch (error) {
+      setActionError(toUserFacingErrorMessage(error, 'We couldn’t update this care follow-up. Please try again.'));
+    } finally {
+      setWorkingId(null);
+    }
+  };
+
+  const prayerList = prayers.data ?? [];
+  const careList = followups.data ?? [];
+  const scopeTitle = ministryScope === 'expression' && expression?.name
+    ? `${expression.name} Prayer Ministry`
+    : 'General Prayer Ministry';
+
+  const scopeTabs = expression?.id && canUseGeneralScope && canUseExpressionScope ? (
+    <View style={styles.scopeTabs}>
+      <Chip label="General" selected={ministryScope === 'general'} onPress={() => setMinistryScope('general')} />
+      <Chip label={expression.name} selected={ministryScope === 'expression'} onPress={() => setMinistryScope('expression')} />
+    </View>
+  ) : null;
+
+  return (
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 120 },
+        ]}
+      >
+        <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+          <ScreenHeader
+            title="Pastoral Care"
+            kicker="LEADERSHIP"
+            subtitle="Prayer, live-service follow-up and confidential COT AI care alerts stay within the church or Expression you are responsible for."
+            showBack
+          />
+        </View>
+
+        {canModeratePrayer || canReceiveFollowups ? (
+          <View style={[styles.tabRow, { backgroundColor: colors.card, borderColor: colors.borderSubtle }]}>
+            {canModeratePrayer ? (
+              <Chip label="Prayer Requests" selected={activeQueue === 'prayer'} onPress={() => setActiveQueue('prayer')} count={prayerList.length} />
+            ) : null}
+            {canReceiveFollowups ? (
+              <Chip label="Care & AI Alerts" selected={activeQueue === 'care'} onPress={() => setActiveQueue('care')} count={careList.length} />
+            ) : null}
+          </View>
+        ) : null}
+
+        <View style={styles.body}>
+          {!canUseGeneralScope && !canUseExpressionScope ? (
+            <EmptyState
+              title="Pastoral access unavailable"
+              message="Your current role is not assigned to prayer moderation or pastoral follow-up in this church or active Expression."
+              iconName="lock-closed-outline"
+            />
+          ) : null}
+          {actionError ? (
+            <View style={[styles.errorBanner, { backgroundColor: colors.liveSoft, borderColor: colors.live }]}>
+              <Text style={[styles.errorText, { color: colors.live }]}>{actionError}</Text>
+            </View>
+          ) : null}
+          {canModeratePrayer && activeQueue === 'prayer' ? (
+            <View style={styles.queueSection}>
+              {scopeTabs}
+              <SectionHeader title={scopeTitle} badge={prayerList.length} />
+              {prayers.loading && !prayers.data ? (
+                <Skeleton height={140} count={2} />
+              ) : prayers.error && !prayers.data ? (
+                <ResourceError message={prayers.error} retry={prayers.refresh} />
+              ) : prayerList.length > 0 ? (
+                prayerList.map((p) => {
+                  const wallIntent = p.privacy === 'public_approved';
+                  const approved = p.is_publicly_visible === true;
+                  const busy = workingId === p.id;
+                  const badgeLabel = p.privacy === 'pastoral_only'
+                    ? 'CONFIDENTIAL PASTORAL'
+                    : p.privacy === 'prayer_team'
+                      ? 'PRAYER TEAM'
+                      : approved
+                        ? 'ON PRAYER WALL'
+                        : 'WALL APPROVAL PENDING';
+
+                  return (
+                    <View key={p.id} style={[styles.triageCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+                      <View style={styles.cardHeader}>
+                        <Badge label={badgeLabel} variant={p.privacy === 'pastoral_only' ? 'prayer' : 'primary'} />
+                        <Text style={[styles.dateText, { color: colors.textMuted }]}>{new Date(p.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Text>
+                      </View>
+                      <Text style={[styles.title, { color: colors.text }]}>{p.title}</Text>
+                      {p.request || p.description ? <Text style={[styles.bodyText, { color: colors.textSecondary }]}>{p.request || p.description}</Text> : null}
+
+                      {wallIntent ? (
+                        <View style={[styles.wallNotice, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+                          <Text style={[styles.wallNoticeText, { color: colors.textSecondary }]}>The submitter allowed this petition to appear on the {ministryScope === 'expression' ? 'Expression' : 'public'} prayer wall. It remains private to the assigned ministry until you approve it.</Text>
+                          <Button label={approved ? 'Remove from Wall' : 'Approve for Wall'} onPress={() => updatePrayer(p.id, { approvePublic: !approved })} variant={approved ? 'outline' : 'primary'} size="sm" loading={busy} />
+                        </View>
+                      ) : null}
+
+                      <View style={[styles.actionBar, { borderTopColor: colors.borderSubtle }]}>
+                        <Text style={[styles.statusLabel, { color: colors.textMuted }]}>Status: <Text style={{ color: colors.interactive, fontWeight: '700' }}>{p.status || 'submitted'}</Text></Text>
+                        <View style={styles.btnRow}>
+                          <Button label="Mark Praying" onPress={() => updatePrayer(p.id, { status: 'praying' })} variant="outline" size="sm" loading={busy} />
+                          <Button label="Answered" onPress={() => updatePrayer(p.id, { status: 'answered' })} variant="primary" size="sm" loading={busy} />
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })
+              ) : (
+                <EmptyState title="No Prayer Requests in This Queue" message="New petitions assigned to your prayer or pastoral care area will appear here." iconName="shield-checkmark-outline" />
+              )}
+            </View>
+          ) : canReceiveFollowups ? (
+            <View style={styles.queueSection}>
+              {scopeTabs}
+              <SectionHeader title={ministryScope === 'expression' && expression?.name ? `${expression.name} Altar & Care Queue` : 'General Altar & Care Queue'} badge={careList.length} />
+              {followups.loading && !followups.data ? (
+                <Skeleton height={130} count={2} />
+              ) : followups.error && !followups.data ? (
+                <ResourceError message={followups.error} retry={followups.refresh} />
+              ) : careList.length > 0 ? (
+                careList.map((f) => {
+                  const busy = workingId === f.id;
+                  return (
+                    <View key={f.id} style={[styles.triageCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.md]}>
+                      <View style={styles.cardHeader}>
+                        <Badge label={f.source === 'ai' ? `COT AI · ${(f.severity || 'support').toUpperCase()}` : f.type.replaceAll('_', ' ').toUpperCase()} variant={f.requires_immediate_attention ? 'warning' : 'primary'} />
+                        <Text style={[styles.dateText, { color: colors.textMuted }]}>{new Date(f.created_at).toLocaleDateString()}</Text>
+                      </View>
+                      <View style={styles.identityRow}>
+                        <View style={styles.identityCopy}>
+                          <Text style={[styles.aiContextLabel, { color: colors.textMuted }]}>FULL NAME</Text>
+                          <Text style={[styles.title, { color: colors.text }]}>{f.user_name || 'Church Participant'}</Text>
+                          {f.user_username ? <Text style={[styles.bodyText, { color: colors.textMuted }]}>@{f.user_username}</Text> : null}
+                        </View>
+                        {f.source === 'ai' ? <Badge label={f.source_mode === 'automatic_safety' ? 'AUTOMATIC SAFETY' : 'MEMBER REQUEST'} variant={f.requires_immediate_attention ? 'warning' : 'neutral'} /> : null}
+                      </View>
+                      {f.source === 'ai' && f.summary ? <Text style={[styles.bodyText, { color: colors.textSecondary }]}>{f.summary}</Text> : null}
+                      {f.source === 'ai' && f.last_member_message ? <View style={[styles.aiContextCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+                        <Text style={[styles.aiContextLabel, { color: colors.textMuted }]}>LATEST MEMBER MESSAGE</Text>
+                        <Text style={[styles.bodyText, { color: colors.text }]}>{f.last_member_message}</Text>
+                        {f.conversation_excerpt && f.conversation_excerpt !== f.last_member_message ? (
+                          <>
+                            <Pressable onPress={() => setExpandedAiId((current) => current === f.id ? null : f.id)} style={styles.contextToggle}>
+                              <Text style={[styles.contextToggleText, { color: colors.interactive }]}>{expandedAiId === f.id ? 'Hide conversation context' : 'View conversation context'}</Text>
+                            </Pressable>
+                            {expandedAiId === f.id ? <Text style={[styles.conversationText, { color: colors.textSecondary }]}>{f.conversation_excerpt}</Text> : null}
+                          </>
+                        ) : null}
+                      </View> : null}
+                      {f.stream_title ? <Text style={[styles.bodyText, { color: colors.textSecondary }]}>From: {f.stream_title}</Text> : null}
+                      {f.user_phone ? <Text style={[styles.bodyText, { color: colors.interactive }]}>{f.user_phone}</Text> : null}
+                      {f.private_note ? <Text style={[styles.bodyText, { color: colors.textSecondary }]}>{f.private_note}</Text> : null}
+                      <View style={[styles.actionBar, { borderTopColor: colors.borderSubtle }]}>
+                        <Text style={[styles.statusLabel, { color: colors.textMuted }]}>Status: <Text style={{ color: colors.interactive, fontWeight: '700' }}>{f.status}</Text></Text>
+                        <View style={styles.btnRow}>
+                          <Button label="Contacted" onPress={() => updateFollowup(f.id, 'contacted', f.source || 'live')} variant="outline" size="sm" loading={busy} />
+                          <Button label="Resolved" onPress={() => updateFollowup(f.id, 'resolved', f.source || 'live')} variant="primary" size="sm" loading={busy} />
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })
+              ) : (
+                <EmptyState title="No Follow-Up Requests" message="Altar responses, counselling requests, live-service follow-ups and confidential COT AI care alerts routed to this exact scope will appear here." iconName="heart-outline" />
+              )}
+            </View>
+          ) : null}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1 },
+  content: { flexGrow: 1 },
+  headerCard: { marginHorizontal: spacing.md, borderWidth: 1, borderRadius: radius.xxl, overflow: 'hidden' },
+  tabRow: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: spacing.md, marginTop: spacing.md, padding: 5, gap: spacing.xs, borderWidth: 1, borderRadius: radius.xl, alignSelf: 'flex-start' },
+  body: { paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: spacing.lg },
+  errorBanner: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md },
+  errorText: { fontSize: 12, lineHeight: 17, fontWeight: '600' },
+  queueSection: { gap: spacing.sm },
+  scopeTabs: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.xs },
+  triageCard: { padding: spacing.md, borderRadius: radius.xl, borderWidth: 1, marginBottom: spacing.sm, gap: spacing.sm },
+  aiContextCard: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.sm, gap: 5 },
+  aiContextLabel: { fontSize: 9, lineHeight: 13, fontWeight: '900', letterSpacing: 0.6 },
+  identityRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm },
+  identityCopy: { flex: 1, minWidth: 0, gap: 2 },
+  contextToggle: { alignSelf: 'flex-start', paddingVertical: 4 },
+  contextToggleText: { fontSize: 11, fontWeight: '800' },
+  conversationText: { fontSize: 12, lineHeight: 18, paddingTop: 3 },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  dateText: { fontSize: 11 },
+  title: { fontSize: 15, fontWeight: '800', letterSpacing: -0.15 },
+  bodyText: { fontSize: 13, lineHeight: 18 },
+  wallNotice: { borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm, marginTop: spacing.xs },
+  wallNoticeText: { fontSize: 11, lineHeight: 16 },
+  actionBar: { gap: spacing.sm, paddingTop: spacing.xs + 4, borderTopWidth: 1, marginTop: spacing.xs },
+  statusLabel: { fontSize: 12 },
+  btnRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+});

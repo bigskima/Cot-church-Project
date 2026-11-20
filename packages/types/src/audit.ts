@@ -1,0 +1,1 @@
+export interface AuditRecord { id: number; branch_id: string | null; actor_profile_id: string | null; action: string; target_type: string; target_id: string | null; request_id: string | null; old_values: Record<string, unknown> | null; new_values: Record<string, unknown> | null; occurred_at: string; }

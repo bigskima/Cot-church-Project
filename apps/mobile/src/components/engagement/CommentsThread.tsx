@@ -1,0 +1,469 @@
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { router } from 'expo-router';
+import { useTheme } from '@/state/theme';
+import { useSession } from '@/state/session';
+import { radius, shadows, spacing } from '@/design-system/tokens';
+import type { ContentComment } from '@/types/content';
+import { Avatar } from '../primitives/Avatar';
+import { Icon } from '../primitives/Icon';
+import { ContentReportSheet, type ContentReportContext } from './ContentReportSheet';
+import { CompactIdentityBadge } from '@/components/identity/PublicIdentityBadge';
+import { ScripturePreviewCard } from '@/components/bible/ScriptureReferenceText';
+
+const MAX_COMMENT_LENGTH = 3000;
+
+export interface CommentsThreadProps {
+  comments: ContentComment[];
+  loading?: boolean;
+  canComment?: boolean;
+  focusRequest?: number;
+  onRequireSignIn?: () => void;
+  onSubmitComment: (body: string, parentCommentId?: string | null) => Promise<void>;
+  onDeleteComment?: (commentId: string) => Promise<void>;
+  canReport?: boolean;
+  reportContext?: ContentReportContext;
+}
+
+function commentIdentity(item: ContentComment) {
+  const row = item as any;
+  const author = row.author ?? {};
+  return {
+    displayName: author.displayName || author.display_name || item.profiles?.display_name || 'Church Member',
+    username: author.username || author.handle || undefined,
+    avatarUrl: author.avatarUrl || author.avatar_url || item.profiles?.avatar_url,
+    badges: Array.isArray(author.badges) ? author.badges : [],
+  };
+}
+
+function commentTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+  if (seconds < 60) return 'now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d`;
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+export function CommentsThread({
+  comments,
+  loading = false,
+  canComment = true,
+  focusRequest = 0,
+  onRequireSignIn,
+  onSubmitComment,
+  onDeleteComment,
+  canReport = canComment,
+  reportContext = 'public',
+}: CommentsThreadProps) {
+  const { colors } = useTheme();
+  const { context } = useSession();
+  const inputRef = useRef<TextInput>(null);
+  const [text, setText] = useState('');
+  const [replyingTo, setReplyingTo] = useState<ContentComment | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [composerFocused, setComposerFocused] = useState(false);
+  const [reportTarget, setReportTarget] = useState<ContentComment | null>(null);
+  const [deletingId, setDeletingId] = useState('');
+  const [deleteError, setDeleteError] = useState('');
+
+  const commentById = useMemo(() => new Map(comments.map((item) => [item.id, item])), [comments]);
+  const roots = useMemo(
+    () => comments.filter((item) => !item.parent_comment_id || !commentById.has(item.parent_comment_id)),
+    [comments, commentById],
+  );
+  const repliesByParent = useMemo(() => {
+    const map = new Map<string, ContentComment[]>();
+    for (const item of comments) {
+      if (!item.parent_comment_id || !commentById.has(item.parent_comment_id)) continue;
+      const current = map.get(item.parent_comment_id) ?? [];
+      current.push(item);
+      map.set(item.parent_comment_id, current);
+    }
+    return map;
+  }, [comments, commentById]);
+
+  const threadRows = useMemo(() => {
+    const rows: Array<{ item: ContentComment; depth: number }> = [];
+    const visited = new Set<string>();
+
+    const visit = (item: ContentComment, depth: number) => {
+      if (visited.has(item.id)) return;
+      visited.add(item.id);
+      rows.push({ item, depth });
+      for (const child of repliesByParent.get(item.id) ?? []) visit(child, depth + 1);
+    };
+
+    for (const root of roots) visit(root, 0);
+    // Defensive fallback for malformed/cyclic legacy rows: keep every comment
+    // visible rather than allowing recursive nesting to disappear off-screen.
+    for (const item of comments) {
+      if (!visited.has(item.id)) rows.push({ item, depth: 0 });
+    }
+    return rows;
+  }, [comments, repliesByParent, roots]);
+
+  useEffect(() => {
+    if (!focusRequest || !canComment) return;
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, [focusRequest, canComment]);
+
+  const replyIdentity = replyingTo ? commentIdentity(replyingTo) : null;
+  const remaining = MAX_COMMENT_LENGTH - text.length;
+  const canSend = canComment && Boolean(text.trim()) && !submitting;
+
+  const startReply = (comment: ContentComment) => {
+    if (!canComment) {
+      onRequireSignIn?.();
+      return;
+    }
+    setReplyingTo(comment);
+    setSubmitError('');
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
+  const startReport = (comment: ContentComment) => {
+    if (!canReport) {
+      onRequireSignIn?.();
+      return;
+    }
+    setReportTarget(comment);
+  };
+
+  const send = async () => {
+    if (!canComment) {
+      onRequireSignIn?.();
+      return;
+    }
+    if (!canSend) return;
+    setSubmitting(true);
+    setSubmitError('');
+    try {
+      await onSubmitComment(text.trim(), replyingTo?.id ?? null);
+      setText('');
+      setReplyingTo(null);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Unable to post this comment.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const removeComment = async (item: ContentComment) => {
+    if (!onDeleteComment || item.author_profile_id !== context?.profile?.id || deletingId) return;
+    setDeletingId(item.id);
+    setDeleteError('');
+    try {
+      await onDeleteComment(item.id);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : 'Unable to delete this comment.');
+    } finally {
+      setDeletingId('');
+    }
+  };
+
+  const renderComment = (item: ContentComment, isReply = false, parent?: ContentComment | null) => {
+    const identity = commentIdentity(item);
+    const mine = item.author_profile_id === context?.profile?.id;
+    const parentIdentity = parent ? commentIdentity(parent) : null;
+    return (
+      <View
+        key={item.id}
+        style={[
+          styles.comment,
+          isReply && styles.reply,
+          {
+            backgroundColor: isReply ? colors.bgSecondary : colors.card,
+            borderColor: colors.borderSubtle,
+          },
+        ]}
+      >
+        <Pressable
+          onPress={identity.username ? () => router.push({ pathname: '/general/member/[username]', params: { username: identity.username } } as any) : undefined}
+          disabled={!identity.username}
+          hitSlop={5}
+          accessibilityRole={identity.username ? 'link' : undefined}
+          accessibilityLabel={identity.username ? `Open ${identity.displayName} profile` : undefined}
+        >
+          <Avatar url={identity.avatarUrl} name={identity.displayName} size="sm" />
+        </Pressable>
+        <View style={styles.commentBody}>
+          <View style={styles.commentMeta}>
+            <Pressable
+              onPress={identity.username ? () => router.push({ pathname: '/general/member/[username]', params: { username: identity.username } } as any) : undefined}
+              disabled={!identity.username}
+              style={styles.identityLine}
+              accessibilityRole={identity.username ? 'link' : undefined}
+              accessibilityLabel={identity.username ? `Open ${identity.displayName} profile` : undefined}
+            >
+              <Text style={[styles.authorName, { color: colors.text }]} numberOfLines={1}>{identity.displayName}</Text>
+              {identity.badges[0] ? <CompactIdentityBadge badge={identity.badges[0]} size={15} /> : null}
+              {identity.username ? <Text style={[styles.username, { color: colors.textMuted }]} numberOfLines={1}>@{identity.username}</Text> : null}
+            </Pressable>
+            <Text style={[styles.time, { color: colors.textMuted }]}>{commentTime(item.created_at)}</Text>
+          </View>
+
+          {parentIdentity ? (
+            <View style={[styles.replyContext, { backgroundColor: colors.primarySoft }]}>
+              <Icon name="return-down-forward-outline" size={12} color={colors.interactive} />
+              <Text style={[styles.replyContextText, { color: colors.textSecondary }]} numberOfLines={1}>
+                Replying to {parentIdentity.username ? `@${parentIdentity.username}` : parentIdentity.displayName}
+                {parent?.body ? ` · “${parent.body.trim().slice(0, 72)}${parent.body.trim().length > 72 ? '…' : ''}”` : ''}
+              </Text>
+            </View>
+          ) : null}
+
+          <Text style={[styles.bodyText, { color: colors.text }]}>{item.body}</Text>
+          <ScripturePreviewCard text={item.body} compact />
+
+          <View style={styles.commentActions}>
+            <Pressable
+              onPress={() => startReply(item)}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={`Reply to ${identity.displayName}`}
+              style={({ pressed }) => [styles.replyAction, pressed && styles.pressed]}
+            >
+              <Icon name="arrow-undo-outline" size={13} color={colors.textMuted} />
+              <Text style={[styles.replyActionText, { color: colors.textSecondary }]}>Reply</Text>
+            </Pressable>
+            {mine && onDeleteComment ? (
+              <Pressable
+                onPress={() => void removeComment(item)}
+                disabled={deletingId === item.id}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel="Delete your comment"
+                style={({ pressed }) => [styles.replyAction, pressed && styles.pressed]}
+              >
+                <Icon name={deletingId === item.id ? 'hourglass-outline' : 'trash-outline'} size={13} color={colors.live} />
+                <Text style={[styles.replyActionText, { color: colors.live }]}>{deletingId === item.id ? 'Deleting…' : 'Delete'}</Text>
+              </Pressable>
+            ) : (
+              <Pressable
+                onPress={() => startReport(item)}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={`Report comment by ${identity.displayName}`}
+                style={({ pressed }) => [styles.replyAction, pressed && styles.pressed]}
+              >
+                <Icon name="flag-outline" size={13} color={colors.textMuted} />
+                <Text style={[styles.replyActionText, { color: colors.textSecondary }]}>Report</Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  const renderThreadRow = (item: ContentComment, depth = 0): React.ReactNode => {
+    const parent = item.parent_comment_id ? commentById.get(item.parent_comment_id) ?? null : null;
+    const isReply = depth > 0;
+    return (
+      <View
+        key={item.id}
+        style={[
+          styles.threadRow,
+          isReply && styles.threadReplyRow,
+        ]}
+      >
+        {isReply ? (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.threadConnector,
+              { borderColor: colors.borderStrong },
+            ]}
+          />
+        ) : null}
+        {renderComment(item, isReply, parent)}
+      </View>
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.headingRow}>
+        <View>
+          <Text style={[styles.heading, { color: colors.text }]}>Comments</Text>
+          <Text style={[styles.subheading, { color: colors.textMuted }]}>
+            {comments.length ? `${comments.length} ${comments.length === 1 ? 'response' : 'responses'}` : 'Join the conversation'}
+          </Text>
+        </View>
+        <View style={[styles.count, { backgroundColor: colors.primarySoft }]}>
+          <Text style={[styles.countText, { color: colors.interactive }]}>{comments.length}</Text>
+        </View>
+      </View>
+
+      {loading && !comments.length ? (
+        <View style={[styles.stateCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+          <Icon name="chatbubble-ellipses-outline" size={22} color={colors.interactive} />
+          <Text style={[styles.stateTitle, { color: colors.text }]}>Loading comments…</Text>
+        </View>
+      ) : !comments.length ? (
+        <View style={[styles.stateCard, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+          <Icon name="chatbubble-ellipses-outline" size={22} color={colors.interactive} />
+          <Text style={[styles.stateTitle, { color: colors.text }]}>No comments yet</Text>
+          <Text style={[styles.stateCopy, { color: colors.textMuted }]}>Be the first to add something meaningful.</Text>
+        </View>
+      ) : (
+        <View style={styles.thread}>
+          {threadRows.map(({ item, depth }) => renderThreadRow(item, depth))}
+        </View>
+      )}
+
+      {deleteError ? (
+        <Pressable onPress={() => setDeleteError('')} style={[styles.error, { backgroundColor: colors.liveSoft }]} accessibilityRole="button">
+          <Icon name="alert-circle-outline" size={15} color={colors.live} />
+          <Text style={[styles.errorText, { color: colors.live }]}>{deleteError}</Text>
+          <Icon name="close" size={13} color={colors.live} />
+        </Pressable>
+      ) : null}
+
+      <View style={[styles.composerShell, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
+        {replyIdentity ? (
+          <View style={[styles.replyingBanner, { backgroundColor: colors.primarySoft }]}>
+            <View style={styles.replyingCopy}>
+              <Text style={[styles.replyingKicker, { color: colors.interactive }]}>Replying to</Text>
+              <Text style={[styles.replyingName, { color: colors.text }]} numberOfLines={1}>{replyIdentity.displayName}</Text>
+              {replyingTo?.body ? <Text style={[styles.replyingExcerpt, { color: colors.textMuted }]} numberOfLines={1}>“{replyingTo.body.trim()}”</Text> : null}
+            </View>
+            <Pressable onPress={() => setReplyingTo(null)} hitSlop={6} accessibilityRole="button" accessibilityLabel="Cancel reply">
+              <Icon name="close-circle" size={19} color={colors.interactive} />
+            </Pressable>
+          </View>
+        ) : null}
+
+        {submitError ? (
+          <Pressable onPress={() => setSubmitError('')} style={[styles.error, { backgroundColor: colors.liveSoft }]} accessibilityRole="button">
+            <Icon name="alert-circle-outline" size={15} color={colors.live} />
+            <Text style={[styles.errorText, { color: colors.live }]}>{submitError}</Text>
+            <Icon name="close" size={13} color={colors.live} />
+          </Pressable>
+        ) : null}
+
+        {canComment ? (
+          <View style={styles.composerRow}>
+            <View style={[
+              styles.inputShell,
+              {
+                backgroundColor: colors.inputBg,
+                borderColor: composerFocused ? colors.interactive : colors.borderSubtle,
+              },
+            ]}>
+              <TextInput
+                ref={inputRef}
+                value={text}
+                onChangeText={setText}
+                onFocus={() => setComposerFocused(true)}
+                onBlur={() => setComposerFocused(false)}
+                placeholder={replyingTo ? 'Write a reply…' : 'Add a comment…'}
+                placeholderTextColor={colors.textMuted}
+                multiline
+                maxLength={MAX_COMMENT_LENGTH}
+                style={[styles.input, { color: colors.text }]}
+                accessibilityLabel={replyingTo ? 'Write a reply' : 'Write a comment'}
+              />
+              {composerFocused || text.length > 0 ? (
+                <Text style={[styles.remaining, { color: remaining < 150 ? colors.interactive : colors.textMuted }]}>{remaining}</Text>
+              ) : null}
+            </View>
+            <Pressable
+              onPress={() => void send()}
+              disabled={!canSend}
+              accessibilityRole="button"
+              accessibilityLabel={submitting ? 'Posting comment' : 'Send comment'}
+              accessibilityState={{ disabled: !canSend }}
+              style={({ pressed }) => [
+                styles.send,
+                {
+                  backgroundColor: canSend ? colors.interactive : colors.bgSecondary,
+                  borderColor: canSend ? colors.interactive : colors.borderSubtle,
+                },
+                pressed && canSend && styles.sendPressed,
+              ]}
+            >
+              <Icon name={submitting ? 'hourglass-outline' : 'arrow-up'} size={19} color={canSend ? '#FFFFFF' : colors.textMuted} />
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable
+            onPress={onRequireSignIn}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.signInRow, { backgroundColor: colors.bgSecondary }, pressed && styles.pressed]}
+          >
+            <Icon name="person-circle-outline" size={19} color={colors.interactive} />
+            <Text style={[styles.signInText, { color: colors.text }]}>Sign in to comment</Text>
+            <Icon name="chevron-forward" size={16} color={colors.textMuted} />
+          </Pressable>
+        )}
+      </View>
+
+      <ContentReportSheet
+        target={reportTarget ? {
+          commentId: reportTarget.id,
+          context: reportContext,
+          label: `Report comment by ${commentIdentity(reportTarget).displayName}`,
+        } : null}
+        onClose={() => setReportTarget(null)}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { gap: spacing.md },
+  headingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  heading: { fontSize: 19, lineHeight: 24, fontWeight: '800', letterSpacing: -0.35 },
+  subheading: { fontSize: 11, lineHeight: 16, marginTop: 1 },
+  count: { minWidth: 30, height: 26, paddingHorizontal: 8, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  countText: { fontSize: 11, fontWeight: '800' },
+  stateCard: { minHeight: 118, borderWidth: 1, borderRadius: radius.xl, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, gap: spacing.xs },
+  stateTitle: { fontSize: 14, fontWeight: '800' },
+  stateCopy: { fontSize: 11, lineHeight: 16, textAlign: 'center' },
+  thread: { gap: spacing.sm, width: '100%' },
+  threadRow: { position: 'relative', width: '100%', minWidth: 0 },
+  // Replies keep only one compact visual offset regardless of reply depth.
+  // Parent identity is carried by the "Replying to" context inside each card.
+  threadReplyRow: { paddingLeft: 14 },
+  threadConnector: { position: 'absolute', left: 1, top: 0, width: 10, height: 28, borderLeftWidth: 1, borderBottomWidth: 1, borderBottomLeftRadius: 8 },
+  commentActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
+  threadGroup: { gap: spacing.sm },
+  comment: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md },
+  reply: { borderRadius: radius.lg },
+  commentBody: { flex: 1, minWidth: 0 },
+  commentMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  identityLine: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  authorName: { fontSize: 13, fontWeight: '800', flexShrink: 1 },
+  username: { fontSize: 11, flexShrink: 1 },
+  time: { fontSize: 10, fontWeight: '600' },
+  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 5 },
+  badge: { borderRadius: radius.pill, paddingHorizontal: 6, paddingVertical: 2 },
+  badgeText: { fontSize: 9, fontWeight: '800' },
+  replyContext: { minHeight: 28, borderRadius: radius.md, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 5, marginTop: 7 },
+  replyContextText: { flex: 1, minWidth: 0, fontSize: 9.5, lineHeight: 14, fontWeight: '700' },
+  bodyText: { fontSize: 13, lineHeight: 19, marginTop: 7 },
+  replyAction: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8, minHeight: 28, paddingHorizontal: 2 },
+  replyActionText: { fontSize: 11, fontWeight: '700' },
+  composerShell: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.sm, gap: spacing.sm },
+  replyingBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingHorizontal: spacing.sm, paddingVertical: 7, borderRadius: radius.lg },
+  replyingCopy: { flex: 1, minWidth: 0 },
+  replyingKicker: { fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+  replyingName: { fontSize: 11, fontWeight: '700', marginTop: 1 },
+  replyingExcerpt: { fontSize: 9.5, lineHeight: 13, marginTop: 2 },
+  composerRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm },
+  inputShell: { flex: 1, minHeight: 46, maxHeight: 132, borderWidth: 1, borderRadius: 18, paddingHorizontal: spacing.md, paddingVertical: 8 },
+  input: { minHeight: 26, maxHeight: 92, fontSize: 13, lineHeight: 18, padding: 0 },
+  remaining: { alignSelf: 'flex-end', fontSize: 9, fontWeight: '700', marginTop: 3 },
+  send: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  sendPressed: { opacity: 0.84, transform: [{ scale: 0.96 }] },
+  signInRow: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, borderRadius: radius.lg },
+  signInText: { flex: 1, fontSize: 12, fontWeight: '700' },
+  error: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.sm, paddingVertical: 7, borderRadius: radius.md },
+  errorText: { flex: 1, fontSize: 11, lineHeight: 15, fontWeight: '600' },
+  pressed: { opacity: 0.82 },
+});

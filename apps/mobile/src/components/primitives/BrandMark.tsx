@@ -1,0 +1,61 @@
+import React from 'react';
+import { Image, StyleSheet, View, StyleProp, ViewStyle, ImageStyle } from 'react-native';
+import { useBranding } from '@/state/branding';
+import { useTheme } from '@/state/theme';
+
+// Use the dedicated COT Family artwork for every bundled COT brand fallback.
+// Splash artwork is a launch-screen asset and should not leak into in-app branding.
+const defaultCotLogo = require('../../../assets/cot-family-logo.png');
+
+export interface BrandMarkProps {
+  variant?: 'auth' | 'header' | 'compact' | 'icon';
+  size?: number;
+  style?: StyleProp<ViewStyle>;
+  imageStyle?: StyleProp<ImageStyle>;
+  forceCot?: boolean;
+}
+
+export function BrandMark({
+  variant = 'compact',
+  size,
+  style,
+  imageStyle,
+  forceCot = false,
+}: BrandMarkProps) {
+  const { isDark } = useTheme();
+  const { primaryLogoUrl, compactLogoUrl, darkLogoUrl } = useBranding();
+
+  const remoteUrl = isDark
+    ? darkLogoUrl || primaryLogoUrl
+    : primaryLogoUrl || compactLogoUrl;
+
+  const defaultDimensions = {
+    auth: { width: size || 72, height: size || 72 },
+    header: { width: size || 36, height: size || 36 },
+    compact: { width: size || 28, height: size || 28 },
+    icon: { width: size || 24, height: size || 24 },
+  }[variant];
+
+  return (
+    <View style={[styles.container, defaultDimensions, style]}>
+      <Image
+        source={!forceCot && remoteUrl ? { uri: remoteUrl } : defaultCotLogo}
+        style={[styles.image, defaultDimensions, imageStyle]}
+        resizeMode="contain"
+        accessibilityRole="image"
+        accessibilityLabel={forceCot ? "COT logo" : "Church logo"}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+});

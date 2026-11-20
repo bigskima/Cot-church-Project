@@ -1,0 +1,507 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { ApiError } from "../_shared/errors.ts";
+import { createHandler } from "../_shared/handler.ts";
+import { jsonBody } from "../_shared/request.ts";
+import { adminClient, publicClient } from "../_shared/supabase.ts";
+import { assertProfilesMayInteract, filterByAuthor, loadSafetyProfileSets } from "../_shared/safety.ts";
+import { assertNoUnknownFields, assertObject, optionalString, requiredString, uuid } from "../_shared/validation.ts";
+import { loadPublicChatBadges } from "../_shared/identity-badges.ts";
+import { assertFeatureEnabled } from "../_shared/feature-controls.ts";
+
+const allowedReactions = new Set(["like", "love", "pray", "celebrate", "amen", "support"]);
+
+function requestedContentIds(value: string | null) {
+  const ids = [...new Set((value ?? "").split(",").map((item) => item.trim()).filter(Boolean))];
+  if (!ids.length) throw new ApiError("VALIDATION_FAILED", "At least one contentId is required", 400);
+  if (ids.length > 30) throw new ApiError("VALIDATION_FAILED", "A maximum of 30 content activity states can be loaded at once", 422);
+  return ids.map((id) => uuid(id, "contentId", true)!);
+}
+
+async function enrichCommentAuthors(admin: any, rows: any[], content: any) {
+  if (!rows.length) return rows;
+  const profileIds = [...new Set(rows.map((row) => row.author_profile_id).filter(Boolean))] as string[];
+  const badgeMap = await loadPublicChatBadges(
+    admin,
+    profileIds,
+    content?.organization_id ?? null,
+    content?.expression_id ?? null,
+  );
+
+  return rows.map((row) => {
+    const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+    return {
+      ...row,
+      author: profile ? {
+        id: profile.id,
+        display_name: profile.display_name,
+        username: profile.username,
+        avatar_url: profile.avatar_url,
+        badges: badgeMap.get(row.author_profile_id) ?? [],
+      } : null,
+    };
+  });
+}
+
+async function assertContentAccess(auth: any, contentId: string) {
+  const client = auth?.client ?? publicClient();
+  const { data, error } = await client
+    .from("content_items")
+    .select("id,organization_id,expression_id,group_id,author_profile_id,visibility,status")
+    .eq("id", contentId)
+    .maybeSingle();
+
+  if (error) throw new ApiError("CONTENT_ACCESS_CHECK_FAILED", "Unable to verify content access", 500, undefined, false);
+  if (!data || data.status !== "published") {
+    throw new ApiError("CONTENT_NOT_FOUND", "This content is unavailable", 404);
+  }
+
+  if (auth?.user && data.author_profile_id) {
+    await assertProfilesMayInteract(adminClient(), auth.user.id, data.author_profile_id);
+  }
+
+  if (data.visibility === "public") return data;
+
+  if (!auth?.user) {
+    throw new ApiError("CONTENT_ACCESS_DENIED", "Sign in with access to this content to continue", 403);
+  }
+
+  if (!auth.organizationId || auth.organizationId !== data.organization_id) {
+    throw new ApiError("CONTENT_ACCESS_DENIED", "Enter the church space that owns this content", 403);
+  }
+
+  if ((data.visibility === "branch" || data.visibility === "group") && auth.branchId !== data.expression_id) {
+    throw new ApiError("EXPRESSION_CONTEXT_REQUIRED", "Enter this Expression to view or interact with its content", 403);
+  }
+
+  return data;
+}
+
+Deno.serve(createHandler(
+  { methods: ["GET", "POST"], authentication: "optional", organization: "optional" },
+  async ({ request, auth }) => {
+    const url = new URL(request.url);
+
+    // GET Comments on Content Item (publicly readable if content item is public)
+    if (request.method === "GET") {
+      if (url.searchParams.get("view") === "states") {
+        const contentIds = requestedContentIds(url.searchParams.get("contentIds"));
+        if (!auth?.user) {
+          return {
+            data: contentIds.map((contentId) => ({
+              contentId,
+              reaction: null,
+              bookmarked: false,
+              progress: null,
+            })),
+          };
+        }
+
+        const [reactions, bookmarks, progress] = await Promise.all([
+          auth.client
+            .from("content_reactions")
+            .select("content_item_id,reaction")
+            .eq("profile_id", auth.user.id)
+            .in("content_item_id", contentIds),
+          auth.client
+            .from("content_bookmarks")
+            .select("content_item_id")
+            .eq("profile_id", auth.user.id)
+            .in("content_item_id", contentIds),
+          auth.client
+            .from("content_playback_progress")
+            .select("content_item_id,progress_seconds,duration_seconds,completed,last_played_at")
+            .eq("profile_id", auth.user.id)
+            .in("content_item_id", contentIds),
+        ]);
+        if (reactions.error || bookmarks.error || progress.error) {
+          throw new ApiError("ENGAGEMENT_STATE_FAILED", "Unable to retrieve your content activity", 500, undefined, false);
+        }
+
+        const reactionMap = new Map((reactions.data ?? []).map((item: any) => [item.content_item_id, item.reaction]));
+        const bookmarkSet = new Set((bookmarks.data ?? []).map((item: any) => item.content_item_id));
+        const progressMap = new Map((progress.data ?? []).map((item: any) => [item.content_item_id, {
+          progress_seconds: item.progress_seconds,
+          duration_seconds: item.duration_seconds,
+          completed: item.completed,
+          last_played_at: item.last_played_at,
+        }]));
+
+        return {
+          data: contentIds.map((contentId) => ({
+            contentId,
+            reaction: reactionMap.get(contentId) ?? null,
+            bookmarked: bookmarkSet.has(contentId),
+            progress: progressMap.get(contentId) ?? null,
+          })),
+        };
+      }
+
+      if (url.searchParams.get("view") === "saved") {
+        if (!auth?.user) throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication required for saved content", 401);
+
+        const { data: bookmarks, error: bookmarksError } = await auth.client
+          .from("content_bookmarks")
+          .select("content_item_id,created_at,content_items!inner(id,organization_id,expression_id,content_type,visibility,status,published_at,created_at)")
+          .eq("profile_id", auth.user.id)
+          .order("created_at", { ascending: false })
+          .limit(200);
+        if (bookmarksError) throw new ApiError("BOOKMARKS_FETCH_FAILED", "Unable to retrieve saved content", 500, undefined, false);
+
+        const rows = bookmarks ?? [];
+        const contentItem = (row: any) => Array.isArray(row.content_items) ? row.content_items[0] : row.content_items;
+        const idsFor = (type: string) => rows
+          .filter((row: any) => contentItem(row)?.content_type === type)
+          .map((row: any) => row.content_item_id);
+
+        const postIds = idsFor("post");
+        const reelIds = idsFor("reel");
+        const videoIds = idsFor("video");
+        const sermonContentIds = idsFor("sermon");
+
+        const [postsResult, reelsResult, videosResult, sermonsResult] = await Promise.all([
+          postIds.length
+            ? auth.client.from("social_posts").select("id,body,published_at,created_at").in("id", postIds)
+            : Promise.resolve({ data: [], error: null }),
+          reelIds.length
+            ? auth.client.from("reels").select("id,caption,audio_title,audio_artist,created_at").in("id", reelIds)
+            : Promise.resolve({ data: [], error: null }),
+          videoIds.length
+            ? auth.client.from("videos").select("id,title,description,category,created_at").in("id", videoIds)
+            : Promise.resolve({ data: [], error: null }),
+          sermonContentIds.length
+            ? auth.client.from("sermons").select("id,content_item_id,title,preacher,sermon_date,published_at").in("content_item_id", sermonContentIds)
+            : Promise.resolve({ data: [], error: null }),
+        ]);
+        if (postsResult.error || reelsResult.error || videosResult.error || sermonsResult.error) {
+          throw new ApiError("BOOKMARK_DETAILS_FAILED", "Unable to retrieve saved content details", 500, undefined, false);
+        }
+
+        const posts = new Map((postsResult.data ?? []).map((item: any) => [item.id, item]));
+        const reels = new Map((reelsResult.data ?? []).map((item: any) => [item.id, item]));
+        const videos = new Map((videosResult.data ?? []).map((item: any) => [item.id, item]));
+        const sermons = new Map((sermonsResult.data ?? []).map((item: any) => [item.content_item_id, item]));
+
+        const items = rows.flatMap((row: any) => {
+          const item = contentItem(row);
+          if (!item || item.status !== "published") return [];
+          const common = {
+            contentId: row.content_item_id,
+            type: item.content_type,
+            savedAt: row.created_at,
+            organizationId: item.organization_id,
+            expressionId: item.expression_id ?? null,
+            visibility: item.visibility,
+            publishedAt: item.published_at ?? item.created_at,
+          };
+
+          if (item.content_type === "post") {
+            const post: any = posts.get(row.content_item_id);
+            if (!post) return [];
+            return [{ ...common, routeId: post.id, title: "Community post", summary: post.body ?? "" }];
+          }
+          if (item.content_type === "reel") {
+            const reel: any = reels.get(row.content_item_id);
+            if (!reel) return [];
+            return [{ ...common, routeId: reel.id, title: reel.audio_title || "Saved Reel", summary: reel.caption ?? "" }];
+          }
+          if (item.content_type === "video") {
+            const video: any = videos.get(row.content_item_id);
+            if (!video) return [];
+            return [{ ...common, routeId: video.id, title: video.title, summary: video.description ?? "", meta: video.category ?? null }];
+          }
+          if (item.content_type === "sermon") {
+            const sermon: any = sermons.get(row.content_item_id);
+            if (!sermon) return [];
+            return [{ ...common, routeId: sermon.id, title: sermon.title, summary: sermon.preacher ? `Message by ${sermon.preacher}` : "", meta: sermon.sermon_date ?? null }];
+          }
+          return [];
+        });
+
+        return { data: items };
+      }
+
+      const contentId = uuid(url.searchParams.get("contentId"), "contentId");
+      if (!contentId) throw new ApiError("VALIDATION_FAILED", "contentId is required", 400);
+
+      const client = auth?.client ?? publicClient();
+      if (url.searchParams.get("view") === "state") {
+        if (!auth?.user) return { data: { reaction: null, bookmarked: false, progress: null } };
+        const [reaction, bookmark, progress] = await Promise.all([
+          auth.client.from("content_reactions").select("reaction").eq("content_item_id", contentId).eq("profile_id", auth.user.id).maybeSingle(),
+          auth.client.from("content_bookmarks").select("content_item_id").eq("content_item_id", contentId).eq("profile_id", auth.user.id).maybeSingle(),
+          auth.client.from("content_playback_progress").select("progress_seconds,duration_seconds,completed,last_played_at").eq("content_item_id", contentId).eq("profile_id", auth.user.id).maybeSingle(),
+        ]);
+        if (reaction.error || bookmark.error || progress.error) throw new ApiError("ENGAGEMENT_STATE_FAILED", "Unable to retrieve your content activity", 500, undefined, false);
+        return { data: { reaction: reaction.data?.reaction ?? null, bookmarked: Boolean(bookmark.data), progress: progress.data ?? null } };
+      }
+      const targetContent = await assertContentAccess(auth, contentId);
+      const { data, error } = await client
+        .from("content_comments")
+        .select(`
+          id,
+          content_item_id,
+          author_profile_id,
+          parent_comment_id,
+          body,
+          created_at,
+          profiles(id, display_name, username, avatar_url)
+        `)
+        .eq("content_item_id", contentId)
+        .eq("is_hidden", false)
+        .order("created_at", { ascending: true })
+        .limit(100);
+
+      if (error) throw new ApiError("COMMENTS_FETCH_FAILED", "Unable to retrieve comments", 500, undefined, false);
+      const admin = adminClient();
+      const enriched = await enrichCommentAuthors(admin, data ?? [], targetContent);
+      if (!auth?.user) return { data: enriched };
+      const safety = await loadSafetyProfileSets(admin, auth.user.id);
+      return {
+        data: filterByAuthor(enriched, safety.hiddenFromFeed, (comment: any) => comment.author_profile_id),
+      };
+    }
+
+    // POST Actions require authentication
+    if (!auth?.user) {
+      throw new ApiError("AUTHENTICATION_REQUIRED", "Authentication required for engagement", 401);
+    }
+
+    const body = assertObject(await jsonBody(request));
+
+    if (body.action === "delete_comment") {
+      assertNoUnknownFields(body, ["action", "commentId"]);
+      const commentId = uuid(requiredString(body.commentId, "commentId", 36), "commentId", true)!;
+      const admin = adminClient();
+      const { data: comment, error: commentError } = await admin
+        .from("content_comments")
+        .select("id,content_item_id,author_profile_id,is_hidden")
+        .eq("id", commentId)
+        .maybeSingle();
+      if (commentError || !comment || comment.is_hidden) {
+        throw new ApiError("COMMENT_NOT_FOUND", "This comment is unavailable", 404);
+      }
+      if (comment.author_profile_id !== auth.user.id) {
+        throw new ApiError("COMMENT_DELETE_DENIED", "You can delete only comments you wrote.", 403);
+      }
+      await assertContentAccess(auth, comment.content_item_id);
+      const { error: hideError } = await admin.from("content_comments")
+        .update({ is_hidden: true, updated_at: new Date().toISOString() })
+        .eq("id", commentId)
+        .eq("author_profile_id", auth.user.id);
+      if (hideError) throw new ApiError("COMMENT_DELETE_FAILED", "Unable to delete this comment.", 500, undefined, false);
+      return { data: { commentId, deleted: true } };
+    }
+
+    // 1. React
+    if (body.action === "react") {
+      assertNoUnknownFields(body, ["action", "contentId", "reaction"]);
+      const contentId = uuid(requiredString(body.contentId, "contentId", 36), "contentId", true)!;
+      const reaction = requiredString(body.reaction, "reaction", 20);
+      const targetContent = await assertContentAccess(auth, contentId);
+      await assertFeatureEnabled(
+        adminClient(),
+        "reactions",
+        { organizationId: targetContent.organization_id, expressionId: targetContent.expression_id, groupId: targetContent.group_id },
+        "Reactions are currently unavailable for this content.",
+      );
+
+      if (!allowedReactions.has(reaction)) {
+        throw new ApiError("VALIDATION_FAILED", "Invalid reaction type", 422);
+      }
+
+      const { data, error } = await auth.client
+        .from("content_reactions")
+        .upsert({
+          content_item_id: contentId,
+          profile_id: auth.user.id,
+          reaction,
+          created_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (error) throw new ApiError("REACTION_FAILED", "Unable to record reaction", 500, undefined, false);
+      return { data };
+    }
+
+    if (body.action === "unreact") {
+      assertNoUnknownFields(body, ["action", "contentId"]);
+      const contentId = uuid(requiredString(body.contentId, "contentId", 36), "contentId", true)!;
+      const targetContent = await assertContentAccess(auth, contentId);
+      await assertFeatureEnabled(
+        adminClient(),
+        "reactions",
+        { organizationId: targetContent.organization_id, expressionId: targetContent.expression_id, groupId: targetContent.group_id },
+        "Reactions are currently unavailable for this content.",
+      );
+      const { error } = await auth.client.from("content_reactions").delete().eq("content_item_id", contentId).eq("profile_id", auth.user.id);
+      if (error) throw new ApiError("REACTION_FAILED", "Unable to remove reaction", 500, undefined, false);
+      return { data: { reacted: false } };
+    }
+
+    // 2. Comment / Reply
+    if (body.action === "comment") {
+      assertNoUnknownFields(body, ["action", "contentId", "body", "parentCommentId"]);
+      const contentId = uuid(requiredString(body.contentId, "contentId", 36), "contentId", true)!;
+      const commentBody = requiredString(body.body, "body", 3000);
+      const parentId = body.parentCommentId ? uuid(String(body.parentCommentId), "parentCommentId", true) : null;
+      const targetContent = await assertContentAccess(auth, contentId);
+      await assertFeatureEnabled(
+        adminClient(),
+        "comments",
+        { organizationId: targetContent.organization_id, expressionId: targetContent.expression_id, groupId: targetContent.group_id },
+        "Comments are currently unavailable for this content.",
+      );
+
+      if (parentId) {
+        const { data: parentComment, error: parentError } = await auth.client
+          .from("content_comments")
+          .select("id,author_profile_id")
+          .eq("id", parentId)
+          .eq("content_item_id", contentId)
+          .maybeSingle();
+        if (parentError) throw new ApiError("COMMENT_PARENT_CHECK_FAILED", "Unable to validate the reply target", 500, undefined, false);
+        if (!parentComment) throw new ApiError("INVALID_PARENT_COMMENT", "Reply target does not belong to this post", 422);
+        await assertProfilesMayInteract(adminClient(), auth.user.id, parentComment.author_profile_id);
+      }
+
+      const { data, error } = await auth.client
+        .from("content_comments")
+        .insert({
+          content_item_id: contentId,
+          author_profile_id: auth.user.id,
+          parent_comment_id: parentId,
+          body: commentBody.trim(),
+        })
+        .select(`
+          id,
+          content_item_id,
+          author_profile_id,
+          parent_comment_id,
+          body,
+          created_at,
+          profiles(id, display_name, username, avatar_url)
+        `)
+        .single();
+
+      if (error) throw new ApiError("COMMENT_FAILED", "Unable to post comment", 500, undefined, false);
+      const [enriched] = await enrichCommentAuthors(adminClient(), data ? [data] : [], targetContent);
+      return { data: enriched ?? data, status: 201 };
+    }
+
+    // 3. Bookmark
+    if (body.action === "bookmark") {
+      assertNoUnknownFields(body, ["action", "contentId"]);
+      const contentId = uuid(requiredString(body.contentId, "contentId", 36), "contentId", true)!;
+      const targetContent = await assertContentAccess(auth, contentId);
+      await assertFeatureEnabled(
+        adminClient(),
+        "bookmarks",
+        { organizationId: targetContent.organization_id, expressionId: targetContent.expression_id, groupId: targetContent.group_id },
+        "Saved content is currently unavailable.",
+      );
+
+      const { data: existing } = await auth.client
+        .from("content_bookmarks")
+        .select("content_item_id")
+        .eq("content_item_id", contentId)
+        .eq("profile_id", auth.user.id)
+        .maybeSingle();
+
+      if (existing) {
+        const { error } = await auth.client
+          .from("content_bookmarks")
+          .delete()
+          .eq("content_item_id", contentId)
+          .eq("profile_id", auth.user.id);
+        if (error) throw new ApiError("BOOKMARK_FAILED", "Unable to remove bookmark", 500, undefined, false);
+        return { data: { bookmarked: false } };
+      }
+
+      const { error } = await auth.client
+        .from("content_bookmarks")
+        .insert({ content_item_id: contentId, profile_id: auth.user.id });
+
+      if (error) throw new ApiError("BOOKMARK_FAILED", "Unable to bookmark content", 500, undefined, false);
+      return { data: { bookmarked: true }, status: 201 };
+    }
+
+    // 4. Playback Progress Sync
+    if (body.action === "sync_playback") {
+      assertNoUnknownFields(body, ["action", "contentId", "progressSeconds", "durationSeconds"]);
+      const contentId = uuid(requiredString(body.contentId, "contentId", 36), "contentId", true)!;
+      const progressSeconds = typeof body.progressSeconds === "number" ? Math.max(0, Math.floor(body.progressSeconds)) : 0;
+      const durationSeconds = typeof body.durationSeconds === "number" ? Math.max(0, Math.floor(body.durationSeconds)) : 0;
+      await assertContentAccess(auth, contentId);
+
+      const { data, error } = await auth.client.rpc("sync_content_playback", {
+        p_content_id: contentId,
+        p_progress_seconds: progressSeconds,
+        p_duration_seconds: durationSeconds,
+      });
+
+      if (error) throw new ApiError("PLAYBACK_SYNC_FAILED", "Unable to sync playback", 500, undefined, false);
+      return { data };
+    }
+
+    // 5. Moderation Report
+    if (body.action === "report") {
+      assertNoUnknownFields(body, ["action", "contentId", "commentId", "reason", "details"]);
+      const contentId = body.contentId ? uuid(String(body.contentId), "contentId", true) : null;
+      const commentId = body.commentId ? uuid(String(body.commentId), "commentId", true) : null;
+      if ((contentId ? 1 : 0) + (commentId ? 1 : 0) !== 1) {
+        throw new ApiError("VALIDATION_FAILED", "Choose exactly one content or comment target to report", 422);
+      }
+
+      const reason = requiredString(body.reason, "reason", 200);
+      const details = optionalString(body.details, "details", 1000) ?? "";
+
+      let targetContentId = contentId;
+      if (commentId) {
+        const { data: comment, error: commentError } = await auth.client
+          .from("content_comments")
+          .select("id,content_item_id,is_hidden")
+          .eq("id", commentId)
+          .maybeSingle();
+        if (commentError) throw new ApiError("REPORT_TARGET_CHECK_FAILED", "Unable to verify this comment", 500, undefined, false);
+        if (!comment || comment.is_hidden) throw new ApiError("COMMENT_NOT_FOUND", "This comment is unavailable", 404);
+        targetContentId = comment.content_item_id;
+      }
+
+      const targetContent = await assertContentAccess(auth, targetContentId!);
+
+      let existingQuery = auth.client
+        .from("content_moderation_reports")
+        .select("id,organization_id,expression_id,content_item_id,comment_id,reason,details,status,created_at,updated_at")
+        .eq("reporter_profile_id", auth.user.id)
+        .in("status", ["pending", "under_review"])
+        .limit(1);
+      existingQuery = contentId
+        ? existingQuery.eq("content_item_id", contentId)
+        : existingQuery.eq("comment_id", commentId!);
+
+      const { data: existing, error: existingError } = await existingQuery.maybeSingle();
+      if (existingError) throw new ApiError("REPORT_CHECK_FAILED", "Unable to verify an existing report", 500, undefined, false);
+      if (existing) return { data: { ...existing, alreadyReported: true } };
+
+      const { data, error } = await auth.client
+        .from("content_moderation_reports")
+        .insert({
+          organization_id: targetContent.organization_id,
+          expression_id: targetContent.expression_id ?? null,
+          content_item_id: contentId,
+          comment_id: commentId,
+          reporter_profile_id: auth.user.id,
+          reason,
+          details,
+        })
+        .select()
+        .single();
+
+      if (error) throw new ApiError("REPORT_FAILED", "Unable to submit moderation report", 500, undefined, false);
+      return { data: { ...data, alreadyReported: false }, status: 201 };
+    }
+
+    throw new ApiError("NOT_FOUND", "Engagement action not recognized", 404);
+  }
+));

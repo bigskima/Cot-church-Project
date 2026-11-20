@@ -1,0 +1,299 @@
+# General COT and Expression Navigation Migration
+
+## Product decision
+
+COT has two deliberately different member-facing environments:
+
+1. **General COT** — the church-wide, public/corporate experience.
+2. **Expressions** — private, membership-bound community workspaces that users explicitly enter.
+
+They may reuse lower-level product components, API clients, domain services, media players, cards, design tokens, auth, permissions and backend contracts. They must not share a single navigation shell that silently changes behavior based on `context.expression`.
+
+Internal routes use immutable Expression IDs.
+
+## Canonical route model
+
+```text
+/general
+  -> canonical General COT entry
+
+/expressions
+  -> membership switcher / join flow
+
+/expressions/[expressionId]
+  -> canonical private Expression workspace
+
+/expression/[id]
+  -> public Expression profile / discovery surface
+```
+
+Public Expression profiles and private Expression workspaces are intentionally different routes.
+
+## Boundary rules
+
+### General COT
+
+- General COT is never an Expression-aware variant of the same tab screen.
+- If a private Expression context is active, the General tab shell must not render.
+- Returning to General COT clears the active Expression context first.
+- Visitors may remain entirely in General COT.
+- Authentication adds interaction rights; it does not inject private Expression navigation into General COT.
+
+### Expressions
+
+- The Expression ID in the route is the source of truth for the workspace being opened.
+- The authenticated account must have an active membership matching that exact ID.
+- The runtime synchronizes the selected backend Expression context to the route before rendering private content.
+- A stale selected Expression must never cause a different Expression route to render its data.
+- Expression navigation is owned by the Expression workspace, not by General COT tabs.
+- The workspace must always expose a clear route back to General COT.
+
+## Shared code policy
+
+Reuse:
+
+- `PostCard`
+- `SermonCard`
+- `EventCard`
+- Reel/video/live players
+- comments and engagement primitives
+- uploads
+- design tokens
+- auth/session
+- API client
+- query cache
+- streaming adapters
+- giving engine
+- notifications
+- AI services
+- backend functions and database contracts
+
+Do not reuse as one hybrid route screen:
+
+- General Home and Expression Home
+- General Community and Expression Feed
+- General Live and Expression Live
+- General media catalogue and Expression media catalogue
+- General leadership entry and Expression management navigation
+
+The goal is **shared components and domain services, separate route-level information architecture**.
+
+## Responsive Expression navigation
+
+### Mobile
+
+Expression workspace uses a dedicated top bar and drawer-style navigator.
+
+Initial foundation:
+
+```text
+Expression
+  Overview
+    Home
+
+  Space
+    My Expressions
+
+  COT
+    Return to General COT
+```
+
+As destinations are migrated, the navigator becomes:
+
+```text
+OVERVIEW
+  Home
+  Announcements
+  Live
+
+COMMUNITY
+  Feed
+  Prayer
+  Events
+  Birthdays
+
+MINISTRIES & GROUPS
+  Groups
+  Departments / teams where supported
+
+MEDIA
+  Sermons
+  Videos
+  Reels
+
+PEOPLE
+  Members
+  Leadership
+
+MY EXPRESSION
+  Giving
+  Saved
+  Notifications
+
+LEADERSHIP (permission gated)
+  Studio
+  Live Studio
+  Events
+  Media
+  Roles & Access
+  Giving Administration
+  Expression Settings
+```
+
+### Tablet / web
+
+The same information architecture becomes a persistent left sidebar. Content remains in the right workspace pane.
+
+## Migration phases
+
+### Phase 1 — route and shell foundation
+
+- canonical `/general` entry
+- canonical `/expressions/[expressionId]` workspace
+- exact-ID membership route boundary
+- dedicated responsive Expression shell
+- dedicated Expression Home
+- General tabs blocked while a private Expression is active
+- Expression entry no longer routes to `/(tabs)/home`
+- application invariants protect the new boundary
+
+### Phase 2 — Expression community navigation
+
+Move into dedicated Expression routes:
+
+- Feed
+- Announcements
+- Prayer
+- Events
+- Birthdays
+
+No General route should be used as the Expression destination after each area is migrated.
+
+### Phase 3 — Expression media and live
+
+Implemented:
+
+- `/expressions/[expressionId]/live`
+- `/expressions/[expressionId]/live/[streamId]`
+- `/expressions/[expressionId]/sermons`
+- `/expressions/[expressionId]/sermons/[sermonId]`
+- `/expressions/[expressionId]/videos`
+- `/expressions/[expressionId]/videos/[videoId]`
+- `/expressions/[expressionId]/reels`
+
+The Expression shell now owns Live, Sermons, Videos and Reels navigation. Shared players, cards, playback, engagement, Mux runtime and media services remain canonical; only route-level information architecture is separated.
+
+General Watch, General Reels and General Live are explicitly General-only. Legacy Expression media links redirect into the canonical exact-ID Expression workspace where practical. Expression media detail views verify that the resolved video, sermon or broadcast belongs to the exact active Expression before rendering it.
+
+### Phase 4 — Groups and people
+
+Implemented:
+
+- `/expressions/[expressionId]/groups`
+- `/expressions/[expressionId]/groups/[groupId]`
+- `/expressions/[expressionId]/members`
+- `/expressions/[expressionId]/leadership`
+
+The Expression shell now owns Groups, Members and Leadership navigation. The existing Groups UI/API is reused through a scoped feature experience, including join requests, group creation and membership review where capabilities allow it. Group detail routes stay inside the same exact Expression boundary.
+
+The member directory extends the canonical `memberships` Edge Function with a member-facing `expression-directory` view rather than creating another membership system. The route Expression ID must match the authenticated active Expression, the caller must have an active `expression_memberships` row, and the response exposes only safe directory fields: display name, username, avatar and join date. Phone numbers and administration-only membership data remain outside this view.
+
+The existing Expression leadership directory remains backed by `church-story?view=leadership` and `leadership_profiles`, but now has a canonical Expression-owned route. Leadership management remains in the existing leadership area until Phase 5 moves Expression operations into the workspace.
+
+### Phase 5 — Expression leadership
+
+Implemented canonical Expression management routes:
+
+- `/expressions/[expressionId]/manage`
+- `/expressions/[expressionId]/manage/studio`
+- `/expressions/[expressionId]/manage/reel`
+- `/expressions/[expressionId]/manage/video`
+- `/expressions/[expressionId]/manage/sermons`
+- `/expressions/[expressionId]/manage/live`
+- `/expressions/[expressionId]/manage/events`
+- `/expressions/[expressionId]/manage/leadership`
+- `/expressions/[expressionId]/manage/invite-codes`
+- `/expressions/[expressionId]/manage/access`
+- `/expressions/[expressionId]/manage/settings`
+- `/expressions/[expressionId]/manage/giving`
+- `/expressions/[expressionId]/manage/finance`
+
+All management navigation is generated from one shared `useExpressionManagementAccess` capability resolver. The resolver consumes the already-resolved Expression permissions plus accountable ownership state, so sidebar visibility, the management hub and route gates use the same authority model.
+
+Existing leadership, studio, live, sermon, event, giving, role/invitation and ownership implementations remain canonical underneath; Phase 5 changes their route ownership and presentation rather than creating duplicate operational systems. The old Profile Leadership and Studio hubs canonicalize an active Expression back into its workspace, while legacy deep links remain compatibility paths until Phase 7 cleanup.
+
+Expression Content Studio, Reel, Watch, Live Studio and Giving configuration are locked to the active Expression when rendered below `/expressions/[expressionId]/manage`. A user who separately has public/church-wide authority cannot use an Expression management route to switch destination scope.
+
+Expression Settings uses the existing `branches.update` backend permission and exposes only day-to-day identity fields (name, member-facing code and timezone). Immutable route identity remains the Expression UUID, and platform lifecycle controls such as suspension/archive are intentionally excluded.
+
+### Phase 6 — General COT route migration
+
+Implemented a dedicated General COT shell rooted at `/general`.
+
+Primary General destinations are now:
+
+- `/general` — church-wide Home
+- `/general/explore` — public discovery
+- `/general/reels` — public Reels
+- `/general/community` — General Community
+- `/general/profile` — account and church tools
+
+The General shell owns its own five-item responsive bottom navigation. Watch, Live, sermons, series, events, public Expression profiles, posts/comments, Prayer, Giving, Church Story, Saved Library, notifications, settings, the AI assistant, Ministry Studio and church-wide leadership operations now have canonical `/general/*` routes while remaining hidden from bottom navigation.
+
+Entering `/general` explicitly clears any active private Expression context before General content renders. App restart still preserves a deliberately active Expression by routing directly back into `/expressions/[expressionId]`; General is the default when no Expression is active.
+
+General Home no longer sends `expressionId` to `home-feed`, uses an Expression-independent cache identity, does not inspect Expression capabilities, and routes public media/details through `/general/*`. General Profile no longer shows Expression Groups, birthdays, invite-code administration or Expression management authority.
+
+Shared experiences remain reusable, but route scope is explicit:
+
+- General Community and Prayer ignore stale Expression context unless rendered with `scope="expression"`.
+- General Giving is locked to church-wide scope.
+- General Reels, Watch, Live, sermons, events and posts use public/church-wide routes and request context.
+- General Ministry Studio is explicitly forced to General scope.
+- The shared leadership hub recognizes `/general` and uses church/organization permissions and General operation routes; Expression leadership/access remains inside the Expression workspace.
+
+Legacy `/(tabs)/*`, root media/detail routes and older leadership paths remain compatibility surfaces until Phase 7 removes or redirects them. They are no longer the canonical app entry or General navigation model.
+
+### Phase 7 — cleanup and hardening
+
+Implemented the production cleanup and boundary hardening pass.
+
+#### Canonical navigation and compatibility cleanup
+
+- The legacy `/(tabs)` shell is now redirect-only. It no longer renders a second bottom-navigation product.
+- Old General URLs for Live, Watch, Reels, sermons, series, Giving, Prayer, Church Story, Settings, Assistant and legacy leadership entry points redirect to canonical `/general/*` routes.
+- Old private URLs that contain only `context=expression` but no Expression ID fail closed to `/expressions` instead of guessing from the selected session.
+- Expression events, posts, comments, Watch videos, sermons, Reels and saved private media now use exact `/expressions/[expressionId]/*` links.
+- Root creator URLs no longer choose General versus Expression publishing from session state. Canonical General and Expression studio routes determine the destination.
+
+#### Membership and access lifecycle hardening
+
+- Every private Expression route refreshes membership context on entry.
+- The route boundary accepts only an active membership whose ID exactly matches the route Expression ID.
+- If a previously active Expression disappears from the refreshed membership list, the selected private context is cleared before private children render.
+- Existing session foreground refresh and two-minute refresh continue to pick up membership and role changes without requiring sign-out.
+- Switching directly from one Expression URL to another re-resolves the exact active membership before scoped content renders.
+- General COT continues to clear private Expression context before rendering General content.
+
+#### Production-language cleanup
+
+Member-facing screens no longer explain implementation details such as permissions, capabilities, provider/configuration state, Platform Administration, routing IDs, internal scope names or backend setup.
+
+A shared error sanitizer now prevents technical server messages and symbolic error codes from being rendered through common resource error states. Key workflow errors use user-facing fallback messages.
+
+Examples of the new product language include:
+
+- “Getting your private community ready.”
+- “This Expression isn’t available to you.”
+- “This tool isn’t available for your account in this Expression.”
+- “Live broadcasting isn’t available for this account.”
+- “Only the ministry tools available to you appear here.”
+- “Giving Setup” and “Giving Reports” rather than configuration/finance implementation labels.
+
+CI now contains positive boundary checks plus forbidden-copy checks so old developer wording and generic private deep links cannot be reintroduced unnoticed.
+
+## Non-negotiable security invariant
+
+A private Expression route must be authorized by the exact route Expression ID and active membership before rendering or requesting scoped private data.
+
+A selected session context alone is not sufficient authorization.

@@ -1,0 +1,352 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import type { ApiClient } from '../api';
+import { Badge, Button, Card, InputField, Modal, StatWidget, Table } from '../components/ui';
+
+type ProviderStatus = 'active' | 'disabled' | 'degraded';
+
+type PaymentConfig = {
+  id: string;
+  organization_id: string | null;
+  provider_id: string;
+  environment: 'production' | 'sandbox';
+  secret_reference: string;
+  webhook_secret_reference: string;
+  is_default: boolean;
+  is_active: boolean;
+  configuration?: Record<string, unknown>;
+};
+
+type PaymentProvider = {
+  id: string;
+  code: string;
+  name: string;
+  adapter_version: string;
+  status: ProviderStatus;
+  capabilities: string[];
+  supported_currencies: string[];
+  configured: boolean;
+  activeConfigurationCount: number;
+  configurations: PaymentConfig[];
+};
+
+type PaymentRoute = {
+  id: string;
+  organization_id: string | null;
+  currency: string;
+  payment_method: string;
+  priority: number;
+  is_active: boolean;
+  payment_providers?: { code?: string; name?: string; status?: string } | null;
+};
+
+type PaymentAttempt = {
+  id: string;
+  provider: string;
+  amount_minor: number;
+  currency: string;
+  status: string;
+  failure_code?: string | null;
+  created_at: string;
+  organizations?: { name?: string } | null;
+};
+
+type PaymentPayload = {
+  generatedAt: string;
+  summary: {
+    attempts24h: number;
+    succeeded24h: number;
+    failed24h: number;
+    processing24h: number;
+    pendingEvents: number;
+    invalidSignatureEvents: number;
+    activeConfigs: number;
+    activeRoutes: number;
+    reconciliation24h: number;
+    refundPending: number;
+    refundFailed: number;
+  };
+  providers: PaymentProvider[];
+  routes: PaymentRoute[];
+  recentAttempts: PaymentAttempt[];
+};
+
+const emptyPayload: PaymentPayload = {
+  generatedAt: '',
+  summary: {
+    attempts24h: 0,
+    succeeded24h: 0,
+    failed24h: 0,
+    processing24h: 0,
+    pendingEvents: 0,
+    invalidSignatureEvents: 0,
+    activeConfigs: 0,
+    activeRoutes: 0,
+    reconciliation24h: 0,
+    refundPending: 0,
+    refundFailed: 0,
+  },
+  providers: [],
+  routes: [],
+  recentAttempts: [],
+};
+
+const defaultReferences: Record<string, { primary: string; webhook: string }> = {
+  paystack: { primary: 'PAYMENT_PAYSTACK_PRIMARY', webhook: 'PAYMENT_PAYSTACK_WEBHOOK' },
+  stripe: { primary: 'PAYMENT_STRIPE_PRIMARY', webhook: 'PAYMENT_STRIPE_WEBHOOK' },
+};
+
+function money(amountMinor: number, currency: string) {
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(Number(amountMinor || 0) / 100);
+  } catch {
+    return `${currency} ${(Number(amountMinor || 0) / 100).toFixed(2)}`;
+  }
+}
+
+export function PaymentInfrastructure({ api, canManage = false, canManageSecrets = false }: { api: ApiClient; canManage?: boolean; canManageSecrets?: boolean }) {
+  const [data, setData] = useState<PaymentPayload>(emptyPayload);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+
+  const [provider, setProvider] = useState<PaymentProvider | null>(null);
+  const [environment, setEnvironment] = useState<'production' | 'sandbox'>('production');
+  const [secretReference, setSecretReference] = useState('');
+  const [webhookReference, setWebhookReference] = useState('');
+  const [secretValue, setSecretValue] = useState('');
+  const [webhookValue, setWebhookValue] = useState('');
+  const [showSecrets, setShowSecrets] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      setData(await api.request<PaymentPayload>('platform-payments'));
+    } catch (value) {
+      setError(value instanceof Error ? value.message : 'Unable to load payment infrastructure.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { void load(); }, [api]);
+
+  const preparedConfigs = useMemo(
+    () => data.providers.reduce((total, item) => total + item.configurations.length, 0),
+    [data.providers],
+  );
+
+  const openConfiguration = (item: PaymentProvider) => {
+    if (!canManage) return;
+    const existing = item.configurations.find((config) => config.organization_id === null && config.environment === 'production')
+      ?? item.configurations.find((config) => config.organization_id === null);
+    const defaults = defaultReferences[item.code] ?? {
+      primary: `PAYMENT_${item.code.toUpperCase()}_PRIMARY`,
+      webhook: `PAYMENT_${item.code.toUpperCase()}_WEBHOOK`,
+    };
+    setProvider(item);
+    setEnvironment(existing?.environment ?? 'production');
+    setSecretReference(existing?.secret_reference ?? defaults.primary);
+    setWebhookReference(existing?.webhook_secret_reference ?? defaults.webhook);
+    setSecretValue('');
+    setWebhookValue('');
+    setShowSecrets(false);
+    setError('');
+    setMessage('');
+  };
+
+  const storeSecret = async (reference: string, value: string, description: string) => {
+    if (!value.trim()) return;
+    if (!canManageSecrets) throw new Error('Your role cannot store or rotate platform secrets.');
+    await api.request('platform-secrets', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'store',
+        reference,
+        category: 'payments',
+        providerCode: provider?.code ?? 'payment',
+        description,
+        value,
+      }),
+    });
+  };
+
+  const savePreparation = async () => {
+    if (!canManage || !provider || !secretReference.trim() || !webhookReference.trim()) return;
+    if ((secretValue.trim() || webhookValue.trim()) && !canManageSecrets) {
+      setError('Your role can prepare payment configuration but cannot store or rotate platform secrets.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      await storeSecret(secretReference.trim().toUpperCase(), secretValue, `${provider.name} provider credential`);
+      await storeSecret(webhookReference.trim().toUpperCase(), webhookValue, `${provider.name} webhook verification secret`);
+
+      await api.request('platform-payments', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          action: 'upsert_provider_config',
+          providerId: provider.id,
+          organizationId: null,
+          environment,
+          secretReference: secretReference.trim().toUpperCase(),
+          webhookSecretReference: webhookReference.trim().toUpperCase(),
+          configuration: provider.configurations.find((config) => config.organization_id === null)?.configuration ?? {},
+          isDefault: false,
+          isActive: false,
+          reason: 'Prepared for future provider onboarding; online payments remain release-locked.',
+        }),
+      });
+
+      setSecretValue('');
+      setWebhookValue('');
+      setProvider(null);
+      setMessage(`${provider.name} credentials/configuration prepared. Online payment remains unavailable.`);
+      await load();
+    } catch (value) {
+      setError(value instanceof Error ? value.message : 'Unable to prepare payment provider configuration.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="admin-page-stack">
+      <Card
+        title="Payment infrastructure"
+        subtitle="Manual bank transfer is the active production giving method. Online payment services remain unavailable until service setup and production approval are complete."
+        headerAction={<Button variant="outline" size="sm" onClick={() => void load()} loading={loading}>Refresh</Button>}
+      >
+        <div className="admin-stats-grid">
+          <StatWidget
+            title="Online Payments"
+            value="OFF"
+            subtitle="Manual bank transfer remains the production giving method"
+            icon="LOCK"
+            variant="gold"
+          />
+          <StatWidget
+            title="Payment Services"
+            value={data.providers.length}
+            subtitle="Installed for future verified rollout"
+            icon="ADAPTERS"
+          />
+          <StatWidget
+            title="Prepared Configs"
+            value={preparedConfigs}
+            subtitle="Stored safely and kept inactive"
+            icon="READY"
+            variant="success"
+          />
+          <StatWidget
+            title="Active Routes"
+            value={data.summary.activeRoutes}
+            subtitle={data.summary.activeRoutes === 0 ? 'Correct release-locked state' : 'Review immediately'}
+            trend={{
+              value: data.summary.activeRoutes === 0 ? 'No online payment path active' : 'Unexpected online payment path',
+              isPositive: data.summary.activeRoutes === 0,
+            }}
+            icon="ROUTES"
+            variant={data.summary.activeRoutes === 0 ? 'default' : 'live'}
+          />
+        </div>
+      </Card>
+
+      {error ? <div className="admin-inline-error" role="alert">{error}</div> : null}
+      {message ? <div className="admin-status-message admin-status-success">{message}</div> : null}
+
+      <Card
+        title="Payment service setup"
+        subtitle="You may safely save payment credentials now. They are encrypted and cannot be displayed again. Saving credentials does not enable online giving."
+      >
+        <div className="admin-provider-grid">
+          {data.providers.map((item) => {
+            const globalConfig = item.configurations.find((config) => config.organization_id === null);
+            return (
+              <div key={item.id} className="admin-provider-card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: 16 }}>{item.name}</h4>
+                    <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 4 }}>{item.code} · connection {item.adapter_version}</div>
+                  </div>
+                  <Badge label="FUTURE / OFF" variant="neutral" />
+                </div>
+                <p style={{ color: 'var(--text-secondary)', fontSize: 12, lineHeight: 1.6 }}>
+                  {globalConfig ? `Credential name prepared: ${globalConfig.secret_reference}` : 'This payment service has not been prepared yet.'}
+                </p>
+                <div className="admin-capability-tags">
+                  {(item.capabilities ?? []).map((capability) => <span key={capability} className="active">{capability}</span>)}
+                </div>
+                {canManage ? <Button variant="outline" size="sm" onClick={() => openConfiguration(item)}>{canManageSecrets ? 'Prepare credentials' : 'Prepare configuration'}</Button> : <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Read only</div>}
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+
+      <Card
+        title="Online payment paths"
+        subtitle="Online payment remains unavailable in the current release. No payment path should be active."
+      >
+        <Table
+          columns={[
+            { header: 'CURRENCY', accessor: (item) => item.currency },
+            { header: 'METHOD', accessor: (item) => item.payment_method },
+            { header: 'SERVICE', accessor: (item) => item.payment_providers?.name ?? '—' },
+            { header: 'PRIORITY', accessor: (item) => item.priority },
+            { header: 'STATE', accessor: (item) => <Badge label={item.is_active ? 'BLOCKED ACTIVE' : 'INACTIVE'} variant={item.is_active ? 'warning' : 'neutral'} /> },
+          ]}
+          data={data.routes}
+          keyExtractor={(item) => item.id}
+          loading={loading}
+          emptyMessage="No future online payment paths have been prepared."
+        />
+      </Card>
+
+      <Card title="Payment activity history" subtitle="Review past online payment attempts for audit and future rollout checks.">
+        <Table
+          columns={[
+            { header: 'SERVICE', accessor: (item) => item.provider },
+            { header: 'CHURCH', accessor: (item) => item.organizations?.name ?? '—' },
+            { header: 'AMOUNT', accessor: (item) => money(item.amount_minor, item.currency) },
+            { header: 'STATUS', accessor: (item) => <Badge label={item.status.toUpperCase()} variant={item.status === 'succeeded' ? 'active' : item.status === 'failed' ? 'suspended' : 'neutral'} /> },
+            { header: 'CREATED', accessor: (item) => new Date(item.created_at).toLocaleString() },
+          ]}
+          data={data.recentAttempts}
+          keyExtractor={(item) => item.id}
+          loading={loading}
+          emptyMessage="No online payment attempts exist."
+        />
+      </Card>
+
+      <Modal
+        isOpen={canManage && !!provider}
+        onClose={() => { if (!busy) setProvider(null); }}
+        title={provider ? `Prepare ${provider.name}` : 'Prepare payment provider'}
+        subtitle="Credentials are encrypted and protected when saved. The payment service remains inactive after preparation."
+        footer={<div style={{ display: 'flex', gap: 10 }}><Button variant="outline" disabled={busy} onClick={() => setProvider(null)}>Cancel</Button><Button variant="primary" loading={busy} onClick={() => void savePreparation()}>Save preparation</Button></div>}
+      >
+        <div className="admin-modal-form">
+          <label className="admin-form-group">
+            <span className="admin-form-label">Environment</span>
+            <select className="admin-form-select" value={environment} onChange={(event) => setEnvironment(event.target.value as 'production' | 'sandbox')}>
+              <option value="production">Production</option>
+              <option value="sandbox">Sandbox / test</option>
+            </select>
+          </label>
+          <InputField label="Payment credential name" value={secretReference} onChange={(event) => setSecretReference(event.target.value.toUpperCase())} helperText="Stable name used by COT for the protected payment credential." />
+          {canManageSecrets ? <InputField label="Provider API secret / key" type={showSecrets ? 'text' : 'password'} value={secretValue} onChange={(event) => setSecretValue(event.target.value)} placeholder="Leave blank to keep the existing secret" autoComplete="new-password" /> : null}
+          <InputField label="Payment verification credential name" value={webhookReference} onChange={(event) => setWebhookReference(event.target.value.toUpperCase())} />
+          {canManageSecrets ? <InputField label="Webhook verification secret" type={showSecrets ? 'text' : 'password'} value={webhookValue} onChange={(event) => setWebhookValue(event.target.value)} placeholder="Leave blank to keep the existing secret" autoComplete="new-password" /> : <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Your role may reuse saved credential names but cannot add or replace payment credentials.</p>}
+          {canManageSecrets ? <label className="admin-inline-check"><input type="checkbox" checked={showSecrets} onChange={(event) => setShowSecrets(event.target.checked)} /><span>Show values while entering them on this device</span></label> : null}
+          <div className="admin-warning-callout">
+            Saving here does <strong>not</strong> enable online payment. Manual transfer remains the production giving method until a future provider rollout is explicitly released.
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+}

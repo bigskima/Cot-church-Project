@@ -1,0 +1,608 @@
+import { access, readFile, readdir } from 'node:fs/promises';
+
+const requiredFiles = [
+  'supabase/config.toml',
+  'supabase/functions/_shared/config.ts',
+  'supabase/functions/_shared/context.ts',
+  'supabase/functions/_shared/cors.ts',
+  'supabase/functions/_shared/errors.ts',
+  'supabase/functions/_shared/handler.ts',
+  'supabase/functions/_shared/logging.ts',
+  'supabase/functions/_shared/request.ts',
+  'supabase/functions/_shared/response.ts',
+  'supabase/functions/_shared/supabase.ts',
+  'supabase/functions/_shared/validation.ts',
+  'supabase/functions/login/index.ts',
+  'supabase/functions/refresh-session/index.ts',
+  'supabase/functions/signup/index.ts',
+  'supabase/functions/password-recovery/index.ts',
+  'supabase/functions/password-reset/index.ts',
+  'supabase/functions/profile/index.ts',
+  'supabase/functions/verify-otp/index.ts',
+  'supabase/functions/organization-context/index.ts',
+  'supabase/functions/onboarding/index.ts',
+  'supabase/functions/organizations/index.ts',
+  'supabase/functions/branches/index.ts',
+  'supabase/functions/memberships/index.ts',
+  'supabase/functions/roles/index.ts',
+  'supabase/functions/role-assignments/index.ts',
+  'supabase/functions/permissions/index.ts',
+  'supabase/functions/events/index.ts',
+  'supabase/functions/event-registrations/index.ts',
+  'supabase/functions/attendance/index.ts',
+  'supabase/functions/audit-log/index.ts',
+  'supabase/functions/organization-units/index.ts',
+  'supabase/functions/groups/index.ts',
+  'supabase/functions/prayer-requests/index.ts',
+  'supabase/functions/volunteers/index.ts',
+  'supabase/functions/announcements/index.ts',
+  'supabase/functions/notification-settings/index.ts',
+  'supabase/functions/conversations/index.ts',
+  'supabase/functions/notifications/index.ts',
+  'supabase/functions/notification-dispatch/index.ts',
+  'supabase/functions/governance-invitations/index.ts',
+  'supabase/functions/platform-admin-invitations/index.ts',
+  'supabase/functions/membership-invitations/index.ts',
+  'supabase/functions/expression-memberships/index.ts',
+  'supabase/functions/_shared/rate-limit.ts',
+  'supabase/functions/giving/index.ts',
+  'supabase/functions/public-giving/index.ts',
+  'supabase/functions/finance/index.ts',
+  'supabase/functions/payment-events/index.ts',
+  'supabase/functions/live-streams/index.ts',
+  'supabase/functions/social-feed/index.ts',
+  'supabase/functions/public-social-feed/index.ts',
+  'supabase/functions/community-media/index.ts',
+  'supabase/functions/_shared/public-identity.ts',
+  'supabase/functions/public-content/index.ts',
+  'supabase/functions/engagement/index.ts',
+  'supabase/functions/_shared/feed-ranking.ts',
+  'supabase/functions/reports/index.ts',
+  'supabase/functions/integrations/index.ts',
+  'supabase/functions/workflow-dispatch/index.ts',
+  'supabase/functions/streaming-broadcasts/index.ts',
+  'supabase/functions/streaming-webhook/index.ts',
+  'supabase/functions/streaming-recordings/index.ts',
+  'supabase/functions/stream-access/index.ts',
+  'supabase/functions/ai-gateway/index.ts',
+  'supabase/functions/_shared/cot-life-guidance.ts',
+  'supabase/functions/pastoral-followups/index.ts',
+  'supabase/functions/bible/index.ts',
+  'supabase/functions/ai-review/index.ts',
+  'supabase/functions/sermons/index.ts',
+  'supabase/functions/branding/index.ts',
+  'supabase/functions/church-story/index.ts',
+  'supabase/functions/platform-context/index.ts',
+  'supabase/functions/platform-overview/index.ts',
+  'supabase/functions/platform-organizations/index.ts',
+  'supabase/functions/platform-expressions/index.ts',
+  'supabase/functions/platform-users/index.ts',
+  'supabase/functions/platform-moderation/index.ts',
+  'supabase/functions/platform-roles-access/index.ts',
+  'supabase/functions/platform-audit/index.ts',
+  'supabase/functions/platform-streaming/index.ts',
+  'supabase/functions/platform-ai/index.ts',
+  'supabase/functions/platform-admin-guide/index.ts',
+  'supabase/functions/platform-features/index.ts',
+  'supabase/functions/platform-integrations/index.ts',
+  'supabase/functions/platform-public-directory/index.ts',
+  'supabase/functions/platform-payments/index.ts',
+  'supabase/functions/platform-giving/index.ts',
+  'supabase/functions/search/index.ts',
+  'supabase/functions/chat/index.ts',
+  'supabase/functions/group-chat/index.ts',
+  'supabase/functions/public-profile/index.ts',
+  'supabase/functions/profile-banner/index.ts',
+  'supabase/functions/realtime-config/index.ts',
+  'supabase/functions/public-event-detail/index.ts',
+  'supabase/functions/expression-media/index.ts',
+];
+
+await Promise.all(requiredFiles.map((file) => access(file)));
+
+const supabaseConfig = await readFile('supabase/config.toml', 'utf8');
+const handler = await readFile('supabase/functions/_shared/handler.ts', 'utf8');
+const cors = await readFile('supabase/functions/_shared/cors.ts', 'utf8');
+const publicEventDetail = await readFile('supabase/functions/public-event-detail/index.ts', 'utf8');
+const expressionMedia = await readFile('supabase/functions/expression-media/index.ts', 'utf8');
+const authContext = await readFile('supabase/functions/_shared/context.ts', 'utf8');
+const response = await readFile('supabase/functions/_shared/response.ts', 'utf8');
+const signup = await readFile('supabase/functions/signup/index.ts', 'utf8');
+const organizationContext = await readFile('supabase/functions/organization-context/index.ts', 'utf8');
+const platformRolesAccess = await readFile('supabase/functions/platform-roles-access/index.ts', 'utf8');
+const platformModeration = await readFile('supabase/functions/platform-moderation/index.ts', 'utf8');
+const publicPostingPolicyMigration = await readFile('supabase/migrations/20260908182339_platform_public_posting_policy.sql', 'utf8');
+const publicPostingPolicyHardening = await readFile('supabase/migrations/20260908190901_platform_public_posting_policy_hardening.sql', 'utf8');
+const platformExpressions = await readFile('supabase/functions/platform-expressions/index.ts', 'utf8');
+const destructiveModerationMigration = await readFile('supabase/migrations/20260908194500_platform_destructive_moderation.sql', 'utf8');
+const destructiveModerationAdvisorHardening = await readFile('supabase/migrations/20260908194824_platform_destructive_moderation_advisor_hardening.sql', 'utf8');
+const streamingBroadcasts = await readFile('supabase/functions/streaming-broadcasts/index.ts', 'utf8');
+const liveStreams = await readFile('supabase/functions/live-streams/index.ts', 'utf8');
+const onboarding = await readFile('supabase/functions/onboarding/index.ts', 'utf8');
+const mobileOnboarding = await readFile('apps/mobile/app/onboarding.tsx', 'utf8');
+const onboardingGate = await readFile('apps/mobile/src/components/OnboardingGate.tsx', 'utf8');
+const login = await readFile('supabase/functions/login/index.ts', 'utf8');
+const refreshSession = await readFile('supabase/functions/refresh-session/index.ts', 'utf8');
+const passwordReset = await readFile('supabase/functions/password-reset/index.ts', 'utf8');
+const organizations = await readFile('supabase/functions/organizations/index.ts', 'utf8');
+const memberships = await readFile('supabase/functions/memberships/index.ts', 'utf8');
+const expressionMemberships = await readFile('supabase/functions/expression-memberships/index.ts', 'utf8');
+const roles = await readFile('supabase/functions/roles/index.ts', 'utf8');
+const events = await readFile('supabase/functions/events/index.ts', 'utf8');
+const signupRateLimited = await readFile('supabase/functions/signup/index.ts', 'utf8');
+const rateLimit = await readFile('supabase/functions/_shared/rate-limit.ts', 'utf8');
+const paymentEvents = await readFile('supabase/functions/payment-events/index.ts', 'utf8');
+const publicContent = await readFile('supabase/functions/public-content/index.ts', 'utf8');
+const socialFeed = await readFile('supabase/functions/social-feed/index.ts', 'utf8');
+const publicSocialFeed = await readFile('supabase/functions/public-social-feed/index.ts', 'utf8');
+const communityMedia = await readFile('supabase/functions/community-media/index.ts', 'utf8');
+const publicIdentity = await readFile('supabase/functions/_shared/public-identity.ts', 'utf8');
+const engagement = await readFile('supabase/functions/engagement/index.ts', 'utf8');
+const homeFeed = await readFile('supabase/functions/home-feed/index.ts', 'utf8');
+const streamAccess = await readFile('supabase/functions/stream-access/index.ts', 'utf8');
+const contentMedia = await readFile('supabase/functions/content-media/index.ts', 'utf8');
+const creatorStudio = await readFile('supabase/functions/creator-studio/index.ts', 'utf8');
+const publicOrganization = await readFile('supabase/functions/_shared/public-organization.ts', 'utf8');
+const generalPublicCreationMigration = await readFile('supabase/migrations/20260908171653_general_authenticated_public_creation.sql', 'utf8');
+const feedRanking = await readFile('supabase/functions/_shared/feed-ranking.ts', 'utf8');
+const eventRegistrations = await readFile('supabase/functions/event-registrations/index.ts', 'utf8');
+const sermons = await readFile('supabase/functions/sermons/index.ts', 'utf8');
+const branding = await readFile('supabase/functions/branding/index.ts', 'utf8');
+const churchStory = await readFile('supabase/functions/church-story/index.ts', 'utf8');
+const prayerRequests = await readFile('supabase/functions/prayer-requests/index.ts', 'utf8');
+const announcements = await readFile('supabase/functions/announcements/index.ts', 'utf8');
+const giving = await readFile('supabase/functions/giving/index.ts', 'utf8');
+const publicGiving = await readFile('supabase/functions/public-giving/index.ts', 'utf8');
+const platformGiving = await readFile('supabase/functions/platform-giving/index.ts', 'utf8');
+const retiredSearch = await readFile('supabase/functions/search/index.ts', 'utf8');
+const platformPayments = await readFile('supabase/functions/platform-payments/index.ts', 'utf8');
+const platformStreaming = await readFile('supabase/functions/platform-streaming/index.ts', 'utf8');
+const platformAi = await readFile('supabase/functions/platform-ai/index.ts', 'utf8');
+const platformAdminGuide = await readFile('supabase/functions/platform-admin-guide/index.ts', 'utf8');
+const bible = await readFile('supabase/functions/bible/index.ts', 'utf8');
+const aiRouter = await readFile('supabase/functions/_shared/ai/router.ts', 'utf8');
+const aiRegistry = await readFile('supabase/functions/_shared/ai/registry.ts', 'utf8');
+const cloudflareAi = await readFile('supabase/functions/_shared/ai/cloudflare.ts', 'utf8');
+const aiGateway = await readFile('supabase/functions/ai-gateway/index.ts', 'utf8');
+const cotLifeGuidance = await readFile('supabase/functions/_shared/cot-life-guidance.ts', 'utf8');
+const pastoralFollowups = await readFile('supabase/functions/pastoral-followups/index.ts', 'utf8');
+const aiPastoralCareMigration = await readFile('supabase/migrations/20260923021234_ai_pastoral_care_alerts.sql', 'utf8');
+const cloudflareAiFallbackMigration = await readFile('supabase/migrations/20260923030953_cloudflare_ai_assistant_fallback.sql', 'utf8');
+const adminGuidePage = await readFile('apps/admin/src/components/AdminGuide.tsx', 'utf8');
+const adminShell = await readFile('apps/admin/src/components/Shell.tsx', 'utf8');
+const platformSecrets = await readFile('supabase/functions/platform-secrets/index.ts', 'utf8');
+const platformFeatures = await readFile('supabase/functions/platform-features/index.ts', 'utf8');
+const platformIntegrations = await readFile('supabase/functions/platform-integrations/index.ts', 'utf8');
+const notifications = await readFile('supabase/functions/notifications/index.ts', 'utf8');
+const notificationSettings = await readFile('supabase/functions/notification-settings/index.ts', 'utf8');
+const mobileNotificationSettingsPage = await readFile('apps/mobile/app/(tabs)/profile/notification-settings.tsx', 'utf8');
+const mobileSavedLibrary = await readFile('apps/mobile/app/(tabs)/profile/saved.tsx', 'utf8');
+const governanceInvitations = await readFile('supabase/functions/governance-invitations/index.ts', 'utf8');
+const platformAdminInvitations = await readFile('supabase/functions/platform-admin-invitations/index.ts', 'utf8');
+const platformPublicDirectory = await readFile('supabase/functions/platform-public-directory/index.ts', 'utf8');
+const ministryBoundaryMigration = await readFile('supabase/migrations/20260919170000_restore_ministry_owned_operations.sql', 'utf8');
+const mobileNotificationsPage = await readFile('apps/mobile/app/(tabs)/profile/notifications.tsx', 'utf8');
+const mobileNotificationsExperience = await readFile('apps/mobile/src/features/notifications/NotificationsExperience.tsx', 'utf8');
+const adminLoginPage = await readFile('apps/admin/src/components/Login.tsx', 'utf8');
+const adminAiPage = await readFile('apps/admin/src/pages/AiInfrastructure.tsx', 'utf8');
+const adminBiblePage = await readFile('apps/admin/src/pages/BibleInfrastructure.tsx', 'utf8');
+const adminStreamingPage = await readFile('apps/admin/src/pages/StreamingInfrastructure.tsx', 'utf8');
+const adminPaymentsPage = await readFile('apps/admin/src/pages/PaymentInfrastructure.tsx', 'utf8');
+const adminIntegrationsPage = await readFile('apps/admin/src/pages/IntegrationsJobs.tsx', 'utf8');
+const adminFeaturesPage = await readFile('apps/admin/src/pages/FeatureFlags.tsx', 'utf8');
+const gatewayConfig = await readFile('supabase/config.toml', 'utf8');
+const rateLimitRpcHardening = await readFile('supabase/migrations/20260905103057_restore_privileged_rpc_execute_boundaries.sql', 'utf8');
+const privilegedRpcGrantHardening = await readFile('supabase/migrations/20260905121228_harden_remaining_privileged_rpc_execute_grants.sql', 'utf8');
+const streamGrantHardening = await readFile('supabase/migrations/20260905121401_restore_stream_and_idempotency_execute_boundaries.sql', 'utf8');
+const triggerGrantHardening = await readFile('supabase/migrations/20260905121523_remove_api_execute_from_security_definer_triggers.sql', 'utf8');
+const profileStateRpcHardening = await readFile('supabase/migrations/20260905122057_harden_ai_usage_and_profile_state_rpc_access.sql', 'utf8');
+
+const socialChatContracts = [
+  await readFile('supabase/functions/chat/index.ts', 'utf8'),
+  await readFile('supabase/functions/group-chat/index.ts', 'utf8'),
+  await readFile('supabase/functions/public-profile/index.ts', 'utf8'),
+  await readFile('supabase/functions/profile-banner/index.ts', 'utf8'),
+  await readFile('supabase/functions/realtime-config/index.ts', 'utf8'),
+].join('\n');
+
+const invariants = [
+  [aiGateway, /protectedCredentialReply[\s\S]*Platform Administration credentials[\s\S]*protected_information/, 'COT AI refuses protected credentials deterministically'],
+  [aiGateway, /assistantBoundaryReply[\s\S]*authorised pastoral-care roles/, 'COT AI explains privacy, access and pastoral-safety limits explicitly'],
+  [aiGateway, /guardrail:\s*"assistant_boundaries"/, 'COT AI boundary questions use the deterministic assistant-boundaries guardrail'],
+  [aiGateway, /You serve a Christian church and Christian discipleship:[\s\S]*Jesus Christ is the center[\s\S]*Scripture is the primary authority/, 'COT AI system identity is explicitly Christ-centered and Scripture-grounded'],
+  [aiGateway, /christCenteredFaithRule[\s\S]*shared ethics[\s\S]*same doctrine, gospel, salvation, or faith/, 'COT AI does not confuse shared ethics with shared Christian faith'],
+  [aiGateway, /When Islam is part of the comparison[\s\S]*without attacking Muslims[\s\S]*theologically interchangeable/, 'COT AI handles Islam comparison briefly, respectfully and from Christian doctrine'],
+  [aiRegistry, /cloudflare:new CloudflareProvider\(\)/, 'generic AI registry includes Cloudflare fallback adapter'],
+  [cloudflareAi, /CLOUDFLARE_ACCOUNT_ID[\s\S]*ai\/run\/[\s\S]*messages/, 'Cloudflare fallback uses existing account secret and chat-completions runtime'],
+  [cloudflareAi, /supports\(capability:[\s\S]*generateText[\s\S]*generateStructuredData/, 'Cloudflare fallback declares supported text capabilities'],
+  [cloudflareAiFallbackMigration, /cloudflare[\s\S]*@cf\/meta\/llama-3\.2-3b-instruct[\s\S]*fallback_model_ids[\s\S]*max_retries=0/, 'COT AI route falls back to Cloudflare before the secondary Gemini model'],
+  [aiGateway, /request_pastoral_support[\s\S]*createPastoralAlert[\s\S]*member_requested/, 'COT AI supports explicit member-requested pastoral care'],
+  [aiGateway, /self_harm_risk[\s\S]*take my life[\s\S]*autoEscalate:\s*true[\s\S]*createPastoralAlert[\s\S]*automatic_safety/, 'COT AI detects direct take-my-life language and can trigger transparent pastoral escalation'],
+  [aiGateway, /COT_DEFAULT_EMERGENCY_COUNTRY = "Nigeria"[\s\S]*COT_NIGERIA_EMERGENCY_NUMBER = "112"[\s\S]*nigeriaUrgentSafetyLead/, 'COT AI uses deterministic Nigeria-first emergency guidance'],
+  [aiGateway, /stripForeignCrisisContacts[\s\S]*988[\s\S]*911[\s\S]*Samaritans/, 'COT AI removes common foreign crisis contacts from urgent model output'],
+  [aiGateway, /Do not provide any phone number, hotline, crisis line, or named overseas crisis service[\s\S]*server will prepend verified Nigeria-specific emergency guidance/, 'COT AI keeps model-generated urgent support free of unverified hotline numbers'],
+  [cotLifeGuidance, /self-harm-crisis[\s\S]*Nigeria[\s\S]*112[\s\S]*emotional-distress[\s\S]*Psalm 34:18/, 'COT AI curated life guidance includes Nigeria-first suicide safety and Scripture-grounded support'],
+  [pastoralFollowups, /requested_permission:\s*"pastoral\.followups\.receive"/, 'pastoral follow-up API requires exact-scope care permission'],
+  [pastoralFollowups, /\.from\("ai_pastoral_alerts"\)/, 'pastoral follow-up API includes COT AI alerts'],
+  [pastoralFollowups, /function mappedAi\([\s\S]*last_member_message/, 'pastoral follow-up API maps confidential COT AI care context'],
+  [aiPastoralCareMigration, /alter table public\.ai_pastoral_alerts enable row level security[\s\S]*can_receive_pastoral_followups/, 'COT AI pastoral alerts are exact-scope RLS protected'],
+  [aiPastoralCareMigration, /notify_ai_pastoral_alert[\s\S]*recipient_profile_id[\s\S]*p\.code='pastoral\.followups\.receive'/, 'COT AI pastoral notifications route only to authorised care roles'],
+  [socialChatContracts, /direct_conversations[\s\S]*direct_messages/, 'global profile-to-profile direct messaging contract'],
+  [bible, /platform-config[\s\S]*platform\.bible\.read/, 'Bible platform configuration uses platform read authority'],
+  [bible, /platform_translation_save[\s\S]*platform\.bible\.manage/, 'Bible translation governance uses platform manage authority'],
+  [bible, /kjvFullBible[\s\S]*GETBIBLE_BASE.*kjv\.json/, 'Bible keyword search uses KJV public-domain corpus'],
+  [adminShell, /key: 'bible'[\s\S]*label: 'Bible Experience'[\s\S]*platform\.bible\.read/, 'Platform Administration exposes dedicated Bible navigation'],
+  [adminBiblePage, /WEB \(World English Bible\)[\s\S]*disabled[\s\S]*not shown to members/, 'Bible administration explains WEB retirement'],
+  [adminBiblePage, /Set default/, 'Bible administration supports selecting the platform default translation'],
+  [socialChatContracts, /organization:\s*"none"/, 'direct chat is independent of Expression membership context'],
+  [socialChatContracts, /group_memberships[\s\S]*group_messages/, 'Group chat remains a separate membership-scoped conversation'],
+  [socialChatContracts, /targetProfileId|target_profile_id/, 'individual member follow target contract'],
+  [socialChatContracts, /banner_url|profile-banners/, 'member profile banner contract'],
+  [handler, /request\.method === "OPTIONS"/, 'CORS preflight handling'],
+  [handler, /await corsHeaders\(request\)/, 'CORS policy resolves asynchronous runtime configuration'],
+  [cors, /platform_web_origins/, 'provider-agnostic database origin configuration'],
+  [cors, /originMatchesPattern/, 'generic exact and wildcard browser-origin matching'],
+  [publicEventDetail, /createHandler/, 'public event detail uses shared request and CORS infrastructure'],
+  [expressionMedia, /createHandler/, 'Expression media uses shared request and CORS infrastructure'],
+  [handler, /authenticate\(request/, 'central authentication'],
+  [handler, /options\.organization \?\? "optional"/, 'handler preserves explicit organisation context mode'],
+  [authContext, /organizationMode === "none"[\s\S]*?organizationId[\s\S]*?null/, 'organisation-independent endpoints ignore stale organisation headers'],
+  [authContext, /organizationMode === "none"[\s\S]*?branchId[\s\S]*?null/, 'organisation-independent endpoints ignore stale Expression headers'],
+  [handler, /authorize\(auth/, 'central authorization'],
+  [handler, /api_request_failed/, 'structured failure logging'],
+  [response, /requestId/, 'request IDs in response envelopes'],
+  [response, /Cache-Control.*no-store/, 'no-store response caching'],
+  [gatewayConfig, /\[functions\.onboarding\][\s\S]*?verify_jwt\s*=\s*false/, 'onboarding gateway delegates authentication to shared handler'],
+  [signup, /client\.auth\.signUp/, 'Supabase Auth signup'],
+  [signup, /assertNoUnknownFields/, 'strict signup validation'],
+  [organizationContext, /effectivePermissions/, 'effective permission resolution'],
+  [organizationContext, /requestedMembership[\s\S]*memberships\[0\][\s\S]*requestedMembership\.id/, 'first-response role resolution before persisted church headers'],
+  [organizationContext, /creatorOrganizations/, 'Expression creator authority remains separate from membership permissions'],
+  [organizationContext, /publicCapabilitiesResult[\s\S]*publicCapabilities/, 'public capability resolution independent of Expression roles'],
+  [platformRolesAccess, /methods:\s*\["GET",\s*"PATCH"\]/, 'Roles & Access read/update methods'],
+  [platformRolesAccess, /platform\.roles\.read/, 'Roles & Access read authority'],
+  [platformRolesAccess, /platform\.roles\.manage/, 'Roles & Access mutation authority'],
+  [platformRolesAccess, /set_public_capability_assignment/, 'audited public capability assignment'],
+  [streamingBroadcasts, /organization:\s*"none"/, 'broadcast authority does not depend on stale membership headers'],
+  [streamingBroadcasts, /has_public_capability/, 'root public broadcast capability check'],
+  [streamingBroadcasts, /has_permission[\s\S]*streams\.broadcast/, 'Expression broadcast permission check'],
+  [streamingBroadcasts, /EXPRESSION_PUBLICATION_REQUIRES_SEPARATE_FLOW/, 'Expression livestreams cannot leak directly to General Community'],
+  [liveStreams, /PUBLIC_LIVE_PERMISSION_REQUIRED/, 'public broadcast management role boundary'],
+  [onboarding, /methods:\s*\["GET",\s*"POST"\]/, 'onboarding read/update backend methods'],
+  [onboarding, /authentication:\s*"required"/, 'onboarding requires an authenticated identity'],
+  [onboarding, /action === "accept_policy"/, 'versioned onboarding policy acknowledgement'],
+  [onboarding, /action === "complete"/, 'versioned onboarding completion'],
+  [mobileOnboarding, /api\.request<OnboardingPayload>\('onboarding'/, 'mobile onboarding API contract'],
+  [onboardingGate, /api[\s\S]*\.request<OnboardingStatus>\('onboarding'/, 'authenticated first-run onboarding gate'],
+  [organizationContext, /expressionMemberships/, 'multiple Expression membership resolution'],
+  [organizationContext, /requestedExpressionMembership/, 'deliberate exact Expression context resolution'],
+  [expressionMemberships, /expression-invite-preview/, 'Expression invite preview rate limiting'],
+  [expressionMemberships, /expression-invite-redeem/, 'Expression invite redemption rate limiting'],
+  [expressionMemberships, /generate_expression_invite_code/, 'server-generated Expression invite codes'],
+  [expressionMemberships, /revoke_expression_invite_code/, 'Expression invite revocation'],
+  [publicContent, /type === "expression"/, 'public Expression profile contract'],
+  [socialFeed, /organization:\s*"optional"/, 'social publishing separates public and scoped membership context'],
+  [socialFeed, /resolveActiveOrganizationId[\s\S]*requestedOrganizationId[\s\S]*targetOrganizationId/, 'root General Community publishing resolves church context without membership'],
+  [socialFeed, /view === "post"[\s\S]*postId[\s\S]*scope === "expression"[\s\S]*auth\.branchId/, 'scoped post detail binds exact active Expression'],
+  [publicSocialFeed, /postId[\s\S]*query = query\.eq\("id", postId\)[\s\S]*POST_NOT_FOUND/, 'public post detail returns one published General Community post'],
+  [communityMedia, /organization:\s*"none"/, 'community media ignores stale membership headers'],
+  [communityMedia, /expression_memberships/, 'Expression media still validates exact membership'],
+  [publicIdentity, /profileAuthorMap/, 'public profile-authored posts resolve identity without membership'],
+  [publicContent, /type === "event"/, 'exact public event detail contract'],
+  [publicContent, /type === "video"/, 'exact public video detail contract'],
+  [publicContent, /type === "sermon"/, 'exact public sermon detail contract'],
+  [publicContent, /Search must be between 2 and 100 characters/, 'bounded public search input'],
+  [publicContent, /type === "series-detail"/, 'exact public sermon series contract'],
+  [publicContent, /PUBLIC_SERIES_SERMONS_FAILED/, 'series partial-failure handling'],
+  [publicContent, /replace\(\/\[\\\\%_\]/, 'public search wildcard escaping'],
+  [eventRegistrations, /cancel_event_registration/, 'event registration cancellation'],
+  [eventRegistrations, /REGISTRATION_ACCESS_DENIED/, 'event eligibility error mapping'],
+  [homeFeed, /rankFeedCandidates/, 'public feed personalization pipeline'],
+  [homeFeed, /from\("social_posts"\)[\s\S]*?is\("branch_id", null\)\.eq\("visibility", "public"\)/, 'General Home social posts exclude Expression-scoped posts'],
+  [homeFeed, /kind: "post" as const[\s\S]*?posts\.forEach/, 'Home social posts participate in canonical feed ranking'],
+  [homeFeed, /followedExpressionIds/, 'follow-driven public recommendations'],
+  [homeFeed, /inProgressContentIds/, 'continue-watching recommendation signal'],
+  [homeFeed, /value === selectedExpressionId/, 'exact Expression home isolation'],
+  [homeFeed, /scheduled"[\s\S]*provisioning"[\s\S]*ready"[\s\S]*processing"[\s\S]*replay_ready"/, 'public livestream feed lifecycle coverage'],
+  [streamAccess, /scheduled"[\s\S]*provisioning"[\s\S]*ready"[\s\S]*processing"[\s\S]*replay_ready"[\s\S]*failed"/, 'livestream detail lifecycle coverage'],
+  [streamAccess, /playbackEligible[\s\S]*live"[\s\S]*ended"[\s\S]*processing"[\s\S]*replay_ready"/, 'livestream playback lifecycle gating'],
+  [streamAccess, /giving_settings[\s\S]*givingEnabled/, 'live giving visibility follows scoped configuration'],
+  [publicContent, /type === "videos"[\s\S]*author_profile_id[\s\S]*enrichContentCreators/, 'public Watch lists include real creator attribution'],
+  [publicContent, /type === "streams"[\s\S]*provisioning[\s\S]*ready[\s\S]*processing[\s\S]*replay_ready/, 'public stream catalogue lifecycle coverage'],
+  [contentMedia, /action"\) === "video_detail"[\s\S]*content_items\.expression_id[\s\S]*auth\.branchId/, 'exact Expression Watch detail is scoped to active Expression'],
+  [contentMedia, /video_detail[\s\S]*enrichContentCreators/, 'exact Expression Watch detail includes creator attribution'],
+  [contentMedia, /can_profile_post[\s\S]*expressionId[\s\S]*auth\.branchId[\s\S]*authorize\(auth, "media\.upload"\)[\s\S]*admin\.rpc\("can_profile_post_publicly"/, 'media upload keeps individual restrictions while applying global policy only to General creation'],
+  [contentMedia, /resolveActiveOrganizationId[\s\S]*organizationId/, 'General content media resolves the active church without membership context'],
+  [communityMedia, /can_profile_post[\s\S]*const action[\s\S]*branchId[\s\S]*admin\.rpc\("can_profile_post_publicly"/, 'community media keeps account restrictions and applies public policy only to General uploads'],
+  [communityMedia, /audio\/webm/, 'community media accepts browser voice recordings'],
+  [publicOrganization, /limit\(2\)[\s\S]*ORGANIZATION_REQUIRED/, 'public organization resolver fails closed when General context is ambiguous'],
+  [creatorStudio, /organization:\s*"optional"[\s\S]*admin\.rpc\("can_profile_post_publicly"[\s\S]*publish_typed_reel[\s\S]*publish_typed_video/, 'General creator studio obeys the platform public posting policy'],
+  [generalPublicCreationMigration, /publish_social_post_with_uploads[\s\S]*media_kind[\s\S]*publish_typed_reel[\s\S]*can_profile_post[\s\S]*publish_typed_video[\s\S]*created_by <> auth\.uid\(\)/, 'General publishing migration keeps multimedia creation authenticated and owner-scoped'],
+  [publicPostingPolicyMigration, /platform_public_posting_policy[\s\S]*mode in \('open', 'closed', 'allowlist'\)[\s\S]*platform_public_posting_exemptions/, 'platform public posting policy supports open, paused, and approved-only modes'],
+  [publicPostingPolicyMigration, /can_profile_post[\s\S]*profile_posting_controls[\s\S]*platform_user_restrictions/, 'individual posting checks combine legacy profile controls with platform restrictions'],
+  [publicPostingPolicyMigration, /can_profile_post_publicly[\s\S]*policy_mode = 'open'[\s\S]*policy_mode = 'closed'[\s\S]*platform_public_posting_exemptions/, 'public posting resolver enforces global mode and explicit exemptions'],
+  [publicPostingPolicyMigration, /publish_social_post_with_uploads[\s\S]*can_profile_post_publicly[\s\S]*publish_social_reel_share[\s\S]*can_profile_post_publicly[\s\S]*publish_typed_reel[\s\S]*can_profile_post_publicly[\s\S]*publish_typed_video[\s\S]*can_profile_post_publicly/, 'all General publishing formats share the platform public posting gate'],
+  [publicPostingPolicyMigration, /publish_social_post\([\s\S]*target_visibility = 'public'[\s\S]*target_branch_id is null[\s\S]*can_profile_post_publicly/, 'direct social post RPC cannot bypass the global public posting policy'],
+  [publicPostingPolicyMigration, /publish_typed_post\([\s\S]*p_expression_id is null[\s\S]*p_visibility = 'public'[\s\S]*can_profile_post_publicly/, 'typed post RPC cannot bypass the global public posting policy'],
+  [publicPostingPolicyMigration, /publish_typed_reel[\s\S]*can_profile_post\(auth\.uid\(\)\)/, 'individual posting restrictions remain effective for scoped Reel publishing'],
+  [publicPostingPolicyMigration, /publish_typed_video[\s\S]*can_profile_post\(auth\.uid\(\)\)/, 'individual posting restrictions remain effective for scoped Watch publishing'],
+  [publicPostingPolicyMigration, /publish_typed_post[\s\S]*can_profile_post\(auth\.uid\(\)\)/, 'individual posting restrictions remain effective for scoped post publishing'],
+  [publicPostingPolicyMigration, /alter table public\.platform_public_posting_policy enable row level security[\s\S]*alter table public\.platform_public_posting_exemptions enable row level security[\s\S]*revoke all on table public\.platform_public_posting_policy from public, anon, authenticated/, 'public posting governance tables are protected from direct client access'],
+  [publicPostingPolicyMigration, /platform_public_posting_policy_no_client_access[\s\S]*using \(false\)[\s\S]*platform_public_posting_exemptions_no_client_access[\s\S]*using \(false\)/, 'public posting governance tables explicitly deny client row access'],
+  [publicPostingPolicyMigration, /revoke all on function public\.can_profile_post_publicly\(uuid\)[\s\S]*authenticated[\s\S]*grant execute on function public\.can_profile_post_publicly\(uuid\)[\s\S]*service_role/, 'public posting policy helper is service-only at the API boundary'],
+  [publicPostingPolicyHardening, /platform_public_posting_policy_updated_by_idx[\s\S]*platform_public_posting_exemptions_granted_by_idx[\s\S]*revoke all on function public\.can_profile_post_publicly\(uuid\)[\s\S]*authenticated/, 'production follow-up removes new advisor findings and direct helper execution'],
+  [platformModeration, /platform\.moderation\.read[\s\S]*platform\.moderation\.manage/, 'moderation API uses dedicated platform capabilities'],
+  [platformModeration, /set_public_posting_policy[\s\S]*add_public_posting_exemption[\s\S]*remove_public_posting_exemption/, 'moderation API manages global mode and approved accounts'],
+  [platformModeration, /moderation\.public_posting_policy_changed[\s\S]*moderation\.public_posting_exemption_added[\s\S]*moderation\.public_posting_exemption_removed/, 'posting policy and exemption changes are audited'],
+  [platformModeration, /methods:\s*\["GET",\s*"PATCH",\s*"DELETE"\]/, 'platform moderation supports read, review, and destructive actions'],
+  [platformModeration, /view === "reports"[\s\S]*view === "content"[\s\S]*view === "deletions"/, 'platform moderation exposes layered reports, content, and deletion-history views'],
+  [platformModeration, /action === "remove_content"[\s\S]*platform_remove_content[\s\S]*processStorageCleanup/, 'platform moderation deletes canonical content then processes queued Storage cleanup'],
+  [platformModeration, /action === "remove_comment"[\s\S]*platform_remove_comment/, 'platform moderation removes reported comment threads through server-only RPC'],
+  [platformModeration, /action === "resolve_report"[\s\S]*platform_resolve_content_report/, 'platform moderation resolves reports through platform authority'],
+  [platformModeration, /admin\.storage\.from\(bucket\)\.remove\(paths\)[\s\S]*retry_storage_cleanup/, 'platform moderation retries Storage API cleanup without restoring content'],
+  [platformExpressions, /methods:\s*\["GET",\s*"PATCH",\s*"DELETE"\][\s\S]*platform_delete_expression/, 'platform Expression API exposes protected deletion'],
+  [platformExpressions, /deleted_at[\s\S]*EXPRESSION_DELETED[\s\S]*Deleted Expressions cannot be restored/, 'deleted Expressions cannot re-enter the lifecycle restore path'],
+  [destructiveModerationMigration, /platform_moderation_deletions[\s\S]*platform_storage_cleanup_tasks/, 'destructive moderation keeps deletion evidence and Storage cleanup tasks'],
+  [destructiveModerationMigration, /platform_moderation_deletions_no_client_access[\s\S]*using \(false\)[\s\S]*platform_storage_cleanup_tasks_no_client_access[\s\S]*using \(false\)/, 'destructive moderation evidence is inaccessible to client roles'],
+  [destructiveModerationMigration, /revoke all on function public\.platform_remove_content[\s\S]*authenticated[\s\S]*grant execute on function public\.platform_remove_content[\s\S]*service_role/, 'content deletion RPC is service-role only'],
+  [destructiveModerationMigration, /revoke all on function public\.platform_delete_expression[\s\S]*authenticated[\s\S]*grant execute on function public\.platform_delete_expression[\s\S]*service_role/, 'Expression deletion RPC is service-role only'],
+  [destructiveModerationMigration, /community-public-media[\s\S]*content-media[\s\S]*platform_storage_cleanup_tasks/, 'destructive moderation queues both social and normalized media Storage cleanup'],
+  [destructiveModerationMigration, /not exists\(select 1 from public\.reels[\s\S]*not exists\(select 1 from public\.videos[\s\S]*not exists\(select 1 from public\.sermons/, 'shared media assets are retained while still referenced'],
+  [destructiveModerationMigration, /expression_invite_codes[\s\S]*status='revoked'[\s\S]*is_active=false[\s\S]*deleted_at=now\(\)/, 'Expression deletion revokes invites and tombstones member-facing access'],
+  [destructiveModerationMigration, /preservedHistoricalData[\s\S]*true/, 'Expression deletion explicitly records historical-data preservation'],
+  [destructiveModerationAdvisorHardening, /platform_moderation_deletions_organization_idx[\s\S]*organization_id/, 'destructive moderation deletion evidence covers organization foreign-key lookups'],
+  [destructiveModerationMigration, /content_type='post'[\s\S]*content_type='reel'[\s\S]*content_type='video'[\s\S]*content_type='sermon'[\s\S]*dedicated moderation workflow/, 'canonical deletion is limited to supported content types and excludes live streams'],
+  [destructiveModerationMigration, /protect_content_moderation_report_evidence[\s\S]*platform_moderation_deletions[\s\S]*target_type='content'[\s\S]*target_type='comment'/, 'reported target references may null only when protected platform deletion evidence exists'],
+  [destructiveModerationMigration, /cascadeFromContent[\s\S]*content_comments[\s\S]*cascadeFromComment/, 'cascaded comment removals preserve per-comment evidence before foreign-key cleanup'],
+  [expressionMemberships, /view === "memberships"[\s\S]*filter\(\(membership: any\) => membership\.branch\?\.is_active === true\)/, 'standalone My Expressions membership lists exclude disabled or deleted Expressions'],
+  [supabaseConfig, /\[functions\.platform-moderation\][\s\S]*verify_jwt\s*=\s*true/, 'platform moderation gateway requires JWT authentication'],
+  [socialFeed, /PUBLIC_POSTING_UNAVAILABLE[\s\S]*Public posting is currently unavailable/, 'social feed surfaces global public posting policy denial'],
+  [feedRanking, /completedPenalty/, 'completed-content recommendation suppression'],
+  [feedRanking, /diversifyFeed/, 'mixed-format feed diversification'],
+  [engagement, /view.*state/, 'engagement viewer-state retrieval'],
+  [engagement, /body\.action === "unreact"/, 'reaction removal contract'],
+  [engagement, /body\.action === "report"[\s\S]*assertNoUnknownFields\(body, \["action", "contentId", "commentId", "reason", "details"\]\)/, 'member reports do not accept client-supplied organization or Expression scope'],
+  [engagement, /\(contentId \? 1 : 0\) \+ \(commentId \? 1 : 0\) !== 1/, 'member reports require exactly one target'],
+  [engagement, /commentId[\s\S]*content_comments[\s\S]*targetContentId = comment\.content_item_id[\s\S]*assertContentAccess\(auth, targetContentId!\)/, 'comment reports derive and verify their canonical parent content'],
+  [engagement, /organization_id: targetContent\.organization_id[\s\S]*expression_id: targetContent\.expression_id \?\? null/, 'member report tenancy is derived from canonical content'],
+  [engagement, /reporter_profile_id[\s\S]*status", \["pending", "under_review"\][\s\S]*alreadyReported: true/, 'duplicate open member reports reuse the existing moderation case'],
+  [engagement, /assertContentAccess[\s\S]*visibility === "branch"[\s\S]*auth\.branchId !== data\.expression_id/, 'engagement requires the exact active Expression for Expression content'],
+  [engagement, /await assertContentAccess\(auth, contentId\)[\s\S]*content_comments/, 'comment reads verify content visibility before returning a thread'],
+  [supabaseConfig, /\[functions\.engagement\][\s\S]*verify_jwt\s*=\s*false/, 'public comment threads can reach optional-auth engagement handler'],
+  [publicContent, /content_items\.visibility.*public/s, 'public media visibility boundary'],
+  [churchStory, /EXPRESSION_MEMBERSHIP_REQUIRED/, 'internal Expression leadership boundary'],
+  [login, /signInWithPassword/, 'password login workflow'],
+  [refreshSession, /auth\.refreshSession/, 'refresh-token session rotation'],
+  [refreshSession, /enforceRateLimit/, 'refresh session rate limiting'],
+  [passwordReset, /auth\.getUser\(token\)/, 'password reset recovery-token validation'],
+  [passwordReset, /auth\.updateUser\(\{ password \}\)/, 'Supabase recovery-session password reset completion'],
+  [organizations, /create_organization/, 'transactional organization provisioning'],
+  [organizations, /Main Expression/, 'canonical initial Expression provisioning'],
+  [memberships, /update_membership_status/, 'protected membership lifecycle'],
+  [memberships, /view === "expression-directory"[\s\S]*requestedExpressionId[\s\S]*auth\.branchId[\s\S]*EXPRESSION_CONTEXT_MISMATCH/, 'Expression member directory binds to exact active Expression'],
+  [memberships, /expression_memberships[\s\S]*profile:profiles(?:![^(]+)?\(id,display_name,username,avatar_url\)/, 'Expression member directory exposes safe profile fields only'],
+  [memberships, /exactMembership[\s\S]*profile_id[\s\S]*auth\.user\.id[\s\S]*status", "active"/, 'Expression member directory verifies caller active membership'],
+  [roles, /create_custom_role/, 'custom role administration'],
+  [events, /events\.create/, 'event authorization'],
+  [signupRateLimited, /enforceRateLimit/, 'signup rate limiting'],
+  [rateLimit, /import \{ adminClient \} from "\.\/supabase\.ts";/, 'rate limiter uses server-privileged Supabase client'],
+  [rateLimit, /adminClient\(\)\.rpc\("consume_rate_limit"/, 'rate limiter invokes privileged RPC through service role'],
+  [rateLimitRpcHardening, /revoke all on function public\.consume_rate_limit\(text,text,integer,integer\) from public, anon, authenticated/i, 'rate-limit RPC denied to client roles'],
+  [rateLimitRpcHardening, /grant execute on function public\.consume_rate_limit\(text,text,integer,integer\) to service_role/i, 'rate-limit RPC granted only to service role'],
+  [paymentEvents, /HMAC/, 'payment event signature validation'],
+  [publicContent, /visibility.*public/, 'public content visibility enforcement'],
+  [sermons, /bannerDomain[\s\S]*\$\{bannerDomain\}\.create/, 'sermon authorization'],
+  [branding, /platform\.branding\.manage/, 'branding authorization'],
+  [churchStory, /leadership_profiles/, 'leadership profile management'],
+  [prayerRequests, /action === "pray"/, 'prayer-wall support action'],
+  [prayerRequests, /prayer_supports/, 'server-backed prayer support persistence'],
+  [prayerRequests, /viewer_has_prayed/, 'per-viewer prayer support state'],
+  [prayerRequests, /ignoreDuplicates:\s*true/, 'idempotent prayer support'],
+  [prayerRequests, /prayer_count/, 'server-backed prayer support count'],
+  [announcements, /requestedBranchId[\s\S]*auth\.branchId[\s\S]*EXPRESSION_CONTEXT_MISMATCH/, 'Expression announcement reads bind to exact active context'],
+  [announcements, /memberFeed[\s\S]*eq\("status","published"\)/, 'member-facing announcement feed exposes published updates only'],
+  [giving, /requireExpression\(auth\.branchId\)/, 'expression giving management requires expression context'],
+  [giving, /online_payment_enabled:\s*false/, 'expression online giving remains unavailable'],
+  [publicGiving, /ORGANIZATION_REQUIRED/, 'public giving requires explicit church scope'],
+  [publicGiving, /expressionId/, 'public giving supports explicit expression scope'],
+  [publicGiving, /manualBankTransfer/, 'manual transfer is exposed as a server-driven giving method'],
+  [platformGiving, /PLATFORM_GIVING_RETIRED/, 'retired Platform Giving endpoint boundary'],
+  [platformGiving, /does not own church giving/i, 'church-owned giving retirement message'],
+  [retiredSearch, /SEARCH_ENDPOINT_RETIRED/, 'retired duplicate search endpoint'],
+  [retiredSearch, /public-content/, 'canonical public discovery search destination'],
+  [platformPayments, /authorizePlatform\(auth, "platform\.payments\.read"\)/, 'Level-1 payment read authorization'],
+  [platformPayments, /authorizePlatform\(auth, "platform\.payments\.manage"\)/, 'Level-1 payment manage authorization'],
+  [platformPayments, /payment_provider_configs/, 'database-driven payment provider configuration'],
+  [platformPayments, /platform_audit_log/, 'payment governance audit trail'],
+  [platformPayments, /Deno\.env\.get\(config\.secret_reference\)/, 'runtime secret-reference validation before provider activation'],
+  [platformStreaming, /platform\.streaming\./, 'Level-1 streaming authority'],
+  [platformAi, /platform\.ai\./, 'Level-1 AI authority'],
+  [platformSecrets, /SECRET_STORE_FAILED", "Unable to store provider credential\. Please try again\."/ , 'secret storage hides raw database failures'],
+  [platformFeatures, /platform\.features\./, 'Level-1 feature authority'],
+  [platformIntegrations, /platform\.integrations\./, 'Level-1 integrations authority'],
+  [mobileNotificationsPage, /api\.request\('notifications',\s*\{[\s\S]*?method:\s*'PATCH'[\s\S]*?JSON\.stringify\(\{\s*id:\s*item\.id,\s*read:\s*true\s*\}\)/, 'Mobile notification read client payload'],
+  [notifications, /methods:\s*\[\s*"GET"\s*,\s*"PATCH"\s*\]/, 'Notification read/update backend methods'],
+  [notifications, /assertNoUnknownFields\(body,\s*\[\s*"id"\s*,\s*"read"\s*,\s*"markAll"\s*,\s*"scope"\s*,\s*"branchId"\s*\]\)/, 'Notification update backend payload fields'],
+  [notifications, /paged[\s\S]*range\(offset, offset \+ limit - 1\)/, 'Notification inbox server pagination'],
+  [notifications, /markAll === true[\s\S]*applyScope\(update, scope, branchId\)/, 'Scoped notification mark-all-read'],
+  [notificationSettings, /methods:\s*\["GET",\s*"PUT",\s*"POST",\s*"DELETE"\]/, 'Notification preference and device methods'],
+  [notificationSettings, /body\.emailEnabled \?\? existing\.email_enabled/, 'Notification preference partial-update preservation'],
+  [notificationSettings, /body\.smsEnabled \?\? existing\.sms_enabled/, 'SMS preference partial-update preservation'],
+  [notificationSettings, /body\.pushEnabled \?\? existing\.push_enabled/, 'Push preference partial-update preservation'],
+  [mobileNotificationSettingsPage, /api\.request<NotificationPreferences>\('notification-settings'/, 'Mobile notification settings read contract'],
+  [mobileNotificationSettingsPage, /method:\s*'PUT'/, 'Mobile notification settings update method'],
+  [mobileNotificationSettingsPage, /emailEnabled[\s\S]*smsEnabled[\s\S]*pushEnabled[\s\S]*quietHours/, 'Mobile notification preference payload'],
+  [engagement, /view"\) === "saved"/, 'authenticated Saved Library backend view'],
+  [engagement, /content_bookmarks/, 'Saved Library canonical bookmark source'],
+  [engagement, /social_posts[\s\S]*reels[\s\S]*videos[\s\S]*sermons/, 'Saved Library typed content hydration'],
+  [mobileSavedLibrary, /engagement\?view=saved/, 'mobile Saved Library API contract'],
+  [mobileSavedLibrary, /action:\s*'bookmark'/, 'Saved Library remove action'],
+  [mobileNotificationsPage, /api\.request\('governance-invitations',\s*\{[\s\S]*?method:\s*'POST'[\s\S]*?JSON\.stringify\(\{\s*invitationId:\s*invitation\.id,\s*decision\s*\}\)/, 'Mobile Expression invitation response client payload'],
+  [mobileNotificationsExperience, /invitation\.kind === 'platform_role'[\s\S]*PLATFORM_ADMIN_URL|invitation\.kind === 'platform_role'[\s\S]*openPlatformAdministration/, 'Mobile Platform Administrator invitations are web handoffs'],
+  [mobileNotificationsExperience, /Platform Administrator invitations can only be accepted or declined on the administration website[\s\S]*return;/, 'Mobile blocks Platform Administrator invitation responses before the mutation callback'],
+  [governanceInvitations, /methods:\s*\[\s*"GET"\s*,\s*"POST"\s*\]/, 'Governance invitation backend methods'],
+  [governanceInvitations, /assertNoUnknownFields\(body,\s*\[\s*"invitationId"\s*,\s*"decision"\s*\]\)/, 'Governance invitation backend payload fields'],
+  [governanceInvitations, /new Set\(\[\s*"accept"\s*,\s*"decline"\s*\]\)/, 'Governance invitation decision values'],
+  [governanceInvitations, /PLATFORM_INVITATION_WEB_ONLY/, 'General invitation endpoint rejects Platform Administrator responses'],
+  [platformAdminInvitations, /view"\) === "pending"/, 'Existing web-admin invitation endpoint exposes the invited user pending view'],
+  [platformAdminInvitations, /respond_platform_role_invitation/, 'Web-admin invitation endpoint uses the server-only Platform Administrator response RPC'],
+  [adminLoginPage, /platform-admin-invitations\?view=pending[\s\S]*Accept and continue/, 'Platform Administration login completes pending administrator invitations'],
+  [ministryBoundaryMigration, /'platform_role_invitation'[\s\S]*'\/general\/notifications\?view=actions'/, 'Platform Administrator invitations create an app delivery notice and web handoff route'],
+  [ministryBoundaryMigration, /respond_governance_invitation[\s\S]*invitation\.kind='platform_role'[\s\S]*Platform Administration website/, 'Database general invitation RPC rejects Platform Administrator responses'],
+  [ministryBoundaryMigration, /respond_platform_role_invitation\(uuid,uuid,text\)[\s\S]*from public,anon,authenticated[\s\S]*to service_role/, 'Platform Administrator response RPC is server-only'],
+  [ministryBoundaryMigration, /delete from public\.platform_role_permissions[\s\S]*platform\.notifications\.broadcast[\s\S]*platform\.identity_badges\.manage[\s\S]*platform\.public_directory\.manage/, 'Retired ministry-authoring permissions are removed from platform roles'],
+  [churchStory, /view === "badges"[\s\S]*authorizeLeadershipScope\(auth, expressionId \?\? null\)[\s\S]*organizationBadgeMembers/, 'General and Expression presentation titles use scoped ministry authorization'],
+  [platformPublicDirectory, /PLATFORM_PUBLIC_DIRECTORY_RETIRED/, 'Platform public-directory ministry authoring endpoint is retired'],
+  [adminAiPage, /action:\s*'configure_provider'/, 'Admin AI configure-provider client action'],
+  [platformAi, /action === "configure_provider"/, 'Admin AI configure-provider backend action'],
+  [platformAi, /credential_configured/, 'Admin AI provider credential readiness state'],
+  [platformAi, /AI_PROVIDER_CREDENTIAL_MISSING/, 'AI provider activation requires a resolvable credential'],
+  [platformAi, /ai_providers!inner\(status\)/, 'AI route model validation includes provider state'],
+  [platformAi, /belong to an active provider/, 'AI routes reject disabled-provider models'],
+  [aiRouter, /'admin\.help': 'generateText'/, 'Admin Guide capability uses provider-neutral AI routing'],
+  [aiRouter, /organizationId: string \| null/, 'AI router supports platform-wide global routes'],
+  [platformAdminGuide, /authorizePlatform\(auth,\s*"platform\.overview\.read"\)/, 'Admin Guide requires Platform Administration authority'],
+  [platformAdminGuide, /capabilityCode:\s*"admin\.help"/, 'Admin Guide executes the dedicated admin-help capability'],
+  [platformAdminGuide, /organizationId:\s*null/, 'Admin Guide uses a global platform AI route'],
+  [adminGuidePage, /platform-admin-guide/, 'Admin Guide UI is connected to its backend endpoint'],
+  [adminShell, /<AdminGuide/, 'Admin Guide is available throughout the shared admin shell'],
+  [platformAi, /resolve_runtime_secret/, 'AI provider credential validation uses runtime secret resolver'],
+  [adminAiPage, /action:\s*'upsert_model'/, 'Admin AI model client action'],
+  [platformAi, /action === "upsert_model"/, 'Admin AI model backend action'],
+  [adminAiPage, /action:\s*'set_route'/, 'Admin AI route client action'],
+  [adminAiPage, /1 · CREDENTIAL/, 'Admin AI guided provider setup credential step'],
+  [adminAiPage, /2 · MODEL/, 'Admin AI guided provider setup model step'],
+  [adminAiPage, /3 · ROUTE/, 'Admin AI guided provider setup route step'],
+  [platformAi, /action === "set_route"/, 'Admin AI route backend action'],
+  [adminStreamingPage, /action:\s*'configure_global'/, 'Admin streaming configuration client action'],
+  [platformStreaming, /action === "configure_global"/, 'Admin streaming configuration backend action'],
+  [adminStreamingPage, /action:\s*'set_provider_active'/, 'Admin streaming provider-state client action'],
+  [platformStreaming, /action === "set_provider_active"/, 'Admin streaming provider-state backend action'],
+  [adminStreamingPage, /action:\s*'terminate_stream'/, 'Admin streaming termination client action'],
+  [platformStreaming, /action === "terminate_stream"/, 'Admin streaming termination backend action'],
+  [adminPaymentsPage, /action:\s*'upsert_provider_config'/, 'Admin payment configuration client action'],
+  [platformPayments, /action === "upsert_provider_config"/, 'Admin payment configuration backend action'],
+  [adminIntegrationsPage, /action:\s*'retry_job'/, 'Admin integration retry client action'],
+  [platformIntegrations, /action === "retry_job"/, 'Admin integration retry backend action'],
+  [adminIntegrationsPage, /action:\s*'set_connection_status'/, 'Admin integration state client action'],
+  [platformIntegrations, /action === "set_connection_status"/, 'Admin integration state backend action'],
+  [adminFeaturesPage, /action:\s*'set_global'/, 'Admin feature-control client action'],
+  [platformFeatures, /action === "set_global"/, 'Admin feature-control backend action'],
+  [privilegedRpcGrantHardening, /platform_store_secret\(text,text,text,text,text\).*from public, anon/s, 'secret-store anonymous execute revocation'],
+  [platformAi, /Add this provider API key before activating it/, 'AI activation returns admin-safe credential guidance'],
+  [privilegedRpcGrantHardening, /resolve_runtime_secret\(text\).*from public, anon, authenticated/s, 'runtime-secret service-only execute boundary'],
+  [privilegedRpcGrantHardening, /process_payment_result\(text,text,text,uuid,text,payment_attempt_status,jsonb,text\).*from public, anon, authenticated/s, 'payment-result service-only execute boundary'],
+  [privilegedRpcGrantHardening, /generate_expression_invite_code\(uuid,uuid,integer,integer\).*from public, anon/s, 'Expression invite anonymous execute revocation'],
+  [privilegedRpcGrantHardening, /update_membership_status\(uuid,uuid,membership_status,uuid\).*from public, anon/s, 'membership mutation anonymous execute revocation'],
+  [streamGrantHardening, /can_access_stream\(uuid\).*from public, anon/s, 'stream-access anonymous execute revocation'],
+  [streamGrantHardening, /reserve_api_idempotency\(uuid,text,text,text\).*from public, anon/s, 'idempotency anonymous execute revocation'],
+  [triggerGrantHardening, /p\.prorettype = 'trigger'::regtype/, 'security-definer trigger execute hardening'],
+  [profileStateRpcHardening, /ai_usage_totals\(uuid,text,timestamptz\).*from public, anon, authenticated/s, 'AI usage totals service-only boundary'],
+  [profileStateRpcHardening, /target_profile_id <> auth\.uid\(\)/, 'profile-state self-only direct RPC boundary'],
+];
+
+const missing = invariants.filter(([source, pattern]) => !pattern.test(source));
+const forbidden = [
+  [cors, /(?:vercel|netlify)\.app/i, 'hosting-provider-specific shared CORS rule'],
+  [publicEventDetail, /(?:vercel|netlify)\.app/i, 'hosting-provider-specific public event CORS rule'],
+  [organizations, /Main Campus/, 'stale Campus default in organization provisioning'],
+  [platformGiving, /platform\.giving\.(?:read|manage)|authorizePlatform/, 'retired Platform Giving authorization path'],
+  [churchStory, /Foundation & First Gathering|Multi-Expression Expansion|Global Digital Ministry/, 'fabricated church story fallback'],
+  [platformIntegrations, /notification_broadcast|notification-broadcasts|platform\.notifications\.broadcast/, 'Platform Administration church-notification authoring path'],
+  [platformPublicDirectory, /identity_badge_definitions|identity_badge_assignments|leadership_profiles|church_story/, 'retired Platform Administration church-directory data access'],
+  [signup, /password\(body\.password\)/, 'hardcoded signup password policy'],
+  [signup, /length\s*<\s*\d+.*password|password.*length\s*<\s*\d+/s, 'hardcoded signup password length rule'],
+];
+const presentForbidden = forbidden.filter(([source, pattern]) => pattern.test(source));
+
+async function collectSourceFiles(root) {
+  const entries = await readdir(root, { withFileTypes: true });
+  const paths = [];
+  for (const entry of entries) {
+    const path = `${root}/${entry.name}`;
+    if (entry.isDirectory()) paths.push(...await collectSourceFiles(path));
+    else if (/\.(?:ts|tsx)$/.test(entry.name)) paths.push(path);
+  }
+  return paths;
+}
+
+const clientSourceFiles = [
+  ...await collectSourceFiles('apps/mobile'),
+  ...await collectSourceFiles('apps/admin'),
+];
+const functionSourceFiles = await collectSourceFiles('supabase/functions');
+
+const hostingProviderRuntimeReferences = [];
+for (const file of functionSourceFiles) {
+  const source = await readFile(file, 'utf8');
+  if (/(?:vercel|netlify)\.app/i.test(source)) hostingProviderRuntimeReferences.push(file);
+}
+
+const hardcodedClientFunctionHosts = [];
+for (const file of clientSourceFiles) {
+  const source = await readFile(file, 'utf8');
+  if (/https:\/\/[^\s'\"]+\.supabase\.co\/functions\/v1/i.test(source)) {
+    hardcodedClientFunctionHosts.push(file);
+  }
+}
+const endpointReferences = new Map();
+const literalRequest = /\b(?:api|platformApi)\.request(?:<[^;]{0,500}?>)?\(\s*([\`'"])([^\`'"]+)\1/gms;
+for (const file of clientSourceFiles) {
+  const source = await readFile(file, 'utf8');
+  for (const match of source.matchAll(literalRequest)) {
+    const rawPath = match[2];
+    const slug = rawPath.split(/[?/$]/, 1)[0];
+    if (!slug || slug.includes('${')) continue;
+    const paths = endpointReferences.get(slug) ?? [];
+    paths.push(file);
+    endpointReferences.set(slug, paths);
+  }
+}
+const missingEndpointFunctions = [];
+for (const [slug, paths] of endpointReferences) {
+  try {
+    await access(`supabase/functions/${slug}/index.ts`);
+  } catch {
+    missingEndpointFunctions.push(`${slug} <- ${[...new Set(paths)].join(', ')}`);
+  }
+}
+
+const functionEntries = await readdir('supabase/functions', { withFileTypes: true });
+const publicHandlerFunctions = [];
+for (const entry of functionEntries) {
+  if (!entry.isDirectory() || entry.name.startsWith('_')) continue;
+  const path = `supabase/functions/${entry.name}/index.ts`;
+  try {
+    const source = await readFile(path, 'utf8');
+    if (/authentication\s*:\s*["']none["']/.test(source)) publicHandlerFunctions.push(entry.name);
+  } catch {
+    // Directories without an index.ts are not Edge Function entrypoints.
+  }
+}
+
+const gatewayMismatches = publicHandlerFunctions.filter((functionName) => {
+  const header = `[functions.${functionName}]`;
+  const sectionStart = gatewayConfig.indexOf(header);
+  if (sectionStart < 0) return true;
+  const remainder = gatewayConfig.slice(sectionStart + header.length);
+  const nextSection = remainder.search(/\n\s*\[/);
+  const section = nextSection >= 0 ? remainder.slice(0, nextSection) : remainder;
+  return !/verify_jwt\s*=\s*false/.test(section);
+});
+
+if (missing.length || gatewayMismatches.length || presentForbidden.length || missingEndpointFunctions.length || hostingProviderRuntimeReferences.length || hardcodedClientFunctionHosts.length) {
+  const failures = [
+    ...missing.map(([, , label]) => label),
+    ...gatewayMismatches.map((name) => `gateway verify_jwt=false for ${name}`),
+    ...presentForbidden.map(([, , label]) => `remove ${label}`),
+    ...missingEndpointFunctions.map((entry) => `missing Edge Function for client endpoint ${entry}`),
+    ...hostingProviderRuntimeReferences.map((file) => `hosting-provider runtime hardcode in ${file}`),
+    ...hardcodedClientFunctionHosts.map((file) => `hardcoded Supabase Functions host in client source ${file}`),
+  ];
+  console.error(`API check failed: ${failures.join(', ')}`);
+  process.exitCode = 1;
+} else {
+  console.log(
+    `API check passed (${requiredFiles.length} shared modules, ${invariants.length} invariants, ${endpointReferences.size} client Edge Function contracts, ${publicHandlerFunctions.length} public/secret-verified gateway contracts).`,
+  );
+}

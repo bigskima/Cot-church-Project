@@ -1,0 +1,19 @@
+revoke all on function public.accept_membership_invitation(text) from public, anon;
+revoke all on function public.apply_for_volunteer_opportunity(uuid,text) from public, anon;
+revoke all on function public.cancel_event_registration(uuid,uuid) from public, anon;
+revoke all on function public.check_in_member(uuid,uuid,uuid,text) from public, anon;
+revoke all on function public.comment_on_social_post(uuid,text,uuid) from public, anon;
+revoke all on function public.create_direct_conversation(uuid,uuid[]) from public, anon;
+revoke all on function public.react_to_social_post(uuid,text) from public, anon;
+revoke all on function public.register_for_event(uuid,uuid) from public, anon;
+revoke all on function public.send_message(uuid,text,uuid) from public, anon;
+
+grant execute on function public.accept_membership_invitation(text) to authenticated, service_role;
+grant execute on function public.apply_for_volunteer_opportunity(uuid,text) to authenticated, service_role;
+grant execute on function public.cancel_event_registration(uuid,uuid) to authenticated, service_role;
+grant execute on function public.check_in_member(uuid,uuid,uuid,text) to authenticated, service_role;
+grant execute on function public.comment_on_social_post(uuid,text,uuid) to authenticated, service_role;
+grant execute on function public.create_direct_conversation(uuid,uuid[]) to authenticated, service_role;
+grant execute on function public.react_to_social_post(uuid,text) to authenticated, service_role;
+grant execute on function public.register_for_event(uuid,uuid) to authenticated, service_role;
+grant execute on function public.send_message(uuid,text,uuid) to authenticated, service_role;

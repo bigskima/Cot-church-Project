@@ -1,0 +1,12 @@
+begin;
+select plan(8);
+select has_function('public','get_media_playback_info',array['uuid'],'guarded playback resolver exists');
+select has_function('public','sync_content_playback',array['uuid','integer','integer'],'guarded progress sync exists');
+select has_function_privilege('anon','public.get_media_playback_info(uuid)','execute','anonymous users can resolve genuinely public media');
+select ok(not has_function_privilege('anon','public.sync_content_playback(uuid,integer,integer)','execute'),'anonymous users cannot persist progress');
+select has_function_privilege('authenticated','public.sync_content_playback(uuid,integer,integer)','execute','authenticated users can persist authorized progress');
+select function_returns('public','get_media_playback_info',array['uuid'],'jsonb','playback resolver has stable response type');
+select function_returns('public','sync_content_playback',array['uuid','integer','integer'],'jsonb','progress sync has stable response type');
+select ok((select proconfig @> array['search_path=""'] from pg_proc where oid='public.sync_content_playback(uuid,integer,integer)'::regprocedure),'progress RPC has an empty search path');
+select * from finish();
+rollback;

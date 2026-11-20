@@ -1,0 +1,223 @@
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, KeyboardAvoidingView, Pressable, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Button, Icon, ResourceError, ScreenHeader } from '@/components';
+import { radius, spacing } from '@/design-system/tokens';
+import { useResource } from '@/hooks/use-resource';
+import { invalidate } from '@/services/query-cache';
+import { useSession } from '@/state/session';
+import { useTheme } from '@/state/theme';
+import { PLATFORM_KEYBOARD_BEHAVIOR, PLATFORM_KEYBOARD_DISMISS_MODE, PLATFORM_KEYBOARD_VERTICAL_OFFSET } from '@/utils/keyboard';
+import { RichChatComposer } from './RichChatComposer';
+import { RichMessageBubble } from './RichMessageBubble';
+import type { ChatReaction, ChatReply, ChatSendPayload, RichChatMessage } from './rich-chat-types';
+import { ChatCallActions } from '@/features/calls/ChatCallActions';
+import { CallHistoryBubble } from '@/features/calls/CallHistoryBubble';
+import type { CallHistoryPayload } from '@/features/calls/call-types';
+
+type GroupChatPayload = {
+  group: { id: string; name: string; branch_id?: string | null };
+  activeSection?: { id: string; name: string; description?: string | null } | null;
+  membership: { chat_restricted_until?: string | null; moderation_reason?: string | null };
+  permissions: { pinMessages: boolean };
+  messages: RichChatMessage[];
+};
+
+type GroupTimelineItem =
+  | { kind: 'message'; id: string; at: string; message: RichChatMessage }
+  | { kind: 'call'; id: string; at: string; entry: CallHistoryPayload['history'][number] };
+
+export function GroupChatExperience({ groupId, sectionId, scope = 'expression' }: { groupId: string; sectionId?: string | null; scope?: 'expression' | 'general' }) {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { api, context, mode } = useSession();
+  const organizationId = context?.organization?.id ?? context?.organizations?.[0]?.id ?? '';
+  const requestScope = scope === 'general'
+    ? { context: 'public' as const, headers: organizationId ? { 'X-Organization-Id': organizationId } : undefined }
+    : { context: 'current' as const };
+  const [messages, setMessages] = useState<RichChatMessage[]>([]);
+  const [replyTo, setReplyTo] = useState<ChatReply | null>(null);
+  const [actionError, setActionError] = useState('');
+  const listRef = useRef<FlatList<GroupTimelineItem>>(null);
+  const key = `group-chat:${groupId}:${sectionId ?? 'main'}`;
+
+  const resource = useResource<GroupChatPayload>(key, (signal) => {
+    if (mode !== 'authenticated' || !groupId) return Promise.reject(new Error('Join this Group to use its chat.'));
+    const query = new URLSearchParams({ groupId });
+    if (sectionId) query.set('sectionId', sectionId);
+    return api.request<GroupChatPayload>(`group-chat?${query.toString()}`, { signal, ...requestScope });
+  });
+
+  const callHistory = useResource<CallHistoryPayload>(
+    `chat-call:history:group:${groupId}:${sectionId ?? 'main'}`,
+    (signal) => {
+      if (mode !== 'authenticated' || !groupId) return Promise.resolve({ history: [] });
+      const query = new URLSearchParams({ service: 'calls', history: 'true', scope: 'group', groupId });
+      if (sectionId) query.set('sectionId', sectionId);
+      return api.request<CallHistoryPayload>(`noop?${query.toString()}`, { signal, context: 'public' });
+    },
+  );
+
+  useEffect(() => {
+    if (resource.data?.messages) setMessages(resource.data.messages);
+  }, [resource.data?.messages]);
+
+  const send = async (payload: ChatSendPayload) => {
+    const optimisticId = `local-${Date.now()}`;
+    const optimistic: RichChatMessage = {
+      id: optimisticId,
+      body: payload.body,
+      sent_at: new Date().toISOString(),
+      sender_profile_id: context?.profile?.id ?? 'me',
+      sender: context?.profile ? { id: context.profile.id, username: context.profile.username, display_name: context.profile.display_name, avatar_url: context.profile.avatar_url } : null,
+      reply_to_id: payload.replyToId,
+      replyTo,
+      attachments: payload.attachments,
+      reactions: [],
+      optimistic: true,
+    };
+    setMessages((current) => [...current, optimistic]);
+    try {
+      const created = await api.request<RichChatMessage>('group-chat', {
+        method: 'POST',
+        ...requestScope,
+        body: JSON.stringify({ action: 'send', groupId, sectionId, body: payload.body, replyToId: payload.replyToId, attachmentIds: payload.attachments.map((item) => item.uploadId) }),
+      });
+      setMessages((current) => current.map((item) => item.id === optimisticId ? created : item));
+      invalidate(key);
+    } catch (error) {
+      setMessages((current) => current.filter((item) => item.id !== optimisticId));
+      throw error;
+    }
+  };
+
+  const react = async (message: RichChatMessage, emoji: string) => {
+    const before = message.reactions ?? [];
+    const existing = before.find((item) => item.emoji === emoji);
+    const next: ChatReaction[] = existing?.reactedByMe
+      ? before.map((item) => item.emoji === emoji ? { ...item, count: item.count - 1, reactedByMe: false } : item).filter((item) => item.count > 0)
+      : existing
+        ? before.map((item) => item.emoji === emoji ? { ...item, count: item.count + 1, reactedByMe: true } : item)
+        : [...before, { emoji, count: 1, reactedByMe: true }];
+    setMessages((current) => current.map((item) => item.id === message.id ? { ...item, reactions: next } : item));
+    try {
+      await api.request('group-chat', { method: 'POST', ...requestScope, body: JSON.stringify({ action: 'react', groupId, sectionId, messageId: message.id, emoji }) });
+      invalidate(key);
+    } catch (error) {
+      setMessages((current) => current.map((item) => item.id === message.id ? { ...item, reactions: before } : item));
+      setActionError(error instanceof Error ? error.message : 'Unable to update reaction.');
+    }
+  };
+
+  const pin = async (message: RichChatMessage, pinned: boolean) => {
+    const before = { pinned_at: message.pinned_at, pinned_by_profile_id: message.pinned_by_profile_id };
+    setMessages((current) => current.map((item) => item.id === message.id ? { ...item, pinned_at: pinned ? new Date().toISOString() : null, pinned_by_profile_id: pinned ? context?.profile?.id ?? null : null } : item));
+    try {
+      await api.request('group-chat', { method: 'POST', ...requestScope, body: JSON.stringify({ action: 'pin', groupId, sectionId, messageId: message.id, pinned }) });
+      invalidate(key);
+    } catch (error) {
+      setMessages((current) => current.map((item) => item.id === message.id ? { ...item, ...before } : item));
+      setActionError(error instanceof Error ? error.message : 'Unable to update pin.');
+    }
+  };
+
+  const deleteMessage = async (message: RichChatMessage) => {
+    if (message.sender_profile_id !== context?.profile?.id) return;
+    setActionError('');
+    await api.request('group-chat', {
+      method: 'POST',
+      ...requestScope,
+      feedback: false,
+      body: JSON.stringify({ action: 'delete_message', groupId, sectionId, messageId: message.id }),
+    });
+    setMessages((current) => current.filter((item) => item.id !== message.id));
+    if (replyTo?.id === message.id) setReplyTo(null);
+    invalidate(key);
+  };
+
+  const timeline = useMemo<GroupTimelineItem[]>(() => {
+    const messageItems = messages.map((message) => ({ kind: 'message' as const, id: `message:${message.id}`, at: message.sent_at, message }));
+    const callItems = (callHistory.data?.history ?? []).map((entry) => ({ kind: 'call' as const, id: `call:${entry.call.id}`, at: entry.call.created_at, entry }));
+    return [...messageItems, ...callItems].sort((left, right) => new Date(left.at).getTime() - new Date(right.at).getTime());
+  }, [callHistory.data?.history, messages]);
+
+  const beginReply = (message: RichChatMessage) => setReplyTo({ id: message.id, body: message.body, sender_profile_id: message.sender_profile_id, sender: message.sender, attachmentType: message.attachments?.[0]?.type ?? null });
+  const jumpToMessage = (id: string) => {
+    const index = timeline.findIndex((item) => item.kind === 'message' && item.message.id === id);
+    if (index >= 0) listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+  };
+
+  if (resource.loading && !resource.data) return <View style={[styles.center, { backgroundColor: colors.bg }]}><ActivityIndicator color={colors.interactive} /></View>;
+  const sectionExpired = Boolean(sectionId && resource.error?.toLowerCase().includes('temporary chat is no longer available'));
+  if (sectionExpired && !resource.data) {
+    return <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+      <View style={{ paddingTop: insets.top }}><ScreenHeader title='Temporary chat' showBack /></View>
+      <View style={[styles.state, { alignItems: 'center', justifyContent: 'center', gap: spacing.sm }]}>
+        <Icon name='timer-outline' size={34} color={colors.textMuted} />
+        <Text style={[styles.emptyTitle, { color: colors.text }]}>This temporary chat has expired</Text>
+        <Text style={{ color: colors.textMuted, textAlign: 'center' }}>Its time window has ended, so it is no longer available inside this Group.</Text>
+        <Button label='Back to Group' onPress={() => context?.expression?.id ? router.replace(`/expressions/${context.expression.id}/groups/${groupId}` as any) : router.back()} />
+      </View>
+    </View>;
+  }
+  if (resource.error && !resource.data) return <View style={[styles.screen, { backgroundColor: colors.bg }]}><View style={{ paddingTop: insets.top }}><ScreenHeader title='Group chat' showBack /></View><View style={styles.state}><ResourceError message={resource.error} retry={resource.refresh} /></View></View>;
+
+  const restrictedUntil = resource.data?.membership.chat_restricted_until;
+  const restriction = restrictedUntil && new Date(restrictedUntil) > new Date()
+    ? `Chat restricted until ${new Date(restrictedUntil).toLocaleString()}${resource.data?.membership.moderation_reason ? ` · ${resource.data.membership.moderation_reason}` : ''}`
+    : null;
+  const pinned = messages.filter((message) => message.pinned_at);
+
+  return (
+    <KeyboardAvoidingView
+      style={[styles.screen, { backgroundColor: colors.bg }]}
+      behavior={PLATFORM_KEYBOARD_BEHAVIOR}
+      keyboardVerticalOffset={PLATFORM_KEYBOARD_VERTICAL_OFFSET}
+    >
+      <View style={{ paddingTop: insets.top }}>
+        <ScreenHeader
+          title={resource.data?.activeSection?.name ?? resource.data?.group.name ?? 'Group chat'}
+          showBack
+          compact
+          rightAction={context?.expression?.id ? (
+            <Pressable
+              onPress={() => router.push(`/expressions/${context.expression!.id}/groups/${groupId}` as any)}
+              accessibilityRole="button"
+              accessibilityLabel="Group home"
+              style={[styles.groupHome, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}
+            >
+              <Icon name="home-outline" size={16} color={colors.text} />
+            </Pressable>
+          ) : undefined}
+        />
+      </View>
+      <View style={styles.callRow}><ChatCallActions scope='group' groupId={groupId} sectionId={sectionId} /></View>
+      {pinned.length ? <Pressable onPress={() => jumpToMessage(pinned[0].id)} style={[styles.pinned, { backgroundColor: colors.primarySoft }]}><Icon name='pin' size={14} color={colors.interactive} /><Text style={[styles.pinnedText, { color: colors.textSecondary }]} numberOfLines={1}>{pinned[0].body || 'Pinned media message'}</Text></Pressable> : null}
+      <FlatList
+        ref={listRef}
+        data={timeline}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.messages}
+        keyboardShouldPersistTaps='handled'
+        keyboardDismissMode={PLATFORM_KEYBOARD_DISMISS_MODE}
+        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+        onScrollToIndexFailed={({ index, averageItemLength }) => listRef.current?.scrollToOffset({ offset: averageItemLength * index, animated: true })}
+        ListEmptyComponent={<View style={styles.empty}><Icon name='chatbubbles-outline' size={30} color={colors.textMuted} /><Text style={[styles.emptyTitle, { color: colors.text }]}>No messages yet</Text></View>}
+        renderItem={({ item }) => item.kind === 'call'
+          ? <CallHistoryBubble entry={item.entry} viewerId={context?.profile?.id ?? ''} />
+          : <RichMessageBubble message={item.message} mine={item.message.sender_profile_id === context?.profile?.id} showSender canPin={resource.data?.permissions.pinMessages === true} onReply={beginReply} onReact={(target, emoji) => void react(target, emoji)} onPin={(target, value) => void pin(target, value)} onDelete={(target) => deleteMessage(target)} onJumpToMessage={jumpToMessage} />}
+      />
+      {actionError ? <Text style={[styles.error, { color: colors.live }]}>{actionError}</Text> : null}
+      <RichChatComposer endpoint='group-chat' requestContext='current' scope={{ groupId, sectionId }} replyTo={replyTo} disabledReason={restriction} bottomInset={Math.max(insets.bottom, 10)} onCancelReply={() => setReplyTo(null)} onSend={send} />
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1 }, center: { flex: 1, alignItems: 'center', justifyContent: 'center' }, state: { flex: 1, padding: spacing.lg },
+  groupHome: { width: 36, height: 36, borderWidth: 1, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  callRow: { paddingHorizontal: spacing.md, paddingVertical: 4, alignItems: 'flex-end' },
+  pinned: { marginHorizontal: spacing.md, borderRadius: radius.md, padding: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }, pinnedText: { flex: 1, fontSize: 11, fontWeight: '700' },
+  messages: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, gap: spacing.xs, flexGrow: 1, justifyContent: 'flex-end' }, empty: { paddingVertical: 60, alignItems: 'center', gap: 6 }, emptyTitle: { fontSize: 17, fontWeight: '800' }, error: { paddingHorizontal: spacing.md, paddingVertical: 5, fontSize: 11 },
+});

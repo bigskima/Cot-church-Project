@@ -1,0 +1,54 @@
+-- Cover legacy public-schema foreign-key relationships flagged by Supabase's advisor.
+-- These are plain btree indexes on the FK columns in constraint order; no data or
+-- authorization semantics are changed.
+
+create index if not exists cot_fk_cover_0151 on public.notifications (organization_id);
+create index if not exists cot_fk_cover_0152 on public.notifications (announcement_id, organization_id);
+create index if not exists cot_fk_cover_0153 on public.organization_bank_accounts (created_by);
+create index if not exists cot_fk_cover_0154 on public.organization_bank_accounts (branch_id, organization_id);
+create index if not exists cot_fk_cover_0155 on public.organization_feature_overrides (updated_by);
+create index if not exists cot_fk_cover_0156 on public.organizations (created_by);
+create index if not exists cot_fk_cover_0157 on public.payment_attempts (organization_id);
+create index if not exists cot_fk_cover_0158 on public.payment_attempts (donation_id, organization_id);
+create index if not exists cot_fk_cover_0159 on public.payment_provider_configs (provider_id);
+create index if not exists cot_fk_cover_0160 on public.payment_routing_rules (provider_id);
+create index if not exists cot_fk_cover_0161 on public.platform_audit_log (actor_profile_id);
+create index if not exists cot_fk_cover_0162 on public.platform_branding (updated_by);
+create index if not exists cot_fk_cover_0163 on public.platform_feature_flags (updated_by);
+create index if not exists cot_fk_cover_0164 on public.platform_role_assignments (role_code);
+create index if not exists cot_fk_cover_0165 on public.platform_role_assignments (granted_by);
+create index if not exists cot_fk_cover_0166 on public.platform_role_permissions (permission_code);
+create index if not exists cot_fk_cover_0167 on public.platform_secret_metadata (created_by);
+create index if not exists cot_fk_cover_0168 on public.platform_secret_metadata (updated_by);
+create index if not exists cot_fk_cover_0169 on public.platform_user_restrictions (imposed_by);
+create index if not exists cot_fk_cover_0170 on public.platform_user_restrictions (lifted_by);
+create index if not exists cot_fk_cover_0171 on public.prayer_request_recipients (organization_id);
+create index if not exists cot_fk_cover_0172 on public.prayer_request_recipients (prayer_request_id, organization_id);
+create index if not exists cot_fk_cover_0173 on public.prayer_request_recipients (branch_id, organization_id);
+create index if not exists cot_fk_cover_0174 on public.prayer_request_recipients (recipient_membership_id, organization_id);
+create index if not exists cot_fk_cover_0175 on public.prayer_request_routes (prayer_request_id, organization_id);
+create index if not exists cot_fk_cover_0176 on public.prayer_request_routes (branch_id, organization_id);
+create index if not exists cot_fk_cover_0177 on public.prayer_requests (branch_id, organization_id);
+create index if not exists cot_fk_cover_0178 on public.prayer_requests (membership_id, organization_id);
+create index if not exists cot_fk_cover_0179 on public.prayer_requests (public_approved_by);
+create index if not exists cot_fk_cover_0180 on public.profile_posting_controls (updated_by);
+create index if not exists cot_fk_cover_0181 on public.public_capability_assignments (permission_code);
+create index if not exists cot_fk_cover_0182 on public.public_capability_assignments (granted_by);
+create index if not exists cot_fk_cover_0183 on public.public_capability_assignments (updated_by);
+create index if not exists cot_fk_cover_0184 on public.push_devices (profile_id);
+create index if not exists cot_fk_cover_0185 on public.receipts (organization_id);
+create index if not exists cot_fk_cover_0186 on public.receipts (issued_to_profile_id);
+create index if not exists cot_fk_cover_0187 on public.receipts (donation_id, organization_id);
+create index if not exists cot_fk_cover_0188 on public.reconciliation_entries (payment_attempt_id, organization_id);
+create index if not exists cot_fk_cover_0189 on public.reels (id, organization_id);
+create index if not exists cot_fk_cover_0190 on public.reels (media_asset_id, organization_id);
+create index if not exists cot_fk_cover_0191 on public.refunds (organization_id);
+create index if not exists cot_fk_cover_0192 on public.refunds (requested_by);
+create index if not exists cot_fk_cover_0193 on public.refunds (donation_id, organization_id);
+create index if not exists cot_fk_cover_0194 on public.refunds (payment_attempt_id, organization_id);
+create index if not exists cot_fk_cover_0195 on public.role_assignments (granted_by);
+create index if not exists cot_fk_cover_0196 on public.role_assignments (membership_id, organization_id);
+create index if not exists cot_fk_cover_0197 on public.role_assignments (role_id, organization_id);
+create index if not exists cot_fk_cover_0198 on public.role_assignments (branch_id, organization_id);
+create index if not exists cot_fk_cover_0199 on public.role_permissions (permission_code);
+create index if not exists cot_fk_cover_0200 on public.sermon_series (expression_id);
