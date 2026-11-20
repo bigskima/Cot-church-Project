@@ -397,7 +397,7 @@ const checks = [
   [/MediaPreviewModal[\s\S]*typePill[\s\S]*AdaptiveMediaImage[\s\S]*VideoPlayer[\s\S]*AudioPlayer/, 'shared media preview stays type-aware and geometry-aware'],
   [/CompactIdentityBadge[\s\S]*(?:badges\?\.\[0\]|badges\[0\])/, 'creator identity badges are reusable across content surfaces'],
   [/feedIdentityBlock[\s\S]*identityHeader[\s\S]*contextRow[\s\S]*feedBodyBlock/, 'feed post identity stays visually integrated inside the shared post card'],
-  [/GENERAL REELS[\s\S]*Public COT discovery[\s\S]*\/general\/studio\/reel/, 'General Reels carries public identity and direct creation'],
+  [/GENERAL COT REELS[\s\S]*Public short videos from COT[\s\S]*\/general\/studio\/reel/, 'General Reels carries public identity and direct creation'],
   [/GENERAL COT · WATCH[\s\S]*Videos[\s\S]*Reels[\s\S]*Messages[\s\S]*Start watching/, 'General Watch uses a layered public media dashboard'],
   [/visibility: broadcastScope === 'public' \? 'public' : 'branch'/, 'live broadcast destination follows selected scope'],
   [/This livestream will stay inside this Expression/, 'Expression livestream privacy copy'],
