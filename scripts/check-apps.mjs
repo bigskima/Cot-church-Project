@@ -544,7 +544,7 @@ const checks = [
 ];
 
 const boundaryChecks = [
-  [mobilePlatformBoundaryUi, /This screen grants ministry access only[\s\S]*Platform administrator invitations and operations belong only to the separate administration website/, 'General Roles & Access states the ministry/platform boundary'],
+  [mobilePlatformBoundaryUi, /Manage General COT access here[\s\S]*separate Platform Administration website/, 'General Roles & Access states the ministry/platform boundary'],
   [mobilePlatformBoundaryUi, /route: '\/general\/leadership\/titles-badges'[\s\S]*enabled: access\.canManageLeadership/, 'General ministry leadership owns church-wide title management'],
   [mobilePlatformBoundaryUi, /SEPARATE WEB WORKSPACE[\s\S]*Open administration website/, 'legacy mobile Platform Administration routes provide only a web handoff'],
   [mobilePlatformBoundaryUi, /invitation\.kind === 'platform_role'[\s\S]*Open administration website/, 'mobile Platform Administrator invitations provide only the web action'],
