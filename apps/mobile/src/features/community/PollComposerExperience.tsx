@@ -129,7 +129,7 @@ export function PollComposerExperience({ scope, expressionId }: { scope: Scope; 
         {step === 1 ? (
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, shadows.sm]}>
             <InputField label="Question" value={question} onChangeText={setQuestion} placeholder="What should the community decide or respond to?" />
-            <InputField label="Context (optional)" value={description} onChangeText={setDescription} multiline numberOfLines={3} placeholder="Add helpful context…" />
+            <InputField label="Details (optional)" value={description} onChangeText={setDescription} multiline numberOfLines={3} placeholder="Add helpful context…" />
             <View style={styles.sectionLabelRow}><Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>OPTIONS</Text><Text style={[styles.sectionMeta, { color: colors.textMuted }]}>{readyOptions.length} ready</Text></View>
             {options.map((option, index) => <InputField key={index} label={`Option ${index + 1}`} value={option} onChangeText={(value) => setOptions((current) => current.map((item, itemIndex) => itemIndex === index ? value : item))} placeholder={`Choice ${index + 1}`} />)}
             <View style={styles.inlineActions}>

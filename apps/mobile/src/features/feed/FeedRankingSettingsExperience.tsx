@@ -155,7 +155,7 @@ export function FeedRankingSettingsExperience({ scope, expressionId }: { scope: 
       setFeedback(scope === 'expression' ? 'This Expression’s content order settings have been saved.' : 'General COT content order settings have been saved.');
       resource.refresh();
     } catch (value) {
-      setError(value instanceof Error ? value.message : 'Unable to save feed ranking settings.');
+      setError(value instanceof Error ? value.message : 'Unable to save content order settings. Please try again.');
     } finally { setSaving(false); }
   };
 
@@ -174,7 +174,7 @@ export function FeedRankingSettingsExperience({ scope, expressionId }: { scope: 
   };
 
   if (!canManage) {
-    return <EmptyState title="Content order settings unavailable" message="Only COT or Expression leaders with permission can change what appears first." iconName="lock-closed-outline" />;
+    return <EmptyState title="Content order settings unavailable" message="Only COT or Expression leaders with the right access can change what appears first." iconName="lock-closed-outline" />;
   }
 
   return (

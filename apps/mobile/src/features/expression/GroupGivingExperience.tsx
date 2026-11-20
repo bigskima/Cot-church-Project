@@ -102,7 +102,7 @@ export function GroupGivingExperience({ groupId, scope = 'expression' }: { group
   const expressionGiving = useResource<PublicGivingDetails>(
     `group-giving:scope:${organizationId || 'none'}:${expressionId ?? 'general'}`,
     (signal) => {
-      if (!organizationId) return Promise.reject(new Error('Church giving scope is unavailable.'));
+      if (!organizationId) return Promise.reject(new Error('Church giving is not available right now.'));
       const params = new URLSearchParams({ organizationId });
       if (expressionId) params.set('expressionId', expressionId);
       return api.request<PublicGivingDetails>(`public-giving?${params.toString()}`, { signal });

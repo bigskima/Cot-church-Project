@@ -246,7 +246,7 @@ export default function GeneralRolesAccessExperience() {
                   const enabled = activeRoleIds.has(role.id);
                   const owner = role.code === 'owner';
                   return <View key={role.id} style={[styles.roleRow, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><View style={styles.flex}><View style={styles.roleHeading}><Text style={[styles.roleName, { color: colors.text }]}>{role.name}</Text>{role.is_system ? <Badge label="STANDARD" variant="neutral" /> : <Badge label="CUSTOM ROLE" variant="primary" />}{enabled ? <Badge label="ASSIGNED" variant="active" /> : null}</View><Text style={[styles.roleDescription, { color: colors.textSecondary }]}>{role.description || 'Standard COT role'}</Text></View><Button label={enabled ? (owner ? 'Protected' : 'Remove') : 'Assign'} size="sm" variant={enabled ? 'outline' : 'primary'} disabled={!canAssign || owner && enabled || Boolean(busyKey)} loading={busyKey === `role:${role.id}`} onPress={() => void (enabled ? revokeRole(role) : assignRole(role))} /></View>;
-                }) : <EmptyState title="Select a member" message="Their General COT roles and operator access will appear here." iconName="person-circle-outline" />}
+                }) : <EmptyState title="Select a member" message="Their General COT roles and responsibilities will appear here." iconName="person-circle-outline" />}
               </View>
             </View>
           </>

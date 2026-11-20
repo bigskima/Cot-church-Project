@@ -431,7 +431,7 @@ export function CommunityParticipationExperience({ scope, expressionId }: { scop
       <BottomSheet visible={pollComposerOpen} onClose={() => !saving && setPollComposerOpen(false)} title="Create poll" subtitle="Only leaders approved to publish polls can create an official poll here." maxHeightPercent={94}>
         <View style={styles.form}>
           <InputField label="Question" value={question} onChangeText={setQuestion} placeholder="What should the community decide or respond to?" />
-          <InputField label="Context (optional)" value={pollDescription} onChangeText={setPollDescription} multiline numberOfLines={3} placeholder="Add helpful context…" />
+          <InputField label="Details (optional)" value={pollDescription} onChangeText={setPollDescription} multiline numberOfLines={3} placeholder="Add helpful context…" />
           <Text style={[styles.smallLabel, { color: colors.textSecondary }]}>OPTIONS</Text>
           {pollOptions.map((option, index) => <InputField key={index} label={`Option ${index + 1}`} value={option} onChangeText={(value) => setPollOptions((current) => current.map((item, itemIndex) => itemIndex === index ? value : item))} placeholder={`Choice ${index + 1}`} />)}
           <View style={styles.inlineActions}>

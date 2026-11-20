@@ -353,7 +353,7 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
       setAttachments((current) => [...current, ...uploaded].slice(0, attachmentLimit));
     } catch (error) {
       if (uploaded.length) await cleanupAttachments(uploaded);
-      setPostError(error instanceof Error ? error.message : 'Unable to upload selected media.');
+      setPostError(error instanceof Error ? error.message : 'Unable to upload the attachments.');
     } finally {
       setMediaUploading(false);
     }
@@ -386,7 +386,7 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
         webFile: ((asset as any).file as Blob | undefined) ?? null,
       })));
     } catch (error) {
-      setPostError(error instanceof Error ? error.message : 'Unable to choose media.');
+      setPostError(error instanceof Error ? error.message : 'Unable to select attachments.');
       setMediaUploading(false);
     }
   };
@@ -423,7 +423,7 @@ export function CommunityExperience({ scope = 'general', embedded = false }: { s
         body: JSON.stringify({ uploadId: attachment.uploadId }),
       });
     } catch (error) {
-      setPostError(error instanceof Error ? error.message : 'Unable to remove the selected media.');
+      setPostError(error instanceof Error ? error.message : 'Unable to remove the attachment.');
     }
   };
 
