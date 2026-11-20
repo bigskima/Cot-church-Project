@@ -4,14 +4,14 @@ import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   EmptyState,
+  EventCard,
   HeroLiveCard,
   Icon,
+  MediaShelfCard,
   PostCard,
-  ReelCard,
   ResourceError,
   SermonCard,
   Skeleton,
-  VideoCard,
 } from '@/components';
 import { GeneralTopBar } from './GeneralTopBar';
 import { GeneralHomeActionDeck } from './GeneralHomeActionDeck';
@@ -52,13 +52,8 @@ type CommunityPost = SocialPost & {
 };
 type Ranked = { feed_rank?: number; feed_reason?: 'following' | 'continue' | 'popular' | 'recent' };
 type PlaybackBatchEntry = { contentId: string; available: boolean; renditions?: Array<{ kind?: string; playbackUrl?: string; storagePath?: string }>; thumbnails?: Array<{ isPrimary?: boolean; playbackUrl?: string; storagePath?: string }> };
-type StreamUnit =
-  | { key: string; kind: 'post'; post: CommunityPost & Ranked; timestamp: number; rank: number }
-  | { key: string; kind: 'reel'; reel: Reel & Ranked; timestamp: number; rank: number }
-  | { key: string; kind: 'video'; video: Video & Ranked; timestamp: number; rank: number };
-type SectionUnit = { key: string; kind: 'section'; contentKind: 'sermon'; ids: string[] };
-type HomeFeedUnit = StreamUnit | SectionUnit;
-type HomeResource = { payload: HomePayload; plan: FeedPlanRow[] };
+type Announcement = { id: string; title: string; body: string; banner_url?: string | null; published_at?: string | null; created_at?: string | null };
+type HomeResource = { payload: HomePayload; plan: FeedPlanRow[]; announcements: Announcement[] };
 
 function timeValue(value?: string | null) {
   if (!value) return 0;
@@ -70,6 +65,21 @@ function chunks<T>(items: T[], size: number) {
   const result: T[][] = [];
   for (let index = 0; index < items.length; index += size) result.push(items.slice(index, index + size));
   return result;
+}
+
+function idsForPlan(plan: FeedPlanRow[], unitKind: FeedPlanRow['unit_kind'], contentKind: FeedPlanRow['content_kind']) {
+  return plan.filter((row) => row.unit_kind === unitKind && row.content_kind === contentKind).flatMap((row) => row.content_ids ?? []);
+}
+
+function orderByPlan<T extends { id: string }>(items: T[], plannedIds: string[], fallback: (a: T, b: T) => number) {
+  const byId = new Map(items.map((item) => [item.id, item]));
+  const ordered: T[] = [];
+  const seen = new Set<string>();
+  plannedIds.forEach((id) => {
+    const item = byId.get(id);
+    if (item && !seen.has(id)) { ordered.push(item); seen.add(id); }
+  });
+  return [...ordered, ...items.filter((item) => !seen.has(item.id)).sort(fallback)];
 }
 
 function FeedSectionHeading({ eyebrow, title, subtitle, actionLabel, onAction }: { eyebrow: string; title: string; subtitle?: string; actionLabel?: string; onAction?: () => void }) {
@@ -96,10 +106,8 @@ export default function GeneralHomeExperience() {
   const controls = useFeatureControls({ organizationId });
   const accessToken = auth?.session.accessToken ?? null;
   const authenticated = mode === 'authenticated';
-  const wide = width >= 820;
   const contentWidth = Math.min(Math.max(width - spacing.sm * 2, 300), 1120);
-  const reelWidth = Math.max(300, Math.min(wide ? 720 : contentWidth, 720));
-  const homeListRef = useRef<FlatList<HomeFeedUnit>>(null);
+  const homeListRef = useRef<FlatList<CommunityPost>>(null);
 
   const canManageAny = authenticated && (
     hasOrganizationCapability('sermons.create') || hasOrganizationCapability('sermons.manage') ||
@@ -146,16 +154,24 @@ export default function GeneralHomeExperience() {
     }
 
     let plan: FeedPlanRow[] = [];
+    let announcements: Announcement[] = [];
+    let announcementLoadFailed = false;
     if (organizationId) {
       try {
         const supabase = await getRuntimeSupabase(accessToken);
         const planResult = await supabase.rpc('home_feed_layer_plan', { target_organization_id: organizationId, target_expression_id: null, stream_limit: 48, section_batch_size: 6, stream_items_between_sections: 4 });
         if (!planResult.error && Array.isArray(planResult.data)) plan = planResult.data as FeedPlanRow[];
+        if (authenticated) {
+          const announcementResult = await supabase.from('announcements').select('id,title,body,banner_url,published_at,created_at').eq('organization_id', organizationId).is('branch_id', null).eq('status', 'published').order('published_at', { ascending: false, nullsFirst: false }).limit(24);
+          if (announcementResult.error) announcementLoadFailed = true;
+          else announcements = (announcementResult.data ?? []) as Announcement[];
+        }
       } catch {
-        // Edge data remains the fallback when a preview does not expose direct database reads.
+        // Home remains usable when direct layout or announcement reads are unavailable.
       }
     }
-    return { payload, plan };
+    const degradedSections = [...(payload.degradedSections ?? []), ...(announcementLoadFailed && !(payload.degradedSections ?? []).includes('announcements') ? ['announcements'] : [])];
+    return { payload: { ...payload, degradedSections }, plan, announcements };
   });
 
   const lastForegroundRefresh = useRef(0);
@@ -224,6 +240,8 @@ export default function GeneralHomeExperience() {
   const reels = communityAvailable && controls.isEnabled('reels') ? (payload?.reels ?? []) : [];
   const videos = communityAvailable && controls.isEnabled('long_form_video') ? (payload?.videos ?? []) : [];
   const sermons = controls.isEnabled('sermons') ? (payload?.sermons ?? []) : [];
+  const events = controls.isEnabled('events_gatherings') ? (payload?.events ?? []) : [];
+  const announcements = authenticated && controls.isEnabled('announcements') ? (resource.data?.announcements ?? []) : [];
   const degradedSections = payload?.degradedSections ?? [];
   const rankingMode = (resource.data?.plan?.length ?? 0) > 0 || payload?.rankingMode === 'personalized' ? 'personalized' : 'recent';
   const activeStream = useMemo(
@@ -231,39 +249,13 @@ export default function GeneralHomeExperience() {
     [streams],
   );
 
-  const feed = useMemo<HomeFeedUnit[]>(() => {
-    const postMap = new Map(posts.map((item) => [item.id, item]));
-    const reelMap = new Map(reels.map((item) => [item.id, item]));
-    const videoMap = new Map(videos.map((item) => [item.id, item]));
-    const makeStream = (kind: 'post' | 'reel' | 'video', id: string): StreamUnit | null => {
-      if (kind === 'post') { const post = postMap.get(id); return post ? { key: `post:${id}`, kind, post, timestamp: timeValue(post.published_at || (post as any).created_at), rank: (post as CommunityPost & Ranked).feed_rank ?? 0 } : null; }
-      if (kind === 'reel') { const reel = reelMap.get(id); return reel ? { key: `reel:${id}`, kind, reel, timestamp: timeValue((reel.content_items as any)?.published_at || reel.created_at), rank: (reel as Reel & Ranked).feed_rank ?? 0 } : null; }
-      const video = videoMap.get(id); return video ? { key: `video:${id}`, kind, video, timestamp: timeValue((video.content_items as any)?.published_at || video.created_at), rank: (video as Video & Ranked).feed_rank ?? 0 } : null;
-    };
-
-    const databasePlan = resource.data?.plan ?? [];
-    if (databasePlan.length) {
-      return databasePlan.flatMap<HomeFeedUnit>((row, index) => {
-        if (row.unit_kind === 'stream' && ['post', 'reel', 'video'].includes(row.content_kind)) {
-          const stream = makeStream(row.content_kind as 'post' | 'reel' | 'video', row.content_ids?.[0]);
-          return stream ? [stream] : [];
-        }
-        if (row.unit_kind === 'section' && row.content_kind === 'sermon') return [{ key: `section:sermon:${index}:${row.content_ids.join(':')}`, kind: 'section', contentKind: 'sermon', ids: row.content_ids }];
-        return [];
-      });
-    }
-
-    const stream = [...posts.map((post) => makeStream('post', post.id)), ...reels.map((reel) => makeStream('reel', reel.id)), ...videos.map((video) => makeStream('video', video.id))].filter(Boolean) as StreamUnit[];
-    stream.sort((a, b) => b.rank - a.rank || b.timestamp - a.timestamp);
-    const sectionBatches: SectionUnit[] = chunks(sermons.map((item) => item.id), 6)
-      .map((ids, chunkIndex) => ({ key: `fallback:sermon:${chunkIndex}`, kind: 'section' as const, contentKind: 'sermon' as const, ids }));
-    const result: HomeFeedUnit[] = [];
-    let sectionIndex = 0;
-    stream.forEach((item, index) => { result.push(item); if ((index + 1) % 4 === 0 && sectionBatches[sectionIndex]) result.push(sectionBatches[sectionIndex++]); });
-    while (sectionBatches[sectionIndex]) result.push(sectionBatches[sectionIndex++]);
-    return result;
-  }, [posts, reels, resource.data?.plan, sermons, videos]);
-
+  const plan = resource.data?.plan ?? [];
+  const orderedPosts = useMemo(() => orderByPlan(posts, idsForPlan(plan, 'stream', 'post'), (a, b) => ((b as CommunityPost & Ranked).feed_rank ?? 0) - ((a as CommunityPost & Ranked).feed_rank ?? 0) || timeValue(b.published_at || (b as any).created_at) - timeValue(a.published_at || (a as any).created_at)), [plan, posts]);
+  const orderedReels = useMemo(() => orderByPlan(reels, idsForPlan(plan, 'stream', 'reel'), (a, b) => ((b as Reel & Ranked).feed_rank ?? 0) - ((a as Reel & Ranked).feed_rank ?? 0) || timeValue(b.created_at) - timeValue(a.created_at)), [plan, reels]);
+  const orderedVideos = useMemo(() => orderByPlan(videos, idsForPlan(plan, 'stream', 'video'), (a, b) => ((b as Video & Ranked).feed_rank ?? 0) - ((a as Video & Ranked).feed_rank ?? 0) || timeValue(b.created_at) - timeValue(a.created_at)), [plan, videos]);
+  const orderedSermons = useMemo(() => orderByPlan(sermons, idsForPlan(plan, 'section', 'sermon'), (a, b) => timeValue(b.published_at || b.sermon_date) - timeValue(a.published_at || a.sermon_date)), [plan, sermons]);
+  const orderedEvents = useMemo(() => orderByPlan(events, idsForPlan(plan, 'section', 'event'), (a, b) => timeValue(a.starts_at) - timeValue(b.starts_at)), [events, plan]);
+  const orderedAnnouncements = useMemo(() => orderByPlan(announcements, idsForPlan(plan, 'section', 'announcement'), (a, b) => timeValue(b.published_at || b.created_at) - timeValue(a.published_at || a.created_at)), [announcements, plan]);
   const openGeneralComposer = (compose: 'post' | 'audio') => router.push({ pathname: '/general/community', params: { compose, intentId: String(Date.now()) } } as any);
   const openPost = (postId: string, focusComments = false) => router.push({ pathname: '/general/post/[id]', params: { id: postId, scope: 'general', ...(focusComments ? { focus: 'comments' } : {}) } } as any);
 
@@ -276,62 +268,69 @@ export default function GeneralHomeExperience() {
     try { const result = await api.request<{ bookmarked: boolean }>('engagement', { method: 'POST', context: 'public', body: JSON.stringify({ action: 'bookmark', contentId: postId }) }); return result.bookmarked === !currentlySaved; } catch { return false; }
   };
 
-  const renderSection = (unit: SectionUnit) => {
-    const sermonMap = new Map(sermons.map((item) => [item.id, item]));
-    return (
-      <View style={[styles.discoverySection, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
-        <View style={styles.discoveryHeadingRow}>
-          <View style={[styles.discoveryIcon, { backgroundColor: colors.primarySoft }]}><Icon name="book-outline" size={18} color={colors.interactive} /></View>
-          <View style={styles.flex}>
-            <Text style={[styles.discoveryEyebrow, { color: colors.interactive }]}>WATCH · LISTEN · STUDY</Text>
-            <Text style={[styles.discoveryTitle, { color: colors.text }]}>Messages for the week</Text>
-            <Text style={[styles.discoverySubtitle, { color: colors.textMuted }]}>Watch, listen to and study recent messages from COT.</Text>
-          </View>
-          <Pressable onPress={() => router.push('/general/sermons' as any)} style={({ pressed }) => [styles.viewAllButton, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, pressed && styles.pressed]}>
-            <Text style={[styles.viewAllText, { color: colors.text }]}>View all</Text><Icon name="arrow-forward" size={14} color={colors.interactive} />
-          </Pressable>
-        </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalContent}>
-          {unit.ids.map((id) => {
-            const sermon = sermonMap.get(id);
-            if (!sermon) return null;
-            const isPastorMessage = sermon.is_pastor_message === true;
-            return (
-              <View key={id} style={styles.discoveryCardWidth}>
-                <SermonCard
-                  sermon={sermon}
-                  variant="discovery"
-                  onPress={() => router.push(
-                    (isPastorMessage
-                      ? `/general/pastor-messages/${sermon.id}`
-                      : `/general/sermon/${sermon.id}`) as any,
-                  )}
-                />
-              </View>
-            );
-          })}
-        </ScrollView>
-      </View>
-    );
-  };
+  const renderMessagesShelf = () => orderedSermons.length ? (
+    <View style={[styles.shelf, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+      <FeedSectionHeading eyebrow="WATCH · LISTEN · STUDY" title="Messages for the week" actionLabel="View all" onAction={() => router.push('/general/sermons' as any)} />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalContent}>
+        {orderedSermons.slice(0, 6).map((sermon) => <View key={sermon.id} style={styles.discoveryCardWidth}><SermonCard sermon={sermon} variant="discovery" onPress={() => router.push((sermon.is_pastor_message ? `/general/pastor-messages/${sermon.id}` : `/general/sermon/${sermon.id}`) as any)} /></View>)}
+      </ScrollView>
+    </View>
+  ) : null;
 
+  const renderReelsShelf = () => orderedReels.length ? (
+    <View style={[styles.shelf, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+      <FeedSectionHeading eyebrow="SHORT VIDEOS" title="Reels from COT" subtitle="A quick look at recent short videos." actionLabel="Watch Reels" onAction={() => router.push('/general/reels' as any)} />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalContent}>
+        {orderedReels.slice(0, 8).map((reel) => <MediaShelfCard key={reel.id} label="REEL" title={reel.caption?.trim() || 'Watch this Reel'} subtitle={reel.content_items?.author?.display_name || reel.content_items?.organization?.name || 'COT member'} meta={reel.views_count ? `${reel.views_count.toLocaleString()} views` : undefined} thumbnailUrl={reel.media_assets?.thumbnailUrl || reel.media_assets?.thumbnails?.find((item) => item.is_primary)?.playbackUrl} width={146} aspectRatio={0.78} onPress={() => router.push({ pathname: '/general/reels', params: { reelId: reel.id } } as any)} />)}
+      </ScrollView>
+    </View>
+  ) : null;
+
+  const renderVideosShelf = () => orderedVideos.length ? (
+    <View style={[styles.shelf, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+      <FeedSectionHeading eyebrow="WATCH" title="More to watch" subtitle="Longer videos shared by the COT community." actionLabel="View all" onAction={() => router.push('/general/watch' as any)} />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalContent}>
+        {orderedVideos.slice(0, 6).map((video) => <MediaShelfCard key={video.id} label="WATCH" title={video.title} subtitle={video.content_items?.author?.display_name || video.content_items?.organization?.name || 'COT'} meta={video.category?.replace(/_/g, ' ')} thumbnailUrl={video.media_assets?.thumbnailUrl || video.media_assets?.thumbnails?.find((item) => item.is_primary)?.playbackUrl} width={238} aspectRatio={16 / 9} onPress={() => router.push(`/general/watch/${video.id}` as any)} />)}
+      </ScrollView>
+    </View>
+  ) : null;
+
+  const renderEventsShelf = () => orderedEvents.length ? (
+    <View style={[styles.shelf, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+      <FeedSectionHeading eyebrow="GATHER TOGETHER" title="Upcoming events" actionLabel="See all" onAction={() => router.push('/general/events' as any)} />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalContent}>
+        {orderedEvents.slice(0, 6).map((event) => <View key={event.id} style={styles.discoveryCardWidth}><EventCard event={event} variant="discovery" onPress={() => router.push(`/general/event/${event.id}` as any)} /></View>)}
+      </ScrollView>
+    </View>
+  ) : null;
+
+  const renderAnnouncementsShelf = () => orderedAnnouncements.length ? (
+    <View style={[styles.shelf, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}>
+      <FeedSectionHeading eyebrow="OFFICIAL UPDATES" title="Announcements" actionLabel="See all" onAction={() => router.push('/general/announcements' as any)} />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalContent}>
+        {orderedAnnouncements.slice(0, 5).map((announcement) => <Pressable key={announcement.id} onPress={() => router.push({ pathname: '/general/announcements', params: { announcementId: announcement.id } } as any)} style={({ pressed }) => [styles.announcementCard, { backgroundColor: colors.card, borderColor: colors.borderSubtle }, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel={`Open announcement: ${announcement.title}`}>
+          <View style={[styles.announcementIcon, { backgroundColor: colors.primarySoft }]}><Icon name="megaphone-outline" size={18} color={colors.interactive} /></View>
+          <Text style={[styles.announcementTitle, { color: colors.text }]} numberOfLines={2}>{announcement.title}</Text>
+          <Text style={[styles.announcementBody, { color: colors.textSecondary }]} numberOfLines={4}>{announcement.body}</Text>
+          <View style={styles.announcementFooter}><Text style={[styles.announcementLink, { color: colors.interactive }]}>Read announcement</Text><Icon name="arrow-forward" size={13} color={colors.interactive} /></View>
+        </Pressable>)}
+      </ScrollView>
+    </View>
+  ) : null;
   const header = (
     <View style={[styles.headerContent, { width: contentWidth }]}>
       <GeneralHomeActionDeck />
-      <TourAnchor targetKey="general.home.spotlight" reveal={() => homeListRef.current?.scrollToOffset({ offset: 0, animated: true })}>
-        <GeneralHomeSpotlightCarousel />
-      </TourAnchor>
-
+      <TourAnchor targetKey="general.home.spotlight" reveal={() => homeListRef.current?.scrollToOffset({ offset: 0, animated: true })}><GeneralHomeSpotlightCarousel /></TourAnchor>
       {degradedSections.length ? <Pressable onPress={refreshHome} style={[styles.degradedBanner, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><View style={[styles.degradedIcon, { backgroundColor: colors.card }]}><Icon name="refresh-outline" size={16} color={colors.interactive} /></View><View style={styles.flex}><Text style={[styles.degradedTitle, { color: colors.text }]}>Some updates have not loaded yet</Text><Text style={[styles.degradedText, { color: colors.textMuted }]}>You can keep using Home. Tap here to try loading the missing content again.</Text></View></Pressable> : null}
       {activeStream ? <View style={styles.liveSection}><FeedSectionHeading eyebrow={activeStream.status === 'live' ? 'LIVE NOW' : 'NEXT LIVE'} title={activeStream.status === 'live' ? 'Join what is happening now' : 'Coming up live'} subtitle="Watch the live broadcast right here on Home." actionLabel="Live" onAction={() => router.push('/general/live' as any)} /><HeroLiveCard stream={activeStream} onPress={() => router.push(`/general/live/${activeStream.id}` as any)} /></View> : null}
-
-      {feed.length ? (
-        <TourAnchor targetKey="general.home.feed" reveal={() => homeListRef.current?.scrollToOffset({ offset: 220, animated: true })}>
-          <FeedSectionHeading eyebrow="COMMUNITY" title={rankingMode === 'personalized' ? 'For you' : 'Latest from COT'} actionLabel="Discover" onAction={() => router.push('/general/explore')} />
-        </TourAnchor>
-      ) : null}
+      {renderMessagesShelf()}
+      {renderReelsShelf()}
+      {renderVideosShelf()}
+      <TourAnchor targetKey="general.home.feed" reveal={() => homeListRef.current?.scrollToOffset({ offset: 0, animated: true })}><FeedSectionHeading eyebrow="COMMUNITY" title={rankingMode === 'personalized' ? 'For you' : 'Latest from COT'} subtitle="Posts shared by the COT community." actionLabel="Discover" onAction={() => router.push('/general/explore')} /></TourAnchor>
     </View>
   );
+
+  const footer = <View style={[styles.footerContent, { width: contentWidth }]}>{renderEventsShelf()}{renderAnnouncementsShelf()}</View>;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -343,46 +342,28 @@ export default function GeneralHomeExperience() {
       ) : (
         <FlatList
           ref={homeListRef}
-          data={feed}
-          keyExtractor={(item) => item.key}
+          data={orderedPosts}
+          keyExtractor={(item) => `post:${item.id}`}
           showsVerticalScrollIndicator={false}
           nestedScrollEnabled
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           ListHeaderComponent={header}
-          ListEmptyComponent={<View style={[styles.emptyHome, { width: contentWidth }]}><EmptyState title="Nothing to show just yet" message="New sermons, videos and community posts will appear here. Events and announcements are highlighted above." iconName="home-outline" /></View>}
+          ListEmptyComponent={<View style={[styles.emptyHome, { width: contentWidth }]}><EmptyState title="No community posts yet" message="New posts from COT members will appear here. Messages, Reels, events and announcements have their own sections above and below." iconName="chatbubbles-outline" /></View>}
+          ListFooterComponent={footer}
           contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, spacing.md) + spacing.lg }}
           refreshControl={<RefreshControl refreshing={resource.refreshing} onRefresh={refreshHome} tintColor={colors.interactive} colors={[colors.interactive]} progressBackgroundColor={colors.card} />}
-          renderItem={({ item }) => {
-            if (item.kind === 'section') return <View style={[styles.fullWidthItem, { width: contentWidth }]}>{renderSection(item)}</View>;
-            if (item.kind === 'post') return <View style={[styles.timelineItem, { width: Math.min(contentWidth, 920) }]}><PostCard post={item.post} expressionName={item.post.expression?.name} canEngage={authenticated} allowExternalShare={item.post.visibility === 'public'} onPressAuthor={item.post.author?.username ? () => router.push({ pathname: '/general/member/[username]', params: { username: item.post.author!.username! } } as any) : undefined} onPress={() => openPost(item.post.id)} onReply={controls.isEnabled('comments') ? () => openPost(item.post.id, true) : undefined} onReact={authenticated && controls.isEnabled('reactions') ? (reaction) => reactToPost(item.post.id, reaction) : undefined} onBookmark={authenticated && controls.isEnabled('bookmarks') ? (currentlySaved) => bookmarkPost(item.post.id, currentlySaved) : undefined} variant="feed" showContext={false} style={styles.homePostCard} /></View>;
-            if (item.kind === 'reel') return <View style={[styles.timelineItem, { width: Math.min(contentWidth, 920) }]}><ReelCard reel={item.reel} width={reelWidth} variant="feed" commentContext="public" onPressCreator={item.reel.content_items?.author?.username ? () => router.push({ pathname: '/general/member/[username]', params: { username: item.reel.content_items!.author!.username! } } as any) : undefined} onPress={() => router.push({ pathname: '/general/reels', params: { reelId: item.reel.id } } as any)} onOpenComments={item.reel.content_items?.id ? () => router.push({ pathname: '/general/comments/[contentId]', params: { contentId: item.reel.content_items!.id } } as any) : undefined} /></View>;
-            return <View style={[styles.timelineItem, { width: Math.min(contentWidth, 920) }]}><VideoCard video={item.video} variant="feed" commentContext="public" onPress={() => router.push(`/general/watch/${item.video.id}` as any)} onPressCreator={item.video.content_items?.author?.username ? () => router.push({ pathname: '/general/member/[username]', params: { username: item.video.content_items!.author!.username! } } as any) : undefined} onOpenComments={item.video.content_items?.id ? () => router.push({ pathname: '/general/comments/[contentId]', params: { contentId: item.video.content_items!.id } } as any) : undefined} /></View>;
-          }}
+          renderItem={({ item }) => <View style={[styles.timelineItem, { width: Math.min(contentWidth, 920) }]}><PostCard post={item} expressionName={item.expression?.name} canEngage={authenticated} allowExternalShare={item.visibility === 'public'} onPressAuthor={item.author?.username ? () => router.push({ pathname: '/general/member/[username]', params: { username: item.author!.username! } } as any) : undefined} onPress={() => openPost(item.id)} onReply={controls.isEnabled('comments') ? () => openPost(item.id, true) : undefined} onReact={authenticated && controls.isEnabled('reactions') ? (reaction) => reactToPost(item.id, reaction) : undefined} onBookmark={authenticated && controls.isEnabled('bookmarks') ? (currentlySaved) => bookmarkPost(item.id, currentlySaved) : undefined} variant="feed" showContext={false} style={styles.homePostCard} /></View>}
         />
       )}
-
-      {authenticated ? (
-        <Pressable
-          onPress={() => openGeneralComposer('post')}
-          accessibilityRole="button"
-          accessibilityLabel="Create"
-          style={({ pressed }) => [
-            styles.createFab,
-            { bottom: Math.max(insets.bottom, 8) + 14, backgroundColor: colors.interactive },
-            pressed && styles.createFabPressed,
-          ]}
-        >
-          <Icon name="add" size={28} color="#FFFFFF" />
-        </Pressable>
-      ) : null}
+      {authenticated ? <Pressable onPress={() => openGeneralComposer('post')} accessibilityRole="button" accessibilityLabel="Create" style={({ pressed }) => [styles.createFab, { bottom: Math.max(insets.bottom, 8) + 14, backgroundColor: colors.interactive }, pressed && styles.createFabPressed]}><Icon name="add" size={28} color="#FFFFFF" /></Pressable> : null}
     </View>
   );
 }
-
 const styles = StyleSheet.create({
   screen: { flex: 1 }, flex: { flex: 1, minWidth: 0 },
   headerContent: { alignSelf: 'center', paddingTop: spacing.sm, gap: spacing.md },
+  footerContent: { alignSelf: 'center', paddingTop: spacing.lg, gap: spacing.md },
   loadingContainer: { alignSelf: 'center', paddingTop: spacing.md, gap: spacing.md },
   errorWrap: { alignSelf: 'center', paddingTop: spacing.xl },
   fullWidthItem: { alignSelf: 'center', marginTop: spacing.md },
@@ -397,6 +378,13 @@ const styles = StyleSheet.create({
   headingAction: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 4 }, headingActionText: { fontSize: 10.5, fontWeight: '900' },
   degradedBanner: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }, degradedIcon: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, degradedTitle: { fontSize: 12.5, fontWeight: '900' }, degradedText: { fontSize: 10.5, lineHeight: 15, marginTop: 2 },
   liveSection: { gap: spacing.sm },
+  shelf: { borderWidth: 1, borderRadius: radius.xxl, paddingVertical: spacing.md, paddingHorizontal: spacing.md, gap: spacing.md, overflow: 'hidden' },
+  announcementCard: { width: 270, minHeight: 174, borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm },
+  announcementIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  announcementTitle: { fontSize: 14, lineHeight: 19, fontWeight: '900' },
+  announcementBody: { fontSize: 11, lineHeight: 16 },
+  announcementFooter: { marginTop: 'auto', flexDirection: 'row', alignItems: 'center', gap: 5 },
+  announcementLink: { fontSize: 10.5, fontWeight: '900' },
   discoverySection: { borderWidth: 1, borderRadius: radius.xxl, paddingVertical: spacing.lg, overflow: 'hidden' },
   discoveryHeadingRow: { paddingHorizontal: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   discoveryIcon: { width: 42, height: 42, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
