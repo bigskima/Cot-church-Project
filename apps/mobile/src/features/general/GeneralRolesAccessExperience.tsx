@@ -81,6 +81,10 @@ function roleForAssignment(assignment: RoleAssignment) {
   return one(assignment.role);
 }
 
+function roleCodeFromName(value: string) {
+  return value.trim().toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'custom_role';
+}
+
 export default function GeneralRolesAccessExperience() {
   const insets = useSafeAreaInsets();
   const { api, context, hasOrganizationCapability, mode } = useSession();
@@ -178,13 +182,13 @@ export default function GeneralRolesAccessExperience() {
   };
 
   const createRole = async () => {
-    if (!canManage || !roleName.trim() || !roleCode.trim() || busyKey) return;
+    if (!canManage || !roleName.trim() || busyKey) return;
     setBusyKey('create-role'); setError(''); setNotice('');
     try {
       await api.request('roles', {
         method: 'POST',
         body: JSON.stringify({
-          code: roleCode.trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, ''),
+          code: roleCode.trim() || roleCodeFromName(roleName),
           name: roleName.trim(),
           description: roleDescription.trim(),
           permissionCodes: selectedPermissions,
@@ -253,15 +257,14 @@ export default function GeneralRolesAccessExperience() {
         <View style={styles.form}>
           <Text style={[styles.fieldTitle, { color: colors.textSecondary }]}>START FROM A PRESET</Text>
           <View style={styles.chips}>{rolePresets.map((preset) => <Chip key={preset.key} label={preset.name} selected={roleCode === preset.key} onPress={() => applyPreset(preset.key)} />)}</View>
-          <InputField label="Role name" value={roleName} onChangeText={setRoleName} placeholder="General Content Operator" />
-          <InputField label="Reference name" value={roleCode} onChangeText={setRoleCode} autoCapitalize="none" placeholder="content_operator" helperText="A short name used to identify this role. Use lowercase letters, numbers and underscores." />
+          <InputField label="Role name" value={roleName} onChangeText={(value) => { setRoleName(value); setRoleCode(''); }} placeholder="General Content Operator" />
           <InputField label="Description" value={roleDescription} onChangeText={setRoleDescription} multiline numberOfLines={3} placeholder="What this operator is responsible for" />
           <Text style={[styles.fieldTitle, { color: colors.textSecondary }]}>ACCESS & RESPONSIBILITIES</Text>
           <View style={styles.permissionList}>{assignablePermissions.map((permission) => {
             const selected = selectedPermissions.includes(permission.code);
             return <Pressable key={permission.code} onPress={() => setSelectedPermissions((current) => selected ? current.filter((code) => code !== permission.code) : [...current, permission.code])} style={[styles.permissionRow, { backgroundColor: selected ? colors.primarySoft : colors.bgSecondary, borderColor: selected ? colors.interactive : colors.borderSubtle }]}><View style={styles.flex}><Text style={[styles.permissionName, { color: colors.text }]}>{permission.name}</Text><Text style={[styles.permissionMeta, { color: colors.textMuted }]}>{permission.description}</Text></View><Icon name={selected ? 'checkbox' : 'square-outline'} size={20} color={selected ? colors.interactive : colors.textMuted} /></Pressable>;
           })}</View>
-          <Button label="Create role" fullWidth size="lg" loading={busyKey === 'create-role'} disabled={!roleName.trim() || !roleCode.trim() || Boolean(busyKey && busyKey !== 'create-role')} onPress={() => void createRole()} />
+          <Button label="Create role" fullWidth size="lg" loading={busyKey === 'create-role'} disabled={!roleName.trim() || Boolean(busyKey && busyKey !== 'create-role')} onPress={() => void createRole()} />
         </View>
       </BottomSheet>
     </View>
