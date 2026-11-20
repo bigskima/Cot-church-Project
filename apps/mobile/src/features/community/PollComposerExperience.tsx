@@ -81,8 +81,8 @@ export function PollComposerExperience({ scope, expressionId }: { scope: Scope; 
       <View style={[styles.screen, { backgroundColor: colors.bg }]}>
         <View style={styles.pad}>
           <EmptyState
-            title="Poll publishing is restricted"
-            message="Official polls can be created only by an authorized ministry role in this space."
+            title="Only approved leaders can publish polls"
+            message="Only leaders approved to publish polls can create an official poll here."
             iconName="lock-closed-outline"
             actionLabel="Back to participation"
             onAction={() => router.replace(backDestination as any)}

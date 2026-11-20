@@ -422,13 +422,13 @@ export function CommunityParticipationExperience({ scope, expressionId }: { scop
         </View>
 
         {resource.loading && !resource.data ? <Skeleton height={170} count={3} /> : resource.error && !resource.data ? <ResourceError message={resource.error} retry={resource.refresh} /> : tab === 'polls' ? (
-          polls.length ? <View style={styles.stack}>{polls.map(renderPoll)}</View> : <EmptyState title="No polls yet" message={canCreatePoll ? 'Create the first official poll for this space.' : 'Authorized leaders can publish polls here.'} iconName="stats-chart-outline" />
+          polls.length ? <View style={styles.stack}>{polls.map(renderPoll)}</View> : <EmptyState title="No polls yet" message={canCreatePoll ? 'Create the first poll for this community.' : scope === 'expression' ? 'Expression leaders can publish polls here.' : 'COT leaders can publish polls here.'} iconName="stats-chart-outline" />
         ) : mode !== 'authenticated' ? (
           <EmptyState title="Sign in for giveaways" message="Giveaways are a member participation feature." iconName="gift-outline" actionLabel="Sign in" onAction={() => router.push({ pathname: '/(auth)/login', params: { returnTo: scope === 'general' ? '/general/participate' : `/expressions/${branchId}/participate` } } as any)} />
         ) : giveaways.length ? <View style={styles.stack}>{giveaways.map(renderGiveaway)}</View> : <EmptyState title="No giveaways yet" message="Any member can host a giveaway and record the selected winners here." iconName="gift-outline" actionLabel={canHostGiveaway ? 'Host giveaway' : undefined} onAction={canHostGiveaway ? () => setGiveawayComposerOpen(true) : undefined} />}
       </ScrollView>
 
-      <BottomSheet visible={pollComposerOpen} onClose={() => !saving && setPollComposerOpen(false)} title="Create poll" subtitle="Official polls require poll publishing permission." maxHeightPercent={94}>
+      <BottomSheet visible={pollComposerOpen} onClose={() => !saving && setPollComposerOpen(false)} title="Create poll" subtitle="Only leaders approved to publish polls can create an official poll here." maxHeightPercent={94}>
         <View style={styles.form}>
           <InputField label="Question" value={question} onChangeText={setQuestion} placeholder="What should the community decide or respond to?" />
           <InputField label="Context (optional)" value={pollDescription} onChangeText={setPollDescription} multiline numberOfLines={3} placeholder="Add helpful context…" />

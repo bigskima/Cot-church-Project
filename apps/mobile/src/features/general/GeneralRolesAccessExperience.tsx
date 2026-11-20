@@ -192,7 +192,7 @@ export default function GeneralRolesAccessExperience() {
       });
       setRoleComposerOpen(false);
       setRoleName(''); setRoleCode(''); setRoleDescription(''); setSelectedPermissions([]);
-      setNotice('General COT operator role created. You can now assign it to members.');
+      setNotice('COT ministry role created. You can now assign it to members.');
       await refreshAll();
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to create this role.');
@@ -200,20 +200,20 @@ export default function GeneralRolesAccessExperience() {
   };
 
   if (!organization) {
-    return <View style={[styles.center, { backgroundColor: colors.bg }]}><EmptyState title="Choose a church" message="General COT roles are managed inside a church organization." iconName="business-outline" /></View>;
+    return <View style={[styles.center, { backgroundColor: colors.bg }]}><EmptyState title="Open your church" message="Open General COT under your church before managing ministry access." iconName="business-outline" /></View>;
   }
   if (!canRead) {
-    return <View style={[styles.center, { backgroundColor: colors.bg }]}><EmptyState title="Role management unavailable" message="Your role does not include access to manage church roles." iconName="lock-closed-outline" /></View>;
+    return <View style={[styles.center, { backgroundColor: colors.bg }]}><EmptyState title="Role settings unavailable" message="You need the right COT role to manage church roles." iconName="lock-closed-outline" /></View>;
   }
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + 100 }]}>
-        <ScreenHeader title="Roles & Access" kicker="GENERAL COT · ADMIN" subtitle="Give people the exact church-wide ministry responsibilities they need without leaking Expression or platform authority." showBack rightAction={canManage ? <Button label="New role" size="sm" onPress={() => setRoleComposerOpen(true)} /> : undefined} />
+        <ScreenHeader title="Roles & Access" kicker="GENERAL COT · ADMIN" subtitle="Give people the right responsibilities for General COT without granting access to private Expressions or Platform Administration." showBack rightAction={canManage ? <Button label="New role" size="sm" onPress={() => setRoleComposerOpen(true)} /> : undefined} />
 
         <View style={[styles.scopeCard, { backgroundColor: colors.primarySoft, borderColor: colors.borderSubtle }]}>
           <Icon name="shield-checkmark-outline" size={20} color={colors.interactive} />
-          <View style={styles.flex}><Text style={[styles.scopeTitle, { color: colors.text }]}>This screen grants ministry access only</Text><Text style={[styles.scopeText, { color: colors.textSecondary }]}>General COT roles control church-wide ministry work. Expression roles stay inside an Expression. Platform administrator invitations and operations belong only to the separate administration website.</Text></View>
+          <View style={styles.flex}><Text style={[styles.scopeTitle, { color: colors.text }]}>Manage General COT access here</Text><Text style={[styles.scopeText, { color: colors.textSecondary }]}>These roles give access to church-wide COT work. They do not grant access to private Expressions or the separate Platform Administration website.</Text></View>
         </View>
 
         {notice ? <Pressable onPress={() => setNotice('')} style={[styles.notice, { backgroundColor: colors.successSoft, borderColor: colors.success }]}><Icon name="checkmark-circle" size={18} color={colors.success} /><Text style={[styles.noticeText, { color: colors.success }]}>{notice}</Text></Pressable> : null}
@@ -241,7 +241,7 @@ export default function GeneralRolesAccessExperience() {
                 {selectedMembership ? roles.map((role) => {
                   const enabled = activeRoleIds.has(role.id);
                   const owner = role.code === 'owner';
-                  return <View key={role.id} style={[styles.roleRow, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><View style={styles.flex}><View style={styles.roleHeading}><Text style={[styles.roleName, { color: colors.text }]}>{role.name}</Text>{role.is_system ? <Badge label="SYSTEM" variant="neutral" /> : <Badge label="CUSTOM" variant="primary" />}{enabled ? <Badge label="ASSIGNED" variant="active" /> : null}</View><Text style={[styles.roleDescription, { color: colors.textSecondary }]}>{role.description || role.code}</Text></View><Button label={enabled ? (owner ? 'Protected' : 'Remove') : 'Assign'} size="sm" variant={enabled ? 'outline' : 'primary'} disabled={!canAssign || owner && enabled || Boolean(busyKey)} loading={busyKey === `role:${role.id}`} onPress={() => void (enabled ? revokeRole(role) : assignRole(role))} /></View>;
+                  return <View key={role.id} style={[styles.roleRow, { backgroundColor: colors.bgSecondary, borderColor: colors.borderSubtle }]}><View style={styles.flex}><View style={styles.roleHeading}><Text style={[styles.roleName, { color: colors.text }]}>{role.name}</Text>{role.is_system ? <Badge label="STANDARD" variant="neutral" /> : <Badge label="CUSTOM ROLE" variant="primary" />}{enabled ? <Badge label="ASSIGNED" variant="active" /> : null}</View><Text style={[styles.roleDescription, { color: colors.textSecondary }]}>{role.description || 'Standard COT role'}</Text></View><Button label={enabled ? (owner ? 'Protected' : 'Remove') : 'Assign'} size="sm" variant={enabled ? 'outline' : 'primary'} disabled={!canAssign || owner && enabled || Boolean(busyKey)} loading={busyKey === `role:${role.id}`} onPress={() => void (enabled ? revokeRole(role) : assignRole(role))} /></View>;
                 }) : <EmptyState title="Select a member" message="Their General COT roles and operator access will appear here." iconName="person-circle-outline" />}
               </View>
             </View>
@@ -249,17 +249,17 @@ export default function GeneralRolesAccessExperience() {
         )}
       </ScrollView>
 
-      <BottomSheet visible={roleComposerOpen} onClose={() => { if (!busyKey) setRoleComposerOpen(false); }} title="Create General COT role" subtitle="Reusable operator permissions" maxHeightPercent={95}>
+      <BottomSheet visible={roleComposerOpen} onClose={() => { if (!busyKey) setRoleComposerOpen(false); }} title="Create General COT role" subtitle="Choose what people with this role can do." maxHeightPercent={95}>
         <View style={styles.form}>
           <Text style={[styles.fieldTitle, { color: colors.textSecondary }]}>START FROM A PRESET</Text>
           <View style={styles.chips}>{rolePresets.map((preset) => <Chip key={preset.key} label={preset.name} selected={roleCode === preset.key} onPress={() => applyPreset(preset.key)} />)}</View>
           <InputField label="Role name" value={roleName} onChangeText={setRoleName} placeholder="General Content Operator" />
-          <InputField label="Role code" value={roleCode} onChangeText={setRoleCode} autoCapitalize="none" placeholder="general_content_operator" helperText="Stable internal code; lowercase letters, numbers and underscores work best." />
+          <InputField label="Reference name" value={roleCode} onChangeText={setRoleCode} autoCapitalize="none" placeholder="content_operator" helperText="A short name used to identify this role. Use lowercase letters, numbers and underscores." />
           <InputField label="Description" value={roleDescription} onChangeText={setRoleDescription} multiline numberOfLines={3} placeholder="What this operator is responsible for" />
-          <Text style={[styles.fieldTitle, { color: colors.textSecondary }]}>PERMISSIONS</Text>
+          <Text style={[styles.fieldTitle, { color: colors.textSecondary }]}>ACCESS & RESPONSIBILITIES</Text>
           <View style={styles.permissionList}>{assignablePermissions.map((permission) => {
             const selected = selectedPermissions.includes(permission.code);
-            return <Pressable key={permission.code} onPress={() => setSelectedPermissions((current) => selected ? current.filter((code) => code !== permission.code) : [...current, permission.code])} style={[styles.permissionRow, { backgroundColor: selected ? colors.primarySoft : colors.bgSecondary, borderColor: selected ? colors.interactive : colors.borderSubtle }]}><View style={styles.flex}><Text style={[styles.permissionName, { color: colors.text }]}>{permission.name}</Text><Text style={[styles.permissionMeta, { color: colors.textMuted }]}>{permission.category} · {permission.code}</Text></View><Icon name={selected ? 'checkbox' : 'square-outline'} size={20} color={selected ? colors.interactive : colors.textMuted} /></Pressable>;
+            return <Pressable key={permission.code} onPress={() => setSelectedPermissions((current) => selected ? current.filter((code) => code !== permission.code) : [...current, permission.code])} style={[styles.permissionRow, { backgroundColor: selected ? colors.primarySoft : colors.bgSecondary, borderColor: selected ? colors.interactive : colors.borderSubtle }]}><View style={styles.flex}><Text style={[styles.permissionName, { color: colors.text }]}>{permission.name}</Text><Text style={[styles.permissionMeta, { color: colors.textMuted }]}>{permission.description}</Text></View><Icon name={selected ? 'checkbox' : 'square-outline'} size={20} color={selected ? colors.interactive : colors.textMuted} /></Pressable>;
           })}</View>
           <Button label="Create role" fullWidth size="lg" loading={busyKey === 'create-role'} disabled={!roleName.trim() || !roleCode.trim() || Boolean(busyKey && busyKey !== 'create-role')} onPress={() => void createRole()} />
         </View>

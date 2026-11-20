@@ -67,7 +67,7 @@ export default function GeneralMinistryWorkspace() {
   if (mode !== 'authenticated') {
     return (
       <View style={[styles.screen, styles.centered, { backgroundColor: colors.bg }]}>
-        <EmptyState title="Sign in for ministry tools" message="Ministry access is tied to your COT roles." iconName="shield-checkmark-outline" />
+        <EmptyState title="Sign in for ministry tools" message="Sign in with the account that has your COT ministry access." iconName="shield-checkmark-outline" />
         <Button label="Sign in" onPress={() => router.push({ pathname: '/(auth)/login', params: { returnTo: '/general/leadership' } } as any)} />
       </View>
     );
@@ -114,7 +114,7 @@ export default function GeneralMinistryWorkspace() {
           </View>
         ) : !hasWorkspaceAccess ? (
           <View style={styles.noAccess}>
-            <EmptyState title="No ministry tools assigned" message="Tools appear when your ministry role grants access." iconName="shield-outline" />
+            <EmptyState title="No ministry tools available" message="Your COT responsibilities determine which tools you can use." iconName="shield-outline" />
             <Button label="Back to You" variant="outline" onPress={() => router.replace('/general/profile')} />
           </View>
         ) : (
